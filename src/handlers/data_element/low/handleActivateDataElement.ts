@@ -6,6 +6,7 @@
 
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,14 @@ export async function handleActivateDataElement(
   return answer(
     { tool: 'ActivateDataElementLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDataElement(resultsFor(dataElementDocuments))
-        .activate({ dataElementName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'dataElement.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getDataElement(resultsFor(dataElementDocuments))
+          .activate(
+            { dataElementName },
+            { headers, analyse: analyseActivation },
+          ),
+      ),
     project(detail, terseActivation),
   );
 }

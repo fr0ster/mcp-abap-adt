@@ -37,6 +37,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -230,28 +231,34 @@ export async function handleUpdateDataElement(
               ),
             ),
             atStep('update metadata', (current) =>
-              obj.updateMetadata(
-                {
-                  dataElementName,
-                  transportRequest: args.transport_request,
-                },
-                {
-                  source: patchDataElementXml(
-                    extractXmlString(
-                      current.raw,
-                      `data element ${dataElementName}`,
+              withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
+                obj.updateMetadata(
+                  {
+                    dataElementName,
+                    transportRequest: args.transport_request,
+                  },
+                  {
+                    headers,
+                    source: patchDataElementXml(
+                      extractXmlString(
+                        current.raw,
+                        `data element ${dataElementName}`,
+                      ),
+                      changes,
                     ),
-                    changes,
-                  ),
-                  lockHandle,
-                  analyse: analyseException,
-                },
+                    lockHandle,
+                    analyse: analyseException,
+                  },
+                ),
               ),
             ),
             atStep('check', () =>
-              obj.check({ dataElementName }, undefined, {
-                analyse: analyseException,
-              }),
+              withAdtHeaders(context, 'dataElement.check', (headers) =>
+                obj.check({ dataElementName }, undefined, {
+                  headers,
+                  analyse: analyseException,
+                }),
+              ),
             ),
           ),
         (lockHandle) =>
@@ -279,7 +286,12 @@ export async function handleUpdateDataElement(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ dataElementName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'dataElement.activate', (headers) =>
+            obj.activate(
+              { dataElementName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

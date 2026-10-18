@@ -23,6 +23,7 @@
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -105,22 +106,28 @@ export async function handleUpdateFunctionGroup(
               ),
             ),
             atStep('update metadata', (current) =>
-              obj.updateMetadata(
-                {
-                  functionGroupName,
-                  transportRequest: args.transport_request,
-                },
-                {
-                  source: patchFunctionGroupXml(
-                    extractXmlString(
-                      current.raw,
-                      `function group ${functionGroupName}`,
-                    ),
-                    { description: args.description },
+              withAdtHeaders(
+                context,
+                'functionGroup.updateMetadata',
+                (headers) =>
+                  obj.updateMetadata(
+                    {
+                      functionGroupName,
+                      transportRequest: args.transport_request,
+                    },
+                    {
+                      headers,
+                      source: patchFunctionGroupXml(
+                        extractXmlString(
+                          current.raw,
+                          `function group ${functionGroupName}`,
+                        ),
+                        { description: args.description },
+                      ),
+                      lockHandle,
+                      analyse: analyseException,
+                    },
                   ),
-                  lockHandle,
-                  analyse: analyseException,
-                },
               ),
             ),
           ),

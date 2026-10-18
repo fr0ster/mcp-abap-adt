@@ -26,6 +26,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -104,13 +105,16 @@ export async function handleUpdateTable(
         () => obj.lock({ tableName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = atStep('update', () =>
-            obj.update(
-              { tableName, transportRequest: args.transport_request },
-              {
-                source: args.ddl_code,
-                lockHandle,
-                analyse: analyseException,
-              },
+            withAdtHeaders(context, 'table.update', (headers) =>
+              obj.update(
+                { tableName, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.ddl_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
             ),
           );
           // A conditional phase of the sequence, not a hand-rolled
@@ -118,9 +122,13 @@ export async function handleUpdateTable(
           return shouldActivate
             ? sequence(
                 atStep('check', () =>
-                  obj.check({ tableName, source: args.ddl_code }, 'inactive', {
-                    analyse: analyseException,
-                  }),
+                  withAdtHeaders(context, 'table.check', (headers) =>
+                    obj.check(
+                      { tableName, source: args.ddl_code },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
+                  ),
                 ),
                 update,
               )
@@ -137,7 +145,12 @@ export async function handleUpdateTable(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ tableName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'table.activate', (headers) =>
+            obj.activate(
+              { tableName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

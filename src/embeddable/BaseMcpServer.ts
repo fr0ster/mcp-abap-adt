@@ -8,6 +8,11 @@ import {
   registerActiveTool,
   shutdownRefusalAnswer,
 } from '../lib/activeTools.js';
+import {
+  AdtHeaderPairs,
+  type AdtHeaderPort,
+} from '../lib/adtHeaders/AdtHeaderPairs.js';
+import { asRecordedCall } from '../lib/adtHeaders/scope.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
 import { CurrentCredential } from '../lib/auth/currentCredential.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
@@ -299,6 +304,13 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly heldLocks: HeldLocks | undefined;
 
   /**
+   * The corrected request header pairs of the systems this instance talks
+   * to (`adtHeaderPairs` option), keyed by system: the host's, shared by its
+   * instances; this instance's own when the host gave none.
+   */
+  protected readonly adtHeaderPairs: AdtHeaderPairs;
+
+  /**
    * Whose words the batch sentence of a tool's description uses: the full
    * sets' (`BatchBegin`) or the compact sets' (`HandlerBatch`), read from
    * the batch tools a registered registry serves; `undefined` before one.
@@ -354,6 +366,13 @@ export abstract class BaseMcpServer extends McpServer {
      */
     heldLocks?: HeldLocks;
     /**
+     * The corrected request header pairs of the systems the process talks
+     * to, created by the host and shared by its instances: a pair SAP
+     * answered `406`/`415` to, corrected, is sent from then on to that
+     * system for that operation. Absent: this instance keeps its own.
+     */
+    adtHeaderPairs?: AdtHeaderPairs;
+    /**
      * Whether the transport's close is the end of this instance's session
      * (default `true`): stdio's transport, an SSE stream, an embedder's
      * connected transport — its close is then the instance's close
@@ -384,6 +403,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.batch !== undefined) this.state.attach(this.batch);
     this.heldLocks = options.heldLocks;
     if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
+    this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     this.systemType = options.systemType;
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;
@@ -688,6 +708,18 @@ export abstract class BaseMcpServer extends McpServer {
     return destination === undefined
       ? undefined
       : this.destinationRecord(destination).batchAvailability;
+  }
+
+  /**
+   * The header pairs of the system `connection` talks to: its destination's
+   * target system (credentials aside), else the connection itself (a
+   * host's injected one).
+   */
+  private adtHeadersOf(connection: object): AdtHeaderPort {
+    const destination = this.destinationOf.get(connection);
+    return destination === undefined
+      ? this.adtHeaderPairs.forConnection(connection)
+      : this.adtHeaderPairs.forSystem(destination.target);
   }
 
   /**
@@ -1356,6 +1388,7 @@ export abstract class BaseMcpServer extends McpServer {
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
+                adtHeaders: this.adtHeadersOf(connection),
                 state: this.state,
                 debugger: () => this.debuggerFor(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
@@ -1779,11 +1812,13 @@ export abstract class BaseMcpServer extends McpServer {
                 this.systemContexts.get(connection),
                 () =>
                   withKnownSystemContext(call.system, () =>
-                    callHandler(
-                      call.handler,
-                      call.group,
-                      recordedContext,
-                      call.args,
+                    asRecordedCall(() =>
+                      callHandler(
+                        call.handler,
+                        call.group,
+                        recordedContext,
+                        call.args,
+                      ),
                     ),
                   ),
               ),

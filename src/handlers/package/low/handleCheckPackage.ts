@@ -20,6 +20,7 @@
 
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -74,11 +75,14 @@ export async function handleCheckPackage(
   return answer(
     { tool: 'CheckPackageLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getPackage(resultsFor(packageDocuments))
-        // `status` left undefined: the shipped default checks the inactive
-        // version, which is what a caller wants right after a write.
-        .check({ packageName }, undefined, { analyse: analyseException }),
+      withAdtHeaders(context, 'package.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getPackage(resultsFor(packageDocuments))
+          .check({ packageName }, undefined, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

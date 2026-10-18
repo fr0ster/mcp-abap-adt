@@ -21,6 +21,7 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -105,20 +106,25 @@ export async function handleCreateBehaviorImplementation(
       // empty system context, so the responsible and master system go in the
       // config — the responsible guarded like every other create.
       const { responsible, masterSystem } = requireSystemContextForCreate();
-      return createAdtClient(connection, logger)
-        .getBehaviorImplementation(resultsFor(classDocuments))
-        .create(
-          {
-            className,
-            behaviorDefinition: args.behavior_definition.toUpperCase(),
-            packageName: args.package_name.toUpperCase(),
-            description: args.description || className,
-            transportRequest: args.transport_request,
-            responsible,
-            masterSystem,
-          },
-          { analyse: analyseException },
-        );
+      return withAdtHeaders(
+        context,
+        'behaviorImplementation.create',
+        (headers) =>
+          createAdtClient(connection, logger)
+            .getBehaviorImplementation(resultsFor(classDocuments))
+            .create(
+              {
+                className,
+                behaviorDefinition: args.behavior_definition.toUpperCase(),
+                packageName: args.package_name.toUpperCase(),
+                description: args.description || className,
+                transportRequest: args.transport_request,
+                responsible,
+                masterSystem,
+              },
+              { headers, analyse: analyseException },
+            ),
+      );
     },
     project(detail, terseWrite),
   );

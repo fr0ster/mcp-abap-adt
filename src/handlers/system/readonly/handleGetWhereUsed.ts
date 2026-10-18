@@ -19,6 +19,7 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   answer,
   answerFailure,
@@ -45,6 +46,7 @@ import {
   fetchWhereUsedReferences,
   type WhereUsedListResult,
   type WhereUsedSource,
+  whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
 
@@ -148,12 +150,17 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
   // searched, anything else is an explicit error — so we return only what
   // was asked for, never extra.
   if (typedArgs.enable_only_types && typedArgs.enable_only_types.length > 0) {
-    const scopeResponse = await utils.getWhereUsedScope(
-      {
-        object_name: typedArgs.object_name,
-        object_type: typedArgs.object_type,
-      },
-      { analyse: analyseException },
+    const scopeResponse = await withAdtHeaders(
+      context,
+      'utils.getWhereUsedScope',
+      (headers) =>
+        utils.getWhereUsedScope(
+          {
+            object_name: typedArgs.object_name,
+            object_type: typedArgs.object_type,
+          },
+          { headers, analyse: analyseException },
+        ),
     );
     if (!scopeResponse.ok) {
       return answerFailure(
@@ -181,7 +188,7 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
   return answer(
     { tool: 'GetWhereUsed', detail: 'terse' },
     () =>
-      fetchWhereUsedReferences(utils, {
+      fetchWhereUsedReferences(whereUsedOn(context, utils), {
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
         enableAllTypes: typedArgs.enable_all_types,
@@ -416,13 +423,16 @@ async function whereUsedInEnvelopes(
     try {
       read = (await runPhase(context, readable, ({ target }, batch) => {
         if (validatesScope(filter)) {
-          return utilsOn(batch).getWhereUsedScope(params(target), {
-            analyse: analyseException,
-          });
+          return withAdtHeaders(context, 'utils.getWhereUsedScope', (headers) =>
+            utilsOn(batch).getWhereUsedScope(params(target), {
+              headers,
+              analyse: analyseException,
+            }),
+          );
         }
         // Sent as `fetchWhereUsedReferences` sends it, through the members
         // it names (`WhereUsedSource`).
-        const source: WhereUsedSource = utilsOn(batch);
+        const source: WhereUsedSource = whereUsedOn(context, utilsOn(batch));
         return source.getWhereUsedScope(params(target));
       })) as Answered[];
     } catch (error) {
@@ -452,7 +462,7 @@ async function whereUsedInEnvelopes(
       read = (await runPhase(context, searched, ({ target, i }, batch) => {
         // Sent as `fetchWhereUsedReferences` sends it, through the members
         // it names (`WhereUsedSource`).
-        const utils: WhereUsedSource = utilsOn(batch);
+        const utils: WhereUsedSource = whereUsedOn(context, utilsOn(batch));
         const scope = scopes.get(i);
         const scoped = scope?.ok === true ? scope.value : undefined;
         if (scoped === undefined || !scoped.ok) {

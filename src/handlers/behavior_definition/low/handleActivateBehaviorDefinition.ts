@@ -6,6 +6,7 @@
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,14 @@ export async function handleActivateBehaviorDefinition(
   return answer(
     { tool: 'ActivateBehaviorDefinitionLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-        .activate({ name: bdefName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+          .activate(
+            { name: bdefName },
+            { headers, analyse: analyseActivation },
+          ),
+      ),
     project(detail, terseActivation),
   );
 }

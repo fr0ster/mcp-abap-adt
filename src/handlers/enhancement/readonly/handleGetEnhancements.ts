@@ -2,6 +2,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../../../lib/adtHeaders/withAdtHeaders';
+import {
   type FailureEntry,
   failedPayloadOf,
   failureEntry,
@@ -474,14 +478,16 @@ async function getIncludesListInternal(
     const utils = client.getUtils(ourUtils);
 
     // Step 1: Get root node structure to find the includes node
-    const rootResponse = await utils.fetchNodeStructure(
-      parentType,
-      parentName,
-      {
-        analyse: analyseException,
-        nodeId: '000000', // Root node
-        withShortDescriptions: true,
-      },
+    const rootResponse = await withAdtHeaders(
+      context,
+      'utils.fetchNodeStructure',
+      (headers) =>
+        utils.fetchNodeStructure(parentType, parentName, {
+          headers,
+          analyse: analyseException,
+          nodeId: '000000', // Root node
+          withShortDescriptions: true,
+        }),
     );
 
     if (!rootResponse.ok) {
@@ -507,14 +513,16 @@ async function getIncludesListInternal(
     }
 
     // Step 3: Get includes list using the found node ID
-    const includesResponse = await utils.fetchNodeStructure(
-      parentType,
-      parentName,
-      {
-        analyse: analyseException,
-        nodeId: includesNode.nodeId,
-        withShortDescriptions: true,
-      },
+    const includesResponse = await withAdtHeaders(
+      context,
+      'utils.fetchNodeStructure',
+      (headers) =>
+        utils.fetchNodeStructure(parentType, parentName, {
+          headers,
+          analyse: analyseException,
+          nodeId: includesNode.nodeId,
+          withShortDescriptions: true,
+        }),
     );
 
     if (!includesResponse.ok) {
@@ -933,6 +941,7 @@ function enhancementStep(read: EnhancementRead): string {
 
 /** `read` sent on `connection`, as the sequential version sends it. */
 function sendEnhancementRead(
+  context: AdtHeadersContext,
   connection: AbapConnection,
   read: EnhancementRead,
 ): Promise<unknown> {
@@ -972,13 +981,16 @@ function sendEnhancementRead(
           );
     }
   }
-  return client
-    .getUtils(ourUtils)
-    .fetchNodeStructure(read.parentType, read.parentName, {
-      analyse: analyseException,
-      nodeId: read.nodeId,
-      withShortDescriptions: true,
-    });
+  return withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+    client
+      .getUtils(ourUtils)
+      .fetchNodeStructure(read.parentType, read.parentName, {
+        headers,
+        analyse: analyseException,
+        nodeId: read.nodeId,
+        withShortDescriptions: true,
+      }),
+  );
 }
 
 /** A read the walk needs before it can go on: the next phase sends it. */
@@ -1010,7 +1022,7 @@ function enhancementAnswers(context: HandlerContext) {
       if (asked.size === 0) return;
       const pending = [...asked.values()];
       const results = await runPhase(context, pending, (read, connection) =>
-        sendEnhancementRead(connection as AbapConnection, read),
+        sendEnhancementRead(context, connection as AbapConnection, read),
       );
       results.forEach((result, i) => {
         const read = pending[i] as EnhancementRead;

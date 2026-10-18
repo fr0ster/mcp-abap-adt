@@ -644,7 +644,7 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     expect(recorder.requests()).toBe(1);
   });
 
-  it('the recorder is exempt from accept negotiation: a part answered 406 through an AdtClient over it is not corrected and sent again', async () => {
+  it('a part answered 406 through an AdtClient over the recorder is not corrected and sent again', async () => {
     const owner = new InstanceBatch({ keepRawParts: false });
     const target = new LateBoundConnection();
     const batch = new AdtBatchConnection(target, { endpoint: 'communication' });

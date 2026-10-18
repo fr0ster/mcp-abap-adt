@@ -308,40 +308,6 @@ export function siblingRecordOf(
   return records.get(connection);
 }
 
-/**
- * The key under which adt-clients keeps a connection's accept negotiation
- * state — its switch (`enabled`) and its accept and Content-Type caches. A
- * registry symbol (`Symbol.for`), the same in every copy of adt-clients.
- */
-const ACCEPT_NEGOTIATION_STATE = Symbol.for(
-  '@mcp-abap-adt/adt-clients/acceptNegotiation',
-);
-
-/**
- * Accept correction on for `connection` (adt-clients 35 corrects nothing
- * unless switched on): every client built over it later corrects through it
- * — a request SAP answers `406` naming the types it serves is sent once more
- * with them, the corrected Accept kept in the connection's accept cache; a
- * `415` likewise with the Content-Type. The connection's own switch, as
- * adt-clients' `setAcceptCorrectionEnabled(connection, true)` sets it (not
- * exported from adt-clients' root in 35.0.0); nothing else of the
- * connection changes here.
- */
-export function switchAcceptCorrectionOn(connection: IAbapConnection): void {
-  const state = (connection as unknown as Record<symbol, unknown>)[
-    ACCEPT_NEGOTIATION_STATE
-  ] as { enabled?: boolean } | undefined;
-  if (state !== undefined) {
-    state.enabled = true;
-    return;
-  }
-  Object.defineProperty(connection, ACCEPT_NEGOTIATION_STATE, {
-    value: { accept: new Map(), contentType: new Map(), enabled: true },
-    enumerable: false,
-    configurable: true,
-  });
-}
-
 export function createAbapConnection(
   settings: SapConfig,
   credential: IAuthProvider,
@@ -415,7 +381,6 @@ export function createAbapConnection(
     );
   })();
 
-  switchAcceptCorrectionOn(built);
   records.set(built as unknown as object, {
     settings,
     credential,

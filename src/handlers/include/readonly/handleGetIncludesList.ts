@@ -1,4 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   answerCaught,
   failedPayloadOf,
@@ -15,10 +16,14 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
-import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
+import {
+  type FunctionGroupNodeSource,
+  fetchFunctionGroupChildren,
+} from '../../../lib/strategies/functionGroupChildren';
 import {
   endsTheCall,
   type NodeLevel,
+  nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
@@ -308,7 +313,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       // directly is worked out from the rest: every include of the group,
       // less those another include of the group names.
       const listed = await fetchFunctionGroupChildren(
-        utils,
+        nodeStructureOn(context, utils),
         parent.name,
         'FUGR/I',
       );
@@ -391,7 +396,11 @@ const readKey = (read: IncludeRead): string =>
     : `${read.kind}:${read.name}`;
 
 /** `read` sent on `utils`, as the sequential version sends it. */
-function sendRead(utils: any, read: IncludeRead): Promise<unknown> {
+function sendRead(
+  context: AdtHeadersContext,
+  utils: any,
+  read: IncludeRead,
+): Promise<unknown> {
   switch (read.kind) {
     case 'program':
       return utils.readObjectSource('program', read.name);
@@ -399,13 +408,15 @@ function sendRead(utils: any, read: IncludeRead): Promise<unknown> {
       return utils.getInclude(read.name);
     case 'class':
       return utils.readObjectMetadata('class', read.name);
-    case 'group':
+    case 'group': {
       // `fetchFunctionGroupChildren`'s two requests: the group's node
-      // structure, then its includes node.
-      return utils.fetchNodeStructure('FUGR/F', read.name, {
+      // structure, then its includes node — on the source it reads.
+      const groups: FunctionGroupNodeSource = nodeStructureOn(context, utils);
+      return groups.fetchNodeStructure('FUGR/F', read.name, {
         ...(read.nodeId !== undefined ? { nodeId: read.nodeId } : {}),
         withShortDescriptions: true,
       });
+    }
   }
 }
 
@@ -431,6 +442,7 @@ function includeAnswers(context: HandlerContext) {
       const pending = [...asked.values()];
       const results = await runPhase(context, pending, (read, connection) =>
         sendRead(
+          context,
           createAdtClient(connection, context.logger).getUtils(ourUtils),
           read,
         ),

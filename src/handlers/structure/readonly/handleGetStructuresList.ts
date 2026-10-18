@@ -23,6 +23,7 @@ import { carryingFailure } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
   type WhereUsedSource,
+  whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
 import {
   type AxiosResponse,
@@ -310,11 +311,14 @@ async function structuresListOf(
       let lastErr: unknown;
       for (const objectType of ['structure', 'table'] as const) {
         try {
-          const wu = await fetchWhereUsedReferences(utils, {
-            object_name: baseName,
-            object_type: objectType,
-            enableOnlyTypes: ['TABL/DS'],
-          });
+          const wu = await fetchWhereUsedReferences(
+            whereUsedOn(context, utils),
+            {
+              object_name: baseName,
+              object_type: objectType,
+              enableOnlyTypes: ['TABL/DS'],
+            },
+          );
           if (!wu.ok) {
             // The credentials are the same for every request: the call ends.
             if (isCredentialPayload(failureEntry(wu.getError(), 'where-used')))
@@ -687,7 +691,10 @@ function structureReads(
       // Sent as `fetchWhereUsedReferences` sends it, through the members
       // it names (`WhereUsedSource`).
       const scoped = await runPhase(context, pairs, (pair, connection) => {
-        const source: WhereUsedSource = utilsOn(connection);
+        const source: WhereUsedSource = whereUsedOn(
+          context,
+          utilsOn(connection),
+        );
         return source.getWhereUsedScope({
           object_name: pair.name,
           object_type: pair.objectType,
@@ -707,7 +714,10 @@ function structureReads(
       const found =
         answered.length > 0
           ? await runPhase(context, answered, async (pair, connection) => {
-              const source: WhereUsedSource = utilsOn(connection);
+              const source: WhereUsedSource = whereUsedOn(
+                context,
+                utilsOn(connection),
+              );
               let sent: Promise<unknown> | undefined;
               try {
                 await fetchWhereUsedReferences(

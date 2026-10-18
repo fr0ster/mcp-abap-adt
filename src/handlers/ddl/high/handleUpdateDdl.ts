@@ -21,6 +21,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -97,13 +98,16 @@ export async function handleUpdateDdl(
         () => obj.lock({ ddlName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = atStep('update', () =>
-            obj.update(
-              { ddlName, transportRequest: args.transport_request },
-              {
-                source: args.ddl_source,
-                lockHandle,
-                analyse: analyseException,
-              },
+            withAdtHeaders(context, 'ddl.update', (headers) =>
+              obj.update(
+                { ddlName, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.ddl_source,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
             ),
           );
           // A conditional phase of the sequence, not a hand-rolled
@@ -111,9 +115,13 @@ export async function handleUpdateDdl(
           return shouldActivate
             ? sequence(
                 atStep('check', () =>
-                  obj.check({ ddlName, source: args.ddl_source }, 'inactive', {
-                    analyse: analyseException,
-                  }),
+                  withAdtHeaders(context, 'ddl.check', (headers) =>
+                    obj.check(
+                      { ddlName, source: args.ddl_source },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
+                  ),
                 ),
                 update,
               )
@@ -129,7 +137,9 @@ export async function handleUpdateDdl(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ ddlName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'ddl.activate', (headers) =>
+            obj.activate({ ddlName }, { headers, analyse: analyseActivation }),
+          ),
         ),
       );
     },

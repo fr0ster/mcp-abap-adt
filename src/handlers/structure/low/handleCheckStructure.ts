@@ -12,6 +12,7 @@
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -75,11 +76,14 @@ export async function handleCheckStructure(
   return answer(
     { tool: 'CheckStructureLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getStructure(resultsFor(structureDocuments))
-        .check({ structureName, source: ddl_code }, checkVersion, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'structure.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getStructure(resultsFor(structureDocuments))
+          .check({ structureName, source: ddl_code }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

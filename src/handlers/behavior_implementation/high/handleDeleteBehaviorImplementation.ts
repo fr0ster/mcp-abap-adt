@@ -68,6 +68,8 @@ export async function handleDeleteBehaviorImplementation(
     { tool: 'DeleteBehaviorImplementation', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'behaviorImplementation',
         createAdtClient(connection, logger).getBehaviorImplementation(
           resultsFor(classDocuments),
         ),

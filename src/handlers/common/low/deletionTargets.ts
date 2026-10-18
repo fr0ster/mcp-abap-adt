@@ -37,7 +37,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type { createAdtClient } from '../../../lib/clients';
 import type { DELETION_CHECK_TYPES } from '../../../lib/compact/compactSchemas';
-import type { CheckedDeletable } from '../../../lib/strategies/checkedDeletion';
+import type {
+  CheckedDeletable,
+  CheckedDeletableType,
+} from '../../../lib/strategies/checkedDeletion';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 
@@ -50,6 +53,8 @@ export interface DeletionName {
 }
 
 export interface DeletionTarget {
+  /** The object type of its `checkDeletion` and `delete` (their header pairs). */
+  objectType: CheckedDeletableType;
   /** The adt-clients object whose `checkDeletion` and `delete` are sent. */
   object(client: AdtClient): CheckedDeletable<any, any>;
   /** The configuration of both requests. */
@@ -59,10 +64,12 @@ export interface DeletionTarget {
 }
 
 const target = (
+  objectType: CheckedDeletableType,
   object: (client: AdtClient) => unknown,
   config: (name: DeletionName) => object,
   deleteAnalyse: IAnalyse<any> = analyseDeletion,
 ): DeletionTarget => ({
+  objectType,
   object: object as DeletionTarget['object'],
   config: (name, transportRequest) => ({
     ...config(name),
@@ -78,52 +85,64 @@ export const DELETION_TARGETS: Readonly<
   Record<(typeof DELETION_CHECK_TYPES)[number], DeletionTarget>
 > = {
   PACKAGE: target(
+    'package',
     (c) => c.getPackage(resultsFor(packageDocuments)),
     ({ name }) => ({ packageName: name }),
   ),
   DOMAIN: target(
+    'domain',
     (c) => c.getDomain(resultsFor(domainDocuments)),
     ({ name }) => ({ domainName: name }),
   ),
   DATA_ELEMENT: target(
+    'dataElement',
     (c) => c.getDataElement(resultsFor(dataElementDocuments)),
     ({ name }) => ({ dataElementName: name }),
   ),
   TABLE: target(
+    'table',
     (c) => c.getTable(resultsFor(tableDocuments)),
     ({ name }) => ({ tableName: name }),
   ),
   STRUCTURE: target(
+    'structure',
     (c) => c.getStructure(resultsFor(structureDocuments)),
     ({ name }) => ({ structureName: name }),
   ),
   DDL: target(
+    'ddl',
     (c) => c.getDdl(resultsFor(ddlDocuments)),
     ({ name }) => ({ ddlName: name }),
   ),
   SERVICE_DEFINITION: target(
+    'serviceDefinition',
     (c) => c.getServiceDefinition(resultsFor(serviceDefinitionDocuments)),
     ({ name }) => ({ serviceDefinitionName: name }),
   ),
   SERVICE_BINDING: target(
+    'serviceBinding',
     (c) => c.getServiceBinding(resultsFor(serviceDocuments)),
     ({ name }) => ({ bindingName: name }),
   ),
-  CLASS: target(asClass, ({ name }) => ({ className: name })),
-  CDS_UNIT_TEST: target(asClass, ({ name }) => ({ className: name })),
+  CLASS: target('class', asClass, ({ name }) => ({ className: name })),
+  CDS_UNIT_TEST: target('class', asClass, ({ name }) => ({ className: name })),
   PROGRAM: target(
+    'program',
     (c) => c.getProgram(resultsFor(programDocuments)),
     ({ name }) => ({ programName: name }),
   ),
   INTERFACE: target(
+    'interface',
     (c) => c.getInterface(resultsFor(interfaceDocuments)),
     ({ name }) => ({ interfaceName: name }),
   ),
   FUNCTION_GROUP: target(
+    'functionGroup',
     (c) => c.getFunctionGroup(resultsFor(functionGroupDocuments)),
     ({ name }) => ({ functionGroupName: name }),
   ),
   FUNCTION_MODULE: target(
+    'functionModule',
     (c) => c.getFunctionModule(resultsFor(functionModuleDocuments)),
     ({ name, group }) => ({
       functionModuleName: name,
@@ -131,14 +150,17 @@ export const DELETION_TARGETS: Readonly<
     }),
   ),
   BEHAVIOR_DEFINITION: target(
+    'behaviorDefinition',
     (c) => c.getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments)),
     ({ name }) => ({ name }),
   ),
   BEHAVIOR_IMPLEMENTATION: target(
+    'behaviorImplementation',
     (c) => c.getBehaviorImplementation(resultsFor(classDocuments)),
     ({ name }) => ({ className: name }),
   ),
   METADATA_EXTENSION: target(
+    'metadataExtension',
     (c) => c.getMetadataExtension(resultsFor(metadataExtensionDocuments)),
     ({ name }) => ({ name }),
     analyseException,

@@ -28,6 +28,7 @@ import {
 } from '../../handlers/message_class/high/handleCreateMessageClass';
 import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { SYSTEM_LOOKUP_FAILED_WORDS } from '../../lib/auth/serverRefusal';
 import { createAdtClient } from '../../lib/clients';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
@@ -215,30 +216,39 @@ describe('on-premise', () => {
     [
       'service definition',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getServiceDefinition().create({
-          serviceDefinitionName: 'ZSD_PLACEHOLDER',
-          packageName: 'ZPACKAGE_PLACEHOLDER',
-          description: 'placeholder',
-        }),
+        c.getServiceDefinition().create(
+          {
+            serviceDefinitionName: 'ZSD_PLACEHOLDER',
+            packageName: 'ZPACKAGE_PLACEHOLDER',
+            description: 'placeholder',
+          },
+          { headers: DEFAULT_ADT_HEADERS['serviceDefinition.create'] },
+        ),
     ],
     [
       'transformation',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getTransformation().create({
-          transformationName: 'ZXSLT_PLACEHOLDER',
-          transformationType: 'SimpleTransformation',
-          packageName: 'ZPACKAGE_PLACEHOLDER',
-          description: 'placeholder',
-        }),
+        c.getTransformation().create(
+          {
+            transformationName: 'ZXSLT_PLACEHOLDER',
+            transformationType: 'SimpleTransformation',
+            packageName: 'ZPACKAGE_PLACEHOLDER',
+            description: 'placeholder',
+          },
+          { headers: DEFAULT_ADT_HEADERS['transformation.create'] },
+        ),
     ],
     [
       'access control',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getAccessControl().create({
-          accessControlName: 'ZDCL_PLACEHOLDER',
-          packageName: 'ZPACKAGE_PLACEHOLDER',
-          description: 'placeholder',
-        }),
+        c.getAccessControl().create(
+          {
+            accessControlName: 'ZDCL_PLACEHOLDER',
+            packageName: 'ZPACKAGE_PLACEHOLDER',
+            description: 'placeholder',
+          },
+          { headers: DEFAULT_ADT_HEADERS['accessControl.create'] },
+        ),
     ],
   ] as const;
 

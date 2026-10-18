@@ -6,6 +6,7 @@
 
 import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,14 @@ export async function handleActivateServiceDefinition(
   return answer(
     { tool: 'ActivateServiceDefinitionLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
-        .activate({ serviceDefinitionName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'serviceDefinition.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+          .activate(
+            { serviceDefinitionName },
+            { headers, analyse: analyseActivation },
+          ),
+      ),
     project(detail, terseActivation),
   );
 }

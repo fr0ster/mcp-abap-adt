@@ -54,6 +54,10 @@ import type {
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../../../lib/adtHeaders/withAdtHeaders';
+import {
   answer,
   type FailureEntry,
   failureEntry,
@@ -69,6 +73,7 @@ import {
   endsTheCall,
   type NodeLevel,
   type NodeRequest,
+  nodeStructureOn,
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -125,6 +130,7 @@ function flatObjects(level: NodeLevel): FlatObject[] {
  * handler in this migration formats one.
  */
 async function collectValidObjects(
+  context: AdtHeadersContext,
   utils: NodeSource,
   parentType: string,
   parentName: string,
@@ -135,11 +141,17 @@ async function collectValidObjects(
   if (visited.has(nodeId)) return ok([]);
   visited.add(nodeId);
 
-  const response = await utils.fetchNodeStructure(parentType, parentName, {
-    analyse: analyseException,
-    nodeId,
-    withShortDescriptions,
-  });
+  const response = await withAdtHeaders(
+    context,
+    'utils.fetchNodeStructure',
+    (headers) =>
+      utils.fetchNodeStructure(parentType, parentName, {
+        headers,
+        analyse: analyseException,
+        nodeId,
+        withShortDescriptions,
+      }),
+  );
   if (!response.ok) return response as IAdtResponse<FlatObject[], IAdtError>;
 
   const level = response.getResult().value as NodeLevel;
@@ -152,6 +164,7 @@ async function collectValidObjects(
 
   for (const child of level.childNodes) {
     const childResult = await collectValidObjects(
+      context,
       utils,
       parentType,
       parentName,
@@ -227,7 +240,13 @@ async function walkParentsBatched(
   withShortDescriptions: boolean,
 ): Promise<ParentWalks> {
   const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
-    readNode(createAdtClient(c, context.logger).getUtils(ourUtils), request),
+    readNode(
+      nodeStructureOn(
+        context,
+        createAdtClient(c, context.logger).getUtils(ourUtils),
+      ),
+      request,
+    ),
   );
   const failures = new Map<number, IAdtFailure | Thrown>();
   const visited = parents.map(() => new Set<string>(['000000']));
@@ -312,6 +331,7 @@ async function walkParentsSequential(
     let walk: ParentWalk;
     try {
       walk = await collectValidObjects(
+        context,
         utils,
         parent.type,
         parent.name,
@@ -474,6 +494,7 @@ export async function handleGetObjectsList(
         },
         () =>
           collectValidObjects(
+            context,
             utilsOf(context),
             parent_type,
             parentName,

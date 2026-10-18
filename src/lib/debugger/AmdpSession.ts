@@ -21,6 +21,7 @@ import type {
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { adtHeadersOf, withAdtHeaders } from '../adtHeaders/withAdtHeaders';
 import {
   carryingFailure,
   carryingPayload,
@@ -621,14 +622,20 @@ export class AmdpSession<O = unknown> {
   > {
     return this.mutate(async () => {
       const open = this.requireOpen();
-      const answer = await open.onCommands.getDataPreview({
-        sessionId: open.hanaSession,
-        debuggerId: open.mainId,
-        debuggeeId: this.requireDebuggee(),
-        variableName: variable.toUpperCase(),
-        rowNumber: 100,
-        ...(query ? { query } : {}),
-      });
+      const answer = await withAdtHeaders(
+        adtHeadersOf(this.origin),
+        'amdpDebugger.getDataPreview',
+        (headers) =>
+          open.onCommands.getDataPreview({
+            sessionId: open.hanaSession,
+            debuggerId: open.mainId,
+            debuggeeId: this.requireDebuggee(),
+            variableName: variable.toUpperCase(),
+            rowNumber: 100,
+            ...(query ? { query } : {}),
+            headers,
+          }),
+      );
       if (!answer.ok) {
         throw failedAt(
           new DebugRequestError(messageOf(answer)),
@@ -828,16 +835,22 @@ export class AmdpSession<O = unknown> {
   > {
     return this.mutate(async () => {
       const once = this.requireOnce();
-      const answer = await once.onCommands.getDataPreview({
-        sessionId: once.hanaSession,
-        debuggerId: once.mainId,
-        debuggeeId: options.debuggeeId,
-        variableName: options.variable.toUpperCase(),
-        ...(options.rowNumber !== undefined
-          ? { rowNumber: options.rowNumber }
-          : {}),
-        ...(options.query ? { query: options.query } : {}),
-      });
+      const answer = await withAdtHeaders(
+        adtHeadersOf(this.origin),
+        'amdpDebugger.getDataPreview',
+        (headers) =>
+          once.onCommands.getDataPreview({
+            sessionId: once.hanaSession,
+            debuggerId: once.mainId,
+            debuggeeId: options.debuggeeId,
+            variableName: options.variable.toUpperCase(),
+            ...(options.rowNumber !== undefined
+              ? { rowNumber: options.rowNumber }
+              : {}),
+            ...(options.query ? { query: options.query } : {}),
+            headers,
+          }),
+      );
       if (!answer.ok)
         throw failedAt(
           new DebugRequestError(messageOf(answer)),

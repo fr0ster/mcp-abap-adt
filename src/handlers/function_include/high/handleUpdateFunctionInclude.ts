@@ -29,6 +29,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -125,17 +126,20 @@ export async function handleUpdateFunctionInclude(
             { analyse: analyseLock },
           ),
         atStep('update', (lockHandle) =>
-          obj.update(
-            {
-              functionGroupName,
-              includeName,
-              transportRequest: args.transport_request,
-            },
-            {
-              source: args.source_code,
-              lockHandle,
-              analyse: analyseException,
-            },
+          withAdtHeaders(context, 'functionInclude.update', (headers) =>
+            obj.update(
+              {
+                functionGroupName,
+                includeName,
+                transportRequest: args.transport_request,
+              },
+              {
+                headers,
+                source: args.source_code,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
         ),
         (lockHandle) =>
@@ -151,9 +155,11 @@ export async function handleUpdateFunctionInclude(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate(
-            { functionGroupName, includeName },
-            { analyse: analyseActivation },
+          withAdtHeaders(context, 'functionInclude.activate', (headers) =>
+            obj.activate(
+              { functionGroupName, includeName },
+              { headers, analyse: analyseActivation },
+            ),
           ),
         ),
       );

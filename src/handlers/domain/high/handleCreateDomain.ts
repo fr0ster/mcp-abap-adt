@@ -33,6 +33,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -206,15 +207,17 @@ export async function handleCreateDomain(
           ),
         ),
         atStep('create', () =>
-          obj.create(
-            {
-              domainName,
-              description: args.description || domainName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { analyse: analyseException },
+          withAdtHeaders(context, 'domain.create', (headers) =>
+            obj.create(
+              {
+                domainName,
+                description: args.description || domainName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
         ),
         () =>
@@ -231,29 +234,32 @@ export async function handleCreateDomain(
                   ),
                 ),
                 atStep('update metadata', (current) =>
-                  obj.updateMetadata(
-                    {
-                      domainName,
-                      transportRequest: args.transport_request,
-                    },
-                    {
-                      source: patchDomainXml(
-                        extractXmlString(current.raw, `domain ${domainName}`),
-                        {
-                          description: args.description || domainName,
-                          datatype: args.datatype || 'CHAR',
-                          length: args.length || 100,
-                          decimals: args.decimals || 0,
-                          conversion_exit: args.conversion_exit,
-                          lowercase: args.lowercase || false,
-                          sign_exists: args.sign_exists || false,
-                          value_table: args.value_table,
-                          fixed_values: args.fixed_values,
-                        },
-                      ),
-                      lockHandle,
-                      analyse: analyseException,
-                    },
+                  withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+                    obj.updateMetadata(
+                      {
+                        domainName,
+                        transportRequest: args.transport_request,
+                      },
+                      {
+                        headers,
+                        source: patchDomainXml(
+                          extractXmlString(current.raw, `domain ${domainName}`),
+                          {
+                            description: args.description || domainName,
+                            datatype: args.datatype || 'CHAR',
+                            length: args.length || 100,
+                            decimals: args.decimals || 0,
+                            conversion_exit: args.conversion_exit,
+                            lowercase: args.lowercase || false,
+                            sign_exists: args.sign_exists || false,
+                            value_table: args.value_table,
+                            fixed_values: args.fixed_values,
+                          },
+                        ),
+                        lockHandle,
+                        analyse: analyseException,
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -274,9 +280,12 @@ export async function handleCreateDomain(
               { withLongPolling: true, analyse: analyseException },
             )
             .catch(unlessCredentialFailure);
-          return obj.check({ domainName }, undefined, {
-            analyse: analyseException,
-          });
+          return withAdtHeaders(context, 'domain.check', (headers) =>
+            obj.check({ domainName }, undefined, {
+              headers,
+              analyse: analyseException,
+            }),
+          );
         }),
       );
 
@@ -287,7 +296,12 @@ export async function handleCreateDomain(
       return carryCleanup(
         checked,
         atStep('activate', () =>
-          obj.activate({ domainName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'domain.activate', (headers) =>
+            obj.activate(
+              { domainName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

@@ -6,6 +6,7 @@
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -62,9 +63,11 @@ export async function handleActivateProgram(
   return answer(
     { tool: 'ActivateProgramLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getProgram(resultsFor(programDocuments))
-        .activate({ programName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'program.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getProgram(resultsFor(programDocuments))
+          .activate({ programName }, { headers, analyse: analyseActivation }),
+      ),
     project(detail, terseActivation),
   );
 }

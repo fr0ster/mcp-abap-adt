@@ -39,6 +39,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -190,35 +191,41 @@ export async function handleUpdateDomain(
               obj.readMetadata({ domainName }, { analyse: analyseException }),
             ),
             atStep('update metadata', (current) =>
-              obj.updateMetadata(
-                {
-                  domainName,
-                  transportRequest: args.transport_request,
-                },
-                {
-                  source: patchDomainXml(
-                    extractXmlString(current.raw, `domain ${domainName}`),
-                    {
-                      description: args.description,
-                      datatype: args.datatype,
-                      length: args.length,
-                      decimals: args.decimals,
-                      conversion_exit: args.conversion_exit,
-                      lowercase: args.lowercase,
-                      sign_exists: args.sign_exists,
-                      value_table: args.value_table,
-                      fixed_values: args.fixed_values,
-                    },
-                  ),
-                  lockHandle,
-                  analyse: analyseException,
-                },
+              withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+                obj.updateMetadata(
+                  {
+                    domainName,
+                    transportRequest: args.transport_request,
+                  },
+                  {
+                    headers,
+                    source: patchDomainXml(
+                      extractXmlString(current.raw, `domain ${domainName}`),
+                      {
+                        description: args.description,
+                        datatype: args.datatype,
+                        length: args.length,
+                        decimals: args.decimals,
+                        conversion_exit: args.conversion_exit,
+                        lowercase: args.lowercase,
+                        sign_exists: args.sign_exists,
+                        value_table: args.value_table,
+                        fixed_values: args.fixed_values,
+                      },
+                    ),
+                    lockHandle,
+                    analyse: analyseException,
+                  },
+                ),
               ),
             ),
             atStep('check', () =>
-              obj.check({ domainName }, undefined, {
-                analyse: analyseException,
-              }),
+              withAdtHeaders(context, 'domain.check', (headers) =>
+                obj.check({ domainName }, undefined, {
+                  headers,
+                  analyse: analyseException,
+                }),
+              ),
             ),
           ),
         (lockHandle) =>
@@ -246,7 +253,12 @@ export async function handleUpdateDomain(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ domainName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'domain.activate', (headers) =>
+            obj.activate(
+              { domainName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

@@ -32,6 +32,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -134,21 +135,24 @@ export async function handleUpdatePackage(
             .readMetadata({ packageName }, { analyse: analyseException }),
         ),
         atStep('update metadata', (current) =>
-          client.getPackage().updateMetadata(
-            {
-              packageName,
-              ...(transport_request && {
-                transportRequest: transport_request,
-              }),
-            },
-            {
-              source: patchPackageXml(
-                extractXmlString(current, `package ${packageName}`),
-                { description: updated_description },
-              ),
-              lockHandle: lock_handle,
-              analyse: analyseException,
-            },
+          withAdtHeaders(context, 'package.updateMetadata', (headers) =>
+            client.getPackage().updateMetadata(
+              {
+                packageName,
+                ...(transport_request && {
+                  transportRequest: transport_request,
+                }),
+              },
+              {
+                headers,
+                source: patchPackageXml(
+                  extractXmlString(current, `package ${packageName}`),
+                  { description: updated_description },
+                ),
+                lockHandle: lock_handle,
+                analyse: analyseException,
+              },
+            ),
           ),
         ),
       );

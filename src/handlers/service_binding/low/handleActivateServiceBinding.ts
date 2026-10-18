@@ -10,6 +10,7 @@
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -58,9 +59,11 @@ export async function handleActivateServiceBinding(
   return answer(
     { tool: 'ActivateServiceBindingLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getServiceBinding(resultsFor(serviceDocuments))
-        .activate({ bindingName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'serviceBinding.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getServiceBinding(resultsFor(serviceDocuments))
+          .activate({ bindingName }, { headers, analyse: analyseActivation }),
+      ),
     project(detail, terseActivation),
   );
 }

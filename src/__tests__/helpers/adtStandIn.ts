@@ -32,6 +32,8 @@ export interface StandInRequest {
   cookie: string | undefined;
   /** Its `Content-Type` header, if any. */
   contentType: string | undefined;
+  /** Its `Accept` header, if any. */
+  accept: string | undefined;
   /** Its body, once it has arrived in full; `''` before. */
   body: string;
 }
@@ -179,6 +181,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       sessionType: Array.isArray(sessionType) ? sessionType[0] : sessionType,
       cookie: req.headers.cookie,
       contentType,
+      accept: req.headers.accept,
       body: '',
     };
     requests.push(request);

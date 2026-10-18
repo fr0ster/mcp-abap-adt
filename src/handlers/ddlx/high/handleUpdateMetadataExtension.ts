@@ -22,6 +22,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -104,13 +105,16 @@ export async function handleUpdateMetadataExtension(
       );
 
       const update = (lockHandle: string) =>
-        obj.update(
-          { name: ddlxName, transportRequest: args.transport_request },
-          {
-            source: args.source_code,
-            lockHandle,
-            analyse: analyseException,
-          },
+        withAdtHeaders(context, 'metadataExtension.update', (headers) =>
+          obj.update(
+            { name: ddlxName, transportRequest: args.transport_request },
+            {
+              headers,
+              source: args.source_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
         );
 
       const written = args.lock_handle
@@ -143,7 +147,12 @@ export async function handleUpdateMetadataExtension(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ name: ddlxName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
+            obj.activate(
+              { name: ddlxName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

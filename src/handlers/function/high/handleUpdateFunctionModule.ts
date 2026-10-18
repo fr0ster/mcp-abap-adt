@@ -25,6 +25,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -130,23 +131,30 @@ export async function handleUpdateFunctionModule(
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             atStep('update', () =>
-              obj.update(
-                {
-                  functionModuleName,
-                  functionGroupName,
-                  transportRequest: args.transport_request,
-                },
-                {
-                  source: args.source_code,
-                  lockHandle,
-                  analyse: analyseException,
-                },
+              withAdtHeaders(context, 'functionModule.update', (headers) =>
+                obj.update(
+                  {
+                    functionModuleName,
+                    functionGroupName,
+                    transportRequest: args.transport_request,
+                  },
+                  {
+                    headers,
+                    source: args.source_code,
+                    lockHandle,
+                    analyse: analyseException,
+                  },
+                ),
               ),
             ),
             atStep('check', () =>
-              obj.check({ functionModuleName, functionGroupName }, undefined, {
-                analyse: analyseException,
-              }),
+              withAdtHeaders(context, 'functionModule.check', (headers) =>
+                obj.check(
+                  { functionModuleName, functionGroupName },
+                  undefined,
+                  { headers, analyse: analyseException },
+                ),
+              ),
             ),
           ),
         (lockHandle) =>
@@ -174,9 +182,11 @@ export async function handleUpdateFunctionModule(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate(
-            { functionModuleName, functionGroupName },
-            { analyse: analyseActivation },
+          withAdtHeaders(context, 'functionModule.activate', (headers) =>
+            obj.activate(
+              { functionModuleName, functionGroupName },
+              { headers, analyse: analyseActivation },
+            ),
           ),
         ),
       );

@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtHeaderPort } from '../lib/adtHeaders/AdtHeaderPairs';
 import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
 import type { BatchAvailability } from '../lib/batch/availability';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch';
@@ -56,6 +57,13 @@ export interface HandlerContext {
    * every phase then sends its envelope, and only that call falls back.
    */
   batchAvailability?: BatchAvailability;
+  /**
+   * The request header pairs of the call's system (`AdtHeaderPairs`): the
+   * pair a header-taking member is called with (`withAdtHeaders`), and
+   * where a corrected one is kept. Kept in every context derived from this
+   * one. Absent: the default pairs, nothing kept.
+   */
+  adtHeaders?: AdtHeaderPort;
   /**
    * The locks this instance holds between requests (`HeldLocks`), given by a
    * host whose instances last one request each (Streamable HTTP); absent on

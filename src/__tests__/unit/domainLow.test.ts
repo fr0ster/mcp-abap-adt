@@ -6,6 +6,7 @@ import { handleActivateDomain } from '../../handlers/domain/low/handleActivateDo
 import { handleCheckDomain } from '../../handlers/domain/low/handleCheckDomain';
 import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
 import { corpusBody } from '../../lib/adtCorpus';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
@@ -122,6 +123,7 @@ describe('UpdateDomainLow', () => {
       domainName: 'ZD',
     });
     expect(updateCall?.options).toEqual({
+      headers: DEFAULT_ADT_HEADERS['domain.updateMetadata'],
       source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,

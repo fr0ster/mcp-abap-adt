@@ -2,6 +2,7 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { AdtHeaderPairs } from '../lib/adtHeaders/AdtHeaderPairs.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { noopLogger } from '../lib/handlerLogger.js';
@@ -71,6 +72,15 @@ export interface EmbeddableMcpServerOptions {
    * background-run tools are refused (`background_runs_unavailable`).
    */
   backgroundRuns?: IBackgroundRuns;
+
+  /**
+   * The corrected request header pairs of the systems this instance talks
+   * to — `new AdtHeaderPairs()`, one an embedder may share between its
+   * instances: a pair SAP answered `406`/`415` to, corrected by the server
+   * (whatever connection it is given), is sent from then on to that system
+   * for that operation. Absent: the instance keeps its own.
+   */
+  adtHeaderPairs?: AdtHeaderPairs;
 
   /**
    * The owner of this instance's batch state (batch mode), created by the
@@ -233,6 +243,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
         backgroundRuns: options.backgroundRuns,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
+      ...(options.adtHeaderPairs !== undefined && {
+        adtHeaderPairs: options.adtHeaderPairs,
+      }),
     });
 
     // Used as given: no credential built, no wrap, no connect().

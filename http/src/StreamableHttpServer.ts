@@ -8,6 +8,7 @@ import type {
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
+  type AdtHeaderPairs,
   BaseMcpServer,
   type IBackgroundRuns,
   InstanceBatch,
@@ -482,6 +483,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
+          adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
         // A transport per request: the client's disconnect closes that
@@ -532,6 +534,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         // here is kept as state, so the write and the unlock under it reach
         // this instance (and its SAP session) by its state_handle.
         heldLocks: new HeldLocks(),
+        // The corrected header pairs: the process's, shared by every
+        // instance.
+        adtHeaderPairs: this.adtHeaderPairs,
       },
     );
   }

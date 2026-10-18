@@ -1,6 +1,7 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import {
   fakeClientOf,
   okResponse,
@@ -65,6 +66,7 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
       transportRequest: undefined,
     });
     expect(updateCall?.options).toEqual({
+      headers: DEFAULT_ADT_HEADERS['domain.updateMetadata'],
       source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'LOCK123',
       analyse: analyseException,

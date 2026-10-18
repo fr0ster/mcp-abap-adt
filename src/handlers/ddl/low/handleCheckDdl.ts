@@ -12,6 +12,7 @@
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -75,11 +76,14 @@ export async function handleCheckDdl(
   return answer(
     { tool: 'CheckDdlLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDdl(resultsFor(ddlDocuments))
-        .check({ ddlName, source: ddl_source }, checkVersion, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'ddl.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getDdl(resultsFor(ddlDocuments))
+          .check({ ddlName, source: ddl_source }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

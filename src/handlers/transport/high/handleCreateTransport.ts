@@ -22,6 +22,7 @@ import {
   transportCreated,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -105,17 +106,19 @@ export async function handleCreateTransport(
   return answer(
     { tool: 'CreateTransport', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .create(
-          {
-            description: args.description,
-            transportType: args.transport_type || 'workbench',
-            targetSystem: args.target_system,
-            owner,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'request.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .create(
+            {
+              description: args.description,
+              transportType: args.transport_type || 'workbench',
+              targetSystem: args.target_system,
+              owner,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseCreatedTransport),
   );
 }

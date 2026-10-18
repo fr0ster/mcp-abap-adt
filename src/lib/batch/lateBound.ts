@@ -17,15 +17,10 @@
  * forward so the stateful LOCK/UNLOCK envelopes run on, and are restored
  * on, the connection in force.
  *
- * An envelope goes out through the pointed connection's base request
- * (adt-clients' `getBaseRequest`), never through its `makeAdtRequest`: an
- * `AdtClient` built over the instance's connection outside a batch wraps that
- * member with accept negotiation, which would correct and resend an envelope
- * SAP answered `406`/`415`. What SAP answers to an envelope reaches
- * `execute()` as it came; the connection's own handling (credential, CSRF,
- * session) stays.
+ * An envelope goes out through the pointed connection's `makeAdtRequest`.
+ * What SAP answers to an envelope reaches `execute()` as it came; the
+ * connection's own handling (credential, CSRF, session) stays.
  */
-import { getBaseRequest } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -101,8 +96,6 @@ export class LateBoundConnection implements IAbapConnection {
   async makeAdtRequest<T = unknown, D = unknown>(
     options: IAbapRequestOptions,
   ): Promise<IAdtWireResponse<T, D>> {
-    return getBaseRequest(this.target())(options) as Promise<
-      IAdtWireResponse<T, D>
-    >;
+    return this.target().makeAdtRequest<T, D>(options);
   }
 }

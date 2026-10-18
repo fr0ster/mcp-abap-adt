@@ -28,6 +28,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -104,19 +105,21 @@ export async function handleCreateMessageClassMessage(
   return answer(
     { tool: 'CreateMessageClassMessage', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getMessageClassMessage()
-        .create(
-          {
-            className,
-            msgno: args.msgno,
-            msgtext: args.msgtext,
-            selfExplanatory: args.self_explanatory ?? false,
-            description: args.description,
-            transportRequest: args.transport_request,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'messageClassMessage.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getMessageClassMessage()
+          .create(
+            {
+              className,
+              msgno: args.msgno,
+              msgtext: args.msgtext,
+              selfExplanatory: args.self_explanatory ?? false,
+              description: args.description,
+              transportRequest: args.transport_request,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     () => ({
       success: true,
       message_class_name: className,

@@ -6,6 +6,7 @@
 
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -61,15 +62,14 @@ export async function handleCheckDataElement(
   return answer(
     { tool: 'CheckDataElementLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDataElement(resultsFor(dataElementDocuments))
-        // `status` left undefined: the shipped default checks the inactive
-        // version, which is what a caller wants right after a write —
-        // `AdtDataElement.check`'s own `status === 'active' ? 'active' :
-        // 'inactive'` reduces an undefined status to 'inactive'.
-        .check({ dataElementName }, args.version, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'dataElement.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getDataElement(resultsFor(dataElementDocuments))
+          .check({ dataElementName }, args.version, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

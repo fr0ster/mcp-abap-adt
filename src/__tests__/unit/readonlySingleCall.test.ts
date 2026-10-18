@@ -65,6 +65,7 @@ import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTe
 import { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus';
 import { corpusBody } from '../../lib/adtCorpus';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
@@ -202,7 +203,11 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZPKG',
-      { nodeId: '000001', withShortDescriptions: true },
+      {
+        headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
+        nodeId: '000001',
+        withShortDescriptions: true,
+      },
     ]);
   });
 
@@ -222,7 +227,11 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZPKG',
-      { nodeId: '000000', withShortDescriptions: true },
+      {
+        headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
+        nodeId: '000000',
+        withShortDescriptions: true,
+      },
     ]);
   });
 
@@ -267,7 +276,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZPKG',
-      { withShortDescriptions: true },
+      {
+        headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
+        withShortDescriptions: true,
+      },
     ]);
   });
 
@@ -289,7 +301,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleGetSqlQuery(context as any, { sql_query: 'SELECT 1' });
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
-    expect(call?.args).toEqual([{ sql_query: 'SELECT 1', row_number: 100 }]);
+    expect(call?.args).toEqual([
+      { sql_query: 'SELECT 1', row_number: 100 },
+      { headers: DEFAULT_ADT_HEADERS['utils.getSqlQuery'] },
+    ]);
   });
 
   it('GetTableContents calls getTableContents({table_name, max_rows, sql_query})', async () => {
@@ -301,6 +316,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       .at(-1);
     expect(call?.args).toEqual([
       { table_name: 'ZT', max_rows: 100, sql_query: 'SELECT * FROM ZT' },
+      { headers: DEFAULT_ADT_HEADERS['utils.getTableContents'] },
     ]);
   });
 

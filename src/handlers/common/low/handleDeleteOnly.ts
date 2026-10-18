@@ -19,6 +19,8 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
@@ -97,19 +99,29 @@ export async function handleDeleteOnly(
     if (className === undefined) {
       return return_error(new Error('class_name is required'));
     }
-    const [, include] = CLASS_INCLUDES[objectType];
+    const [, includeType, include] = CLASS_INCLUDES[objectType];
     return answer(
       ANSWER,
       () =>
         atStep(
           'update',
           () =>
-            include(createAdtClient(connection, logger)).update(
-              {
-                className: className.toUpperCase(),
-                ...(transportRequest ? { transportRequest } : {}),
-              },
-              { source: '', lockHandle, analyse: analyseException },
+            withAdtHeaders(
+              context,
+              adtOperation(includeType, 'update'),
+              (headers) =>
+                include(createAdtClient(connection, logger)).update(
+                  {
+                    className: className.toUpperCase(),
+                    ...(transportRequest ? { transportRequest } : {}),
+                  },
+                  {
+                    headers,
+                    source: '',
+                    lockHandle,
+                    analyse: analyseException,
+                  },
+                ),
             ) as Promise<never>,
         )() as Promise<never>,
       project('terse', terseWrite),
@@ -142,15 +154,20 @@ export async function handleDeleteOnly(
       atStep(
         'delete',
         () =>
-          target.object(createAdtClient(connection, logger)).delete(
-            target.config(
-              {
-                name: name.toUpperCase(),
-                ...(group ? { group: group.toUpperCase() } : {}),
-              },
-              transportRequest,
-            ),
-            { analyse: target.deleteAnalyse },
+          withAdtHeaders(
+            context,
+            adtOperation(target.objectType, 'delete'),
+            (headers) =>
+              target.object(createAdtClient(connection, logger)).delete(
+                target.config(
+                  {
+                    name: name.toUpperCase(),
+                    ...(group ? { group: group.toUpperCase() } : {}),
+                  },
+                  transportRequest,
+                ),
+                { headers, analyse: target.deleteAnalyse },
+              ),
           ) as Promise<never>,
       )() as Promise<never>,
     // The metadata extension's DELETE answers an empty 2xx; every other

@@ -29,6 +29,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -108,13 +109,16 @@ export async function handleUpdateClass(
         () => obj.lock({ className }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = atStep('update', () =>
-            obj.update(
-              { className, transportRequest: args.transport_request },
-              {
-                source: args.source_code,
-                lockHandle,
-                analyse: analyseException,
-              },
+            withAdtHeaders(context, 'class.update', (headers) =>
+              obj.update(
+                { className, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.source_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
             ),
           );
           // **A finding does not stop the write; a check that could not run
@@ -139,10 +143,12 @@ export async function handleUpdateClass(
           return shouldActivate
             ? sequence(
                 atStep('check', () =>
-                  obj.check(
-                    { className, source: args.source_code },
-                    'inactive',
-                    { analyse: analyseException },
+                  withAdtHeaders(context, 'class.check', (headers) =>
+                    obj.check(
+                      { className, source: args.source_code },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
                   ),
                 ),
                 update,
@@ -159,7 +165,12 @@ export async function handleUpdateClass(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ className }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'class.activate', (headers) =>
+            obj.activate(
+              { className },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

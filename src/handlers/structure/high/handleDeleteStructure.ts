@@ -64,6 +64,8 @@ export async function handleDeleteStructure(
     { tool: 'DeleteStructure', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'structure',
         createAdtClient(connection, logger).getStructure(
           resultsFor(structureDocuments),
         ),

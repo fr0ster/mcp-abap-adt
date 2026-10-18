@@ -34,6 +34,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -180,13 +181,16 @@ export async function handleGetObjectsByType(
   return answer(
     { tool: 'GetObjectsByType', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getUtils(ourUtils)
-        .fetchNodeStructure(parent_type, parentName, {
-          analyse: analyseException,
-          nodeId: node_id,
-          withShortDescriptions: withDescriptions,
-        }),
+      withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+        createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .fetchNodeStructure(parent_type, parentName, {
+            headers,
+            analyse: analyseException,
+            nodeId: node_id,
+            withShortDescriptions: withDescriptions,
+          }),
+      ),
     (level: NodeLevel) => {
       const { text, cached } = formatObjects(
         level,

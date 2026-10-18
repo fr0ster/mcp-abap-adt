@@ -17,6 +17,7 @@ import { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonl
 import { handleRuntimeListFeeds } from '../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeListSystemMessages } from '../../handlers/system/readonly/handleRuntimeListSystemMessages';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const context = { connection: {} as any, logger: undefined };
@@ -277,6 +278,7 @@ describe('RuntimeCreateProfilerTraceParameters', () => {
     const body = JSON.parse(result.content[0].text);
 
     expect(scheduleTrace).toHaveBeenCalledWith({
+      headers: DEFAULT_ADT_HEADERS['classExecutor.scheduleTrace'],
       description: 'my trace',
       allMiscAbapStatements: true,
       allProceduralUnits: true,

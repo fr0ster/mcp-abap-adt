@@ -34,6 +34,7 @@ import {
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -176,97 +177,131 @@ export async function handleCheckObject(
     () => {
       switch (objectType) {
         case 'class':
-          return client
-            .getClass(resultsFor(classDocuments))
-            .check(
-              { className: objectName, source: source_code },
-              checkVersion,
-              {
-                analyse: analyseException,
-              },
-            );
+          return withAdtHeaders(context, 'class.check', (headers) =>
+            client
+              .getClass(resultsFor(classDocuments))
+              .check(
+                { className: objectName, source: source_code },
+                checkVersion,
+                { headers, analyse: analyseException },
+              ),
+          );
         case 'program':
-          return client
-            .getProgram(resultsFor(programDocuments))
-            .check({ programName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
-        case 'interface':
-          return client
-            .getInterface(resultsFor(interfaceDocuments))
-            .check({ interfaceName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
-        case 'function_group':
-          return client
-            .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .check({ functionGroupName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
-        case 'table':
-          return client
-            .getTable(resultsFor(tableDocuments))
-            .check({ tableName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
-        case 'structure':
-          return client
-            .getStructure(resultsFor(structureDocuments))
-            .check(
-              { structureName: objectName, source: source_code },
-              checkVersion,
-              {
+          return withAdtHeaders(context, 'program.check', (headers) =>
+            client
+              .getProgram(resultsFor(programDocuments))
+              .check({ programName: objectName }, checkVersion, {
+                headers,
                 analyse: analyseException,
-              },
-            );
+              }),
+          );
+        case 'interface':
+          return withAdtHeaders(context, 'interface.check', (headers) =>
+            client
+              .getInterface(resultsFor(interfaceDocuments))
+              .check({ interfaceName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
+        case 'function_group':
+          return withAdtHeaders(context, 'functionGroup.check', (headers) =>
+            client
+              .getFunctionGroup(resultsFor(functionGroupDocuments))
+              .check({ functionGroupName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
+        case 'table':
+          return withAdtHeaders(context, 'table.check', (headers) =>
+            client
+              .getTable(resultsFor(tableDocuments))
+              .check({ tableName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
+        case 'structure':
+          return withAdtHeaders(context, 'structure.check', (headers) =>
+            client
+              .getStructure(resultsFor(structureDocuments))
+              .check(
+                { structureName: objectName, source: source_code },
+                checkVersion,
+                { headers, analyse: analyseException },
+              ),
+          );
         case 'ddl':
-          return client
-            .getDdl(resultsFor(ddlDocuments))
-            .check({ ddlName: objectName, source: source_code }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'ddl.check', (headers) =>
+            client
+              .getDdl(resultsFor(ddlDocuments))
+              .check(
+                { ddlName: objectName, source: source_code },
+                checkVersion,
+                { headers, analyse: analyseException },
+              ),
+          );
         case 'domain':
-          return client
-            .getDomain(resultsFor(domainDocuments))
-            .check({ domainName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'domain.check', (headers) =>
+            client
+              .getDomain(resultsFor(domainDocuments))
+              .check({ domainName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'data_element':
-          return client
-            .getDataElement(resultsFor(dataElementDocuments))
-            .check({ dataElementName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'dataElement.check', (headers) =>
+            client
+              .getDataElement(resultsFor(dataElementDocuments))
+              .check({ dataElementName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'behavior_definition':
-          return client
-            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-            .check({ name: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(
+            context,
+            'behaviorDefinition.check',
+            (headers) =>
+              client
+                .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+                .check({ name: objectName }, checkVersion, {
+                  headers,
+                  analyse: analyseException,
+                }),
+          );
         case 'metadata_extension':
-          return client
-            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-            .check({ name: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'metadataExtension.check', (headers) =>
+            client
+              .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+              .check({ name: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'function_module':
-          return client
-            .getFunctionModule(resultsFor(functionModuleDocuments))
-            .check(
+          return withAdtHeaders(context, 'functionModule.check', (headers) =>
+            client.getFunctionModule(resultsFor(functionModuleDocuments)).check(
               {
                 functionGroupName: functionGroupName as string,
                 functionModuleName: functionModuleName as string,
               },
               checkVersion,
-              { analyse: analyseException },
-            );
+              { headers, analyse: analyseException },
+            ),
+          );
         case 'package':
           // A package check takes no version: the low tool sent none.
-          return client
-            .getPackage(resultsFor(packageDocuments))
-            .check({ packageName: objectName }, undefined, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'package.check', (headers) =>
+            client
+              .getPackage(resultsFor(packageDocuments))
+              .check({ packageName: objectName }, undefined, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);

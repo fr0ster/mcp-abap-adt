@@ -17,6 +17,7 @@
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -91,18 +92,20 @@ export async function handleCreateDdl(
   return answer(
     { tool: 'CreateDdl', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDdl(resultsFor(ddlDocuments))
-        .create(
-          {
-            ddlName,
-            description: args.description || ddlName,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'ddl.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getDdl(resultsFor(ddlDocuments))
+          .create(
+            {
+              ddlName,
+              description: args.description || ddlName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

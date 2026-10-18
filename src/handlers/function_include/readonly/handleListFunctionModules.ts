@@ -27,6 +27,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
+import { nodeStructureOn } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
@@ -73,7 +74,11 @@ export async function handleListFunctionModules(
             .readMetadata({ functionGroupName }, { analyse: analyseException }),
         ),
         atStep('read node structure', () =>
-          fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/FF'),
+          fetchFunctionGroupChildren(
+            nodeStructureOn(context, utils),
+            functionGroupName,
+            'FUGR/FF',
+          ),
         ),
       ),
     (objects) => ({

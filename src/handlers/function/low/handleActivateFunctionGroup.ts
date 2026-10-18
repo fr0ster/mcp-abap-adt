@@ -6,6 +6,7 @@
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,14 @@ export async function handleActivateFunctionGroup(
   return answer(
     { tool: 'ActivateFunctionGroupLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionGroup(resultsFor(functionGroupDocuments))
-        .activate({ functionGroupName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'functionGroup.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionGroup(resultsFor(functionGroupDocuments))
+          .activate(
+            { functionGroupName },
+            { headers, analyse: analyseActivation },
+          ),
+      ),
     project(detail, terseActivation),
   );
 }

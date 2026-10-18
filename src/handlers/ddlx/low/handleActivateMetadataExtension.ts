@@ -6,6 +6,7 @@
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,14 @@ export async function handleActivateMetadataExtension(
   return answer(
     { tool: 'ActivateMetadataExtensionLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .activate({ name: ddlxName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+          .activate(
+            { name: ddlxName },
+            { headers, analyse: analyseActivation },
+          ),
+      ),
     project(detail, terseActivation),
   );
 }

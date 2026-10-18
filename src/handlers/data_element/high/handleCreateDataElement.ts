@@ -34,6 +34,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -222,15 +223,17 @@ export async function handleCreateDataElement(
           ),
         ),
         atStep('create', () =>
-          obj.create(
-            {
-              dataElementName,
-              description: args.description || dataElementName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { analyse: analyseException },
+          withAdtHeaders(context, 'dataElement.create', (headers) =>
+            obj.create(
+              {
+                dataElementName,
+                description: args.description || dataElementName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
         ),
         () =>
@@ -247,36 +250,42 @@ export async function handleCreateDataElement(
                   ),
                 ),
                 atStep('update metadata', (current) =>
-                  obj.updateMetadata(
-                    {
-                      dataElementName,
-                      transportRequest: args.transport_request,
-                    },
-                    {
-                      source: patchDataElementXml(
-                        extractXmlString(
-                          current.raw,
-                          `data element ${dataElementName}`,
-                        ),
+                  withAdtHeaders(
+                    context,
+                    'dataElement.updateMetadata',
+                    (headers) =>
+                      obj.updateMetadata(
                         {
-                          description: args.description || dataElementName,
-                          type_kind: typeKind,
-                          type_name: args.type_name,
-                          data_type: args.data_type || 'CHAR',
-                          length: args.length || 100,
-                          decimals: args.decimals || 0,
-                          short_label: args.short_label,
-                          medium_label: args.medium_label,
-                          long_label: args.long_label,
-                          heading_label: args.heading_label,
-                          search_help: args.search_help,
-                          search_help_parameter: args.search_help_parameter,
-                          set_get_parameter: args.set_get_parameter,
+                          dataElementName,
+                          transportRequest: args.transport_request,
+                        },
+                        {
+                          headers,
+                          source: patchDataElementXml(
+                            extractXmlString(
+                              current.raw,
+                              `data element ${dataElementName}`,
+                            ),
+                            {
+                              description: args.description || dataElementName,
+                              type_kind: typeKind,
+                              type_name: args.type_name,
+                              data_type: args.data_type || 'CHAR',
+                              length: args.length || 100,
+                              decimals: args.decimals || 0,
+                              short_label: args.short_label,
+                              medium_label: args.medium_label,
+                              long_label: args.long_label,
+                              heading_label: args.heading_label,
+                              search_help: args.search_help,
+                              search_help_parameter: args.search_help_parameter,
+                              set_get_parameter: args.set_get_parameter,
+                            },
+                          ),
+                          lockHandle,
+                          analyse: analyseException,
                         },
                       ),
-                      lockHandle,
-                      analyse: analyseException,
-                    },
                   ),
                 ),
               ),
@@ -295,9 +304,12 @@ export async function handleCreateDataElement(
               { withLongPolling: true, analyse: analyseException },
             )
             .catch(unlessCredentialFailure);
-          return obj.check({ dataElementName }, undefined, {
-            analyse: analyseException,
-          });
+          return withAdtHeaders(context, 'dataElement.check', (headers) =>
+            obj.check({ dataElementName }, undefined, {
+              headers,
+              analyse: analyseException,
+            }),
+          );
         }),
       );
 
@@ -308,7 +320,12 @@ export async function handleCreateDataElement(
       return carryCleanup(
         checked,
         atStep('activate', () =>
-          obj.activate({ dataElementName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'dataElement.activate', (headers) =>
+            obj.activate(
+              { dataElementName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

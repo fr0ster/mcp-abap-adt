@@ -28,6 +28,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -115,15 +116,17 @@ export async function handleCreateFunctionGroup(
       );
 
       let created = await atStep('create', () =>
-        obj.create(
-          {
-            functionGroupName,
-            description: args.description || functionGroupName,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
+        withAdtHeaders(context, 'functionGroup.create', (headers) =>
+          obj.create(
+            {
+              functionGroupName,
+              description: args.description || functionGroupName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
         ),
       )();
 
@@ -151,7 +154,12 @@ export async function handleCreateFunctionGroup(
       }
 
       return atStep('activate', () =>
-        obj.activate({ functionGroupName }, { analyse: analyseActivation }),
+        withAdtHeaders(context, 'functionGroup.activate', (headers) =>
+          obj.activate(
+            { functionGroupName },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
       )();
     },
     project(detail, terseWrite),

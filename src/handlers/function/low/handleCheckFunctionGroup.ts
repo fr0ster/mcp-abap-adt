@@ -11,6 +11,7 @@
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -66,14 +67,14 @@ export async function handleCheckFunctionGroup(
   return answer(
     { tool: 'CheckFunctionGroupLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionGroup(resultsFor(functionGroupDocuments))
-        // `status` left undefined: the shipped default checks the inactive
-        // version, and there is no `version` parameter on this tool to say
-        // otherwise.
-        .check({ functionGroupName }, args.version, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'functionGroup.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionGroup(resultsFor(functionGroupDocuments))
+          .check({ functionGroupName }, args.version, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

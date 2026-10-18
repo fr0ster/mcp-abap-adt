@@ -22,6 +22,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -102,22 +103,28 @@ export async function handleUpdateServiceDefinition(
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             atStep('update', () =>
-              obj.update(
-                {
-                  serviceDefinitionName,
-                  transportRequest: args.transport_request,
-                },
-                {
-                  source: args.source_code,
-                  lockHandle,
-                  analyse: analyseException,
-                },
+              withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
+                obj.update(
+                  {
+                    serviceDefinitionName,
+                    transportRequest: args.transport_request,
+                  },
+                  {
+                    headers,
+                    source: args.source_code,
+                    lockHandle,
+                    analyse: analyseException,
+                  },
+                ),
               ),
             ),
             atStep('check', () =>
-              obj.check({ serviceDefinitionName }, undefined, {
-                analyse: analyseException,
-              }),
+              withAdtHeaders(context, 'serviceDefinition.check', (headers) =>
+                obj.check({ serviceDefinitionName }, undefined, {
+                  headers,
+                  analyse: analyseException,
+                }),
+              ),
             ),
           ),
         (lockHandle) =>
@@ -145,9 +152,11 @@ export async function handleUpdateServiceDefinition(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate(
-            { serviceDefinitionName },
-            { analyse: analyseActivation },
+          withAdtHeaders(context, 'serviceDefinition.activate', (headers) =>
+            obj.activate(
+              { serviceDefinitionName },
+              { headers, analyse: analyseActivation },
+            ),
           ),
         ),
       );

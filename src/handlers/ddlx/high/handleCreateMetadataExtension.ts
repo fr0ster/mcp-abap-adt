@@ -21,6 +21,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -111,15 +112,17 @@ export async function handleCreateMetadataExtension(
       );
 
       const created = await atStep('create', () =>
-        obj.create(
-          {
-            name,
-            description: args.description || name,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
+        withAdtHeaders(context, 'metadataExtension.create', (headers) =>
+          obj.create(
+            {
+              name,
+              description: args.description || name,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
         ),
       )();
       if (!created.ok) return created;
@@ -131,7 +134,12 @@ export async function handleCreateMetadataExtension(
         // that exists yet is the unsaved one. The endpoint does not fall back
         // — asking for `active` here answers `notProcessed`.
         atStep('check', () =>
-          obj.check({ name }, 'inactive', { analyse: analyseException }),
+          withAdtHeaders(context, 'metadataExtension.check', (headers) =>
+            obj.check({ name }, 'inactive', {
+              headers,
+              analyse: analyseException,
+            }),
+          ),
         ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
@@ -155,7 +163,9 @@ export async function handleCreateMetadataExtension(
       return carryCleanup(
         checked,
         atStep('activate', () =>
-          obj.activate({ name }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
+            obj.activate({ name }, { headers, analyse: analyseActivation }),
+          ),
         ),
       );
     },

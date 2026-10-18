@@ -6,6 +6,7 @@
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,11 @@ export async function handleActivateInterface(
   return answer(
     { tool: 'ActivateInterfaceLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getInterface(resultsFor(interfaceDocuments))
-        .activate({ interfaceName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'interface.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getInterface(resultsFor(interfaceDocuments))
+          .activate({ interfaceName }, { headers, analyse: analyseActivation }),
+      ),
     project(detail, terseActivation),
   );
 }

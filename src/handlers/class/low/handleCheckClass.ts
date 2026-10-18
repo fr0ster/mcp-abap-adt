@@ -8,6 +8,7 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -74,11 +75,14 @@ export async function handleCheckClass(
   return answer(
     { tool: 'CheckClassLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getClass(resultsFor(classDocuments))
-        .check({ className, source: source_code }, checkVersion, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'class.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getClass(resultsFor(classDocuments))
+          .check({ className, source: source_code }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

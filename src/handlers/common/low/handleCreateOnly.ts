@@ -53,6 +53,7 @@ import type {
   IAdtResponse,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -253,18 +254,20 @@ export async function handleCreateOnly(
       if (refused) return refused;
       const domainName = String(args.domain_name).toUpperCase();
       return createAlone(args, 'CreateDomain', () =>
-        client()
-          .getDomain(resultsFor(domainDocuments))
-          .create(
-            {
-              domainName,
-              description: text(args.description) || domainName,
-              packageName,
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'domain.create', (headers) =>
+          client()
+            .getDomain(resultsFor(domainDocuments))
+            .create(
+              {
+                domainName,
+                description: text(args.description) || domainName,
+                packageName,
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'DATA_ELEMENT': {
@@ -272,18 +275,20 @@ export async function handleCreateOnly(
       if (refused) return refused;
       const dataElementName = String(args.data_element_name).toUpperCase();
       return createAlone(args, 'CreateDataElement', () =>
-        client()
-          .getDataElement(resultsFor(dataElementDocuments))
-          .create(
-            {
-              dataElementName,
-              description: text(args.description) || dataElementName,
-              packageName,
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'dataElement.create', (headers) =>
+          client()
+            .getDataElement(resultsFor(dataElementDocuments))
+            .create(
+              {
+                dataElementName,
+                description: text(args.description) || dataElementName,
+                packageName,
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'STRUCTURE': {
@@ -291,18 +296,20 @@ export async function handleCreateOnly(
       if (refused) return refused;
       const structureName = String(args.structure_name).toUpperCase();
       return createAlone(args, 'CreateStructure', () =>
-        client()
-          .getStructure(resultsFor(structureDocuments))
-          .create(
-            {
-              structureName,
-              description: text(args.description) || structureName,
-              packageName,
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'structure.create', (headers) =>
+          client()
+            .getStructure(resultsFor(structureDocuments))
+            .create(
+              {
+                structureName,
+                description: text(args.description) || structureName,
+                packageName,
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'SERVICE_DEFINITION': {
@@ -315,18 +322,20 @@ export async function handleCreateOnly(
         args.service_definition_name,
       ).toUpperCase();
       return createAlone(args, 'CreateServiceDefinition', () =>
-        client()
-          .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
-          .create(
-            {
-              serviceDefinitionName,
-              description: text(args.description) || serviceDefinitionName,
-              packageName: packageName.toUpperCase(),
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'serviceDefinition.create', (headers) =>
+          client()
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .create(
+              {
+                serviceDefinitionName,
+                description: text(args.description) || serviceDefinitionName,
+                packageName: packageName.toUpperCase(),
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'SERVICE_BINDING': {
@@ -340,30 +349,32 @@ export async function handleCreateOnly(
         .trim()
         .toUpperCase();
       return createAlone(args, 'CreateServiceBinding', () =>
-        client()
-          .getServiceBinding(resultsFor(serviceDocuments))
-          .create(
-            {
-              bindingName: serviceBindingName,
-              packageName: packageName.trim().toUpperCase(),
-              description: (
-                text(args.description) || serviceBindingName
-              ).trim(),
-              serviceDefinitionName: String(args.service_definition_name)
-                .trim()
-                .toUpperCase(),
-              serviceName: (text(args.service_name) || serviceBindingName)
-                .trim()
-                .toUpperCase(),
-              serviceVersion: (text(args.service_version) || '0001').trim(),
-              bindingVariant:
-                (args.binding_variant as ServiceBindingVariant | undefined) ??
-                'ODATA_V4_UI',
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'serviceBinding.create', (headers) =>
+          client()
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .create(
+              {
+                bindingName: serviceBindingName,
+                packageName: packageName.trim().toUpperCase(),
+                description: (
+                  text(args.description) || serviceBindingName
+                ).trim(),
+                serviceDefinitionName: String(args.service_definition_name)
+                  .trim()
+                  .toUpperCase(),
+                serviceName: (text(args.service_name) || serviceBindingName)
+                  .trim()
+                  .toUpperCase(),
+                serviceVersion: (text(args.service_version) || '0001').trim(),
+                bindingVariant:
+                  (args.binding_variant as ServiceBindingVariant | undefined) ??
+                  'ODATA_V4_UI',
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'FUNCTION_GROUP': {
@@ -371,18 +382,20 @@ export async function handleCreateOnly(
       if (refused) return refused;
       const functionGroupName = String(args.function_group_name).toUpperCase();
       return createAlone(args, 'CreateFunctionGroup', () =>
-        client()
-          .getFunctionGroup(resultsFor(functionGroupDocuments))
-          .create(
-            {
-              functionGroupName,
-              description: text(args.description) || functionGroupName,
-              packageName,
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'functionGroup.create', (headers) =>
+          client()
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
+            .create(
+              {
+                functionGroupName,
+                description: text(args.description) || functionGroupName,
+                packageName,
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'BEHAVIOR_DEFINITION': {
@@ -394,19 +407,21 @@ export async function handleCreateOnly(
       if (refused) return refused;
       const name = String(args.name).toUpperCase();
       return createAlone(args, 'CreateBehaviorDefinition', () =>
-        client()
-          .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-          .create(
-            {
-              name,
-              description: text(args.description) || name,
-              packageName,
-              transportRequest,
-              implementationType: args.implementation_type as never,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'behaviorDefinition.create', (headers) =>
+          client()
+            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+            .create(
+              {
+                name,
+                description: text(args.description) || name,
+                packageName,
+                transportRequest,
+                implementationType: args.implementation_type as never,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     case 'BEHAVIOR_IMPLEMENTATION': {
@@ -420,23 +435,24 @@ export async function handleCreateOnly(
         // adt-clients builds the inner class with an empty system context:
         // the responsible and the master system go in the config.
         const { responsible, masterSystem } = requireSystemContextForCreate();
-        return client()
-          .getBehaviorImplementation(resultsFor(classDocuments))
-          .create(
-            // The config type declares `behaviorDefinition`, which this
-            // create never sends (AdtBehaviorImplementation.create passes
-            // className, packageName, transportRequest, description,
-            // masterSystem, responsible to the class create): left out.
-            {
-              className,
-              packageName: packageName.toUpperCase(),
-              description: text(args.description) || className,
-              transportRequest,
-              responsible,
-              masterSystem,
-            } as never,
-            { analyse: analyseException },
-          );
+        return withAdtHeaders(
+          context,
+          'behaviorImplementation.create',
+          (headers) =>
+            client()
+              .getBehaviorImplementation(resultsFor(classDocuments))
+              .create(
+                {
+                  className,
+                  packageName: packageName.toUpperCase(),
+                  description: text(args.description) || className,
+                  transportRequest,
+                  responsible,
+                  masterSystem,
+                } as never,
+                { headers, analyse: analyseException },
+              ),
+        );
       });
     }
     case 'METADATA_EXTENSION': {
@@ -444,18 +460,20 @@ export async function handleCreateOnly(
       if (refused) return refused;
       const name = String(args.name).toUpperCase();
       return createAlone(args, 'CreateMetadataExtension', () =>
-        client()
-          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-          .create(
-            {
-              name,
-              description: text(args.description) || name,
-              packageName,
-              transportRequest,
-              masterLanguage,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'metadataExtension.create', (headers) =>
+          client()
+            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+            .create(
+              {
+                name,
+                description: text(args.description) || name,
+                packageName,
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       );
     }
     default:

@@ -17,6 +17,7 @@
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateServiceDefinition } from '../../../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getTimeout } from '../../helpers/configHelpers';
@@ -40,7 +41,10 @@ async function deleteServiceDefinitionWrapper(
         serviceDefinitionName: args.service_definition_name,
         transportRequest: args.transport_request,
       },
-      { analyse: analyseDeletion },
+      {
+        headers: DEFAULT_ADT_HEADERS['serviceDefinition.delete'],
+        analyse: analyseDeletion,
+      },
     );
     if (!deleted.ok) {
       throw new Error(deleted.getError().message);

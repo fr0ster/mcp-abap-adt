@@ -42,6 +42,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -239,21 +240,26 @@ export async function handleCreateStructure(
           ),
         ),
         atStep('create', () =>
-          obj.create(
-            {
-              structureName,
-              description: args.description || structureName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { analyse: analyseException },
+          withAdtHeaders(context, 'structure.create', (headers) =>
+            obj.create(
+              {
+                structureName,
+                description: args.description || structureName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
         ),
         atStep('check', () =>
-          obj.check({ structureName }, 'inactive', {
-            analyse: analyseException,
-          }),
+          withAdtHeaders(context, 'structure.check', (headers) =>
+            obj.check({ structureName }, 'inactive', {
+              headers,
+              analyse: analyseException,
+            }),
+          ),
         ),
       );
 
@@ -261,7 +267,12 @@ export async function handleCreateStructure(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ structureName }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'structure.activate', (headers) =>
+        obj.activate(
+          { structureName },
+          { headers, analyse: analyseActivation },
+        ),
+      );
     },
     project(detail, terseWrite),
   );

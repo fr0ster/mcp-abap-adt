@@ -14,6 +14,7 @@
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -117,20 +118,22 @@ export async function handleCreateProgram(
   return answer(
     { tool: 'CreateProgram', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getProgram(resultsFor(programDocuments))
-        .create(
-          {
-            programName,
-            description: args.description || programName,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            programType: args.program_type,
-            application: args.application,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'program.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getProgram(resultsFor(programDocuments))
+          .create(
+            {
+              programName,
+              description: args.description || programName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              programType: args.program_type,
+              application: args.application,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

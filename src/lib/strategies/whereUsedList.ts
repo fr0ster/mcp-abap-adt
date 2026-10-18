@@ -1,4 +1,12 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtHeaders,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../adtHeaders/withAdtHeaders';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
 
@@ -33,6 +41,44 @@ export interface WhereUsedSource {
     object_type: string;
     scopeXml?: string;
   }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+}
+
+/**
+ * The utilities' three where-used members as adt-clients declares them: the
+ * two requests take their header pair (`options.headers`).
+ */
+export interface WhereUsedMembers {
+  getWhereUsedScope(
+    params: { object_name: string; object_type: string },
+    options: { headers: IAdtHeaders },
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  modifyWhereUsedScope: WhereUsedSource['modifyWhereUsedScope'];
+  getWhereUsed(
+    params: { object_name: string; object_type: string; scopeXml?: string },
+    options: { headers: IAdtHeaders },
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+}
+
+/**
+ * `utils` as a `WhereUsedSource`: each request with the header pair of its
+ * member for the call's system (`withAdtHeaders`).
+ */
+export function whereUsedOn(
+  context: AdtHeadersContext,
+  utils: WhereUsedMembers,
+): WhereUsedSource {
+  return {
+    getWhereUsedScope: (params) =>
+      withAdtHeaders(context, 'utils.getWhereUsedScope', (headers) =>
+        utils.getWhereUsedScope(params, { headers }),
+      ),
+    modifyWhereUsedScope: (scopeXml, options) =>
+      utils.modifyWhereUsedScope(scopeXml, options),
+    getWhereUsed: (params) =>
+      withAdtHeaders(context, 'utils.getWhereUsed', (headers) =>
+        utils.getWhereUsed(params, { headers }),
+      ),
+  };
 }
 
 export interface WhereUsedReference {

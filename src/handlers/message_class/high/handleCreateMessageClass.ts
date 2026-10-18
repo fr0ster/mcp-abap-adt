@@ -9,6 +9,7 @@
 
 import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -85,18 +86,20 @@ export async function handleCreateMessageClass(
   return answer(
     { tool: 'CreateMessageClass', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMessageClass(resultsFor(messageClassDocuments))
-        .create(
-          {
-            name,
-            description: args.description || name,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'messageClass.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getMessageClass(resultsFor(messageClassDocuments))
+          .create(
+            {
+              name,
+              description: args.description || name,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

@@ -4,6 +4,7 @@ import type {
   IAdtFailure,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   answer,
   failedPayloadOf,
@@ -27,6 +28,7 @@ import {
   metadataDescriptions,
   type NodeLevel,
   type NodeRequest,
+  nodeStructureOn,
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -321,10 +323,15 @@ async function buildTree(
   const children: TreeNode[] = [];
 
   if (depth < maxDepth) {
-    const rootResponse = await utils.fetchNodeStructure(
-      objectType,
-      objectName,
-      { analyse: analyseException, withShortDescriptions: true },
+    const rootResponse = await withAdtHeaders(
+      context,
+      'utils.fetchNodeStructure',
+      (headers) =>
+        utils.fetchNodeStructure(objectType, objectName, {
+          headers,
+          analyse: analyseException,
+          withShortDescriptions: true,
+        }),
     );
     if (!rootResponse.ok) {
       return rootResponse as IAdtResponse<TreeNode, IAdtError>;
@@ -340,14 +347,16 @@ async function buildTree(
     }
 
     for (const child of root.childNodes) {
-      const childResponse = await utils.fetchNodeStructure(
-        objectType,
-        objectName,
-        {
-          analyse: analyseException,
-          nodeId: child.nodeId,
-          withShortDescriptions: true,
-        },
+      const childResponse = await withAdtHeaders(
+        context,
+        'utils.fetchNodeStructure',
+        (headers) =>
+          utils.fetchNodeStructure(objectType, objectName, {
+            headers,
+            analyse: analyseException,
+            nodeId: child.nodeId,
+            withShortDescriptions: true,
+          }),
       );
       if (!childResponse.ok) {
         return childResponse as IAdtResponse<TreeNode, IAdtError>;
@@ -412,7 +421,13 @@ async function buildTrees(
   ended: Ended,
 ): Promise<Trees> {
   const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
-    readNode(createAdtClient(c, context.logger).getUtils(ourUtils), request),
+    readNode(
+      nodeStructureOn(
+        context,
+        createAdtClient(c, context.logger).getUtils(ourUtils),
+      ),
+      request,
+    ),
   );
   const failures = new Map<number, IAdtFailure | Thrown>();
   const roots: InfoNode[] = objects.map((o, root) => ({

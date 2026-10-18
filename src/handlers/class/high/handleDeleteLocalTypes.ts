@@ -16,6 +16,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -86,9 +87,11 @@ export async function handleDeleteLocalTypes(
       const deleted = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
         atStep('update', (lockHandle) =>
-          obj.update(
-            { className, transportRequest: args.transport_request },
-            { source: '', lockHandle, analyse: analyseException },
+          withAdtHeaders(context, 'localTypes.update', (headers) =>
+            obj.update(
+              { className, transportRequest: args.transport_request },
+              { headers, source: '', lockHandle, analyse: analyseException },
+            ),
           ),
         ),
         (lockHandle) =>
@@ -102,7 +105,12 @@ export async function handleDeleteLocalTypes(
       return carryCleanup(
         deleted,
         atStep('activate', () =>
-          obj.activate({ className }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'localTypes.activate', (headers) =>
+            obj.activate(
+              { className },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

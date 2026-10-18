@@ -16,6 +16,7 @@
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -79,12 +80,14 @@ export async function handleCheckProgram(
   return answer(
     { tool: 'CheckProgramLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getProgram(resultsFor(programDocuments))
-        // `status` left undefined: the shipped default checks the inactive
-        // version, and there is no `version` parameter on this tool to say
-        // otherwise.
-        .check({ programName }, args.version, { analyse: analyseException }),
+      withAdtHeaders(context, 'program.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getProgram(resultsFor(programDocuments))
+          .check({ programName }, args.version, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

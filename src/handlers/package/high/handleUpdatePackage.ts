@@ -17,6 +17,7 @@
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -104,21 +105,27 @@ export async function handleUpdatePackage(
                   ),
                 ),
                 atStep('update metadata', (current) =>
-                  pkg.updateMetadata(
-                    {
-                      packageName,
-                      ...(args.transport_request && {
-                        transportRequest: args.transport_request,
-                      }),
-                    },
-                    {
-                      source: patchPackageXml(
-                        extractXmlString(current.raw, `package ${packageName}`),
-                        { description: args.description },
-                      ),
-                      lockHandle,
-                      analyse: analyseException,
-                    },
+                  withAdtHeaders(context, 'package.updateMetadata', (headers) =>
+                    pkg.updateMetadata(
+                      {
+                        packageName,
+                        ...(args.transport_request && {
+                          transportRequest: args.transport_request,
+                        }),
+                      },
+                      {
+                        headers,
+                        source: patchPackageXml(
+                          extractXmlString(
+                            current.raw,
+                            `package ${packageName}`,
+                          ),
+                          { description: args.description },
+                        ),
+                        lockHandle,
+                        analyse: analyseException,
+                      },
+                    ),
                   ),
                 ),
               ),

@@ -6,6 +6,7 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,11 @@ export async function handleActivateClass(
   return answer(
     { tool: 'ActivateClassLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getClass(resultsFor(classDocuments))
-        .activate({ className }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'class.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getClass(resultsFor(classDocuments))
+          .activate({ className }, { headers, analyse: analyseActivation }),
+      ),
     project(detail, terseActivation),
   );
 }

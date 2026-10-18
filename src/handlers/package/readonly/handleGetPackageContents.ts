@@ -9,6 +9,7 @@ import {
   batchReader,
   describeFromMetadata,
   type NodeRequest,
+  nodeStructureOn,
   readNode,
   rootByRoot,
   walkPackage,
@@ -96,7 +97,13 @@ export async function handleGetPackageContents(
           context,
           await walkPackages(
             batchReader<NodeRequest, unknown>(context, (request, c) =>
-              readNode(createAdtClient(c, logger).getUtils(ourUtils), request),
+              readNode(
+                nodeStructureOn(
+                  context,
+                  createAdtClient(c, logger).getUtils(ourUtils),
+                ),
+                request,
+              ),
             ),
             packageNames,
             options,
@@ -105,7 +112,7 @@ export async function handleGetPackageContents(
       () => {
         const utils = createAdtClient(connection, logger).getUtils(ourUtils);
         return rootByRoot(packageNames, (name) =>
-          walkPackage(utils, name, options),
+          walkPackage(nodeStructureOn(context, utils), name, options),
         );
       },
     );

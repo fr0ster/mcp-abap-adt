@@ -24,6 +24,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answerFailure, answerThrown } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -114,19 +115,22 @@ export async function handleUpdateDomain(
             .readMetadata({ domainName }, { analyse: analyseException }),
         ),
         atStep('update metadata', (current) =>
-          client.getDomain().updateMetadata(
-            {
-              domainName,
-              transportRequest,
-            },
-            {
-              source: patchDomainXml(
-                extractXmlString(current, `domain ${domainName}`),
-                properties,
-              ),
-              lockHandle: lock_handle,
-              analyse: analyseException,
-            },
+          withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+            client.getDomain().updateMetadata(
+              {
+                domainName,
+                transportRequest,
+              },
+              {
+                headers,
+                source: patchDomainXml(
+                  extractXmlString(current, `domain ${domainName}`),
+                  properties,
+                ),
+                lockHandle: lock_handle,
+                analyse: analyseException,
+              },
+            ),
           ),
         ),
       );

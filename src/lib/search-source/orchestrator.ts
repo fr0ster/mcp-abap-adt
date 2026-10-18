@@ -7,6 +7,7 @@ import {
   assembleList,
   batchReader,
   type NodeRequest,
+  nodeStructureOn,
   readNode,
   type WalkedItem,
   walkPackages,
@@ -422,7 +423,10 @@ async function runSearchSourceInPhases(
   const names = resolved.map((name) => name.toUpperCase());
   const levels = batchReader<NodeRequest, unknown>(ctx, (request, connection) =>
     readNode(
-      createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+      nodeStructureOn(
+        ctx,
+        createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+      ),
       request,
     ),
   );

@@ -31,6 +31,7 @@
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -89,9 +90,14 @@ export async function handleCheckMetadataExtension(
   return answer(
     { tool: 'CheckMetadataExtensionLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .check({ name: ddlxName }, checkVersion, { analyse: analyseException }),
+      withAdtHeaders(context, 'metadataExtension.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+          .check({ name: ddlxName }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

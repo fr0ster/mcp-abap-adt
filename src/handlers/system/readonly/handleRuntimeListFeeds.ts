@@ -1,8 +1,4 @@
-import {
-  AdtRuntimeClient,
-  exemptFromAcceptNegotiation,
-  FeedRepository,
-} from '@mcp-abap-adt/adt-clients';
+import { AdtRuntimeClient, FeedRepository } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   feedEntries,
@@ -512,7 +508,7 @@ const ROUNDS_ENDED_WORDS =
 /**
  * A connection for one feed's read whose requests wait for their round:
  * `ask` holds each one until the round sends it, and settles it with the
- * part's answer. Exempt from accept negotiation, as the batch connection is.
+ * part's answer.
  */
 function roundConnection(
   connection: HandlerContext['connection'],
@@ -532,7 +528,6 @@ function roundConnection(
       return ask(request) as Promise<IAdtWireResponse<T, D>>;
     },
   };
-  exemptFromAcceptNegotiation(view);
   return view as HandlerContext['connection'];
 }
 

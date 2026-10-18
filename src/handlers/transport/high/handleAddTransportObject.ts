@@ -18,6 +18,7 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -97,17 +98,19 @@ export async function handleAddTransportObject(
   return answer(
     { tool: 'AddTransportObject', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .addObject(
-          args.transport_number,
-          {
-            name: args.object_name,
-            type: args.object_type,
-            ...(args.pgmid ? { pgmid: args.pgmid } : {}),
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'request.addObject', (headers) =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .addObject(
+            args.transport_number,
+            {
+              name: args.object_name,
+              type: args.object_type,
+              ...(args.pgmid ? { pgmid: args.pgmid } : {}),
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseAddition),
   );
 }

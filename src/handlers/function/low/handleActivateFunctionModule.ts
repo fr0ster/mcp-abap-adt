@@ -6,6 +6,7 @@
 
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -63,12 +64,14 @@ export async function handleActivateFunctionModule(
   return answer(
     { tool: 'ActivateFunctionModuleLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionModule(resultsFor(functionModuleDocuments))
-        .activate(
-          { functionModuleName, functionGroupName },
-          { analyse: analyseActivation },
-        ),
+      withAdtHeaders(context, 'functionModule.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionModule(resultsFor(functionModuleDocuments))
+          .activate(
+            { functionModuleName, functionGroupName },
+            { headers, analyse: analyseActivation },
+          ),
+      ),
     project(detail, terseActivation),
   );
 }

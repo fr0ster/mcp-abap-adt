@@ -27,6 +27,7 @@
 
 import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -109,9 +110,16 @@ export async function handleUpdateMessageClass(
       return withLock(
         () => obj.lock({ name }, { analyse: analyseLock }),
         atStep('update metadata', (lockHandle) =>
-          obj.updateMetadata(
-            { name, transportRequest: args.transport_request },
-            { source: edited, lockHandle, analyse: analyseException },
+          withAdtHeaders(context, 'messageClass.updateMetadata', (headers) =>
+            obj.updateMetadata(
+              { name, transportRequest: args.transport_request },
+              {
+                headers,
+                source: edited,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
         ),
         (lockHandle) =>

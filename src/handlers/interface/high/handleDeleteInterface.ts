@@ -64,6 +64,8 @@ export async function handleDeleteInterface(
     { tool: 'DeleteInterface', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'interface',
         createAdtClient(connection, logger).getInterface(
           resultsFor(interfaceDocuments),
         ),

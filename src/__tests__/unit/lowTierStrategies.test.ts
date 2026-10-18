@@ -78,6 +78,7 @@ import { handleActivateTable } from '../../handlers/table/low/handleActivateTabl
 import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { corpusBody } from '../../lib/adtCorpus';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
@@ -969,6 +970,7 @@ describe('data_element', () => {
       transportRequest: 'SIDK900001',
     });
     expect(updateCall?.options).toEqual({
+      headers: DEFAULT_ADT_HEADERS['dataElement.updateMetadata'],
       source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,
@@ -1115,7 +1117,11 @@ describe('system — three getUtils() reads, each given analyseException (interf
       'ZP_X',
       // The root is `000000`: `0000` answers 200 with an empty body on premise
       // (2026-09-25), which read as an empty package.
-      { nodeId: '000000', withShortDescriptions: true },
+      {
+        headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
+        nodeId: '000000',
+        withShortDescriptions: true,
+      },
     ]);
   });
 
@@ -1408,6 +1414,7 @@ describe('package — no Activate tool (a package is a container, no activation)
       'adtcore:name="ZADT_BLD_PKG03"',
     );
     expect(updateCall?.options).toEqual({
+      headers: DEFAULT_ADT_HEADERS['package.updateMetadata'],
       source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,

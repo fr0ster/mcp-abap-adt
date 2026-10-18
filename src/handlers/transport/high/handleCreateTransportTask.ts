@@ -31,6 +31,7 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   answer,
   type FailureEntry,
@@ -157,10 +158,13 @@ export async function handleCreateTransportTask(
         resultsFor(transportDocuments),
       );
       const created = await atStep('create task', () =>
-        request.createTask(args.transport_number, {
-          targetUser,
-          analyse: analyseException,
-        }),
+        withAdtHeaders(context, 'request.createTask', (headers) =>
+          request.createTask(args.transport_number, {
+            headers,
+            targetUser,
+            analyse: analyseException,
+          }),
+        ),
       )();
       // A reading, as `project` receives it: the parsed document is its value.
       const number = created.ok
@@ -170,9 +174,15 @@ export async function handleCreateTransportTask(
           )
         : '';
       if (number && taskType !== 'X') {
-        const changed = await request.changeTaskType(number, taskType, {
-          analyse: analyseException,
-        });
+        const changed = await withAdtHeaders(
+          context,
+          'request.changeTaskType',
+          (headers) =>
+            request.changeTaskType(number, taskType, {
+              headers,
+              analyse: analyseException,
+            }),
+        );
         // A refusal is the method's error as it is, with its step.
         typed = changed.ok
           ? { type: taskType }

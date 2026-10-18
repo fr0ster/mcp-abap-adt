@@ -6,6 +6,7 @@
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -61,11 +62,14 @@ export async function handleCheckInterface(
   return answer(
     { tool: 'CheckInterfaceLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getInterface(resultsFor(interfaceDocuments))
-        // `status` left undefined: the shipped default checks the inactive
-        // version, which is what a caller wants right after a write.
-        .check({ interfaceName }, args.version, { analyse: analyseException }),
+      withAdtHeaders(context, 'interface.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getInterface(resultsFor(interfaceDocuments))
+          .check({ interfaceName }, args.version, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

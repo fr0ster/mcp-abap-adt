@@ -77,6 +77,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -202,55 +203,102 @@ function familyFor(typeCode: string): ActivationFamily | undefined {
 }
 
 function activateFamily(
+  context: HandlerContext,
   client: ReturnType<typeof createAdtClient>,
   family: ActivationFamily,
   name: string,
 ) {
   switch (family) {
     case 'class':
-      return client
-        .getClass(resultsFor(classDocuments))
-        .activate({ className: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'class.activate', (headers) =>
+        client
+          .getClass(resultsFor(classDocuments))
+          .activate(
+            { className: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'program':
-      return client
-        .getProgram(resultsFor(programDocuments))
-        .activate({ programName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'program.activate', (headers) =>
+        client
+          .getProgram(resultsFor(programDocuments))
+          .activate(
+            { programName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'interface':
-      return client
-        .getInterface(resultsFor(interfaceDocuments))
-        .activate({ interfaceName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'interface.activate', (headers) =>
+        client
+          .getInterface(resultsFor(interfaceDocuments))
+          .activate(
+            { interfaceName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'function_group':
-      return client
-        .getFunctionGroup(resultsFor(functionGroupDocuments))
-        .activate({ functionGroupName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'functionGroup.activate', (headers) =>
+        client
+          .getFunctionGroup(resultsFor(functionGroupDocuments))
+          .activate(
+            { functionGroupName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'table':
-      return client
-        .getTable(resultsFor(tableDocuments))
-        .activate({ tableName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'table.activate', (headers) =>
+        client
+          .getTable(resultsFor(tableDocuments))
+          .activate(
+            { tableName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'structure':
-      return client
-        .getStructure(resultsFor(structureDocuments))
-        .activate({ structureName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'structure.activate', (headers) =>
+        client
+          .getStructure(resultsFor(structureDocuments))
+          .activate(
+            { structureName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'ddl':
-      return client
-        .getDdl(resultsFor(ddlDocuments))
-        .activate({ ddlName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'ddl.activate', (headers) =>
+        client
+          .getDdl(resultsFor(ddlDocuments))
+          .activate({ ddlName: name }, { headers, analyse: analyseActivation }),
+      );
     case 'domain':
-      return client
-        .getDomain(resultsFor(domainDocuments))
-        .activate({ domainName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'domain.activate', (headers) =>
+        client
+          .getDomain(resultsFor(domainDocuments))
+          .activate(
+            { domainName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'data_element':
-      return client
-        .getDataElement(resultsFor(dataElementDocuments))
-        .activate({ dataElementName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'dataElement.activate', (headers) =>
+        client
+          .getDataElement(resultsFor(dataElementDocuments))
+          .activate(
+            { dataElementName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'behavior_definition':
-      return client
-        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-        .activate({ name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
+        client
+          .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+          .activate({ name }, { headers, analyse: analyseActivation }),
+      );
     case 'metadata_extension':
-      return client
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .activate({ name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
+        client
+          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+          .activate({ name }, { headers, analyse: analyseActivation }),
+      );
   }
 }
 
@@ -317,7 +365,7 @@ export async function handleActivateObject(
     const objectName = activationObjects[0].name;
     return answer(
       { tool: 'ActivateObjectLow', detail },
-      () => activateFamily(client, family, objectName),
+      () => activateFamily(context, client, family, objectName),
       project(detail, terseActivation),
     );
   }
@@ -337,10 +385,14 @@ export async function handleActivateObject(
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
     async () => {
-      const started = await utils.activateObjectsGroup(
-        activationObjects,
-        preaudit,
-        { analyse: analyseException },
+      const started = await withAdtHeaders(
+        context,
+        'utils.activateObjectsGroup',
+        (headers) =>
+          utils.activateObjectsGroup(activationObjects, preaudit, {
+            headers,
+            analyse: analyseException,
+          }),
       );
       if (!started.ok) return started as never;
       const runId = started.getResult().value;
@@ -457,10 +509,14 @@ export async function handleActivateObjectOnce(
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
     async () => {
-      const started = await utils.activateObjectsGroup(
-        activationObjects,
-        preaudit,
-        { analyse: analyseException },
+      const started = await withAdtHeaders(
+        context,
+        'utils.activateObjectsGroup',
+        (headers) =>
+          utils.activateObjectsGroup(activationObjects, preaudit, {
+            headers,
+            analyse: analyseException,
+          }),
       );
       if (!started.ok) {
         return failedWith<string>(

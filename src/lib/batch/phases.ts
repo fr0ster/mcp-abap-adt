@@ -11,20 +11,17 @@
  *   A part's non-2xx is that item's failure; an envelope that fails is every
  *   item's failure, the envelope's error as it came; a credential refusal (or
  *   another failure the server's reader answers — its own refusal, a closed
- *   instance) ends the call: rethrown as it came, never a result. The batch
- *   connection is exempt from accept negotiation (adt-clients), and so is the
- *   forwarding connection under it: adt-clients corrects and resends nothing
- *   of a phase.
- * - The 406 correction, the phase's own (`correctNotAcceptable`): each part
- *   is recorded with the Accept the call's connection's accept cache holds
- *   for its method and URL (`cachedAccept`), when it holds one. Right after
- *   the envelope answered, before any answer reaches its read, the parts SAP
- *   answered `406` go in one envelope of their own — only those parts, each
- *   with the Accept its own `406` names (`extractSupportedAccept`, joined as
- *   adt-clients' negotiation joins them), stored in that cache
- *   (`rememberAccept`). One round: what the correction envelope answers is
- *   the part's answer, whatever it is. A `406` naming no type, or naming
- *   the Accept the part sent, is the part's answer.
+ *   instance) ends the call: rethrown as it came, never a result.
+ * - The format correction, the phase's own (`correctPhaseParts`): a part
+ *   recorded by a header-taking call (`withAdtHeaders`) goes in with the
+ *   system's kept pair, else the operation's default. Right after the
+ *   envelope answered, before any answer reaches its read, the parts SAP
+ *   answered `406`/`415` go in one envelope of their own — only those parts,
+ *   each recorded again by the same member call with the corrected pair
+ *   (`correctedPair`), kept for the system. One round: what the correction
+ *   envelope answers is the call's answer, whatever it is. A `406`/`415`
+ *   naming nothing, or naming what the part sent, is the part's answer; so
+ *   is a part no header-taking call recorded.
  * - Each item records through its own view of the batch connection, which
  *   signals its first request; the envelope is sent once every item has
  *   recorded or settled without recording. A request recorded once the
@@ -51,20 +48,16 @@
  * takes; the long call's own `timeout`, when given, cuts it by logging its
  * connection off.
  */
-import {
-  AdtBatchConnection,
-  cachedAccept,
-  exemptFromAcceptNegotiation,
-  extractSupportedAccept,
-  getBaseRequest,
-  rememberAccept,
-} from '@mcp-abap-adt/adt-clients';
+import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
+import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
+import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
@@ -105,9 +98,8 @@ export const MORE_ENVELOPES_WORDS =
 
 /**
  * A forwarding connection over `connection` for one phase. It sends the
- * phase's one envelope request through the connection's base request, past
- * any accept negotiation, and is itself exempt from it; it keeps that
- * request's outer status — resolved, or carried by the rejection as its
+ * phase's one envelope request through the connection's `makeAdtRequest`;
+ * it keeps that request's outer status — resolved, or carried by the rejection as its
  * `response` — before anyone reads the body. A second envelope request is
  * not sent: it is refused with `MORE_ENVELOPES_WORDS`, and the phase fails.
  */
@@ -138,7 +130,7 @@ function outerStatusWatch(connection: IAbapConnection): {
         refused ??= new Error(MORE_ENVELOPES_WORDS);
         return Promise.reject(refused);
       }
-      return getBaseRequest(connection)<T, D>(request).then(
+      return connection.makeAdtRequest<T, D>(request).then(
         (response) => {
           outer = statusOf(response);
           return response;
@@ -150,7 +142,6 @@ function outerStatusWatch(connection: IAbapConnection): {
       );
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  exemptFromAcceptNegotiation(forwarding);
   return { forwarding, outer: () => outer, refused: () => refused };
 }
 
@@ -159,8 +150,8 @@ function outerStatusWatch(connection: IAbapConnection): {
  * `batch`; its first request signals `recorded`. Once the phase's envelope
  * is under way (`sealed()`), a request is not recorded — it is rejected at
  * once with `LATE_RECORD_WORDS`, so it neither waits in a queue nobody sends
- * nor goes out in a second envelope. Exempt from accept negotiation, as the
- * batch connection is.
+ * nor goes out in a second envelope. A request of a call the phase records
+ * again (`correctPhaseParts`) goes to the correction envelope.
  */
 function itemView(
   batch: AdtBatchConnection,
@@ -177,13 +168,16 @@ function itemView(
     makeAdtRequest<T = unknown, D = unknown>(
       request: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
+      const correcting = adtCallScope.getStore()?.correcting;
+      if (correcting !== undefined && correcting.phase === batch) {
+        return correcting.record(request) as Promise<IAdtWireResponse<T, D>>;
+      }
       if (sealed()) return Promise.reject(new Error(LATE_RECORD_WORDS));
       const answer = record(request) as Promise<IAdtWireResponse<T, D>>;
       recorded();
       return answer;
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  exemptFromAcceptNegotiation(view);
   return view;
 }
 
@@ -192,34 +186,12 @@ type PartAnswer =
   | { ok: true; response: IAdtWireResponse }
   | { ok: false; error: unknown };
 
-/** One recorded part: the request as recorded, its first answer, and its hand-over. */
+/** One recorded part: its first answer, its hand-over, and the call that recorded it. */
 interface RecordedPart {
-  request: IAbapRequestOptions;
   first: Promise<PartAnswer>;
   answer(final: PartAnswer): void;
-}
-
-const NOT_ACCEPTABLE = 406;
-
-/** The request's Accept header, whatever its spelling; `undefined` when it has none. */
-function acceptOf(request: IAbapRequestOptions): string | undefined {
-  for (const [key, value] of Object.entries(request.headers ?? {})) {
-    if (key.toLowerCase() === 'accept') return String(value);
-  }
-  return undefined;
-}
-
-/** `request` with `accept` as its one Accept header. */
-function withAccept(
-  request: IAbapRequestOptions,
-  accept: string,
-): IAbapRequestOptions {
-  const headers: Record<string, string> = {};
-  for (const [key, value] of Object.entries(request.headers ?? {})) {
-    if (key.toLowerCase() !== 'accept') headers[key] = value;
-  }
-  headers.Accept = accept;
-  return { ...request, headers };
+  /** The header-taking call that recorded it, when one did. */
+  invocation: HeaderInvocation | undefined;
 }
 
 /** Settles as `answer`, never rejecting. */
@@ -231,51 +203,69 @@ function settledOf(answer: Promise<IAdtWireResponse>): Promise<PartAnswer> {
 }
 
 /**
- * The 406 correction of a phase whose envelope answered: every part SAP
- * answered `406` naming types its request did not send goes in one envelope
- * of its own, with the Accept those types make (stored in `connection`'s
- * accept cache); its answer there is its final answer. Every other part's
- * final answer is its first. One round; nothing else is sent.
+ * The format correction of a phase whose envelope answered: every call one
+ * of whose parts SAP answered `406`/`415` naming what its pair did not send
+ * is recorded again — the same member call, with the corrected pair (kept
+ * for the system) — in one envelope of its own; that call's answer there is
+ * its answer (`HeaderInvocation.redone`). One round; nothing else is sent.
  */
-async function correctNotAcceptable(
+async function correctPhaseParts(
   context: HandlerContext,
+  phase: AdtBatchConnection,
   parts: readonly RecordedPart[],
   firsts: readonly PartAnswer[],
-): Promise<PartAnswer[]> {
-  const finals = [...firsts];
-  const corrected: { at: number; request: IAbapRequestOptions }[] = [];
+): Promise<void> {
+  const corrected: { invocation: HeaderInvocation; pair: IAdtHeaders }[] = [];
+  const seen = new Set<HeaderInvocation>();
   firsts.forEach((first, at) => {
-    const part = parts[at];
-    if (part === undefined || first.ok) return;
-    if (statusOf(readOwn(first.error, 'response')) !== NOT_ACCEPTABLE) return;
-    const supported = extractSupportedAccept(first.error);
-    if (supported.length === 0) return;
-    const accept = supported.join(', ');
-    if (acceptOf(part.request) === accept) return;
-    rememberAccept(context.connection, part.request, accept);
-    corrected.push({ at, request: withAccept(part.request, accept) });
+    const invocation = parts[at]?.invocation;
+    if (invocation === undefined || first.ok || seen.has(invocation)) return;
+    const pair = correctedPair(first.error, invocation.sent);
+    if (pair === undefined) return;
+    seen.add(invocation);
+    corrected.push({ invocation, pair });
   });
-  if (corrected.length === 0) return finals;
+  if (corrected.length === 0) return;
   const watch = outerStatusWatch(context.connection);
   const batch = new AdtBatchConnection(watch.forwarding, {
     endpoint: 'communication',
     ...(context.logger !== undefined ? { logger: context.logger } : {}),
   });
-  const answers = corrected.map(({ request }) =>
-    settledOf(batch.makeAdtRequest(request)),
-  );
+  const waits = corrected.map(({ invocation, pair }) => {
+    invocation.port?.remember(invocation.operation, pair);
+    let signal!: () => void;
+    const recorded = new Promise<void>((resolve) => {
+      signal = resolve;
+    });
+    const redone = adtCallScope.run(
+      {
+        correcting: {
+          phase,
+          record: (request) => {
+            const answer = batch.makeAdtRequest(request);
+            signal();
+            return answer;
+          },
+        },
+      },
+      () => invocation.call(pair),
+    );
+    // Read by the call (`withAdtHeaders`); never unhandled here.
+    redone.catch(() => undefined);
+    invocation.redone = redone;
+    return Promise.race([recorded, redone.then(noop, noop)]);
+  });
+  await Promise.all(waits);
+  await new Promise((resolve) => setImmediate(resolve));
   try {
     await batch.execute();
   } catch {
-    // Every corrected part settles with the envelope's failure: its answer.
+    // Every part recorded again settles with the envelope's failure: its
+    // call's answer.
   }
-  const settled = await Promise.all(answers);
-  corrected.forEach(({ at }, i) => {
-    const answer = settled[i];
-    if (answer !== undefined) finals[at] = answer;
-  });
-  return finals;
 }
+
+function noop(): void {}
 
 /**
  * One phase: `read(item, batch)` for every item, recorded on one batch
@@ -301,17 +291,16 @@ export async function runPhase<I, R>(
   });
   let sealed = false;
   const parts: RecordedPart[] = [];
-  // A part goes in with the Accept the connection's cache holds for it; its
-  // answer reaches its read once the correction decided it.
-  const record = (asked: IAbapRequestOptions): Promise<IAdtWireResponse> => {
-    const cached = cachedAccept(context.connection, asked);
-    const request = cached !== undefined ? withAccept(asked, cached) : asked;
+  // A part's answer reaches its read once the correction is made.
+  const record = (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
+    const invocation = adtCallScope.getStore()?.invocation;
+    if (invocation !== undefined) invocation.parts += 1;
     const first = settledOf(batch.makeAdtRequest(request));
     let answer!: (final: PartAnswer) => void;
     const final = new Promise<PartAnswer>((resolve) => {
       answer = resolve;
     });
-    parts.push({ request, first, answer });
+    parts.push({ first, answer, invocation });
     return final.then((settled) =>
       settled.ok ? settled.response : Promise.reject(settled.error),
     );
@@ -322,10 +311,15 @@ export async function runPhase<I, R>(
       signal = resolve;
     });
     const view = itemView(batch, () => sealed, signal, record);
-    const settled = (async () => read(item, view))().then(
-      (value): PhaseResult<R> => ({ ok: true, value }),
-      (error: unknown): PhaseResult<R> => ({ ok: false, error }),
-    );
+    const outer = adtCallScope.getStore();
+    const settled = adtCallScope
+      .run({ ...outer, phase: batch, invocation: undefined }, async () =>
+        read(item, view),
+      )
+      .then(
+        (value): PhaseResult<R> => ({ ok: true, value }),
+        (error: unknown): PhaseResult<R> => ({ ok: false, error }),
+      );
     return { recorded, settled };
   });
   // Every item has recorded or settled.
@@ -343,14 +337,15 @@ export async function runPhase<I, R>(
     error = thrown;
   }
   // Every part has its first answer once the envelope settled. An envelope
-  // that answered: its 406 parts are corrected before any answer is handed on.
+  // that answered: its 406/415 parts are corrected before any answer is
+  // handed on — not in a call recorded in batch mode, made once.
   const firsts = await Promise.all(parts.map((part) => part.first));
-  const finals = failed
-    ? firsts
-    : await correctNotAcceptable(context, parts, firsts);
+  if (!failed && adtCallScope.getStore()?.recorded !== true) {
+    await correctPhaseParts(context, batch, parts, firsts);
+  }
   parts.forEach((part, at) => {
-    const final = finals[at];
-    if (final !== undefined) part.answer(final);
+    const first = firsts[at];
+    if (first !== undefined) part.answer(first);
   });
   const settled = entries.map((e) => e.settled);
   const refused = watch.refused();

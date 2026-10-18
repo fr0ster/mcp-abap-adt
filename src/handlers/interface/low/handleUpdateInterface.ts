@@ -15,6 +15,7 @@
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -82,21 +83,24 @@ export async function handleUpdateInterface(
   return answer(
     { tool: 'UpdateInterfaceLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getInterface(resultsFor(interfaceDocuments))
-        .update(
-          {
-            interfaceName,
-            ...(args.transport_request && {
-              transportRequest: args.transport_request,
-            }),
-          },
-          {
-            source: source_code,
-            lockHandle: lock_handle,
-            analyse: analyseException,
-          },
-        ),
+      withAdtHeaders(context, 'interface.update', (headers) =>
+        createAdtClient(connection, logger)
+          .getInterface(resultsFor(interfaceDocuments))
+          .update(
+            {
+              interfaceName,
+              ...(args.transport_request && {
+                transportRequest: args.transport_request,
+              }),
+            },
+            {
+              headers,
+              source: source_code,
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

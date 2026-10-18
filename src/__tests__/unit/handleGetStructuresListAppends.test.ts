@@ -40,6 +40,7 @@ jest.mock('../../lib/clients', () => ({
 }));
 
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 
 const ctx = { connection: {}, logger: undefined } as any;
@@ -79,6 +80,7 @@ describe('GetStructuresList append handling (#128)', () => {
     expect(result.isError).toBe(false);
     expect(mockGetWhereUsedScope).toHaveBeenCalledWith(
       expect.objectContaining({ object_name: 'ZS', object_type: 'structure' }),
+      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsedScope'] },
     );
     expect(mockModifyWhereUsedScope).toHaveBeenCalledWith(
       '<scope/>',
@@ -90,6 +92,7 @@ describe('GetStructuresList append handling (#128)', () => {
         object_type: 'structure',
         scopeXml: '<scope-modified/>',
       }),
+      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },
     );
     expect(payload(result).appends_unavailable).toBeUndefined();
   });

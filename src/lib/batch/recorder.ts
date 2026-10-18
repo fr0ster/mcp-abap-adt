@@ -10,10 +10,9 @@
  * its metadata), all under its one number. A call that records nothing takes
  * no number.
  *
- * The recorder is an object of its own, not the batch connection, so it is
- * marked exempt from accept negotiation at creation: an `AdtClient` built
- * over it never corrects and resends what SAP answers to a recorded request
- * (a `406`/`415` part is that call's answer).
+ * Nothing recorded is corrected or sent again: the recorded call runs as a
+ * recorded call (`asRecordedCall`, the dispatch's), so a `406`/`415` part is
+ * that call's answer.
  *
  * A batch is homogeneous by session kind (`sessionKind.ts`): its first
  * recorded request decides LOCK, UNLOCK or stateless, and a request of
@@ -33,10 +32,7 @@
  * Nothing is sent by the drop. `BatchEnd` never aborts the signal, so an
  * executed part reaches the handler as it came.
  */
-import {
-  type AdtBatchConnection,
-  exemptFromAcceptNegotiation,
-} from '@mcp-abap-adt/adt-clients';
+import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -201,7 +197,6 @@ export function createRecorder(
     rawParts: () => raw.filter((part): part is RawPart => part !== undefined),
     otherKind: () => refused,
   };
-  exemptFromAcceptNegotiation(recorder);
   return recorder;
 }
 

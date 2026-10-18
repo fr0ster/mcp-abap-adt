@@ -25,6 +25,10 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -80,9 +84,11 @@ export async function writeClassTests(
   const written = await withLock(
     () => tests.lock({ className: name }, { analyse: analyseLock }),
     atStep('update', (lockHandle) =>
-      tests.update(
-        { className: name, transportRequest },
-        { source, lockHandle, analyse: analyseException },
+      withAdtHeaders(context, 'localTestClass.update', (headers) =>
+        tests.update(
+          { className: name, transportRequest },
+          { headers, source, lockHandle, analyse: analyseException },
+        ),
       ),
     ),
     (lockHandle) =>
@@ -94,7 +100,12 @@ export async function writeClassTests(
   return carryCleanup(
     written,
     atStep('activate', () =>
-      tests.activate({ className: name }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'localTestClass.activate', (headers) =>
+        tests.activate(
+          { className: name },
+          { headers, analyse: analyseActivation },
+        ),
+      ),
     ),
   ) as Promise<Answer>;
 }
@@ -133,14 +144,16 @@ export async function writeProgramTests(
     )();
     if (!metadata.ok) return metadata as unknown as Answer;
     const created = await atStep('create include', () =>
-      include.create(
-        {
-          includeName,
-          packageName: packageOf(metadata.getResult().value.raw),
-          description: `ABAP Unit tests of ${name}`,
-          transportRequest,
-        },
-        { analyse: analyseException },
+      withAdtHeaders(context, 'include.create', (headers) =>
+        include.create(
+          {
+            includeName,
+            packageName: packageOf(metadata.getResult().value.raw),
+            description: `ABAP Unit tests of ${name}`,
+            transportRequest,
+          },
+          { headers, analyse: analyseException },
+        ),
       ),
     )();
     if (!created.ok) return created as unknown as Answer;
@@ -149,9 +162,11 @@ export async function writeProgramTests(
   const written = await withLock(
     () => include.lock({ includeName }, { analyse: analyseLock }),
     atStep('update', (lockHandle) =>
-      include.update(
-        { includeName, transportRequest },
-        { source, lockHandle, analyse: analyseException },
+      withAdtHeaders(context, 'include.update', (headers) =>
+        include.update(
+          { includeName, transportRequest },
+          { headers, source, lockHandle, analyse: analyseException },
+        ),
       ),
     ),
     (lockHandle) =>
@@ -166,10 +181,20 @@ export async function writeProgramTests(
   const activateBoth = () =>
     sequence(
       atStep('activate include', () =>
-        include.activate({ includeName }, { analyse: analyseActivation }),
+        withAdtHeaders(context, 'include.activate', (headers) =>
+          include.activate(
+            { includeName },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
       ),
       atStep('activate program', () =>
-        program.activate({ programName: name }, { analyse: analyseActivation }),
+        withAdtHeaders(context, 'program.activate', (headers) =>
+          program.activate(
+            { programName: name },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
       ),
     ) as Promise<Answer>;
 
@@ -195,13 +220,16 @@ export async function writeProgramTests(
           return current as unknown as Answer;
         }
         return atStep('update program', () =>
-          program.update(
-            { programName: name, transportRequest },
-            {
-              source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
-              lockHandle,
-              analyse: analyseException,
-            },
+          withAdtHeaders(context, 'program.update', (headers) =>
+            program.update(
+              { programName: name, transportRequest },
+              {
+                headers,
+                source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
         )() as Promise<Answer>;
       },
@@ -238,13 +266,15 @@ export async function writeFunctionGroupTests(
 
   if (options.create) {
     const created = await atStep('create include', () =>
-      include.create(
-        {
-          ...target,
-          description: `ABAP Unit tests of ${groupName}`,
-          transportRequest,
-        },
-        { analyse: analyseException },
+      withAdtHeaders(context, 'functionInclude.create', (headers) =>
+        include.create(
+          {
+            ...target,
+            description: `ABAP Unit tests of ${groupName}`,
+            transportRequest,
+          },
+          { headers, analyse: analyseException },
+        ),
       ),
     )();
     if (!created.ok) return created as unknown as Answer;
@@ -253,9 +283,11 @@ export async function writeFunctionGroupTests(
   const written = await withLock(
     () => include.lock(target, { analyse: analyseLock }),
     atStep('update', (lockHandle) =>
-      include.update(
-        { ...target, transportRequest },
-        { source, lockHandle, analyse: analyseException },
+      withAdtHeaders(context, 'functionInclude.update', (headers) =>
+        include.update(
+          { ...target, transportRequest },
+          { headers, source, lockHandle, analyse: analyseException },
+        ),
       ),
     ),
     (lockHandle) =>
@@ -266,7 +298,7 @@ export async function writeFunctionGroupTests(
   return carryCleanup(
     written,
     atStep('activate', () =>
-      activateWithMainProgram(client, groupName, includeName),
+      activateWithMainProgram(context, client, groupName, includeName),
     ),
   );
 }
@@ -297,23 +329,29 @@ const ACTIVATION_POLLS = 6;
  * is accepted, not done, so its results are read before answering.
  */
 async function activateWithMainProgram(
+  context: AdtHeadersContext,
   client: ReturnType<typeof createAdtClient>,
   groupName: string,
   includeName: string,
 ): Promise<Answer> {
   const utils = client.getUtils(ourUtils);
-  const started = await utils.activateObjectsGroup(
-    [
-      { type: 'FUGR/I', name: includeName, parentName: groupName },
-      { type: 'FUGR/F', name: groupName },
-      {
-        type: 'FUGR/I',
-        name: functionGroupMainProgram(groupName),
-        parentName: groupName,
-      },
-    ],
-    false,
-    { analyse: analyseException },
+  const started = await withAdtHeaders(
+    context,
+    'utils.activateObjectsGroup',
+    (headers) =>
+      utils.activateObjectsGroup(
+        [
+          { type: 'FUGR/I', name: includeName, parentName: groupName },
+          { type: 'FUGR/F', name: groupName },
+          {
+            type: 'FUGR/I',
+            name: functionGroupMainProgram(groupName),
+            parentName: groupName,
+          },
+        ],
+        false,
+        { headers, analyse: analyseException },
+      ),
   );
   if (!started.ok) return started as unknown as Answer;
   // Long polls back to back, no timer of ours: the server holds each one

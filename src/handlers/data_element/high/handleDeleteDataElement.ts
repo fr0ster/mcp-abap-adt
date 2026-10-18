@@ -64,6 +64,8 @@ export async function handleDeleteDataElement(
     { tool: 'DeleteDataElement', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'dataElement',
         createAdtClient(connection, logger).getDataElement(
           resultsFor(dataElementDocuments),
         ),

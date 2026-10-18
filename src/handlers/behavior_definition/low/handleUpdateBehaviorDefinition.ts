@@ -17,6 +17,7 @@
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -85,19 +86,22 @@ export async function handleUpdateBehaviorDefinition(
   return answer(
     { tool: 'UpdateBehaviorDefinitionLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-        .update(
-          {
-            name: bdefName,
-            transportRequest: transport_request,
-          },
-          {
-            source: source_code,
-            lockHandle: lock_handle,
-            analyse: analyseException,
-          },
-        ),
+      withAdtHeaders(context, 'behaviorDefinition.update', (headers) =>
+        createAdtClient(connection, logger)
+          .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+          .update(
+            {
+              name: bdefName,
+              transportRequest: transport_request,
+            },
+            {
+              headers,
+              source: source_code,
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

@@ -9,6 +9,7 @@ import type {
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
+  AdtHeaderPairs,
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
@@ -160,6 +161,8 @@ export class SseServer {
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
+  /** The corrected header pairs: the process's, shared by every stream's instance. */
+  private readonly adtHeaderPairs = new AdtHeaderPairs();
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -371,6 +374,7 @@ export class SseServer {
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
+          adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
         super({
@@ -405,6 +409,7 @@ export class SseServer {
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
         }),
+        adtHeaderPairs: this.adtHeaderPairs,
       },
     );
     server.init(context);

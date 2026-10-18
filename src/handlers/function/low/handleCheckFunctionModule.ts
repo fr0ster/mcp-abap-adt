@@ -15,6 +15,7 @@
 
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -83,11 +84,14 @@ export async function handleCheckFunctionModule(
   return answer(
     { tool: 'CheckFunctionModuleLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionModule(resultsFor(functionModuleDocuments))
-        .check({ functionModuleName, functionGroupName }, checkVersion, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'functionModule.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionModule(resultsFor(functionModuleDocuments))
+          .check({ functionModuleName, functionGroupName }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

@@ -64,6 +64,8 @@ export async function handleDeleteClass(
     { tool: 'DeleteClass', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'class',
         createAdtClient(connection, logger).getClass(
           resultsFor(classDocuments),
         ),

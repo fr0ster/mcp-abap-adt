@@ -13,6 +13,7 @@
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -81,21 +82,24 @@ export async function handleUpdateDdl(
   return answer(
     { tool: 'UpdateDdlLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDdl(resultsFor(ddlDocuments))
-        .update(
-          {
-            ddlName,
-            ...(args.transport_request && {
-              transportRequest: args.transport_request,
-            }),
-          },
-          {
-            source: ddl_source,
-            lockHandle: lock_handle,
-            analyse: analyseException,
-          },
-        ),
+      withAdtHeaders(context, 'ddl.update', (headers) =>
+        createAdtClient(connection, logger)
+          .getDdl(resultsFor(ddlDocuments))
+          .update(
+            {
+              ddlName,
+              ...(args.transport_request && {
+                transportRequest: args.transport_request,
+              }),
+            },
+            {
+              headers,
+              source: ddl_source,
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

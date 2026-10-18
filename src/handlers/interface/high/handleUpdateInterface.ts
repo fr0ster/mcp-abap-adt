@@ -23,6 +23,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -103,13 +104,16 @@ export async function handleUpdateInterface(
         () => obj.lock({ interfaceName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = atStep('update', () =>
-            obj.update(
-              { interfaceName, transportRequest: args.transport_request },
-              {
-                source: args.source_code,
-                lockHandle,
-                analyse: analyseException,
-              },
+            withAdtHeaders(context, 'interface.update', (headers) =>
+              obj.update(
+                { interfaceName, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.source_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
             ),
           );
           // A conditional phase of the sequence, not a hand-rolled
@@ -117,10 +121,12 @@ export async function handleUpdateInterface(
           return shouldActivate
             ? sequence(
                 atStep('check', () =>
-                  obj.check(
-                    { interfaceName, source: args.source_code },
-                    'inactive',
-                    { analyse: analyseException },
+                  withAdtHeaders(context, 'interface.check', (headers) =>
+                    obj.check(
+                      { interfaceName, source: args.source_code },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
                   ),
                 ),
                 update,
@@ -140,7 +146,12 @@ export async function handleUpdateInterface(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ interfaceName }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'interface.activate', (headers) =>
+            obj.activate(
+              { interfaceName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

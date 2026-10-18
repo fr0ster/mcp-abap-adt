@@ -207,8 +207,8 @@ function emptyOrFailed(res: unknown): boolean {
 }
 
 /**
- * A search answer SAP refused `406`, after the phase's correction round:
- * that search's error, never an empty answer.
+ * A search answer SAP refused `406`: that search's error, never an empty
+ * answer.
  */
 function notAcceptable(res: unknown): FailureEntry | undefined {
   const failure = failedPayloadOf(

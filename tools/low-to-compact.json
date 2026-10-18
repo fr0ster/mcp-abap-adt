@@ -125,8 +125,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/packages/pkg_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -354,8 +353,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/ddic/domains/dom_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -609,8 +607,7 @@
       "low_requests": [
         {
           "method": "POST",
-          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "headers": {}
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
         }
       ]
     },
@@ -1135,8 +1132,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/ddic/structures/stru_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -1378,8 +1374,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -1630,8 +1625,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/oo/classes/clas_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -1877,8 +1871,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/programs/programs/prog_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -2276,6 +2269,7 @@
           "url": "/sap/bc/adt/functions/groups?corrNr=XXXK900001",
           "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<group:abapFunctionGroup xmlns:group=\"http://www.sap.com/adt/functions/groups\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"FUGR_A\" adtcore:type=\"FUGR/F\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</group:abapFunctionGroup>",
           "headers": {
+            "Accept": "application/vnd.sap.adt.functions.groups.v3+xml",
             "Content-Type": "application/vnd.sap.adt.functions.groups.v3+xml"
           }
         }
@@ -2358,8 +2352,7 @@
       "low_requests": [
         {
           "method": "POST",
-          "url": "/sap/bc/adt/functions/groups/fugr_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "headers": {}
+          "url": "/sap/bc/adt/functions/groups/fugr_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
         }
       ]
     },
@@ -2834,8 +2827,7 @@
       "low_requests": [
         {
           "method": "POST",
-          "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "headers": {}
+          "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
         }
       ]
     },
@@ -3042,8 +3034,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/oo/classes/bimp_a?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
-          "data": null,
-          "headers": {}
+          "data": null
         }
       ]
     },
@@ -3222,8 +3213,7 @@
       "low_requests": [
         {
           "method": "POST",
-          "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-          "headers": {}
+          "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
         }
       ]
     },
@@ -3342,7 +3332,8 @@
           "method": "DELETE",
           "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a?corrNr=XXXK900001",
           "headers": {
-            "Accept": "application/xml"
+            "Accept": "application/xml",
+            "Content-Type": "application/xml"
           }
         }
       ]

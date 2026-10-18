@@ -1,8 +1,16 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtFailure,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../adtHeaders/withAdtHeaders';
 import {
   failureEntry,
   isCredentialFailure,
@@ -37,6 +45,47 @@ export interface NodeStructureSource {
       analyse?: typeof analyseException;
     },
   ): Promise<unknown>;
+}
+
+/** The options a node structure read takes, beside its header pair. */
+type NodeStructureOptions = {
+  nodeId?: string;
+  withShortDescriptions?: boolean;
+  analyse?: typeof analyseException;
+};
+
+/** The utilities' `fetchNodeStructure` as adt-clients declares it: it takes its header pair. */
+export interface NodeStructureMembers<R> {
+  fetchNodeStructure(
+    parentType: string,
+    parentName: string,
+    options: { headers: IAdtHeaders } & NodeStructureOptions,
+  ): Promise<R>;
+}
+
+/**
+ * `utils`' node structure read with the header pair of
+ * `utils.fetchNodeStructure` for the call's system (`withAdtHeaders`).
+ */
+export function nodeStructureOn<R>(
+  context: AdtHeadersContext,
+  utils: NodeStructureMembers<R>,
+): {
+  fetchNodeStructure(
+    parentType: string,
+    parentName: string,
+    options?: NodeStructureOptions,
+  ): Promise<R>;
+} {
+  return {
+    fetchNodeStructure: (parentType, parentName, options) =>
+      withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+        utils.fetchNodeStructure(parentType, parentName, {
+          ...options,
+          headers,
+        }),
+      ),
+  };
 }
 
 /** Reads every item of one level; each item's settlement, in item order. */

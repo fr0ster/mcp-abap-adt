@@ -1,5 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -70,13 +71,15 @@ export async function handleGetTableContents(
   return answer(
     { tool: 'GetTableContents', detail },
     () =>
-      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
-        {
-          table_name: tableName,
-          max_rows: maxRows,
-          sql_query: sqlQuery,
-        },
-        { analyse: analyseException },
+      withAdtHeaders(context, 'utils.getTableContents', (headers) =>
+        createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
+          {
+            table_name: tableName,
+            max_rows: maxRows,
+            sql_query: sqlQuery,
+          },
+          { headers, analyse: analyseException },
+        ),
       ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;

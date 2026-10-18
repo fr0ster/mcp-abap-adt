@@ -27,6 +27,7 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -121,18 +122,20 @@ export async function handleRemoveTransportObject(
   return answer(
     { tool: 'RemoveTransportObject', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .removeObject(
-          args.transport_number,
-          {
-            name: args.object_name,
-            type: args.object_type,
-            position: args.position,
-            ...(args.pgmid ? { pgmid: args.pgmid } : {}),
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'request.removeObject', (headers) =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .removeObject(
+            args.transport_number,
+            {
+              name: args.object_name,
+              type: args.object_type,
+              position: args.position,
+              ...(args.pgmid ? { pgmid: args.pgmid } : {}),
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseRemoval),
   );
 }

@@ -20,6 +20,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -100,13 +101,16 @@ export async function handleUpdateLocalDefinitions(
       const written = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
         atStep('update', (lockHandle) =>
-          obj.update(
-            { className, transportRequest: args.transport_request },
-            {
-              source: args.definitions_code,
-              lockHandle,
-              analyse: analyseException,
-            },
+          withAdtHeaders(context, 'localDefinitions.update', (headers) =>
+            obj.update(
+              { className, transportRequest: args.transport_request },
+              {
+                headers,
+                source: args.definitions_code,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
         ),
         (lockHandle) =>
@@ -120,7 +124,12 @@ export async function handleUpdateLocalDefinitions(
       return carryCleanup(
         written,
         atStep('activate', () =>
-          obj.activate({ className }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'localDefinitions.activate', (headers) =>
+            obj.activate(
+              { className },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

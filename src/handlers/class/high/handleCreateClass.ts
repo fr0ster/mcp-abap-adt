@@ -15,6 +15,7 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -103,22 +104,24 @@ export async function handleCreateClass(
   return answer(
     { tool: 'CreateClass', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getClass(resultsFor(classDocuments))
-        .create(
-          {
-            className,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            description: args.description || className,
-            superclass: args.superclass,
-            final: args.final || false,
-            abstract: args.abstract || false,
-            createProtected: args.create_protected || false,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'class.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getClass(resultsFor(classDocuments))
+          .create(
+            {
+              className,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              description: args.description || className,
+              superclass: args.superclass,
+              final: args.final || false,
+              abstract: args.abstract || false,
+              createProtected: args.create_protected || false,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

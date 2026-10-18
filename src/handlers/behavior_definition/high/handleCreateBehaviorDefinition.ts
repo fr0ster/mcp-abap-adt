@@ -24,6 +24,7 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -132,17 +133,19 @@ export async function handleCreateBehaviorDefinition(
       );
 
       const created = await atStep('create', () =>
-        obj.create(
-          {
-            name,
-            description: args.description || name,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            rootEntity: args.root_entity,
-            implementationType: args.implementation_type,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
+        withAdtHeaders(context, 'behaviorDefinition.create', (headers) =>
+          obj.create(
+            {
+              name,
+              description: args.description || name,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              rootEntity: args.root_entity,
+              implementationType: args.implementation_type,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
         ),
       )();
       if (!created.ok) return created;
@@ -150,7 +153,12 @@ export async function handleCreateBehaviorDefinition(
       const checked = await withLock(
         () => obj.lock({ name }, { analyse: analyseLock }),
         atStep('check', () =>
-          obj.check({ name }, undefined, { analyse: analyseException }),
+          withAdtHeaders(context, 'behaviorDefinition.check', (headers) =>
+            obj.check({ name }, undefined, {
+              headers,
+              analyse: analyseException,
+            }),
+          ),
         ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
@@ -174,7 +182,9 @@ export async function handleCreateBehaviorDefinition(
       return carryCleanup(
         checked,
         atStep('activate', () =>
-          obj.activate({ name }, { analyse: analyseActivation }),
+          withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
+            obj.activate({ name }, { headers, analyse: analyseActivation }),
+          ),
         ),
       );
     },

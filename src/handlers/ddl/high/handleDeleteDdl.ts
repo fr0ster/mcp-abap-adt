@@ -64,6 +64,8 @@ export async function handleDeleteDdl(
     { tool: 'DeleteDdl', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'ddl',
         createAdtClient(connection, logger).getDdl(resultsFor(ddlDocuments)),
         { ddlName, transportRequest: transport_request },
       ),

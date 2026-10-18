@@ -13,6 +13,7 @@ import {
   analyseCdsTestDoubles,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -101,15 +102,17 @@ export async function handleCreateCdsUnitTest(
             }),
         ),
         atStep('create', () =>
-          client.getClass(resultsFor(classDocuments)).create(
-            {
-              className,
-              packageName: args.package_name,
-              description: `ABAP Unit tests of ${args.cds_view_name.toUpperCase()}`,
-              final: true,
-              transportRequest: args.transport_request,
-            },
-            { analyse: analyseException },
+          withAdtHeaders(context, 'class.create', (headers) =>
+            client.getClass(resultsFor(classDocuments)).create(
+              {
+                className,
+                packageName: args.package_name,
+                description: `ABAP Unit tests of ${args.cds_view_name.toUpperCase()}`,
+                final: true,
+                transportRequest: args.transport_request,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
         ),
         () =>

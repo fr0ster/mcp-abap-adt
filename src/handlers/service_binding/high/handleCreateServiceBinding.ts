@@ -38,6 +38,7 @@ import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -181,19 +182,21 @@ export async function handleCreateServiceBinding(
       );
 
       const created = await atStep('create', () =>
-        obj.create(
-          {
-            bindingName: serviceBindingName,
-            packageName,
-            description: (args.description || serviceBindingName).trim(),
-            serviceDefinitionName,
-            serviceName,
-            serviceVersion,
-            bindingVariant,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
+        withAdtHeaders(context, 'serviceBinding.create', (headers) =>
+          obj.create(
+            {
+              bindingName: serviceBindingName,
+              packageName,
+              description: (args.description || serviceBindingName).trim(),
+              serviceDefinitionName,
+              serviceName,
+              serviceVersion,
+              bindingVariant,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
         ),
       )();
 
@@ -202,9 +205,11 @@ export async function handleCreateServiceBinding(
       }
 
       const activated = await atStep('activate', () =>
-        obj.activate(
-          { bindingName: serviceBindingName },
-          { analyse: analyseActivation },
+        withAdtHeaders(context, 'serviceBinding.activate', (headers) =>
+          obj.activate(
+            { bindingName: serviceBindingName },
+            { headers, analyse: analyseActivation },
+          ),
         ),
       )();
       if (!activated.ok) {

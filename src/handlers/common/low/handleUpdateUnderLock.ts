@@ -1,3 +1,4 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 /**
  * The compact update: one write under the lock the caller holds (spec §4.6).
  *
@@ -32,6 +33,11 @@ import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type AdtObjectWith,
+  adtOperation,
+} from '../../../lib/adtHeaders/defaultPairs';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -101,43 +107,54 @@ const written = (call: () => Promise<never>) =>
 
 type AdtClient = ReturnType<typeof createAdtClient>;
 export type IncludeWriter = {
-  update(config: object, options: object): Promise<unknown>;
+  update(
+    config: object,
+    options: { headers: IAdtHeaders } & Record<string, unknown>,
+  ): Promise<unknown>;
 };
 
 /**
- * The class includes: the source argument each takes (beside `source_code`)
- * and the accessor that writes it, under the class's lock.
+ * The class includes: the source argument each takes (beside `source_code`),
+ * the object type of its `update`, and the accessor that writes it, under
+ * the class's lock.
  */
 export const CLASS_INCLUDES: Record<
   string,
-  [string, (client: AdtClient) => IncludeWriter]
+  [string, AdtObjectWith<'update'>, (client: AdtClient) => IncludeWriter]
 > = {
   LOCAL_TEST_CLASS: [
     'test_class_code',
+    'localTestClass',
     (c) => c.getLocalTestClass(resultsFor(classDocuments)),
   ],
   LOCAL_TYPES: [
     'local_types_code',
+    'localTypes',
     (c) => c.getLocalTypes(resultsFor(classDocuments)),
   ],
   LOCAL_DEFINITIONS: [
     'definitions_code',
+    'localDefinitions',
     (c) => c.getLocalDefinitions(resultsFor(classDocuments)),
   ],
   LOCAL_MACROS: [
     'macros_code',
+    'localMacros',
     (c) => c.getLocalMacros(resultsFor(classDocuments)),
   ],
   UNIT_TEST: [
     'test_class_source',
+    'localTestClass',
     (c) => c.getLocalTestClass(resultsFor(classDocuments)),
   ],
   CDS_UNIT_TEST: [
     'test_class_source',
+    'localTestClass',
     (c) => c.getLocalTestClass(resultsFor(classDocuments)),
   ],
   BEHAVIOR_IMPLEMENTATION: [
     'implementation_code',
+    'behaviorImplementation',
     (c) => c.getBehaviorImplementation(resultsFor(classDocuments)),
   ],
 };
@@ -182,19 +199,22 @@ export async function handleUpdateUnderLock(
       // runs in that session, where the handle is valid.
       return written(
         () =>
-          createAdtClient(
-            connectionHoldingPackageLock(connection, lockHandle),
-            logger,
-          )
-            .getPackage(resultsFor(packageDocuments))
-            .updateMetadata(
-              { packageName: upper(args.package_name), ...transport },
-              {
-                source: args.source_code as string,
-                lockHandle,
-                analyse: analyseException,
-              },
-            ) as Promise<never>,
+          withAdtHeaders(context, 'package.updateMetadata', (headers) =>
+            createAdtClient(
+              connectionHoldingPackageLock(connection, lockHandle),
+              logger,
+            )
+              .getPackage(resultsFor(packageDocuments))
+              .updateMetadata(
+                { packageName: upper(args.package_name), ...transport },
+                {
+                  headers,
+                  source: args.source_code as string,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ) as Promise<never>,
       );
     }
     case 'DOMAIN': {
@@ -204,16 +224,19 @@ export async function handleUpdateUnderLock(
       if (missing) return return_error(missing);
       return written(
         () =>
-          client()
-            .getDomain(resultsFor(domainDocuments))
-            .updateMetadata(
-              { domainName: upper(args.domain_name), ...transport },
-              {
-                source: args.source_code as string,
-                lockHandle,
-                analyse: analyseException,
-              },
-            ) as Promise<never>,
+          withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+            client()
+              .getDomain(resultsFor(domainDocuments))
+              .updateMetadata(
+                { domainName: upper(args.domain_name), ...transport },
+                {
+                  headers,
+                  source: args.source_code as string,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ) as Promise<never>,
       );
     }
     case 'DATA_ELEMENT': {
@@ -223,16 +246,22 @@ export async function handleUpdateUnderLock(
       if (missing) return return_error(missing);
       return written(
         () =>
-          client()
-            .getDataElement(resultsFor(dataElementDocuments))
-            .updateMetadata(
-              { dataElementName: upper(args.data_element_name), ...transport },
-              {
-                source: args.source_code as string,
-                lockHandle,
-                analyse: analyseException,
-              },
-            ) as Promise<never>,
+          withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
+            client()
+              .getDataElement(resultsFor(dataElementDocuments))
+              .updateMetadata(
+                {
+                  dataElementName: upper(args.data_element_name),
+                  ...transport,
+                },
+                {
+                  headers,
+                  source: args.source_code as string,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ) as Promise<never>,
       );
     }
     case 'FUNCTION_GROUP': {
@@ -242,19 +271,22 @@ export async function handleUpdateUnderLock(
       if (missing) return return_error(missing);
       return written(
         () =>
-          client()
-            .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .updateMetadata(
-              {
-                functionGroupName: upper(args.function_group_name),
-                ...transport,
-              },
-              {
-                source: args.source_code as string,
-                lockHandle,
-                analyse: analyseException,
-              },
-            ) as Promise<never>,
+          withAdtHeaders(context, 'functionGroup.updateMetadata', (headers) =>
+            client()
+              .getFunctionGroup(resultsFor(functionGroupDocuments))
+              .updateMetadata(
+                {
+                  functionGroupName: upper(args.function_group_name),
+                  ...transport,
+                },
+                {
+                  headers,
+                  source: args.source_code as string,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ) as Promise<never>,
       );
     }
     case 'SERVICE_DEFINITION': {
@@ -264,19 +296,22 @@ export async function handleUpdateUnderLock(
       if (missing) return return_error(missing);
       return written(
         () =>
-          client()
-            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
-            .update(
-              {
-                serviceDefinitionName: upper(args.service_definition_name),
-                ...transport,
-              },
-              {
-                source: args.source_code as string,
-                lockHandle,
-                analyse: analyseException,
-              },
-            ) as Promise<never>,
+          withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
+            client()
+              .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+              .update(
+                {
+                  serviceDefinitionName: upper(args.service_definition_name),
+                  ...transport,
+                },
+                {
+                  headers,
+                  source: args.source_code as string,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ) as Promise<never>,
       );
     }
     case 'SERVICE_BINDING': {
@@ -314,25 +349,35 @@ export async function handleUpdateUnderLock(
         .toUpperCase();
       return written(
         () =>
-          client()
-            .getServiceBinding(resultsFor(serviceDocuments))
-            .update(
-              // An OData V2 publication job resolves the service by name and
-              // version; V4 names its target on its own.
-              serviceType === 'odatav2'
-                ? {
-                    bindingName,
-                    desiredPublicationState: state,
-                    serviceType,
-                    serviceName: String(args.service_name).trim().toUpperCase(),
-                    serviceVersion: String(
-                      args.service_version ?? '0001',
-                    ).trim(),
-                  }
-                : { bindingName, desiredPublicationState: state, serviceType },
-              // No timeout of the server's choosing.
-              { lockHandle, timeout: 0, analyse: analysePublication },
-            ) as Promise<never>,
+          withAdtHeaders(context, 'serviceBinding.update', (headers) =>
+            client()
+              .getServiceBinding(resultsFor(serviceDocuments))
+              .update(
+                serviceType === 'odatav2'
+                  ? {
+                      bindingName,
+                      desiredPublicationState: state,
+                      serviceType,
+                      serviceName: String(args.service_name)
+                        .trim()
+                        .toUpperCase(),
+                      serviceVersion: String(
+                        args.service_version ?? '0001',
+                      ).trim(),
+                    }
+                  : {
+                      bindingName,
+                      desiredPublicationState: state,
+                      serviceType,
+                    },
+                {
+                  headers,
+                  lockHandle,
+                  timeout: 0,
+                  analyse: analysePublication,
+                },
+              ),
+          ) as Promise<never>,
       );
     }
     case 'LOCAL_TEST_CLASS':
@@ -342,20 +387,26 @@ export async function handleUpdateUnderLock(
     case 'UNIT_TEST':
     case 'CDS_UNIT_TEST':
     case 'BEHAVIOR_IMPLEMENTATION': {
-      const [field, include] = CLASS_INCLUDES[args.object_type];
+      const [field, includeType, include] = CLASS_INCLUDES[args.object_type];
       const body = source(args, field);
       const missing =
         required('class_name', args.class_name) ?? required(field, body);
       if (missing) return return_error(missing);
       return written(
         () =>
-          include(client()).update(
-            { className: upper(args.class_name), ...transport },
-            {
-              source: body as string,
-              lockHandle,
-              analyse: analyseException,
-            },
+          withAdtHeaders(
+            context,
+            adtOperation(includeType, 'update'),
+            (headers) =>
+              include(client()).update(
+                { className: upper(args.class_name), ...transport },
+                {
+                  headers,
+                  source: body as string,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
           ) as Promise<never>,
       );
     }

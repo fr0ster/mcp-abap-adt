@@ -13,6 +13,7 @@
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -80,21 +81,24 @@ export async function handleUpdateStructure(
   return answer(
     { tool: 'UpdateStructureLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getStructure(resultsFor(structureDocuments))
-        .update(
-          {
-            structureName,
-            ...(args.transport_request && {
-              transportRequest: args.transport_request,
-            }),
-          },
-          {
-            source: ddl_code,
-            lockHandle: lock_handle,
-            analyse: analyseException,
-          },
-        ),
+      withAdtHeaders(context, 'structure.update', (headers) =>
+        createAdtClient(connection, logger)
+          .getStructure(resultsFor(structureDocuments))
+          .update(
+            {
+              structureName,
+              ...(args.transport_request && {
+                transportRequest: args.transport_request,
+              }),
+            },
+            {
+              headers,
+              source: ddl_code,
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

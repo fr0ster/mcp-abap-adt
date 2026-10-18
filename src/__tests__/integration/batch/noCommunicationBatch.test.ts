@@ -43,8 +43,8 @@ const ENVELOPE_URL = '/sap/bc/adt/communication/batch';
 
 /**
  * `connection` with every request's URL recorded. Writes the handler's
- * client makes to the view (its accept negotiation) stay on the view, never
- * on the connection under it.
+ * client makes to the view stay on the view, never on the connection under
+ * it.
  */
 function recording(connection: IAbapConnection): {
   view: IAbapConnection;

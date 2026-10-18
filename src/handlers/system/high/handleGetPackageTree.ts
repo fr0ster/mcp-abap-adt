@@ -26,6 +26,7 @@ import {
   describeFromMetadata,
   endsTheCall,
   type NodeRequest,
+  nodeStructureOn,
   readNode,
   type WalkedItem,
   walkPackage,
@@ -158,7 +159,10 @@ async function readTreesBatched(
     'metadata' in item
       ? readMetadata(context, c, item.metadata)
       : readNode(
-          createAdtClient(c, context.logger).getUtils(ourUtils),
+          nodeStructureOn(
+            context,
+            createAdtClient(c, context.logger).getUtils(ourUtils),
+          ),
           item.node,
         ),
   );
@@ -224,7 +228,11 @@ async function readTreesSequential(
     try {
       tree.walked = {
         ok: true,
-        value: await walkPackage(utils, name, options),
+        value: await walkPackage(
+          nodeStructureOn(context, utils),
+          name,
+          options,
+        ),
       };
     } catch (error) {
       if (endsTheCall(error)) throw error;

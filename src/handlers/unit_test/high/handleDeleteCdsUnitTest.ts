@@ -83,6 +83,8 @@ export async function handleDeleteCdsUnitTest(
     { tool: 'DeleteCdsUnitTest', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'class',
         createAdtClient(connection, logger).getClass(
           resultsFor(classDocuments),
         ),

@@ -6,6 +6,7 @@
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,11 @@ export async function handleActivateStructure(
   return answer(
     { tool: 'ActivateStructureLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getStructure(resultsFor(structureDocuments))
-        .activate({ structureName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'structure.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getStructure(resultsFor(structureDocuments))
+          .activate({ structureName }, { headers, analyse: analyseActivation }),
+      ),
     project(detail, terseActivation),
   );
 }

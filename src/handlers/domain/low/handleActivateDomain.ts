@@ -6,6 +6,7 @@
 
 import { domainDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -54,9 +55,11 @@ export async function handleActivateDomain(
   return answer(
     { tool: 'ActivateDomainLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDomain(resultsFor(domainDocuments))
-        .activate({ domainName }, { analyse: analyseActivation }),
+      withAdtHeaders(context, 'domain.activate', (headers) =>
+        createAdtClient(connection, logger)
+          .getDomain(resultsFor(domainDocuments))
+          .activate({ domainName }, { headers, analyse: analyseActivation }),
+      ),
     project(detail, terseActivation),
   );
 }

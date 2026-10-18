@@ -115,6 +115,8 @@ export async function handleDeletePackage(
       { tool: 'DeletePackage', detail },
       () =>
         deleteIfDeletable(
+          context,
+          'package',
           createAdtClient(deleteConnection, logger).getPackage(
             resultsFor(packageDocuments),
           ),

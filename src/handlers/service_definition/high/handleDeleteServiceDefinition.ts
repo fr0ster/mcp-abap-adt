@@ -66,6 +66,8 @@ export async function handleDeleteServiceDefinition(
     { tool: 'DeleteServiceDefinition', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'serviceDefinition',
         createAdtClient(connection, logger).getServiceDefinition(
           resultsFor(serviceDefinitionDocuments),
         ),

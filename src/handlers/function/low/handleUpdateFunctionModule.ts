@@ -12,6 +12,7 @@
 
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -104,20 +105,23 @@ export async function handleUpdateFunctionModule(
   return answer(
     { tool: 'UpdateFunctionModuleLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionModule(resultsFor(functionModuleDocuments))
-        .update(
-          {
-            functionModuleName,
-            functionGroupName,
-            transportRequest: transport_request,
-          },
-          {
-            source: source_code,
-            lockHandle: lock_handle,
-            analyse: analyseException,
-          },
-        ),
+      withAdtHeaders(context, 'functionModule.update', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionModule(resultsFor(functionModuleDocuments))
+          .update(
+            {
+              functionModuleName,
+              functionGroupName,
+              transportRequest: transport_request,
+            },
+            {
+              headers,
+              source: source_code,
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

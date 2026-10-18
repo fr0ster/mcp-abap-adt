@@ -1,4 +1,5 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -81,12 +82,14 @@ export async function handleGetSqlQuery(
   return answer(
     { tool: 'GetSqlQuery', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getUtils(ourUtils)
-        .getSqlQuery(
-          { sql_query: sqlQuery, row_number: rowNumber },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
+        createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .getSqlQuery(
+            { sql_query: sqlQuery, row_number: rowNumber },
+            { headers, analyse: analyseException },
+          ),
+      ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;

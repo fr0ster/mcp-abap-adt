@@ -131,6 +131,7 @@ import { handleSortAndCompressTransportTask } from '../../../../handlers/transpo
 import { handleGetTransport } from '../../../../handlers/transport/readonly/handleGetTransport';
 import { handleReadTransportActionLog } from '../../../../handlers/transport/readonly/handleReadTransportActionLog';
 import { handleReadTransportObjects } from '../../../../handlers/transport/readonly/handleReadTransportObjects';
+import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import {
   getOperationDelay,
@@ -467,6 +468,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         const deleted = await createAdtClient(connection, logger)
           .getRequest()
           .delete({ transportNumber: task } as any, {
+            headers: DEFAULT_ADT_HEADERS['request.delete'],
             analyse: analyseDeletion,
           });
         if (deleted.ok) {
@@ -486,6 +488,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         const deleted = await createAdtClient(connection, logger)
           .getRequest()
           .delete({ transportNumber: secondRequestNumber } as any, {
+            headers: DEFAULT_ADT_HEADERS['request.delete'],
             analyse: analyseDeletion,
           });
         if (deleted.ok) {

@@ -70,6 +70,8 @@ export async function handleDeleteDomain(
     { tool: 'DeleteDomain', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'domain',
         createAdtClient(connection, logger).getDomain(
           resultsFor(domainDocuments),
         ),

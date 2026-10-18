@@ -25,30 +25,51 @@
 
 import type {
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { type AdtObjectWith, adtOperation } from '../adtHeaders/defaultPairs';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../adtHeaders/withAdtHeaders';
 import { absentPerCheck, analyseDeletion } from './deletionRefusal';
 import { atStep } from './step';
 
 export interface CheckedDeletable<C, V> {
   checkDeletion(
     config: C,
-    options?: { analyse?: IAnalyse<any> },
+    options: { headers: IAdtHeaders; analyse?: IAnalyse<any> },
   ): Promise<IAdtResponse<unknown, IAdtError>>;
   delete(
     config: C,
-    options?: { analyse?: IAnalyse<any> },
+    options: { headers: IAdtHeaders; analyse?: IAnalyse<any> },
   ): Promise<IAdtResponse<V, IAdtError>>;
 }
 
+/** An object type whose `checkDeletion` and `delete` take a header pair. */
+export type CheckedDeletableType = AdtObjectWith<'checkDeletion'> &
+  AdtObjectWith<'delete'>;
+
+/**
+ * `object`'s deletion check, then its delete when the check permits it —
+ * each with the header pair of `objectType`'s member (`withAdtHeaders`).
+ */
 export async function deleteIfDeletable<C, V>(
+  context: AdtHeadersContext,
+  objectType: CheckedDeletableType,
   object: CheckedDeletable<C, V>,
   config: C,
   deleteAnalyse: IAnalyse<any> = analyseDeletion,
 ): Promise<IAdtResponse<V, IAdtError>> {
   const check = await atStep('delete check', () =>
-    object.checkDeletion(config, { analyse: analyseDeletion }),
+    withAdtHeaders(
+      context,
+      adtOperation(objectType, 'checkDeletion'),
+      (headers) =>
+        object.checkDeletion(config, { headers, analyse: analyseDeletion }),
+    ),
   )();
   if (!check.ok) return check as unknown as IAdtResponse<V, IAdtError>;
   // Permitted, but not there: nothing to delete, so no delete is sent. The
@@ -61,6 +82,8 @@ export async function deleteIfDeletable<C, V>(
     return check as unknown as IAdtResponse<V, IAdtError>;
   }
   return atStep('delete', () =>
-    object.delete(config, { analyse: deleteAnalyse }),
+    withAdtHeaders(context, adtOperation(objectType, 'delete'), (headers) =>
+      object.delete(config, { headers, analyse: deleteAnalyse }),
+    ),
   )();
 }

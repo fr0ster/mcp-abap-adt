@@ -13,6 +13,15 @@
 
 export { type ActiveTool, activeTools } from '../lib/activeTools.js';
 /**
+ * The corrected request header pairs of the systems the process talks to
+ * (`adtHeaderPairs`): a pair SAP answered `406`/`415` to, corrected, kept
+ * per system and operation. A host shares one between its instances.
+ */
+export {
+  AdtHeaderPairs,
+  type AdtHeaderPort,
+} from '../lib/adtHeaders/AdtHeaderPairs.js';
+/**
  * Background runs of the code-running tools: the strategy's contract
  * (`IBackgroundRuns`) — where runs and their answers are kept, checked
  * against the caller. lib ships no implementation: a host hands its

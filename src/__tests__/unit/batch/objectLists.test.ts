@@ -20,7 +20,6 @@ import { handleDescribeByList } from '../../../handlers/system/readonly/handleDe
 import { handleGetAbapSystemSymbols } from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { createBatchAvailability } from '../../../lib/batch/availability';
-import { switchAcceptCorrectionOn } from '../../../lib/connectionFactory';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -682,7 +681,7 @@ describe('DescribeByList', () => {
     expect(context.batchAvailability?.available()).toBe(false);
   });
 
-  it('a typed search answered 406 naming no type is that object’s error; no typeless search', async () => {
+  it('a typed search answered 406 is that object’s error; no typeless search', async () => {
     const fake = system({
       answers: {
         'qs:ZPROG_B:WRONG': { status: 406, statusText: 'Not Acceptable' },
@@ -708,85 +707,6 @@ describe('DescribeByList', () => {
       'ZT*',
       'ZNONE',
     ]);
-  });
-
-  it('a typed search answered 406 naming a type is corrected in its own envelope: the sequential answer', async () => {
-    const OBJREFS = 'application/vnd.sap.adt.repository.objrefs+xml';
-    const typedHit = ok(
-      hitsXml([{ name: 'ZPROG_B', type: 'PROG/P', description: 'Program B' }]),
-    );
-    // SAP serves the typed search of ZPROG_B only as OBJREFS.
-    const answer = (label: string, accept: string | undefined): PartAnswer =>
-      label === 'qs:ZPROG_B:WRONG'
-        ? accept === OBJREFS
-          ? typedHit
-          : {
-              status: 406,
-              statusText: 'Not Acceptable',
-              headers: { 'x-sap-adt-supported-accept': OBJREFS },
-            }
-        : answerOf({}, label);
-    const fakeOf = () =>
-      envelopeConnection(
-        (parts) =>
-          envelopeResponse(
-            parts.map((p) =>
-              answer(labelOf(p.method, p.url), p.headers.accept),
-            ),
-          ),
-        async (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
-          const accept = Object.entries(request.headers ?? {}).find(
-            ([k]) => k.toLowerCase() === 'accept',
-          )?.[1];
-          const a = answer(
-            labelOf(request.method, request.url, request.params),
-            accept === undefined ? undefined : String(accept),
-          );
-          if (a.status >= 400) {
-            throw statusError(
-              a.status,
-              a.statusText ?? '',
-              a.body ?? '',
-              a.headers ?? {},
-            );
-          }
-          return {
-            status: a.status,
-            statusText: a.statusText ?? 'OK',
-            headers: a.headers ?? {},
-            data: a.body ?? '',
-          } as IAdtWireResponse;
-        },
-      );
-    const batched = fakeOf();
-    switchAcceptCorrectionOn(batched.connection as never);
-    const a = await withinTurns(
-      handleDescribeByList(contextOn(batched), { objects: OBJECTS }),
-      TURNS,
-    );
-    const sequential = fakeOf();
-    switchAcceptCorrectionOn(sequential.connection as never);
-    const b = await withinTurns(
-      handleDescribeByList(contextOn(sequential, 'absent'), {
-        objects: OBJECTS,
-      }),
-      TURNS,
-    );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(
-      batched.envelopes.map((e) =>
-        e.parts.map((p) => [labelOf(p.method, p.url), p.headers.accept]),
-      ),
-    ).toEqual([
-      [
-        ['qs:ZCL_A:CLAS/OC', 'application/xml'],
-        ['qs:ZPROG_B:WRONG', 'application/xml'],
-        ['qs:ZT*:', 'application/xml'],
-        ['qs:ZNONE:', 'application/xml'],
-      ],
-      [['qs:ZPROG_B:WRONG', OBJREFS]],
-    ]);
-    expect(batched.directs).toHaveLength(0);
   });
 
   it('no objects: the parameter error, nothing sent', async () => {

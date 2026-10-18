@@ -16,6 +16,7 @@
 
 import { tableDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -89,9 +90,14 @@ export async function handleCheckTable(
   return answer(
     { tool: 'CheckTableLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getTable(resultsFor(tableDocuments))
-        .check({ tableName }, checkVersion, { analyse: analyseException }),
+      withAdtHeaders(context, 'table.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getTable(resultsFor(tableDocuments))
+          .check({ tableName }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

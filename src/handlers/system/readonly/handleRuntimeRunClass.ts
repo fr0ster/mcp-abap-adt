@@ -39,6 +39,7 @@
 
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
@@ -212,10 +213,13 @@ export async function handleRuntimeRunClass(
       let profilerId = '';
       const ran = await sequence(
         atStep('schedule trace', () =>
-          classExecutor.scheduleTrace({
-            ...profilerParameters,
-            analyse: analyseException,
-          }),
+          withAdtHeaders(context, 'classExecutor.scheduleTrace', (headers) =>
+            classExecutor.scheduleTrace({
+              ...profilerParameters,
+              analyse: analyseException,
+              headers,
+            }),
+          ),
         ),
         atStep('run with profiler', (id: string) => {
           profilerId = id;

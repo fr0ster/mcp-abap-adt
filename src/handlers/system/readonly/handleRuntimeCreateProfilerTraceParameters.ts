@@ -22,6 +22,7 @@
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -94,25 +95,28 @@ export async function handleRuntimeCreateProfilerTraceParameters(
   return answer(
     { tool: 'RuntimeCreateProfilerTraceParameters', detail: 'terse' },
     () =>
-      classExecutor.scheduleTrace({
-        ...definedOnly({
-          description: args.description,
-          allMiscAbapStatements: args.all_misc_abap_statements,
-          allProceduralUnits: args.all_procedural_units,
-          allInternalTableEvents: args.all_internal_table_events,
-          allDynproEvents: args.all_dynpro_events,
-          aggregate: args.aggregate,
-          explicitOnOff: args.explicit_on_off,
-          withRfcTracing: args.with_rfc_tracing,
-          allSystemKernelEvents: args.all_system_kernel_events,
-          sqlTrace: args.sql_trace,
-          allDbEvents: args.all_db_events,
-          maxSizeForTraceFile: args.max_size_for_trace_file,
-          amdpTrace: args.amdp_trace,
-          maxTimeForTracing: args.max_time_for_tracing,
+      withAdtHeaders(context, 'classExecutor.scheduleTrace', (headers) =>
+        classExecutor.scheduleTrace({
+          ...definedOnly({
+            description: args.description,
+            allMiscAbapStatements: args.all_misc_abap_statements,
+            allProceduralUnits: args.all_procedural_units,
+            allInternalTableEvents: args.all_internal_table_events,
+            allDynproEvents: args.all_dynpro_events,
+            aggregate: args.aggregate,
+            explicitOnOff: args.explicit_on_off,
+            withRfcTracing: args.with_rfc_tracing,
+            allSystemKernelEvents: args.all_system_kernel_events,
+            sqlTrace: args.sql_trace,
+            allDbEvents: args.all_db_events,
+            maxSizeForTraceFile: args.max_size_for_trace_file,
+            amdpTrace: args.amdp_trace,
+            maxTimeForTracing: args.max_time_for_tracing,
+          }),
+          analyse: analyseException,
+          headers,
         }),
-        analyse: analyseException,
-      }),
+      ),
     (profilerId) => ({
       success: true,
       profiler_id: profilerId,
@@ -156,25 +160,28 @@ export async function handleScheduleProfilerTraceOnce(
     { tool, detail: 'terse' },
     async () => {
       const scheduled = await atStep(SCHEDULE_TRACE, () =>
-        classExecutor.scheduleTrace({
-          ...definedOnly({
-            description: args?.description,
-            allMiscAbapStatements: args?.all_misc_abap_statements,
-            allProceduralUnits: args?.all_procedural_units,
-            allInternalTableEvents: args?.all_internal_table_events,
-            allDynproEvents: args?.all_dynpro_events,
-            aggregate: args?.aggregate,
-            explicitOnOff: args?.explicit_on_off,
-            withRfcTracing: args?.with_rfc_tracing,
-            allSystemKernelEvents: args?.all_system_kernel_events,
-            sqlTrace: args?.sql_trace,
-            allDbEvents: args?.all_db_events,
-            maxSizeForTraceFile: args?.max_size_for_trace_file,
-            amdpTrace: args?.amdp_trace,
-            maxTimeForTracing: args?.max_time_for_tracing,
+        withAdtHeaders(context, 'classExecutor.scheduleTrace', (headers) =>
+          classExecutor.scheduleTrace({
+            ...definedOnly({
+              description: args?.description,
+              allMiscAbapStatements: args?.all_misc_abap_statements,
+              allProceduralUnits: args?.all_procedural_units,
+              allInternalTableEvents: args?.all_internal_table_events,
+              allDynproEvents: args?.all_dynpro_events,
+              aggregate: args?.aggregate,
+              explicitOnOff: args?.explicit_on_off,
+              withRfcTracing: args?.with_rfc_tracing,
+              allSystemKernelEvents: args?.all_system_kernel_events,
+              sqlTrace: args?.sql_trace,
+              allDbEvents: args?.all_db_events,
+              maxSizeForTraceFile: args?.max_size_for_trace_file,
+              amdpTrace: args?.amdp_trace,
+              maxTimeForTracing: args?.max_time_for_tracing,
+            }),
+            analyse: analyseException,
+            headers,
           }),
-          analyse: analyseException,
-        }),
+        ),
       )();
       if (!scheduled.ok) return scheduled;
       const profilerId = scheduled.getResult().value;

@@ -93,6 +93,7 @@ import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -231,30 +232,25 @@ export async function handleUpdateServiceBinding(
         if (!acquired.ok) return acquired;
 
         const publish = atStep('publish', (lockHandle: string) =>
-          obj.update(
-            // **V2 resolves the service by name and version; V4 does not.** The
-            // job's body names the target by type (`SCGR`) and name, and for V2
-            // that is not enough — without the two fields it answers `200` with
-            // `SEVERITY ERROR`, naming an empty service and version `0000`.
-            // Measured on all four variants (adt-clients 23.0.5 ERRATA, "A V2
-            // publication job resolves the service by name and version").
-            serviceType === 'odatav2'
-              ? {
-                  bindingName,
-                  desiredPublicationState,
-                  serviceType,
-                  serviceName: args.service_name.trim().toUpperCase(),
-                  serviceVersion: (args.service_version ?? '0001').trim(),
-                }
-              : { bindingName, desiredPublicationState, serviceType },
-            // adt-clients 23 no longer reads SAP's publication refusal on its
-            // own (MIGRATION-23 §3); `analysePublication` is that verdict.
-            {
-              lockHandle,
-              // None of the server's: see the file header.
-              timeout: 0,
-              analyse: analysePublication,
-            },
+          withAdtHeaders(context, 'serviceBinding.update', (headers) =>
+            obj.update(
+              serviceType === 'odatav2'
+                ? {
+                    bindingName,
+                    desiredPublicationState,
+                    serviceType,
+                    serviceName: args.service_name.trim().toUpperCase(),
+                    serviceVersion: (args.service_version ?? '0001').trim(),
+                  }
+                : { bindingName, desiredPublicationState, serviceType },
+              {
+                headers,
+                lockHandle,
+                // None of the server's: see the file header.
+                timeout: 0,
+                analyse: analysePublication,
+              },
+            ),
           ),
         );
 

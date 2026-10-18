@@ -27,6 +27,7 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
@@ -127,25 +128,28 @@ export async function handleRuntimeRunProgram(
     () =>
       pair(
         atStep('schedule trace', () =>
-          programExecutor.scheduleTrace({
-            ...definedOnly({
-              description: args.description,
-              allProceduralUnits: args.all_procedural_units,
-              allMiscAbapStatements: args.all_misc_abap_statements,
-              allInternalTableEvents: args.all_internal_table_events,
-              allDynproEvents: args.all_dynpro_events,
-              aggregate: args.aggregate,
-              explicitOnOff: args.explicit_on_off,
-              withRfcTracing: args.with_rfc_tracing,
-              allSystemKernelEvents: args.all_system_kernel_events,
-              sqlTrace: args.sql_trace,
-              allDbEvents: args.all_db_events,
-              maxSizeForTraceFile: args.max_size_for_trace_file,
-              amdpTrace: args.amdp_trace,
-              maxTimeForTracing: args.max_time_for_tracing,
+          withAdtHeaders(context, 'programExecutor.scheduleTrace', (headers) =>
+            programExecutor.scheduleTrace({
+              ...definedOnly({
+                description: args.description,
+                allProceduralUnits: args.all_procedural_units,
+                allMiscAbapStatements: args.all_misc_abap_statements,
+                allInternalTableEvents: args.all_internal_table_events,
+                allDynproEvents: args.all_dynpro_events,
+                aggregate: args.aggregate,
+                explicitOnOff: args.explicit_on_off,
+                withRfcTracing: args.with_rfc_tracing,
+                allSystemKernelEvents: args.all_system_kernel_events,
+                sqlTrace: args.sql_trace,
+                allDbEvents: args.all_db_events,
+                maxSizeForTraceFile: args.max_size_for_trace_file,
+                amdpTrace: args.amdp_trace,
+                maxTimeForTracing: args.max_time_for_tracing,
+              }),
+              analyse: analyseException,
+              headers,
             }),
-            analyse: analyseException,
-          }),
+          ),
         ),
         atStep('run with profiler', (profilerId: string) =>
           programExecutor.runWithProfiler(

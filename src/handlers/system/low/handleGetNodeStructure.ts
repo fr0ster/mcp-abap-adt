@@ -59,6 +59,7 @@ import {
   isIndeterminateWalkAnswer,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -195,13 +196,16 @@ async function nodeStructure(
       const client = createAdtClient(connection, logger);
       return sequence(
         atStep('read node structure', () =>
-          client
-            .getUtils({ ...ourUtils, node: rawNodeStructureXml })
-            .fetchNodeStructure(parent_type, parent_name, {
-              analyse: analyseException,
-              nodeId: node_id || '000000',
-              withShortDescriptions: with_short_descriptions !== false,
-            }),
+          withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+            client
+              .getUtils({ ...ourUtils, node: rawNodeStructureXml })
+              .fetchNodeStructure(parent_type, parent_name, {
+                headers,
+                analyse: analyseException,
+                nodeId: node_id || '000000',
+                withShortDescriptions: with_short_descriptions !== false,
+              }),
+          ),
         ),
         async (rawXml) => {
           if (!isIndeterminateWalkAnswer(rawXml)) {

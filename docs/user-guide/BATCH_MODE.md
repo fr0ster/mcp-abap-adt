@@ -202,6 +202,22 @@ again. The system serves the communication batch, so the not-served branch (an o
 destination marked, the reads sequential) is shown by the unit tests only
 (`src/__tests__/unit/batch/availability.test.ts`), not measured.
 
+### `GetWhereUsed`'s objects cache after a credential refusal
+
+`GetWhereUsed` with `objects` keeps each object it answers in the objects cache that
+`GetObjectNodeFromCache` reads. A call that ends on a credential refusal keeps what it answered
+before the refusal, and the two versions answer a different amount before it:
+
+- Without the batch, each object is answered, and cached, before the next one is read; the
+  objects before the refused read are in the cache.
+- In envelopes, a refusal in the last phase still caches the objects before the refused one.
+  A refusal in an earlier phase — with a type filter, a scope read answered `401` — ends the call
+  before the scoped searches are sent, so the objects whose scope was already answered get no
+  where-used answer and are not cached; a refusal thrown for a whole envelope caches nothing from
+  that phase.
+
+A call that ends without a refusal caches the same objects on both versions.
+
 ### A read answered `406` in an envelope
 
 Each read in an envelope is sent with the Accept the connection's accept cache holds for its

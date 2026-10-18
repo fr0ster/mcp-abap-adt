@@ -9,6 +9,7 @@
 
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import { handleGetAbapSystemSymbols } from '../../handlers/system/readonly/handleGetAbapSystemSymbols';
+import { createBatchAvailability } from '../../lib/batch/availability';
 import { okResponse, reading } from '../helpers/fakeClient';
 
 /** What `createAdtClient` does for the delegated reads: throw, or answer. */
@@ -63,8 +64,17 @@ describe('GetAbapSystemSymbols: a delegated read that threw', () => {
         authError['credential-refused']({ credential: 'token' }),
       );
     };
+    // The sequential version, one symbol after another: a destination known
+    // to have no communication batch. (The batched version records every
+    // symbol's read in one envelope: `unit/batch/objectLists.test.ts`.)
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
     const result: any = await handleGetAbapSystemSymbols(
-      { connection: {} as any, logger: undefined } as any,
+      {
+        connection: {} as any,
+        logger: undefined,
+        batchAvailability: notServed,
+      } as any,
       { code: CODE },
     );
     expect(result.isError).toBe(true);

@@ -57,7 +57,7 @@
     "tool": "ListTransports",
     "set": "full",
     "handler": "src/handlers/transport/readonly/handleListTransports.ts#handleListTransports",
-    "sends": "GET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations, then GET /sap/bc/adt/cts/transportrequests?configUri=… per saved configuration, up to 5"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): GET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations, then GET /sap/bc/adt/cts/transportrequests?configUri=… of every saved configuration, up to 5, in one envelope; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetSqlQuery",
@@ -81,13 +81,13 @@
     "tool": "DescribeByList",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleDescribeByList.ts#handleDescribeByList",
-    "sends": "one quickSearch GET per object, in sequence, retried without its type when the first answer is empty"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the quickSearch GET of every object, then the quickSearch GET without its type of every object whose first answer was empty or failed; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetAbapSystemSymbols",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetAbapSystemSymbols.ts#handleGetAbapSystemSymbols",
-    "sends": "one source or metadata GET per symbol found in the given code, in sequence"
+    "sends": "in one ADT batch envelope (POST /sap/bc/adt/communication/batch): the source GET of every class and interface symbol found in the given code; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetATCFindings",

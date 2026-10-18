@@ -187,8 +187,9 @@ number answers the same refusal.
 ## A system without the communication batch
 
 The tools that read several independent things inside one call (the package walks,
-`GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`) send
-them in envelopes to `/sap/bc/adt/communication/batch`.
+`GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`,
+`ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`) send them in envelopes to
+`/sap/bc/adt/communication/batch`.
 Whether a destination has that endpoint is learned only from the outer status of its first
 envelope: `2xx` means served, for good; `404` means not served, and from then on that
 destination's reads run sequentially, one request after another. Any other status decides

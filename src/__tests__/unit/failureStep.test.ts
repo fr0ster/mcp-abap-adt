@@ -520,6 +520,15 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
     await expect(run).rejects.toBe(unauthorized);
   });
 
+  // The sequential versions, one request after another: a destination known
+  // to have no communication batch. (The batched versions send every object's
+  // read in one envelope: `unit/batch/objectLists.test.ts`.)
+  const oneByOne = () => {
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
+    return { ...context, batchAvailability: notServed };
+  };
+
   it('DescribeByList: the answer is the failure as it came, no object after it is searched', async () => {
     const searched: string[] = [];
     fakeClient = fakeClientOf({
@@ -528,7 +537,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
         throw credential();
       },
     });
-    const result: any = await handleDescribeByList(context as any, {
+    const result: any = await handleDescribeByList(oneByOne() as any, {
       objects: [
         { name: 'ZCL_X', type: 'CLAS/OC' },
         { name: 'ZCL_Y', type: 'CLAS/OC' },
@@ -548,7 +557,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
         throw credential();
       },
     });
-    const result: any = await handleGetAbapSystemSymbols(context as any, {
+    const result: any = await handleGetAbapSystemSymbols(oneByOne() as any, {
       code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
     });
     expect(result.isError).toBe(true);

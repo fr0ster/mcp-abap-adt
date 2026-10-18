@@ -12,7 +12,12 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, answerThrown, type McpResult } from '../../../lib/answer';
+import {
+  type PhaseResult,
+  runPhase,
+  withSequentialFallback,
+} from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -176,7 +181,7 @@ export function isModifiableStatus(status: string | undefined): boolean {
   return !status || MODIFIABLE_STATUSES.has(status);
 }
 
-export async function handleListTransports(
+async function listTransportsOneByOne(
   context: HandlerContext,
   args: ListTransportsArgs,
 ) {
@@ -351,4 +356,166 @@ export async function handleListTransports(
       };
     }),
   );
+}
+
+/** The transport request client over `connection`, as the sequential version builds it. */
+function transportRequestOn(
+  connection: HandlerContext['connection'],
+  logger: HandlerContext['logger'],
+) {
+  return createAdtClient(connection, logger).getRequest({
+    ...resultsFor(transportDocuments),
+    searchConfigurations: transportSearchConfigurations,
+  });
+}
+
+/**
+ * The listing in ADT batch envelopes (spec §11): (1) the search
+ * configurations GET; (2) the transport-request GET of every configuration
+ * searched (up to `MAX_SEARCH_CONFIGURATIONS`), in one envelope. The answer
+ * is assembled as the sequential version assembles it: the first search
+ * that failed is the answer, in the order of the configurations. A
+ * credential refusal the connection throws ends the call (`runPhase`).
+ */
+async function listTransportsInEnvelopes(
+  context: HandlerContext,
+  args: ListTransportsArgs,
+) {
+  const { logger } = context;
+  const modifiableOnly = args?.modifiable_only !== false;
+  const user = (
+    args?.user?.trim() ||
+    getStatedSystemContext().responsible ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+
+  logger?.debug(
+    `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
+  );
+
+  const detail = detailOf(args);
+
+  const [first] = await runPhase(context, [undefined], (_item, batch) =>
+    atStep('read search configurations', () =>
+      transportRequestOn(batch, logger).searchConfigurations({
+        analyse: analyseException,
+      }),
+    )(),
+  );
+  const configured = first as PhaseResult<
+    IAdtResponse<Array<{ uri: string }>, IAdtError>
+  >;
+  let lists: PhaseResult<IAdtResponse<unknown, IAdtError>>[] = [];
+  if (configured.ok && configured.value.ok) {
+    const running = configured.value
+      .getResult()
+      .value.slice(0, MAX_SEARCH_CONFIGURATIONS);
+    if (running.length > 0) {
+      lists = await runPhase(context, running, (configuration, batch) =>
+        atStep('list', () =>
+          transportRequestOn(batch, logger).list({
+            analyse: analyseException,
+            configUri: configuration.uri,
+          }),
+        )(),
+      );
+    }
+  }
+
+  let searched: string[] = [];
+  let capped = false;
+
+  return answer(
+    { tool: 'ListTransports', detail },
+    async () => {
+      if (!configured.ok) throw configured.error;
+      const answered = configured.value;
+      if (!answered.ok) {
+        return answered as unknown as IAdtResponse<
+          AdtReading<unknown>,
+          IAdtError
+        >;
+      }
+
+      const configurations = answered.getResult().value;
+      if (configurations.length === 0) {
+        throw new Error(
+          `This system holds no saved transport search configuration, and a transport listing is a saved search: ${TRANSPORT_SEARCH_CONFIGURATIONS_URL} answered none. Create one in ADT's Transport Organizer and the tool will use it.`,
+        );
+      }
+
+      capped = configurations.length > MAX_SEARCH_CONFIGURATIONS;
+      const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
+      searched = running.map((configuration) => configuration.uri);
+
+      const readings: AdtReading<unknown>[] = [];
+      for (const result of lists) {
+        if (!result.ok) throw result.error;
+        const listed = result.value;
+        if (!listed.ok) {
+          return listed as unknown as IAdtResponse<
+            AdtReading<unknown>,
+            IAdtError
+          >;
+        }
+        readings.push(listed.getResult().value as AdtReading<unknown>);
+      }
+
+      const merged: AdtReading<unknown> =
+        readings.length === 1
+          ? readings[0]
+          : {
+              value: readings.map((r) => r.value),
+              raw: readings.map((r) => r.raw).join('\n'),
+              status: readings[0]?.status ?? 200,
+            };
+
+      return {
+        ok: true,
+        getResult: () => ({ value: merged }),
+        getError: () => {
+          throw new Error('ListTransports: asked for the error of a success');
+        },
+      } as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+    },
+    project(detail, (value) => {
+      const parsed = parseTransportListValue(value);
+      const byUser = user ? parsed.filter((t) => t.owner === user) : parsed;
+      const transports = modifiableOnly
+        ? byUser.filter((t) => isModifiableStatus(t.status))
+        : byUser;
+
+      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
+
+      return {
+        success: true,
+        count: transports.length,
+        transports,
+        ...(searched.length > 1 ? { searched_configurations: searched } : {}),
+        ...(capped ? { configurations_capped: MAX_SEARCH_CONFIGURATIONS } : {}),
+      };
+    }),
+  );
+}
+
+export async function handleListTransports(
+  context: HandlerContext,
+  args: ListTransportsArgs,
+): Promise<McpResult> {
+  try {
+    return await withSequentialFallback<McpResult>(
+      context,
+      () => listTransportsInEnvelopes(context, args),
+      () => listTransportsOneByOne(context, args),
+    );
+  } catch (error) {
+    // A throw of a phase (a credential refusal the connection threw): as
+    // `answer()` renders a throw of the sequential version's call.
+    return answerThrown(error, {
+      tool: 'ListTransports',
+      detail: detailOf(args),
+    });
+  }
 }

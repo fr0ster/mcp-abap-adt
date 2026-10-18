@@ -7,6 +7,11 @@ import {
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
+import {
+  type PhaseResult,
+  runPhase,
+  withSequentialFallback,
+} from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { return_error } from '../../../lib/utils';
@@ -545,6 +550,62 @@ class AbapSystemSymbolResolver {
     return { resolvedSymbols, stats };
   }
 
+  /**
+   * `resolveSymbols` in one ADT batch envelope (spec §11): every symbol's
+   * read — a class's or an interface's source GET; a function module or a
+   * local symbol sends none — recorded on one batch connection and sent
+   * together, then assembled as `resolveSymbols` assembles them: the first
+   * credential failure in the order of the symbols ends the call with its
+   * answer. Nothing is sent again.
+   */
+  public async resolveSymbolsInEnvelope(
+    context: HandlerContext,
+    symbols: AbapSymbolInfo[],
+  ): Promise<{
+    resolvedSymbols: AbapSymbolInfo[];
+    stats: any;
+    /** A credential failure's answer, as it came: the call ends with it. */
+    ended?: unknown;
+  }> {
+    const answered = await runPhase(context, symbols, (symbol, batch) =>
+      this.resolveSymbol({ ...context, connection: batch }, symbol),
+    );
+    const resolvedSymbols: AbapSymbolInfo[] = [];
+    let resolvedCount = 0;
+    let failedCount = 0;
+
+    for (const [i, symbol] of symbols.entries()) {
+      try {
+        const result = answered[i] as PhaseResult<AbapSymbolInfo>;
+        if (!result.ok) throw result.error;
+        const resolved = result.value;
+        const ended = resolved.error
+          ? credentialAnswers.get(resolved.error)
+          : undefined;
+        if (ended !== undefined)
+          return { resolvedSymbols, stats: undefined, ended };
+        resolvedSymbols.push(resolved);
+        if (resolved.systemInfo?.exists) {
+          resolvedCount++;
+        } else {
+          failedCount++;
+        }
+      } catch (error) {
+        resolvedSymbols.push(threwAt(symbol, error, 'resolve symbol'));
+        failedCount++;
+      }
+    }
+
+    const stats = {
+      totalSymbols: symbols.length,
+      resolvedSymbols: resolvedCount,
+      failedSymbols: failedCount,
+      resolutionRate: `${((resolvedCount / symbols.length) * 100).toFixed(1)}%`,
+    };
+
+    return { resolvedSymbols, stats };
+  }
+
   private async resolveSymbol(
     context: HandlerContext,
     symbol: AbapSymbolInfo,
@@ -759,10 +820,7 @@ class AbapSystemSymbolResolver {
   }
 }
 
-export async function handleGetAbapSystemSymbols(
-  context: HandlerContext,
-  args: any,
-) {
+async function systemSymbolsOneByOne(context: HandlerContext, args: any) {
   const { logger } = context;
   try {
     if (!args?.code) {
@@ -808,6 +866,70 @@ export async function handleGetAbapSystemSymbols(
     logger?.error('Failed to resolve ABAP system symbols', error as any);
     // A credential failure as the chain made it, a carried error as it is,
     // a throw of our own `client_threw` — never its message as bare text.
+    return answerCaught(error, {
+      tool: 'GetAbapSystemSymbols',
+      detail: 'terse',
+    });
+  }
+}
+
+/**
+ * The symbols resolved in one ADT batch envelope: the sequential version's
+ * analysis and answer, its resolution `resolveSymbolsInEnvelope`.
+ */
+async function systemSymbolsInEnvelope(
+  context: HandlerContext,
+  args: any,
+): Promise<McpResult> {
+  const { logger } = context;
+  logger?.debug('Running semantic analysis and system symbol resolution');
+
+  const analyzer = new SimpleAbapSemanticAnalyzer();
+  const semanticResult = analyzer.analyze(args.code);
+
+  const resolver = new AbapSystemSymbolResolver();
+  const { resolvedSymbols, stats, ended } =
+    await resolver.resolveSymbolsInEnvelope(context, semanticResult.symbols);
+  if (ended !== undefined) return ended as McpResult;
+  logger?.info(
+    `Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`,
+  );
+
+  const result: AbapSystemSymbolsResult = {
+    symbols: resolvedSymbols,
+    dependencies: semanticResult.dependencies,
+    errors: semanticResult.errors,
+    scopes: semanticResult.scopes,
+    systemResolutionStats: stats,
+  };
+
+  return {
+    isError: false,
+    content: [
+      {
+        type: 'json',
+        json: result,
+      },
+    ],
+  } as unknown as McpResult;
+}
+
+export async function handleGetAbapSystemSymbols(
+  context: HandlerContext,
+  args: any,
+) {
+  if (!args?.code) return systemSymbolsOneByOne(context, args);
+  try {
+    return await withSequentialFallback<McpResult>(
+      context,
+      () => systemSymbolsInEnvelope(context, args),
+      () => systemSymbolsOneByOne(context, args) as Promise<McpResult>,
+    );
+  } catch (error) {
+    context.logger?.error(
+      'Failed to resolve ABAP system symbols',
+      error as any,
+    );
     return answerCaught(error, {
       tool: 'GetAbapSystemSymbols',
       detail: 'terse',

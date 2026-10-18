@@ -10,6 +10,10 @@ import { AdtHeaderPairs } from '../../../lib/adtHeaders/AdtHeaderPairs';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { asRecordedCall } from '../../../lib/adtHeaders/scope';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  SAP_EXCEPTION_HEADERS,
+  unsupportedMediaTypeBody,
+} from '../../helpers/sapRefusals';
 
 const OP = 'utils.getWhereUsed';
 const DEFAULT = DEFAULT_ADT_HEADERS[OP];
@@ -110,13 +114,17 @@ describe('withAdtHeaders', () => {
     expect(m.sent[1]?.accept).toBe(`${NEWER}, application/xml`);
   });
 
-  it('a 415 naming a type is sent once more with it as the Content-Type, kept', async () => {
+  it("SAP's 415 naming a type is sent once more with it as the Content-Type, kept; its own application/xml never", async () => {
     const pairs = new AdtHeaderPairs();
     const context = { adtHeaders: pairs.forSystem('S1') };
     const m = member((headers) =>
       headers.contentType === NEWER_BODY
         ? okAnswer(headers)
-        : failed(415, '', { 'content-type': NEWER_BODY }),
+        : failed(
+            415,
+            unsupportedMediaTypeBody(NEWER_BODY),
+            SAP_EXCEPTION_HEADERS,
+          ),
     );
     const answer = await withAdtHeaders(context, OP, m.call);
     expect(answer.ok).toBe(true);
@@ -124,10 +132,32 @@ describe('withAdtHeaders', () => {
       DEFAULT,
       { accept: DEFAULT.accept, contentType: NEWER_BODY },
     ]);
+    expect(m.sent.map((h) => h.contentType)).not.toContain('application/xml');
     expect(pairs.forSystem('S1').pairFor(OP)).toEqual({
       accept: DEFAULT.accept,
       contentType: NEWER_BODY,
     });
+    await withAdtHeaders(context, OP, m.call);
+    expect(m.sent).toHaveLength(3);
+    expect(m.sent[2]).toEqual({
+      accept: DEFAULT.accept,
+      contentType: NEWER_BODY,
+    });
+  });
+
+  it('a bare "Unsupported Media Type" is the answer: nothing sent again, nothing kept', async () => {
+    const pairs = new AdtHeaderPairs();
+    const m = member(() =>
+      failed(415, unsupportedMediaTypeBody(), SAP_EXCEPTION_HEADERS),
+    );
+    const answer = await withAdtHeaders(
+      { adtHeaders: pairs.forSystem('S1') },
+      OP,
+      m.call,
+    );
+    expect(answer.ok).toBe(false);
+    expect(m.sent).toEqual([DEFAULT]);
+    expect(pairs.forSystem('S1').pairFor(OP)).toEqual(DEFAULT);
   });
 
   it('a 406 naming no type is the answer: nothing sent again, nothing kept', async () => {

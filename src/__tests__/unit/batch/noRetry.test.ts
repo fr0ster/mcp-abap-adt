@@ -20,6 +20,10 @@ import {
   statusError,
 } from '../../helpers/batchEnvelope';
 import { batchStand, payloadOf } from '../../helpers/batchStand';
+import {
+  SAP_EXCEPTION_HEADERS,
+  unsupportedMediaTypeBody,
+} from '../../helpers/sapRefusals';
 
 /** The one media type SAP takes here — not the one adt-clients sends. */
 const SUPPORTED = 'application/vnd.placeholder.source+text';
@@ -45,7 +49,8 @@ function picky(inner: InnerRequest): PartAnswer {
       : {
           status: 415,
           statusText: 'Unsupported Media Type',
-          headers: { 'content-type': SUPPORTED },
+          headers: SAP_EXCEPTION_HEADERS,
+          body: unsupportedMediaTypeBody(SUPPORTED),
         };
   }
   return { status: 200, statusText: 'OK' };

@@ -29,6 +29,10 @@ import {
   partByPart,
   statusError,
 } from '../../helpers/batchEnvelope';
+import {
+  SAP_EXCEPTION_HEADERS,
+  unsupportedMediaTypeBody,
+} from '../../helpers/sapRefusals';
 import { withinTurns } from '../../helpers/withinTurns';
 
 const OP = 'utils.getWhereUsed';
@@ -241,7 +245,8 @@ describe('the format correction of an internal batch phase', () => {
         ? {
             status: 415,
             statusText: 'Unsupported Media Type',
-            headers: { 'content-type': NEWER_BODY },
+            headers: SAP_EXCEPTION_HEADERS,
+            body: unsupportedMediaTypeBody(NEWER_BODY),
           }
         : { status: 200, statusText: 'OK', body: `${item} as ${accept}` },
     );

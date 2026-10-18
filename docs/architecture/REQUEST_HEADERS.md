@@ -7,7 +7,7 @@ operation, and the pair a system named in a `406` / `415`, kept for that system.
 describes the members, the default pairs, how the library sends and corrects them, and what an
 embedder and a direct adt-clients consumer do.
 
-Versions: `@mcp-abap-adt/adt-clients` `^36.0.0`, `@mcp-abap-adt/interfaces-adt` `^20.0.0`,
+Versions: `@mcp-abap-adt/adt-clients` `^36.0.1`, `@mcp-abap-adt/interfaces-adt` `^20.0.0`,
 `@mcp-abap-adt/adt-strategies` `^0.13.0`, `@mcp-abap-adt/lib` 19.0.0. The source of every pair
 below is adt-clients' `docs/usage/MIGRATION-36.md` (shipped in the package,
 `node_modules/@mcp-abap-adt/adt-clients/docs/usage/MIGRATION-36.md`): its tables "The pairs 35.0.0 sent" and "The completed pairs,
@@ -493,7 +493,9 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
   again and overwrites it.
 - **`406`**: the types SAP names in its body (`extractSupportedAccept(error)`, joined with `, `)
   become the `Accept`, the `Content-Type` as sent. **`415`**: the first type
-  `extractSupportedContentType(error)` names becomes the `Content-Type`, the `Accept` as sent. The
+  `extractSupportedContentType(error)` names becomes the `Content-Type`, the `Accept` as sent —
+  SAP's list after `Supported Media Types:` in its exception document; a bare `Unsupported Media
+  Type` names nothing, and the document's own `application/xml` is never read as a type. The
   same member call is made once more with the corrected pair, and the pair is kept. A `406` /
   `415` that names nothing, or names what was sent, is the call's answer; the second call's
   answer is the call's answer, whatever it is.
@@ -566,7 +568,9 @@ if (!answer.ok) {
 ```
 
 `extractSupportedAccept` reads only SAP's list after `Accepted content types:` in the `406`
-body (often empty); `extractSupportedContentType` reads a `415`'s headers and body. Keeping the
+body (often empty); `extractSupportedContentType` reads only SAP's list after `Supported Media Types:` in the `415`
+body (a bare `Unsupported Media Type` names nothing; the response's own `content-type`, the
+exception document's `application/xml`, is not read). Keeping the
 corrected pair is the consumer's.
 
 ## Exports

@@ -384,14 +384,31 @@ async function whereUsedInEnvelopes(
     step: string,
   ): number | undefined =>
     readable.find(({ i }) => refusesCredential(answers.get(i), step))?.i;
-  const endWith = async (i: number): Promise<WhereUsedOutcome> => ({
-    ended: (await whereUsedFromAnswers(
-      context,
-      targets[i] as WhereUsedArgs,
-      scopes.get(i),
-      references.get(i),
-    )) as McpResult,
-  });
+  // With every read in (the last phase), the objects before the one that
+  // ends the call are answered first, as the sequential version answers them
+  // before it meets the refusal: the cache holds what its cache holds.
+  const endWith = async (
+    i: number,
+    answeredBefore: boolean,
+  ): Promise<WhereUsedOutcome> => {
+    for (const { target, i: j } of answeredBefore ? readable : []) {
+      if (j >= i) break;
+      await whereUsedFromAnswers(
+        context,
+        target,
+        scopes.get(j),
+        references.get(j),
+      );
+    }
+    return {
+      ended: (await whereUsedFromAnswers(
+        context,
+        targets[i] as WhereUsedArgs,
+        scopes.get(i),
+        references.get(i),
+      )) as McpResult,
+    };
+  };
 
   let searched = readable;
   if (readsScope(filter)) {
@@ -419,7 +436,7 @@ async function whereUsedInEnvelopes(
       if (result !== undefined) scopes.set(i, result);
     });
     const refused = ended(scopes, 'read where-used scope');
-    if (refused !== undefined) return endWith(refused);
+    if (refused !== undefined) return endWith(refused, false);
     searched = readable.filter(({ target, i }) => {
       const scope = scopes.get(i);
       if (scope?.ok !== true || !scope.value.ok) return false;
@@ -462,7 +479,7 @@ async function whereUsedInEnvelopes(
       if (result !== undefined) references.set(i, result);
     });
     const refused = ended(references, 'read where-used');
-    if (refused !== undefined) return endWith(refused);
+    if (refused !== undefined) return endWith(refused, true);
   }
 
   const answers: McpResult[] = [];

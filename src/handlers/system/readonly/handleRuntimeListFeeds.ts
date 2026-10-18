@@ -62,7 +62,6 @@ export const TOOL_DEFINITION = {
         ],
         description:
           'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
-        default: 'descriptors',
       },
       feed_types: {
         type: 'array',

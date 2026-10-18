@@ -1151,7 +1151,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `component` (string, optional) - Dumps whose application component contains this text, in any case.
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
-- `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
+- `feed_type` (string, optional) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.

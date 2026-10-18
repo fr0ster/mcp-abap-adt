@@ -16,11 +16,17 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetWhereUsed as getWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
-import { handleRuntimeListFeeds as runtimeListFeeds } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
+import {
+  TOOL_DEFINITION as RUNTIME_LIST_FEEDS,
+  handleRuntimeListFeeds as runtimeListFeeds,
+} from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { eligible } from '../../../lib/batch/eligibility';
+import { objectsListCache } from '../../../lib/getObjectsListCache';
+import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -430,6 +436,23 @@ async function sequentialWithFailed(
   return withinTurns(handler(contextOn(fake, 'absent'), args), TURNS);
 }
 
+/** The sequential answer with each of `labels` refused by the connection: its credential refusal thrown. */
+async function sequentialWithThrown(
+  handler: Handler,
+  args: Record<string, unknown>,
+  labels: string[],
+) {
+  const fake = system();
+  const answering = fake.connection.makeAdtRequest.getMockImplementation();
+  fake.connection.makeAdtRequest.mockImplementation(
+    async (request: IAbapRequestOptions) => {
+      if (labels.includes(directLabel(request))) throw credential();
+      return (answering as NonNullable<typeof answering>)(request);
+    },
+  );
+  return withinTurns(handler(contextOn(fake, 'absent'), args), TURNS);
+}
+
 /** A system whose envelope number `failing` fails as a whole (`500`). */
 function failingEnvelope(failing: number) {
   return system({}, (parts, index) => {
@@ -676,14 +699,82 @@ describe('GetWhereUsed', () => {
       [2, { enable_all_types: true }],
       [2, { enable_only_types: ['CLAS/OC'] }],
     ] as const) {
+      const args = { objects: THREE, ...filter };
       const fake = refusingEnvelope(failing);
       const result = await withinTurns(
-        handleGetWhereUsed(contextOn(fake), { objects: THREE, ...filter }),
+        handleGetWhereUsed(contextOn(fake), args),
         TURNS,
       );
+      const expected = await sequentialWithThrown(
+        handleGetWhereUsed,
+        args,
+        phasesOf(fake)[failing - 1] as string[],
+      );
+      expect(wholeOf(result)).toEqual(wholeOf(expected));
       expect(payloadOf(result).error).toBe('authentication_failed');
       expect(fake.envelopes).toHaveLength(failing);
     }
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ['wu:ZT_C', {}],
+    ['wu:ZT_C:CLAS/OC', { enable_only_types: ['CLAS/OC'] }],
+  ])(
+    'a 401 SAP answered to %s: the cache holds what the sequential version leaves in it',
+    async (label, filter) => {
+      const args = { objects: THREE, ...filter };
+      const model = { answers: { [label]: UNAUTHORIZED } };
+      objectsListCache.clearCache();
+      const batched = await withinTurns(
+        handleGetWhereUsed(contextOn(system(model)), args),
+        TURNS,
+      );
+      const batchedCache = objectsListCache.getCache();
+      objectsListCache.clearCache();
+      const sequential = await withinTurns(
+        handleGetWhereUsed(contextOn(system(model), 'absent'), args),
+        TURNS,
+      );
+      const sequentialCache = objectsListCache.getCache();
+      objectsListCache.clearCache();
+      expect(wholeOf(batched)).toEqual(wholeOf(sequential));
+      expect(payloadOf(batched)).toMatchObject({ status: 401 });
+      expect(batchedCache).toEqual(sequentialCache);
+      expect(batchedCache.content[0].json).toMatchObject({
+        object_name: 'ZT_B',
+      });
+    },
+  );
+
+  it('401s in two phases: the batched call ends at the first 401 of the phase that met it, in the order of the objects', async () => {
+    const outcome = await bothWays(
+      handleGetWhereUsed,
+      { objects: THREE, enable_only_types: ['CLAS/OC'] },
+      {
+        answers: {
+          'scope:ZT_B': UNAUTHORIZED,
+          'scope:ZT_C': UNAUTHORIZED,
+          'wu:ZT_A:CLAS/OC': UNAUTHORIZED,
+        },
+      },
+    );
+    // Batched: the scopes' phase meets the 401s of ZT_B and ZT_C and ends at
+    // ZT_B's, the first in the order of the objects; ZT_A's scoped request
+    // is never sent.
+    expect(phasesOf(outcome.batched)).toEqual([
+      ['scope:ZT_A', 'scope:ZT_B', 'scope:ZT_C'],
+    ]);
+    expect(payloadOf(outcome.a)).toMatchObject({
+      status: 401,
+      step: 'read where-used scope',
+    });
+    expect(JSON.stringify(payloadOf(outcome.a).request)).toContain('zt_b');
+    // Sequential: ZT_A is read first, and its scoped request's 401 ends it.
+    expect(payloadOf(outcome.b)).toMatchObject({
+      status: 401,
+      step: 'read where-used',
+    });
+    expect(JSON.stringify(payloadOf(outcome.b).request)).toContain('zt_a');
   });
 
   it('a refusal the connection throws to the validating scope read is thrown, as the sequential version throws it', async () => {
@@ -910,6 +1001,12 @@ describe('RuntimeListFeeds', () => {
         handleRuntimeListFeeds(contextOn(fake), args as never),
         TURNS,
       );
+      const expected = await sequentialWithThrown(
+        handleRuntimeListFeeds,
+        args,
+        phasesOf(fake)[failing - 1] as string[],
+      );
+      expect(wholeOf(result)).toEqual(wholeOf(expected));
       expect(payloadOf(result).error).toBe('authentication_failed');
       expect(fake.envelopes).toHaveLength(failing);
     }
@@ -970,6 +1067,31 @@ describe('RuntimeListFeeds', () => {
       expect(fake.envelopes).toHaveLength(0);
       expect(fake.directs).toHaveLength(0);
     }
+  });
+
+  it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {
+    const schema = z.object(jsonSchemaToZod(RUNTIME_LIST_FEEDS.inputSchema));
+    const listed = schema.parse({ feed_types: PAGED });
+    expect(listed).toEqual({ feed_types: PAGED });
+    const fake = system();
+    const result = await withinTurns(
+      handleRuntimeListFeeds(contextOn(fake), listed as never),
+      TURNS,
+    );
+    expect((result as { isError?: boolean }).isError).toBeFalsy();
+    expect(payloadOf(result)).toHaveLength(PAGED.length);
+    expect(schema.parse({})).toEqual({});
+    const absent = await withinTurns(
+      handleRuntimeListFeeds(contextOn(system()), {}),
+      TURNS,
+    );
+    const descriptors = await withinTurns(
+      handleRuntimeListFeeds(contextOn(system()), {
+        feed_type: 'descriptors',
+      }),
+      TURNS,
+    );
+    expect(textOf(absent)).toBe(textOf(descriptors));
   });
 });
 

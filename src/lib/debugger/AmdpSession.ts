@@ -144,7 +144,9 @@ export class AmdpSession<O = unknown> {
   private closing?: Open; // retired, its cleanup not finished
   private debuggeeId?: string;
   private breaks = 0; // counts ON_BREAK, to tell a break that came during a step
-  private ends = 0; // counts ON_WARNING, ON_EXECUTION_END and STOP: a debuggee's cancel or release has finished
+  private ends = 0;
+  /** The session's end began (`endWaits`): no stop waits for a debuggee any more. */
+  private sessionEnding = false; // counts ON_WARNING, ON_EXECUTION_END and STOP: a debuggee's cancel or release has finished
   private queue: AmdpEvent[] = [];
   private readonly syncs = new Map<string, AmdpEvent>(); // SYNC_BREAKPOINTS by request id, apart from the queue
   private readonly abandoned = new Set<string>(); // syncs no call waits for any more
@@ -248,6 +250,7 @@ export class AmdpSession<O = unknown> {
           'an AMDP debug session is already running for this debug session',
         );
       const origin = this.requireOrigin();
+      this.sessionEnding = false; // a new session: its stop waits again
       const user = (await this.ports.requestUser(origin)).toUpperCase();
       // Until the session is recorded as ours, whatever was opened is closed on any failure.
       let events: IAbapConnection | undefined;
@@ -1109,13 +1112,27 @@ export class AmdpSession<O = unknown> {
   async stop(): Promise<void> {
     let ending: Open | undefined;
     let notAttempted: readonly string[] = [];
+    // 1. In the serial: a debuggee at a break is cancelled. A refused cancel
+    // sends no stop — a stop leaves a suspended debuggee where it stands —
+    // unless the session is ending: the stop fails, and the session stays for
+    // the next stop.
+    const before: DebugFailure[] = [];
+    const cancelled = await this.mutate(() => this.cancelForStop(before));
+    if (cancelled === 'refused') {
+      this.cleanupFailures = before;
+      this.notify();
+      throw new DebugCleanupError(before);
+    }
+    // 2. Outside the serial: its end awaited, so no other call — a retried
+    // stop, a dispose — waits behind it.
+    if (cancelled !== undefined) await this.waitDebuggeeEnd(cancelled, before);
+    // 3. In the serial: the stop and the cleanup.
     await this.mutate(async () => {
-      const failures: DebugFailure[] = [];
+      const failures: DebugFailure[] = [...before];
       try {
         for (const c of [...this.unclosed])
           await this.closeOrKeep(c, 'a connection', failures);
         await this.finishOnce(failures);
-        await this.letDebuggeeEnd(failures);
         if (this.open) this.retire(this.open);
         if (this.closing) {
           const open = this.closing;
@@ -1171,23 +1188,61 @@ export class AmdpSession<O = unknown> {
    * refused is left to the retired session's cleanup, which sends it again
    * and names it.
    */
-  private async letDebuggeeEnd(failures: DebugFailure[]): Promise<void> {
+  /**
+   * Inside the serial, step 1 of a stop: a debuggee standing at a break of
+   * the running session is cancelled. Answers what the stop then waits for;
+   * `refused` when the cancel was refused (its failure in `failures`) and the
+   * session is not ending; nothing to wait for otherwise. A refused cancel at
+   * the session's end is left to the retired session's cleanup, which sends
+   * it once more and stops.
+   */
+  private async cancelForStop(
+    failures: DebugFailure[],
+  ): Promise<
+    { open: Open; debuggee: string; endsBefore: number } | 'refused' | undefined
+  > {
     const open = this.open;
     const debuggee = this.debuggeeId;
-    if (!open || open.stopping || debuggee === undefined) return;
+    if (!open || open.stopping || debuggee === undefined) return undefined;
     const endsBefore = this.ends;
     const cancelled = await open.onCommands
       .deleteDebuggee(open.mainId, debuggee)
       .catch(asFailure);
-    if (!cancelled.ok) return;
+    if (!cancelled.ok) {
+      if (this.sessionEnding) return undefined;
+      failures.push(failedEntry(cancelled, `release debuggee ${debuggee}`));
+      return 'refused';
+    }
     open.released.add(debuggee);
     if (this.debuggeeId === debuggee) this.debuggeeId = undefined;
+    return { open, debuggee, endsBefore };
+  }
+
+  /**
+   * Outside the serial, step 2 of a stop: the cancelled debuggee's end — the
+   * event read reports `ON_WARNING`, `ON_EXECUTION_END` or `STOP`, and every
+   * run in flight has returned — as Eclipse does. Measured on premise
+   * (2026-10-19): a stop and logoffs sent while the cancel was still under
+   * way left the AMDP debugger's ABAP sessions and their RFCs alive; sent
+   * after it had finished, nothing stayed. No timer: the wait also ends when
+   * the session is retired (another stop), its event read failed, the
+   * session is ending (`endWaits`: dispose, the instance's close), or the
+   * stop call's own signal aborts — and then the answer names the debuggee
+   * that had not ended.
+   */
+  private async waitDebuggeeEnd(
+    target: { open: Open; debuggee: string; endsBefore: number },
+    failures: DebugFailure[],
+  ): Promise<void> {
+    const { open, debuggee, endsBefore } = target;
     const signal = currentRequestSignal();
     const debuggeeEnded = () => this.ends > endsBefore && this.runs.size === 0;
     const settled = () =>
       debuggeeEnded() ||
       this.open !== open ||
+      open.stopping ||
       open.readFailed !== undefined ||
+      this.sessionEnding ||
       signal?.aborted === true;
     await new Promise<void>((resolve) => {
       const check = () => {
@@ -1209,6 +1264,16 @@ export class AmdpSession<O = unknown> {
           'wait for the debuggee to end',
         ),
       );
+  }
+
+  /**
+   * The session is ending (a dispose, the instance's close): a stop waiting
+   * for a debuggee's end goes on at once, and a refused cancel no longer
+   * holds the stop back. A new start waits again.
+   */
+  endWaits(): void {
+    this.sessionEnding = true;
+    this.notify();
   }
 
   /**

@@ -2,6 +2,7 @@ import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
+import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import { runWithRequestSignal } from '../../../lib/requestSignal';
 import { payloadCarriedBy } from '../../../lib/strategies/step';
@@ -78,6 +79,20 @@ function world() {
   /** The request id the next sync will be answered with. */
   const nextSync = () => `Q${syncN + 1}`;
   return { session, reads, calls, closed, dbg, run, nextSync, sim };
+}
+
+/** An ABAP side that holds nothing, for a DebuggerInstance around the AMDP session. */
+function idleAbap() {
+  return {
+    holdsState: () => false,
+    pending: () => false,
+    failures: () => [],
+    bind() {
+      return this;
+    },
+    observe() {},
+    stop: async () => [],
+  } as never;
 }
 
 describe('AmdpSession', () => {
@@ -204,6 +219,87 @@ describe('AmdpSession', () => {
     expect(w.calls.filter((c) => c === 'delete:D1')).toHaveLength(1);
     expect(w.closed).toHaveLength(3); // events, commands and the run, after the stop
     expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a stop whose debuggee never ends holds no other call: a dispose ends the wait, and every connection is logged off', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const first = w.session.stop();
+    const firstFailed = expect(first).rejects.toThrow(
+      /the debuggee D1 had not ended when the stop was sent/,
+    );
+    await until(() => w.calls.includes('delete:D1'));
+    // No end event, no run's return: the session's end is the escape.
+    const disposed = new DebuggerInstance({
+      abap: idleAbap(),
+      amdp: w.session as never,
+    }).dispose();
+    await until(() => w.calls.includes('stop'));
+    await firstFailed;
+    await disposed.catch(() => undefined);
+    await until(() => w.closed.length === 3); // events, commands, the run
+    expect(w.calls.filter((c) => c === 'stop')).toHaveLength(1);
+  });
+
+  it('a dispose at a break whose debuggee never ends: it cancels, waits for nothing, stops, and logs off every connection', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const disposed = new DebuggerInstance({
+      abap: idleAbap(),
+      amdp: w.session as never,
+    })
+      .dispose()
+      .catch((e: unknown) => e);
+    await until(() => w.calls.includes('stop'));
+    expect(w.calls.indexOf('delete:D1')).toBeLessThan(w.calls.indexOf('stop'));
+    expect(String(await disposed)).toMatch(/the debuggee D1 had not ended/);
+    await until(() => w.closed.length === 3);
+  });
+
+  it('a second stop while the first waits for the debuggee does not hang: it stops, and both settle', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const first = w.session.stop().catch((e: unknown) => e);
+    await until(() => w.calls.includes('delete:D1'));
+    const second = w.session.stop().catch((e: unknown) => e);
+    await until(() => w.calls.includes('stop'));
+    await first;
+    await second;
+    await until(() => w.closed.length >= 2);
+    expect(w.calls.filter((c) => c === 'delete:D1')).toHaveLength(1);
+  });
+
+  it('a refused cancel sends no stop: the stop fails naming the refusal, the session stays, and the next stop cancels, waits for the end, then stops', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const realDelete = w.dbg.deleteDebuggee;
+    w.dbg.deleteDebuggee = async (_m: string, d: string) => {
+      w.calls.push(`refused-delete:${d}`);
+      return refusedResponse('busy');
+    };
+    await expect(w.session.stop()).rejects.toThrow(/release debuggee D1: busy/);
+    expect(w.calls).not.toContain('stop');
+    expect(w.closed).toHaveLength(0);
+    expect(w.session.holdsState()).toBe(true);
+    w.dbg.deleteDebuggee = realDelete;
+    const again = w.session.stop();
+    await until(() => w.calls.includes('delete:D1'));
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(w.calls).not.toContain('stop'); // waits for the end
+    w.reads[2].resolve(okResponse(END));
+    await until(() => w.reads.length === 4);
+    w.run.resolve({ ok: false, message: 'cancelled' });
+    await until(() => w.calls.includes('stop'));
+    await again;
+    expect(w.closed).toHaveLength(3);
   });
 
   it("the stop call's own signal ends the wait for the debuggee: the stop is sent and the answer says the debuggee had not ended", async () => {

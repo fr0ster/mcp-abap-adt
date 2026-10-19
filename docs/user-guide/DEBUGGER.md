@@ -715,8 +715,12 @@ class (`class_name`, `line`).
   event read it ended. Measured on premise (2026-10-19): a stop and logoffs sent while the
   cancel was still under way left the AMDP debugger's ABAP sessions and their RFCs
   (`AMDP_DBG_EVENT_LISTENER`, `AMDP_DBG_ACTION_ON_DEBUGGEE_WP`) alive until their timeout;
-  sent once the cancel had finished, nothing stayed. The wait has no clock of its own: the
-  stop call's cancellation ends it, and the answer then says the debuggee had not ended.
+  sent once the cancel had finished, nothing stayed. The wait has no clock of its own and holds
+  no other call: a second stop, the debug state's end (a dispose, the idle bound, the instance's
+  close, the process's shutdown) or the stop call's cancellation ends it, and the answer then
+  names the debuggee that had not ended. A cancel SAP refuses sends no stop: the stop answers the
+  refusal and the session stays for the next stop — at the debug state's end the stop is sent all
+  the same.
   `AmdpDebugStop` ends the handle only when nothing else is held; an ABAP session
   under the same handle goes on. A credential refusal on one of these steps ends
   the stop as it does the ABAP one ([What ends a session](#what-ends-a-session)):

@@ -121,7 +121,12 @@ export class DebuggerInstance implements StatePart {
     return { value: { ended: true, logoffs }, raw: '' };
   }
 
+  /**
+   * The end: an AMDP stop waiting for a debuggee's end goes on at once
+   * (`endWaits`), then both sides stop.
+   */
   async dispose(): Promise<void> {
+    this.amdp.endWaits?.();
     await this.stop();
   }
 }

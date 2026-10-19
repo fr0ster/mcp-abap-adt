@@ -279,7 +279,11 @@ describe.each([
     });
 
     /** A tool call over its own client, the handle in `x-mcp-state-handle`; the logons it made. */
-    async function callWithHeader(name: string, handle: string, args: Args = {}) {
+    async function callWithHeader(
+      name: string,
+      handle: string,
+      args: Args = {},
+    ) {
       const transport = new StreamableHTTPClientTransport(url, {
         requestInit: {
           headers: { ...CREDENTIALS, 'x-mcp-state-handle': handle },
@@ -292,7 +296,10 @@ describe.each([
           content: Array<{ text: string }>;
           isError?: boolean;
         };
-        return { text: result.content[0]?.text ?? '', isError: !!result.isError };
+        return {
+          text: result.content[0]?.text ?? '',
+          isError: !!result.isError,
+        };
       } finally {
         await client.close().catch(() => undefined);
       }
@@ -325,7 +332,9 @@ describe.each([
         const handle = await handleOf();
         const made = instancesMade();
         const before = logons();
-        const byArgument = await call('PoolProbeEcho', { state_handle: handle });
+        const byArgument = await call('PoolProbeEcho', {
+          state_handle: handle,
+        });
         expect(byArgument).toEqual({
           text: 'state is not available',
           isError: true,

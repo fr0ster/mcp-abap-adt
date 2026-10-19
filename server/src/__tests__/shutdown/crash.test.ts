@@ -89,9 +89,9 @@ it('a crash during a running shutdown lets it finish and exits 1; a second crash
   // The logoff the shutdown wrote is joined, never sent again.
   expect(s.adt.logoffs()).toBe(1);
   expect(failedLine(s.shutdownLines)).toHaveLength(1);
-  expect(
-    s.shutdownLines.some((l) => l.includes('at the forced close')),
-  ).toBe(false);
+  expect(s.shutdownLines.some((l) => l.includes('at the forced close'))).toBe(
+    false,
+  );
   hold.release();
   flush.mockRestore();
 });

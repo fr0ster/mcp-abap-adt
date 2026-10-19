@@ -1,6 +1,6 @@
 /**
- * The debugger batch at a live stop (spec §7, §9.3, plan Task 29), on the
- * configured system, and the AMDP gate.
+ * The debugger batch at a live stop (spec §7, §9.3, plan Tasks 29 and 29a),
+ * on the configured system: at an ABAP stop and at an AMDP break.
  *
  * Where it runs: the system the config names, when the case
  * `batch.test_cases.debugger` is enabled. Nothing else may debug for the
@@ -22,34 +22,32 @@
  *    `DebugGetVariables` — each answers nothing; one `DebugBatchEnd`; then
  *    `BatchAnswers` 1–3, each checked on its own: the step answered, the
  *    stack on the next line, the variable as the loop's first pass left it.
- * 2. **The AMDP gate** — on premise only, over either transport, on a
- *    system that runs AMDP debugging (HANA). ABAP Cloud skips. The server
- *    refuses `DebugBatchBegin` at an AMDP debug session
- *    (`debug_batch_amdp_unmeasured`) until a test against a system confirms
- *    that the AMDP debugger's requests go through a debugger batch
- *    envelope; this case is that test. It drives SAP directly, in process,
- *    at the shared AMDP pair (`shared_dependencies`: the class
- *    `ZMCP_SHR_DBG_AMDP` with a SQLScript table function, and its DDL source
- *    `ZMCP_SHR_DBG_TF`; created once by `npm run shared:setup`, never
- *    deleted). The case only reads them. It skips only where SAP's system
- *    information names a database system other than HANA (`DBSystem` not
- *    `HDB`), naming it; a pair that has no active version, or a class
- *    without its breakpoint marker, fails it. Then an AMDP
- *    debug session (`AmdpDebugStart` with a breakpoint in the table
- *    function and a run of the class), `AmdpDebugWait` until `ON_BREAK`,
- *    and the AMDP data preview of the table variable and a step over
- *    recorded in one debugger batch envelope on the session's command
- *    connection. It passes when the envelope and both parts answer ok and
- *    the debuggee moves on to its next event (the step took effect).
+ * 2. **The AMDP debugger batch** — on premise only, over either transport,
+ *    on a system that runs AMDP debugging (HANA). ABAP Cloud skips. Hard
+ *    mode, as case 1: the served full server over stdio, at the shared AMDP
+ *    pair (`shared_dependencies`: the class `ZMCP_SHR_DBG_AMDP` with a
+ *    SQLScript table function, and its DDL source `ZMCP_SHR_DBG_TF`; created
+ *    once by `npm run shared:setup`, never deleted). The case only reads and
+ *    runs them. It skips only where SAP's system information (read on the
+ *    test's own connection) names a database system other than HANA
+ *    (`DBSystem` not `HDB`), naming it; a pair that has no active version,
+ *    or a class without its breakpoint marker, fails it. Then
+ *    `AmdpDebugStart` with a breakpoint in the table function and a run of
+ *    the class (`stop_existing` false), `AmdpDebugWait` until `ON_BREAK`,
+ *    `DebugBatchBegin` at the AMDP break, `AmdpDebugGetTable` of the table
+ *    variable and `AmdpDebugStep` over — each answers nothing; one
+ *    `DebugBatchEnd`; then `BatchAnswers` 1–2: the rows, the step. It passes
+ *    when both answers are ok and the debuggee moves on to its next event
+ *    (`AmdpDebugWait`: the step took effect).
  *
- * Cleanup, in `finally`, whatever happened: debugger state only —
- * `DebugStop` / `AmdpDebugStop` (the debuggee released, the breakpoints
- * removed, the listener stopped), each answer checked, each step run
- * whatever the one before it did; the shared objects are left as they are.
- * Every session is logged
- * off: the served server's by its own shutdown (stdin ended, exit `0`
- * asserted), the in-process instance's by its shutdown, the test's own
- * connection by the setup file's close of tracked connections.
+ * Cleanup, in `finally`, whatever happened, each step in its own `finally`:
+ * an open debugger batch ended, then `DebugStop` / `AmdpDebugStop` (the
+ * debuggee released, the breakpoints removed, the listener or the AMDP
+ * session stopped), each answer checked; then the served server's
+ * shutdown, which logs off every session it opened (stdin ended, exit `0`
+ * asserted). The shared objects are left as they are. The test's own
+ * connection is logged off by the setup file's close of tracked
+ * connections.
  *
  * Each measured answer is one `debugger-batch-live` line on stderr; a state
  * handle never reaches it.
@@ -63,7 +61,6 @@ import type { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { AdtBatchConnection, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -72,20 +69,7 @@ import {
 } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
-import { handleAmdpDebugStart } from '../../../handlers/debugger/debug/handleAmdpDebugStart';
-import { handleAmdpDebugStop } from '../../../handlers/debugger/debug/handleAmdpDebugStop';
-import { handleAmdpDebugWait } from '../../../handlers/debugger/debug/handleAmdpDebugWait';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
-import {
-  createDebuggerInstance,
-  type DebuggerInstance,
-} from '../../../lib/debugger/DebuggerInstance';
-import { newDebuggerId } from '../../../lib/debugger/ids';
-import {
-  InstanceState,
-  stderrStateLogger,
-} from '../../../lib/state/InstanceState';
 import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
 import {
   getEnabledTestCase,
@@ -193,8 +177,6 @@ const say = (kind: Kind, what: string, answered: unknown): void => {
     `debugger-batch-live\t${kind}\t${what}\t${withoutHandles(String(text)).slice(0, 2000)}\n`,
   );
 };
-
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // --- 1. the debugger batch through the served full server ---------------------------
 
@@ -521,13 +503,6 @@ async function readSystemInformation(
 
 type Local = { isError: boolean; text: string; json: any };
 
-/** A part's answer as the record shows it: a document, or a wire answer's status and Location. */
-function shownValue(value: unknown): unknown {
-  if (typeof value === 'string') return value;
-  const wire = value as { status?: unknown; headers?: Record<string, unknown> };
-  return { status: wire?.status, location: wire?.headers?.location };
-}
-
 async function local(
   handler: (ctx: HandlerContext, args: any) => any,
   ctx: HandlerContext,
@@ -554,7 +529,7 @@ function fixtureRead(read: Local): FixtureRead {
   return { status: 200, text: String(read.json?.source ?? '') };
 }
 
-async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
+async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
   const params = testCase.params ?? {};
   const cls = String(params.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
   const ddl = String(params.amdp_ddl ?? 'ZMCP_SHR_DBG_TF').toUpperCase();
@@ -565,7 +540,7 @@ async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
   const { connection } = await createTestConnectionAndSession();
   const plain = createHandlerContext({ connection, logger });
 
-  // The shared pair (`shared_dependencies`): read, never written. The gate
+  // The shared pair (`shared_dependencies`): read, never written. The case
   // skips only where SAP's own system information names a database system
   // other than HANA; any other reason it cannot run fails it.
   const verdict = amdpGateVerdict({
@@ -578,159 +553,122 @@ async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
     ddlRead: fixtureRead(await local(handleGetDdl, plain, { ddl_name: ddl })),
   });
   if ('skip' in verdict) {
-    testLogger?.info(`⏭️  Skipping the AMDP gate: ${verdict.skip}`);
+    testLogger?.info(`⏭️  Skipping the AMDP debugger batch: ${verdict.skip}`);
     say(kind, 'amdp skipped', verdict.skip);
     return;
   }
   if ('fail' in verdict) throw new Error(verdict.fail);
   const tfLine = verdict.breakpointLine;
 
-  let state: InstanceState | undefined;
-  let dbg: DebuggerInstance | undefined;
+  const served = await serve(kind);
   let handle: string | undefined;
+  let batchOpen = false;
   let failure: unknown;
+  /** AmdpDebugWait until an event of `kinds`; the event, or why there is none. */
+  const eventOf = async (kinds: string[], rounds: number): Promise<any> => {
+    for (let round = 0; round < rounds; round++) {
+      const waited = await served.call('AmdpDebugWait', {
+        state_handle: handle,
+        hold_seconds: 30,
+      });
+      const state = payloadOf(waited);
+      if (waited.isError === true || state?.state === 'ended') {
+        throw new Error(
+          `no AMDP event of ${kinds.join(', ')}: ${withoutHandles(textOf(waited)).slice(0, 600)}`,
+        );
+      }
+      const hit = (state?.events ?? []).find((e: any) =>
+        kinds.includes(e?.kind),
+      );
+      if (hit !== undefined) return hit;
+    }
+    return undefined;
+  };
   try {
-    // The AMDP debug session, stopped in the table function.
-    state = new InstanceState({ logger: stderrStateLogger });
-    const ctx: HandlerContext = {
-      ...plain,
-      state,
-      debugger: () => {
-        if (!dbg) {
-          dbg = createDebuggerInstance({
-            terminalId: newDebuggerId(),
-            ideId: newDebuggerId(),
-            stated: false,
-          });
-          (state as InstanceState).attach(dbg);
-        }
-        return dbg;
-      },
-    };
-    const started = await local(handleAmdpDebugStart, ctx, {
+    const started = await served.call('AmdpDebugStart', {
+      stop_existing: false,
       breakpoints: [{ class_name: cls, line: tfLine }],
       run: { kind: 'class', name: cls },
     });
-    if (typeof started.json?.state_handle === 'string')
-      handle = started.json.state_handle;
+    const start = payloadOf(started);
+    if (typeof start?.state_handle === 'string') handle = start.state_handle;
     say(kind, 'amdp start', {
-      isError: started.isError,
-      answer: started.isError ? started.text.slice(0, 600) : undefined,
+      isError: started.isError === true,
+      answer:
+        started.isError === true
+          ? withoutHandles(textOf(started)).slice(0, 600)
+          : undefined,
     });
-    expect(started.isError).toBe(false);
+    expect(started.isError).not.toBe(true);
+    expect(handle).toMatch(/^[0-9A-F]{32}$/);
 
-    let onBreak: any;
-    for (let round = 0; round < 8 && onBreak === undefined; round++) {
-      const waited = await local(handleAmdpDebugWait, ctx, {
-        state_handle: handle,
-        hold_seconds: 30,
-      });
-      if (waited.isError || waited.json?.state === 'ended') {
-        throw new Error(
-          `no AMDP break: ${withoutHandles(waited.text).slice(0, 600)}`,
-        );
-      }
-      onBreak = (waited.json?.events ?? []).find(
-        (e: any) => e?.kind === 'ON_BREAK',
-      );
-    }
+    const onBreak = await eventOf(['ON_BREAK'], 8);
     say(kind, 'amdp break', { line: onBreak?.line });
     expect(onBreak?.line).toBe(tfLine);
 
-    // The session's own ids and its command connection: what an AMDP
-    // debugger batch would record on.
-    const amdp = (dbg as DebuggerInstance).amdp as unknown as {
-      open?: {
-        commands: IAbapConnection;
-        mainId: string;
-        hanaSession: string;
-      };
-      debuggeeId?: string;
-    };
-    const open = amdp.open;
-    const debuggeeId = amdp.debuggeeId;
-    if (open === undefined || debuggeeId === undefined) {
-      throw new Error('the AMDP session holds no break to record at');
-    }
-    const batch = new AdtBatchConnection(open.commands, {
-      endpoint: 'debugger',
-    });
-    const recording = new AmdpDebugger(batch);
-    const preview = recording.getDataPreview({
-      sessionId: open.hanaSession,
-      debuggerId: open.mainId,
-      debuggeeId,
-      variableName: 'LT_ROWS',
-      rowNumber: 100,
-      headers: DEFAULT_ADT_HEADERS['amdpDebugger.getDataPreview'],
-    });
-    const step = recording.step(open.mainId, debuggeeId, 'over');
-    // Both parts are recorded before the envelope goes.
-    await new Promise((r) => setImmediate(r));
-    const parts = Promise.allSettled([preview, step]);
-    let envelope: { status?: number } | undefined;
-    let envelopeThrew: string | undefined;
-    try {
-      envelope = (await batch.execute()) as { status?: number };
-    } catch (error) {
-      envelopeThrew = error instanceof Error ? error.message : String(error);
-    }
-    // A part's promise settles only with the envelope's answer: after a
-    // throw of the envelope it may never settle, so it is not awaited then.
-    const settledParts = envelopeThrew
-      ? undefined
-      : await Promise.race([parts, pause(120_000).then(() => undefined)]);
-    if (settledParts === undefined) {
-      say(kind, 'amdp envelope', {
-        threw: envelopeThrew,
-        parts: 'not settled',
-      });
-      throw new Error(
-        `the AMDP debugger batch envelope: ${envelopeThrew ?? 'its parts did not settle'}`,
-      );
-    }
-    const [previewed, stepped] = settledParts as [
-      PromiseSettledResult<any>,
-      PromiseSettledResult<any>,
-    ];
-    const partOf = (settled: PromiseSettledResult<any>) =>
-      settled.status === 'rejected'
-        ? { threw: String(settled.reason?.message ?? settled.reason) }
-        : settled.value.ok
-          ? { ok: true, value: shownValue(settled.value.getResult().value) }
-          : {
-              ok: false,
-              status: settled.value.getError().status,
-              error: settled.value.getError().message,
-            };
-    const previewPart = partOf(previewed);
-    const stepPart = partOf(stepped);
-    say(kind, 'amdp envelope', {
-      status: envelope?.status,
-      threw: envelopeThrew,
-    });
-    say(kind, 'amdp part 1 (data preview)', previewPart);
-    say(kind, 'amdp part 2 (step over)', stepPart);
-    expect(envelopeThrew).toBeUndefined();
-    expect(previewPart.ok).toBe(true);
-    expect(stepPart.ok).toBe(true);
+    const begun = await served.call('DebugBatchBegin', {});
+    say(kind, 'amdp begin', textOf(begun));
+    expect(begun.isError).not.toBe(true);
+    expect(payloadOf(begun)?.debug_batch).toBe('on');
+    batchOpen = true;
 
-    // The step took effect: the debuggee moved on to its next event.
-    let next: any;
-    for (let round = 0; round < 4 && next === undefined; round++) {
-      const waited = await local(handleAmdpDebugWait, ctx, {
-        state_handle: handle,
-        hold_seconds: 30,
-      });
-      if (waited.isError) {
+    const calls: Array<{ tool: string; args: Record<string, unknown> }> = [
+      {
+        tool: 'AmdpDebugGetTable',
+        args: { state_handle: handle, variable: 'LT_ROWS' },
+      },
+      { tool: 'AmdpDebugStep', args: { state_handle: handle, action: 'over' } },
+    ];
+    for (const { tool, args } of calls) {
+      const recorded = await served.call(tool, args);
+      if (recorded.isError === true || (recorded.content ?? []).length > 0) {
         throw new Error(
-          `the wait after the envelope: ${withoutHandles(waited.text).slice(0, 600)}`,
+          `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
         );
       }
-      next = (waited.json?.events ?? []).find(
-        (e: any) => e?.kind === 'ON_BREAK' || e?.kind === 'ON_EXECUTION_END',
+    }
+    const endAt = process.hrtime.bigint();
+    const ended = await served.call('DebugBatchEnd', {});
+    const endedAt = process.hrtime.bigint();
+    batchOpen = false;
+    const summary = payloadOf(ended) ?? {};
+    say(kind, 'amdp end', {
+      summary,
+      end_ms: Math.round(Number(endedAt - endAt) / 1e6),
+    });
+    expect(ended.isError).not.toBe(true);
+    expect(summary.recorded).toBe(calls.length);
+    expect(summary.came).toBeUndefined();
+
+    const entries = (payloadOf(
+      await served.call('BatchAnswers', { numbers: [1, 2] }),
+    ) ?? []) as Entry[];
+    for (const entry of entries) {
+      say(kind, `amdp answer #${entry.number}`, {
+        isError: entry.isError === true,
+        answer: payloadOf(entry) ?? textOf(entry),
+      });
+    }
+    expect(entries.map((entry) => entry.number)).toEqual([1, 2]);
+    const failed = entries.filter((entry) => entry.isError === true);
+    if (failed.length > 0) {
+      throw new Error(
+        failed
+          .map(
+            (entry) =>
+              `#${entry.number} ${calls[entry.number - 1]?.tool}: ${withoutHandles(textOf(entry)).slice(0, 600)}`,
+          )
+          .join('\n'),
       );
     }
+    expect(summary.failed).toEqual([]);
+    // 1: the rows of the table variable.
+    expect(Array.isArray(payloadOf(entries[0]))).toBe(true);
+    // 2: the step answered.
+    expect(payloadOf(entries[1])?.state).toBe('moving');
+
+    // The step took effect: the debuggee moved on to its next event.
+    const next = await eventOf(['ON_BREAK', 'ON_EXECUTION_END'], 4);
     say(kind, 'amdp after the envelope', {
       kind: next?.kind,
       line: next?.line,
@@ -739,48 +677,51 @@ async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
   } catch (error) {
     failure = error;
   } finally {
-    // Debugger state only — the shared pair is never deleted. Each step runs
-    // whatever the one before it did, and every failure is reported.
+    // Each step whatever the one before it did: the batch ended, the AMDP
+    // session stopped, the served server shut down — its shutdown logs off
+    // every session it opened. The shared pair is never deleted.
     const problems: string[] = [];
-    if (state !== undefined && handle !== undefined) {
-      try {
-        const ctx: HandlerContext = {
-          ...plain,
-          state,
-          debugger: () => dbg as DebuggerInstance,
-        };
-        const stopped = await local(handleAmdpDebugStop, ctx, {
-          state_handle: handle,
-        });
-        say(kind, 'AmdpDebugStop', withoutHandles(stopped.text));
-        if (stopped.isError) {
+    try {
+      if (batchOpen) {
+        const ended = await served.call('DebugBatchEnd', {});
+        if (ended.isError === true) {
           problems.push(
-            `AmdpDebugStop: ${withoutHandles(stopped.text).slice(0, 600)}`,
+            `DebugBatchEnd in cleanup: ${withoutHandles(textOf(ended)).slice(0, 600)}`,
           );
         }
-        const amdpSession = (dbg as DebuggerInstance).amdp;
-        for (let i = 0; i < 240 && amdpSession.holdsState(); i++)
-          await pause(250);
-        if (amdpSession.holdsState())
-          problems.push('the AMDP session still holds state after its stop');
+      }
+    } catch (error) {
+      problems.push(`DebugBatchEnd threw: ${withoutHandles(String(error))}`);
+    } finally {
+      try {
+        if (handle !== undefined) {
+          const stopped = await served.call('AmdpDebugStop', {
+            state_handle: handle,
+          });
+          say(kind, 'AmdpDebugStop', withoutHandles(textOf(stopped)));
+          if (stopped.isError === true) {
+            problems.push(
+              `AmdpDebugStop: ${withoutHandles(textOf(stopped)).slice(0, 600)}`,
+            );
+          }
+        }
       } catch (error) {
         problems.push(`AmdpDebugStop threw: ${withoutHandles(String(error))}`);
-      }
-    }
-    if (state !== undefined) {
-      try {
-        const left = await state.shutdown();
-        if (left.length > 0)
-          problems.push(`instance shutdown left: ${left.join('; ')}`);
-      } catch (error) {
-        problems.push(
-          `instance shutdown threw: ${withoutHandles(String(error))}`,
-        );
+      } finally {
+        const code = await served.stop();
+        say(kind, 'server exit', String(code));
+        if (code !== 0) {
+          problems.push(
+            `the server exited ${code}, not 0: not every session was logged off cleanly.\n${served.stderrTail()}`,
+          );
+        }
       }
     }
     if (failure !== undefined) {
       if (problems.length > 0) {
-        process.stderr.write(`AMDP gate cleanup:\n${problems.join('\n')}\n`);
+        process.stderr.write(
+          `AMDP debugger batch cleanup:\n${problems.join('\n')}\n`,
+        );
       }
       throw failure;
     }
@@ -830,22 +771,22 @@ describe('the debugger batch at a live stop, on the system the test config names
 
   for (const kind of kinds) {
     it(
-      `${KIND_WORDS[kind]}: the AMDP gate — AMDP data preview and step in one debugger batch envelope at an AMDP break (on premise on HANA)`,
+      `${KIND_WORDS[kind]}: the AMDP debugger batch — DebugBatchBegin at an AMDP break, the data preview and a step recorded, one DebugBatchEnd, answers per number (on premise on HANA)`,
       async () => {
         if (kind === 'cloud') {
           testLogger?.info(
-            '⏭️  Skipping the AMDP gate on ABAP Cloud: it is measured on premise on HANA',
+            '⏭️  Skipping the AMDP debugger batch on ABAP Cloud: it runs on premise on HANA',
           );
           return;
         }
-        const where = whereItRuns(kind, 'the AMDP gate');
+        const where = whereItRuns(kind, 'the AMDP debugger batch');
         if ('reason' in where) {
           testLogger?.info(
-            `⏭️  Skipping the AMDP gate ${KIND_WORDS[kind]}: ${where.reason}`,
+            `⏭️  Skipping the AMDP debugger batch ${KIND_WORDS[kind]}: ${where.reason}`,
           );
           return;
         }
-        await amdpGateOn(kind, where.testCase);
+        await amdpBatchOn(kind, where.testCase);
       },
       getTimeout('long'),
     );

@@ -18,8 +18,8 @@
  * `ON_BREAK`, `DebugBatchBegin` (the handle it answers is the same),
  * `AmdpDebugGetTable` and `AmdpDebugStep` over — each answers nothing —,
  * `DebugBatchEnd`, `BatchAnswers` 1–2, the debuggee's next event,
- * `AmdpDebugStop`. Then the state has ended: a call with the handle reaches
- * no debug state. Then `SIGTERM` to the server's process (a graceful
+ * `AmdpDebugStop`. Then the state has ended: a wait over the handle answers
+ * `idle`. Then `SIGTERM` to the server's process (a graceful
  * shutdown), exit `0`.
  *
  * The session trace is on: after the exit every security session the
@@ -387,12 +387,14 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         expect(stopped.isError).not.toBe(true);
         const stoppedHandle = handle;
         handle = undefined;
-        // The state has ended: the handle reaches no debug state any more.
+        // The state has ended: the AMDP debugger holds nothing behind the handle
+        // (measured 2026-10-19: a wait right after the stop answers `idle`).
         const after = await call(held, 'AmdpDebugWait', {
           state_handle: stoppedHandle,
           hold_seconds: 1,
         });
-        expect(after.isError).toBe(true);
+        expect(after.isError).not.toBe(true);
+        expect(payloadOf(after)?.state).toBe('idle');
       } catch (error) {
         failure = error;
       } finally {

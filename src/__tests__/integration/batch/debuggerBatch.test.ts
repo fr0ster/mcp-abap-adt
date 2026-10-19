@@ -239,10 +239,10 @@ const SESSION_TRACE_PREAMBLE = [
   "      const path = String(req.path ?? '').split('?')[0];",
   "      const cookie = req.getHeader('cookie');",
   "      const stateful = String(req.getHeader('x-sap-adt-sessiontype') ?? '').toLowerCase() === 'stateful' ? 1 : 0;",
-  "      process.stderr.write(['session-trace', 'req', id, req.method + ' ' + path, 'stateful=' + stateful, 'sec=' + traceSecurity(traceCookie(cookie, 'SAP_SESSIONID')), 'ctx=' + (traceCookie(cookie, 'sap-contextid') ?? '-')].join(String.fromCharCode(9)) + String.fromCharCode(10));",
+  "      process.stderr.write(['session-trace', 'req', id, req.method + ' ' + path, 'stateful=' + stateful, 'sec=' + traceSecurity(traceCookie(cookie, 'SAP_SESSIONID')), 'ctx=' + (traceCookie(cookie, 'sap-contextid') ?? '-'), 't=' + Date.now()].join(String.fromCharCode(9)) + String.fromCharCode(10));",
   "      req.on('response', (res: any) => {",
   "        const set = res.headers['set-cookie'];",
-  "        process.stderr.write(['session-trace', 'res', id, res.statusCode, 'sec=' + traceSecurity(traceSet(set, 'SAP_SESSIONID')), 'ctx=' + (traceSet(set, 'sap-contextid') ?? '-')].join(String.fromCharCode(9)) + String.fromCharCode(10));",
+  "        process.stderr.write(['session-trace', 'res', id, res.statusCode, 'sec=' + traceSecurity(traceSet(set, 'SAP_SESSIONID')), 'ctx=' + (traceSet(set, 'sap-contextid') ?? '-'), 't=' + Date.now()].join(String.fromCharCode(9)) + String.fromCharCode(10));",
   '      });',
   '    } catch {}',
   '    return req;',
@@ -258,7 +258,15 @@ interface TracedSession {
   stateful: boolean;
   contexts: Set<string>;
   loggedOff: boolean;
+  /** SAP's answer to the logoff and the ms from its send to it; `no answer` before the trace was read. */
+  logoff?: { status: string; ms?: number };
 }
+
+/** A trace line's `t=` field: when it was written, in ms. */
+const timeOf = (fields: string[]): number | undefined => {
+  const field = fields.find((f) => f.startsWith('t='));
+  return field === undefined ? undefined : Number(field.slice(2));
+};
 
 /**
  * The trace read back, by security session: a request's session is the one
@@ -274,16 +282,21 @@ function readSessionTrace(lines: string[]): {
     contexts: string[];
     paths: Record<string, number>;
     logged_off: boolean;
+    logoff?: { status: string; ms?: number };
   }>;
   problems: string[];
 } {
   const requests = new Map<
     string,
-    { what: string; stateful: boolean; sec: string; ctx: string }
+    { what: string; stateful: boolean; sec: string; ctx: string; t?: number }
   >();
-  const answers = new Map<string, { sec: string; ctx: string }>();
+  const answers = new Map<
+    string,
+    { status: string; sec: string; ctx: string; t?: number }
+  >();
   for (const line of lines) {
-    const [, type, id, what, a, b, c] = line.split('\t');
+    const fields = line.split('\t');
+    const [, type, id, what, a, b, c] = fields;
     if (id === undefined) continue;
     if (type === 'req') {
       requests.set(id, {
@@ -291,9 +304,15 @@ function readSessionTrace(lines: string[]): {
         stateful: a === 'stateful=1',
         sec: String(b).slice(4),
         ctx: String(c).slice(4),
+        t: timeOf(fields),
       });
     } else if (type === 'res') {
-      answers.set(id, { sec: String(a).slice(4), ctx: String(b).slice(4) });
+      answers.set(id, {
+        status: String(what),
+        sec: String(a).slice(4),
+        ctx: String(b).slice(4),
+        t: timeOf(fields),
+      });
     }
   }
   const sessions = new Map<string, TracedSession>();
@@ -312,6 +331,15 @@ function readSessionTrace(lines: string[]): {
     sessions.set(sec, session);
     if (request.what.includes('/sap/public/bc/icf/logoff')) {
       session.loggedOff = true;
+      session.logoff =
+        answer === undefined
+          ? { status: 'no answer' }
+          : {
+              status: answer.status,
+              ...(answer.t !== undefined && request.t !== undefined
+                ? { ms: answer.t - request.t }
+                : {}),
+            };
       continue;
     }
     session.requests += 1;
@@ -351,6 +379,7 @@ function readSessionTrace(lines: string[]): {
       contexts: [...s.contexts],
       paths: s.paths,
       logged_off: s.loggedOff,
+      ...(s.logoff !== undefined ? { logoff: s.logoff } : {}),
     })),
     problems,
   };
@@ -713,6 +742,209 @@ function fixtureRead(read: Local): FixtureRead {
   return { status: 200, text: String(read.json?.source ?? '') };
 }
 
+/**
+ * Which diagnostic variant of the AMDP case an owner's run asks for
+ * (`DEBUGGER_BATCH_AMDP_VARIANT`): `R1` — the debuggee cancelled and its end
+ * awaited before the stop. Unset: the AMDP debugger batch case as always.
+ */
+const AMDP_VARIANT = process.env.DEBUGGER_BATCH_AMDP_VARIANT;
+
+/** The bound on one pause of a diagnostic run: then it goes on, saying so. */
+const PAUSE_MAX_MS = 30 * 60_000;
+
+/** A step's moment, local and UTC, on stderr. */
+function stamp(kind: Kind, what: string): void {
+  const now = new Date();
+  const offset = -now.getTimezoneOffset();
+  const local = new Date(now.getTime() + offset * 60_000)
+    .toISOString()
+    .replace('T', ' ')
+    .slice(0, 19);
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+  const utc = now.toISOString().replace('T', ' ').slice(0, 19);
+  process.stderr.write(
+    `debugger-batch-live\t${kind}\tstep\t${what}\tlocal ${local} ${sign}${hh}${mm}\tUTC ${utc}\n`,
+  );
+}
+
+/**
+ * Waits until the release file of `name` exists (`touch` it), at most
+ * `PAUSE_MAX_MS`. The file's directory: `DEBUGGER_BATCH_RELEASE_DIR`, else
+ * the system's temp directory. A file left from an earlier run is removed
+ * first.
+ */
+async function pauseAt(kind: Kind, name: string): Promise<void> {
+  const dir = process.env.DEBUGGER_BATCH_RELEASE_DIR ?? os.tmpdir();
+  const file = path.join(dir, `debugger-batch-release-${name}`);
+  fs.rmSync(file, { force: true });
+  stamp(kind, `PAUSE ${name}`);
+  process.stderr.write(
+    `debugger-batch-live\t${kind}\tPAUSE ${name}\ttouch ${file} to go on\n`,
+  );
+  const until = Date.now() + PAUSE_MAX_MS;
+  while (!fs.existsSync(file) && Date.now() < until)
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  stamp(
+    kind,
+    fs.existsSync(file)
+      ? `released ${name}`
+      : `PAUSE ${name} ended after ${PAUSE_MAX_MS / 60_000} minutes unreleased`,
+  );
+}
+
+/** The session trace so far, one line. */
+function traceNow(kind: Kind, what: string, served: Served): void {
+  process.stderr.write(
+    `debugger-batch-live\t${kind}\t${what}\t${JSON.stringify(readSessionTrace(served.sessionTrace()))}\n`,
+  );
+}
+
+/**
+ * Diagnostic R1 (owner's run, `DEBUGGER_BATCH_AMDP_VARIANT=R1`, session
+ * trace on): at the AMDP break the debuggee is cancelled (`AmdpDebugCancel`)
+ * and its end awaited — its `ON_EXECUTION_END` and the run's end — before
+ * the stop. PAUSE A after the cancel finished; `AmdpDebugStop` (it returns
+ * once the STOP event's last batch logged off the events and commands
+ * sessions), the logoffs' answers awaited a moment; PAUSE B; the server's
+ * exit; PAUSE C. Each step is stamped local and UTC; the owner reads SM04
+ * and SM05 at each pause.
+ */
+async function amdpR1On(kind: Kind, testCase: any): Promise<void> {
+  const params = testCase.params ?? {};
+  const cls = String(params.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
+  const ddl = String(params.amdp_ddl ?? 'ZMCP_SHR_DBG_TF').toUpperCase();
+  const logger = createTestLogger('debugger-batch-amdp');
+  const { connection } = await createTestConnectionAndSession();
+  const plain = createHandlerContext({ connection, logger });
+  const verdict = amdpGateVerdict({
+    systemInformation: await readSystemInformation(connection),
+    className: cls,
+    classRead: fixtureRead(
+      await local(handleGetClass, plain, { class_name: cls }),
+    ),
+    ddlName: ddl,
+    ddlRead: fixtureRead(await local(handleGetDdl, plain, { ddl_name: ddl })),
+  });
+  if ('skip' in verdict) {
+    say(kind, 'amdp skipped', verdict.skip);
+    return;
+  }
+  if ('fail' in verdict) throw new Error(verdict.fail);
+
+  const served = await serve(kind);
+  let handle: string | undefined;
+  let stopped = false;
+  let failure: unknown;
+  const wait = async () =>
+    served.call('AmdpDebugWait', { state_handle: handle, hold_seconds: 30 });
+  try {
+    stamp(kind, 'AmdpDebugStart');
+    const started = await served.call('AmdpDebugStart', {
+      stop_existing: false,
+      breakpoints: [{ class_name: cls, line: verdict.breakpointLine }],
+      run: { kind: 'class', name: cls },
+    });
+    const start = payloadOf(started);
+    if (typeof start?.state_handle === 'string') handle = start.state_handle;
+    say(kind, 'amdp start', {
+      isError: started.isError === true,
+      answer:
+        started.isError === true
+          ? withoutHandles(textOf(started)).slice(0, 600)
+          : undefined,
+    });
+    expect(started.isError).not.toBe(true);
+
+    let onBreak: any;
+    for (let round = 0; round < 8 && onBreak === undefined; round++) {
+      const waited = payloadOf(await wait());
+      onBreak = (waited?.events ?? []).find((e: any) => e?.kind === 'ON_BREAK');
+    }
+    stamp(kind, `ON_BREAK line ${onBreak?.line}`);
+    expect(onBreak?.line).toBe(verdict.breakpointLine);
+
+    // The cancel, and its end: ON_EXECUTION_END and the run's own end.
+    stamp(kind, 'AmdpDebugCancel');
+    const cancelled = await served.call('AmdpDebugCancel', {
+      state_handle: handle,
+    });
+    say(kind, 'amdp cancel', withoutHandles(textOf(cancelled)).slice(0, 600));
+    expect(cancelled.isError).not.toBe(true);
+    const seen: string[] = [];
+    let runEnded: any;
+    for (let round = 0; round < 12 && runEnded === undefined; round++) {
+      const waited = payloadOf(await wait());
+      if (waited?.state === 'ended') runEnded = waited;
+      for (const e of waited?.events ?? []) {
+        seen.push(String(e?.kind));
+        stamp(kind, `event ${e?.kind}`);
+      }
+    }
+    say(kind, 'amdp after the cancel', {
+      events: seen,
+      run: runEnded?.run,
+    });
+    traceNow(kind, 'session trace at A', served);
+    await pauseAt(kind, 'A');
+
+    stamp(kind, 'AmdpDebugStop');
+    const stop = await served.call('AmdpDebugStop', { state_handle: handle });
+    stamp(kind, 'AmdpDebugStop answered');
+    say(kind, 'AmdpDebugStop', withoutHandles(textOf(stop)));
+    expect(stop.isError).not.toBe(true);
+    stopped = true;
+    // The logoffs' answers, a moment: what SAP said to each.
+    for (let i = 0; i < 20; i++) {
+      const trace = readSessionTrace(served.sessionTrace());
+      if (
+        trace.sessions.every(
+          (s) => !s.logged_off || s.logoff?.status !== 'no answer',
+        )
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    traceNow(kind, 'session trace at B', served);
+    await pauseAt(kind, 'B');
+  } catch (error) {
+    failure = error;
+  } finally {
+    const problems: string[] = [];
+    try {
+      if (handle !== undefined && !stopped) {
+        const again = await served.call('AmdpDebugStop', {
+          state_handle: handle,
+        });
+        if (again.isError === true)
+          problems.push(
+            `AmdpDebugStop: ${withoutHandles(textOf(again)).slice(0, 600)}`,
+          );
+      }
+    } catch (error) {
+      problems.push(`AmdpDebugStop threw: ${withoutHandles(String(error))}`);
+    } finally {
+      stamp(kind, 'server exit begins');
+      const code = await served.stop();
+      stamp(kind, `server exited ${code}`);
+      if (code !== 0) problems.push(`the server exited ${code}, not 0`);
+      const trace = readSessionTrace(served.sessionTrace());
+      process.stderr.write(
+        `debugger-batch-live\t${kind}\tsession trace at C\t${JSON.stringify(trace)}\n`,
+      );
+      problems.push(...trace.problems);
+      await pauseAt(kind, 'C');
+    }
+    if (failure !== undefined) {
+      if (problems.length > 0)
+        process.stderr.write(`R1 cleanup:\n${problems.join('\n')}\n`);
+      throw failure;
+    }
+    if (problems.length > 0) throw new Error(problems.join('\n'));
+  }
+}
+
 async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
   const params = testCase.params ?? {};
   const cls = String(params.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
@@ -977,9 +1209,12 @@ describe('the debugger batch at a live stop, on the system the test config names
           );
           return;
         }
-        await amdpBatchOn(kind, where.testCase);
+        if (AMDP_VARIANT === 'R1') await amdpR1On(kind, where.testCase);
+        else await amdpBatchOn(kind, where.testCase);
       },
-      getTimeout('long'),
+      AMDP_VARIANT !== undefined
+        ? getTimeout('long') + 3 * PAUSE_MAX_MS
+        : getTimeout('long'),
     );
   }
 });

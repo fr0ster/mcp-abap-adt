@@ -141,7 +141,8 @@ Ending an instance has two parts, kept apart:
 - **The terminal close** — `terminalClose()` (lib's `closeOwnedConnections(instance)`): the
   `disconnect()` of every connection the instance owns, each once, a failure logged in fixed
   words, joined with the instance's logoffs already under way; it waits for no request in
-  flight. The pool and the idle bound run it after the undo was
+  flight, and resolves once each of the instance's logoffs is answered or its transport failed
+  (the connection's `flushGoodbye()`, no timer, the answer not read). The pool and the idle bound run it after the undo was
   tried, **never conditional on the undo succeeding**: a failed undo is reported, never a reason to
   keep a session — or a lock — open.
 
@@ -172,9 +173,14 @@ refusal. A connection whose `connect()` was under way at the latch was swept wit
 **The process's logoffs** (`logOffAtOnce()`, lib's `shutdownSequence.ts`): `forceClose()` — the
 logoff of every connection the process owns, background runs' included, joined where one is under
 way — and `interrupt()` of every live call, in one tick. Every launcher's shutdown begins with it
-(stdio's on the end of stdin too): nothing waits for a running tool. It does await each logoff to
-its **write** (connection 16's `disconnect()`): a write that never completes keeps the process
-until it is killed (`SIGKILL`). **The forced close** (`forceClose()` again, without waiting for
+(stdio's on the end of stdin too): nothing waits for a running tool. It does await each logoff —
+these and any a site wrote before — until SAP answered it or its transport failed (the
+connection's `flushGoodbye()`, no timer, the answer not read): SAP ends a security session, and
+every user session in it, only once it has received the logoff request whole
+(`CL_HTTP_EXT_LOGOFF`), and a socket closed before that ends nothing (measured on premise
+2026-10-19: sessions whose logoff went out right before the process ended stayed in SM05 until
+their timeout). A logoff that is never answered keeps the process until it is killed
+(`SIGKILL`) or forced. **The forced close** (`forceClose()` again, without waiting for
 the sequence's last steps) serves both escapes (a second signal, `--shutdown-timeout`) and
 a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered beside the signals
 in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a

@@ -34,7 +34,7 @@
 import type { EventEmitter } from 'node:events';
 import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
-import { forceClose } from './ownedConnections';
+import { forceClose, logoffsAnswered } from './ownedConnections';
 
 /**
  * **The logoffs at once** (the process's end — stdio's client close, a
@@ -42,14 +42,18 @@ import { forceClose } from './ownedConnections';
  * (`forceClose`: the main connectors, held state's, the fresh ones of long
  * reads and lock sessions, the background runs') and every live call is
  * interrupted (`interrupt`): its signal aborts, a queued call leaves without
- * sending. Resolves once every logoff is written (connection 17's
- * `disconnect()` waits for no request in flight and not for SAP's answer);
- * it waits for no tool.
+ * sending. Resolves once every logoff the process wrote — these and any a
+ * site wrote before — is answered or its transport failed
+ * (`logoffsAnswered`: the connection's `flushGoodbye()`, no timer, the answer
+ * not read); it waits for no tool.
  */
 export async function logOffAtOnce(): Promise<void> {
   const written = forceClose();
   interrupt();
   await written;
+  // The orderly end: no socket closes before its logoff is answered — SAP
+  // ends a security session only once it received the logoff whole.
+  await logoffsAnswered();
 }
 
 /** What the shutdown listens on: the process, or a test's stand-in. */

@@ -1618,7 +1618,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `closeInstance` takes any **`ClosableInstance`** (exported from `@mcp-abap-adt/lib/embeddable`):
   an object with `letGoOfState(): void` and `close(): Promise<void>` — `BaseMcpServer` is one; a
   structural stand-in must provide both. It returns a `Promise<void>` that carries no value and
-  never rejects: it resolves once each logoff is written and `close()` settled, and waits for no
+  never rejects: it resolves once each logoff is answered (or its transport failed; the answer is not read, no timer) and `close()` settled, and waits for no
   running tool; a second call returns the same promise. **From the close on, the instance opens
   no new connection**: a running tool whose next step would log on — `getConnection`, a fresh
   connection (`openFreshConnection`, a host's `freshConnection` factory is then not called), a

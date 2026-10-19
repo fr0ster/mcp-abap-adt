@@ -104,6 +104,20 @@ const writing = new Set<Promise<void>>();
  * written.
  */
 const writingFor = new WeakMap<object, Set<Promise<void>>>();
+/**
+ * Logoffs written and not yet answered: each followed through the
+ * connection's `flushGoodbye()` — with no bound, so the connection sets no
+ * timer — until SAP's answer or its transport's failure; nothing reads the
+ * answer. SAP ends a security session, and every user session in it, only
+ * once it has received the logoff request whole (`CL_HTTP_EXT_LOGOFF`); a
+ * socket closed before that ends nothing (measured on premise 2026-10-19:
+ * sessions whose logoff went out right before the process ended stayed in
+ * SM05 until their timeout). The orderly end and an instance's terminal
+ * close wait for them; the forced close does not.
+ */
+const answering = new Set<Promise<void>>();
+/** The same, per owner. */
+const answeringFor = new WeakMap<object, Set<Promise<void>>>();
 const ownerScope = new AsyncLocalStorage<object>();
 /** Each recorded connection's owner, kept past its end for `refuseWhenClosed`. */
 const owners = new WeakMap<OwnedConnection, object | undefined>();
@@ -227,6 +241,7 @@ export function endConnection(
       }
       return;
     }
+    followAnswer(connection);
     const written = logoffListeners.get(connection) ?? [];
     logoffListeners.delete(connection);
     for (const listener of written) {
@@ -260,6 +275,43 @@ export function endConnection(
     }
   }
   return closing;
+}
+
+/** Follows a written logoff until it is answered or its transport fails (`answering`). */
+function followAnswer(connection: object): void {
+  const flush = (connection as { flushGoodbye?: () => Promise<void> })
+    .flushGoodbye;
+  if (typeof flush !== 'function') return;
+  const answered = (async () => {
+    try {
+      await flush.call(connection);
+    } catch {
+      // The library's flush never rejects; a stand-in that does ends the wait.
+    }
+  })();
+  answering.add(answered);
+  const owner = owners.get(connection);
+  const ofOwner =
+    owner === undefined ? undefined : (answeringFor.get(owner) ?? new Set());
+  if (owner !== undefined && ofOwner !== undefined) {
+    ofOwner.add(answered);
+    answeringFor.set(owner, ofOwner);
+  }
+  void answered.finally(() => {
+    answering.delete(answered);
+    ofOwner?.delete(answered);
+  });
+}
+
+/**
+ * Resolves once every logoff written so far — of `owner`, or of the whole
+ * process — has been answered or its transport failed. Nothing reads the
+ * answer; no timer.
+ */
+export async function logoffsAnswered(owner?: object): Promise<void> {
+  const pendingNow =
+    owner === undefined ? [...answering] : [...(answeringFor.get(owner) ?? [])];
+  await Promise.all(pendingNow);
 }
 
 /** The connections `owner` owns and has not ended (every owner's: none given). */
@@ -298,6 +350,9 @@ export async function closeOwnedConnections(
     ),
     ...under,
   ]);
+  // The whole close lets the instance's logoffs finish: each answered, or
+  // its transport failed.
+  if (roles === undefined) await logoffsAnswered(instance);
 }
 
 /**

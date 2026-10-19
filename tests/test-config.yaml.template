@@ -415,6 +415,26 @@ shared_dependencies:
           created_at
         }
 
+    # The table function of the AMDP debugger batch gate (debuggerBatch.test.ts),
+    # implemented by the shared class ZMCP_SHR_DBG_AMDP below; the two name each
+    # other and activate together. Running it changes nothing, so it can be
+    # shared. On premise on HANA only: an AMDP needs SAP HANA.
+    - name: "ZMCP_SHR_DBG_TF"
+      description: "Shared AMDP table function for the debugger batch"
+      available_in: ["onprem"]
+      source: |
+        @EndUserText.label: 'Shared AMDP table function for the debugger'
+        @ClientHandling.type: #CLIENT_INDEPENDENT
+        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        define table function ZMCP_SHR_DBG_TF
+          with parameters
+            p_limit : abap.int4
+          returns {
+            n      : abap.int4;
+            square : abap.int4;
+          }
+          implemented by method zmcp_shr_dbg_amdp=>tf;
+
   behavior_definitions:
     # Behaviour definition of ZI_MCP_SHR_ROOT for check_bdef_high. Managed
     # without an implementation class: nothing here needs one. Strict, so the
@@ -542,6 +562,37 @@ shared_dependencies:
         CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
           METHOD test_method.
             cl_abap_unit_assert=>assert_true( abap_true ).
+          ENDMETHOD.
+        ENDCLASS.
+    # The AMDP class of the debugger batch gate (debuggerBatch.test.ts): its
+    # table function ZMCP_SHR_DBG_TF (views above). `-- BP:tf` marks the
+    # SQLScript line the gate stops at. Running it changes nothing, so it can
+    # be shared. On premise on HANA only.
+    - name: "ZMCP_SHR_DBG_AMDP"
+      description: "Shared AMDP class for the debugger batch"
+      available_in: ["onprem"]
+      source: |
+        CLASS zmcp_shr_dbg_amdp DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_amdp_marker_hdb.
+            INTERFACES if_oo_adt_classrun.
+            CLASS-METHODS tf FOR TABLE FUNCTION zmcp_shr_dbg_tf.
+        ENDCLASS.
+
+        CLASS zmcp_shr_dbg_amdp IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            SELECT * FROM zmcp_shr_dbg_tf( p_limit = 3 ) INTO TABLE @DATA(lt_rows).
+            out->write( |rows { lines( lt_rows ) }| ).
+          ENDMETHOD.
+
+          METHOD tf BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT
+            OPTIONS READ-ONLY.
+            DECLARE lt_rows TABLE ( n INTEGER, square INTEGER );
+            DECLARE lv_i INTEGER;
+            FOR lv_i IN 1..:p_limit DO
+              :lt_rows.INSERT( ( :lv_i, :lv_i * :lv_i ) ); -- BP:tf
+            END FOR;
+            RETURN SELECT n, square FROM :lt_rows;
           ENDMETHOD.
         ENDCLASS.
 
@@ -1859,18 +1910,18 @@ batch:
     # src/__tests__/integration/batch/debuggerBatch.test.ts: the full server
     # started over stdio stops in the shared class (shared_dependencies), and
     # DebugBatchEnd sends a step, the stack and a variable in one envelope;
-    # then, on premise on HANA, the AMDP gate in process on a probe it creates
-    # in amdp_package with no transport and deletes. Nothing else may debug
-    # for the same SAP user while it runs.
+    # then, on premise on HANA, the AMDP gate in process at the shared AMDP
+    # pair (shared_dependencies: ZMCP_SHR_DBG_AMDP, ZMCP_SHR_DBG_TF), only
+    # read; run npm run shared:setup first. Nothing else may debug for the
+    # same SAP user while it runs.
     - name: "debugger"
       enabled: false
       available_in: ["onprem", "cloud"]
       description: "Debugger batch at a live stop (step, stack, variables in one DebugBatchEnd); the AMDP gate"
       params:
         class_name: "ZMCP_SHR_PROF_CLS"
-        amdp_class: "ZMCP_DBB_AMDP"
-        amdp_ddl: "ZMCP_DBB_AMDP_TF"
-        amdp_package: "$TMP"
+        amdp_class: "ZMCP_SHR_DBG_AMDP"
+        amdp_ddl: "ZMCP_SHR_DBG_TF"
     # src/__tests__/integration/batch/refusalFollowUps.test.ts, in process, a
     # user and a password only: the logoff after a credential refusal asks
     # nothing of the provider, and the debugger stop's second stopListener

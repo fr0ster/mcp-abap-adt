@@ -284,7 +284,11 @@ SQLScript table function, the AMDP debugger's data preview of a table variable a
 went in one debugger batch envelope on the AMDP session's command connection. SAP answered the
 envelope `202`, the data preview with its table document, the step with `200`, and the debuggee
 moved on to the next line (its next `ON_BREAK`). The server's refusal above still holds: AMDP
-operations are not yet recorded in the debugger batch.
+operations are not yet recorded in the debugger batch. The gate stops in a shared fixture, the
+AMDP class `ZMCP_SHR_DBG_AMDP` and its table function `ZMCP_SHR_DBG_TF` (`shared_dependencies`,
+created once by `npm run shared:setup`, never deleted); the test only reads them. It skips only
+where SAP's system information names a database system other than HANA; a pair that is not
+active fails it.
 
 ## Catching, and one debuggee at a time
 

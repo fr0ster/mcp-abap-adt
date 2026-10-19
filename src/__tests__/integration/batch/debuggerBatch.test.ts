@@ -27,11 +27,14 @@
  *    refuses `DebugBatchBegin` at an AMDP debug session
  *    (`debug_batch_amdp_unmeasured`) until a test against a system confirms
  *    that the AMDP debugger's requests go through a debugger batch
- *    envelope; this case is that test. It drives SAP directly, in process:
- *    an AMDP probe (a class with a SQLScript table function, and its DDL
- *    source) is created in `amdp_package` with no transport — there is no
- *    shared AMDP target — and activated; a probe that does not activate
- *    (a system not on HANA) skips the case with SAP's words. Then an AMDP
+ *    envelope; this case is that test. It drives SAP directly, in process,
+ *    at the shared AMDP pair (`shared_dependencies`: the class
+ *    `ZMCP_SHR_DBG_AMDP` with a SQLScript table function, and its DDL source
+ *    `ZMCP_SHR_DBG_TF`; created once by `npm run shared:setup`, never
+ *    deleted). The case only reads them. It skips only where SAP's system
+ *    information names a database system other than HANA (`DBSystem` not
+ *    `HDB`), naming it; a pair that has no active version, or a class
+ *    without its breakpoint marker, fails it. Then an AMDP
  *    debug session (`AmdpDebugStart` with a breakpoint in the table
  *    function and a run of the class), `AmdpDebugWait` until `ON_BREAK`,
  *    and the AMDP data preview of the table variable and a step over
@@ -41,8 +44,9 @@
  *
  * Cleanup, in `finally`, whatever happened: debugger state only —
  * `DebugStop` / `AmdpDebugStop` (the debuggee released, the breakpoints
- * removed, the listener stopped), each answer checked; the AMDP probe
- * deleted and each of its reads answering `404`. Every session is logged
+ * removed, the listener stopped), each answer checked, each step run
+ * whatever the one before it did; the shared objects are left as they are.
+ * Every session is logged
  * off: the served server's by its own shutdown (stdin ended, exit `0`
  * asserted), the in-process instance's by its shutdown, the test's own
  * connection by the setup file's close of tracked connections.
@@ -66,15 +70,8 @@ import {
   getDefaultEnvironment,
   StdioClientTransport,
 } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
-import { handleDeleteClass } from '../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
-import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
-import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
-import { handleCreateDdl } from '../../../handlers/ddl/high/handleCreateDdl';
-import { handleDeleteDdl } from '../../../handlers/ddl/high/handleDeleteDdl';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
-import { handleUpdateDdl } from '../../../handlers/ddl/high/handleUpdateDdl';
 import { handleAmdpDebugStart } from '../../../handlers/debugger/debug/handleAmdpDebugStart';
 import { handleAmdpDebugStop } from '../../../handlers/debugger/debug/handleAmdpDebugStop';
 import { handleAmdpDebugWait } from '../../../handlers/debugger/debug/handleAmdpDebugWait';
@@ -89,6 +86,7 @@ import {
   InstanceState,
   stderrStateLogger,
 } from '../../../lib/state/InstanceState';
+import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -496,48 +494,29 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
 
 // --- 2. the AMDP gate, in process ------------------------------------------------------
 
-function amdpDdlSource(ddl: string, cls: string): string {
-  return `@EndUserText.label: 'AMDP debugger batch probe table function'
-@ClientHandling.type: #CLIENT_INDEPENDENT
-@AccessControl.authorizationCheck: #NOT_REQUIRED
-define table function ${ddl}
-  with parameters
-    p_limit : abap.int4
-  returns {
-    n      : abap.int4;
-    square : abap.int4;
+/** SAP's system information: where the database system is named. */
+async function readSystemInformation(
+  connection: IAbapConnection,
+): Promise<FixtureRead> {
+  try {
+    const answered = (await connection.makeAdtRequest({
+      url: '/sap/bc/adt/system/information',
+      method: 'GET',
+      timeout: 0,
+      headers: { Accept: 'application/atom+xml;type=feed' },
+    } as never)) as { status?: number; data?: unknown };
+    return {
+      status: answered?.status,
+      text: typeof answered?.data === 'string' ? answered.data : '',
+    };
+  } catch (error) {
+    const status = (error as { response?: { status?: unknown } })?.response
+      ?.status;
+    return {
+      status: typeof status === 'number' ? status : undefined,
+      text: error instanceof Error ? error.message : String(error),
+    };
   }
-  implemented by method ${cls.toLowerCase()}=>tf;
-`;
-}
-
-/** `-- BP:tf` names the SQLScript line the AMDP case stops at. */
-function amdpClassSource(cls: string, ddl: string): string {
-  const n = cls.toLowerCase();
-  return `CLASS ${n} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_amdp_marker_hdb.
-    INTERFACES if_oo_adt_classrun.
-    CLASS-METHODS tf FOR TABLE FUNCTION ${ddl.toLowerCase()}.
-ENDCLASS.
-
-CLASS ${n} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    SELECT * FROM ${ddl.toLowerCase()}( p_limit = 3 ) INTO TABLE @DATA(lt_rows).
-    out->write( |rows { lines( lt_rows ) }| ).
-  ENDMETHOD.
-
-  METHOD tf BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT
-    OPTIONS READ-ONLY.
-    DECLARE lt_rows TABLE ( n INTEGER, square INTEGER );
-    DECLARE lv_i INTEGER;
-    FOR lv_i IN 1..:p_limit DO
-      :lt_rows.INSERT( ( :lv_i, :lv_i * :lv_i ) ); -- BP:tf
-    END FOR;
-    RETURN SELECT n, square FROM :lt_rows;
-  ENDMETHOD.
-ENDCLASS.
-`;
 }
 
 type Local = { isError: boolean; text: string; json: any };
@@ -567,78 +546,50 @@ async function local(
   return { isError: r?.isError === true, text, json };
 }
 
-/** Thrown when the AMDP case cannot run on this system: its message says why. */
-class Skip extends Error {}
+/** A read of a shared object's active source, as a status and its text. */
+function fixtureRead(read: Local): FixtureRead {
+  if (read.isError) {
+    return { status: statusIn(read.json) ?? 0, text: read.text };
+  }
+  return { status: 200, text: String(read.json?.source ?? '') };
+}
 
 async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
   const params = testCase.params ?? {};
-  const cls = String(params.amdp_class ?? 'ZMCP_DBB_AMDP').toUpperCase();
-  const ddl = String(params.amdp_ddl ?? 'ZMCP_DBB_AMDP_TF').toUpperCase();
-  const pkg = String(params.amdp_package ?? '$TMP');
+  const cls = String(params.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
+  const ddl = String(params.amdp_ddl ?? 'ZMCP_SHR_DBG_TF').toUpperCase();
   const logger = createTestLogger('debugger-batch-amdp');
 
+  // The test's own connection is tracked (`createTestConnectionAndSession`):
+  // the setup file logs it off when the file ends, whatever happens here.
   const { connection } = await createTestConnectionAndSession();
   const plain = createHandlerContext({ connection, logger });
-  let created = false;
+
+  // The shared pair (`shared_dependencies`): read, never written. The gate
+  // skips only where SAP's own system information names a database system
+  // other than HANA; any other reason it cannot run fails it.
+  const verdict = amdpGateVerdict({
+    systemInformation: await readSystemInformation(connection),
+    className: cls,
+    classRead: fixtureRead(
+      await local(handleGetClass, plain, { class_name: cls }),
+    ),
+    ddlName: ddl,
+    ddlRead: fixtureRead(await local(handleGetDdl, plain, { ddl_name: ddl })),
+  });
+  if ('skip' in verdict) {
+    testLogger?.info(`⏭️  Skipping the AMDP gate: ${verdict.skip}`);
+    say(kind, 'amdp skipped', verdict.skip);
+    return;
+  }
+  if ('fail' in verdict) throw new Error(verdict.fail);
+  const tfLine = verdict.breakpointLine;
+
   let state: InstanceState | undefined;
   let dbg: DebuggerInstance | undefined;
   let handle: string | undefined;
   let failure: unknown;
   try {
-    // The names are free: nothing is created over an object that exists.
-    for (const [what, read] of [
-      [`CLASS ${cls}`, await local(handleGetClass, plain, { class_name: cls })],
-      [`DDLS ${ddl}`, await local(handleGetDdl, plain, { ddl_name: ddl })],
-    ] as Array<[string, Local]>) {
-      if (!read.isError || statusIn(read.json) !== 404) {
-        throw new Error(
-          `${what} is not free (its read answered: ${read.text.slice(0, 300)}); nothing is created`,
-        );
-      }
-    }
-
-    // The probe: the two name each other — shells, bodies, one group activation.
-    const source = amdpClassSource(cls, ddl);
-    const tfLine =
-      source.split('\n').findIndex((text) => text.includes('-- BP:tf')) + 1;
-    created = true;
-    const shells = [
-      await local(handleCreateDdl, plain, {
-        ddl_name: ddl,
-        package_name: pkg,
-        description: 'AMDP debugger batch probe',
-      }),
-      await local(handleCreateClass, plain, {
-        class_name: cls,
-        package_name: pkg,
-        description: 'AMDP debugger batch probe',
-      }),
-    ];
-    const bodies = [
-      await local(handleUpdateDdl, plain, {
-        ddl_name: ddl,
-        ddl_source: amdpDdlSource(ddl, cls),
-      }),
-      await local(handleUpdateClass, plain, {
-        class_name: cls,
-        source_code: source,
-      }),
-    ];
-    const activated = await local(handleActivateObjects, plain, {
-      objects: [
-        { name: ddl, type: 'DDLS' },
-        { name: cls, type: 'CLAS' },
-      ],
-    });
-    const setup = [...shells, ...bodies, activated];
-    if (setup.some((a) => a.isError) || activated.json?.activated !== true) {
-      throw new Skip(
-        `the AMDP probe does not activate here (an AMDP needs a system on HANA): ${setup
-          .map((a) => a.text.slice(0, 300))
-          .join(' / ')}`,
-      );
-    }
-
     // The AMDP debug session, stopped in the table function.
     state = new InstanceState({ logger: stderrStateLogger });
     const ctx: HandlerContext = {
@@ -788,9 +739,11 @@ async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
   } catch (error) {
     failure = error;
   } finally {
+    // Debugger state only — the shared pair is never deleted. Each step runs
+    // whatever the one before it did, and every failure is reported.
     const problems: string[] = [];
-    try {
-      if (state !== undefined && handle !== undefined) {
+    if (state !== undefined && handle !== undefined) {
+      try {
         const ctx: HandlerContext = {
           ...plain,
           state,
@@ -810,48 +763,20 @@ async function amdpGateOn(kind: Kind, testCase: any): Promise<void> {
           await pause(250);
         if (amdpSession.holdsState())
           problems.push('the AMDP session still holds state after its stop');
+      } catch (error) {
+        problems.push(`AmdpDebugStop threw: ${withoutHandles(String(error))}`);
       }
-      if (state !== undefined) {
+    }
+    if (state !== undefined) {
+      try {
         const left = await state.shutdown();
         if (left.length > 0)
           problems.push(`instance shutdown left: ${left.join('; ')}`);
+      } catch (error) {
+        problems.push(
+          `instance shutdown threw: ${withoutHandles(String(error))}`,
+        );
       }
-      if (created) {
-        for (const [what, deleted] of [
-          [
-            `CLASS ${cls}`,
-            await local(handleDeleteClass, plain, { class_name: cls }),
-          ],
-          [
-            `DDLS ${ddl}`,
-            await local(handleDeleteDdl, plain, { ddl_name: ddl }),
-          ],
-        ] as Array<[string, Local]>) {
-          if (deleted.isError && statusIn(deleted.json) !== 404)
-            problems.push(`delete ${what}: ${deleted.text.slice(0, 300)}`);
-        }
-        for (const [what, read] of [
-          [
-            `CLASS ${cls}`,
-            await local(handleGetClass, plain, { class_name: cls }),
-          ],
-          [`DDLS ${ddl}`, await local(handleGetDdl, plain, { ddl_name: ddl })],
-        ] as Array<[string, Local]>) {
-          const status = read.isError ? statusIn(read.json) : 200;
-          say(kind, `after delete ${what}`, String(status));
-          if (status !== 404)
-            problems.push(`${what} still reads (${status}): not deleted`);
-        }
-      }
-    } catch (error) {
-      problems.push(`cleanup: ${String(error)}`);
-    }
-    // The test's own connection is tracked (`createTestConnectionAndSession`):
-    // the setup file logs it off when the file ends.
-    if (failure instanceof Skip && problems.length === 0) {
-      testLogger?.info(`⏭️  Skipping the AMDP gate: ${failure.message}`);
-      say(kind, 'amdp skipped', failure.message);
-      return;
     }
     if (failure !== undefined) {
       if (problems.length > 0) {

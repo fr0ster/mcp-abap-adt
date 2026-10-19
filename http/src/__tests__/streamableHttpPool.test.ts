@@ -343,6 +343,39 @@ describe.each([
       },
     );
 
+    it('a JSON-RPC batch with a tool call and an unknown header handle: not available for each request, no logon', async () => {
+      const before = logons();
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...CREDENTIALS,
+          'x-mcp-state-handle': 'F'.repeat(32),
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify([
+          {
+            jsonrpc: '2.0',
+            id: 7,
+            method: 'tools/call',
+            params: { name: 'PoolProbeHold', arguments: {} },
+          },
+        ]),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        {
+          jsonrpc: '2.0',
+          id: 7,
+          result: {
+            content: [{ type: 'text', text: 'state is not available' }],
+            isError: true,
+          },
+        },
+      ]);
+      expect(logons()).toBe(before);
+    });
+
     it('a tool call without a handle still gets an instance', async () => {
       const made = instancesMade();
       const handle = await hold();

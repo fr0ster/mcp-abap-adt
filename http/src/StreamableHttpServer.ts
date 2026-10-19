@@ -126,6 +126,33 @@ interface PerRequestServerApi extends Poolable {
   useConnectionContext(context: ConnectionContext): void;
 }
 
+/** Whether a request body is, or holds, a `tools/call`: a JSON-RPC batch counts by its elements. */
+function carriesToolCall(body: unknown): boolean {
+  const isCall = (m: unknown) =>
+    (m as { method?: unknown } | null | undefined)?.method === 'tools/call';
+  return Array.isArray(body) ? body.some(isCall) : isCall(body);
+}
+
+/** One tool error per request (an element with an id), in the body's shape; none: nothing to answer. */
+function notAvailableAnswers(body: unknown): unknown {
+  const answerOf = (m: unknown) => {
+    const id = (m as { id?: unknown } | null | undefined)?.id;
+    return id === undefined
+      ? undefined
+      : {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            content: [{ type: 'text', text: STATE_UNAVAILABLE_WORDS }],
+            isError: true,
+          },
+        };
+  };
+  if (!Array.isArray(body)) return answerOf(body);
+  const answers = body.map(answerOf).filter((a) => a !== undefined);
+  return answers.length > 0 ? answers : undefined;
+}
+
 /**
  * The Streamable HTTP server. Each HTTP POST is an MCP session of its own, on
  * a new server instance or the pooled one its `state_handle` names.
@@ -250,7 +277,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
 
         await this.pool.serve(
-          { handle, refuseUnknown: mcpMethod === 'tools/call' },
+          { handle, refuseUnknown: carriesToolCall(req.body) },
           () => this.createPerRequestServer(),
           async (server) => {
             // A client that left while this request waited for the lease gets nothing.
@@ -316,15 +343,11 @@ export class StreamableHttpServer extends BaseMcpServer {
         // A tool call whose handle names no state: the pool's answer, as a
         // tool's — no instance was made, nothing logged on.
         if (err instanceof StateUnavailableError) {
-          if (!res.headersSent)
-            res.status(200).json({
-              jsonrpc: '2.0',
-              id: mcpId ?? null,
-              result: {
-                content: [{ type: 'text', text: STATE_UNAVAILABLE_WORDS }],
-                isError: true,
-              },
-            });
+          if (!res.headersSent) {
+            const answered = notAvailableAnswers(req.body);
+            if (answered === undefined) res.status(202).end();
+            else res.status(200).json(answered);
+          }
           return;
         }
         const answer = requestFailureAnswer(err);

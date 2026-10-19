@@ -8,7 +8,11 @@
  * still open and names how many there were: a stop and a shutdown that
  * did their work leave none, so any is a problem of the case.
  */
-import { endConnection, ownedConnections } from '../../../lib/ownedConnections';
+import {
+  endConnection,
+  logoffsAnswered,
+  ownedConnections,
+} from '../../../lib/ownedConnections';
 
 /** The server's owned connections now. */
 export function ownedNow(): Set<object> {
@@ -25,6 +29,9 @@ export async function logOffLeft(
 ): Promise<string[]> {
   const left = ownedConnections().filter((c) => !before.has(c));
   await Promise.all(left.map((c) => endConnection(c)));
+  // Each logoff finished — answered, or its transport failed — before the
+  // file can end: SAP ends a session only once it received the logoff whole.
+  await logoffsAnswered();
   return left.length > 0
     ? [
         `${what}: ${left.length} connection(s) the server opened were still open after the stop and the instance's shutdown; logged off now`,

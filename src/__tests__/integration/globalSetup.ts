@@ -25,6 +25,7 @@ import {
   promptLogger,
 } from '@mcp-abap-adt/core/auth';
 import { createAbapConnection } from '../../lib/connectionFactory';
+import { endTestConnection } from './helpers/openConnections';
 import { restoreResolution } from './helpers/packageSources';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';
 
@@ -124,7 +125,7 @@ async function setUp(): Promise<void> {
     const connection = createAbapConnection(settings, provider);
     await connection.connect();
     console.log(`[globalSetup] Session ready for "${destination}"`);
-    await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
+    await endTestConnection(connection);
   } catch (error: unknown) {
     console.log(
       `[globalSetup] Auth failed: ${destinationFailureWords(error, destination)}`,

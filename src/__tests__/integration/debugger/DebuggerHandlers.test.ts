@@ -92,6 +92,7 @@ import {
 } from '../helpers/configHelpers';
 import { logOffLeft, ownedNow } from '../helpers/debuggerCleanup';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { endTestConnection } from '../helpers/openConnections';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../helpers/testers/types';
 import { createHandlerContext } from '../helpers/testHelpers';
@@ -333,7 +334,7 @@ describe('Debugger handlers (integration)', () => {
           }
         : { ok: false, output: answer.getError().message, ms: now() - t0 };
     } finally {
-      await (conn as { disconnect?: () => Promise<void> }).disconnect?.();
+      await endTestConnection(conn);
     }
   };
 
@@ -374,7 +375,7 @@ describe('Debugger handlers (integration)', () => {
       poll,
       started,
       close: async () => {
-        await (conn as { disconnect?: () => Promise<void> }).disconnect?.();
+        await endTestConnection(conn);
       },
     };
   };
@@ -432,7 +433,7 @@ describe('Debugger handlers (integration)', () => {
     return {
       connection: conn as IAbapConnection,
       close: async () => {
-        await (conn as { disconnect?: () => Promise<void> }).disconnect?.();
+        await endTestConnection(conn);
       },
     };
   };

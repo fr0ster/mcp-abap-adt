@@ -35,14 +35,23 @@ export function requestUserOf(): string {
   return user.trim().toUpperCase();
 }
 
-async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
+/**
+ * A debugger connection of its own: stateful — every request on it in the
+ * one ABAP session its first stateful request opened — unless `session` is
+ * `stateless` (a run).
+ */
+async function openStateful(
+  context: HandlerContext,
+  session: 'stateful' | 'stateless' = 'stateful',
+): Promise<IAbapConnection> {
   const connection = await openFreshConnection(
     context.connection,
     context.logger,
   );
-  (
-    connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
-  ).setSessionType?.('stateful');
+  if (session === 'stateful')
+    (
+      connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
+    ).setSessionType?.('stateful');
   // Held state's own: closed at its stop, the idle bound's stop, the host's
   // stop and the instance's terminal close, whichever comes first.
   own(connection, { role: 'state' });

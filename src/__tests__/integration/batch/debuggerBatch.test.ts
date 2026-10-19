@@ -186,7 +186,156 @@ type Served = {
   /** Ends stdin and waits for the server's own exit; its code. */
   stop(): Promise<number | null>;
   stderrTail(): string;
+  /** The session trace's lines (`DEBUGGER_BATCH_SESSION_TRACE=1`), in order. */
+  sessionTrace(): string[];
 };
+
+/**
+ * Whether the served server traces its ABAP sessions: an owner's run sets
+ * `DEBUGGER_BATCH_SESSION_TRACE=1`. Off, nothing is traced or checked.
+ */
+const TRACE_SESSIONS = process.env.DEBUGGER_BATCH_SESSION_TRACE === '1';
+
+/**
+ * The child's session trace, put before the launcher runs: every HTTP(S)
+ * request the server sends is one `session-trace` line on stderr at its
+ * creation — its method, its path without the query, whether it asks for the
+ * stateful session, a hash of the security session cookie it carries and the
+ * context id it carries — and every answer one line with the hash of a
+ * security session cookie and the context id it sets. No cookie value, token
+ * or credential is printed: the security session only as the first 12 hex
+ * digits of its SHA-256, the context id as SAP gave it.
+ */
+const SESSION_TRACE_PREAMBLE = [
+  "import { createRequire as traceRequire } from 'node:module';",
+  // The modules themselves, not an import's namespace copy: their `request` is what the wires call.
+  "const traceHttp = traceRequire(process.cwd() + '/')('node:http');",
+  "const traceHttps = traceRequire(process.cwd() + '/')('node:https');",
+  "import { createHash as traceHash } from 'node:crypto';",
+  'let traceId = 0;',
+  "const traceSecurity = (value: string | undefined) => value ? traceHash('sha256').update(value).digest('hex').slice(0, 12) : '-';",
+  'const traceCookie = (header: unknown, name: string) => {',
+  "  for (const pair of String(header ?? '').split(';')) {",
+  "    const at = pair.indexOf('=');",
+  '    if (at < 0) continue;',
+  '    const key = pair.slice(0, at).trim();',
+  "    if (name === 'SAP_SESSIONID' ? key.startsWith('SAP_SESSIONID') : key === name) return pair.slice(at + 1).trim();",
+  '  }',
+  '  return undefined;',
+  '};',
+  'const traceSet = (header: unknown, name: string) => {',
+  '  for (const line of Array.isArray(header) ? header : header ? [header] : []) {',
+  "    const value = traceCookie(String(line).split(';')[0], name);",
+  '    if (value !== undefined) return value;',
+  '  }',
+  '  return undefined;',
+  '};',
+  'for (const mod of [traceHttp, traceHttps] as any[]) {',
+  '  const original = mod.request;',
+  '  mod.request = function (...args: any[]) {',
+  '    const req = original.apply(this, args);',
+  '    const id = ++traceId;',
+  '    try {',
+  "      const path = String(req.path ?? '').split('?')[0];",
+  "      const cookie = req.getHeader('cookie');",
+  "      const stateful = String(req.getHeader('x-sap-adt-sessiontype') ?? '').toLowerCase() === 'stateful' ? 1 : 0;",
+  "      process.stderr.write(['session-trace', 'req', id, req.method + ' ' + path, 'stateful=' + stateful, 'sec=' + traceSecurity(traceCookie(cookie, 'SAP_SESSIONID')), 'ctx=' + (traceCookie(cookie, 'sap-contextid') ?? '-')].join(String.fromCharCode(9)) + String.fromCharCode(10));",
+  "      req.on('response', (res: any) => {",
+  "        const set = res.headers['set-cookie'];",
+  "        process.stderr.write(['session-trace', 'res', id, res.statusCode, 'sec=' + traceSecurity(traceSet(set, 'SAP_SESSIONID')), 'ctx=' + (traceSet(set, 'sap-contextid') ?? '-')].join(String.fromCharCode(9)) + String.fromCharCode(10));",
+  '      });',
+  '    } catch {}',
+  '    return req;',
+  '  };',
+  '}',
+];
+
+/** One security session of the trace: what its requests carried, whether it was logged off. */
+interface TracedSession {
+  requests: number;
+  stateful: boolean;
+  contexts: Set<string>;
+  loggedOff: boolean;
+}
+
+/**
+ * The trace read back, by security session: a request's session is the one
+ * its cookie names, else the one its answer set. Each stateful session must
+ * hold one context id throughout, each session must be logged off; answers
+ * the summary and what broke the rules.
+ */
+function readSessionTrace(lines: string[]): {
+  summary: Record<string, number>;
+  problems: string[];
+} {
+  const requests = new Map<
+    string,
+    { what: string; stateful: boolean; sec: string; ctx: string }
+  >();
+  const answers = new Map<string, { sec: string; ctx: string }>();
+  for (const line of lines) {
+    const [, type, id, what, a, b, c] = line.split('\t');
+    if (id === undefined) continue;
+    if (type === 'req') {
+      requests.set(id, {
+        what: String(what),
+        stateful: a === 'stateful=1',
+        sec: String(b).slice(4),
+        ctx: String(c).slice(4),
+      });
+    } else if (type === 'res') {
+      answers.set(id, { sec: String(a).slice(4), ctx: String(b).slice(4) });
+    }
+  }
+  const sessions = new Map<string, TracedSession>();
+  for (const [id, request] of requests) {
+    const answer = answers.get(id);
+    const sec = request.sec !== '-' ? request.sec : (answer?.sec ?? '-');
+    if (sec === '-') continue;
+    const session = sessions.get(sec) ?? {
+      requests: 0,
+      stateful: false,
+      contexts: new Set<string>(),
+      loggedOff: false,
+    };
+    sessions.set(sec, session);
+    if (request.what.includes('/sap/public/bc/icf/logoff')) {
+      session.loggedOff = true;
+      continue;
+    }
+    session.requests += 1;
+    if (request.stateful) session.stateful = true;
+    for (const ctx of [request.ctx, answer?.ctx ?? '-'])
+      if (ctx !== '-') session.contexts.add(ctx);
+  }
+  const problems: string[] = [];
+  let index = 0;
+  for (const session of sessions.values()) {
+    index += 1;
+    if (session.contexts.size > 1)
+      problems.push(
+        `security session #${index}: ${session.contexts.size} ABAP contexts on one connection`,
+      );
+    if (!session.stateful && session.contexts.size > 0)
+      problems.push(
+        `security session #${index}: a context on a stateless connection`,
+      );
+    if (!session.loggedOff)
+      problems.push(`security session #${index}: never logged off`);
+  }
+  const all = [...sessions.values()];
+  return {
+    summary: {
+      security_sessions: all.length,
+      stateful: all.filter((s) => s.stateful).length,
+      stateless: all.filter((s) => !s.stateful).length,
+      contexts: all.reduce((n, s) => n + s.contexts.size, 0),
+      logged_off: all.filter((s) => s.loggedOff).length,
+      requests: all.reduce((n, s) => n + s.requests, 0),
+    },
+    problems,
+  };
+}
 
 async function serve(kind: Kind): Promise<Served> {
   const cfg = loadTestConfig();
@@ -195,6 +344,7 @@ async function serve(kind: Kind): Promise<Served> {
   fs.writeFileSync(
     entry,
     [
+      ...(TRACE_SESSIONS ? SESSION_TRACE_PREAMBLE : []),
       `import { main, launcherFailedLine } from ${JSON.stringify(path.join(REPO, 'server/src/launcher'))};`,
       `import { CORE_VERSION } from ${JSON.stringify(path.join(REPO, 'server/src/coreVersion'))};`,
       `import { fullToolSet } from ${JSON.stringify(path.join(REPO, 'src/lib/toolSet'))};`,
@@ -250,8 +400,15 @@ async function serve(kind: Kind): Promise<Served> {
     stderr: 'pipe',
   });
   const tail: string[] = [];
+  const traced: string[] = [];
+  let pending = '';
   transport.stderr?.on('data', (chunk: Buffer) => {
-    tail.push(...chunk.toString('utf8').split('\n'));
+    const text = pending + chunk.toString('utf8');
+    const lines = text.split('\n');
+    pending = lines.pop() ?? '';
+    for (const line of lines)
+      if (line.startsWith('session-trace\t')) traced.push(line);
+      else tail.push(line);
     if (tail.length > 200) tail.splice(0, tail.length - 200);
   });
   const client = new Client({ name: 'debugger-batch', version: '1.0.0' });
@@ -281,6 +438,7 @@ async function serve(kind: Kind): Promise<Served> {
       return code;
     },
     stderrTail: () => tail.join('\n'),
+    sessionTrace: () => [...traced],
   };
 }
 
@@ -461,6 +619,11 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       problems.push(
         `the server exited ${code}, not 0: not every session was logged off cleanly.\n${served.stderrTail()}`,
       );
+    }
+    if (TRACE_SESSIONS) {
+      const trace = readSessionTrace(served.sessionTrace());
+      say(kind, 'session trace', trace);
+      problems.push(...trace.problems);
     }
     if (failure !== undefined) {
       if (problems.length > 0) {
@@ -714,6 +877,11 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
           problems.push(
             `the server exited ${code}, not 0: not every session was logged off cleanly.\n${served.stderrTail()}`,
           );
+        }
+        if (TRACE_SESSIONS) {
+          const trace = readSessionTrace(served.sessionTrace());
+          say(kind, 'amdp session trace', trace);
+          problems.push(...trace.problems);
         }
       }
     }

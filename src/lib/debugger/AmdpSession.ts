@@ -63,7 +63,11 @@ import { Serial } from './serial';
 
 export type AmdpDebuggerT = AmdpDebugger<typeof amdpDebuggerDocuments>;
 export interface AmdpSessionPorts<O = unknown> {
-  openConnection(origin: O): Promise<IAbapConnection>;
+  /** A connection of its own, `stateful` unless `session` says otherwise. */
+  openConnection(
+    origin: O,
+    session?: 'stateful' | 'stateless',
+  ): Promise<IAbapConnection>;
   closeConnection(c: IAbapConnection): Promise<void>;
   amdpDebugger(c: IAbapConnection): AmdpDebuggerT;
   requestUser(origin: O): Promise<string>;
@@ -1173,7 +1177,8 @@ export class AmdpSession<O = unknown> {
       let connection: IAbapConnection | undefined;
       let outcome: RunOutcome;
       try {
-        connection = await this.ports.openConnection(origin);
+        // A run is one request: a stateless session.
+        connection = await this.ports.openConnection(origin, 'stateless');
         if (this.runs.has(run)) run.connection = connection;
         outcome = await this.ports.run(connection, target);
       } catch (error) {

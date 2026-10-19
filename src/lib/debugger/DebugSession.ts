@@ -102,8 +102,18 @@ export interface RunTarget {
 export type RunOutcome =
   | { ok: true; output: string }
   | { ok: false; message: string };
+/**
+ * The ABAP session a debugger connection opens: stateful for what SAP's
+ * design binds to one session (the listener, the attach, the breakpoints'
+ * requests), stateless for the program's run.
+ */
+export type DebugSessionKind = 'stateful' | 'stateless';
 export interface DebugSessionPorts<O = unknown> {
-  openConnection(origin: O): Promise<IAbapConnection>;
+  /** A connection of its own, `stateful` unless `session` says otherwise. */
+  openConnection(
+    origin: O,
+    session?: DebugSessionKind,
+  ): Promise<IAbapConnection>;
   closeConnection(connection: IAbapConnection): Promise<void>;
   /**
    * Forgets a connection whose ABAP session the system freed itself
@@ -621,8 +631,10 @@ export class DebugSession<O = unknown> {
     );
     return kept ? [kept] : [];
   }
-  protected async open(): Promise<IAbapConnection> {
-    return this.ports.openConnection(this.requireOrigin());
+  protected async open(
+    session: DebugSessionKind = 'stateful',
+  ): Promise<IAbapConnection> {
+    return this.ports.openConnection(this.requireOrigin(), session);
   }
   /**
    * Closes once. The connector's `disconnect()` never throws by contract (it
@@ -2124,7 +2136,9 @@ export class DebugSession<O = unknown> {
       let connection: IAbapConnection | undefined;
       let outcome: RunOutcome | undefined;
       try {
-        connection = await this.open();
+        // A run is one request: a stateless session (measured 2026-10-17: a
+        // run on a stateless connection is caught and held as any).
+        connection = await this.open('stateless');
         if (this.run?.generation === generation) {
           this.run.connection = connection;
           outcome = await this.ports.run(connection, target, debuggee);
@@ -2249,52 +2263,12 @@ export class DebugSession<O = unknown> {
     try {
       for (const connection of [...this.unclosed])
         await this.closeOrKeep(connection, 'a connection', failures);
-      for (const owed of [...this.owed]) {
-        if (skipped(`release ${owed.what}`)) continue;
-        const notReleased = await this.release(owed.debugger, owed.what);
-        if (notReleased) {
-          failures.push(notReleased); // kept: a later stop retries
-          continue;
-        }
-        // Released: only its connection may be left, and a retry must not release twice.
-        this.owed.delete(owed);
-        await this.closeOrKeep(
-          owed.connection,
-          `${owed.what}'s connection`,
-          failures,
-        );
-      }
-      // The attaching session of the one-request path ends with its logoff,
-      // which ends its attachment; no release step is sent on it.
-      const attaching = this.onceAttaching;
-      if (this.current?.once) this.current = undefined;
-      if (attaching) {
-        this.onceAttaching = undefined;
-        await this.closeOrKeep(
-          attaching.connection,
-          "the debuggee's connection",
-          failures,
-        );
-      }
-      // 1. A held stop is released.
-      const stop = this.current;
-      if (stop && !skipped('release the debuggee')) {
-        const released = await stop.debugger
-          .step('stepContinue', { analyse: analyseDebuggeeEnd })
-          .catch(asFailure);
-        if (released.ok) {
-          // Released: only its connection may be left, and a retry must not release twice.
-          this.current = undefined;
-          await this.closeOrKeep(
-            stop.connection,
-            "the debuggee's connection",
-            failures,
-          );
-        } else {
-          failures.push(failedEntry(released, 'release the debuggee')); // kept: a later stop retries
-        }
-      }
-      // 2. The listener is stopped, and the key's breakpoints with it.
+      // The releases an earlier stop left owed: one owed during this stop's
+      // listener stop is this stop's failure, retried by the next.
+      const owedBefore = [...this.owed];
+      // 1. The listener is stopped, and the key's breakpoints with it — first,
+      // so a debuggee let go below runs to its end: a continue from a
+      // breakpoint in a loop would stop there again while it is armed.
       if (this.changed && !skipped('stop listener')) {
         const identity = this.requireIdentity();
         const control = await this.controlDebugger();
@@ -2373,6 +2347,51 @@ export class DebugSession<O = unknown> {
           "the listener's connection",
           failures,
         );
+      }
+      for (const owed of owedBefore) {
+        if (skipped(`release ${owed.what}`)) continue;
+        const notReleased = await this.release(owed.debugger, owed.what);
+        if (notReleased) {
+          failures.push(notReleased); // kept: a later stop retries
+          continue;
+        }
+        // Released: only its connection may be left, and a retry must not release twice.
+        this.owed.delete(owed);
+        await this.closeOrKeep(
+          owed.connection,
+          `${owed.what}'s connection`,
+          failures,
+        );
+      }
+      // The attaching session of the one-request path ends with its logoff,
+      // which ends its attachment; no release step is sent on it.
+      const attaching = this.onceAttaching;
+      if (this.current?.once) this.current = undefined;
+      if (attaching) {
+        this.onceAttaching = undefined;
+        await this.closeOrKeep(
+          attaching.connection,
+          "the debuggee's connection",
+          failures,
+        );
+      }
+      // 2. A held stop is released, with no breakpoint left to stop it again.
+      const stop = this.current;
+      if (stop && !skipped('release the debuggee')) {
+        const released = await stop.debugger
+          .step('stepContinue', { analyse: analyseDebuggeeEnd })
+          .catch(asFailure);
+        if (released.ok) {
+          // Released: only its connection may be left, and a retry must not release twice.
+          this.current = undefined;
+          await this.closeOrKeep(
+            stop.connection,
+            "the debuggee's connection",
+            failures,
+          );
+        } else {
+          failures.push(failedEntry(released, 'release the debuggee')); // kept: a later stop retries
+        }
       }
       // The one-request path's listener: its open listen answers once the
       // listener is stopped; then its connection closes.

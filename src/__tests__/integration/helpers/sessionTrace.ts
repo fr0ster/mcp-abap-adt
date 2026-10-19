@@ -175,6 +175,11 @@ export function readSessionTrace(lines: string[]): {
       );
     if (!session.loggedOff)
       problems.push(`security session #${index}: never logged off`);
+    // A live run claims SAP closed the session: its logoff answered 200.
+    else if (session.logoff?.status !== '200')
+      problems.push(
+        `security session #${index}: its logoff was answered ${session.logoff?.status ?? 'no answer'}, not 200`,
+      );
   }
   const all = [...sessions.values()];
   return {

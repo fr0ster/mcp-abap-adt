@@ -76,7 +76,20 @@ describe('readSessionTrace', () => {
     expect(trace.problems).toEqual([
       'security session #1: 2 ABAP contexts on one connection',
       'security session #1: never logged off',
+      'security session #2: its logoff was answered no answer, not 200',
     ]);
     expect(trace.sessions[1]?.logoff).toEqual({ status: 'no answer' });
+  });
+
+  it('a logoff answered other than 200 is a problem: SAP did not say the session ended', () => {
+    const trace = readSessionTrace([
+      req(1, 'GET /x', 0, 'ddd', '-', 1),
+      req(2, 'GET /sap/public/bc/icf/logoff', 0, 'ddd', '-', 2),
+      res(2, 500, '-', '-', 3),
+    ]);
+    expect(trace.problems).toEqual([
+      'security session #1: its logoff was answered 500, not 200',
+    ]);
+    expect(trace.sessions[0]?.logoff).toEqual({ status: '500', ms: 1 });
   });
 });

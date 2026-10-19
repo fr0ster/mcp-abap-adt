@@ -25,7 +25,8 @@
  *
  * The session trace is on: after the exit every security session the
  * server opened must hold at most one ABAP context, a stateless one none,
- * and each must have been logged off with SAP's answer before the exit.
+ * and each must have been logged off, its logoff answered 200 before the
+ * exit (`readSessionTrace`).
  *
  * Cleanup, each step in its own `finally`, whatever happened: an open batch
  * ended, `AmdpDebugStop`, the server's shutdown. The test's own in-process
@@ -433,11 +434,6 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
             const trace = readSessionTrace(served.trace());
             say('session trace', trace);
             problems.push(...trace.problems);
-            for (const session of trace.sessions)
-              if (session.logoff?.status === 'no answer')
-                problems.push(
-                  `security session ${session.sec}: its logoff was not answered before the exit`,
-                );
           }
         }
         if (failure !== undefined) {

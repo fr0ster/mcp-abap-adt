@@ -1,6 +1,6 @@
 /**
  * A crash outside a tool, http: `uncaughtException` and
- * `unhandledRejection` run the forced close — the stand-in receives the
+ * `unhandledRejection` run the orderly shutdown — the stand-in receives the
  * logoff of the held instance's connections, one fixed-words line, exit `1`.
  * (A crash during a running shutdown: core's suite and lib's sequence — the
  * http shutdown runs no step a crash could meet.) The events arrive on the

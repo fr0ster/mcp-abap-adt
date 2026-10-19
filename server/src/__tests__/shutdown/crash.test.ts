@@ -1,12 +1,12 @@
 /**
  * A crash outside a tool, stdio: an `uncaughtException` (a
  * timer callback that throws) or an `unhandledRejection` (a promise
- * rejected with no handler) runs the forced close — the stand-in receives
+ * rejected with no handler) runs the orderly shutdown — the stand-in receives
  * the logoff of the instance's connection, one fixed-words stderr line names
  * the failure by its class, never its message, and the process exits `1`.
- * During a running shutdown (its session writes held) the crash switches it
- * to the forced close; a second crash starts no other one, and the logoff
- * is sent once.
+ * During a running shutdown (its session writes held) the crash lets it
+ * finish and exit `1`; a second crash adds nothing, and the logoff is sent
+ * once.
  *
  * The process's events arrive on the launcher's process edge (`processLike`)
  * as Node delivers them: a real throw here would end the test runner.
@@ -48,7 +48,7 @@ it.each([
       ),
   ],
 ])(
-  '%s: the forced close logs off the connection, one line, exit 1',
+  '%s: the orderly shutdown logs off the connection, one line, exit 1',
   async (_name, crash) => {
     s = await stand({ shutdown: {} });
     expect(await s.callTool('ProbeAdt', { id: 'p1' })).toMatchObject({
@@ -62,7 +62,7 @@ it.each([
   },
 );
 
-it('a crash during a running shutdown switches it to the forced close; a second crash starts no other', async () => {
+it('a crash during a running shutdown lets it finish and exits 1; a second crash adds nothing', async () => {
   s = await stand({ shutdown: {} });
   // The session writes are held: the orderly shutdown is still running.
   const written = deferred<void>();
@@ -79,16 +79,19 @@ it('a crash during a running shutdown switches it to the forced close; a second 
   expect(s.exits).toEqual([]);
   s.processLike.emit('uncaughtException', new TypeError('first'));
   s.processLike.emit('uncaughtException', new TypeError('second'));
+  await turns(20);
+  // Not forced: the sequence still waits for its session writes.
+  expect(s.exits).toEqual([]);
+  written.resolve();
   expect(await s.exited).toBe(1);
   await turns(20);
   expect(s.exits).toEqual([1]);
   // The logoff the shutdown wrote is joined, never sent again.
   expect(s.adt.logoffs()).toBe(1);
   expect(failedLine(s.shutdownLines)).toHaveLength(1);
-  expect(s.shutdownLines).toContain(
-    '[MCP] Still running at the forced close: LockedUpdate',
-  );
+  expect(
+    s.shutdownLines.some((l) => l.includes('at the forced close')),
+  ).toBe(false);
   hold.release();
-  written.resolve();
   flush.mockRestore();
 });

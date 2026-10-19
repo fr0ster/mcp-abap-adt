@@ -180,12 +180,14 @@ every user session in it, only once it has received the logoff request whole
 (`CL_HTTP_EXT_LOGOFF`), and a socket closed before that ends nothing (measured on premise
 2026-10-19: sessions whose logoff went out right before the process ended stayed in SM05 until
 their timeout). A logoff that is never answered keeps the process until it is killed
-(`SIGKILL`) or forced. **The forced close** (`forceClose()` again, without waiting for
-the sequence's last steps) serves both escapes (a second signal, `--shutdown-timeout`) and
-a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered beside the signals
-in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a
-crash during a shutdown forces it, and a second crash joins the forced close under way. A killed
-process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its sessions and locks,
+(`SIGKILL`) or forced. Its triggers (lib's `shutdownSequence.ts`): the signals of
+`SHUTDOWN_SIGNALS` (`SIGTERM`, `SIGINT`, `SIGHUP`, `SIGQUIT`, `SIGBREAK`), for stdio the end of
+stdin and a broken pipe (`EPIPE`) on stdin or stdout, `beforeExit`, and a crash outside a tool
+(`uncaughtException`, `unhandledRejection`): one fixed-words line naming the failure by its class,
+the same orderly sequence, exit `1`; a crash during a shutdown lets it finish and exits `1`.
+**The forced close** (`forceClose()` again, without waiting for the sequence's last steps) serves
+the two escapes only: a second signal and `--shutdown-timeout`. A killed process (`SIGKILL`, out
+of memory, a crash of the runtime, a power loss) cannot log off: SAP's idle timeout ends its sessions and locks,
 unless a later stdio process of the same destination starts on it, or the user logs them off
 (below).
 

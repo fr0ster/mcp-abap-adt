@@ -113,7 +113,8 @@ above — after its work when it holds nothing, at its state's end when it holds
 
 ## Shutdown
 
-On `SIGTERM` / `SIGINT` the server stops taking requests (`503`, *the server is shutting down*;
+On `SIGTERM` / `SIGINT` / `SIGHUP` / `SIGQUIT` (`SIGBREAK` on Windows), or a crash outside a
+tool (then exit `1`), the server stops taking requests (`503`, *the server is shutting down*;
 a call already accepted whose body arrives later reaches no tool), stops listening, **logs off
 every ADT session of every instance at once** — pooled instances and their held state's included;
 no state undo is sent, the logoff ends the state — and interrupts the running tools: **nothing

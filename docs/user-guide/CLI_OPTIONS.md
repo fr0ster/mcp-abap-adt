@@ -243,20 +243,25 @@ mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
 
 ### Shutdown
 
-On `SIGTERM`, `SIGINT` (and, for `mcp-abap-adt`, the end of stdin: your client closed the
-transport) a binary stops taking calls — a call arriving from then on is answered "The server is
+On `SIGTERM`, `SIGINT` (Ctrl+C), `SIGHUP` (the terminal closed, an SSH session dropped; on
+Windows the console window closed), `SIGQUIT`, on Windows `SIGBREAK` (Ctrl+Break) — and, for
+`mcp-abap-adt`, the end of stdin or a broken pipe on stdin or stdout (your client closed the
+transport, or is gone) — a binary stops taking calls — a call arriving from then on is answered "The server is
 shutting down." and reaches no tool —, **logs off every ADT session it opened at once** — the
 logoff is what releases any lock a tool holds — and interrupts the running tools: **nothing waits
 for a running tool**, a queued call never starts, and a write whose `UNLOCK` was still to come
-never sends it (its lock goes with the logoff). No state undo is sent: the logoff ends the held
+never sends it (its lock goes with the logoff). **Each logoff is let finish**: the process stays
+until SAP answered it (any answer) or its connection failed — SAP ends a session only once it
+received the logoff whole, so a process that ended first would leave the session open until
+SAP's timeout. No state undo is sent: the logoff ends the held
 state (a debug session included). Then — `mcp-abap-adt` only — it writes the pending session
 secrets. It exits `0`, or `1` with one stderr line per fact not done. **There is no deadline**
 (18.x gave up after 30 s). An SSE connection that closes is handled the same way for its own
 sessions; over Streamable HTTP a client that drops its request closes nothing.
 
 `--shutdown-timeout=<seconds>` (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; a whole number
-from 1 to 86400, **no default**) ends the waiting after that long, and so does a second `SIGTERM`
-/ `SIGINT`: the forced close. Nothing more is waited for — not a session write, not a flush —
+from 1 to 86400, **no default**) ends the waiting after that long, and so does a second signal:
+the forced close. Nothing more is waited for — not a session write, not a flush —
 but each ADT session's logoff, which is still written (a logoff whose write never completes, a
 system that never takes the bytes, keeps the process until it is killed), and the exit is `1`, naming each tool
 still running (`Still running at the forced close: <tool>`) and the step cut short.
@@ -264,10 +269,13 @@ still running (`Still running at the forced close: <tool>`) and the step cut sho
 on the next start. Set it against the time your supervisor waits before it kills the process (a
 container's stop grace, a service manager's `TimeoutStopSec`), a few seconds below it.
 
-A crash outside a tool (an uncaught exception, an unhandled promise rejection) runs the same
-forced close: every ADT session is logged off, one stderr line names the failure by its class,
-exit `1`. A process that is killed (`SIGKILL`, out of memory) cannot log off: SAP's own idle
-timeout ends its sessions and their locks — unless you act first. On stdio its HTTP sessions are
+A crash outside a tool (an uncaught exception, an unhandled promise rejection) writes one stderr
+line naming the failure by its class and runs the same orderly shutdown — every ADT session
+logged off, each logoff let finish — then exits `1`; a crash during a shutdown lets it finish and
+exits `1`. An emptied event loop runs it too. What cannot be caught cannot log off: a process
+killed with `SIGKILL` or for lack of memory, a crash of the runtime itself, a power loss, Windows
+ending the process after its console closed before the logoffs finished — SAP's security-session
+timeout ends their sessions and their locks, unless you act first. On stdio its HTTP sessions are
 recorded in `<config dir>/runtime/` (`--auth-broker-path` moves it), and a later stdio server
 process of the same destination starts on the one it finds (with several it logs on normally),
 lists them (`ListLeftoverSessions`, compact `HandlerLeftoverSessionList`) and logs off the one you

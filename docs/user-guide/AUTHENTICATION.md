@@ -445,8 +445,9 @@ the connection's own words, with its hint, never replaced.
 
 ## Shutdown
 
-On `SIGTERM`, `SIGINT` or the end of stdin (its `end` and `close` are one trigger: your client
-closed the transport) the server, in this order:
+On `SIGTERM`, `SIGINT`, `SIGHUP`, `SIGQUIT`, `SIGBREAK` (Windows), the end of stdin (its `end`
+and `close` are one trigger: your client closed the transport), a broken pipe on stdin or stdout,
+or a crash outside a tool (then exit `1`) the server, in this order:
 
 1. stops taking calls: a call read from now on is answered `interactive-login` `aborted` with
    "The server is shutting down.", and reaches no tool; no interactive login starts any more;

@@ -2,9 +2,12 @@
  * The shutdown of a program — core's, http's and sse's launchers: installed by the launcher only, so an embedder's process is never
  * taken over.
  *
- * **What starts it.** The first trigger — `SIGTERM`, `SIGINT`, and for stdio
- * the end of stdin (`end` and `close` alike: one start; the client
- * closed the transport) — starts one sequence. In that tick the process
+ * **What starts it.** The first trigger — a signal (`SIGTERM`, `SIGINT`,
+ * `SIGHUP`, `SIGQUIT`, on Windows `SIGBREAK`: `SHUTDOWN_SIGNALS`), for stdio
+ * the end of stdin (`end` and `close` alike: one start; the client closed
+ * the transport) or a broken pipe on stdin or stdout (`EPIPE`: the client is
+ * gone), a crash outside a tool, or an emptied event loop (`beforeExit`) —
+ * starts one sequence. In that tick the process
  * latch is set (`latch()`), before anything else: a call arriving from here
  * on is refused before any connection. Then the program's own `begin` (stop
  * listening, stop the pool's admission, stop taking input) and its orderly
@@ -16,7 +19,7 @@
  * sends. Then the program's last steps (stdio: the session writes). No
  * deadline: the sequence takes as long as its steps do.
  *
- * **The forced close.** Only a `SIGTERM` / `SIGINT` after the start, or
+ * **The forced close.** Only a second signal after the start, or
  * `--shutdown-timeout` (no default), ends the waiting early: no further wait
  * on a last step or a flush — every connection the process owns is logged
  * off (`forceClose`, awaited only to each logoff's write), and the exit is
@@ -24,9 +27,11 @@
  * and the step the orderly sequence was in.
  *
  * **A crash outside a tool** (`uncaughtException`, `unhandledRejection`)
- * runs the same forced close, with one fixed-words line naming the failure
- * by its class. A killed process (`SIGKILL`, out of memory) cannot log off:
- * SAP's own idle timeout ends its sessions and their locks.
+ * writes one fixed-words line naming the failure by its class and runs the
+ * orderly sequence, every logoff finished, then exits `1`; a crash during a
+ * running sequence lets it finish and exits `1`. A killed process
+ * (`SIGKILL`, out of memory, a crash of the runtime, a power loss) cannot
+ * log off: SAP's security-session timeout ends its sessions and their locks.
  *
  * Nothing is written to stdout, and no line carries an error's message.
  */
@@ -57,7 +62,37 @@ export async function logOffAtOnce(): Promise<void> {
 }
 
 /** What the shutdown listens on: the process, or a test's stand-in. */
-export type ShutdownProcess = EventEmitter & { stdin?: EventEmitter };
+export type ShutdownProcess = EventEmitter & {
+  stdin?: EventEmitter;
+  stdout?: EventEmitter;
+};
+
+/**
+ * The signals that start the orderly shutdown (a second one forces it):
+ * `SIGTERM`, `SIGINT` (Ctrl+C), `SIGHUP` (the terminal closed, an SSH
+ * session dropped; on Windows the console window closed — Windows ends the
+ * process some seconds later whatever it does), `SIGQUIT`, and on Windows
+ * `SIGBREAK` (Ctrl+Break). A name the platform does not know is an event
+ * that never comes. `SIGKILL`, a crash of the runtime and a power loss
+ * cannot be caught: their sessions live until SAP's security-session
+ * timeout.
+ */
+export const SHUTDOWN_SIGNALS = [
+  'SIGTERM',
+  'SIGINT',
+  'SIGHUP',
+  'SIGQUIT',
+  'SIGBREAK',
+] as const;
+
+/** Whether `error` says the other end of a pipe is gone (`EPIPE`): the client closed. */
+function pipeGone(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    (error as { code?: unknown }).code === 'EPIPE'
+  );
+}
 
 /** The orderly sequence's report: the stderr lines of what it could not do. */
 export interface ShutdownRun {
@@ -117,6 +152,8 @@ export function installShutdownSequence(
   let exited = false;
   let forcing: Promise<void> | undefined;
   let currentStep: string | undefined;
+  /** A crash came: the orderly end exits 1. */
+  let failed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const forced = new AbortController();
   let finished!: () => void;
@@ -154,7 +191,7 @@ export function installShutdownSequence(
     }, forced.signal);
     if (forcing !== undefined || exited) return;
     for (const line of report.lines) stderr(line);
-    exitOnce(report.lines.length > 0 ? 1 : 0);
+    exitOnce(report.lines.length > 0 || failed ? 1 : 0);
   };
 
   const start = (): Promise<void> => {
@@ -184,10 +221,11 @@ export function installShutdownSequence(
   const input = () => {
     void start();
   };
-  // A crash outside a tool (a timer, a socket callback, transport code): the
-  // forced close — every owned connection logged off, exit 1. A running
-  // shutdown switches to it, as a second signal would; a second crash joins
-  // the forced close already under way. Nothing keeps the process alive.
+  // A crash outside a tool (a timer, a socket callback, transport code): one
+  // line naming it by its class, then the orderly shutdown — every logoff
+  // finished, as at any end — and exit 1. A shutdown already running goes on
+  // and exits 1; a second crash adds nothing. Only a signal or
+  // --shutdown-timeout forces it.
   let crashed = false;
   const crash = (thrown: unknown) => {
     if (exited) return;
@@ -199,17 +237,30 @@ export function installShutdownSequence(
         // The line is best effort; the logoffs are not.
       }
     }
+    failed = true;
     latch();
-    void force();
+    if (running === undefined) void start();
+  };
+  // The client gone (stdio): a broken pipe on stdin or stdout is its end of
+  // input, not a crash; any other error of the stream is one.
+  const pipeError = (error: unknown) => {
+    if (pipeGone(error)) input();
+    else crash(error);
   };
 
-  processLike.on('SIGTERM', signal);
-  processLike.on('SIGINT', signal);
+  for (const name of SHUTDOWN_SIGNALS) processLike.on(name, signal);
   processLike.on('uncaughtException', crash);
   processLike.on('unhandledRejection', crash);
+  // The event loop emptied with no trigger before it: the orderly shutdown,
+  // once, so no connection is left without its logoff.
+  processLike.on('beforeExit', () => {
+    if (running === undefined && !exited) void start();
+  });
   if (options.onStdinEnd) {
     processLike.stdin?.on('end', input);
     processLike.stdin?.on('close', input);
+    processLike.stdin?.on('error', pipeError);
+    processLike.stdout?.on('error', pipeError);
   }
   return start;
 }

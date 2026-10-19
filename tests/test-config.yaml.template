@@ -1866,21 +1866,23 @@ runtime_readonly_handlers:
 
 # Debugger Handlers (ABAP and AMDP debugger, memory)
 # Nothing else may debug for the same SAP user while this runs (an IDE with a
-# breakpoint set holds the user's debugging). The probes are created, run and
-# deleted by the test; they go into `package` with no transport, never into
-# the default package's request.
+# breakpoint set holds the user's debugging). The ABAP probe is created, run and
+# deleted by the test; it goes into `package` with no transport, never into
+# the default package's request. The AMDP chain reads and runs the shared AMDP
+# pair (shared_dependencies), created once by npm run shared:setup.
 debugger_handlers:
   test_cases:
     - name: "debugger_chain"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on probes the test creates and deletes"
+      description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on an ABAP probe the test creates and deletes, and the shared AMDP pair"
       params:
         package: "$TMP"
         transport: ""
         probe_class: "ZMCP_DBG_PROBE"
-        amdp_probe_class: "ZMCP_DBG_AMDP"
-        amdp_probe_ddl: "ZMCP_DBG_AMDP_TF"
+        # The shared AMDP pair the AMDP chain reads and runs (shared_dependencies)
+        amdp_class: "ZMCP_SHR_DBG_AMDP"
+        amdp_ddl: "ZMCP_SHR_DBG_TF"
         # Repetitions of each single step and of each baseline run, for the timings
         timing_repeats: 5
         keep_probe: false

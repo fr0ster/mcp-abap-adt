@@ -1,10 +1,13 @@
 /**
  * Integration tests for the debugger handlers against a live system.
  *
- * The test creates its probes — an ABAP class run as a console application,
- * and for AMDP a class with a SQLScript procedure plus a table function — in
- * the package the test case names, with no transport, and deletes them after
- * the run. Every case builds its own instance state with a debugger attached,
+ * The test creates its ABAP probe — a class run as a console application —
+ * in the package the test case names, with no transport, and deletes it
+ * after the run. The AMDP cases only read and run the shared AMDP pair
+ * (`shared_dependencies`: the class `ZMCP_SHR_DBG_AMDP` with a SQLScript
+ * table function, its DDL source `ZMCP_SHR_DBG_TF`; created once by
+ * `npm run shared:setup`, never deleted); the AMDP chain skips only where
+ * SAP's system information names a database system other than HANA. Every case builds its own instance state with a debugger attached,
  * the way a server instance does, and disposes it afterwards.
  *
  * Besides the checks, the cases MEASURE what SAP does where the design leans
@@ -35,11 +38,9 @@ import * as dotenv from 'dotenv';
 import { resolveEnvFilePath } from '../../../../server/src/config/envResolver';
 import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../handlers/class/high/handleDeleteClass';
+import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
-import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
-import { handleCreateDdl } from '../../../handlers/ddl/high/handleCreateDdl';
-import { handleDeleteDdl } from '../../../handlers/ddl/high/handleDeleteDdl';
-import { handleUpdateDdl } from '../../../handlers/ddl/high/handleUpdateDdl';
+import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
 import { handleAmdpDebugGetTable } from '../../../handlers/debugger/debug/handleAmdpDebugGetTable';
 import { handleAmdpDebugStart } from '../../../handlers/debugger/debug/handleAmdpDebugStart';
 import { handleAmdpDebugStep } from '../../../handlers/debugger/debug/handleAmdpDebugStep';
@@ -82,12 +83,14 @@ import {
   stderrStateLogger,
 } from '../../../lib/state/InstanceState';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
+import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
 import {
   getSystemType,
   getTimeout,
   loadTestConfig,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
+import { logOffLeft, ownedNow } from '../helpers/debuggerCleanup';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../helpers/testers/types';
@@ -147,69 +150,6 @@ ENDCLASS.
 }
 const ABAP_OUTPUT = 'counter 15';
 
-function amdpDdlSource(ddl: string, cls: string): string {
-  return `@EndUserText.label: 'AMDP debugger probe table function'
-@ClientHandling.type: #CLIENT_INDEPENDENT
-@AccessControl.authorizationCheck: #NOT_REQUIRED
-define table function ${ddl}
-  with parameters
-    p_limit : abap.int4
-  returns {
-    n      : abap.int4;
-    square : abap.int4;
-  }
-  implemented by method ${cls.toLowerCase()}=>tf;
-`;
-}
-
-/** `-- BP:<name>` names a SQLScript line the AMDP cases stop at. */
-function amdpClassSource(cls: string, ddl: string): string {
-  const n = cls.toLowerCase();
-  return `CLASS ${n} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_amdp_marker_hdb.
-    INTERFACES if_oo_adt_classrun.
-    METHODS sum_to AMDP OPTIONS READ-ONLY CLIENT INDEPENDENT
-      IMPORTING VALUE(iv_limit) TYPE i
-      EXPORTING VALUE(ev_total) TYPE i
-                VALUE(ev_steps) TYPE i.
-    CLASS-METHODS tf FOR TABLE FUNCTION ${ddl.toLowerCase()}.
-ENDCLASS.
-
-CLASS ${n} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    sum_to( EXPORTING iv_limit = 3
-            IMPORTING ev_total = DATA(lv_total)
-                      ev_steps = DATA(lv_steps) ).
-    SELECT * FROM ${ddl.toLowerCase()}( p_limit = 3 ) INTO TABLE @DATA(lt_rows).
-    out->write( |total { lv_total } steps { lv_steps } rows { lines( lt_rows ) }| ).
-  ENDMETHOD.
-
-  METHOD sum_to BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT
-    OPTIONS READ-ONLY.
-    DECLARE lv_i INTEGER;
-    ev_total = 0;
-    ev_steps = 0;
-    FOR lv_i IN 1..:iv_limit DO
-      ev_total = :ev_total + :lv_i; -- BP:loop
-      ev_steps = :ev_steps + 1;
-    END FOR;
-  ENDMETHOD.
-
-  METHOD tf BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT
-    OPTIONS READ-ONLY.
-    DECLARE lt_rows TABLE ( n INTEGER, square INTEGER );
-    DECLARE lv_i INTEGER;
-    FOR lv_i IN 1..:p_limit DO
-      :lt_rows.INSERT( ( :lv_i, :lv_i * :lv_i ) ); -- BP:tf
-    END FOR;
-    RETURN SELECT n, square FROM :lt_rows;
-  ENDMETHOD.
-ENDCLASS.
-`;
-}
-const AMDP_OUTPUT = 'total 6 steps 3 rows 3';
-
 // --- the record ---------------------------------------------------------------------
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
@@ -256,10 +196,8 @@ const HANDLERS: Record<string, (ctx: HandlerContext, args: any) => any> = {
   CreateClass: handleCreateClass,
   UpdateClass: handleUpdateClass,
   DeleteClass: handleDeleteClass,
-  CreateDdl: handleCreateDdl,
-  UpdateDdl: handleUpdateDdl,
-  DeleteDdl: handleDeleteDdl,
-  ActivateObjects: handleActivateObjects,
+  GetClass: handleGetClass,
+  GetDdl: handleGetDdl,
 };
 
 /** One server instance's worth: its state, its debugger, a context bound to them. */
@@ -280,9 +218,7 @@ describe('Debugger handlers (integration)', () => {
   let transport: string | undefined;
   let repeats = 5;
   let LINE: Record<string, number> = {};
-  let AMDP_LINE: Record<string, number> = {};
   let abapReady = false;
-  let amdpReady: string | undefined;
   let connection: IAbapConnection;
   let secondUserEnv = '';
 
@@ -576,8 +512,8 @@ describe('Debugger handlers (integration)', () => {
         connection = context.connection as unknown as IAbapConnection;
         const p = context.params ?? {};
         probe = String(p.probe_class ?? '').toUpperCase();
-        amdpClass = String(p.amdp_probe_class ?? '').toUpperCase();
-        amdpDdl = String(p.amdp_probe_ddl ?? '').toUpperCase();
+        amdpClass = String(p.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
+        amdpDdl = String(p.amdp_ddl ?? 'ZMCP_SHR_DBG_TF').toUpperCase();
         pkg = String(p.package ?? '');
         transport = p.transport ? String(p.transport) : undefined;
         repeats = Number(p.timing_repeats) > 0 ? Number(p.timing_repeats) : 5;
@@ -607,62 +543,6 @@ describe('Debugger handlers (integration)', () => {
         if (updated.isError)
           throw new Error(`the probe was not written: ${updated.text}`);
         abapReady = true;
-
-        if (tester.isHardMode() || !amdpClass || !amdpDdl) return;
-        // The AMDP probe: the two name each other — shells, bodies, one group activation.
-        const classSource = amdpClassSource(amdpClass, amdpDdl);
-        AMDP_LINE = markersOf(classSource, /-- BP:(\w+)/);
-        const ddlShell = await call(obj, 'CreateDdl', {
-          ddl_name: amdpDdl,
-          package_name: pkg,
-          description: 'AMDP debugger probe',
-          ...tr,
-        });
-        if (ddlShell.isError)
-          measure('setup', `create ${amdpDdl}`, ddlShell.text.slice(0, 300));
-        const classShell = await call(obj, 'CreateClass', {
-          class_name: amdpClass,
-          package_name: pkg,
-          description: 'AMDP debugger probe',
-          ...tr,
-        });
-        if (classShell.isError)
-          measure(
-            'setup',
-            `create ${amdpClass}`,
-            classShell.text.slice(0, 300),
-          );
-        const ddlBody = await call(obj, 'UpdateDdl', {
-          ddl_name: amdpDdl,
-          ddl_source: amdpDdlSource(amdpDdl, amdpClass),
-          ...tr,
-        });
-        const classBody = await call(obj, 'UpdateClass', {
-          class_name: amdpClass,
-          source_code: classSource,
-          ...tr,
-        });
-        const activated = await call(obj, 'ActivateObjects', {
-          objects: [
-            { name: amdpDdl, type: 'DDLS' },
-            { name: amdpClass, type: 'CLAS' },
-          ],
-        });
-        if (
-          ddlBody.isError ||
-          classBody.isError ||
-          activated.isError ||
-          activated.json?.activated !== true
-        ) {
-          amdpReady = `the AMDP probe is not active: ${[
-            ddlBody,
-            classBody,
-            activated,
-          ]
-            .map((a) => a.text.slice(0, 400))
-            .join(' / ')}`;
-          measure('setup', 'activate the AMDP probe', amdpReady);
-        }
       },
       async () => {},
     );
@@ -694,12 +574,6 @@ describe('Debugger handlers (integration)', () => {
       const deletions = [
         await call(obj, 'DeleteClass', { class_name: probe, ...tr }),
       ];
-      if (!tester.isHardMode() && amdpClass && amdpDdl) {
-        deletions.push(
-          await call(obj, 'DeleteClass', { class_name: amdpClass, ...tr }),
-          await call(obj, 'DeleteDdl', { ddl_name: amdpDdl, ...tr }),
-        );
-      }
       for (const d of deletions)
         if (d.isError)
           measure('cleanup', 'delete a probe', d.text.slice(0, 300));
@@ -1692,15 +1566,63 @@ describe('Debugger handlers (integration)', () => {
 
   // --- 7 and 6. the AMDP chain, and whether a stop ends the open event read --------------
 
+  /** SAP's system information: where the database system is named. */
+  const systemInformationRead = async (): Promise<FixtureRead> => {
+    try {
+      const answered = (await connection.makeAdtRequest({
+        url: '/sap/bc/adt/system/information',
+        method: 'GET',
+        timeout: 0,
+        headers: { Accept: 'application/atom+xml;type=feed' },
+      } as never)) as { status?: number; data?: unknown };
+      return {
+        status: answered?.status,
+        text: typeof answered?.data === 'string' ? answered.data : '',
+      };
+    } catch (error) {
+      const status = (error as { response?: { status?: unknown } })?.response
+        ?.status;
+      return {
+        status: typeof status === 'number' ? status : undefined,
+        text: error instanceof Error ? error.message : String(error),
+      };
+    }
+  };
+
+  /** A read of a shared object's active source, as a status and its text. */
+  const sourceRead = (read: Answer): FixtureRead =>
+    read.isError
+      ? { status: 0, text: read.text }
+      : { status: 200, text: String(read.json?.source ?? '') };
+
   it(
-    'AMDP chain: start, break, steps, table, continue to the end; then a stop ends the event read',
+    'AMDP chain: start, break, table, steps, continue to the end; then a stop ends the event read',
     async () => {
       await tester.run(async () => {
-        softOnly('the AMDP probe is created in the soft run');
-        if (amdpReady) throw new Error(`SKIP: ${amdpReady}`);
+        softOnly('the AMDP chain drives the instance in process');
+        // The shared pair, read, never written: the case skips only where
+        // SAP's system information names a database system other than HANA.
+        const obj = plain();
+        const verdict = amdpGateVerdict({
+          systemInformation: await systemInformationRead(),
+          className: amdpClass,
+          classRead: sourceRead(
+            await call(obj, 'GetClass', { class_name: amdpClass }),
+          ),
+          ddlName: amdpDdl,
+          ddlRead: sourceRead(await call(obj, 'GetDdl', { ddl_name: amdpDdl })),
+        });
+        if ('skip' in verdict) throw new Error(`SKIP: ${verdict.skip}`);
+        if ('fail' in verdict) throw new Error(verdict.fail);
+        const tfLine = verdict.breakpointLine;
+
+        const before = ownedNow();
         const inst = newInstance();
         const events: any[] = [];
-        const until = async (handle: string, kinds: string[], rounds = 8) => {
+        let handle: string | undefined;
+        let failure: unknown;
+        const problems: string[] = [];
+        const until = async (kinds: string[], rounds = 8) => {
           const t0 = now();
           for (let i = 0; i < rounds; i++) {
             const a = await call(inst, 'AmdpDebugWait', {
@@ -1718,141 +1640,170 @@ describe('Debugger handlers (integration)', () => {
           return { ms: now() - t0 };
         };
 
-        const started = await call(inst, 'AmdpDebugStart', {
-          stop_existing: true,
-          breakpoints: [
-            { class_name: amdpClass, line: AMDP_LINE.loop },
-            { class_name: amdpClass, line: AMDP_LINE.tf },
-          ],
-          run: { kind: 'class', name: amdpClass },
-        });
-        timing('soft amdp.start(sync+run)', started.ms);
-        measure(
-          '7',
-          'AMDP start (states after SYNC_BREAKPOINTS)',
-          started.json ?? started.text.slice(0, 600),
-        );
-        expect(started.isError).toBe(false);
-        const handle = started.json.state_handle;
-
-        const first = await until(handle, ['ON_BREAK']);
-        timing('soft amdp.wait-until-break(run→break)', first.ms);
-        measure('7', 'first break', first.hit ?? first);
-        expect(first.hit?.line).toBe(AMDP_LINE.loop);
-
-        const overs: unknown[] = [];
-        for (let i = 0; i < repeats; i++) {
-          const step = await call(inst, 'AmdpDebugStep', {
-            state_handle: handle,
-            action: 'over',
+        try {
+          const started = await call(inst, 'AmdpDebugStart', {
+            stop_existing: false,
+            breakpoints: [{ class_name: amdpClass, line: tfLine }],
+            run: { kind: 'class', name: amdpClass },
           });
-          timing('soft amdp.step-over(call)', step.ms);
-          expect(step.isError).toBe(false);
-          const next = await until(handle, ['ON_BREAK', 'ON_EXECUTION_END']);
-          timing('soft amdp.step-over(call→next break)', step.ms + next.ms);
-          overs.push(
-            next.hit ? `${next.hit.kind}:${next.hit.line ?? ''}` : next,
+          timing('soft amdp.start(sync+run)', started.ms);
+          measure(
+            '7',
+            'AMDP start (states after SYNC_BREAKPOINTS)',
+            started.json ?? started.text.slice(0, 600),
           );
-          if (next.hit?.kind !== 'ON_BREAK') break;
-        }
-        measure('7', 'after each step over', overs);
+          if (typeof started.json?.state_handle === 'string')
+            handle = started.json.state_handle;
+          expect(started.isError).toBe(false);
 
-        // Continue from break to break. An ON_EXECUTION_END ends one debuggee; the table
-        // function is a debuggee of its own, so after an end the next break is waited for,
-        // not continued from. At the table function's second break its table holds a row.
-        let table: Answer | undefined;
-        let tfHits = 0;
-        let finished: any;
-        let executionEnds = 0;
-        let atBreak = true; // the step-overs left the procedure at a break
-        for (let i = 0; i < 24 && !finished; i++) {
-          let goMs = 0;
-          if (atBreak) {
-            const go = await call(inst, 'AmdpDebugStep', {
+          const first = await until(['ON_BREAK']);
+          timing('soft amdp.wait-until-break(run→break)', first.ms);
+          measure('7', 'first break', first.hit ?? first);
+          expect(first.hit?.line).toBe(tfLine);
+
+          // The table variable at the table function's break.
+          const table = await call(inst, 'AmdpDebugGetTable', {
+            state_handle: handle,
+            variable: 'LT_ROWS',
+          });
+          timing('soft amdp.get-table', table.ms);
+          measure(
+            '7',
+            'table variable at the table function',
+            table.json ?? table.text.slice(0, 600),
+          );
+          expect(table.isError).toBe(false);
+
+          const overs: unknown[] = [];
+          let atBreak = true;
+          for (let i = 0; i < repeats; i++) {
+            const step = await call(inst, 'AmdpDebugStep', {
               state_handle: handle,
-              action: 'continue',
+              action: 'over',
             });
-            if (go.isError) {
-              measure('7', 'continue refused', go.text.slice(0, 300));
+            timing('soft amdp.step-over(call)', step.ms);
+            expect(step.isError).toBe(false);
+            const next = await until(['ON_BREAK', 'ON_EXECUTION_END']);
+            timing('soft amdp.step-over(call→next break)', step.ms + next.ms);
+            overs.push(
+              next.hit ? `${next.hit.kind}:${next.hit.line ?? ''}` : next,
+            );
+            if (next.hit?.kind !== 'ON_BREAK') {
+              atBreak = false;
               break;
             }
-            goMs = go.ms;
-            atBreak = false;
           }
-          const t0 = now();
-          const a = await call(inst, 'AmdpDebugWait', {
-            state_handle: handle,
-            hold_seconds: 30,
-          });
-          if (a.isError) {
-            measure('7', 'wait failed', a.text.slice(0, 300));
-            break;
-          }
-          if (a.json?.state === 'ended') {
-            finished = a.json;
-            timing('soft amdp.wait(run_finished)', goMs + now() - t0);
-            break;
-          }
-          const batch: any[] = a.json?.events ?? [];
-          events.push(...batch);
-          for (const e of batch) {
-            if (e.kind === 'ON_EXECUTION_END') {
-              executionEnds++;
-              timing('soft amdp.continue→ON_EXECUTION_END', goMs + now() - t0);
-              measure('7', `ON_EXECUTION_END #${executionEnds}`, e);
+          measure('7', 'after each step over', overs);
+
+          // Continue from break to break until the run reports its end.
+          let finished: any;
+          let executionEnds = 0;
+          for (let i = 0; i < 24 && !finished; i++) {
+            let goMs = 0;
+            if (atBreak) {
+              const go = await call(inst, 'AmdpDebugStep', {
+                state_handle: handle,
+                action: 'continue',
+              });
+              if (go.isError) {
+                measure('7', 'continue refused', go.text.slice(0, 300));
+                break;
+              }
+              goMs = go.ms;
+              atBreak = false;
             }
-            if (e.kind === 'ON_BREAK') {
-              atBreak = true;
-              timing('soft amdp.continue→ON_BREAK', goMs + now() - t0);
-              if (e.line === AMDP_LINE.tf) {
-                tfHits++;
-                if (tfHits === 1)
-                  measure('7', 'first break in the table function', e);
+            const t0 = now();
+            const a = await call(inst, 'AmdpDebugWait', {
+              state_handle: handle,
+              hold_seconds: 30,
+            });
+            if (a.isError) {
+              measure('7', 'wait failed', a.text.slice(0, 300));
+              break;
+            }
+            if (a.json?.state === 'ended') {
+              finished = a.json;
+              timing('soft amdp.wait(run_finished)', goMs + now() - t0);
+              break;
+            }
+            const batch: any[] = a.json?.events ?? [];
+            events.push(...batch);
+            for (const e of batch) {
+              if (e.kind === 'ON_EXECUTION_END') {
+                executionEnds++;
+                timing(
+                  'soft amdp.continue→ON_EXECUTION_END',
+                  goMs + now() - t0,
+                );
+                measure('7', `ON_EXECUTION_END #${executionEnds}`, e);
+              }
+              if (e.kind === 'ON_BREAK') {
+                atBreak = true;
+                timing('soft amdp.continue→ON_BREAK', goMs + now() - t0);
               }
             }
           }
-          if (atBreak && tfHits === 2 && !table) {
-            table = await call(inst, 'AmdpDebugGetTable', {
-              state_handle: handle,
-              variable: 'LT_ROWS',
-            });
-            timing('soft amdp.get-table', table.ms);
+          measure('7', 'the run as reported', finished);
+          expect(finished?.reason).toBe('run_finished');
+          expect(String(finished?.run?.output)).toContain('rows 3');
+          measure(
+            '7',
+            'event kinds seen',
+            events.map((e) => e.kind),
+          );
+
+          // 6: does SAP end the open event read when the session is stopped?
+          const amdp = inst.debugger()?.amdp;
+          if (!amdp) throw new Error('the AMDP session has no debugger');
+          expect(amdp.holdsState()).toBe(true);
+          const stopAt = now();
+          const stop = await call(inst, 'AmdpDebugStop', {
+            state_handle: handle,
+          });
+          handle = undefined; // stopped: the cleanup's stop is not owed
+          timing('soft amdp.stop', stop.ms);
+          expect(stop.isError).toBe(false);
+          const bound = getTimeout('long') - 60_000;
+          while (amdp.holdsState() && now() - stopAt < bound) await pause(250);
+          measure('6', 'the event read after AmdpDebugStop', {
+            ended: !amdp.holdsState(),
+            ms_after_stop: Math.round(now() - stopAt),
+            failures: amdp.failures(),
+          });
+          expect(amdp.holdsState()).toBe(false);
+        } catch (error) {
+          failure = error;
+        } finally {
+          // Each step whatever the one before it did: the stop, the
+          // instance's shutdown, the logoff of what the server opened.
+          try {
+            if (handle !== undefined) {
+              const stopped = await call(inst, 'AmdpDebugStop', {
+                state_handle: handle,
+              });
+              if (stopped.isError)
+                problems.push(`AmdpDebugStop: ${stopped.text.slice(0, 600)}`);
+            }
+          } catch (error) {
+            problems.push(`AmdpDebugStop threw: ${String(error)}`);
+          } finally {
+            try {
+              const left = inst.state ? await inst.state.shutdown() : [];
+              if (left.length)
+                problems.push(`instance shutdown left: ${left.join('; ')}`);
+            } catch (error) {
+              problems.push(`instance shutdown threw: ${String(error)}`);
+            } finally {
+              problems.push(...(await logOffLeft(before, 'the AMDP chain')));
+            }
           }
         }
-        measure(
-          '7',
-          'table variable at the table function',
-          table ? (table.json ?? table.text.slice(0, 600)) : 'not reached',
-        );
-        expect(table?.isError).toBe(false);
-        measure('7', 'the run as reported', finished);
-        expect(finished?.reason).toBe('run_finished');
-        expect(String(finished?.run?.output)).toContain(AMDP_OUTPUT);
-        measure(
-          '7',
-          'event kinds seen',
-          events.map((e) => e.kind),
-        );
-
-        // 6: does SAP end the open event read when the session is stopped?
-        const dbg = inst.debugger();
-        if (!dbg) throw new Error('the AMDP session has no debugger');
-        const amdp = dbg.amdp;
-        expect(amdp.holdsState()).toBe(true);
-        const stopAt = now();
-        const stop = await call(inst, 'AmdpDebugStop', {
-          state_handle: handle,
-        });
-        timing('soft amdp.stop', stop.ms);
-        expect(stop.isError).toBe(false);
-        const bound = getTimeout('long') - 60_000;
-        while (amdp.holdsState() && now() - stopAt < bound) await pause(250);
-        measure('6', 'the event read after AmdpDebugStop', {
-          ended: !amdp.holdsState(),
-          ms_after_stop: Math.round(now() - stopAt),
-          failures: amdp.failures(),
-        });
-        expect(amdp.holdsState()).toBe(false);
+        if (failure !== undefined) {
+          if (problems.length)
+            measure('cleanup', 'the AMDP chain', problems.join('\n'));
+          throw failure;
+        }
+        if (problems.length) throw new Error(problems.join('\n'));
       });
     },
     getTimeout('long'),

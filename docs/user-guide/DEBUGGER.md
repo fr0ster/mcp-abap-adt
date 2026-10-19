@@ -55,7 +55,8 @@ is sent. An ABAP start answers the ids and the identity in force beside the hand
   MCP session; one conversation may open any number of MCP sessions, and the
   handle is how it finds its debug session again.
 - An unknown handle, and the handle of a session that has ended, get the same
-  answer: `state is not available`.
+  answer: `state is not available`. Over Streamable HTTP the pool gives it before any instance
+  is made: such a tool call logs on nowhere.
 - After a complete stop (`DebugStop`, the idle bound) the handle
   is invalid for good; the next start answers a new one. A stop that could not
   undo everything keeps the handle valid, so the stop can be retried.

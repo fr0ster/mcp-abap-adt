@@ -23,7 +23,10 @@
  */
 import type { IncomingHttpHeaders } from 'node:http';
 import { errorClassOf, failureOf } from '@mcp-abap-adt/lib/auth';
-import type { InstanceState } from '@mcp-abap-adt/lib/state';
+import {
+  type InstanceState,
+  StateUnavailableError,
+} from '@mcp-abap-adt/lib/state';
 
 export interface Poolable {
   readonly state: InstanceState;
@@ -207,8 +210,15 @@ export class InstancePool<T extends Poolable> {
     if (this.index.get(entry.handle) === entry) this.index.delete(entry.handle);
   }
 
+  /**
+   * `refuseUnknown` (a tool call): a handle that names no instance in the
+   * pool — never one, or one whose state ended — is refused here with
+   * `StateUnavailableError`, before any instance is made or anything logs
+   * on; the answer is the same whatever the handle was. Without a handle, a
+   * new instance as ever.
+   */
   async serve(
-    request: { handle?: string },
+    request: { handle?: string; refuseUnknown?: boolean },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
@@ -223,14 +233,20 @@ export class InstancePool<T extends Poolable> {
   }
 
   private route(
-    request: { handle?: string },
+    request: { handle?: string; refuseUnknown?: boolean },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
     const entry = request.handle ? this.byHandle(request.handle) : undefined;
     // The handle is a bearer secret: it reaches its instance whoever sends it.
-    // An unknown handle gets a new instance, which answers `state is not available`.
-    if (!entry) return this.run(create(), work);
+    // An unknown handle on a tool call is not available, answered here; on any
+    // other request (initialize, a list) it gets a new instance, which logs on
+    // nowhere until a tool call.
+    if (!entry) {
+      if (request.handle && request.refuseUnknown)
+        return Promise.reject(new StateUnavailableError());
+      return this.run(create(), work);
+    }
     const turn = entry.tail.then(() =>
       // Revalidate: the instance may have left the pool, be leaving it, or
       // have rotated its handle while this request waited.
@@ -238,7 +254,9 @@ export class InstancePool<T extends Poolable> {
       !this.evicting.has(entry.instance) &&
       entry.instance.stateHandle === request.handle
         ? this.run(entry.instance, work)
-        : this.run(create(), work),
+        : request.refuseUnknown
+          ? Promise.reject(new StateUnavailableError())
+          : this.run(create(), work),
     );
     entry.tail = turn.catch(() => undefined);
     return turn;

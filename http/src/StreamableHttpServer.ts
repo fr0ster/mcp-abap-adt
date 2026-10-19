@@ -31,6 +31,7 @@ import {
 import {
   HeldLocks,
   type StateLogger,
+  StateUnavailableError,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
@@ -248,7 +249,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
 
         await this.pool.serve(
-          { handle },
+          { handle, refuseUnknown: mcpMethod === 'tools/call' },
           () => this.createPerRequestServer(),
           async (server) => {
             // A client that left while this request waited for the lease gets nothing.
@@ -309,6 +310,20 @@ export class StreamableHttpServer extends BaseMcpServer {
       } catch (err) {
         if (err instanceof PoolClosedError) {
           if (!res.headersSent) res.status(503).send(POOL_CLOSED_WORDS);
+          return;
+        }
+        // A tool call whose handle names no state: the pool's answer, as a
+        // tool's — no instance was made, nothing logged on.
+        if (err instanceof StateUnavailableError) {
+          if (!res.headersSent)
+            res.status(200).json({
+              jsonrpc: '2.0',
+              id: mcpId ?? null,
+              result: {
+                content: [{ type: 'text', text: err.message }],
+                isError: true,
+              },
+            });
           return;
         }
         const answer = requestFailureAnswer(err);

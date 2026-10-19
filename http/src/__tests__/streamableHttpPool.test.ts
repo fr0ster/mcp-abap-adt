@@ -278,6 +278,79 @@ describe.each([
       expect(await echo).toEqual({ text: handle, isError: false });
     });
 
+    /** A tool call over its own client, the handle in `x-mcp-state-handle`; the logons it made. */
+    async function callWithHeader(name: string, handle: string, args: Args = {}) {
+      const transport = new StreamableHTTPClientTransport(url, {
+        requestInit: {
+          headers: { ...CREDENTIALS, 'x-mcp-state-handle': handle },
+        },
+      });
+      const client = new Client({ name: 'pool-test', version: '1.0.0' });
+      await client.connect(transport);
+      try {
+        const result = (await client.callTool({ name, arguments: args })) as {
+          content: Array<{ text: string }>;
+          isError?: boolean;
+        };
+        return { text: result.content[0]?.text ?? '', isError: !!result.isError };
+      } finally {
+        await client.close().catch(() => undefined);
+      }
+    }
+    const logons = () =>
+      (
+        BaseMcpServer.prototype as unknown as {
+          getConnection: jest.Mock;
+        }
+      ).getConnection.mock.calls.length;
+    const instancesMade = () =>
+      jest.spyOn(
+        server as unknown as { createPerRequestServer: () => unknown },
+        'createPerRequestServer',
+      );
+
+    it.each([
+      ['an unknown handle', async () => 'F'.repeat(32)],
+      [
+        'the handle of a state that ended',
+        async () => {
+          const handle = await hold();
+          await call('PoolProbeRelease', { state_handle: handle });
+          return handle;
+        },
+      ],
+    ])(
+      '%s on a tool call: not available, answered by the pool — no logon',
+      async (_name, handleOf) => {
+        const handle = await handleOf();
+        const made = instancesMade();
+        const before = logons();
+        const byArgument = await call('PoolProbeEcho', { state_handle: handle });
+        expect(byArgument).toEqual({
+          text: 'state is not available',
+          isError: true,
+        });
+        const byHeader = await callWithHeader('PoolProbeEcho', handle, {
+          state_handle: handle,
+        });
+        expect(byHeader).toEqual({
+          text: 'state is not available',
+          isError: true,
+        });
+        // No logon for either tool call: the pool answered them.
+        expect(logons()).toBe(before);
+        made.mockRestore();
+      },
+    );
+
+    it('a tool call without a handle still gets an instance', async () => {
+      const made = instancesMade();
+      const handle = await hold();
+      expect(handle).toMatch(/^[0-9A-F]{32}$/);
+      expect(made).toHaveBeenCalled();
+      made.mockRestore();
+    });
+
     it('stop() disposes the instance that holds state', async () => {
       await hold();
       const part = allParts[allParts.length - 1];

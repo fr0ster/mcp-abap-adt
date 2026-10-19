@@ -7,8 +7,16 @@
  * Each pair is the one adt-clients 35.0.0 sent from its modern client
  * (`docs/usage/MIGRATION-36.md`, "The pairs 35.0.0 sent"); where 35.0.0 sent
  * one header or none, the pair is the one measured there ("The completed
- * pairs, measured"). What a system answers `406`/`415` to is corrected per
- * system (`AdtHeaderPairs`, `withAdtHeaders`).
+ * pairs, measured"); where SAP refuses the pair 35.0.0 sent, the pair is the
+ * corrected one ("The corrected pairs, measured": the enhancement's `check`).
+ * What a system answers `406`/`415` to is corrected per system
+ * (`AdtHeaderPairs`, `withAdtHeaders`).
+ *
+ * Not here: the members that take no pair, whose headers adt-clients
+ * hard-codes — the feature toggle's `validate` (`IAdtValidatable`, Accept
+ * `application/vnd.sap.as+xml` since 36.0.2) and the application log's
+ * `getObject` / `getSource` (Accept `application/vnd.sap.adt.blues.v1+xml` /
+ * `application/json` since 36.0.2).
  */
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 
@@ -238,9 +246,14 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/xml',
     'application/vnd.sap.adt.activation+xml',
   ),
+  // Not the pair 35.0.0 sent: `application/vnd.sap.adt.checkrun.v1+xml` as
+  // both headers is refused `415` ("Supported Media Types:
+  // application/vnd.sap.adt.checkobjects+xml"). adt-clients 36.0.2 sends the
+  // `chkrun:checkObjectList` every other check sends, under this pair
+  // (MIGRATION-36, "The corrected pairs, measured": `200` on premise).
   'enhancement.check': pair(
-    'application/vnd.sap.adt.checkrun.v1+xml',
-    'application/vnd.sap.adt.checkrun.v1+xml',
+    'application/vnd.sap.adt.checkmessages+xml',
+    'application/vnd.sap.adt.checkobjects+xml',
   ),
   'enhancement.checkDeletion': pair(
     'application/vnd.sap.adt.deletion.check.response.v1+xml',

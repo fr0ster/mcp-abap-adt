@@ -7,11 +7,11 @@ operation, and the pair a system named in a `406` / `415`, kept for that system.
 describes the members, the default pairs, how the library sends and corrects them, and what an
 embedder and a direct adt-clients consumer do.
 
-Versions: `@mcp-abap-adt/adt-clients` `^36.0.1`, `@mcp-abap-adt/interfaces-adt` `^20.0.0`,
+Versions: `@mcp-abap-adt/adt-clients` `^36.0.2`, `@mcp-abap-adt/interfaces-adt` `^20.0.0`,
 `@mcp-abap-adt/adt-strategies` `^0.13.0`, `@mcp-abap-adt/lib` 19.0.0. The source of every pair
 below is adt-clients' `docs/usage/MIGRATION-36.md` (shipped in the package,
-`node_modules/@mcp-abap-adt/adt-clients/docs/usage/MIGRATION-36.md`): its tables "The pairs 35.0.0 sent" and "The completed pairs,
-measured".
+`node_modules/@mcp-abap-adt/adt-clients/docs/usage/MIGRATION-36.md`): its tables "The pairs 35.0.0 sent", "The completed pairs,
+measured" and "The corrected pairs, measured".
 
 ## The members that take a header pair
 
@@ -51,6 +51,16 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
   lists, sent to an on-premise system and accepted ("measured"); the column shows what 35.0.0
   sent. The feature toggle's `update` is completed but not measured (the system refused to create
   a toggle).
+- **Where SAP refuses the pair 35.0.0 sent**, the default is the corrected pair MIGRATION-36
+  lists ("The corrected pairs, measured"): the enhancement's `check`, whose
+  `application/vnd.sap.adt.checkrun.v1+xml` pair is refused `415`. It goes with the request document
+  adt-clients 36.0.2 sends, so the server requires `^36.0.2`.
+- **Members with no pair** keep the headers adt-clients hard-codes, and have no entry here. Since
+  36.0.2 the feature toggle's `validate` (`POST /sap/bc/adt/sfw/featuretoggles/validation`,
+  `IAdtValidatable`, which takes no headers) sends Accept `application/vnd.sap.as+xml`, and the
+  application log's `getObject` / `getSource` (`GET /sap/bc/adt/applicationlog/objects/{name}`,
+  `…/source/main`) send Accept `application/vnd.sap.adt.blues.v1+xml` / `application/json`;
+  `application/xml` was refused `406`. The server calls none of the three.
 - **The older pairs** of the legacy client (`AdtClientLegacy`, `AdtContentTypesBase`, not
   Unicode — `application/vnd.sap.adt.oo.classes+xml`, `application/vnd.sap.adt.programs.programs+xml`,
   `application/vnd.sap.adt.functions.groups+xml`, `text/plain`, …) are not defaults: the library
@@ -192,7 +202,7 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
 | Member | Accept | Content-Type | Source |
 |---|---|---|---|
 | `activate` | `application/xml` | `application/vnd.sap.adt.activation+xml` | 35.0.0 |
-| `check` | `application/vnd.sap.adt.checkrun.v1+xml` | `application/vnd.sap.adt.checkrun.v1+xml` | 35.0.0 |
+| `check` | `application/vnd.sap.adt.checkmessages+xml` | `application/vnd.sap.adt.checkobjects+xml` | corrected, measured (35.0.0 sent `application/vnd.sap.adt.checkrun.v1+xml` as both, refused `415`; adt-clients 36.0.2 sends the `chkrun:checkObjectList` document under this pair) |
 | `checkDeletion` | `application/vnd.sap.adt.deletion.check.response.v1+xml` | `application/vnd.sap.adt.deletion.check.request.v1+xml` | 35.0.0 |
 | `create` | `application/vnd.sap.adt.enh.enhoxhh.v3+xml` | `application/vnd.sap.adt.enh.enhoxhh.v3+xml` | 35.0.0 |
 | `delete` | `application/vnd.sap.adt.deletion.response.v1+xml` | `application/vnd.sap.adt.deletion.request.v1+xml` | 35.0.0 |

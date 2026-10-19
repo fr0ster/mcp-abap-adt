@@ -30,6 +30,7 @@ import {
 } from '@mcp-abap-adt/lib/request-context';
 import {
   HeldLocks,
+  STATE_UNAVAILABLE_WORDS,
   type StateLogger,
   StateUnavailableError,
   stateLoggerOf,
@@ -320,7 +321,7 @@ export class StreamableHttpServer extends BaseMcpServer {
               jsonrpc: '2.0',
               id: mcpId ?? null,
               result: {
-                content: [{ type: 'text', text: err.message }],
+                content: [{ type: 'text', text: STATE_UNAVAILABLE_WORDS }],
                 isError: true,
               },
             });

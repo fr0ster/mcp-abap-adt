@@ -27,9 +27,12 @@ export interface StatePart {
 }
 
 /** An unknown handle and a handle whose state is gone get this one answer. */
+/** The answer to a handle that names no state: unknown, or ended, alike. */
+export const STATE_UNAVAILABLE_WORDS = 'state is not available';
+
 export class StateUnavailableError extends Error {
   constructor() {
-    super('state is not available');
+    super(STATE_UNAVAILABLE_WORDS);
     this.name = 'StateUnavailableError';
   }
 }

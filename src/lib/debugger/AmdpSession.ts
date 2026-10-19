@@ -526,7 +526,12 @@ export class AmdpSession<O = unknown> {
       if (stopped.ok) open.stopped = true;
       else failures.push(failedEntry(stopped, 'stop'));
     }
-    if (failures.length || !open.readDone) return failures; // kept: retried by stop(), or finished by the read loop
+    // A stopped session owes no breakpoint clear: SAP removes a breakpoint
+    // left behind on its own. A refused clear is answered, and nothing is
+    // kept open for it.
+    if (open.stopped) open.cleared = true;
+    const owed = failures.filter((f) => f.step !== 'clear breakpoints');
+    if (owed.length || !open.readDone) return failures; // kept: retried by stop(), or finished by the read loop
     // Done with the session; a connection whose close throws stays in `unclosed` for the next stop.
     this.closing = undefined;
     await this.closeOrKeep(open.events, "the events' connection", failures);

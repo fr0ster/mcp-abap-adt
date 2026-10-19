@@ -575,7 +575,9 @@ ends by:
   entry the method's error as it is with its step (`release the debuggee`, `stop listener`,
   `delete breakpoint <id>`, `close the listener's connection`, `clear breakpoints`, `stop`,
   …), and SAP's final refusal of the listener's stop is a note in the same shape, the
-  breakpoints it leaves on the system named under its `cleanup`; a start that failed and could
+  breakpoints it leaves on the system named under its `cleanup`. An AMDP session whose stop SAP
+  accepted owes no breakpoint clear: a refused `clear breakpoints` is answered, and both of its
+  connections are logged off all the same (SAP removes a breakpoint left behind on its own); a start that failed and could
   not undo everything answers what it could not undo the same way, under `cleanup.failures`;
   the handle stays valid, the
   identity (mode, request user) and the settings stay, and a new start is

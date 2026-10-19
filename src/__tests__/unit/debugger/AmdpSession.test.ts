@@ -291,7 +291,7 @@ describe('AmdpSession', () => {
     });
   });
 
-  it('a breakpoint clear that fails survives the last batch and is retried by the next stop', async () => {
+  it('a breakpoint clear that fails after an accepted stop is answered, and both connections are closed: nothing is kept for it', async () => {
     const w = await started();
     const realSync = w.dbg.syncBreakpoints;
     let refusedClears = 0;
@@ -301,11 +301,29 @@ describe('AmdpSession', () => {
       return refusedResponse('clear refused');
     };
     await expect(w.session.stop()).rejects.toThrow(/clear refused/);
-    await until(() => refusedClears === 2); // the last batch's own attempt failed too
+    expect(w.calls).toContain('stop');
+    // The stop was accepted: the last batch closes both, the clear not sent again.
+    await until(() => w.closed.length === 2);
     await until(() => !w.session.pending());
-    expect(w.session.holdsState()).toBe(true); // not closed: the clear is still owed
+    expect(refusedClears).toBe(1);
+    expect(w.session.holdsState()).toBe(false);
+    await w.session.stop();
+    expect(refusedClears).toBe(1);
+    expect(w.closed).toHaveLength(2);
+  });
+
+  it('a breakpoint clear that fails before a refused stop keeps both connections, and the next stop retries both', async () => {
+    const w = await started();
+    const realSync = w.dbg.syncBreakpoints;
+    const realStop = w.dbg.stop;
+    w.dbg.syncBreakpoints = async (m: string, b: any[]) =>
+      b.length ? realSync(m, b) : refusedResponse('clear refused');
+    w.dbg.stop = async () => refusedResponse('not stopped');
+    await expect(w.session.stop()).rejects.toThrow(/clear refused/);
     expect(w.closed).toHaveLength(0);
+    expect(w.session.holdsState()).toBe(true);
     w.dbg.syncBreakpoints = realSync;
+    w.dbg.stop = realStop;
     await w.session.stop();
     expect(w.session.holdsState()).toBe(false);
     expect(w.closed).toHaveLength(2);

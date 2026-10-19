@@ -493,6 +493,36 @@ async function serve(kind: Kind): Promise<Served> {
 /** The line the debugger batch stops at in the shared class: inside its loop. */
 const STOP_TEXT = 'lv_x = sy-index mod 100.';
 
+/**
+ * The opt-in variant without the debugger batch (`DEBUGGER_BATCH_VARIANT=nobatch`):
+ * the same calls at the stop, each an ordinary call, answered at once.
+ */
+const NO_BATCH = process.env.DEBUGGER_BATCH_VARIANT === 'nobatch';
+
+/** Each call made in turn; its answer as a numbered entry, as `BatchAnswers` gives them. */
+async function callEach(
+  served: Served,
+  calls: Array<{ tool: string; args: Record<string, unknown> }>,
+  kind: Kind,
+  label: string,
+): Promise<Entry[]> {
+  const entries: Entry[] = [];
+  for (const [index, { tool, args }] of calls.entries()) {
+    const answered = await served.call(tool, args);
+    const entry: Entry = {
+      number: index + 1,
+      ...(answered.content !== undefined ? { content: answered.content } : {}),
+      ...(answered.isError === true ? { isError: true } : {}),
+    };
+    say(kind, `${label}answer #${entry.number} (${tool}, no batch)`, {
+      isError: entry.isError === true,
+      answer: payloadOf(entry) ?? textOf(entry),
+    });
+    entries.push(entry);
+  }
+  return entries;
+}
+
 async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
   const params = testCase.params ?? {};
   const className = String(
@@ -559,12 +589,6 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
     expect(stopped?.at?.address?.line).toBe(stopLine);
     expect(stopped?.at?.address?.object_name).toBe(className);
 
-    const begun = await served.call('DebugBatchBegin', {});
-    say(kind, 'begin', textOf(begun));
-    expect(begun.isError).not.toBe(true);
-    expect(payloadOf(begun)?.debug_batch).toBe('on');
-    batchOpen = true;
-
     const calls: Array<{ tool: string; args: Record<string, unknown> }> = [
       { tool: 'DebugStep', args: { state_handle: handle, action: 'over' } },
       { tool: 'DebugGetStack', args: { state_handle: handle } },
@@ -573,37 +597,48 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
         args: { state_handle: handle, names: ['LV_X'] },
       },
     ];
-    const recordedAt = process.hrtime.bigint();
-    for (const { tool, args } of calls) {
-      const recorded = await served.call(tool, args);
-      if (recorded.isError === true || (recorded.content ?? []).length > 0) {
-        throw new Error(
-          `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
-        );
+    let entries: Entry[];
+    if (NO_BATCH) {
+      // The variant without the debugger batch: each an ordinary call.
+      entries = await callEach(served, calls, kind, '');
+    } else {
+      const begun = await served.call('DebugBatchBegin', {});
+      say(kind, 'begin', textOf(begun));
+      expect(begun.isError).not.toBe(true);
+      expect(payloadOf(begun)?.debug_batch).toBe('on');
+      batchOpen = true;
+      const recordedAt = process.hrtime.bigint();
+      for (const { tool, args } of calls) {
+        const recorded = await served.call(tool, args);
+        if (recorded.isError === true || (recorded.content ?? []).length > 0) {
+          throw new Error(
+            `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
+          );
+        }
       }
-    }
-    const endAt = process.hrtime.bigint();
-    const ended = await served.call('DebugBatchEnd', {});
-    const endedAt = process.hrtime.bigint();
-    batchOpen = false;
-    const summary = payloadOf(ended) ?? {};
-    say(kind, 'end', {
-      summary,
-      record_ms: Math.round(Number(endAt - recordedAt) / 1e6),
-      end_ms: Math.round(Number(endedAt - endAt) / 1e6),
-    });
-    expect(ended.isError).not.toBe(true);
-    expect(summary.recorded).toBe(calls.length);
-    expect(summary.came).toBeUndefined();
-
-    const entries = (payloadOf(
-      await served.call('BatchAnswers', { numbers: [1, 2, 3] }),
-    ) ?? []) as Entry[];
-    for (const entry of entries) {
-      say(kind, `answer #${entry.number}`, {
-        isError: entry.isError === true,
-        answer: payloadOf(entry) ?? textOf(entry),
+      const endAt = process.hrtime.bigint();
+      const ended = await served.call('DebugBatchEnd', {});
+      const endedAt = process.hrtime.bigint();
+      batchOpen = false;
+      const summary = payloadOf(ended) ?? {};
+      say(kind, 'end', {
+        summary,
+        record_ms: Math.round(Number(endAt - recordedAt) / 1e6),
+        end_ms: Math.round(Number(endedAt - endAt) / 1e6),
       });
+      expect(ended.isError).not.toBe(true);
+      expect(summary.recorded).toBe(calls.length);
+      expect(summary.came).toBeUndefined();
+      expect(summary.failed).toEqual([]);
+      entries = (payloadOf(
+        await served.call('BatchAnswers', { numbers: [1, 2, 3] }),
+      ) ?? []) as Entry[];
+      for (const entry of entries) {
+        say(kind, `answer #${entry.number}`, {
+          isError: entry.isError === true,
+          answer: payloadOf(entry) ?? textOf(entry),
+        });
+      }
     }
     expect(entries.map((entry) => entry.number)).toEqual([1, 2, 3]);
     const failed = entries.filter((entry) => entry.isError === true);
@@ -617,7 +652,6 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
           .join('\n'),
       );
     }
-    expect(summary.failed).toEqual([]);
 
     // 1: the step answered, the program not ended by it.
     expect(payloadOf(entries[0])?.state).not.toBe('ended');
@@ -1022,12 +1056,6 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
     say(kind, 'amdp break', { line: onBreak?.line });
     expect(onBreak?.line).toBe(tfLine);
 
-    const begun = await served.call('DebugBatchBegin', {});
-    say(kind, 'amdp begin', textOf(begun));
-    expect(begun.isError).not.toBe(true);
-    expect(payloadOf(begun)?.debug_batch).toBe('on');
-    batchOpen = true;
-
     const calls: Array<{ tool: string; args: Record<string, unknown> }> = [
       {
         tool: 'AmdpDebugGetTable',
@@ -1035,35 +1063,46 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       },
       { tool: 'AmdpDebugStep', args: { state_handle: handle, action: 'over' } },
     ];
-    for (const { tool, args } of calls) {
-      const recorded = await served.call(tool, args);
-      if (recorded.isError === true || (recorded.content ?? []).length > 0) {
-        throw new Error(
-          `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
-        );
+    let entries: Entry[];
+    if (NO_BATCH) {
+      // The variant without the debugger batch: each an ordinary call.
+      entries = await callEach(served, calls, kind, 'amdp ');
+    } else {
+      const begun = await served.call('DebugBatchBegin', {});
+      say(kind, 'amdp begin', textOf(begun));
+      expect(begun.isError).not.toBe(true);
+      expect(payloadOf(begun)?.debug_batch).toBe('on');
+      batchOpen = true;
+      for (const { tool, args } of calls) {
+        const recorded = await served.call(tool, args);
+        if (recorded.isError === true || (recorded.content ?? []).length > 0) {
+          throw new Error(
+            `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
+          );
+        }
       }
-    }
-    const endAt = process.hrtime.bigint();
-    const ended = await served.call('DebugBatchEnd', {});
-    const endedAt = process.hrtime.bigint();
-    batchOpen = false;
-    const summary = payloadOf(ended) ?? {};
-    say(kind, 'amdp end', {
-      summary,
-      end_ms: Math.round(Number(endedAt - endAt) / 1e6),
-    });
-    expect(ended.isError).not.toBe(true);
-    expect(summary.recorded).toBe(calls.length);
-    expect(summary.came).toBeUndefined();
-
-    const entries = (payloadOf(
-      await served.call('BatchAnswers', { numbers: [1, 2] }),
-    ) ?? []) as Entry[];
-    for (const entry of entries) {
-      say(kind, `amdp answer #${entry.number}`, {
-        isError: entry.isError === true,
-        answer: payloadOf(entry) ?? textOf(entry),
+      const endAt = process.hrtime.bigint();
+      const ended = await served.call('DebugBatchEnd', {});
+      const endedAt = process.hrtime.bigint();
+      batchOpen = false;
+      const summary = payloadOf(ended) ?? {};
+      say(kind, 'amdp end', {
+        summary,
+        end_ms: Math.round(Number(endedAt - endAt) / 1e6),
       });
+      expect(ended.isError).not.toBe(true);
+      expect(summary.recorded).toBe(calls.length);
+      expect(summary.came).toBeUndefined();
+      expect(summary.failed).toEqual([]);
+      entries = (payloadOf(
+        await served.call('BatchAnswers', { numbers: [1, 2] }),
+      ) ?? []) as Entry[];
+      for (const entry of entries) {
+        say(kind, `amdp answer #${entry.number}`, {
+          isError: entry.isError === true,
+          answer: payloadOf(entry) ?? textOf(entry),
+        });
+      }
     }
     expect(entries.map((entry) => entry.number)).toEqual([1, 2]);
     const failed = entries.filter((entry) => entry.isError === true);
@@ -1077,7 +1116,6 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
           .join('\n'),
       );
     }
-    expect(summary.failed).toEqual([]);
     // 1: the rows of the table variable.
     expect(Array.isArray(payloadOf(entries[0]))).toBe(true);
     // 2: the step answered.

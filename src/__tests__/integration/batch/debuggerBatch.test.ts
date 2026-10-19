@@ -493,36 +493,6 @@ async function serve(kind: Kind): Promise<Served> {
 /** The line the debugger batch stops at in the shared class: inside its loop. */
 const STOP_TEXT = 'lv_x = sy-index mod 100.';
 
-/**
- * The opt-in variant without the debugger batch (`DEBUGGER_BATCH_VARIANT=nobatch`):
- * the same calls at the stop, each an ordinary call, answered at once.
- */
-const NO_BATCH = process.env.DEBUGGER_BATCH_VARIANT === 'nobatch';
-
-/** Each call made in turn; its answer as a numbered entry, as `BatchAnswers` gives them. */
-async function callEach(
-  served: Served,
-  calls: Array<{ tool: string; args: Record<string, unknown> }>,
-  kind: Kind,
-  label: string,
-): Promise<Entry[]> {
-  const entries: Entry[] = [];
-  for (const [index, { tool, args }] of calls.entries()) {
-    const answered = await served.call(tool, args);
-    const entry: Entry = {
-      number: index + 1,
-      ...(answered.content !== undefined ? { content: answered.content } : {}),
-      ...(answered.isError === true ? { isError: true } : {}),
-    };
-    say(kind, `${label}answer #${entry.number} (${tool}, no batch)`, {
-      isError: entry.isError === true,
-      answer: payloadOf(entry) ?? textOf(entry),
-    });
-    entries.push(entry);
-  }
-  return entries;
-}
-
 async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
   const params = testCase.params ?? {};
   const className = String(
@@ -597,48 +567,42 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
         args: { state_handle: handle, names: ['LV_X'] },
       },
     ];
-    let entries: Entry[];
-    if (NO_BATCH) {
-      // The variant without the debugger batch: each an ordinary call.
-      entries = await callEach(served, calls, kind, '');
-    } else {
-      const begun = await served.call('DebugBatchBegin', {});
-      say(kind, 'begin', textOf(begun));
-      expect(begun.isError).not.toBe(true);
-      expect(payloadOf(begun)?.debug_batch).toBe('on');
-      batchOpen = true;
-      const recordedAt = process.hrtime.bigint();
-      for (const { tool, args } of calls) {
-        const recorded = await served.call(tool, args);
-        if (recorded.isError === true || (recorded.content ?? []).length > 0) {
-          throw new Error(
-            `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
-          );
-        }
+    const begun = await served.call('DebugBatchBegin', {});
+    say(kind, 'begin', textOf(begun));
+    expect(begun.isError).not.toBe(true);
+    expect(payloadOf(begun)?.debug_batch).toBe('on');
+    batchOpen = true;
+    const recordedAt = process.hrtime.bigint();
+    for (const { tool, args } of calls) {
+      const recorded = await served.call(tool, args);
+      if (recorded.isError === true || (recorded.content ?? []).length > 0) {
+        throw new Error(
+          `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
+        );
       }
-      const endAt = process.hrtime.bigint();
-      const ended = await served.call('DebugBatchEnd', {});
-      const endedAt = process.hrtime.bigint();
-      batchOpen = false;
-      const summary = payloadOf(ended) ?? {};
-      say(kind, 'end', {
-        summary,
-        record_ms: Math.round(Number(endAt - recordedAt) / 1e6),
-        end_ms: Math.round(Number(endedAt - endAt) / 1e6),
+    }
+    const endAt = process.hrtime.bigint();
+    const ended = await served.call('DebugBatchEnd', {});
+    const endedAt = process.hrtime.bigint();
+    batchOpen = false;
+    const summary = payloadOf(ended) ?? {};
+    say(kind, 'end', {
+      summary,
+      record_ms: Math.round(Number(endAt - recordedAt) / 1e6),
+      end_ms: Math.round(Number(endedAt - endAt) / 1e6),
+    });
+    expect(ended.isError).not.toBe(true);
+    expect(summary.recorded).toBe(calls.length);
+    expect(summary.came).toBeUndefined();
+    expect(summary.failed).toEqual([]);
+    const entries = (payloadOf(
+      await served.call('BatchAnswers', { numbers: [1, 2, 3] }),
+    ) ?? []) as Entry[];
+    for (const entry of entries) {
+      say(kind, `answer #${entry.number}`, {
+        isError: entry.isError === true,
+        answer: payloadOf(entry) ?? textOf(entry),
       });
-      expect(ended.isError).not.toBe(true);
-      expect(summary.recorded).toBe(calls.length);
-      expect(summary.came).toBeUndefined();
-      expect(summary.failed).toEqual([]);
-      entries = (payloadOf(
-        await served.call('BatchAnswers', { numbers: [1, 2, 3] }),
-      ) ?? []) as Entry[];
-      for (const entry of entries) {
-        say(kind, `answer #${entry.number}`, {
-          isError: entry.isError === true,
-          answer: payloadOf(entry) ?? textOf(entry),
-        });
-      }
     }
     expect(entries.map((entry) => entry.number)).toEqual([1, 2, 3]);
     const failed = entries.filter((entry) => entry.isError === true);
@@ -776,209 +740,6 @@ function fixtureRead(read: Local): FixtureRead {
   return { status: 200, text: String(read.json?.source ?? '') };
 }
 
-/**
- * Which diagnostic variant of the AMDP case an owner's run asks for
- * (`DEBUGGER_BATCH_AMDP_VARIANT`): `R1` — the debuggee cancelled and its end
- * awaited before the stop. Unset: the AMDP debugger batch case as always.
- */
-const AMDP_VARIANT = process.env.DEBUGGER_BATCH_AMDP_VARIANT;
-
-/** The bound on one pause of a diagnostic run: then it goes on, saying so. */
-const PAUSE_MAX_MS = 30 * 60_000;
-
-/** A step's moment, local and UTC, on stderr. */
-function stamp(kind: Kind, what: string): void {
-  const now = new Date();
-  const offset = -now.getTimezoneOffset();
-  const local = new Date(now.getTime() + offset * 60_000)
-    .toISOString()
-    .replace('T', ' ')
-    .slice(0, 19);
-  const sign = offset >= 0 ? '+' : '-';
-  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
-  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
-  const utc = now.toISOString().replace('T', ' ').slice(0, 19);
-  process.stderr.write(
-    `debugger-batch-live\t${kind}\tstep\t${what}\tlocal ${local} ${sign}${hh}${mm}\tUTC ${utc}\n`,
-  );
-}
-
-/**
- * Waits until the release file of `name` exists (`touch` it), at most
- * `PAUSE_MAX_MS`. The file's directory: `DEBUGGER_BATCH_RELEASE_DIR`, else
- * the system's temp directory. A file left from an earlier run is removed
- * first.
- */
-async function pauseAt(kind: Kind, name: string): Promise<void> {
-  const dir = process.env.DEBUGGER_BATCH_RELEASE_DIR ?? os.tmpdir();
-  const file = path.join(dir, `debugger-batch-release-${name}`);
-  fs.rmSync(file, { force: true });
-  stamp(kind, `PAUSE ${name}`);
-  process.stderr.write(
-    `debugger-batch-live\t${kind}\tPAUSE ${name}\ttouch ${file} to go on\n`,
-  );
-  const until = Date.now() + PAUSE_MAX_MS;
-  while (!fs.existsSync(file) && Date.now() < until)
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  stamp(
-    kind,
-    fs.existsSync(file)
-      ? `released ${name}`
-      : `PAUSE ${name} ended after ${PAUSE_MAX_MS / 60_000} minutes unreleased`,
-  );
-}
-
-/** The session trace so far, one line. */
-function traceNow(kind: Kind, what: string, served: Served): void {
-  process.stderr.write(
-    `debugger-batch-live\t${kind}\t${what}\t${JSON.stringify(readSessionTrace(served.sessionTrace()))}\n`,
-  );
-}
-
-/**
- * Diagnostic R1 (owner's run, `DEBUGGER_BATCH_AMDP_VARIANT=R1`, session
- * trace on): at the AMDP break the debuggee is cancelled (`AmdpDebugCancel`)
- * and its end awaited — its `ON_EXECUTION_END` and the run's end — before
- * the stop. PAUSE A after the cancel finished; `AmdpDebugStop` (it returns
- * once the STOP event's last batch logged off the events and commands
- * sessions), the logoffs' answers awaited a moment; PAUSE B; the server's
- * exit; PAUSE C. Each step is stamped local and UTC; the owner reads SM04
- * and SM05 at each pause.
- */
-async function amdpR1On(kind: Kind, testCase: any): Promise<void> {
-  const params = testCase.params ?? {};
-  const cls = String(params.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
-  const ddl = String(params.amdp_ddl ?? 'ZMCP_SHR_DBG_TF').toUpperCase();
-  const logger = createTestLogger('debugger-batch-amdp');
-  const { connection } = await createTestConnectionAndSession();
-  const plain = createHandlerContext({ connection, logger });
-  const verdict = amdpGateVerdict({
-    systemInformation: await readSystemInformation(connection),
-    className: cls,
-    classRead: fixtureRead(
-      await local(handleGetClass, plain, { class_name: cls }),
-    ),
-    ddlName: ddl,
-    ddlRead: fixtureRead(await local(handleGetDdl, plain, { ddl_name: ddl })),
-  });
-  if ('skip' in verdict) {
-    say(kind, 'amdp skipped', verdict.skip);
-    return;
-  }
-  if ('fail' in verdict) throw new Error(verdict.fail);
-
-  const served = await serve(kind);
-  let handle: string | undefined;
-  let stopped = false;
-  let failure: unknown;
-  const wait = async () =>
-    served.call('AmdpDebugWait', { state_handle: handle, hold_seconds: 30 });
-  try {
-    stamp(kind, 'AmdpDebugStart');
-    const started = await served.call('AmdpDebugStart', {
-      stop_existing: false,
-      breakpoints: [{ class_name: cls, line: verdict.breakpointLine }],
-      run: { kind: 'class', name: cls },
-    });
-    const start = payloadOf(started);
-    if (typeof start?.state_handle === 'string') handle = start.state_handle;
-    say(kind, 'amdp start', {
-      isError: started.isError === true,
-      answer:
-        started.isError === true
-          ? withoutHandles(textOf(started)).slice(0, 600)
-          : undefined,
-    });
-    expect(started.isError).not.toBe(true);
-
-    let onBreak: any;
-    for (let round = 0; round < 8 && onBreak === undefined; round++) {
-      const waited = payloadOf(await wait());
-      onBreak = (waited?.events ?? []).find((e: any) => e?.kind === 'ON_BREAK');
-    }
-    stamp(kind, `ON_BREAK line ${onBreak?.line}`);
-    expect(onBreak?.line).toBe(verdict.breakpointLine);
-
-    // The cancel, and its end: ON_EXECUTION_END and the run's own end.
-    stamp(kind, 'AmdpDebugCancel');
-    const cancelled = await served.call('AmdpDebugCancel', {
-      state_handle: handle,
-    });
-    say(kind, 'amdp cancel', withoutHandles(textOf(cancelled)).slice(0, 600));
-    expect(cancelled.isError).not.toBe(true);
-    const seen: string[] = [];
-    let runEnded: any;
-    for (let round = 0; round < 12 && runEnded === undefined; round++) {
-      const waited = payloadOf(await wait());
-      if (waited?.state === 'ended') runEnded = waited;
-      for (const e of waited?.events ?? []) {
-        seen.push(String(e?.kind));
-        stamp(kind, `event ${e?.kind}`);
-      }
-    }
-    say(kind, 'amdp after the cancel', {
-      events: seen,
-      run: runEnded?.run,
-    });
-    traceNow(kind, 'session trace at A', served);
-    await pauseAt(kind, 'A');
-
-    stamp(kind, 'AmdpDebugStop');
-    const stop = await served.call('AmdpDebugStop', { state_handle: handle });
-    stamp(kind, 'AmdpDebugStop answered');
-    say(kind, 'AmdpDebugStop', withoutHandles(textOf(stop)));
-    expect(stop.isError).not.toBe(true);
-    stopped = true;
-    // The logoffs' answers, a moment: what SAP said to each.
-    for (let i = 0; i < 20; i++) {
-      const trace = readSessionTrace(served.sessionTrace());
-      if (
-        trace.sessions.every(
-          (s) => !s.logged_off || s.logoff?.status !== 'no answer',
-        )
-      )
-        break;
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-    traceNow(kind, 'session trace at B', served);
-    await pauseAt(kind, 'B');
-  } catch (error) {
-    failure = error;
-  } finally {
-    const problems: string[] = [];
-    try {
-      if (handle !== undefined && !stopped) {
-        const again = await served.call('AmdpDebugStop', {
-          state_handle: handle,
-        });
-        if (again.isError === true)
-          problems.push(
-            `AmdpDebugStop: ${withoutHandles(textOf(again)).slice(0, 600)}`,
-          );
-      }
-    } catch (error) {
-      problems.push(`AmdpDebugStop threw: ${withoutHandles(String(error))}`);
-    } finally {
-      stamp(kind, 'server exit begins');
-      const code = await served.stop();
-      stamp(kind, `server exited ${code}`);
-      if (code !== 0) problems.push(`the server exited ${code}, not 0`);
-      const trace = readSessionTrace(served.sessionTrace());
-      process.stderr.write(
-        `debugger-batch-live\t${kind}\tsession trace at C\t${JSON.stringify(trace)}\n`,
-      );
-      problems.push(...trace.problems);
-      await pauseAt(kind, 'C');
-    }
-    if (failure !== undefined) {
-      if (problems.length > 0)
-        process.stderr.write(`R1 cleanup:\n${problems.join('\n')}\n`);
-      throw failure;
-    }
-    if (problems.length > 0) throw new Error(problems.join('\n'));
-  }
-}
-
 async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
   const params = testCase.params ?? {};
   const cls = String(params.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
@@ -1063,46 +824,40 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       },
       { tool: 'AmdpDebugStep', args: { state_handle: handle, action: 'over' } },
     ];
-    let entries: Entry[];
-    if (NO_BATCH) {
-      // The variant without the debugger batch: each an ordinary call.
-      entries = await callEach(served, calls, kind, 'amdp ');
-    } else {
-      const begun = await served.call('DebugBatchBegin', {});
-      say(kind, 'amdp begin', textOf(begun));
-      expect(begun.isError).not.toBe(true);
-      expect(payloadOf(begun)?.debug_batch).toBe('on');
-      batchOpen = true;
-      for (const { tool, args } of calls) {
-        const recorded = await served.call(tool, args);
-        if (recorded.isError === true || (recorded.content ?? []).length > 0) {
-          throw new Error(
-            `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
-          );
-        }
+    const begun = await served.call('DebugBatchBegin', {});
+    say(kind, 'amdp begin', textOf(begun));
+    expect(begun.isError).not.toBe(true);
+    expect(payloadOf(begun)?.debug_batch).toBe('on');
+    batchOpen = true;
+    for (const { tool, args } of calls) {
+      const recorded = await served.call(tool, args);
+      if (recorded.isError === true || (recorded.content ?? []).length > 0) {
+        throw new Error(
+          `${tool} was not recorded: ${withoutHandles(textOf(recorded)).slice(0, 600)}`,
+        );
       }
-      const endAt = process.hrtime.bigint();
-      const ended = await served.call('DebugBatchEnd', {});
-      const endedAt = process.hrtime.bigint();
-      batchOpen = false;
-      const summary = payloadOf(ended) ?? {};
-      say(kind, 'amdp end', {
-        summary,
-        end_ms: Math.round(Number(endedAt - endAt) / 1e6),
+    }
+    const endAt = process.hrtime.bigint();
+    const ended = await served.call('DebugBatchEnd', {});
+    const endedAt = process.hrtime.bigint();
+    batchOpen = false;
+    const summary = payloadOf(ended) ?? {};
+    say(kind, 'amdp end', {
+      summary,
+      end_ms: Math.round(Number(endedAt - endAt) / 1e6),
+    });
+    expect(ended.isError).not.toBe(true);
+    expect(summary.recorded).toBe(calls.length);
+    expect(summary.came).toBeUndefined();
+    expect(summary.failed).toEqual([]);
+    const entries = (payloadOf(
+      await served.call('BatchAnswers', { numbers: [1, 2] }),
+    ) ?? []) as Entry[];
+    for (const entry of entries) {
+      say(kind, `amdp answer #${entry.number}`, {
+        isError: entry.isError === true,
+        answer: payloadOf(entry) ?? textOf(entry),
       });
-      expect(ended.isError).not.toBe(true);
-      expect(summary.recorded).toBe(calls.length);
-      expect(summary.came).toBeUndefined();
-      expect(summary.failed).toEqual([]);
-      entries = (payloadOf(
-        await served.call('BatchAnswers', { numbers: [1, 2] }),
-      ) ?? []) as Entry[];
-      for (const entry of entries) {
-        say(kind, `amdp answer #${entry.number}`, {
-          isError: entry.isError === true,
-          answer: payloadOf(entry) ?? textOf(entry),
-        });
-      }
     }
     expect(entries.map((entry) => entry.number)).toEqual([1, 2]);
     const failed = entries.filter((entry) => entry.isError === true);
@@ -1247,12 +1002,9 @@ describe('the debugger batch at a live stop, on the system the test config names
           );
           return;
         }
-        if (AMDP_VARIANT === 'R1') await amdpR1On(kind, where.testCase);
-        else await amdpBatchOn(kind, where.testCase);
+        await amdpBatchOn(kind, where.testCase);
       },
-      AMDP_VARIANT !== undefined
-        ? getTimeout('long') + 3 * PAUSE_MAX_MS
-        : getTimeout('long'),
+      getTimeout('long'),
     );
   }
 });

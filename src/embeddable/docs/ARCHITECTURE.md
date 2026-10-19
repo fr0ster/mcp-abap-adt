@@ -186,7 +186,11 @@ stdin and a broken pipe (`EPIPE`) on stdin or stdout, `beforeExit`, and a crash 
 (`uncaughtException`, `unhandledRejection`): one fixed-words line naming the failure by its class,
 the same orderly sequence, exit `1`; a crash during a shutdown lets it finish and exits `1`.
 **The forced close** (`forceClose()` again, without waiting for the sequence's last steps) serves
-the two escapes only: a second signal and `--shutdown-timeout`. A killed process (`SIGKILL`, out
+the two escapes only: a second signal and `--shutdown-timeout`. A server run from source through
+`tsx` (the integration tests' served servers) gets only `SIGINT` and `SIGTERM` from it: `tsx`
+forwards those two to the script it runs, and `SIGHUP` or `SIGQUIT` reach the wrapper, not the
+server (measured 2026-10-19) — send them to the server's own process. An installed bin runs on
+node directly and gets every signal. A killed process (`SIGKILL`, out
 of memory, a crash of the runtime, a power loss) cannot log off: SAP's idle timeout ends its sessions and locks,
 unless a later stdio process of the same destination starts on it, or the user logs them off
 (below).

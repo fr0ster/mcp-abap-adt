@@ -107,6 +107,13 @@ interface Open {
   failureReported: boolean; // that failure was already thrown by a sync
 }
 
+/** What a stop's serial step leaves: its failures, the steps not attempted, the session whose last batch it awaits. */
+interface StopDone {
+  failures: DebugFailure[];
+  notAttempted: readonly string[];
+  ending?: Open;
+}
+
 /** The AMDP session of the one-request path: its two connections and the ids `start` answered. */
 interface OnceAmdp {
   events: IAbapConnection;
@@ -1110,69 +1117,104 @@ export class AmdpSession<O = unknown> {
    * is left to undo. Never throws anything but DebugCleanupError.
    */
   async stop(): Promise<void> {
-    let ending: Open | undefined;
-    let notAttempted: readonly string[] = [];
     // 1. In the serial: a debuggee at a break is cancelled. A refused cancel
     // sends no stop — a stop leaves a suspended debuggee where it stands —
     // unless the session is ending: the stop fails, and the session stays for
-    // the next stop.
+    // the next stop. With nothing to wait for, the whole stop is this one
+    // serial step.
     const before: DebugFailure[] = [];
-    const cancelled = await this.mutate(() => this.cancelForStop(before));
-    if (cancelled === 'refused') {
+    const first = await this.mutate(
+      async (): Promise<
+        | { refused: true }
+        | { done: StopDone }
+        | { wait: { open: Open; debuggee: string; endsBefore: number } }
+      > => {
+        const cancelled = await this.cancelForStop(before);
+        if (cancelled === 'refused') return { refused: true };
+        if (cancelled === undefined)
+          return { done: await this.stopLocked([...before]) };
+        return { wait: cancelled };
+      },
+    );
+    if ('refused' in first) {
       this.cleanupFailures = before;
       this.notify();
       throw new DebugCleanupError(before);
     }
-    // 2. Outside the serial: its end awaited, so no other call — a retried
-    // stop, a dispose — waits behind it.
-    if (cancelled !== undefined) await this.waitDebuggeeEnd(cancelled, before);
-    // 3. In the serial: the stop and the cleanup.
-    await this.mutate(async () => {
-      const failures: DebugFailure[] = [...before];
-      try {
-        for (const c of [...this.unclosed])
-          await this.closeOrKeep(c, 'a connection', failures);
-        await this.finishOnce(failures);
-        if (this.open) this.retire(this.open);
-        if (this.closing) {
-          const open = this.closing;
-          const stoppedBefore = open.stopped;
-          failures.push(...(await this.finishClosing(open, [])));
-          notAttempted = open.notAttempted ?? [];
-          // Accepted in this call: the system answers the open read now, and the read loop
-          // handles that answer as the last batch. This call waits for it outside the serial,
-          // so a read that never answers holds this call only — never another call, a
-          // retried stop, a dispose or a shutdown.
-          if (!stoppedBefore && open.stopped && !open.readDone) ending = open;
-        }
-      } catch (error) {
-        failures.push(thrownFailure(error, 'stop'));
-      } finally {
-        const runs = [...this.runs];
-        this.runs.clear();
-        for (const run of runs)
-          await this.closeOrKeep(
-            run.connection,
-            "the run's connection",
-            failures,
-          );
-        this.queue = [];
-        this.notices = [];
-        this.failure = undefined;
-        this.syncs.clear();
-        this.abandoned.clear();
-        this.cleanupFailures = failures;
-      }
-      if (failures.length)
-        throw new DebugCleanupError(failures, [], notAttempted);
-    });
+    let done: StopDone;
+    if ('wait' in first) {
+      // 2. Outside the serial: the cancelled debuggee's end, so no other call
+      // — a retried stop, a dispose — waits behind it.
+      const target = first.wait;
+      await this.waitDebuggeeEnd(target, before);
+      // 3. In the serial: the stop and the cleanup of the session captured in
+      // step 1 — none of a session started since, when another stop took it.
+      done = await this.mutate(async () =>
+        this.open === target.open || this.closing === target.open
+          ? this.stopLocked([...before])
+          : { failures: before, notAttempted: [] },
+      );
+    } else done = first.done;
+    if (done.failures.length)
+      throw new DebugCleanupError(done.failures, [], done.notAttempted);
     // Outside the serial: the read's last batch, and what it could not undo is this
     // stop's failure too — its own, not whatever a later call left in cleanupFailures.
-    if (ending) {
-      const failures = await this.lastBatchHandled(ending);
+    if (done.ending) {
+      const failures = await this.lastBatchHandled(done.ending);
       if (failures.length)
-        throw new DebugCleanupError(failures, [], ending.notAttempted ?? []);
+        throw new DebugCleanupError(
+          failures,
+          [],
+          done.ending.notAttempted ?? [],
+        );
     }
+  }
+
+  /**
+   * Inside the serial: the stop and the cleanup — owed closes, the
+   * one-request session, the running session retired and its cleanup, the
+   * runs' connections, what the session held. Never throws: answers the
+   * failures, what was not attempted, and the session whose last batch the
+   * stop then awaits outside the serial.
+   */
+  private async stopLocked(failures: DebugFailure[]): Promise<StopDone> {
+    let ending: Open | undefined;
+    let notAttempted: readonly string[] = [];
+    try {
+      for (const c of [...this.unclosed])
+        await this.closeOrKeep(c, 'a connection', failures);
+      await this.finishOnce(failures);
+      if (this.open) this.retire(this.open);
+      if (this.closing) {
+        const open = this.closing;
+        const stoppedBefore = open.stopped;
+        failures.push(...(await this.finishClosing(open, [])));
+        notAttempted = open.notAttempted ?? [];
+        // Accepted in this call: the system answers the open read now, and the read loop
+        // handles that answer as the last batch. This call waits for it outside the serial,
+        // so a read that never answers holds this call only — never another call, a
+        // retried stop, a dispose or a shutdown.
+        if (!stoppedBefore && open.stopped && !open.readDone) ending = open;
+      }
+    } catch (error) {
+      failures.push(thrownFailure(error, 'stop'));
+    } finally {
+      const runs = [...this.runs];
+      this.runs.clear();
+      for (const run of runs)
+        await this.closeOrKeep(
+          run.connection,
+          "the run's connection",
+          failures,
+        );
+      this.queue = [];
+      this.notices = [];
+      this.failure = undefined;
+      this.syncs.clear();
+      this.abandoned.clear();
+      this.cleanupFailures = failures;
+    }
+    return { failures, notAttempted, ...(ending ? { ending } : {}) };
   }
 
   /**

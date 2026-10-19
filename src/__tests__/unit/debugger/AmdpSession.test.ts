@@ -302,6 +302,26 @@ describe('AmdpSession', () => {
     expect(w.closed).toHaveLength(3);
   });
 
+  it('a stop with no session, then a start queued right behind it: the new session survives the stop', async () => {
+    const w = world();
+    const stopping = w.session.stop();
+    const starting = w.session.start({
+      stopExisting: false,
+      breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
+    });
+    await until(() => w.reads.length === 1);
+    w.reads[0].resolve(okResponse(SYNCED('Q1')));
+    await starting;
+    await stopping;
+    await jest.advanceTimersByTimeAsync(10);
+    expect(w.calls).not.toContain('stop');
+    expect(w.closed).toHaveLength(0);
+    expect(w.session.holdsState()).toBe(true);
+    await expect(w.session.wait(0)).resolves.toMatchObject({
+      state: 'waiting',
+    });
+  });
+
   it("the stop call's own signal ends the wait for the debuggee: the stop is sent and the answer says the debuggee had not ended", async () => {
     const w = await started(world(), true);
     await until(() => w.calls.includes('run'));

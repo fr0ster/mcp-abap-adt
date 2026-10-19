@@ -387,8 +387,11 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         expect(stopped.isError).not.toBe(true);
         const stoppedHandle = handle;
         handle = undefined;
-        // The state has ended: the AMDP debugger holds nothing behind the handle
-        // (measured 2026-10-19: a wait right after the stop answers `idle`).
+        // The AMDP state has ended: the debugger holds nothing behind the handle
+        // (measured 2026-10-19: a wait right after the stop answers `idle`). The
+        // handle itself stays valid: the instance keeps the last batch's answers
+        // (`InstanceBatch.holdsState`) until the next batch's end, the idle
+        // bound or the server's stop — no tool of the full set lets them go.
         const after = await call(held, 'AmdpDebugWait', {
           state_handle: stoppedHandle,
           hold_seconds: 1,

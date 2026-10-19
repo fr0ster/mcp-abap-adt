@@ -1931,6 +1931,17 @@ batch:
     # The refusal is made with a wrong password held in memory, one per check
     # and run; a logon with the configured password follows. Nothing else may
     # debug for the same SAP user while it runs.
+    # src/__tests__/integration/batch/amdpHttpHandle.test.ts: the AMDP debugger
+    # batch over Streamable HTTP behind one x-mcp-state-handle (the HTTP launcher
+    # from source, x-sap-* user and password headers from the session file), on
+    # the shared AMDP pair, with the session trace; on premise over HTTP on HANA.
+    - name: "amdp_http_handle"
+      enabled: false
+      available_in: ["onprem"]
+      description: "AMDP debugger batch over Streamable HTTP behind one state handle; every session logged off"
+      params:
+        amdp_class: "ZMCP_SHR_DBG_AMDP"
+        amdp_ddl: "ZMCP_SHR_DBG_TF"
     - name: "refusal_follow_ups"
       enabled: false
       available_in: ["onprem"]

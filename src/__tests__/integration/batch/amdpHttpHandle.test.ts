@@ -18,8 +18,9 @@
  * `ON_BREAK`, `DebugBatchBegin` (the handle it answers is the same),
  * `AmdpDebugGetTable` and `AmdpDebugStep` over — each answers nothing —,
  * `DebugBatchEnd`, `BatchAnswers` 1–2, the debuggee's next event,
- * `AmdpDebugStop`. Then the state has ended: a wait over the handle answers
- * `idle`. Then `SIGTERM` to the server's process (a graceful
+ * `AmdpDebugStop`. Then the state has ended, the debugger batch's kept
+ * answers with it: a call over the handle answers `state is not available`,
+ * as for an unknown handle. Then `SIGTERM` to the server's process (a graceful
  * shutdown), exit `0`.
  *
  * The session trace is on: after the exit every security session the
@@ -387,17 +388,14 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         expect(stopped.isError).not.toBe(true);
         const stoppedHandle = handle;
         handle = undefined;
-        // The AMDP state has ended: the debugger holds nothing behind the handle
-        // (measured 2026-10-19: a wait right after the stop answers `idle`). The
-        // handle itself stays valid: the instance keeps the last batch's answers
-        // (`InstanceBatch.holdsState`) until the next batch's end, the idle
-        // bound or the server's stop — no tool of the full set lets them go.
+        // The debug state has ended with the complete stop, the debugger
+        // batch's kept answers with it: the handle answers as an unknown one.
         const after = await call(held, 'AmdpDebugWait', {
           state_handle: stoppedHandle,
           hold_seconds: 1,
         });
-        expect(after.isError).not.toBe(true);
-        expect(payloadOf(after)?.state).toBe('idle');
+        expect(after.isError).toBe(true);
+        expect(textOf(after)).toContain('state is not available');
       } catch (error) {
         failure = error;
       } finally {

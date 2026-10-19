@@ -3630,7 +3630,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; a part that could not be undone is reported and kept.
+**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that could not be undone is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
@@ -3895,7 +3895,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; a part that could not be undone is reported and kept.
+**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that could not be undone is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 

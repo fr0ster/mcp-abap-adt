@@ -147,6 +147,8 @@ interface Stand {
   /** How the debuggee's envelope is answered, part by part. */
   part: { answer: (inner: InnerRequest) => PartAnswer };
   handle(): string;
+  /** Whether the instance still holds state (its handle valid). */
+  holds(): boolean;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
   /** Attaches the debuggee: the stop the batch works on. */
   attach(): Promise<void>;
@@ -230,6 +232,7 @@ async function stand(set: SetKind): Promise<Stand> {
     opened,
     part,
     handle: () => server.stateHandle,
+    holds: () => server.state.holdsState(),
     call: (name, args = {}) =>
       client.callTool({ name, arguments: args }).then((a) => a as Answer),
     attach: async () => {
@@ -579,6 +582,31 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
       },
     );
     expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
+  });
+});
+
+describe('a complete DebugStop ends the debugger batch answers with the debug state', () => {
+  it('after the end the answers are kept; DebugStop drops them: nothing held, the handle answers not available', async () => {
+    const s = await stand('full');
+    try {
+      await s.attach();
+      const handle = s.handle();
+      await s.call('DebugBatchBegin', {});
+      await within(s.call('DebugGetStack', { state_handle: handle }));
+      await settled(s.call('DebugBatchEnd', {}));
+      expect(s.owner.holdsState()).toBe(true);
+      const stopped = await settled(
+        s.call('DebugStop', { state_handle: handle }),
+      );
+      expect(stopped.isError).not.toBe(true);
+      expect(s.owner.holdsState()).toBe(false);
+      expect(s.holds()).toBe(false);
+      const after = await s.call('DebugGetStack', { state_handle: handle });
+      expect(after.isError).toBe(true);
+      expect(textOf(after)).toContain('state is not available');
+    } finally {
+      await s.close();
+    }
   });
 });
 

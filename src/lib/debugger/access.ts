@@ -73,3 +73,14 @@ export function debugBatchRecorder(
 ): IAbapConnection | undefined {
   return context.batch?.mode() === 'debugger' ? context.connection : undefined;
 }
+
+/**
+ * After a complete debugger stop: when the debug state holds nothing any
+ * more, the kept answers of a debugger batch go with it, so the state's
+ * handle ends with the stop. A communication batch's answers stay.
+ */
+export function endDebugBatchAnswers(context: HandlerContext): void {
+  const held = context.debugger?.();
+  if (held === undefined || held.holdsState()) return;
+  context.batch?.dropDebuggerAnswers();
+}

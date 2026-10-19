@@ -84,6 +84,8 @@ export class InstanceBatch implements StatePart {
 
   private opened_: Opened | undefined;
   private answers: ReadonlyMap<number, BatchAnswer> | undefined;
+  /** The kind of the batch the kept answers came from. */
+  private answersKind: BatchKind | undefined;
   private readonly listeners: Array<() => void> = [];
 
   constructor(options: { keepRawParts: boolean }) {
@@ -177,6 +179,19 @@ export class InstanceBatch implements StatePart {
     if (ending !== undefined && current.batch !== ending) return;
     this.opened_ = undefined;
     this.answers = new Map(answers);
+    this.answersKind = current.kind;
+    this.changed();
+  }
+
+  /**
+   * A complete debugger stop: the kept answers go when a debugger batch gave
+   * them, so the debug state, and its handle, end with the stop. A
+   * communication batch's answers, and an open batch, stay.
+   */
+  dropDebuggerAnswers(): void {
+    if (this.opened_ !== undefined || this.answersKind !== 'debugger') return;
+    this.answers = undefined;
+    this.answersKind = undefined;
     this.changed();
   }
 
@@ -189,6 +204,7 @@ export class InstanceBatch implements StatePart {
     const current = this.opened_;
     this.opened_ = undefined;
     this.answers = undefined;
+    this.answersKind = undefined;
     current?.batch.target?.seal();
     current?.controller.abort();
     this.changed();

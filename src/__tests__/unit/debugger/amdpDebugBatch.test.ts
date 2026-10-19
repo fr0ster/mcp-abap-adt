@@ -48,8 +48,14 @@ import {
   type PartAnswer,
   partByPart,
 } from '../../helpers/batchEnvelope';
-import { okResponse } from '../../helpers/fakeClient';
-import { AMDP_BREAK, AMDP_START, AMDP_STOPPED, AMDP_SYNCED } from './fakes';
+import { okResponse, refusedResponse } from '../../helpers/fakeClient';
+import {
+  AMDP_BREAK,
+  AMDP_START,
+  AMDP_STOPPED,
+  AMDP_SYNCED,
+  amdpEnd,
+} from './fakes';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 const IDS = { terminalId: 'T'.repeat(32), ideId: 'I'.repeat(32) };
@@ -146,6 +152,8 @@ interface Stand {
   scripted: ReturnType<typeof scriptedAmdp>;
   part: { answer: (inner: InnerRequest) => PartAnswer };
   handle(): string;
+  /** Whether the instance still holds state (its handle valid). */
+  holds(): boolean;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
   /** The AMDP session stopped at a break: the full set's session, or the compact set's one-request session. */
   breakAt(): Promise<void>;
@@ -228,6 +236,7 @@ async function stand(set: SetKind): Promise<Stand> {
     scripted,
     part,
     handle: () => server.stateHandle,
+    holds: () => server.state.holdsState(),
     call: (name, args = {}) =>
       client.callTool({ name, arguments: args }).then((a) => a as Answer),
     breakAt: async () => {
@@ -489,6 +498,79 @@ describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
       message: batchNotServedWords(tool),
     });
     await settled(s.call(NAMES.end[set], endArgs(set)));
+  });
+});
+
+describe('a complete stop ends the debugger batch answers with the debug state (full set)', () => {
+  let s: Stand;
+  beforeEach(async () => {
+    s = await stand('full');
+  });
+  afterEach(async () => {
+    await s.close();
+  });
+
+  async function batchAtBreak(): Promise<string> {
+    await s.breakAt();
+    const handle = s.handle();
+    await s.call('DebugBatchBegin', {});
+    await within(
+      s.call('AmdpDebugStep', { state_handle: handle, action: 'over' }),
+    );
+    await settled(s.call('DebugBatchEnd', {}));
+    expect(s.owner.holdsState()).toBe(true); // the answers are kept
+    return handle;
+  }
+
+  it('AmdpDebugStop ending the debug state drops the kept answers: nothing held, the handle answers not available', async () => {
+    const handle = await batchAtBreak();
+    // The cancelled debuggee ends as SAP ends it: the open read answers its end.
+    const stopping = s.call('AmdpDebugStop', { state_handle: handle });
+    await until(() => s.scripted.reads.length >= 3);
+    s.scripted.reads[2]?.resolve(okResponse(amdpEnd('D1')));
+    const stopped = await stopping;
+    expect(stopped.isError).not.toBe(true);
+    expect(s.owner.holdsState()).toBe(false);
+    expect(s.holds()).toBe(false);
+    const after = await s.call('AmdpDebugWait', {
+      state_handle: handle,
+      hold_seconds: 0,
+    });
+    expect(after.isError).toBe(true);
+    expect(textOf(after)).toContain('state is not available');
+  });
+
+  it('a stop that is refused keeps the answers: the state stays', async () => {
+    const handle = await batchAtBreak();
+    s.scripted.dbg.deleteDebuggee = async () => refusedResponse('busy');
+    const stopped = await s.call('AmdpDebugStop', { state_handle: handle });
+    expect(stopped.isError).toBe(true);
+    expect(s.owner.holdsState()).toBe(true);
+    expect(s.holds()).toBe(true);
+    const answers = jsonOf(await s.call('BatchAnswers', { numbers: [1] }));
+    expect(answers[0]?.number).toBe(1);
+  });
+});
+
+describe('InstanceBatch: the kept answers by the kind of their batch', () => {
+  const answer = { isError: false, content: [] } as never;
+  it("dropDebuggerAnswers drops a debugger batch's answers and keeps a communication batch's", () => {
+    const debug = new InstanceBatch({ keepRawParts: false });
+    debug.begin('debugger', { connection: {} as never, recorded: [] });
+    debug.end(new Map([[1, answer]]));
+    debug.dropDebuggerAnswers();
+    expect(debug.holdsState()).toBe(false);
+    expect(debug.answer(1)).toBeUndefined();
+
+    const communication = new InstanceBatch({ keepRawParts: false });
+    communication.begin('communication', {
+      connection: {} as never,
+      recorded: [],
+    });
+    communication.end(new Map([[1, answer]]));
+    communication.dropDebuggerAnswers();
+    expect(communication.holdsState()).toBe(true);
+    expect(communication.answer(1)).toBe(answer);
   });
 });
 

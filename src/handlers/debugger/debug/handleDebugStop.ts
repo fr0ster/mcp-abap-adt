@@ -1,5 +1,8 @@
 // src/handlers/debugger/debug/handleDebugStop.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  endDebugBatchAnswers,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
@@ -10,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugStop',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; a part that could not be undone is reported and kept.',
+    '[debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that could not be undone is reported and kept with the answers.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },
@@ -29,6 +32,8 @@ export async function handleDebugStop(
       context.state!.endWhenEmpty();
       // A note is no debt: SAP's final refusal, reaching the model as it is.
       const notes = await d.stop();
+      // Complete: a debugger batch's kept answers end with the state.
+      endDebugBatchAnswers(context);
       return {
         value: { state: 'stopped', ...(notes.length ? { notes } : {}) },
         raw: JSON.stringify(notes, null, 2),

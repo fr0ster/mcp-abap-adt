@@ -281,6 +281,13 @@ next ordinary debugger call learns it from SAP. At an AMDP break the full set's 
 debuggee until its event read reports the next `ON_BREAK` or `ON_EXECUTION_END`: after a recorded
 step, `AmdpDebugWait` answers where the debuggee went.
 
+**The answers stay** readable (`BatchAnswers`, compact `HandlerDebugBatch` `answers`) until the
+next batch's end, the debug state's complete stop or the idle bound: a complete `DebugStop`, or an
+`AmdpDebugStop` that ends the whole debug state, lets the debugger batch's answers go with the
+state, so the state's handle ends with the stop and then answers `state is not available`. A
+stop that is refused, or leaves anything held, keeps them. A communication batch's answers are
+not touched by a debugger stop.
+
 **Refusals.** Begin needs an ABAP stop or an AMDP break (`no debuggee is stopped in this debug
 session`); while a communication batch is open, or the debugger batch already is, begin is refused
 `batch_mode_other` / `batch_mode_on`, and `BatchBegin` while the debugger batch is open

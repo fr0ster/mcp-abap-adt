@@ -252,6 +252,8 @@ const SESSION_TRACE_PREAMBLE = [
 
 /** One security session of the trace: what its requests carried, whether it was logged off. */
 interface TracedSession {
+  sec: string;
+  paths: Record<string, number>;
   requests: number;
   stateful: boolean;
   contexts: Set<string>;
@@ -266,6 +268,13 @@ interface TracedSession {
  */
 function readSessionTrace(lines: string[]): {
   summary: Record<string, number>;
+  sessions: Array<{
+    sec: string;
+    stateful: boolean;
+    contexts: string[];
+    paths: Record<string, number>;
+    logged_off: boolean;
+  }>;
   problems: string[];
 } {
   const requests = new Map<
@@ -293,6 +302,8 @@ function readSessionTrace(lines: string[]): {
     const sec = request.sec !== '-' ? request.sec : (answer?.sec ?? '-');
     if (sec === '-') continue;
     const session = sessions.get(sec) ?? {
+      sec,
+      paths: {},
       requests: 0,
       stateful: false,
       contexts: new Set<string>(),
@@ -304,6 +315,7 @@ function readSessionTrace(lines: string[]): {
       continue;
     }
     session.requests += 1;
+    session.paths[request.what] = (session.paths[request.what] ?? 0) + 1;
     if (request.stateful) session.stateful = true;
     for (const ctx of [request.ctx, answer?.ctx ?? '-'])
       if (ctx !== '-') session.contexts.add(ctx);
@@ -333,6 +345,13 @@ function readSessionTrace(lines: string[]): {
       logged_off: all.filter((s) => s.loggedOff).length,
       requests: all.reduce((n, s) => n + s.requests, 0),
     },
+    sessions: all.map((s) => ({
+      sec: s.sec,
+      stateful: s.stateful,
+      contexts: [...s.contexts],
+      paths: s.paths,
+      logged_off: s.loggedOff,
+    })),
     problems,
   };
 }
@@ -622,7 +641,9 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
     }
     if (TRACE_SESSIONS) {
       const trace = readSessionTrace(served.sessionTrace());
-      say(kind, 'session trace', trace);
+      process.stderr.write(
+        `debugger-batch-live\t${kind}\tsession trace\t${JSON.stringify(trace)}\n`,
+      );
       problems.push(...trace.problems);
     }
     if (failure !== undefined) {
@@ -880,7 +901,9 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
         }
         if (TRACE_SESSIONS) {
           const trace = readSessionTrace(served.sessionTrace());
-          say(kind, 'amdp session trace', trace);
+          process.stderr.write(
+            `debugger-batch-live\t${kind}\tamdp session trace\t${JSON.stringify(trace)}\n`,
+          );
           problems.push(...trace.problems);
         }
       }

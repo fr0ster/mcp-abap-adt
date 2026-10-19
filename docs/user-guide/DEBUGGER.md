@@ -271,6 +271,21 @@ not offered in the debugger batch yet**: begin at an AMDP debug session is refus
 `debug_batch_amdp_unmeasured` ("AMDP debugging is not offered in a debugger batch: not yet
 confirmed against a system") until a test against a system that runs AMDP debugging confirms it.
 
+**Measured (2026-10-19)** with `src/__tests__/integration/batch/debuggerBatch.test.ts`:
+
+| Destination | The debugger batch at an ABAP stop | The AMDP gate |
+|---|---|---|
+| On premise over HTTP | passed: step over, stack and one variable recorded through the full server over stdio and sent in one `DebugBatchEnd` — 3 recorded, none failed; the stack stood on the line after the step, the variable held what the step left; the end took about 120 ms | passed (on HANA) |
+| On premise over RFC | passed, the same answers; the end took about 120 ms | passed (on HANA) |
+| ABAP Cloud | not run: no ABAP Cloud destination was configured | not measured there (the gate is measured on premise on HANA) |
+
+The AMDP gate was measured in process, not through the served tools: at an AMDP break in a
+SQLScript table function, the AMDP debugger's data preview of a table variable and a step over
+went in one debugger batch envelope on the AMDP session's command connection. SAP answered the
+envelope `202`, the data preview with its table document, the step with `200`, and the debuggee
+moved on to the next line (its next `ON_BREAK`). The server's refusal above still holds: AMDP
+operations are not yet recorded in the debugger batch.
+
 ## Catching, and one debuggee at a time
 
 The listener attaches the first program caught **automatically**: a caught program

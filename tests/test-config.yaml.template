@@ -1856,6 +1856,21 @@ batch:
         domain_name: "ZMCP_BTC_DOM"
         # package_name: "ZMCP_TEST"
         # transport_request: ""
+    # src/__tests__/integration/batch/debuggerBatch.test.ts: the full server
+    # started over stdio stops in the shared class (shared_dependencies), and
+    # DebugBatchEnd sends a step, the stack and a variable in one envelope;
+    # then, on premise on HANA, the AMDP gate in process on a probe it creates
+    # in amdp_package with no transport and deletes. Nothing else may debug
+    # for the same SAP user while it runs.
+    - name: "debugger"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      description: "Debugger batch at a live stop (step, stack, variables in one DebugBatchEnd); the AMDP gate"
+      params:
+        class_name: "ZMCP_SHR_PROF_CLS"
+        amdp_class: "ZMCP_DBB_AMDP"
+        amdp_ddl: "ZMCP_DBB_AMDP_TF"
+        amdp_package: "$TMP"
 
 # Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
 runtime_feed_handlers:

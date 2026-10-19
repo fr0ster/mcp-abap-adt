@@ -1871,6 +1871,19 @@ batch:
         amdp_class: "ZMCP_DBB_AMDP"
         amdp_ddl: "ZMCP_DBB_AMDP_TF"
         amdp_package: "$TMP"
+    # src/__tests__/integration/batch/refusalFollowUps.test.ts, in process, a
+    # user and a password only: the logoff after a credential refusal asks
+    # nothing of the provider, and the debugger stop's second stopListener
+    # after a refusal (a line breakpoint in the shared class, nothing run).
+    # The refusal is made with a wrong password held in memory, one per check
+    # and run; a logon with the configured password follows. Nothing else may
+    # debug for the same SAP user while it runs.
+    - name: "refusal_follow_ups"
+      enabled: false
+      available_in: ["onprem"]
+      description: "After a credential refusal: the logoff asks no provider; the debugger stop's second stopListener"
+      params:
+        class_name: "ZMCP_SHR_PROF_CLS"
 
 # Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
 runtime_feed_handlers:

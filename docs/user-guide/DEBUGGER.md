@@ -537,7 +537,16 @@ ends by:
   the stop, nothing wakes it. The stop then stops the listener once more, which
   in our runs answered it at once; when even that one arrives first, the stop
   waits for the poll's hold. The race is the system's and is documented, not
-  closed (measured on premise, 2026-10-12). A part that could not be undone is
+  closed (measured on premise, 2026-10-12). The second stop's failure is no failure of the
+  stop, whatever it is: measured on premise (2026-10-19, `refusalFollowUps.test.ts`), with
+  the listener's poll held so that the second stop is sent and the password made wrong
+  between the two, over HTTP with the session ended between them the second stop was
+  answered `400` (`ICMENOSESSION`) and over RFC it was answered `200`; each time the stop
+  answered `stopped`, sent nothing more, asked nothing more of the credential and held
+  nothing. A wrong password brings no credential refusal to the second stop on either
+  transport — a live session's cookie, or the RFC conversation's one logon, authenticates
+  it, and an ended session is answered by the ICM before any logon — so the stop's answer
+  to a credential refusal there is not measured. A part that could not be undone is
   reported, kept, and retried by the next stop — the answer is `{ failures, notes? }`, each
   entry the method's error as it is with its step (`release the debuggee`, `stop listener`,
   `delete breakpoint <id>`, `close the listener's connection`, `clear breakpoints`, `stop`,
@@ -570,8 +579,12 @@ ends by:
   stop (<id>)`, and the AMDP part's `release debuggee <id>` and `stop`) stay owed like a
   failure: the handle stays valid, a new start is refused, and the next stop — once the
   credential is usable again — sends them. The session's connections are still closed: a
-  logoff carries the session's cookies and asks nothing of the credential provider (not
-  measured). A start the credential refused cleans up the same way: its undo sends no request,
+  logoff carries the session's cookies and asks nothing of the credential provider
+  (measured on premise over HTTP and over RFC, 2026-10-19, with
+  `src/__tests__/integration/batch/refusalFollowUps.test.ts`: after a logon refused for a
+  wrong password on the same credential, the closes of the refused connection and of a
+  live one asked no moment of the provider, and over HTTP the live session's logoff landed —
+  a connection built on its cookies was refused `401`). A start the credential refused cleans up the same way: its undo sends no request,
   and the answer is the refusal with its step, `not_attempted` naming what stays for the next
   stop — not the `cleanup.failures` of another failed start. A start whose reconciling
   listener stop (see [Restarting with stated ids](#restarting-with-stated-ids)) the credential

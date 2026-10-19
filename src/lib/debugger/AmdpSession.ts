@@ -15,12 +15,14 @@
  * WAIT_MAX_SECONDS.
  */
 import { randomUUID } from 'node:crypto';
-import type {
-  AmdpDebugger,
-  amdpDebuggerDocuments,
+import {
+  AdtBatchConnection,
+  type AmdpDebugger,
+  type amdpDebuggerDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { adtHeadersOf, withAdtHeaders } from '../adtHeaders/withAdtHeaders';
 import {
   carryingFailure,
@@ -666,6 +668,160 @@ export class AmdpSession<O = unknown> {
       open.released.add(debuggee);
       this.debuggeeId = undefined;
     });
+  }
+
+  // --- the debugger batch (spec §7) ---------------------------------------------
+  /**
+   * Whether the session stands at a break the debugger batch can work on:
+   * the running session with a stopped debuggee, or a running one-request
+   * session (its debuggee is named by each call).
+   */
+  atBreak(): boolean {
+    return (
+      (!!this.open && !this.open.stopping && this.debuggeeId !== undefined) ||
+      (!!this.once && !this.once.stopped)
+    );
+  }
+
+  /**
+   * The debugger batch of the break: an `AdtBatchConnection` with endpoint
+   * `debugger` over the session's command connection, whose envelope goes
+   * out on it. Sends nothing; refused with no break.
+   */
+  openBatch(options: { logger?: ILogger } = {}): AdtBatchConnection {
+    const commands =
+      this.open && !this.open.stopping && this.debuggeeId !== undefined
+        ? this.open.commands
+        : this.once && !this.once.stopped
+          ? this.once.commands
+          : undefined;
+    if (commands === undefined)
+      throw new DebugStateError('no AMDP debuggee is stopped');
+    return new AdtBatchConnection(commands, {
+      endpoint: 'debugger',
+      ...(options.logger !== undefined ? { logger: options.logger } : {}),
+    });
+  }
+
+  /**
+   * The batch path: each `record…` checks there is a break and sends its one
+   * request on a fresh AMDP debugger over `recorder` — a per-call recorder of
+   * the debugger batch — so the request is recorded and its answer comes
+   * when the batch is sent. It runs outside the serial: the second recorded
+   * call records while the first waits for its answer. The session's state
+   * stays as it is, whatever the answer says; the next event read tells it.
+   */
+  private batchSession(recorder: IAbapConnection): {
+    open: Open;
+    debuggee: string;
+    dbg: AmdpDebuggerT;
+  } {
+    const open = this.requireOpen();
+    const debuggee = this.requireDebuggee();
+    return { open, debuggee, dbg: this.ports.amdpDebugger(recorder) };
+  }
+  private batchOnce(recorder: IAbapConnection): {
+    once: OnceAmdp;
+    dbg: AmdpDebuggerT;
+  } {
+    return {
+      once: this.requireOnce(),
+      dbg: this.ports.amdpDebugger(recorder),
+    };
+  }
+  /** Batch path: the stopped debuggee steps over or continues. */
+  async recordStep(
+    recorder: IAbapConnection,
+    step: 'over' | 'continue',
+  ): Promise<DebugView<string>> {
+    const { open, debuggee, dbg } = this.batchSession(recorder);
+    const answer = await dbg.step(open.mainId, debuggee, step);
+    if (!answer.ok)
+      throw failedAt(new DebugRequestError(messageOf(answer)), answer, 'step');
+    return { value: 'moving', raw: '' };
+  }
+  /** Batch path: the rows of a table variable at the break, up to 100. */
+  async recordTable(
+    recorder: IAbapConnection,
+    variable: string,
+    query?: string,
+  ): Promise<
+    DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>
+  > {
+    const { open, debuggee, dbg } = this.batchSession(recorder);
+    const answer = await withAdtHeaders(
+      adtHeadersOf(this.origin),
+      'amdpDebugger.getDataPreview',
+      (headers) =>
+        dbg.getDataPreview({
+          sessionId: open.hanaSession,
+          debuggerId: open.mainId,
+          debuggeeId: debuggee,
+          variableName: variable.toUpperCase(),
+          rowNumber: 100,
+          ...(query ? { query } : {}),
+          headers,
+        }),
+    );
+    if (!answer.ok)
+      throw failedAt(
+        new DebugRequestError(messageOf(answer)),
+        answer,
+        'read table',
+      );
+    const raw = bodyOf(answer);
+    return { value: readAmdpPreview(raw), raw };
+  }
+  /** Batch path, one-request session: `debuggeeId` steps over or continues; SAP answers the request id. */
+  async recordStepOnce(
+    recorder: IAbapConnection,
+    debuggeeId: string,
+    step: 'over' | 'continue',
+  ): Promise<DebugView<{ requestId: string }>> {
+    const { once, dbg } = this.batchOnce(recorder);
+    const answer = await dbg.step(once.mainId, debuggeeId, step);
+    if (!answer.ok)
+      throw failedAt(new DebugRequestError(messageOf(answer)), answer, 'step');
+    const value = { requestId: locationId(wireOf(answer)) };
+    return { value, raw: JSON.stringify(value) };
+  }
+  /** Batch path, one-request session: the rows of a table variable of `debuggeeId`. */
+  async recordDataPreviewOnce(
+    recorder: IAbapConnection,
+    options: {
+      debuggeeId: string;
+      variable: string;
+      query?: string;
+      rowNumber?: number;
+    },
+  ): Promise<
+    DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>
+  > {
+    const { once, dbg } = this.batchOnce(recorder);
+    const answer = await withAdtHeaders(
+      adtHeadersOf(this.origin),
+      'amdpDebugger.getDataPreview',
+      (headers) =>
+        dbg.getDataPreview({
+          sessionId: once.hanaSession,
+          debuggerId: once.mainId,
+          debuggeeId: options.debuggeeId,
+          variableName: options.variable.toUpperCase(),
+          ...(options.rowNumber !== undefined
+            ? { rowNumber: options.rowNumber }
+            : {}),
+          ...(options.query ? { query: options.query } : {}),
+          headers,
+        }),
+    );
+    if (!answer.ok)
+      throw failedAt(
+        new DebugRequestError(messageOf(answer)),
+        answer,
+        'read table',
+      );
+    const raw = bodyOf(answer);
+    return { value: readAmdpPreview(raw), raw };
   }
 
   // --- one request per call (the compact debugger) -----------------------------

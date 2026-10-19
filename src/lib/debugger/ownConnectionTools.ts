@@ -85,15 +85,24 @@ function argument(args: unknown, name: string): unknown {
 
 /**
  * Whether a call of `tool` with `args` is recorded in the debugger batch
- * (spec §7's table): step, step to line, stack, variables, child variables,
- * stack position and setting a variable at the ABAP stop — in the full set
- * `DebugStep` (into, over, return, continue), `DebugStepToLine`,
- * `DebugGetStack`, `DebugGetVariables`, `DebugSetStackPosition`,
- * `DebugSetVariable`; in the compact set `HandlerDebugStep` and
- * `HandlerDebugMaintain` of kind abap with those operations. Every other
- * call is refused while the debugger batch is open.
+ * opened at `debuggee` (spec §7's table). At the ABAP stop: step, step to
+ * line, stack, variables, child variables, stack position and setting a
+ * variable — in the full set `DebugStep` (into, over, return, continue),
+ * `DebugStepToLine`, `DebugGetStack`, `DebugGetVariables`,
+ * `DebugSetStackPosition`, `DebugSetVariable`; in the compact set
+ * `HandlerDebugStep` and `HandlerDebugMaintain` of kind abap with those
+ * operations. At the AMDP break: step over, continue and the data preview —
+ * in the full set `AmdpDebugStep` and `AmdpDebugGetTable`; in the compact
+ * set `HandlerDebugStep` (stepOver, stepContinue) and `HandlerDebugMaintain`
+ * (getDataPreview) of kind amdp. Every other call is refused while the
+ * debugger batch is open.
  */
-export function recordableInDebugBatch(tool: string, args: unknown): boolean {
+export function recordableInDebugBatch(
+  tool: string,
+  args: unknown,
+  debuggee: 'abap' | 'amdp',
+): boolean {
+  if (debuggee === 'amdp') return recordableAtAmdpBreak(tool, args);
   switch (tool) {
     case 'DebugStep':
       return FULL_STEPS.has(String(argument(args, 'action')));
@@ -112,6 +121,29 @@ export function recordableInDebugBatch(tool: string, args: unknown): boolean {
       return (
         argument(args, 'kind') === 'abap' &&
         COMPACT_READS.has(String(argument(args, 'operation')))
+      );
+    default:
+      return false;
+  }
+}
+
+const AMDP_STEPS = new Set(['stepOver', 'stepContinue']);
+
+/** The AMDP half of `recordableInDebugBatch`. */
+function recordableAtAmdpBreak(tool: string, args: unknown): boolean {
+  switch (tool) {
+    case 'AmdpDebugStep':
+    case 'AmdpDebugGetTable':
+      return true;
+    case 'HandlerDebugStep':
+      return (
+        argument(args, 'kind') === 'amdp' &&
+        AMDP_STEPS.has(String(argument(args, 'operation')))
+      );
+    case 'HandlerDebugMaintain':
+      return (
+        argument(args, 'kind') === 'amdp' &&
+        argument(args, 'operation') === 'getDataPreview'
       );
     default:
       return false;

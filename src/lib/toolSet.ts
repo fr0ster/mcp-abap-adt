@@ -153,9 +153,9 @@ const COMPACT_BATCH_LINE =
 const DEBUG_LINE =
   'debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user';
 const DEBUG_BATCH_LINE =
-  'the debugger batch: DebugBatchBegin, DebugBatchEnd — calls at the stopped debuggee recorded, sent together in one envelope, answered by number';
+  'the debugger batch: DebugBatchBegin, DebugBatchEnd — calls at the stopped ABAP debuggee or the AMDP break recorded, sent together in one envelope, answered by number';
 const COMPACT_DEBUG_BATCH_LINE =
-  "the debugger batch: HandlerDebugBatch (action 'begin', 'end', 'answers') — calls at the stopped debuggee recorded, sent together in one envelope, answered by number";
+  "the debugger batch: HandlerDebugBatch (action 'begin', 'end', 'answers') — calls at the stopped ABAP debuggee or the AMDP break recorded, sent together in one envelope, answered by number";
 
 /**
  * The object-oriented tool set of `mcp-abap-adt`, `mcp-abap-adt-http` and

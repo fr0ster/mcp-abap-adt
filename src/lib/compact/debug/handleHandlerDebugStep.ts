@@ -72,10 +72,14 @@ export async function handleHandlerDebugStep(
     return onceAnswer(context, args, 'amdp', false, async (d) => {
       if (op !== 'stepOver' && op !== 'stepContinue')
         refuseOperation('amdp', op, AMDP_OPERATIONS);
-      return d.amdp.stepOnce(
-        needed(args.debuggee_id, `debuggee_id: needed for ${op}`),
-        op === 'stepOver' ? 'over' : 'continue',
+      const debuggee = needed(
+        args.debuggee_id,
+        `debuggee_id: needed for ${op}`,
       );
+      const step = op === 'stepOver' ? 'over' : 'continue';
+      return recorder !== undefined
+        ? d.amdp.recordStepOnce(recorder, debuggee, step)
+        : d.amdp.stepOnce(debuggee, step);
     });
   }
   switch (op) {

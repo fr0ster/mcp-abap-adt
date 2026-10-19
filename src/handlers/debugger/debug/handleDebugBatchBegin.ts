@@ -7,7 +7,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugBatchBegin',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Starts the debugger batch on the stopped debuggee. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.',
+    '[debug] Starts the debugger batch on the stopped ABAP debuggee, or at the AMDP break when no ABAP debuggee is stopped. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-/** Opens the debugger batch on the ABAP stop's connection; answers `{ debug_batch: 'on', state_handle }`. */
+/** Opens the debugger batch on the ABAP stop's connection or the AMDP session's command connection; answers `{ debug_batch: 'on', state_handle }`. */
 export async function handleDebugBatchBegin(
   context: HandlerContext,
   _args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,

@@ -3655,7 +3655,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchbegin-debug-debugger"></a>
 #### DebugBatchBegin (Debug / Debugger)
-**Description:** [debug] Starts the debugger batch on the stopped debuggee. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+**Description:** [debug] Starts the debugger batch on the stopped ABAP debuggee, or at the AMDP break when no ABAP debuggee is stopped. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
 
@@ -3666,7 +3666,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchend-debug-debugger"></a>
 #### DebugBatchEnd (Debug / Debugger)
-**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the debuggee's session and ends the debugger batch. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.
+**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
 
@@ -4057,4 +4057,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-18*
+*Last updated: 2026-10-19*

@@ -225,7 +225,9 @@ session still running.
 
 At an ABAP stop, several debugger calls that need no answer of each other — step, then read the
 stack and the variables — go to SAP in one debugger batch envelope (`POST
-/sap/bc/adt/debugger/batch`) on the stop's connection, the attached session:
+/sap/bc/adt/debugger/batch`) on the stop's connection, the attached session. At an AMDP break the
+same envelope carries the AMDP debugger's calls — the data preview of a table variable, a step over
+or a continue — on the AMDP session's command connection:
 
 | | Full set (`mcp-abap-adt`, `-http`, `-sse`) | Compact (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`) |
 |---|---|---|
@@ -249,6 +251,18 @@ batch, see [BATCH_MODE.md](BATCH_MODE.md)); begin answers `{ debug_batch: 'on', 
 | stack position | `DebugSetStackPosition` | `HandlerDebugStep` `setStackPosition` |
 | set a variable | `DebugSetVariable` | `HandlerDebugMaintain` `setVariableValue` |
 
+At an AMDP break, one request each:
+
+| Operation | Full set | Compact |
+|---|---|---|
+| step over, continue | `AmdpDebugStep` `over` / `continue` | `HandlerDebugStep` `kind: 'amdp'`, `stepOver` / `stepContinue` (`debuggee_id` required) |
+| data preview of a table variable | `AmdpDebugGetTable` | `HandlerDebugMaintain` `kind: 'amdp'`, `getDataPreview` (`debuggee_id`, `variable_name` required) |
+
+Begin picks the stop it works on: the ABAP stop when one is held, else the AMDP break — the full
+set's AMDP session with a stopped debuggee (`AmdpDebugWait` answered `ON_BREAK`), or the compact
+set's running AMDP session. A batch records at its own stop only: in a batch begun at an AMDP break
+every ABAP debugger call is refused, and in one begun at an ABAP stop every AMDP call.
+
 A recorded call answers empty content and takes the next number, from 1, in the order recorded.
 In the batch each operation sends its own request alone: a full-set step reads no stack after it
 and `DebugSetStackPosition` answers the position — record `DebugGetStack` beside them to have the
@@ -258,18 +272,19 @@ debugger batch is open (`batch_not_recordable`, "<tool> is not served while a ba
 breakpoints, watchpoints, the listener, start / wait / take-over / stop, attach, detach,
 `release_debugger`, terminate, memory sizes and snapshots, settings, and every non-debugger tool.
 
-**The end** sends the envelope on the stop's connection, keeps each call's answer by number — the
-answer the tool gives for what SAP answered to its part — ends the batch whatever happens and
-answers `{ recorded, failed }`. It leaves the debug session as it was: the stop, its view and its
-connection stay; when a recorded step's answer says the program ended, that answer under its
-number shows it, and the next ordinary debugger call learns it from SAP.
+**The end** sends the envelope on the connection the batch was begun on — the ABAP stop's, or the
+AMDP session's command connection — keeps each call's answer by number — the answer the tool gives
+for what SAP answered to its part — ends the batch whatever happens and answers `{ recorded,
+failed }`. It leaves the debug session as it was: the stop, its view and its connection stay; when
+a recorded step's answer says the program ended, that answer under its number shows it, and the
+next ordinary debugger call learns it from SAP. At an AMDP break the full set's session keeps its
+debuggee until its event read reports the next `ON_BREAK` or `ON_EXECUTION_END`: after a recorded
+step, `AmdpDebugWait` answers where the debuggee went.
 
-**Refusals.** Begin needs an ABAP stop (`no debuggee is stopped in this debug session`); while a
-communication batch is open, or the debugger batch already is, begin is refused `batch_mode_other`
-/ `batch_mode_on`, and `BatchBegin` while the debugger batch is open `batch_mode_other`. **AMDP is
-not offered in the debugger batch yet**: begin at an AMDP debug session is refused
-`debug_batch_amdp_unmeasured` ("AMDP debugging is not offered in a debugger batch: not yet
-confirmed against a system") until a test against a system that runs AMDP debugging confirms it.
+**Refusals.** Begin needs an ABAP stop or an AMDP break (`no debuggee is stopped in this debug
+session`); while a communication batch is open, or the debugger batch already is, begin is refused
+`batch_mode_other` / `batch_mode_on`, and `BatchBegin` while the debugger batch is open
+`batch_mode_other`.
 
 **Measured (2026-10-19)** with `src/__tests__/integration/batch/debuggerBatch.test.ts`:
 
@@ -283,8 +298,10 @@ The AMDP gate was measured in process, not through the served tools: at an AMDP 
 SQLScript table function, the AMDP debugger's data preview of a table variable and a step over
 went in one debugger batch envelope on the AMDP session's command connection. SAP answered the
 envelope `202`, the data preview with its table document, the step with `200`, and the debuggee
-moved on to the next line (its next `ON_BREAK`). The server's refusal above still holds: AMDP
-operations are not yet recorded in the debugger batch. The gate stops in a shared fixture, the
+moved on to the next line (its next `ON_BREAK`). On that measurement the server records the AMDP
+operations in the debugger batch (above); the case through the served tools — `DebugBatchBegin` at
+the AMDP break, the recorded AMDP calls, `DebugBatchEnd`, `BatchAnswers` — is written and not yet
+run. The gate stops in a shared fixture, the
 AMDP class `ZMCP_SHR_DBG_AMDP` and its table function `ZMCP_SHR_DBG_TF` (`shared_dependencies`,
 created once by `npm run shared:setup`, never deleted); the test only reads them. It skips only
 where SAP's system information names a database system other than HANA; a pair that is not

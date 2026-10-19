@@ -64,6 +64,8 @@ export interface OpenBatch {
   connection: AdtBatchConnection;
   target?: LateBoundConnection;
   recorded: RecordedCall[];
+  /** A debugger batch: the debug session it records at, an ABAP stop or an AMDP break. */
+  debuggee?: 'abap' | 'amdp';
 }
 
 interface Opened {

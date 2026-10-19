@@ -1,4 +1,7 @@
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
@@ -30,9 +33,16 @@ export async function handleAmdpDebugStep(
   context: HandlerContext,
   args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  // Recorded in the debugger batch: the step's own request.
+  const recorder = debugBatchRecorder(context);
   return debugAnswer(
     args,
-    async () => requireDebugger(context, args, 'use').amdp.step(args.action),
+    async () => {
+      const amdp = requireDebugger(context, args, 'use').amdp;
+      return recorder !== undefined
+        ? amdp.recordStep(recorder, args.action)
+        : amdp.step(args.action);
+    },
     (v) => ({ state: v }),
   );
 }

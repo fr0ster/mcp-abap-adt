@@ -1712,9 +1712,13 @@ export abstract class BaseMcpServer extends McpServer {
       new ServerRefusal('batch_not_recordable', batchNotServedWords(call.tool));
     if (owner === undefined || open === undefined) throw notServed();
     // The debugger batch records the operations of spec §7's table alone,
-    // each on the ABAP stop; every other call is refused.
+    // each at the stop it was opened on — the ABAP stop or the AMDP break;
+    // every other call is refused.
     if (owner.mode() === 'debugger') {
-      if (!recordableInDebugBatch(call.tool, call.args)) throw notServed();
+      if (
+        !recordableInDebugBatch(call.tool, call.args, open.debuggee ?? 'abap')
+      )
+        throw notServed();
       throwIfRequestAborted(call.signal);
       return this.runRecorded(call, owner, open);
     }

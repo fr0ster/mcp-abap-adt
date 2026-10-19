@@ -663,13 +663,13 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** action 'begin': Starts the debugger batch on the stopped debuggee. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch. action 'end': Sends the recorded calls of the stopped debuggee in one envelope on the debuggee's session and ends the debugger batch. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed. action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.
+**Description:** action 'begin': Starts the debugger batch on the stopped ABAP debuggee, or at the AMDP break when no ABAP debuggee is stopped. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch. action 'end': Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed. action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `action` (required) — begin starts the debugger batch on the stopped debuggee; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.
+- `action` (required) — begin starts the debugger batch on the stopped ABAP debuggee or at the AMDP break; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.
 - `number` — answers: one batch number to read, at least 1.
 - `numbers` — answers: several batch numbers to read, each at least 1, answered in the order given.
 

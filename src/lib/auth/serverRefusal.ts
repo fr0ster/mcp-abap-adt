@@ -32,8 +32,7 @@ export type ServerRefusalCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout'
-  | 'debug_batch_amdp_unmeasured';
+  | 'batch_no_timeout';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -171,10 +170,6 @@ export const BATCH_MODE_OFF_WORDS =
 export const BATCH_NO_TIMEOUT_WORDS =
   'in batch mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline';
 
-/** `DebugBatchBegin` on an AMDP stop. */
-export const DEBUG_BATCH_AMDP_UNMEASURED_WORDS =
-  'AMDP debugging is not offered in a debugger batch: not yet confirmed against a system';
-
 /**
  * A call no entry of `tools/batch-handlers.json` admits, in a communication
  * batch: a request of it depends on another's answer (or it sends none).
@@ -241,7 +236,6 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_mode_other: BATCH_MODE_OTHER_WORDS,
   batch_mode_off: BATCH_MODE_OFF_WORDS,
   batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
-  debug_batch_amdp_unmeasured: DEBUG_BATCH_AMDP_UNMEASURED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

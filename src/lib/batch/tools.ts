@@ -13,8 +13,9 @@
  * - answers: the kept answers by number; nothing is sent.
  *
  * The debugger batch (`DebugBatchBegin`, `DebugBatchEnd`, the compact
- * `HandlerDebugBatch`, spec §7) opens on the ABAP stop's connection and
- * executes there; its answers are kept as the communication batch's.
+ * `HandlerDebugBatch`, spec §7) opens on the ABAP stop's connection, or on
+ * the AMDP session's command connection at an AMDP break, and executes
+ * there; its answers are kept as the communication batch's.
  */
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../handlers/interfaces';
@@ -60,10 +61,10 @@ export async function endBatch(context: HandlerContext): Promise<McpResult> {
 
 /**
  * `DebugBatchBegin`: the debugger batch opened on the ABAP stop's
- * connection (nothing is sent); answers `{ debug_batch: 'on', state_handle }`.
- * Refused while a batch is open (`batch_mode_on` / `batch_mode_other`), at
- * an AMDP debug session (`debug_batch_amdp_unmeasured`) and with no ABAP
- * stop.
+ * connection, or — with no ABAP stop — at an AMDP break on the AMDP
+ * session's command connection (nothing is sent); answers
+ * `{ debug_batch: 'on', state_handle }`. Refused while a batch is open
+ * (`batch_mode_on` / `batch_mode_other`) and with neither stop held.
  */
 export async function beginDebugBatch(
   context: HandlerContext,
@@ -71,18 +72,19 @@ export async function beginDebugBatch(
   const owner = ownerOf(context);
   owner.refuseBegin('debugger');
   const debug = requireDebugger(context, {}, { create: 'abap' });
+  const options =
+    context.logger !== undefined ? { logger: context.logger } : {};
   let connection: ReturnType<typeof debug.abap.openBatch>;
+  let debuggee: 'abap' | 'amdp' = 'abap';
   try {
-    connection = debug.abap.openBatch(
-      context.logger !== undefined ? { logger: context.logger } : {},
-    );
+    connection = debug.abap.openBatch(options);
   } catch (error) {
-    if (error instanceof DebugStateError && debug.amdp.holdsState()) {
-      throw new ServerRefusal('debug_batch_amdp_unmeasured');
-    }
-    throw error;
+    if (!(error instanceof DebugStateError) || !debug.amdp.atBreak())
+      throw error;
+    connection = debug.amdp.openBatch(options);
+    debuggee = 'amdp';
   }
-  owner.begin('debugger', { connection, recorded: [] });
+  owner.begin('debugger', { connection, recorded: [], debuggee });
   const answer: Record<string, unknown> = { debug_batch: 'on' };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
@@ -91,7 +93,7 @@ export async function beginDebugBatch(
   };
 }
 
-/** `DebugBatchEnd`: the open debugger batch executed on the stop's connection. */
+/** `DebugBatchEnd`: the open debugger batch executed on the connection it was opened on. */
 export async function endDebugBatch(
   context: HandlerContext,
 ): Promise<McpResult> {

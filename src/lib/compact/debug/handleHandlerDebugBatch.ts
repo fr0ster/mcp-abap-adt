@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['begin', 'end', 'answers'],
         description:
-          "begin starts the debugger batch on the stopped debuggee; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.",
+          "begin starts the debugger batch on the stopped ABAP debuggee or at the AMDP break; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.",
       },
       number: {
         type: 'integer',

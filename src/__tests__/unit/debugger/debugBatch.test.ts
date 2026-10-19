@@ -8,7 +8,7 @@
  * batch owner, the shipped debugger and batch tools of the full and the
  * compact set, and a debugger whose connections are fakes: real adt-clients
  * `AbapDebugger`s over them, every envelope and every direct request counted.
- * Nothing reaches a system.
+ * Nothing reaches a system. The AMDP debugger batch: `amdpDebugBatch.test.ts`.
  */
 import { AbapDebugger, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
@@ -27,7 +27,6 @@ import {
   BATCH_MODE_ON_WORDS,
   BATCH_MODE_OTHER_WORDS,
   batchNotServedWords,
-  DEBUG_BATCH_AMDP_UNMEASURED_WORDS,
 } from '../../../lib/auth/serverRefusal';
 import { endsBatch } from '../../../lib/batch/batchTools';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
@@ -580,20 +579,6 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
       },
     );
     expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
-  });
-
-  it(`AMDP stop refused ${'debug_batch_amdp_unmeasured'}`, async () => {
-    const amdp = s.instance.amdp.bind({
-      connection: s.main.connection,
-    } as unknown as HandlerContext);
-    await amdp.startOnce(false);
-    const answer = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(answer.isError).toBe(true);
-    expect(jsonOf(answer)).toEqual({
-      error: 'debug_batch_amdp_unmeasured',
-      message: DEBUG_BATCH_AMDP_UNMEASURED_WORDS,
-    });
-    expect(s.owner.mode()).toBe('off');
   });
 });
 

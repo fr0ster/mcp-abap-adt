@@ -16,6 +16,11 @@ Every binary serves it, on stdio, Streamable HTTP and SSE:
 `HandlerBatch` is the three tools in one: `begin` is `BatchBegin`, `end` is `BatchEnd`,
 `answers` is `BatchAnswers`; `number` / `numbers` go with `answers` alone.
 
+The debugger has a batch of its own — `DebugBatchBegin` / `DebugBatchEnd`, compact
+`HandlerDebugBatch` — at an ABAP stop or an AMDP break; its answers are read with `BatchAnswers`
+(compact `HandlerDebugBatch` `answers`), and one batch of either kind is open at a time. See
+[DEBUGGER.md](DEBUGGER.md#the-debugger-batch-several-calls-at-a-stop-in-one-envelope).
+
 ## The flow
 
 1. **`BatchBegin`** switches the server into batch mode. It sends nothing and answers

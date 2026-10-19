@@ -104,7 +104,7 @@ export async function handleHandlerDebugMaintain(
       async (d) => {
         if (op !== 'getDataPreview')
           refuseOperation('amdp', op, AMDP_OPERATIONS);
-        return d.amdp.getDataPreviewOnce({
+        const options = {
           debuggeeId: needed(
             args.debuggee_id,
             'debuggee_id: needed for getDataPreview',
@@ -117,7 +117,10 @@ export async function handleHandlerDebugMaintain(
           ...(args.row_number !== undefined
             ? { rowNumber: args.row_number }
             : {}),
-        });
+        };
+        return recorder !== undefined
+          ? d.amdp.recordDataPreviewOnce(recorder, options)
+          : d.amdp.getDataPreviewOnce(options);
       },
       (v) => v.rows,
     );

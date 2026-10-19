@@ -550,7 +550,10 @@ ends by:
   nothing. A wrong password brings no credential refusal to the second stop on either
   transport — a live session's cookie, or the RFC conversation's one logon, authenticates
   it, and an ended session is answered by the ICM before any logon — so the stop's answer
-  to a credential refusal there is not measured. A part that could not be undone is
+  to a credential refusal there is not measured. That case is unit-tested only, because
+  SAP does not produce it live (`secondStopCredentialRefusal.test.ts`: a stubbed credential
+  refuses the second stop; the stop answers `stopped`, sends nothing more, asks the
+  credential nothing more and holds nothing). A unit test is not a measurement. A part that could not be undone is
   reported, kept, and retried by the next stop — the answer is `{ failures, notes? }`, each
   entry the method's error as it is with its step (`release the debuggee`, `stop listener`,
   `delete breakpoint <id>`, `close the listener's connection`, `clear breakpoints`, `stop`,

@@ -637,10 +637,20 @@ async function secondStopListenerOn(kind: Kind, testCase: any): Promise<void> {
     expect(second).toBeDefined();
     if (kind === 'onprem-http') {
       // The ended session's answer, not the credential's: see the header.
+      // Measured: the ICM answers `400` `ICMENOSESSION`; any other failure
+      // (a credential refusal above all) is not what this case measures.
       expect(second?.outcome.answered).toBeUndefined();
+      expect(second?.refused).toBe(false);
+      expect(second?.outcome.status).toBe(400);
+      expect(JSON.stringify(second?.outcome)).toContain('ICMENOSESSION');
     } else {
       expect(second?.outcome.answered).toBe(true);
     }
+    // While the second stopListener went, the credential was asked only to
+    // authorize its one attempt (measured 2026-10-19, HTTP and RFC alike: no
+    // logon, no rejection); nothing was sent after it.
+    expect(secondMoments).toEqual(['authorize']);
+    expect(after).toEqual([]);
     expect(stopped.isError).toBe(false);
     expect(askedAfter).toEqual([]);
     expect(dbg.holdsState()).toBe(false);

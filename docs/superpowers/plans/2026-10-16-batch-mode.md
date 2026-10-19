@@ -535,6 +535,38 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - [ ] **Step 1:** `src/__tests__/integration/batch/debuggerBatch.test.ts`: at a live stop, step + stack + variables in one `DebugBatchEnd` (on-premise, ABAP Cloud); and the AMDP gate (on-premise on HANA). States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record in `DEBUGGER.md`. The AMDP refusal stays until the AMDP case passes; lifting it is its own commit then. Commit.
 
+### Task 29a: The AMDP debugger batch (spec §7, offered now that the §9.3 gate passed)
+
+Task 29 measured the gate on premise over HTTP and RFC (`debuggerBatch.test.ts`, AMDP case): a debugger
+batch envelope on an AMDP session's command connection is accepted, and the step in it moves the
+debuggee. The owner decided it ships in 19.0.0.
+
+**Files:**
+- Modify: `src/lib/debugger/AmdpSession.ts` (or where `AmdpSession` lives), the begin path in `src/lib/batch/tools.ts`, the AMDP tools (`AmdpDebugStep`, `AmdpDebugGetTable`, …) and the compact `HandlerDebugStep` / `HandlerDebugMaintain` AMDP operations, `serverRefusal.ts` / `failures.ts` (drop `debug_batch_amdp_unmeasured`), the batch tool descriptions, `docs/user-guide/DEBUGGER.md`, `docs/user-guide/BATCH_MODE.md`, CHANGELOG 19.0.0
+- Test: the unit tests of the ABAP debugger batch, mirrored for AMDP; `debuggerBatch.test.ts` (the AMDP case through the served tools)
+
+**Interfaces:**
+- Produces: `DebugBatchBegin` opens a debugger batch on an ABAP stop or an AMDP break — chosen by the
+  kind of stop held; the AMDP session gets the batch paths ABAP has (§7: a recorded operation does not
+  enter the serial, it records on the batch debugger over the command connection); `DebugBatchEnd`
+  executes on the connection that holds the session.
+
+- [ ] **Step 1:** Write the failing unit tests: begin on an AMDP break opens the batch; step over /
+  continue / data preview record (one number each, `{ content: [] }`), through the AMDP tools and the
+  compact operations; end executes one envelope on the AMDP command connection, answers by number;
+  begin with no stop is refused as today; the `debug_batch_amdp_unmeasured` refusal is gone.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement the AMDP batch paths, mirroring the ABAP ones; begin picks ABAP or AMDP by
+  the stop held; remove the refusal code from the closed list and its words.
+- [ ] **Step 4:** Run the unit tests — PASS. Break-it: re-insert the refusal — red; record an AMDP step
+  outside the batch path — red; revert.
+- [ ] **Step 5:** Change `debuggerBatch.test.ts`'s AMDP case to go through the served tools
+  (`DebugBatchBegin` at the AMDP break, the recorded AMDP calls, `DebugBatchEnd`, `BatchAnswers`), on
+  the shared AMDP fixture. On the owner's word, run on premise HTTP and RFC; record with the date in
+  `DEBUGGER.md`.
+- [ ] **Step 6:** Descriptions (functional, spec §3 sentences), `DEBUGGER.md`, `BATCH_MODE.md`,
+  CHANGELOG 19.0.0. Commit.
+
 ### Task 30 (live, owner's VPN/tunnel, on his word): a system without the communication batch
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/noCommunicationBatch.test.ts`: the first envelope's outer status; the destination marked; reads run sequentially. States where it runs.

@@ -1838,6 +1838,25 @@ debugger_handlers:
         # on that user. Empty: the another-user case is skipped.
         second_user_env: ""
 
+# Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
+# the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
+# HandlerUpdate, HandlerUnlock and HandlerActivate of three objects, each phase
+# one batch; the objects deleted at the end (HandlerDeletionCheck, HandlerDelete).
+# They go into environment.default_package / default_transport unless named here.
+# The names must be free: a name that reads is refused before anything is created.
+batch:
+  test_cases:
+    - name: "communication"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      description: "Communication batch through the served compact tools: create, lock, write, unlock, activate, delete"
+      params:
+        class_name: "ZMCP_BTC_CLS"
+        interface_name: "ZMCP_BTC_INTF"
+        domain_name: "ZMCP_BTC_DOM"
+        # package_name: "ZMCP_TEST"
+        # transport_request: ""
+
 # Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
 runtime_feed_handlers:
   test_cases:

@@ -184,6 +184,55 @@ anyway, the call answers `batch_other_kind` and records nothing more; if an earl
 already recorded, the words say so with its number — that part is sent at `BatchEnd`, and its
 number answers the same refusal.
 
+### The phases, measured
+
+Measured 2026-10-19 (`src/__tests__/integration/batch/communicationBatch.test.ts`, the case
+`batch.test_cases.communication`): the compact server started over stdio and called through an MCP
+client, with three objects — a class, an interface and a domain — in a package with a transport
+request. Each phase was one `HandlerBatch` begin, the calls, end, then the answers by number:
+
+1. reads — `HandlerGet` part `metadata` of each object, each answering `404` (the names are free);
+2. create — `HandlerCreate` × 3;
+3. reads — `HandlerGet` part `metadata` of the domain, the document its write sends back whole;
+4. lock — `HandlerLock` × 3, the lock handles read from the answers;
+5. write — `HandlerUpdate` × 3 under those handles: the class's and the interface's sources, the
+   domain's whole document in `source_code`;
+6. unlock — `HandlerUnlock` × 3;
+7. activate — `HandlerActivate` × 3, one object each, each answering `activated: true`;
+8. reads — `HandlerGet` × 3: the sources and the document as written;
+9. deletion check — `HandlerDeletionCheck` × 3, each answering `deletable: true`;
+10. delete — `HandlerDelete` × 3;
+11. reads — `HandlerGet` part `metadata` of each object, each answering `404`.
+
+| Destination | Result | Runs |
+|---|---|---|
+| on premise (HTTP) | passed | 2 |
+| on premise (RFC) | passed | 2 |
+| ABAP Cloud | not run: the test configuration names no ABAP Cloud destination | — |
+
+On both, every recorded call answered nothing, every batch end answered `recorded: 3` (1 for the
+domain document) with no envelope failure, and every number's answer was its own: phases 1 and 11
+failed `[1, 2, 3]` with `404` each, every other phase failed none. The objects' entries went into
+the configured transport request; no other request was created. The server, stopped by the end of
+its stdin, logged its sessions off and exited `0`. Over RFC the server connected to the RFC
+gateway only, with no HTTP connection to the system.
+
+Time of each batch end, in milliseconds (the last run on each; recording a call took 1–10 ms):
+
+| Phase | on premise (HTTP) | on premise (RFC) |
+|---|---:|---:|
+| reads (names free) | 538 | 238 |
+| create | 999 | 947 |
+| reads (domain document) | 141 | 235 |
+| lock | 862 | 202 |
+| write | 471 | 611 |
+| unlock | 108 | 104 |
+| activate | 1436 | 1402 |
+| reads (written) | 205 | 356 |
+| deletion check | 595 | 647 |
+| delete | 3265 | 3062 |
+| reads (deleted) | 386 | 212 |
+
 ## A system without the communication batch
 
 The tools that read several independent things inside one call (the package walks,

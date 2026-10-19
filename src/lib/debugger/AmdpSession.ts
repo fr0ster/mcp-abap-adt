@@ -24,6 +24,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { adtHeadersOf, withAdtHeaders } from '../adtHeaders/withAdtHeaders';
+import { currentRequestSignal } from '../requestSignal';
 import {
   carryingFailure,
   carryingPayload,
@@ -143,6 +144,7 @@ export class AmdpSession<O = unknown> {
   private closing?: Open; // retired, its cleanup not finished
   private debuggeeId?: string;
   private breaks = 0; // counts ON_BREAK, to tell a break that came during a step
+  private ends = 0; // counts ON_WARNING, ON_EXECUTION_END and STOP: a debuggee's cancel or release has finished
   private queue: AmdpEvent[] = [];
   private readonly syncs = new Map<string, AmdpEvent>(); // SYNC_BREAKPOINTS by request id, apart from the queue
   private readonly abandoned = new Set<string>(); // syncs no call waits for any more
@@ -392,6 +394,12 @@ export class AmdpSession<O = unknown> {
       }
       if (e.kind === 'ON_EXECUTION_END' && e.debuggeeId === this.debuggeeId)
         this.debuggeeId = undefined;
+      if (
+        e.kind === 'ON_WARNING' ||
+        e.kind === 'ON_EXECUTION_END' ||
+        e.kind === 'STOP'
+      )
+        this.ends++;
       this.queue.push(e);
     }
   }
@@ -1107,6 +1115,7 @@ export class AmdpSession<O = unknown> {
         for (const c of [...this.unclosed])
           await this.closeOrKeep(c, 'a connection', failures);
         await this.finishOnce(failures);
+        await this.letDebuggeeEnd(failures);
         if (this.open) this.retire(this.open);
         if (this.closing) {
           const open = this.closing;
@@ -1147,6 +1156,59 @@ export class AmdpSession<O = unknown> {
       if (failures.length)
         throw new DebugCleanupError(failures, [], ending.notAttempted ?? []);
     }
+  }
+
+  /**
+   * Inside stop, before the session is retired: a debuggee standing at a
+   * break is cancelled, and the stop waits until it has ended — the event
+   * read reports `ON_WARNING`, `ON_EXECUTION_END` or `STOP`, and every run
+   * in flight has returned — as Eclipse does. Measured on premise
+   * (2026-10-19): a stop and logoffs sent while the cancel was still under
+   * way left the AMDP debugger's ABAP sessions and their RFCs alive; sent
+   * after it had finished, nothing stayed. No timer: the wait ends with the
+   * debuggee, the session's failed read, or the stop call's own signal — and
+   * then the answer says the debuggee had not ended. A cancel that is
+   * refused is left to the retired session's cleanup, which sends it again
+   * and names it.
+   */
+  private async letDebuggeeEnd(failures: DebugFailure[]): Promise<void> {
+    const open = this.open;
+    const debuggee = this.debuggeeId;
+    if (!open || open.stopping || debuggee === undefined) return;
+    const endsBefore = this.ends;
+    const cancelled = await open.onCommands
+      .deleteDebuggee(open.mainId, debuggee)
+      .catch(asFailure);
+    if (!cancelled.ok) return;
+    open.released.add(debuggee);
+    if (this.debuggeeId === debuggee) this.debuggeeId = undefined;
+    const signal = currentRequestSignal();
+    const debuggeeEnded = () => this.ends > endsBefore && this.runs.size === 0;
+    const settled = () =>
+      debuggeeEnded() ||
+      this.open !== open ||
+      open.readFailed !== undefined ||
+      signal?.aborted === true;
+    await new Promise<void>((resolve) => {
+      const check = () => {
+        if (!settled()) return;
+        this.waiters.delete(check);
+        signal?.removeEventListener('abort', check);
+        resolve();
+      };
+      this.waiters.add(check);
+      signal?.addEventListener('abort', check);
+      check();
+    });
+    if (!debuggeeEnded())
+      failures.push(
+        thrownFailure(
+          new Error(
+            `the debuggee ${debuggee} had not ended when the stop was sent`,
+          ),
+          'wait for the debuggee to end',
+        ),
+      );
   }
 
   /**

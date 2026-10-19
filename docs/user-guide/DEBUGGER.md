@@ -709,8 +709,14 @@ class (`class_name`, `line`).
   carried as it is with the step `read events`; a read that threw on our side (not an answer of
   SAP) is carried as `client_threw` with the same step.
 - **Stop releases a suspended debuggee first.** A stop alone never releases it
-  (measured), so `AmdpDebugStop` — and `DebugStop` — delete it first, then stop the
-  session, and return once the system has answered the event read it ended.
+  (measured), so `AmdpDebugStop` — and `DebugStop` — delete it first, wait until it has
+  ended — the event read reports `ON_WARNING`, `ON_EXECUTION_END` or `STOP` and the run that
+  called it has returned — then stop the session, and return once the system has answered the
+  event read it ended. Measured on premise (2026-10-19): a stop and logoffs sent while the
+  cancel was still under way left the AMDP debugger's ABAP sessions and their RFCs
+  (`AMDP_DBG_EVENT_LISTENER`, `AMDP_DBG_ACTION_ON_DEBUGGEE_WP`) alive until their timeout;
+  sent once the cancel had finished, nothing stayed. The wait has no clock of its own: the
+  stop call's cancellation ends it, and the answer then says the debuggee had not ended.
   `AmdpDebugStop` ends the handle only when nothing else is held; an ABAP session
   under the same handle goes on. A credential refusal on one of these steps ends
   the stop as it does the ABAP one ([What ends a session](#what-ends-a-session)):

@@ -17,6 +17,7 @@ import {
   AMDP_START,
   AMDP_STOPPED,
   AMDP_SYNCED,
+  amdpEnd,
   deferred,
   fakeWorld,
   IDS,
@@ -71,7 +72,12 @@ describe('stateful sessions of a debug run', () => {
         return d.promise;
       },
       syncBreakpoints: async () => okResponse({ headers: { location: 'Q1' } }),
-      deleteDebuggee: async () => okResponse({}),
+      // As the system does: a cancel ends the debuggee and its run.
+      deleteDebuggee: async (_m: string, d: string) => {
+        for (const r of reads) r.resolve(okResponse(amdpEnd(d)));
+        run.resolve({ ok: false, message: 'cancelled' });
+        return okResponse({});
+      },
       stop: async () => {
         for (const r of reads) r.resolve(okResponse(AMDP_STOPPED));
         return okResponse({});

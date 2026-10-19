@@ -3,6 +3,7 @@ import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
+import { runWithRequestSignal } from '../../../lib/requestSignal';
 import { payloadCarriedBy } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
@@ -178,7 +179,51 @@ describe('AmdpSession', () => {
     );
   });
 
-  it('stop releases a suspended debuggee before the stop and returns only once the open read answered and its last batch closed everything', async () => {
+  it('stop cancels a suspended debuggee and sends the stop only once the debuggee ended — its end event and the run returned — then logs off', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    let done = false;
+    const stopping = w.session.stop().then(() => {
+      done = true;
+    });
+    await until(() => w.calls.includes('delete:D1'));
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(w.calls).not.toContain('stop'); // the debuggee has not ended yet
+    w.reads[2].resolve(okResponse(END)); // ON_EXECUTION_END of D1
+    await until(() => w.reads.length === 4);
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(w.calls).not.toContain('stop'); // the run has not returned yet
+    w.run.resolve({ ok: false, message: 'cancelled' });
+    await until(() => w.calls.includes('stop'));
+    await stopping;
+    expect(done).toBe(true);
+    const order = ['delete:D1', 'stop'].map((c) => w.calls.indexOf(c));
+    expect(order[0]).toBeLessThan(order[1] as number);
+    expect(w.calls.filter((c) => c === 'delete:D1')).toHaveLength(1);
+    expect(w.closed).toHaveLength(3); // events, commands and the run, after the stop
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it("the stop call's own signal ends the wait for the debuggee: the stop is sent and the answer says the debuggee had not ended", async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const call = new AbortController();
+    const stopping = runWithRequestSignal(call.signal, () => w.session.stop());
+    const failed = expect(stopping).rejects.toThrow(
+      /the debuggee D1 had not ended when the stop was sent/,
+    );
+    await until(() => w.calls.includes('delete:D1'));
+    expect(w.calls).not.toContain('stop');
+    call.abort();
+    await until(() => w.calls.includes('stop'));
+    await failed;
+  });
+
+  it('stop releases a suspended debuggee, waits for its end, then stops, and returns only once the open read answered and its last batch closed everything', async () => {
     const w = await started();
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => w.reads.length === 3);
@@ -187,11 +232,14 @@ describe('AmdpSession', () => {
     const stopping = w.session.stop().then(() => {
       done = true;
     });
+    await until(() => w.calls.includes('delete:D1'));
+    w.reads[2].resolve(okResponse(END)); // the cancelled debuggee ended
     await until(() => w.calls.includes('stop'));
     await jest.advanceTimersByTimeAsync(1000);
     expect(done).toBe(false); // the system has not answered the read yet
     expect(w.calls.indexOf('delete:D1')).toBeLessThan(w.calls.indexOf('stop'));
-    w.reads[2].resolve(okResponse(amdpBreak('D2'))); // a break in the last batch
+    await until(() => w.reads.length === 4);
+    w.reads[3].resolve(okResponse(amdpBreak('D2'))); // a break in the last batch
     await stopping;
     expect(w.calls).toContain('delete:D2');
     expect(w.closed).toHaveLength(2);

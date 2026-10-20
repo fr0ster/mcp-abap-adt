@@ -119,10 +119,10 @@ and the answers.
 | Tool | Arguments | Answers |
 |---|---|---|
 | `BatchBegin` | none | `{ batch: 'on', state_handle }` |
-| `BatchEnd` | none | the summary and what came (§5.3) |
+| `BatchEnd` | none | `{ recorded, sent, received }` or its error (§5.3) |
 | `BatchAnswers` | exactly one of `number` (integer ≥ 1) or `numbers` (array of integers ≥ 1, at least one) | one entry per number asked, in the order asked (§6) |
 | `DebugBatchBegin` | none | `{ debug_batch: 'on', state_handle }` |
-| `DebugBatchEnd` | none | the summary and what came (§5.3) |
+| `DebugBatchEnd` | none | `{ recorded, sent, received }` or its error (§5.3) |
 
 "One number or a list" is two properties because the schema converter
 (`src/lib/handlers/utils/schemaUtils.ts`) has no `oneOf`/union support; giving both or neither is
@@ -169,10 +169,13 @@ wording. The words below follow it; the plan's description sweep holds every oth
   Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call
   of the batch."
 - `BatchEnd`: "Sends the recorded calls in one envelope with the credentials in force and ends batch
-  mode. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer
-  to the envelope when the envelope failed."
+  mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of
+  requests sent and of parts received; when sending fails, the parts received differ from the
+  requests sent or the answer fails to split, answers that error, and every number of the batch then
+  answers it."
 - `BatchAnswers`: "Answers the calls of the last executed batch by number: for each number asked,
-  the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of
+  the tool's answer, built from the call's parts of SAP's response when the number is first read and
+  kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of
   numbers; an unknown number answers as unknown."
 - `HandlerBatch` / `HandlerDebugBatch`: the same sentences, one per action (`action: 'begin'`,
   `'end'`, `'answers'`).

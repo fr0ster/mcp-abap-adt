@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'MemorySnapshotList',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.',
+    '[read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.',
   inputSchema: {
     type: 'object',
     properties: {

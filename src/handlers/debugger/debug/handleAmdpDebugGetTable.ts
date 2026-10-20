@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'AmdpDebugGetTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.',
+    '[read-only] [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.',
   inputSchema: {
     type: 'object',
     properties: {

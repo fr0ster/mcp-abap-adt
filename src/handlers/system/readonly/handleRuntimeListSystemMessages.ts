@@ -8,7 +8,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.',
+    '[read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.',
   inputSchema: {
     type: 'object',
     properties: {

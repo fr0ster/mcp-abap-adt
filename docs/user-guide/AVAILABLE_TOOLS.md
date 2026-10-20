@@ -371,7 +371,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbackgroundrun-read-only-background-run"></a>
 #### GetBackgroundRun (Read-Only / Background Run)
-**Description:** [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). A read keeps the run; a finished run is kept until you discard it.
+**Description:** [read-only] [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). A read keeps the run; a finished run is kept until you discard it.
 
 **Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
 
@@ -382,7 +382,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listbackgroundruns-read-only-background-run"></a>
 #### ListBackgroundRuns (Read-Only / Background Run)
-**Description:** [runtime] Lists your background runs: run_handle, tool, object, when it started, and running or finished. A run's output is read by its run_handle.
+**Description:** [read-only] [runtime] Lists your background runs: run_handle, tool, object, when it started, and running or finished. A run's output is read by its run_handle.
 
 **Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
 
@@ -543,7 +543,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
-**Description:** [read-only] Lists the enhancements (enhancement implementations) of the program, include or class named by object_name and object_type. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).
+**Description:** [read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
@@ -1060,7 +1060,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
@@ -1099,7 +1099,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
+**Description:** [read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
@@ -1112,7 +1112,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
+**Description:** [read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
@@ -1127,7 +1127,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
@@ -1144,7 +1144,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] Reads the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, and lists the runtime feeds and their variants: also system messages and SAP Gateway errors, by feed_type; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
@@ -1166,7 +1166,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
+**Description:** [read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
@@ -1177,7 +1177,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
+**Description:** [read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
@@ -1541,7 +1541,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object, its source code written afterwards.
+**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -3576,7 +3576,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebuggettable-debug-debugger"></a>
 #### AmdpDebugGetTable (Debug / Debugger)
-**Description:** [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
+**Description:** [read-only] [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
 
@@ -3642,7 +3642,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugwait-debug-debugger"></a>
 #### AmdpDebugWait (Debug / Debugger)
-**Description:** [debug] AMDP events of a debug session after waiting up to hold_seconds.
+**Description:** [read-only] [debug] AMDP events of a debug session after waiting up to hold_seconds.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
 
@@ -3729,7 +3729,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetmemorysizes-debug-debugger"></a>
 #### DebugGetMemorySizes (Debug / Debugger)
-**Description:** [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
 
@@ -3741,7 +3741,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetstack-debug-debugger"></a>
 #### DebugGetStack (Debug / Debugger)
-**Description:** [debug] Call stack of the stopped debuggee of the debug session named by state_handle, each frame with its ADT object address and its technical place. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Call stack of the stopped debuggee of the debug session named by state_handle, each frame with its ADT object address and its technical place. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
 
@@ -3753,7 +3753,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetvariables-debug-debugger"></a>
 #### DebugGetVariables (Debug / Debugger)
-**Description:** [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
 
@@ -3767,7 +3767,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistbreakpoints-debug-debugger"></a>
 #### DebugListBreakpoints (Debug / Debugger)
-**Description:** [debug] Breakpoints a debug session armed.
+**Description:** [read-only] [debug] Breakpoints a debug session armed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
 
@@ -3779,7 +3779,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistwatchpoints-debug-debugger"></a>
 #### DebugListWatchpoints (Debug / Debugger)
-**Description:** [debug] Watchpoints of the stopped debuggee.
+**Description:** [read-only] [debug] Watchpoints of the stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
 
@@ -3935,7 +3935,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugwait-debug-debugger"></a>
 #### DebugWait (Debug / Debugger)
-**Description:** [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
+**Description:** [read-only] [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
 
 **Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
 
@@ -3948,7 +3948,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotdelta-debug-debugger"></a>
 #### MemorySnapshotDelta (Debug / Debugger)
-**Description:** [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
 
@@ -3964,7 +3964,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotget-debug-debugger"></a>
 #### MemorySnapshotGet (Debug / Debugger)
-**Description:** [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
 
@@ -3979,7 +3979,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotlist-debug-debugger"></a>
 #### MemorySnapshotList (Debug / Debugger)
-**Description:** [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.
+**Description:** [read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
 
@@ -3997,7 +3997,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listleftoversessions-session-leftover-session"></a>
 #### ListLeftoverSessions (Session / Leftover Session)
-**Description:** [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (absent for a token login) and when it was last recorded. Read from the session records alone, on this machine. Only sessions of ended processes are listed. Log one off by its handle. A server process that starts while exactly one instance session (built) of its destination is left is born on it, before any tool call; with several, all stay here, untaken.
+**Description:** [read-only] [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (absent for a token login) and when it was last recorded. Read from the session records alone, on this machine. Only sessions of ended processes are listed. Log one off by its handle. A server process that starts while exactly one instance session (built) of its destination is left is born on it, before any tool call; with several, all stay here, untaken.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 

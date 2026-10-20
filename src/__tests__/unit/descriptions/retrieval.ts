@@ -257,7 +257,7 @@ export interface Outcome {
 /**
  * Runs every query for every role it names: each collection the role
  * searches gives its top K, and a group is found when one of its tools is
- * among them.
+ * among them with a score above 0.
  */
 export function evaluate(
   queries: readonly Query[],
@@ -268,8 +268,11 @@ export function evaluate(
   for (const query of queries) {
     for (const role of query.roles) {
       const rankings = new Map<Collection, string[]>();
+      const scored = new Map<string, number>();
       for (const collection of COLLECTIONS[role]) {
-        rankings.set(collection, ranked(scorer(collection, query.query)));
+        const scores = scorer(collection, query.query);
+        rankings.set(collection, ranked(scores));
+        for (const [name, score] of scores) scored.set(name, score);
       }
       const groups = query.required.map((tools) => {
         let best: number | undefined;
@@ -281,7 +284,14 @@ export function evaluate(
           if (index < 0) continue;
           const rank = index + 1;
           if (best === undefined || rank < best) best = rank;
-          if (rank <= TOP_K[collectionOf(tool)]) found = true;
+          // A tool that scored nothing is not found, whatever place the
+          // tie-break by name gave it.
+          if (
+            rank <= TOP_K[collectionOf(tool)] &&
+            (scored.get(tool) ?? 0) > 0
+          ) {
+            found = true;
+          }
         }
         return { tools, rank: best, found };
       });

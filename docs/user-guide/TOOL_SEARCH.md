@@ -48,24 +48,59 @@ every set (the full set, the `-ro` sets and the compact sets).
 ## Building the index
 
 - **Lexical (BM25):** index each tool as its name, its parameter names and its
-  `keywords`. Split ABAP identifiers on underscores and case changes
-  (`BAPI_USER_GET_DETAIL` → `bapi user get detail`, `GetWhereUsed` →
-  `get where used`).
+  `keywords`. The tests tokenize as follows; a tokenizer that differs ranks
+  differently:
+  - letters and digits form words; anything else separates them;
+  - a word is split on underscores, case changes and letter/digit boundaries
+    (`BAPI_USER_GET_DETAIL` → `bapi user get detail`, `GetWhereUsed` →
+    `get where used`, `ZI_SALESORDER2` → `zi salesorder 2`);
+  - lower-cased; a plural folded to its singular (`views` → `view`,
+    `entries` → `entry`; a word ending in `ss`, `us` or `is` is kept);
+  - a short list of English stopwords dropped (`the`, `of`, `is`, `me`, …);
+    `where` and `who` are kept, since "where used" and "who calls" are what
+    users ask with.
+  - BM25 with k1 = 1.2, b = 0.75.
 - **Vector:** embed `semantic` alone, with the document prefix your model
   asks for (`search_document: ` for nomic-embed-text, for example), and the
   query with its query prefix.
 - **Hybrid:** 0.7 × cosine + 0.3 × BM25, the BM25 score divided by the best
   of the collection.
-- **Collections:** the read-only tools in one collection, the rest in another,
-  each searched for its own top K.
+- **Collections:** the tests build two: the read collection is the tools the
+  `-ro` binary of the full set (`mcp-abap-adt-ro`) serves; the write
+  collection is every other tool of the full set. Each is searched for its own
+  top K. This is not the same as splitting by the `[read-only]` marker: some
+  tools that change nothing (the syntax checks, the version reads, a class's
+  local includes, the ATC status and findings, the debugger's reads) are not
+  served by the `-ro` binary, and the `-ro` binary also serves the run tools.
+  A tool that scored nothing is never counted as found, whatever its place.
+
+### Embedding with bge-m3 on a GPU
+
+Measured with Ollama 0.24: bge-m3 (F16) on the GPU answers some texts with a
+NaN that Ollama cannot encode (HTTP 500, "unsupported value: NaN"): 54 of the
+296 `semantic` texts. A client embedding with bge-m3 on the GPU loses those
+tools from its index. On the CPU (Ollama option `num_gpu: 0`) every text
+embeds; the tests run bge-m3 that way.
 
 ## How they are checked
 
-Two tests run the labelled queries of `src/__tests__/unit/descriptions/queries.ts`
-(the cases of issues #270 and #271 among them) for a reader (read-only tools)
-and a developer (every tool), over the full set's catalog as `tools/list`
-serves it, and require every tool a query needs within the top 10 of the read
-collection and the top 5 of the write collection:
+Two query sets, both for a reader (the read collection) and a developer
+(both collections), over the full set's catalog as `tools/list` serves it,
+with the top 10 of the read collection and the top 5 of the write collection:
+
+- **the tuning set** (`src/__tests__/unit/descriptions/queries.ts`: the
+  cases of issues #270 and #271, and requests written with the texts): every
+  query must find every tool it needs. It is a regression guard on these
+  queries, not a measure of how the texts do on others.
+- **the held-out set** (`heldOutQueries.json` beside it: queries the texts
+  were never tuned on; the consumer's findings join it): it must not get worse
+  than its recorded baseline (`heldOutBaseline.json`, the pairs that failed
+  per mode and model). The texts are never edited to make a held-out query
+  pass: a held-out failure is fixed only together with fresh held-out
+  queries, which the fix is measured on, and the baseline is recorded again
+  with them.
+
+The tests:
 
 - `toolRetrieval.test.ts` — BM25 over name, parameters and `keywords`;
   offline, in every run (CI included);
@@ -73,9 +108,11 @@ collection and the top 5 of the write collection:
   for five embedding models of a local Ollama (`http://127.0.0.1:11434`:
   nomic-embed-text, bge-m3, mxbai-embed-large, bge-large,
   snowflake-arctic-embed:335m); it runs where that Ollama answers with the
-  model and is skipped elsewhere, its name saying why.
+  model and is skipped elsewhere, its name saying why. Its requests carry no
+  timeout of their own; a hung Ollama is bounded by Jest's test timeout.
 
 `descriptionsFunctional.test.ts` holds every `description` to its rules:
-no negation, no other tool of its set named, `[read-only]` on a read tool, a
-first sentence no other tool of its set shares, and no vague subject ("an
-ABAP object") in it.
+no negation, no other tool of its set named, `[read-only]` on every tool that
+changes nothing (beside a `[runtime]`, `[debug]` or `[session]` marker where
+the tool has one), a first sentence no other tool of its set shares, and no
+vague subject ("an ABAP object") in it.

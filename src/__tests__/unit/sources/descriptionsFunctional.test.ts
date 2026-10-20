@@ -81,10 +81,37 @@ const READ_ONLY_OF: Readonly<Record<ToolSetKind, ToolSetKind>> = {
   'compact-ro': 'compact-ro',
 };
 
-/** The markers that name a tool's own family in place of `[read-only]`. */
-const FAMILY_MARKERS = ['[runtime]', '[debug]', '[session]'];
+/**
+ * The tools a read-only set serves that change something: they run code,
+ * schedule a trace or log a session off. (The batch tools are aside: they
+ * record and send other calls.)
+ */
+const CHANGING_IN_READ_ONLY_SETS: ReadonlySet<string> = new Set([
+  'RuntimeRunClass',
+  'RuntimeRunProgram',
+  'RuntimeCreateProfilerTraceParameters',
+  'LogoffLeftoverSession',
+  'HandlerLeftoverSessionLogoff',
+]);
 
-/** The verbs a full-set read tool's name begins with. */
+/**
+ * The tools that change nothing whose name does not say so by a read verb:
+ * the waits read the debug session's state and send nothing, the delta
+ * compares two snapshots, the compact background-run reads read the kept
+ * runs.
+ */
+const READ_BY_NAME: ReadonlySet<string> = new Set([
+  'DebugWait',
+  'AmdpDebugWait',
+  'MemorySnapshotDelta',
+  'HandlerBackgroundRunGet',
+  'HandlerBackgroundRunList',
+]);
+
+/** The family prefixes a tool name may carry before its verb. */
+const FAMILY_PREFIXES = ['Runtime', 'AmdpDebug', 'Debug', 'MemorySnapshot'];
+
+/** The verbs a read tool's name (after its family prefix) begins with. */
 const READ_VERBS = [
   'Get',
   'List',
@@ -93,31 +120,36 @@ const READ_VERBS = [
   'Describe',
   'Check',
   'Validate',
+  'Analyze',
 ];
 
+/** Whether `name` begins with the word `word`: the next letter, if any, starts a new word. */
+function startsWithWord(name: string, word: string): boolean {
+  if (!name.startsWith(word)) return false;
+  const next = name.charAt(word.length);
+  return next === '' || next === next.toUpperCase();
+}
+
 /**
- * Whether `tool` of a set whose read-only set serves `readOnly` is a read
- * tool that must carry `[read-only]`: served by the read-only set, or (full
- * set) named by a read verb — a batch tool, a leftover-session tool and a
- * tool marked with its family's marker aside.
+ * Whether `tool` changes nothing, and so must carry `[read-only]` (beside
+ * its family's `[runtime]`, `[debug]` or `[session]`): served by the set's
+ * read-only set and not one of the tools there that change something, or
+ * named by a read verb after an optional family prefix, or one of the reads
+ * `READ_BY_NAME` lists. A batch tool is aside.
  */
 function mustBeMarkedReadOnly(
   tool: ServedTool,
   readOnly: ReadonlySet<string>,
 ): boolean {
-  if (isBatchTool(tool.name) || tool.name.includes('LeftoverSession')) {
-    return false;
-  }
-  if (FAMILY_MARKERS.some((marker) => tool.description.startsWith(marker))) {
-    return false;
-  }
-  if (readOnly.has(tool.name)) return true;
-  if (tool.name.startsWith('Handler')) return false;
-  return READ_VERBS.some((verb) => {
-    if (!tool.name.startsWith(verb)) return false;
-    const next = tool.name.charAt(verb.length);
-    return next !== '' && next === next.toUpperCase();
-  });
+  if (isBatchTool(tool.name)) return false;
+  if (CHANGING_IN_READ_ONLY_SETS.has(tool.name)) return false;
+  if (readOnly.has(tool.name) || READ_BY_NAME.has(tool.name)) return true;
+  const prefix = FAMILY_PREFIXES.find((each) =>
+    startsWithWord(tool.name, each),
+  );
+  const rest =
+    prefix === undefined ? tool.name : tool.name.slice(prefix.length);
+  return READ_VERBS.some((verb) => startsWithWord(rest, verb));
 }
 
 /** The identifiers of `text`: runs of letters, digits and underscores. */
@@ -228,6 +260,21 @@ describe('tool descriptions are purely functional', () => {
     expect(mustBeMarkedReadOnly(tool('UpdateClass', 'x'), none)).toBe(false);
     expect(
       mustBeMarkedReadOnly(tool('GetBackgroundRun', '[runtime] x'), none),
+    ).toBe(true);
+    expect(mustBeMarkedReadOnly(tool('DebugGetStack', 'x'), none)).toBe(true);
+    expect(mustBeMarkedReadOnly(tool('MemorySnapshotList', 'x'), none)).toBe(
+      true,
+    );
+    expect(mustBeMarkedReadOnly(tool('DebugWait', 'x'), none)).toBe(true);
+    expect(mustBeMarkedReadOnly(tool('DebugSetBreakpoints', 'x'), none)).toBe(
+      false,
+    );
+    expect(mustBeMarkedReadOnly(tool('DebugStep', 'x'), none)).toBe(false);
+    expect(
+      mustBeMarkedReadOnly(
+        tool('RuntimeRunClass', 'x'),
+        new Set(['RuntimeRunClass']),
+      ),
     ).toBe(false);
     expect(
       mustBeMarkedReadOnly(

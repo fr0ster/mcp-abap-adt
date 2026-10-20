@@ -17,7 +17,7 @@ export interface Query {
   /** One group per step of the request; any tool of a group answers it. */
   readonly required: ReadonlyArray<readonly string[]>;
   /** Where the query comes from. */
-  readonly source: '#270' | '#271' | 'own';
+  readonly source: '#270' | '#271' | 'own' | 'heldout';
 }
 
 const BOTH: readonly Role[] = ['reader', 'developer'];

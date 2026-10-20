@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeGetProfilerTraceData',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.',
+    '[read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.',
   ),
   inputSchema: {
     type: 'object',

@@ -9,7 +9,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugListBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Breakpoints a debug session armed.',
+  description: '[read-only] [debug] Breakpoints a debug session armed.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

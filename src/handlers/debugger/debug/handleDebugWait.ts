@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugWait',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.",
+    "[read-only] [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.",
   inputSchema: {
     type: 'object',
     properties: {

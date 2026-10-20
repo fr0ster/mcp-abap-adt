@@ -2489,22 +2489,12 @@ export abstract class BaseMcpServer extends McpServer {
         typeof second !== 'function'
       ) {
         // `registerTool(name, config, callback)`.
-        const config = second as {
-          description?: unknown;
-          _meta?: Record<string, unknown>;
-        };
+        const config = second as { description?: unknown };
         const description =
           typeof config.description === 'string' ? config.description : '';
-        const search = searchMeta(name);
         return [
           name,
-          {
-            ...config,
-            description: appended(description),
-            ...(search._meta === undefined
-              ? {}
-              : { _meta: { ...config._meta, ...search._meta } }),
-          },
+          { ...config, description: appended(description) },
           ...registerArgs.slice(2),
         ];
       }
@@ -2516,8 +2506,13 @@ export abstract class BaseMcpServer extends McpServer {
           const register = Reflect.get(target, property) as (
             ...registerArgs: unknown[]
           ) => unknown;
+          // Its search texts are attached whatever the batch owner, in
+          // either form (`registerTool` or `tool`), once it is registered.
           return (...registerArgs: unknown[]) =>
-            register.apply(target, wrapLast(described(registerArgs)));
+            withSearchMeta(
+              registerArgs[0],
+              register.apply(target, wrapLast(described(registerArgs))),
+            );
         }
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;
@@ -2691,6 +2686,25 @@ function statedEnvironment(
   return declared === 'onprem' || declared === 'cloud' || declared === 'legacy'
     ? declared
     : undefined;
+}
+
+/**
+ * A registry's own registered tool, given the `_meta` its name has in the
+ * search table (merged into what it carries); a tool the table does not name,
+ * or a registration that answered no updatable tool, is left as it is.
+ */
+function withSearchMeta(name: unknown, registered: unknown): unknown {
+  if (typeof name !== 'string') return registered;
+  const search = searchMeta(name)._meta;
+  if (search === undefined || registered === null) return registered;
+  if (typeof registered !== 'object') return registered;
+  const tool = registered as {
+    _meta?: Record<string, unknown>;
+    update?: (updates: { _meta?: Record<string, unknown> }) => void;
+  };
+  if (typeof tool.update !== 'function') return registered;
+  tool.update({ _meta: { ...tool._meta, ...search } });
+  return registered;
 }
 
 /**

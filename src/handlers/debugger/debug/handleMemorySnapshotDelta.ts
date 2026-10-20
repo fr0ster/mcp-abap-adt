@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'MemorySnapshotDelta',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
+    "[read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
   inputSchema: {
     type: 'object',
     properties: {

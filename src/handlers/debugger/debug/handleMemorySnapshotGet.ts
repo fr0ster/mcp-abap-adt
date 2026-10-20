@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'MemorySnapshotGet',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
+    "[read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
   inputSchema: {
     type: 'object',
     properties: {

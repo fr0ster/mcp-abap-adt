@@ -3,12 +3,16 @@
  * name, parameter names and `keywords` (as `tools/list` serves them, under
  * `_meta["mcp-abap-adt/search"]`), over the full set's catalog — the read
  * collection what the read-only set serves, the write collection the rest.
- * Every required group of every query (`queries.ts`, #270 and #271 among
- * them) is found within the consumer's top K per collection (`TOP_K`: 10
- * read, 5 write) for every role that asks it.
+ * Every required group of every query of the tuning set (`queries.ts`, #270
+ * and #271 among them) is found within the consumer's top K per collection
+ * (`TOP_K`: 10 read, 5 write) for every role that asks it. The held-out set
+ * (`heldOut.ts`, never used to tune the texts) gets no worse than its
+ * recorded baseline; a held-out failure is fixed only together with fresh
+ * held-out queries.
  */
 import { servedCatalog, setOf } from './catalog';
 import { bm25Scorer, type Catalog, catalogOf, lexicalText } from './harness';
+import { HELD_OUT, worseThanBaseline } from './heldOut';
 import { QUERIES } from './queries';
 import {
   Bm25,
@@ -60,6 +64,31 @@ describe('BM25 tool retrieval over name, parameters and keywords', () => {
     expect(ranked(index.scores('rows of a table'))[0]).toBe('B');
   });
 
+  it('counts a tool that scored nothing as not found, whatever its place', () => {
+    const [outcome] = evaluate(
+      [
+        {
+          query: 'q',
+          roles: ['reader'],
+          required: [['Aaa']],
+          source: 'own',
+        },
+      ],
+      () =>
+        new Map([
+          ['Aaa', 0],
+          ['Bbb', 0],
+        ]),
+      () => 'read',
+    );
+    expect(outcome?.groups[0]).toEqual({
+      tools: ['Aaa'],
+      rank: 1,
+      found: false,
+    });
+    expect(outcome?.passed).toBe(false);
+  });
+
   it('serves every tool of the full set with its keywords', () => {
     const bare = catalog.tools
       .filter((tool) => (tool.search?.keywords.length ?? 0) === 0)
@@ -79,5 +108,15 @@ describe('BM25 tool retrieval over name, parameters and keywords', () => {
     expect(
       outcomes.filter((outcome) => !outcome.passed).map(describeFailure),
     ).toEqual([]);
+  });
+
+  it('gets the held-out queries no worse than their recorded baseline', () => {
+    const outcomes = evaluate(
+      HELD_OUT,
+      bm25Scorer(catalog, lexicalText),
+      catalog.collectionOf,
+    );
+    expect(outcomes.length).toBeGreaterThan(HELD_OUT.length);
+    expect(worseThanBaseline('bm25', outcomes)).toEqual([]);
   });
 });

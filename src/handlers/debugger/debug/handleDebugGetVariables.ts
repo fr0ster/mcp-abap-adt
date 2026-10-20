@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugGetVariables',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.',
+    '[read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: {

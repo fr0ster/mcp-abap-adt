@@ -391,7 +391,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object, its source code written afterwards.
+**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 

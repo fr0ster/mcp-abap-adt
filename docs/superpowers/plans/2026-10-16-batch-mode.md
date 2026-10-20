@@ -604,6 +604,19 @@ debuggee. The owner decided it ships in 19.0.0.
 - [ ] **Step 6:** CHANGELOG 19.0.0 *Changed*: tool descriptions state only what each tool does, its parameters and its result.
 - [ ] **Step 7:** Commit `docs: tool descriptions purely functional`.
 
+### Task 36: Lazy answers — `BatchEnd` splits, the read answers (spec §4.3, §5.2–5.4, §6, §7)
+
+**Files:** `src/lib/batch/execute.ts`, `src/lib/batch/` (owner, recorder, answers), the `BatchAnswers` / `HandlerBatch answers` / `DebugBatchEnd` handlers, the spec's §9.1 tests in `src/__tests__/unit/batch/`, `docs/user-guide/BATCH_MODE.md`, `docs/user-guide/DEBUGGER.md`, `docs/MIGRATION-19.0.md`, CHANGELOG 19.0.0 (date = the day of the change).
+
+- [ ] **Step 1:** Write the failing tests of spec §9.1 "`BatchEnd` splits, the read answers" and "`BatchEnd`'s error, no map", and update "Credential refusal" and "`BatchEnd` failing before `execute()`" to "no map, every number read answers the error".
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** `BatchEnd` / `DebugBatchEnd`: `execute()`, split the settled parts by number into the map, check recorded / sent / received, answer `{ recorded, sent, received }`, or the error (`execute()`'s as it came, `batch_parts_mismatch`, `batch_unsplit`) with no map. No handler is resumed.
+- [ ] **Step 4:** `BatchAnswers`: resume each asked number's handler with its parts (in parallel), keep the answer, run a handler once; a resumed handler's further request is refused `batch_ended`; a failed batch's numbers answer its error. A never-read handler leaves nothing pending when its map is replaced, the batch dropped or the instance closed.
+- [ ] **Step 5:** Run, and every batch / debugger-batch / compact test — PASS. Break-its of §9.1 red, reverted.
+- [ ] **Step 6:** Docs and CHANGELOG 19.0.0 (*Changed*: `BatchEnd` answers `{ recorded, sent, received }` or its error; a number's answer is built when it is read).
+- [ ] **Step 7:** All gates (CI's step list). Commit `feat(batch): BatchEnd splits the envelope; a number's answer is built when read`.
+- [ ] **Step 8 (live, on the owner's word):** the communication-batch and debugger-batch live tests (HTTP and RFC) rerun green; SM04/SM05 checked minutes later.
+
 ### Task 35: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).

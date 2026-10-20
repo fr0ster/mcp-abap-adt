@@ -5,7 +5,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DiscardBackgroundRun',
   description:
-    '[runtime] Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.',
+    '[read-only] [runtime] Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.',
   inputSchema: {
     type: 'object',
     properties: {

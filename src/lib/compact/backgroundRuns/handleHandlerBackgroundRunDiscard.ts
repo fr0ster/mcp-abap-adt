@@ -4,7 +4,7 @@ import type { ArgsOf, HandlerContext } from '../../handlers/index';
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunDiscard',
   description:
-    'Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.',
+    '[read-only] Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.',
   inputSchema: {
     type: 'object',
     properties: {

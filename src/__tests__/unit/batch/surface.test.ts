@@ -221,9 +221,9 @@ describe('the batch tools on the surface', () => {
     });
     const { tools } = await client.listTools();
     const byName = new Map(tools.map((t) => [t.name, t.description]));
-    expect(byName.get('BatchBegin')).toBe(BEGIN_WORDS);
-    expect(byName.get('BatchEnd')).toBe(END_WORDS);
-    expect(byName.get('BatchAnswers')).toBe(ANSWERS_WORDS);
+    expect(byName.get('BatchBegin')).toBe(`[read-only] ${BEGIN_WORDS}`);
+    expect(byName.get('BatchEnd')).toBe(`[read-only] ${END_WORDS}`);
+    expect(byName.get('BatchAnswers')).toBe(`[read-only] ${ANSWERS_WORDS}`);
   });
 
   it('without a batch owner no description gets a sentence', async () => {

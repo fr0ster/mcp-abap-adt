@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'RunUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.',
+    '[read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.',
   inputSchema: {
     type: 'object',
     properties: {

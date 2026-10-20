@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestRun',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: title, context, scope, risk_level, duration. Response: JSON.',
+    '[read-only] ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: title, context, scope, risk_level, duration. Response: JSON.',
   inputSchema: compactUnitTestRunSchema,
 } as const;
 

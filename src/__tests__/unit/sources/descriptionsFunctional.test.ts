@@ -13,7 +13,8 @@
  * Words are split with plain code, no regular expression: letters and
  * apostrophes are word characters, anything else a separator.
  */
-import { isBatchTool } from '../../../lib/batch/batchTools';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ToolSetKind } from '../../../lib/config/binaries';
 import {
   SETS,
@@ -73,66 +74,41 @@ function isNegation(word: string): boolean {
   return FORBIDDEN.has(word) || word.endsWith("n't");
 }
 
-/** The read-only set beside each set: its tools change nothing. */
-const READ_ONLY_OF: Readonly<Record<ToolSetKind, ToolSetKind>> = {
-  core: 'core-ro',
-  'core-ro': 'core-ro',
-  compact: 'compact-ro',
-  'compact-ro': 'compact-ro',
-};
-
 /**
- * The tools a read-only set serves that change something: they run code,
- * schedule a trace or log a session off. (The batch tools are aside: they
- * record and send other calls.) `[read-only]` means the tool changes no
- * repository object, the meaning of the `-ro` binaries; the debugger family
- * is marked whole, though its tools change the debug session.
+ * The tools that change a repository object (source, metadata, transports):
+ * they create, update, delete, activate, lock or unlock, move, add, remove or
+ * sort. They are named by that verb first, with no family prefix, or listed in
+ * `CHANGING_BY_NAME`. Every other tool changes no repository object — the
+ * meaning of the `-ro` binaries — and carries `[read-only]`: a read, a run of
+ * code, a trace schedule, a test run, a debug session's step, a session's
+ * logoff, a batch's start, send and answers.
  */
-const CHANGING_IN_READ_ONLY_SETS: ReadonlySet<string> = new Set([
-  'RuntimeRunClass',
-  'RuntimeRunProgram',
-  'RuntimeCreateProfilerTraceParameters',
-  'LogoffLeftoverSession',
-  'HandlerLeftoverSessionLogoff',
-]);
-
-/**
- * The tools that change nothing whose name does not say so by a read verb:
- * the waits read the debug session's state and send nothing, the delta
- * compares two snapshots, the compact background-run reads read the kept
- * runs.
- */
-const READ_BY_NAME: ReadonlySet<string> = new Set([
-  'DebugWait',
-  'AmdpDebugWait',
-  'MemorySnapshotDelta',
-  'HandlerBackgroundRunGet',
-  'HandlerBackgroundRunList',
-]);
-
-/** The compact debugger tools, each marked `[read-only]` like the full set's. */
-const COMPACT_DEBUG_TOOLS: ReadonlySet<string> = new Set([
-  'HandlerDebugSession',
-  'HandlerDebugStep',
-  'HandlerDebugMaintain',
-  'HandlerDebugBreakpoints',
-  'HandlerDebugBatch',
-]);
-
-/** The family prefixes a tool name may carry before its verb. */
-const FAMILY_PREFIXES = ['Runtime', 'AmdpDebug', 'Debug', 'MemorySnapshot'];
-
-/** The verbs a read tool's name (after its family prefix) begins with. */
-const READ_VERBS = [
-  'Get',
-  'List',
-  'Read',
-  'Search',
-  'Describe',
-  'Check',
-  'Validate',
-  'Analyze',
+const CHANGING_VERBS = [
+  'Create',
+  'Update',
+  'Delete',
+  'Activate',
+  'Lock',
+  'Unlock',
+  'Move',
+  'Add',
+  'Remove',
+  'Sort',
+  'Write',
 ];
+
+/** The compact tools that change a repository object, named by a prefix and a verb. */
+const CHANGING_BY_NAME: ReadonlySet<string> = new Set([
+  'HandlerCreate',
+  'HandlerUpdate',
+  'HandlerDelete',
+  'HandlerActivate',
+  'HandlerLock',
+  'HandlerUnlock',
+  'HandlerTransportCreate',
+  'HandlerTransportSortAndCompress',
+  'HandlerTransportMoveObjects',
+]);
 
 /** Whether `name` begins with the word `word`: the next letter, if any, starts a new word. */
 function startsWithWord(name: string, word: string): boolean {
@@ -141,34 +117,17 @@ function startsWithWord(name: string, word: string): boolean {
   return next === '' || next === next.toUpperCase();
 }
 
-/** Whether `tool` is of the debugger family: a `[debug]` tag, or a compact debugger tool. */
-function isDebuggerTool(tool: ServedTool): boolean {
+/** Whether the tool named `name` changes a repository object. */
+function changesRepositoryObject(name: string): boolean {
   return (
-    COMPACT_DEBUG_TOOLS.has(tool.name) || tool.description.includes('[debug] ')
+    CHANGING_BY_NAME.has(name) ||
+    CHANGING_VERBS.some((verb) => startsWithWord(name, verb))
   );
 }
 
-/**
- * Whether `tool` changes nothing, and so must carry `[read-only]` (beside
- * its family's `[runtime]`, `[debug]` or `[session]`): served by the set's
- * read-only set and not one of the tools there that change something, or
- * named by a read verb after an optional family prefix, or one of the reads
- * `READ_BY_NAME` lists. A batch tool is aside.
- */
-function mustBeMarkedReadOnly(
-  tool: ServedTool,
-  readOnly: ReadonlySet<string>,
-): boolean {
-  if (isDebuggerTool(tool)) return true;
-  if (isBatchTool(tool.name)) return false;
-  if (CHANGING_IN_READ_ONLY_SETS.has(tool.name)) return false;
-  if (readOnly.has(tool.name) || READ_BY_NAME.has(tool.name)) return true;
-  const prefix = FAMILY_PREFIXES.find((each) =>
-    startsWithWord(tool.name, each),
-  );
-  const rest =
-    prefix === undefined ? tool.name : tool.name.slice(prefix.length);
-  return READ_VERBS.some((verb) => startsWithWord(rest, verb));
+/** Whether `tool` changes no repository object, and so must carry `[read-only]` (beside its `[runtime]`, `[debug]` or `[session]` marker). */
+function mustBeMarkedReadOnly(tool: ServedTool): boolean {
+  return !changesRepositoryObject(tool.name);
 }
 
 /** The identifiers of `text`: runs of letters, digits and underscores. */
@@ -273,48 +232,48 @@ describe('tool descriptions are purely functional', () => {
       parameters: [],
       search: undefined,
     });
-    const none = new Set<string>();
-    expect(mustBeMarkedReadOnly(tool('GetClass', 'x'), none)).toBe(true);
-    expect(mustBeMarkedReadOnly(tool('Getaway', 'x'), none)).toBe(false);
-    expect(mustBeMarkedReadOnly(tool('UpdateClass', 'x'), none)).toBe(false);
-    expect(
-      mustBeMarkedReadOnly(tool('GetBackgroundRun', '[runtime] x'), none),
-    ).toBe(true);
-    expect(mustBeMarkedReadOnly(tool('DebugGetStack', 'x'), none)).toBe(true);
-    expect(mustBeMarkedReadOnly(tool('MemorySnapshotList', 'x'), none)).toBe(
-      true,
-    );
-    expect(mustBeMarkedReadOnly(tool('DebugWait', 'x'), none)).toBe(true);
-    expect(mustBeMarkedReadOnly(tool('DebugSetBreakpoints', 'x'), none)).toBe(
-      false,
-    );
-    expect(mustBeMarkedReadOnly(tool('DebugStep', '[debug] x'), none)).toBe(
-      true,
-    );
-    expect(mustBeMarkedReadOnly(tool('HandlerDebugStep', 'x'), none)).toBe(
-      true,
-    );
-    expect(
-      mustBeMarkedReadOnly(tool('DebugBatchBegin', '[debug] x'), none),
-    ).toBe(true);
-    expect(
-      mustBeMarkedReadOnly(
-        tool('RuntimeRunClass', 'x'),
-        new Set(['RuntimeRunClass']),
-      ),
-    ).toBe(false);
-    expect(
-      mustBeMarkedReadOnly(
-        tool('HandlerDumpList', 'x'),
-        new Set(['HandlerDumpList']),
-      ),
-    ).toBe(true);
-    expect(
-      mustBeMarkedReadOnly(
-        tool('BatchAnswers', 'x'),
-        new Set(['BatchAnswers']),
-      ),
-    ).toBe(false);
+    const marked = (name: string) => mustBeMarkedReadOnly(tool(name, 'x'));
+    for (const name of [
+      'GetClass',
+      'GetBackgroundRun',
+      'DebugGetStack',
+      'MemorySnapshotList',
+      'DebugWait',
+      'DebugStep',
+      'DebugSetBreakpoints',
+      'DebugCreateWatchpoint',
+      'DebugDeleteBreakpoint',
+      'HandlerDebugStep',
+      'RuntimeRunClass',
+      'RuntimeCreateProfilerTraceParameters',
+      'RunATC',
+      'RunUnitTest',
+      'GetUnitTestStatus',
+      'DiscardBackgroundRun',
+      'LogoffLeftoverSession',
+      'BatchBegin',
+      'BatchAnswers',
+      'HandlerBatch',
+      'HandlerDumpList',
+      'HandlerUnitTestRun',
+      'HandlerProfileSchedule',
+      'Getaway',
+    ]) {
+      expect([name, marked(name)]).toEqual([name, true]);
+    }
+    for (const name of [
+      'UpdateClass',
+      'CreateClass',
+      'DeleteClass',
+      'ActivateClass',
+      'MoveTransportObjects',
+      'RemoveTransportObject',
+      'HandlerUpdate',
+      'HandlerLock',
+      'HandlerTransportCreate',
+    ]) {
+      expect([name, marked(name)]).toEqual([name, false]);
+    }
   });
 
   it.each(SETS.map(([kind]) => kind))(
@@ -322,9 +281,6 @@ describe('tool descriptions are purely functional', () => {
     async (kind) => {
       const tools = await everyServed(kind);
       const names = new Set(tools.map((tool) => tool.name));
-      const readOnly = new Set(
-        (await everyServed(READ_ONLY_OF[kind])).map((tool) => tool.name),
-      );
       const negations: string[] = [];
       const otherTools: string[] = [];
       const unmarked: string[] = [];
@@ -343,8 +299,8 @@ describe('tool descriptions are purely functional', () => {
           }
         }
         if (
-          mustBeMarkedReadOnly(tool, readOnly) &&
-          !tool.description.startsWith('[read-only]')
+          mustBeMarkedReadOnly(tool) !==
+          tool.description.startsWith('[read-only]')
         ) {
           add(unmarked, tool.name);
         }
@@ -383,4 +339,45 @@ describe('tool descriptions are purely functional', () => {
       });
     },
   );
+});
+
+/** The handler files that declare a tool, a set serving it or not (the low ones aside). */
+function handlerFiles(directory: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    // The low handlers are internals of compact and high, listed by no set.
+    if (entry.isDirectory()) {
+      if (entry.name !== 'low') files.push(...handlerFiles(path));
+    } else if (entry.name.startsWith('handle') && entry.name.endsWith('.ts')) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+describe('every declared tool carries [read-only] when it changes no repository object', () => {
+  it('holds for each TOOL_DEFINITION under src/handlers, the unserved ones too', () => {
+    const wrong: string[] = [];
+    let seen = 0;
+    for (const file of handlerFiles(join(__dirname, '../../../handlers'))) {
+      const module = require(file) as {
+        TOOL_DEFINITION?: { name?: unknown; description?: unknown };
+      };
+      const definition = module.TOOL_DEFINITION;
+      if (
+        typeof definition?.name !== 'string' ||
+        typeof definition.description !== 'string'
+      ) {
+        continue;
+      }
+      seen += 1;
+      const changes = changesRepositoryObject(definition.name);
+      if (changes === definition.description.startsWith('[read-only]')) {
+        wrong.push(definition.name);
+      }
+    }
+    expect(seen).toBeGreaterThan(100);
+    expect(wrong).toEqual([]);
+  });
 });

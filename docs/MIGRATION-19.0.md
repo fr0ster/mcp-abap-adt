@@ -951,7 +951,7 @@ A client that picks tools by searching their descriptions (RAG tool selection, a
 index, a reranker) re-indexes them: every description now names the function on what its
 parameters name ("Reads the CDS view (or classic DDL view) named by ddl_name …"), every tool
 that changes no repository object (source, metadata, transports — the meaning of the
-`-ro` binaries) starts with `[read-only]`, every debugger tool included — a `[runtime]`, `[debug]` or `[session]` marker
+`-ro` binaries) starts with `[read-only]` — runs of code, ABAP Unit and ATC runs, trace scheduling, session logoffs, the batch tools and every debugger tool included; only a tool that creates, updates, deletes, activates, locks, unlocks or edits a transport lacks it — a `[runtime]`, `[debug]` or `[session]` marker
 follows it where the tool has one (`GetPackageTree`'s was `[high-level]`) —, and none names
 another tool. Each tool also carries `_meta["mcp-abap-adt/search"]` = `{ keywords, semantic }`
 in `tools/list` — `keywords` for a lexical (BM25) index, `semantic` for a vector index;

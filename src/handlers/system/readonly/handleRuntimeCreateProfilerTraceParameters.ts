@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeCreateProfilerTraceParameters',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.',
+    '[read-only] [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.',
   inputSchema: {
     type: 'object',
     properties: {

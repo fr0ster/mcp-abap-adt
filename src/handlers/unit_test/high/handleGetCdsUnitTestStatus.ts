@@ -10,7 +10,7 @@ import { testRunner } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Retrieve CDS unit test run status for a run_id. ',
+  description: '[read-only] Retrieve CDS unit test run status for a run_id. ',
   inputSchema: {
     type: 'object',
     properties: {

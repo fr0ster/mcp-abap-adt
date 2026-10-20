@@ -26,6 +26,7 @@ import {
   envelopeResponse,
   innerRequests,
 } from '../../../helpers/batchEnvelope';
+import { HandlerLedger } from '../../../helpers/handlerLedger';
 import {
   recordUnhandled,
   report,
@@ -106,6 +107,8 @@ const group = {
   registerHandlers: () => undefined,
 } as unknown as IHandlerGroup;
 
+const ledger = new HandlerLedger();
+
 (async () => {
   const owner = new InstanceBatch({ keepRawParts: false });
   const target = new LateBoundConnection();
@@ -115,7 +118,7 @@ const group = {
   const server = new EmbeddableMcpServer({
     connection: connection as never,
     handlersRegistry: new CompositeHandlersRegistry([
-      group,
+      ledger.watch(group),
       new BatchHandlersGroup({ connection: undefined as never }),
     ]),
     systemType: 'onprem',
@@ -154,11 +157,8 @@ const group = {
   await closing;
   await turns(40);
 
-  let settled = false;
-  void Promise.all(recorded.map((call) => call.settled)).then(() => {
-    settled = true;
-  });
   await turns();
+  const settled = ledger.allEnded();
   report({
     numbers: recorded.map((call) => call.number),
     envelopes,

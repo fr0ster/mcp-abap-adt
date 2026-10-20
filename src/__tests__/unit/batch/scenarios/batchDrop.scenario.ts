@@ -25,6 +25,7 @@ import type {
 } from '../../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { closeInstance } from '../../../../lib/instanceClose';
+import { HandlerLedger } from '../../../helpers/handlerLedger';
 import {
   recordUnhandled,
   report,
@@ -94,6 +95,8 @@ const group = {
   registerHandlers: () => undefined,
 } as unknown as IHandlerGroup;
 
+const ledger = new HandlerLedger();
+
 (async () => {
   const owner = new InstanceBatch({ keepRawParts: false });
   const target = new LateBoundConnection();
@@ -108,7 +111,7 @@ const group = {
 
   const server = new EmbeddableMcpServer({
     connection: connection as never,
-    handlersRegistry: new CompositeHandlersRegistry([group]),
+    handlersRegistry: new CompositeHandlersRegistry([ledger.watch(group)]),
     systemType: 'onprem',
     logger: { info() {}, debug() {}, warn() {}, error() {} } as never,
     batch: owner,
@@ -133,11 +136,8 @@ const group = {
   if (how === 'close') await closeInstance(server);
   else await server.dispose();
 
-  let settled = false;
-  void Promise.all(recorded.map((call) => call.settled)).then(() => {
-    settled = true;
-  });
   await turns();
+  const settled = ledger.allEnded();
   report({
     callAnswers: answers.map((a) => a.content),
     numbers: recorded.map((call) => call.number),

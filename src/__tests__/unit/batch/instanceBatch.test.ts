@@ -37,7 +37,6 @@ function callOf(answer: BatchAnswer, runs = { count: 0 }): RecordedCall {
       runs.count += 1;
       return answer;
     },
-    settled: Promise.resolve(),
   };
 }
 

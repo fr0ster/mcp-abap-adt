@@ -78,8 +78,6 @@ export interface RecordedCall {
    * rejects.
    */
   resume(): Promise<BatchAnswer>;
-  /** Settles (never rejects) once the handler has settled, read or not. */
-  settled: Promise<void>;
 }
 
 /**

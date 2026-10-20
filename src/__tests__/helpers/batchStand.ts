@@ -56,6 +56,7 @@ import {
   partByPart,
   statusError,
 } from './batchEnvelope';
+import type { HandlerLedger } from './handlerLedger';
 import { LOCK_SUCCESS_XML } from './recordingConnection';
 
 export { LOCK_SUCCESS_XML };
@@ -208,6 +209,8 @@ export interface StandOptions {
   heldLocks?: HeldLocks;
   /** Groups served beside the shipped tools named (a test's own handlers). */
   groups?: IHandlerGroup[];
+  /** Writes down when the shipped tools' handlers return or throw. */
+  ledger?: HandlerLedger;
 }
 
 /**
@@ -243,7 +246,9 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
   };
   const server = new StandServer(
     [
-      ...shippedGroup(options.tools),
+      ...shippedGroup(options.tools).map((g) =>
+        options.ledger === undefined ? g : options.ledger.watch(g),
+      ),
       ...(options.groups ?? []),
       new BatchHandlersGroup({ connection: undefined as never }),
       new CompactBatchHandlersGroup({ connection: undefined as never }),

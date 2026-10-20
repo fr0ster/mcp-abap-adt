@@ -32,6 +32,7 @@ import {
   envelopeResponse,
   innerRequests,
 } from '../../../helpers/batchEnvelope';
+import { HandlerLedger } from '../../../helpers/handlerLedger';
 import {
   recordUnhandled,
   report,
@@ -111,12 +112,14 @@ const textOf = (answer: unknown) =>
     (answer as { content: Array<{ text: string }> }).content[0]?.text ?? 'null',
   );
 
+const ledger = new HandlerLedger();
+
 (async () => {
   const owner = new InstanceBatch({ keepRawParts: false });
   const server = new EmbeddableMcpServer({
     connection: connection as never,
     handlersRegistry: new CompositeHandlersRegistry([
-      group,
+      ledger.watch(group),
       new BatchHandlersGroup({ connection: undefined as never }),
     ]),
     systemType: 'onprem',
@@ -137,12 +140,8 @@ const textOf = (answer: unknown) =>
   const read = textOf(await call('BatchAnswers', { number: 1 }));
 
   // Number 2 is never read: its handler waits at its first request.
-  let unreadSettled = false;
-  void recorded[1]?.settled.then(() => {
-    unreadSettled = true;
-  });
   await turns();
-  const settledBefore = unreadSettled;
+  const settledBefore = ledger.endedOf('GetInterface');
 
   if (how === 'replace') {
     await call('BatchBegin');
@@ -152,11 +151,8 @@ const textOf = (answer: unknown) =>
   }
   await turns();
 
-  let settled = false;
-  void Promise.all(recorded.map((c) => c.settled)).then(() => {
-    settled = true;
-  });
   await turns();
+  const settled = ledger.allEnded();
   report({
     numbers: recorded.map((c) => c.number),
     summary,

@@ -1801,12 +1801,6 @@ export abstract class BaseMcpServer extends McpServer {
                 () => recorder.otherKind(),
               );
             }),
-          settled: handlerStarted.then(({ handler }) =>
-            handler.then(
-              () => undefined,
-              () => undefined,
-            ),
-          ),
         });
       },
       call.tool,

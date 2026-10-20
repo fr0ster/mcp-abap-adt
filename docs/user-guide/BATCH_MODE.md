@@ -91,7 +91,13 @@ with the single-step tools:
    lock number never read before the next `BatchEnd` replaces the map, and a lock batch whose
    `BatchEnd` failed, leave locks in SAP that no handle reaches: they last until that session's
    logoff (stdio: the process's end; Streamable HTTP: the pooled instance's end; or SAP's own
-   session timeout). Read every lock number before the next phase's `BatchEnd`;
+   session timeout). An unlock number is read the same way: the instance drops the handle from its
+   held locks when that number is read, so an unlock number never read leaves the handle held after
+   SAP unlocked it — a later write under that handle is sent and SAP refuses it, where a read
+   unlock makes the instance refuse it at once, sending nothing — and over Streamable HTTP the
+   pooled instance stays held for a lock that no longer exists, until the instance ends and its
+   session's logoff releases every lock. Read every lock number and every unlock number before the
+   next phase's `BatchEnd`;
 3. write — `HandlerUpdate` with `lock_handle` (for PACKAGE, DOMAIN, DATA_ELEMENT and
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);

@@ -1,13 +1,20 @@
 import { handleCheckBehaviorDefinition as bdefHigh } from '../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckBehaviorDefinition as bdefLow } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
+import { handleCheckClass as clasHigh } from '../../handlers/class/high/handleCheckClass';
+import { handleCheckClass as clasLow } from '../../handlers/class/low/handleCheckClass';
+import { handleCheckObject as objectLow } from '../../handlers/common/low/handleCheckObject';
 import { handleCheckDataElement as dtelHigh } from '../../handlers/data_element/high/handleCheckDataElement';
 import { handleCheckDataElement as dtelLow } from '../../handlers/data_element/low/handleCheckDataElement';
 import { handleCheckDdl as ddlHigh } from '../../handlers/ddl/high/handleCheckDdl';
 import { handleCheckDdl as ddlLow } from '../../handlers/ddl/low/handleCheckDdl';
+import { handleCheckMetadataExtension as ddlxHigh } from '../../handlers/ddlx/high/handleCheckMetadataExtension';
+import { handleCheckMetadataExtension as ddlxLow } from '../../handlers/ddlx/low/handleCheckMetadataExtension';
 import { handleCheckDomain as domaHigh } from '../../handlers/domain/high/handleCheckDomain';
 import { handleCheckDomain as domaLow } from '../../handlers/domain/low/handleCheckDomain';
 import { handleCheckFunctionGroup as fugrHigh } from '../../handlers/function/high/handleCheckFunctionGroup';
+import { handleCheckFunctionModule as fmodHigh } from '../../handlers/function/high/handleCheckFunctionModule';
 import { handleCheckFunctionGroup as fugrLow } from '../../handlers/function/low/handleCheckFunctionGroup';
+import { handleCheckFunctionModule as fmodLow } from '../../handlers/function/low/handleCheckFunctionModule';
 import { handleCheckInterface as intfHigh } from '../../handlers/interface/high/handleCheckInterface';
 import { handleCheckInterface as intfLow } from '../../handlers/interface/low/handleCheckInterface';
 import { handleCheckPackage as devcHigh } from '../../handlers/package/high/handleCheckPackage';
@@ -64,6 +71,21 @@ const cases: Array<[string, Handler, Record<string, unknown>]> = [
   ['CheckStructure', strucHigh, { structure_name: 'ZS' }],
   ['CheckTableLow', tablLow, { table_name: 'ZT' }],
   ['CheckTable', tablHigh, { table_name: 'ZT' }],
+  ['CheckClassLow', clasLow, { class_name: 'ZCL' }],
+  ['CheckClass', clasHigh, { class_name: 'ZCL' }],
+  [
+    'CheckFunctionModuleLow',
+    fmodLow,
+    { function_group_name: 'ZG', function_module_name: 'ZFM' },
+  ],
+  [
+    'CheckFunctionModule',
+    fmodHigh,
+    { function_group_name: 'ZG', function_module_name: 'ZFM' },
+  ],
+  ['CheckMetadataExtensionLow', ddlxLow, { name: 'ZX' }],
+  ['CheckMetadataExtension', ddlxHigh, { name: 'ZX' }],
+  ['CheckObjectLow', objectLow, { object_name: 'ZCL', object_type: 'class' }],
 ];
 
 describe.each(cases)('%s', (_name, handler, base) => {

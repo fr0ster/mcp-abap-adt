@@ -21,10 +21,10 @@ jest.mock('../../../lib/connectionFactory', () => ({
 
 import { BATCH_MODE_OFF_WORDS } from '../../../lib/auth/serverRefusal';
 import { NO_ANSWER_WORDS } from '../../../lib/batch/answers';
-import type { RecordedCall } from '../../../lib/batch/InstanceBatch';
 import { closeInstance } from '../../../lib/instanceClose';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { batchStand, payloadOf } from '../../helpers/batchStand';
+import { HandlerLedger } from '../../helpers/handlerLedger';
 import { runPlainNode } from '../../helpers/plainNode';
 
 const SCENARIO = 'src/__tests__/unit/batch/scenarios/batchDrop.scenario.ts';
@@ -45,14 +45,10 @@ const turns = async (n = 20) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
 };
 
-/** Whether every recorded call's handler has settled within a few turns. */
-async function settled(recorded: RecordedCall[]): Promise<boolean> {
-  let done = false;
-  void Promise.all(recorded.map((call) => call.settled)).then(() => {
-    done = true;
-  });
+/** Whether every handler that started has returned or thrown within a few turns. */
+async function settled(ledger: HandlerLedger): Promise<boolean> {
   await turns();
-  return done;
+  return ledger.allEnded();
 }
 
 afterEach(() => {
@@ -62,7 +58,8 @@ afterEach(() => {
 
 describe('the instance close with a batch open', () => {
   it('closeInstance with a batch open: zero envelopes, recorded handlers released', async () => {
-    const s = await batchStand({ tools: TOOLS, part: sap });
+    const ledger = new HandlerLedger();
+    const s = await batchStand({ tools: TOOLS, part: sap, ledger });
     s.begin();
     expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
       content: [],
@@ -82,7 +79,7 @@ describe('the instance close with a batch open', () => {
     expect(signal.aborted).toBe(true);
     await closing;
 
-    expect(await settled(recorded)).toBe(true);
+    expect(await settled(ledger)).toBe(true);
     expect(s.executes).not.toHaveBeenCalled();
     for (const fake of s.built) expect(fake.envelopes).toEqual([]);
     expect(s.owner.holdsState()).toBe(false);
@@ -135,7 +132,8 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
       advanceTimers: true,
       doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
     });
-    const s = await batchStand({ tools: TOOLS, part: sap });
+    const ledger = new HandlerLedger();
+    const s = await batchStand({ tools: TOOLS, part: sap, ledger });
     // A batch executed: its answer 1 is kept.
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
@@ -161,7 +159,7 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
 
     expect(s.owner.mode()).toBe('off');
     expect(signal.aborted).toBe(true);
-    expect(await settled(recorded)).toBe(true);
+    expect(await settled(ledger)).toBe(true);
     expect(s.executes).toHaveBeenCalledTimes(1); // the first batch's only
     expect(s.built.map((fake) => fake.envelopes.length)).toEqual(
       sentBefore.concat(new Array(s.built.length - sentBefore.length).fill(0)),

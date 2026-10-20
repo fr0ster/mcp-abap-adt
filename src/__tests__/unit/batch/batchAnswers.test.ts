@@ -37,7 +37,6 @@ function answered(): InstanceBatch {
       number,
       parts: () => [],
       resume: async () => answerOf(number),
-      settled: Promise.resolve(),
     })),
   };
   owner.begin('communication', open);

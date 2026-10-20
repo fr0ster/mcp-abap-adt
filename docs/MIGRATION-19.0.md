@@ -1159,7 +1159,10 @@ transport's options only:
   handle and is not held) — and the write and unlock batches send the instance's
   `state_handle`. A lock number never read before the next `BatchEnd` replaces the map, or a lock
   batch whose `BatchEnd` failed, leaves locks in SAP that no handle reaches; they last until that
-  session's logoff. **A service binding open in an editing session**: its LOCK answers `403`, read as
+  session's logoff. An unlock number never read leaves its handle held by the instance after SAP
+  unlocked it: a later write under it is sent and SAP refuses it, and over Streamable HTTP the
+  pooled instance stays held until it ends. Read every lock number and every unlock number before
+  the next phase's `BatchEnd`. **A service binding open in an editing session**: its LOCK answers `403`, read as
   a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
   SERVICE_BINDING takes that empty `lock_handle` and sends the publication; `HandlerUnlock` with it
   answers that there is nothing to unlock, sending nothing.

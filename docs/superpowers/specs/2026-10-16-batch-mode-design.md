@@ -290,8 +290,9 @@ What the code settles about the first entries (each still proven by its test):
 ### 4.3 The recorded handler's signal and lifetime
 
 `trackCall` aborts a call's signal when the call settles; a recorded handler outlives its call, so
-it runs under the batch's own `AbortController` instead — aborted only when the batch is dropped
-(instance close, `dispose()`), never at `BatchEnd`. Recorded handlers are not tracked in the
+it runs under the batch's own `AbortController` instead — aborted only when nothing can read it any
+more: the batch dropped (instance close, `dispose()`), its map replaced by the next `BatchEnd`, its
+`BatchEnd` failed (no map), or a complete debugger stop; never at a `BatchEnd` that keeps the map. Recorded handlers are not tracked in the
 instance's `inFlight` (the HTTP pool awaits `idle()` before returning an instance; a recorded
 handler waits for `BatchEnd`, so counting it would hold every request open) and are not active
 tools (`registerActiveTool`): the shutdown's `logOffAtOnce` interrupts `BatchEnd`, which is.

@@ -638,6 +638,23 @@ debuggee. The owner decided it ships in 19.0.0.
 - [ ] **Step 4:** Twice in a row on HTTP and RFC — green both times (idempotent); SM04/SM05 checked minutes later.
 - [ ] **Step 5:** Commit `test(debugger): live DebugStop with a failed listener stop`.
 
+### Task 39: Tool retrieval gate and the descriptions it finds (issues #270, #271)
+
+**Files:** a labelled query set under `src/__tests__/unit/descriptions/` (from cloud-llm-hub's `tools/tool-rag-queries.json`, plus the #270 and #271 cases), the retrieval test beside it, the handler descriptions it fails on, regenerated tool docs, CHANGELOG 19.0.0 (date = the day of the change).
+
+Rule (owner): a description is purely functional and names the function on what the parameters name ("Finds where the object named by object_name and object_type is used …", "Reads the CDS view named by ddl_name …"), never a vague "an ABAP object" subject.
+
+- [ ] **Step 1:** The query set: each query with its `required` groups (interchangeable tools per step), per role (reader: read-only tools; developer: all), over the full set's catalog (name + description + parameter names, as `tools/list` serves them).
+- [ ] **Step 2:** The retrieval test, offline: BM25 over that corpus; every required group within top-K per role (K as the consumer's production cap); and the first sentence of every description unique within each set. Run — FAIL on today's offenders (#270 GetDdl, #271 cases), listed by query.
+- [ ] **Step 3:** Rewrite the failing descriptions, and every description built around a vague subject, to the rule; `descriptionsFunctional.test.ts` stays green; regenerate the tool docs.
+- [ ] **Step 4:** Run — PASS. Break-it: put GetDdl's old description back — red; revert.
+- [ ] **Step 5:** All gates (CI's step list). Commit `docs: tool descriptions found by what users ask (#270, #271)`.
+
+### Task 40 (after publish, on the owner's AI Core access): retrieval measured in the consumer
+
+- [ ] **Step 1:** cloud-llm-hub's `tools/measure-tool-rag.ts` on lib 18.1.0's corpus and on 19.0.0's (published), same queries, same embedder/rerank settings; the per-query results kept.
+- [ ] **Step 2:** Any query 19.0.0 loses that 18.1.0 won, or a #270/#271 case still lost, is fixed in 19.0.x with the Task 39 gate extended by that query.
+
 ### Task 35: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).

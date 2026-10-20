@@ -87,7 +87,8 @@ function safeCode(code: unknown): string | undefined {
 
 /**
  * What a read said about the object. `absent` only when SAP answered that it
- * is not there (a refusal on a 404); any other refusal — 401, 5xx, no answer
+ * is not there (a response with status 404, whatever its origin: the library
+ * files a transport-refused status under 'connection'); any other refusal — 401, 5xx, no answer
  * at all — says nothing about the object and is `unreadable`, with the status
  * and code it carried and none of its text.
  */
@@ -103,12 +104,12 @@ export function classifyRead(answer: any): {
     error = undefined;
   }
   const status = error?.response?.status;
-  if (error?.origin === 'refusal' && status === 404) return { state: 'absent' };
+  if (status === 404) return { state: 'absent' };
   const facts: string[] = [];
   if (Number.isInteger(status)) facts.push(`HTTP ${status}`);
   const code = safeCode(error?.code);
   if (code) facts.push(code);
-  if (error?.origin === 'connection') facts.push('no answer');
+  if (!error?.response) facts.push('no answer');
   return {
     state: 'unreadable',
     detail: facts.length ? facts.join(', ') : 'refused',

@@ -10,12 +10,24 @@ const failure = (error: Record<string, unknown>) => ({
   getError: () => error,
 });
 
+// Hand-built exactly as adt-clients' recogniseFailure builds them (its
+// `answering` is not reachable through the package exports): a status the
+// transport refused is origin 'connection' carrying the AxiosError's response;
+// an exception document is origin 'refusal'.
+const transportRefused = (status?: number) =>
+  failure({
+    origin: 'connection',
+    message: 'Request failed with SECRET-TEXT',
+    response: status === undefined ? undefined : { status },
+  });
+
 describe('shared:check classifyRead', () => {
   it('ok is present', () => {
     expect(classifyRead({ ok: true }).state).toBe('present');
   });
 
-  it('a refusal on 404 is absent', () => {
+  it('a 404 is absent whatever its origin', () => {
+    expect(classifyRead(transportRefused(404)).state).toBe('absent');
     expect(
       classifyRead(
         failure({ origin: 'refusal', response: { status: 404 }, message: 'x' }),
@@ -34,10 +46,19 @@ describe('shared:check classifyRead', () => {
     },
   );
 
-  it('a connection failure is unreadable', () => {
-    const r = classifyRead(failure({ origin: 'connection', message: 'x' }));
+  it.each([401, 500])(
+    'a transport-refused %s is unreadable with its status, not "no answer"',
+    (status) => {
+      const r = classifyRead(transportRefused(status));
+      expect(r.state).toBe('unreadable');
+      expect(r.detail).toBe(`HTTP ${status}`);
+    },
+  );
+
+  it('no response at all is unreadable, "no answer"', () => {
+    const r = classifyRead(transportRefused());
     expect(r.state).toBe('unreadable');
-    expect(r.detail).toContain('no answer');
+    expect(r.detail).toBe('no answer');
   });
 
   it('an answer with no error to read is unreadable, not absent', () => {
@@ -124,15 +145,9 @@ describe('shared:check readShared', () => {
               code: 'ECONNRESET',
             });
           }
-          if (p.tableName === 'ZMISSING') {
-            return failure({ origin: 'refusal', response: { status: 404 } });
-          }
+          if (p.tableName === 'ZMISSING') return transportRefused(404);
           if (p.tableName === 'ZEXPIRED') {
-            return failure({
-              origin: 'refusal',
-              response: { status: 401 },
-              message: 'SECRET-TEXT',
-            });
+            return transportRefused(401);
           }
           return { ok: true };
         },

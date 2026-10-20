@@ -83,6 +83,11 @@
       "types": "./dist/lib/adtHeaders/index.d.ts",
       "import": "./dist/lib/adtHeaders/index.js",
       "require": "./dist/lib/adtHeaders/index.js"
+    },
+    "./tool-search": {
+      "types": "./dist/lib/toolSearch/index.d.ts",
+      "import": "./dist/lib/toolSearch/index.js",
+      "require": "./dist/lib/toolSearch/index.js"
     }
   },
   "typesVersions": {
@@ -131,6 +136,9 @@
       ],
       "adt-headers": [
         "dist/lib/adtHeaders/index.d.ts"
+      ],
+      "tool-search": [
+        "dist/lib/toolSearch/index.d.ts"
       ]
     }
   },
@@ -248,6 +256,7 @@
   "files": [
     "dist/",
     "tools/batch-handlers.json",
+    "tools/tool-search.json",
     "docs/",
     "!docs/superpowers/",
     "README.md",
@@ -311,6 +320,7 @@
       "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/src/lib/httpTransport/index.ts",
       "^@mcp-abap-adt/lib/tool-set$": "<rootDir>/src/lib/toolSet.ts",
       "^@mcp-abap-adt/lib/adt-headers$": "<rootDir>/src/lib/adtHeaders/index.ts",
+      "^@mcp-abap-adt/lib/tool-search$": "<rootDir>/src/lib/toolSearch/index.ts",
       "^@mcp-abap-adt/background-runs-memory$": "<rootDir>/background-runs-memory/src/index.ts",
       "^@mcp-abap-adt/responsible-rules$": "<rootDir>/responsible-rules/src/index.ts",
       "^@mcp-abap-adt/compact-readonly-entries$": "<rootDir>/compact-readonly-entries/src/index.ts",

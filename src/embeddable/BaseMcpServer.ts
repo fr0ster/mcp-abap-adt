@@ -145,6 +145,10 @@ import {
   normalizeToolContent,
   type ToolResultLike,
 } from '../lib/toolResult.js';
+import {
+  TOOL_SEARCH_META_KEY,
+  toolSearchText,
+} from '../lib/toolSearch/index.js';
 import { return_error } from '../lib/utils.js';
 import type {
   ConnectionContext,
@@ -1615,6 +1619,7 @@ export abstract class BaseMcpServer extends McpServer {
                     )
                   : entry.toolDefinition.description,
               inputSchema: zodSchema,
+              ...searchMeta(entry.toolDefinition.name),
             },
             wrappedHandler,
           );
@@ -2484,12 +2489,22 @@ export abstract class BaseMcpServer extends McpServer {
         typeof second !== 'function'
       ) {
         // `registerTool(name, config, callback)`.
-        const config = second as { description?: unknown };
+        const config = second as {
+          description?: unknown;
+          _meta?: Record<string, unknown>;
+        };
         const description =
           typeof config.description === 'string' ? config.description : '';
+        const search = searchMeta(name);
         return [
           name,
-          { ...config, description: appended(description) },
+          {
+            ...config,
+            description: appended(description),
+            ...(search._meta === undefined
+              ? {}
+              : { _meta: { ...config._meta, ...search._meta } }),
+          },
           ...registerArgs.slice(2),
         ];
       }
@@ -2676,4 +2691,22 @@ function statedEnvironment(
   return declared === 'onprem' || declared === 'cloud' || declared === 'legacy'
     ? declared
     : undefined;
+}
+
+/**
+ * The `_meta` a tool is listed with: its search texts under
+ * `mcp-abap-adt/search` (`tools/tool-search.json`), for a consumer's tool
+ * search; none for a tool the table does not name.
+ */
+function searchMeta(name: string): { _meta?: Record<string, unknown> } {
+  const text = toolSearchText(name);
+  if (text === undefined) return {};
+  return {
+    _meta: {
+      [TOOL_SEARCH_META_KEY]: {
+        keywords: [...text.keywords],
+        semantic: text.semantic,
+      },
+    },
+  };
 }

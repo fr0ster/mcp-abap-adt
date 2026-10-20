@@ -23,6 +23,7 @@ Documentation for end users: configuration, usage, and available tools.
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
 - `BATCH_MODE.md` - Batch mode: independent calls recorded, sent together at `BatchEnd`, answered by number; which calls are recorded
+- `TOOL_SEARCH.md` - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
 
 ### [configuration/](configuration/) - Configuration Guides
@@ -69,6 +70,7 @@ Documentation for developers: testing, development guides, and internal document
 - **Terminology**: [Project Terms](user-guide/TERMINOLOGY.md)
 - **Handlers Management**: [Handler Groups](user-guide/HANDLERS_MANAGEMENT.md)
 - **Batch mode**: [Batch Mode](user-guide/BATCH_MODE.md)
+- **Tool search**: [Tool Search](user-guide/TOOL_SEARCH.md)
 - **Debugger**: [Debug Sessions](user-guide/DEBUGGER.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Deployment**: [MCP Registry](deployment/MCP_REGISTRY.md) | [Docker](deployment/DOCKER.md)

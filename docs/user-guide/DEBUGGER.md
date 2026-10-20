@@ -567,7 +567,11 @@ ends by:
   (`release the debuggee`, `release <what>`) and the words "not sent: the listener's stop failed
   and a breakpoint may still be set, where the debuggee would stop again. It stays held for the
   next stop.", and the next stop releases it once the listener's stop or the deletes succeeded
-  (unit-tested, not measured: `DebugSessionCleanup.test.ts`); when the
+  (unit-tested, not measured: `DebugSessionCleanup.test.ts`). While a debuggee stays held — not
+  released, or owed — the run's connection stays open with it: the run's request is the one held
+  at the breakpoint, and its logoff would end that session. The stop that releases the debuggee
+  closes the run's connection after the release; the instance's close and the process's shutdown
+  log it off whatever is held (unit-tested, not measured); when the
   system refuses it for the user (`403` `notAuthorized`, `404` `invalidUser`),
   nothing is deleted and the answer names the breakpoints left on the system; the
   session ends when nothing else failed (another failure, such as a connection
@@ -741,7 +745,9 @@ class (`class_name`, `line`).
   close, the process's shutdown) or the stop call's cancellation ends it, and the answer then
   names the debuggee that had not ended. A cancel SAP refuses sends no stop: the stop answers the
   refusal and the session stays for the next stop — at the debug state's end the stop is sent all
-  the same.
+  the same. While a debuggee is still owed a release, the run's connection stays open for the
+  stop that releases it, which closes it after the release; the instance's close and the
+  process's shutdown log it off whatever is held (unit-tested, not measured).
   `AmdpDebugStop` ends the handle only when nothing else is held; an ABAP session
   under the same handle goes on. A credential refusal on one of these steps ends
   the stop as it does the ABAP one ([What ends a session](#what-ends-a-session)):

@@ -150,6 +150,50 @@ describe('the cleanup', () => {
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
 
+  // The run's request is the one held at the breakpoint: its connection's
+  // logoff would end the session of the debuggee kept for the next stop. So
+  // the run and its connection stay with the held debuggee, and the stop that
+  // releases it closes the run's connection after the release.
+  it('a debuggee kept held keeps its run and the run connection: the stop that releases it closes it, after the release', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world, {
+      run: { kind: 'class', name: 'CLASS_X' },
+    });
+    await until(() => world.runs.length === 1);
+    const runConnection = world.opened[world.sessionKinds.indexOf('stateless')];
+    expect(runConnection).toBeDefined();
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async (_i: unknown, id: string) =>
+      id === 'E1'
+        ? refusedResponse('Breakpoint is locked')
+        : okResponse(undefined);
+    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+    expect(world.closed).not.toContain(runConnection);
+    expect(session.holdsState()).toBe(true);
+    // The next stop releases the debuggee, then closes the run's connection.
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+    const close = world.ports.closeConnection;
+    world.ports.closeConnection = async (c) => {
+      if (c === runConnection) world.calls.push('close:run');
+      return close(c);
+    };
+    world.calls.length = 0;
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.indexOf('close:run')).toBeGreaterThan(
+      world.calls.indexOf('step:stepContinue:analysed'),
+    );
+    expect(world.calls.indexOf('step:stepContinue:analysed')).toBeGreaterThan(
+      world.calls.indexOf('stopListener'),
+    );
+    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
+    expect(world.closed).toContain(runConnection);
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
   it('a release an earlier stop owed is not sent either while a breakpoint may still be set', async () => {
     const world = fakeWorld();
     const attach = deferred<any>();

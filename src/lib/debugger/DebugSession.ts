@@ -2451,9 +2451,20 @@ export class DebugSession<O = unknown> {
     } catch (error) {
       failures.push(thrownFailure(error, 'stop'));
     } finally {
-      const run = this.run;
-      this.run = undefined;
-      await this.closeOrKeep(run?.connection, "the run's connection", failures);
+      // The run's request is the one a held debuggee stands in: its logoff
+      // would end that session. While a debuggee stays held (not released, or
+      // owed), the run and its connection stay for the stop that releases it;
+      // the instance's terminal close and the process's logoffs close it
+      // whatever is held.
+      if (!this.current && this.owed.size === 0) {
+        const run = this.run;
+        this.run = undefined;
+        await this.closeOrKeep(
+          run?.connection,
+          "the run's connection",
+          failures,
+        );
+      }
     }
     return failures;
   }

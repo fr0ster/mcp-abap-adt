@@ -826,6 +826,33 @@ describe('AmdpSession', () => {
     ]);
   });
 
+  // The run's request is the one a suspended debuggee stands in: its logoff
+  // would end that session while the debuggee is owed a release.
+  it('a debuggee still owed a release keeps the run connection: the stop that releases it closes it, after the release', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    const runConnection = { n: 2 }; // events, commands, then the run's
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const realDelete = w.dbg.deleteDebuggee;
+    w.dbg.deleteDebuggee = async () => refusedResponse('busy');
+    w.reads[2].resolve(refusedResponse('session gone')); // retired with D1 at its break
+    await until(() => w.session.failures().length > 0);
+    await expect(w.session.wait(0)).rejects.toThrow(/session gone/);
+    await expect(w.session.stop()).rejects.toThrow(/release debuggee D1: busy/);
+    expect(w.closed).not.toContainEqual(runConnection);
+    expect(w.session.holdsState()).toBe(true);
+    w.dbg.deleteDebuggee = async (m: string, d: string) => {
+      const answer = await realDelete(m, d);
+      expect(w.closed).not.toContainEqual(runConnection); // released first
+      return answer;
+    };
+    await w.session.stop();
+    expect(w.calls).toContain('delete:D1');
+    expect(w.closed).toContainEqual(runConnection);
+    expect(w.session.holdsState()).toBe(false);
+  });
+
   it('observers hear of changes the read loop makes', async () => {
     const w = await started();
     const heard = jest.fn();

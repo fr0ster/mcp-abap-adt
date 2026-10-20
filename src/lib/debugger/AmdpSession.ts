@@ -1205,8 +1205,13 @@ export class AmdpSession<O = unknown> {
     } catch (error) {
       failures.push(thrownFailure(error, 'stop'));
     } finally {
-      const runs = [...this.runs];
-      this.runs.clear();
+      // A run's request is the one a suspended debuggee stands in: its logoff
+      // would end that session. While a debuggee is still owed a release, the
+      // runs stay for the stop that releases it; the instance's terminal close
+      // and the process's logoffs close them whatever is held.
+      const owesRelease = (this.closing?.unreleased.size ?? 0) > 0;
+      const runs = owesRelease ? [] : [...this.runs];
+      if (!owesRelease) this.runs.clear();
       for (const run of runs)
         await this.closeOrKeep(
           run.connection,

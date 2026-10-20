@@ -118,3 +118,6 @@ desktop.ini
 .mcp.json
 dist-portable/
 .superpowers/
+
+# Header probe reports (npm run header:discovery): they hold system answers
+.header-probe/

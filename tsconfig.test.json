@@ -78,7 +78,8 @@
     "src/lib/servers/v2/__tests__/**/*",
     "scripts/lib/**/*",
     "scripts/check-analyse.ts",
-    "scripts/list-tools.ts"
+    "scripts/list-tools.ts",
+    "tools/header-probe/**/*"
   ],
   "exclude": ["node_modules", "dist"]
 }

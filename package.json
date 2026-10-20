@@ -175,6 +175,7 @@
     "prepare": "husky",
     "smoke:mcp:crud": "node tools/mcp-crud-smoke.js",
     "smoke:mcp:matrix": "node tools/mcp-crud-matrix.js",
+    "header:discovery": "tsx --tsconfig tsconfig.test.json tools/header-probe/probe.ts",
     "docker:build": "docker compose -f docker/docker-compose.yml build",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",

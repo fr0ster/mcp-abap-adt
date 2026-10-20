@@ -1,10 +1,14 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import {
+  type FugrChild,
+  functionGroupStructure,
+} from '../strategies/functionGroupStructure';
+import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure, methodFailureOf } from '../strategies/step';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
@@ -15,10 +19,7 @@ export interface SourceUnit {
   lines: string[];
 }
 
-export interface FugrChild {
-  objecttype: string;
-  objectname: string;
-}
+export type { FugrChild };
 
 export interface ReadSourceUnitsDeps {
   readProgram(
@@ -60,11 +61,43 @@ function isViewFm(name: string): boolean {
   return name.length >= 4 && name.slice(0, 4).toUpperCase() === 'VIEW';
 }
 
-function sortFugrChildren(children: FugrChild[]): FugrChild[] {
-  return [...children].sort((a, b) => {
-    if (a.objecttype !== b.objecttype)
-      return a.objecttype < b.objecttype ? -1 : 1;
-    return a.objectname < b.objectname ? -1 : 1;
+/** A source of a function group: a function module or an include. */
+interface FugrSource {
+  kind: 'fm' | 'include';
+  name: string;
+}
+
+/**
+ * What a structure node's source is, read from its `objecturi`: a path under
+ * `/fmodules/` is a function module, one under `/includes/` an include —
+ * an `FUGR/I` node, or an element (field, module, class…) whose name is the
+ * include it lies in. Any other address (a screen, a GUI status or title:
+ * `/sap/bc/adt/vit/wb/…`) has no source. A node without `objecturi` is read
+ * by its type: `FUGR/FF` a function module, `FUGR/I` an include.
+ */
+function fugrSourceOf(child: FugrChild): FugrSource | undefined {
+  const uri = child.objecturi;
+  if (uri !== undefined && uri !== '') {
+    const hash = uri.indexOf('#');
+    const path = hash === -1 ? uri : uri.slice(0, hash);
+    if (path.includes('/fmodules/'))
+      return { kind: 'fm', name: child.objectname };
+    if (path.includes('/includes/'))
+      return { kind: 'include', name: child.objectname };
+    return undefined;
+  }
+  if (child.objecttype === 'FUGR/FF')
+    return { kind: 'fm', name: child.objectname };
+  if (child.objecttype === 'FUGR/I')
+    return { kind: 'include', name: child.objectname };
+  return undefined;
+}
+
+/** Function modules first, then includes, each by name. */
+function sortFugrSources(sources: FugrSource[]): FugrSource[] {
+  return [...sources].sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'fm' ? -1 : 1;
+    return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
 }
 
@@ -104,64 +137,40 @@ export async function* readSourceUnits(
         `fetch FUGR structure ${target.object_name}`,
       );
       if (!children) return;
+      // One read per source: an include is named by every element inside
+      // it, so the structure lists it under several types.
       const seen = new Set<string>();
-      const filtered: FugrChild[] = [];
+      const sources: FugrSource[] = [];
       for (const c of children) {
-        if (c.objecttype === 'FUGR/FF' && isViewFm(c.objectname)) continue;
         if (!c.objecttype.startsWith('FUGR/')) continue;
-        const key = `${c.objecttype}|${c.objectname}`;
+        const source = fugrSourceOf(c);
+        if (source === undefined) continue;
+        if (source.kind === 'fm' && isViewFm(source.name)) continue;
+        const key = `${source.kind}|${source.name}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        filtered.push(c);
+        sources.push(source);
       }
-      const ordered = sortFugrChildren(filtered);
-      for (const c of ordered) {
+      for (const c of sortFugrSources(sources)) {
         const src =
-          c.objecttype === 'FUGR/FF'
+          c.kind === 'fm'
             ? await safe(
-                () => deps.readFugrFm(target.object_name, c.objectname),
+                () => deps.readFugrFm(target.object_name, c.name),
                 logger,
-                `read FUGR/FF ${target.object_name}/${c.objectname}`,
+                `read FUGR/FF ${target.object_name}/${c.name}`,
               )
             : await safe(
-                () => deps.readInclude(c.objectname),
+                () => deps.readInclude(c.name),
                 logger,
-                `read FUGR include ${c.objectname}`,
+                `read FUGR include ${c.name}`,
               );
         if (src !== null && src !== undefined) {
-          yield { include: c.objectname, lines: splitLines(src) };
+          yield { include: c.name, lines: splitLines(src) };
         }
       }
       return;
     }
   }
-}
-
-interface FlatStructureNode {
-  nodeid?: string;
-  parentid?: string;
-  objecttype?: string;
-  objectname?: string;
-}
-
-function parseFugrChildrenFromXml(xml: string): FugrChild[] {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const parsed = parser.parse(xml);
-  let nodes = parsed?.['projectexplorer:objectstructure']?.[
-    'projectexplorer:node'
-  ] as FlatStructureNode | FlatStructureNode[] | undefined;
-  if (!nodes) return [];
-  if (!Array.isArray(nodes)) nodes = [nodes];
-  const out: FugrChild[] = [];
-  for (const node of nodes) {
-    if (!node.objecttype || !node.objectname) continue;
-    if (!node.objecttype.startsWith('FUGR/')) continue;
-    out.push({ objecttype: node.objecttype, objectname: node.objectname });
-  }
-  return out;
 }
 
 /**
@@ -211,9 +220,9 @@ export function createSourceReaderDeps(
     },
     async fetchFugrStructure(fugrName) {
       const r = await client
-        .getUtils()
+        .getUtils({ ...ourUtils, objectStructure: functionGroupStructure })
         .getObjectStructure('FUGR/F', fugrName, { analyse: analyseException });
-      if (r.ok) return parseFugrChildrenFromXml(r.getResult().value);
+      if (r.ok) return r.getResult().value;
       refusedOrAbsent(r, 'read function group structure');
       return [];
     },

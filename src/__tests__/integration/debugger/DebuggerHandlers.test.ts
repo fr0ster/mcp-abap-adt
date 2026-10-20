@@ -62,12 +62,21 @@ import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handl
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
+import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import {
   createDebuggerInstance,
-  type DebuggerInstance,
+  DebuggerInstance,
 } from '../../../lib/debugger/DebuggerInstance';
-import type { Debugger } from '../../../lib/debugger/DebugSession';
-import { newDebuggerId } from '../../../lib/debugger/ids';
+import {
+  DEBUGGEE_KEPT_WORDS,
+  type Debugger,
+  DebugSession,
+} from '../../../lib/debugger/DebugSession';
+import {
+  newDebuggerId,
+  resolveBreakpointConflict,
+} from '../../../lib/debugger/ids';
+import { liveAmdpPorts, liveDebugPorts } from '../../../lib/debugger/ports';
 import { openFreshConnection } from '../../../lib/packageSessions';
 import { readSystemInformation } from '../../../lib/systemInformation';
 
@@ -274,6 +283,88 @@ describe('Debugger handlers (integration)', () => {
       },
     };
     return { state, ctx, debugger: () => dbg };
+  };
+
+  /**
+   * An instance whose debugger clients carry a test-only fault seam: while
+   * armed, the next `stopListener` and the next `deleteBreakpoint` each fail
+   * once, synthesized here — nothing is sent, so the system's state is the
+   * one the session left. `stepContinue` sent while recording is counted:
+   * a release the stop must not send. Soft mode only: the seam is in process.
+   */
+  const faultedInstance = (): Instance & {
+    fault: {
+      stopListener: number;
+      deleteBreakpoint: number;
+      continues: number;
+      recording: boolean;
+    };
+  } => {
+    const state = new InstanceState({ logger: stderrStateLogger });
+    instances.push(state);
+    const fault = {
+      stopListener: 0,
+      deleteBreakpoint: 0,
+      continues: 0,
+      recording: false,
+    };
+    const refused = (what: string) =>
+      new Error(`test seam: ${what} refused locally, nothing sent`);
+    const live = liveDebugPorts();
+    const ports: typeof live = {
+      ...live,
+      abapDebugger(connection, onConflict) {
+        const dbg = live.abapDebugger(connection, onConflict);
+        const stopListener = dbg.stopListener.bind(dbg);
+        const deleteBreakpoint = dbg.deleteBreakpoint.bind(dbg);
+        const step = dbg.step.bind(dbg);
+        dbg.stopListener = ((...args: Parameters<typeof stopListener>) => {
+          if (fault.stopListener > 0) {
+            fault.stopListener--;
+            return Promise.reject(refused('stopListener'));
+          }
+          return stopListener(...args);
+        }) as typeof dbg.stopListener;
+        dbg.deleteBreakpoint = ((
+          ...args: Parameters<typeof deleteBreakpoint>
+        ) => {
+          if (fault.deleteBreakpoint > 0) {
+            fault.deleteBreakpoint--;
+            return Promise.reject(refused('deleteBreakpoint'));
+          }
+          return deleteBreakpoint(...args);
+        }) as typeof dbg.deleteBreakpoint;
+        dbg.step = ((...args: Parameters<typeof step>) => {
+          if (fault.recording && args[0] === 'stepContinue') fault.continues++;
+          return step(...args);
+        }) as typeof dbg.step;
+        return dbg;
+      },
+    };
+    let dbg: DebuggerInstance | undefined;
+    const ctx: HandlerContext = {
+      ...createHandlerContext({ connection, logger }),
+      state,
+      debugger: () => {
+        if (!dbg) {
+          dbg = new DebuggerInstance({
+            abap: new DebugSession(
+              ports,
+              {
+                terminalId: newDebuggerId(),
+                ideId: newDebuggerId(),
+                stated: false,
+              },
+              { breakpointConflict: resolveBreakpointConflict() },
+            ),
+            amdp: new AmdpSession(liveAmdpPorts()),
+          });
+          state.attach(dbg);
+        }
+        return dbg;
+      },
+    };
+    return { state, ctx, debugger: () => dbg, fault };
   };
 
   /** A plain context for the object tools. */
@@ -1559,6 +1650,123 @@ describe('Debugger handlers (integration)', () => {
           expect(stop.isError).toBe(false);
         } finally {
           await session.cleanup();
+        }
+      });
+    },
+    getTimeout('long'),
+  );
+
+  // --- 5c. a stop whose listener stop failed: the held debuggee stays for the next stop -----
+
+  it(
+    'a failed listener stop and a failed delete: DebugStop answers the failure and keeps the debuggee held; the next stop releases it',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        softOnly('the fault seam is in process');
+
+        // 1. The sweep: whatever an earlier killed run left for this user — a
+        // listener (taken over), the user's breakpoints (deleted by the
+        // listener's stop) — is cleared by a take-over and its stop.
+        const sweeper = newInstance();
+        const sweep = caseSession(sweeper);
+        try {
+          const taken = await call(sweeper, 'DebugTakeOverListener', {
+            breakpoints: [line('mark')],
+          });
+          sweep.hold(taken);
+          measure(
+            'kept debuggee',
+            'the sweep: take-over',
+            taken.isError ? taken.text.slice(0, 400) : taken.json?.state,
+          );
+          expect(taken.isError).toBe(false);
+          const swept = await sweep.stop();
+          measure(
+            'kept debuggee',
+            'the sweep: stop',
+            swept.isError ? swept.text.slice(0, 400) : 'stopped',
+          );
+          expect(swept.isError).toBe(false);
+        } finally {
+          await sweep.cleanup();
+        }
+
+        const inst = faultedInstance();
+        const session = caseSession(inst);
+        let ran: RunInFlight | undefined;
+        try {
+          const start = await call(inst, 'DebugStartListener', {
+            breakpoints: [line('loop')],
+          });
+          const h = session.hold(start);
+          expect(start.isError).toBe(false);
+          let settled = false;
+          ran = inFlight(
+            runProbe(probe).finally(() => {
+              settled = true;
+            }),
+          );
+          const caught = await waitFor(inst, h.state_handle, ['stopped']);
+          expect(caught.last.json?.state).toBe('stopped');
+          expect(caught.last.json.at.address.line).toBe(LINE.loop);
+
+          // 2. The listener's stop and the breakpoint's delete by id are refused
+          // (through the seam): the stop answers the failure and sends no release.
+          inst.fault.stopListener = 1;
+          inst.fault.deleteBreakpoint = 1;
+          inst.fault.recording = true;
+          const faulted = await session.stop();
+          inst.fault.recording = false;
+          const abap = inst.debugger()?.abap;
+          if (!abap) throw new Error('the instance has no debugger');
+          const failures = abap.failures();
+          measure('kept debuggee', 'the faulted stop', {
+            isError: faulted.isError,
+            failures,
+            run_settled: settled,
+          });
+          expect(inst.fault.stopListener).toBe(0);
+          expect(inst.fault.deleteBreakpoint).toBe(0);
+          expect(faulted.isError).toBe(true);
+          expect(faulted.text).toContain(DEBUGGEE_KEPT_WORDS);
+          expect(failures.map((f) => f.step)).toEqual([
+            'stop listener',
+            expect.stringMatching(/^delete breakpoint /),
+            'release the debuggee',
+          ]);
+          expect(failures[2]?.message).toBe(DEBUGGEE_KEPT_WORDS);
+          expect(inst.fault.continues).toBe(0);
+          expect(abap.holdsState()).toBe(true);
+          expect(abap.listBreakpoints()).toHaveLength(1);
+          // Still held: the run has not returned.
+          await pause(3000);
+          expect(settled).toBe(false);
+
+          // 3. A clean stop: the listener's stop deletes the breakpoints, then
+          // the debuggee is released and the run goes to its end.
+          const clean = await session.stop();
+          measure(
+            'kept debuggee',
+            'the clean stop',
+            clean.isError ? clean.text.slice(0, 600) : 'stopped',
+          );
+          expect(clean.isError).toBe(false);
+          expect(abap.failures()).toEqual([]);
+          expect(abap.listBreakpoints()).toEqual([]);
+          expect(abap.holdsState()).toBe(false);
+          expect(await ran.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+        } finally {
+          // A fault not consumed must not refuse the cleanup's stop.
+          inst.fault.stopListener = 0;
+          inst.fault.deleteBreakpoint = 0;
+          inst.fault.recording = false;
+          await session.cleanup();
+          // The run's own connection is logged off (endTestConnection) as it settles.
+          await ran?.settled();
         }
       });
     },

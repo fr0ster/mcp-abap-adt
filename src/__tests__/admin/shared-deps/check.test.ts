@@ -369,7 +369,7 @@ describe('Live: shared_dependencies exist on the system', () => {
       );
       const report = presenceReport(results);
       testsLogger?.info?.(
-        `Shared objects present: ${report.present.length}, absent: ${report.absent.length}`,
+        `Shared objects present: ${report.present.length}, absent: ${report.absent.length}, unreadable: ${report.unreadable.length}`,
       );
       expect(results.length).toBeGreaterThan(0);
       if (report.message) throw new Error(report.message);

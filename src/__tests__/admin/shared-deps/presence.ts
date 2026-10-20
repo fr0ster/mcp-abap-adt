@@ -15,11 +15,13 @@ export interface SharedItem {
   available_in?: string[];
 }
 
+export type PresenceState = 'present' | 'absent' | 'unreadable';
+
 export interface PresenceResult {
   section: string;
   name: string;
-  present: boolean;
-  /** Why the read said absent when it threw rather than answered */
+  state: PresenceState;
+  /** unreadable only: safe facts (HTTP status, failure code), never a message */
   detail?: string;
 }
 
@@ -76,9 +78,46 @@ export const SHARED_READS: Record<string, Read> = {
 /** Sections in the order the report lists them */
 export const SHARED_SECTIONS = Object.keys(SHARED_READS);
 
+/** A failure code is kept only when it has the shape of a constant. */
+function safeCode(code: unknown): string | undefined {
+  return typeof code === 'string' && /^[A-Za-z0-9_.-]{1,48}$/.test(code)
+    ? code
+    : undefined;
+}
+
 /**
- * Reads every shared name of every section the system offers it for. An
- * answer that is not ok, or a throw, is absent: nothing is created either way.
+ * What a read said about the object. `absent` only when SAP answered that it
+ * is not there (a refusal on a 404); any other refusal — 401, 5xx, no answer
+ * at all — says nothing about the object and is `unreadable`, with the status
+ * and code it carried and none of its text.
+ */
+export function classifyRead(answer: any): {
+  state: PresenceState;
+  detail?: string;
+} {
+  if (answer?.ok === true) return { state: 'present' };
+  let error: any;
+  try {
+    error = answer?.getError?.();
+  } catch {
+    error = undefined;
+  }
+  const status = error?.response?.status;
+  if (error?.origin === 'refusal' && status === 404) return { state: 'absent' };
+  const facts: string[] = [];
+  if (Number.isInteger(status)) facts.push(`HTTP ${status}`);
+  const code = safeCode(error?.code);
+  if (code) facts.push(code);
+  if (error?.origin === 'connection') facts.push('no answer');
+  return {
+    state: 'unreadable',
+    detail: facts.length ? facts.join(', ') : 'refused',
+  };
+}
+
+/**
+ * Reads every shared name of every section the system offers it for.
+ * Reads only: nothing is created either way.
  */
 export async function readShared(
   client: AdtClient,
@@ -93,18 +132,19 @@ export async function readShared(
     for (const item of items as SharedItem[]) {
       if (!availableHere(item.available_in)) continue;
       try {
-        const answer = await read(client, item);
         results.push({
           section,
           name: item.name,
-          present: answer?.ok === true,
+          ...classifyRead(await read(client, item)),
         });
       } catch (error: any) {
+        // A throw says nothing about the object. Its code, never its message.
+        const code = safeCode(error?.code);
         results.push({
           section,
           name: item.name,
-          present: false,
-          detail: String(error?.message ?? error).substring(0, 200),
+          state: 'unreadable',
+          detail: code ?? 'thrown',
         });
       }
     }
@@ -115,23 +155,37 @@ export async function readShared(
 export interface PresenceReport {
   present: string[];
   absent: string[];
-  /** One line per absent object; empty when all are present */
+  unreadable: string[];
+  /** The two groups apart; empty when every object is present */
   message: string;
 }
 
-/** Turns per-name read results into the present / absent report. */
+/** Turns per-name read results into the present / absent / unreadable report. */
 export function presenceReport(
   results: ReadonlyArray<PresenceResult>,
 ): PresenceReport {
   const label = (r: PresenceResult) => `${r.section}: ${r.name}`;
-  const present = results.filter((r) => r.present).map(label);
-  const missing = results.filter((r) => !r.present);
-  const absent = missing.map(label);
-  const message =
-    missing.length === 0
-      ? ''
-      : `${missing.length} of ${results.length} shared objects are absent on the system:\n  ${missing
-          .map((r) => (r.detail ? `${label(r)} (${r.detail})` : label(r)))
-          .join('\n  ')}`;
-  return { present, absent, message };
+  const of = (state: PresenceState) => results.filter((r) => r.state === state);
+  const present = of('present').map(label);
+  const absentR = of('absent');
+  const unreadableR = of('unreadable');
+  const parts: string[] = [];
+  if (absentR.length > 0) {
+    parts.push(
+      `absent on the system (${absentR.length} of ${results.length}):\n  ${absentR.map(label).join('\n  ')}`,
+    );
+  }
+  if (unreadableR.length > 0) {
+    parts.push(
+      `could not be read (${unreadableR.length} of ${results.length}), so their presence is unknown:\n  ${unreadableR
+        .map((r) => `${label(r)} (${r.detail ?? 'refused'})`)
+        .join('\n  ')}`,
+    );
+  }
+  return {
+    present,
+    absent: absentR.map(label),
+    unreadable: unreadableR.map(label),
+    message: parts.join('\n'),
+  };
 }

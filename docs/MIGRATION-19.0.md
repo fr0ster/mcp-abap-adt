@@ -1139,8 +1139,12 @@ transport's options only:
   not right gets SAP's refusal as it came. When SAP ended that session (a timeout, a logoff, an
   administrator) the connection is replaced and its locks are held no more: a later
   `HandlerUpdate` or `HandlerUnlock` under them is refused, sending nothing; lock again. In batch mode the same chain holds across batches: the locks a lock batch recorded are held
-  once their numbers' answers were read after `BatchEnd`, and the write and unlock batches send the instance's
-  `state_handle`. **A service binding open in an editing session**: its LOCK answers `403`, read as
+  once their numbers' answers were read after `BatchEnd` — and only while the SAP session that
+  batch's envelope went out on is still the instance's (read after it ended, the lock answers its
+  handle and is not held) — and the write and unlock batches send the instance's
+  `state_handle`. A lock number never read before the next `BatchEnd` replaces the map, or a lock
+  batch whose `BatchEnd` failed, leaves locks in SAP that no handle reaches; they last until that
+  session's logoff. **A service binding open in an editing session**: its LOCK answers `403`, read as
   a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
   SERVICE_BINDING takes that empty `lock_handle` and sends the publication; `HandlerUnlock` with it
   answers that there is nothing to unlock, sending nothing.

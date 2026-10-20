@@ -47,6 +47,7 @@ import type {
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import type { HeldLocks } from '../../lib/state/heldLocks';
 import {
   type EnvelopeAnswer,
   envelopeConnection,
@@ -157,6 +158,7 @@ class StandServer extends BaseMcpServer {
     groups: IHandlerGroup[],
     owner: InstanceBatch,
     source: ConnectionSource,
+    heldLocks?: HeldLocks,
   ) {
     super({
       name: 'batch-stand',
@@ -164,6 +166,7 @@ class StandServer extends BaseMcpServer {
       logger: silent as never,
       systemType: 'onprem',
       batch: owner,
+      ...(heldLocks !== undefined ? { heldLocks } : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry(groups));
     this.setConnectionContext({ kind: 'built', source, sessionId: 'dest-a' });
@@ -201,6 +204,8 @@ export interface StandOptions {
   /** How each built connection answers an envelope; default part by part. */
   envelope?: EnvelopeAnswer;
   keepRawParts?: boolean;
+  /** The instance's held locks, as the Streamable HTTP host gives them. */
+  heldLocks?: HeldLocks;
   /** Groups served beside the shipped tools named (a test's own handlers). */
   groups?: IHandlerGroup[];
 }
@@ -245,6 +250,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     ],
     owner,
     source,
+    options.heldLocks,
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'batch-stand', version: '1.0.0' });

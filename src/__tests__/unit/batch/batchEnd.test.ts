@@ -21,6 +21,7 @@ import {
   BATCH_ENDED_WORDS,
   BATCH_MODE_OFF_WORDS,
   BATCH_UNSPLIT_WORDS,
+  batchMorePartsWords,
   batchPartsMismatchWords,
 } from '../../../lib/auth/serverRefusal';
 import { endsCommunicationBatch } from '../../../lib/batch/batchTools';
@@ -29,6 +30,7 @@ import type {
   HandlerContext,
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
+import { HeldLocks } from '../../../lib/state/heldLocks';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { envelopeResponse, statusError } from '../../helpers/batchEnvelope';
 import {
@@ -944,4 +946,103 @@ describe("BatchEnd's error, no map", () => {
     });
     await s.close();
   });
+});
+
+describe('a lock read by number', () => {
+  const LOCK = { object_type: 'CLASS', object_name: 'CLAS_A' };
+
+  it("is held by the instance once its number is read, in the session BatchEnd sent it on — also when that session replaced the recording call's", async () => {
+    const heldLocks = new HeldLocks();
+    const s = await batchStand({ tools: TOOLS, part: sap, heldLocks });
+    s.begin();
+    await s.call('HandlerLock', LOCK);
+    // SAP ended the recording call's session: BatchEnd sends on a new one.
+    s.loseSession();
+    await s.end();
+    expect(s.built).toHaveLength(2);
+    expect(heldLocks.holds(LOCK_HANDLE_OF_XML)).toBe(false); // not read yet
+    const [entry] = await s.answers([1]);
+    expect(payloadOf(entry as Answer).lock_handle).toBe(LOCK_HANDLE_OF_XML);
+    expect(heldLocks.holds(LOCK_HANDLE_OF_XML)).toBe(true);
+    await s.close();
+  });
+
+  it("read after the instance's SAP session ended: answers the lock, and the instance holds it no more", async () => {
+    const heldLocks = new HeldLocks();
+    const s = await batchStand({ tools: TOOLS, part: sap, heldLocks });
+    s.begin();
+    await s.call('HandlerLock', LOCK);
+    await s.end();
+    // SAP ends the session the lock lives in; the next call replaces it.
+    s.loseSession();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    expect(s.built).toHaveLength(2);
+    const [entry] = await s.answers([1]);
+    expect((entry as BatchAnswer).isError).toBeUndefined();
+    expect(payloadOf(entry as Answer).lock_handle).toBe(LOCK_HANDLE_OF_XML);
+    expect(heldLocks.holds(LOCK_HANDLE_OF_XML)).toBe(false);
+    // A write under it is refused here, sending nothing.
+    expect(heldLocks.holdsState()).toBe(false);
+    await s.close();
+  });
+});
+
+describe('BatchEnd: more parts than requests', () => {
+  it('batch_parts_mismatch in words that say more came, never "<n> of <n>"', async () => {
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      envelope: async (parts) =>
+        envelopeResponse([...parts, ...parts].map(sap)),
+      groups: [
+        own('GetProgram', async (context) => {
+          await context.connection.makeAdtRequest(READ);
+          return built('a');
+        }),
+      ],
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    const { answer, summary } = await s.end();
+    expect(answer.isError).toBe(true);
+    expect(summary).toEqual({
+      error: 'batch_parts_mismatch',
+      message: batchMorePartsWords(1),
+    });
+    expect(batchMorePartsWords(1)).toBe(
+      'more parts came than the 1 requests sent; the answers cannot be matched to the calls',
+    );
+    for (const entry of await s.answers([1])) {
+      expect(asAnswer(entry)).toEqual(answer);
+    }
+    await s.close();
+  });
+});
+
+describe('a resumed handler reaching the connection after its part', () => {
+  it.each(['getBaseUrl', 'connect'] as const)(
+    '%s is refused batch_ended, and that is its answer',
+    async (member) => {
+      const s = await batchStand({
+        tools: [],
+        part: sap,
+        groups: [
+          own('GetProgram', async (context) => {
+            await context.connection.makeAdtRequest(READ);
+            await context.connection[member]();
+            return built('never');
+          }),
+        ],
+      });
+      s.begin();
+      await s.call('GetProgram', { program_name: 'PROG_A' });
+      await s.end();
+      const [entry] = await s.answers([1]);
+      expect(payloadOf(entry as Answer)).toEqual({
+        error: 'batch_ended',
+        message: BATCH_ENDED_WORDS,
+      });
+      await s.close();
+    },
+  );
 });

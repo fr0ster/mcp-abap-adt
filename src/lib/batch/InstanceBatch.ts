@@ -98,6 +98,12 @@ export interface OpenBatch {
    */
   envelopes?: EnvelopeWatch;
   recorded: RecordedCall[];
+  /**
+   * The instance's SAP session `BatchEnd` sent the envelope on
+   * (`HeldLocks.session()`), set by `BatchEnd`: a lock read by number is
+   * held only while that session is the live one.
+   */
+  lockSession?: number;
   /** A debugger batch: the debug session it records at, an ABAP stop or an AMDP break. */
   debuggee?: 'abap' | 'amdp';
 }

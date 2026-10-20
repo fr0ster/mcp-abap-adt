@@ -34,7 +34,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answerFailure, type McpResult, requestFailureOf } from '../answer';
 import { answerRead } from '../auth/answerFailure';
 import { failureOf, readOwn } from '../auth/failures';
-import { batchPartsMismatchWords, ServerRefusal } from '../auth/serverRefusal';
+import {
+  batchMorePartsWords,
+  batchPartsMismatchWords,
+  ServerRefusal,
+} from '../auth/serverRefusal';
 import { withStep } from '../strategies/step';
 import type {
   BatchFailure,
@@ -129,7 +133,8 @@ function cameBack(part: PartSettlement, envelopeError: unknown): boolean {
  * connection answered and the answer did not split (the parts of that
  * envelope rejected with the very error `execute()` did), and
  * `batch_parts_mismatch` when the parts that came are not as many as the
- * requests sent.
+ * requests sent (fewer: "<received> of <sent> parts came"; more: "more parts
+ * came than the <sent> requests sent").
  */
 function split(
   open: OpenBatch,
@@ -149,13 +154,17 @@ function split(
     const unsplit = parts.some(
       (part) => part.state === 'rejected' && part.error === error,
     );
+    if (unsplit) return { error: new ServerRefusal('batch_unsplit') };
+    // The connection answered, every part settled with its answer, and
+    // adt-clients still refused the count: SAP sent more parts than
+    // requests.
     return {
-      error: unsplit
-        ? new ServerRefusal('batch_unsplit')
-        : new ServerRefusal(
-            'batch_parts_mismatch',
-            batchPartsMismatchWords(received, sent),
-          ),
+      error: new ServerRefusal(
+        'batch_parts_mismatch',
+        received < sent
+          ? batchPartsMismatchWords(received, sent)
+          : batchMorePartsWords(sent),
+      ),
     };
   }
   if (received !== sent) {

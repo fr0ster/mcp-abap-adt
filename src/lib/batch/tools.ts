@@ -69,6 +69,9 @@ export async function beginBatch(context: HandlerContext): Promise<McpResult> {
 export async function endBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   const open = openBatchOf(owner, 'communication');
+  // The session the envelope goes out on: the connection this call took.
+  const locks = context.heldLocks;
+  if (locks !== undefined) open.lockSession = locks.session();
   return executeBatch(owner, open, context.connection);
 }
 

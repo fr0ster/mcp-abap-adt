@@ -11,7 +11,7 @@ import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution';
-import type { HeldLocks } from '../lib/state/heldLocks';
+import type { HeldLockPort } from '../lib/state/heldLocks';
 import type { InstanceState } from '../lib/state/InstanceState';
 
 /**
@@ -69,7 +69,7 @@ export interface HandlerContext {
    * host whose instances last one request each (Streamable HTTP); absent on
    * stdio and SSE, whose instance keeps its session between calls.
    */
-  heldLocks?: HeldLocks;
+  heldLocks?: HeldLockPort;
   /**
    * Sends on the instance's connection through its main flow: directly from a
    * call that holds it, else in turn. `send` is handed the connection to send

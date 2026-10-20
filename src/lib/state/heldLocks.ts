@@ -28,9 +28,20 @@ export const LOCK_NOT_HELD_WORDS =
  */
 export type LockSession = 'main' | 'own';
 
-export class HeldLocks implements StatePart {
+/** What a handler does with the instance's held locks: keep, ask, let go. */
+export interface HeldLockPort {
+  hold(handle: string, session?: LockSession): void;
+  holds(handle: string): boolean;
+  release(handle: string): void;
+  /** The instance's live SAP session, as a token that changes when it ends. */
+  session(): number;
+}
+
+export class HeldLocks implements StatePart, HeldLockPort {
   private readonly handles = new Map<string, LockSession>();
   private readonly listeners: Array<() => void> = [];
+  /** Which SAP session of the instance is live: one more at every end of one. */
+  private generation = 0;
 
   /** Keeps `handle` as held by this instance, in `session`. */
   hold(handle: string, session: LockSession = 'main'): void {
@@ -44,6 +55,7 @@ export class HeldLocks implements StatePart {
    * went with it, and are held no more.
    */
   mainSessionEnded(): void {
+    this.generation += 1;
     let changed = false;
     for (const [handle, session] of this.handles) {
       if (session === 'main') {
@@ -52,6 +64,31 @@ export class HeldLocks implements StatePart {
       }
     }
     if (changed) this.notify();
+  }
+
+  /** The instance's live SAP session, as a token that changes when it ends. */
+  session(): number {
+    return this.generation;
+  }
+
+  /**
+   * The held locks as a recorded call sees them when its number is read
+   * (batch mode): a lock in the main session is kept only when `sentIn()` —
+   * the session its batch's envelope went out on — is still the live one.
+   * A lock read after that session ended went with it: the read answers it,
+   * and the instance does not hold it, so a write or an unlock under it is
+   * refused here, sending nothing.
+   */
+  heldIn(sentIn: () => number | undefined): HeldLockPort {
+    return {
+      hold: (handle, session = 'main') => {
+        if (session === 'main' && sentIn() !== this.generation) return;
+        this.hold(handle, session);
+      },
+      holds: (handle) => this.holds(handle),
+      release: (handle) => this.release(handle),
+      session: () => this.session(),
+    };
   }
 
   /** Whether `handle` is held by this instance. */
@@ -102,7 +139,7 @@ export class HeldLocks implements StatePart {
  * this instance holds.
  */
 export function lockHeldHere(
-  heldLocks: HeldLocks | undefined,
+  heldLocks: HeldLockPort | undefined,
   lockHandle: string,
 ): boolean {
   return heldLocks === undefined || heldLocks.holds(lockHandle);

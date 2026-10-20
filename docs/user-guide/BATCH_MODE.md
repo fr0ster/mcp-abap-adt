@@ -43,7 +43,8 @@ The debugger has a batch of its own — `DebugBatchBegin` / `DebugBatchEnd`, com
    - the envelope failed — what came, as it came: SAP's answer to the envelope (its status and
      body, with `step: "execute"`), the transport's error, or a credential refusal;
    - fewer parts came than requests were sent — `batch_parts_mismatch` ("1 of 2 parts came; the
-     answers cannot be matched to the calls");
+     answers cannot be matched to the calls"); more parts than requests — `batch_parts_mismatch`
+     ("more parts came than the 2 requests sent; the answers cannot be matched to the calls");
    - the answer could not be split into parts — `batch_unsplit` ("the envelope's answer could
      not be split into the calls' parts").
 
@@ -83,7 +84,14 @@ with the single-step tools:
 
 1. create — `HandlerCreate` (compact);
 2. lock — `HandlerLock`; read the lock handles with `BatchAnswers` (over Streamable HTTP the
-   lock is the instance's held state: every later phase sends that instance's `state_handle`);
+   lock is the instance's held state: every later phase sends that instance's `state_handle`).
+   The instance holds a lock once its number is read, and only while the SAP session the
+   envelope went out on is still the instance's: a lock read after that session ended answers
+   its handle, and a write or an unlock under it is refused, sending nothing — lock again. A
+   lock number never read before the next `BatchEnd` replaces the map, and a lock batch whose
+   `BatchEnd` failed, leave locks in SAP that no handle reaches: they last until that session's
+   logoff (stdio: the process's end; Streamable HTTP: the pooled instance's end; or SAP's own
+   session timeout). Read every lock number before the next phase's `BatchEnd`;
 3. write — `HandlerUpdate` with `lock_handle` (for PACKAGE, DOMAIN, DATA_ELEMENT and
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);

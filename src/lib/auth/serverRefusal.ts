@@ -185,14 +185,23 @@ export const BATCH_UNSPLIT_WORDS =
   "the envelope's answer could not be split into the calls' parts";
 
 /**
- * `BatchEnd`'s error: the parts that came are not as many as the requests
- * sent, so no part can be matched to its call.
+ * `BatchEnd`'s error: fewer parts came than requests were sent, so no part
+ * can be matched to its call.
  */
 export function batchPartsMismatchWords(
   received: number,
   sent: number,
 ): string {
   return `${received} of ${sent} parts came; the answers cannot be matched to the calls`;
+}
+
+/**
+ * `BatchEnd`'s error (`batch_parts_mismatch`): more parts came than requests
+ * were sent. adt-clients settles one part per request and drops the rest
+ * unread, so how many more is not known here.
+ */
+export function batchMorePartsWords(sent: number): string {
+  return `more parts came than the ${sent} requests sent; the answers cannot be matched to the calls`;
 }
 
 /**
@@ -284,7 +293,8 @@ export class ServerRefusal extends Error {
    * `background_run_limit` in `backgroundRunLimitWords`.
    * `batch_not_recordable` in `batchNotRecordableWords` or
    * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`;
-   * `batch_parts_mismatch` in `batchPartsMismatchWords`.
+   * `batch_parts_mismatch` in `batchPartsMismatchWords` or
+   * `batchMorePartsWords`.
    */
   constructor(code: WordedCode, words: string);
   constructor(code: ServerRefusalCode, words?: string) {

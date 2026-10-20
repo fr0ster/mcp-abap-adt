@@ -1810,6 +1810,11 @@ export abstract class BaseMcpServer extends McpServer {
       // The debug sessions are bound to the call's own context, whose
       // connection outlives the batch (`requireDebugger`).
       ...(owner.mode() === 'debugger' ? { recordedFrom: call.context } : {}),
+      // Its number is read later: a lock it answers is held only while the
+      // SAP session its envelope went out on is still the instance's.
+      ...(this.heldLocks !== undefined
+        ? { heldLocks: this.heldLocks.heldIn(() => open.lockSession) }
+        : {}),
     };
     open.target?.point(connection);
     try {

@@ -139,9 +139,15 @@ export function createRecorder(
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
+  // Once the batch has ended (or was dropped), the handler — resumed when
+  // its number is read — reaches no connection: what it would reach is
+  // refused `batch_ended`, as a further request is.
+  const ended = () => owner.opened()?.connection !== batch;
+  const endedRefusal = <T>(): Promise<T> =>
+    Promise.reject<T>(new ServerRefusal('batch_ended'));
   const recorder: Recorder = {
-    connect: () => batch.connect(),
-    getBaseUrl: () => batch.getBaseUrl(),
+    connect: () => (ended() ? endedRefusal<void>() : batch.connect()),
+    getBaseUrl: () => (ended() ? endedRefusal<string>() : batch.getBaseUrl()),
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type) => batch.setSessionType(type),
     getSessionType: () => batch.getSessionType(),
@@ -154,7 +160,7 @@ export function createRecorder(
       // was refused, every later part is refused with it: the call records
       // nothing more and takes no number.
       // The batch ended (or was dropped): nothing more is recorded or sent.
-      if (owner.opened()?.connection !== batch) {
+      if (ended()) {
         batch.setSessionType(unswitched);
         const ended = Promise.reject<IAdtWireResponse<T, D>>(
           new ServerRefusal('batch_ended'),

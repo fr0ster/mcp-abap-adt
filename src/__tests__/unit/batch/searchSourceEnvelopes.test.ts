@@ -221,6 +221,21 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
       expect(p.scanned).toEqual({ packages: 1, objects: 300, sources: 300 });
     });
 
+    it('max_objects 400 cut after the first envelope: by_max_objects stays the slice’s, next_start_at 300', async () => {
+      const fake = on(programs(650), passingAfter(3));
+      const result = await search(fake, ['ZBIG'], {
+        time_budget_ms: 5_000,
+        max_objects: 400,
+      });
+      expect(sourceSizes(fake, 2)).toEqual([300]);
+      const p = payloadOf(result);
+      expect(answeredNames(result)).toHaveLength(300);
+      expect(p.truncated.by_max_objects).toBe(true);
+      expect(p.truncated.by_timeout).toBe(true);
+      expect(p.next_start_at).toBe(300);
+      expect(p.total_targets).toBe(650);
+    });
+
     it('from start_at 10: next_start_at 310', async () => {
       const fake = on(programs(650), passingAfter(3));
       const result = await search(fake, ['ZBIG'], {

@@ -247,8 +247,10 @@ section but one): it cannot be cut, so it gets no `timeout`.
   **Drop `concurrency` from your calls**; the hits are the same. `time_budget_ms` is checked before
   every envelope, and a scan it stops answers whole objects only, with `next_start_at` at the first
   object not answered: pass it as `start_at` to go on (a deadline during the package walk answers
-  `next_start_at` = `start_at` and no `total_targets`). Where the system has no communication batch
-  the scan runs as in 18.x, eight fetches at a time over HTTP and one at a time over RFC.
+  `next_start_at` = `start_at` and no `total_targets`). When `next_start_at` equals `start_at`,
+  `time_budget_ms` passed before the first object was answered: raise `time_budget_ms` or lower
+  `max_objects`. Where the system has no communication batch the scan runs as in 18.x, eight
+  fetches at a time over HTTP and one at a time over RFC.
 
 ## stdio: leftover SAP sessions of a killed process
 

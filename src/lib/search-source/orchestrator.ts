@@ -57,7 +57,7 @@ export interface OrchestratorInput {
   start_at?: number;
   concurrency?: number;
   version?: SourceVersion;
-  /** Internal scan deadline in ms. When exceeded, returns the hits of the targets read whole with truncated.by_timeout=true and next_start_at. */
+  /** Internal scan deadline in ms. When exceeded, returns the hits of the objects before `next_start_at` with truncated.by_timeout=true and next_start_at. */
   time_budget_ms?: number;
 }
 
@@ -103,7 +103,7 @@ export interface OrchestratorResult {
   truncated: {
     by_object_cap: boolean;
     by_max_objects: boolean;
-    /** True when a time_budget_ms deadline cut the scan; results hold the targets read whole before it. */
+    /** True when a time_budget_ms deadline cut the scan; results hold the hits of the objects before `next_start_at`. */
     by_timeout: boolean;
   };
 }

@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runs a class or a program in one request. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.',
+    'Runs a class or a program in one request. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — programs exist on premise]. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.',
   inputSchema: compactProfileRunSchema,
 } as const;
 

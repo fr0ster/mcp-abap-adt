@@ -22,7 +22,7 @@ export const TOOL_DEFINITION = {
   name: 'GetATCFindings',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.',
+    'Read what an ATC run found, by the worklist_id RunATC answered. Works for a run started with wait=true or wait=false. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.',
   ),
   inputSchema: {
     type: 'object',

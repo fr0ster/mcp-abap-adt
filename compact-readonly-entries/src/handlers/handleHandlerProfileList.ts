@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerProfileList',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runtime profiling list. object_type: not used. Required: none. Response: JSON.',
+    'Runtime profiling list. Response: JSON.',
   inputSchema: compactProfileListSchema,
 } as const;
 

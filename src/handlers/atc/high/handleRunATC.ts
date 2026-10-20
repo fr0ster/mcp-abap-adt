@@ -30,7 +30,7 @@ export const TOOL_DEFINITION = {
   name: 'RunATC',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.',
+    'Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings for either value of wait. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.',
   inputSchema: {
     type: 'object',
     properties: {

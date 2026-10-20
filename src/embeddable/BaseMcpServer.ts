@@ -59,10 +59,9 @@ import type {
 } from '../lib/batch/InstanceBatch.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
-  NOT_SERVED_SENTENCE,
+  OUTSIDE_BATCH_SENTENCE,
   withBatchSentence,
 } from '../lib/batch/sentence.js';
-import type { ToolSetKind } from '../lib/config/binaries.js';
 import {
   createAbapConnection,
   systemKindOf,
@@ -77,7 +76,6 @@ import {
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
 import type {
-  IHandlerGroup,
   IHandlersRegistry,
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
@@ -313,13 +311,6 @@ export abstract class BaseMcpServer extends McpServer {
    * instances; this instance's own when the host gave none.
    */
   protected readonly adtHeaderPairs: AdtHeaderPairs;
-
-  /**
-   * Whose words the batch sentence of a tool's description uses: the full
-   * sets' (`BatchBegin`) or the compact sets' (`HandlerBatch`), read from
-   * the batch tools a registered registry serves; `undefined` before one.
-   */
-  private batchWords: ToolSetKind | undefined;
 
   constructor(options: {
     name: string;
@@ -1268,12 +1259,8 @@ export abstract class BaseMcpServer extends McpServer {
     if (handlersRegistry instanceof CompositeHandlersRegistry) {
       const groups = handlersRegistry.getHandlerGroups();
       // Where the instance has a batch owner, every tool's description but
-      // a batch tool's ends with its batch sentence (spec §3), in the words
-      // of the batch tools the registry serves (the full sets' by default).
-      const found = batchWordsOf(groups);
-      if (found !== undefined) this.batchWords = found;
-      const words =
-        this.batch !== undefined ? (this.batchWords ?? 'core') : undefined;
+      // a batch tool's ends with its batch sentence (spec §3).
+      const sentenced = this.batch !== undefined;
 
       for (const group of groups) {
         const handlers = group.getHandlers();
@@ -1613,12 +1600,10 @@ export abstract class BaseMcpServer extends McpServer {
             entry.toolDefinition.name,
             {
               description:
-                words !== undefined && !isBatchTool(entry.toolDefinition.name)
+                sentenced && !isBatchTool(entry.toolDefinition.name)
                   ? withBatchSentence(
                       entry.toolDefinition.description,
                       entry.toolDefinition.name,
-                      words,
-                      { connectionless: entry.connectionless === true },
                     )
                   : entry.toolDefinition.description,
               inputSchema: zodSchema,
@@ -2444,14 +2429,14 @@ export abstract class BaseMcpServer extends McpServer {
           ]
         : registerArgs;
     };
-    // A registry's own tool is not served in batch mode: where the instance
-    // has a batch owner, its description says so (spec §3) — the same rule
-    // as a handler group's tools.
+    // A registry's own tool runs outside batch mode: where the instance has
+    // a batch owner, its description says so (spec §3) — the same rule as a
+    // handler group's tools the eligibility table does not list.
     const described = (registerArgs: unknown[]): unknown[] => {
       if (this.batch === undefined) return registerArgs;
       const name = registerArgs[0];
       if (typeof name !== 'string' || isBatchTool(name)) return registerArgs;
-      const sentence = NOT_SERVED_SENTENCE;
+      const sentence = OUTSIDE_BATCH_SENTENCE;
       const second = registerArgs[1];
       const appended = (description: string) =>
         description.trimEnd().length === 0
@@ -2655,20 +2640,4 @@ function statedEnvironment(
   return declared === 'onprem' || declared === 'cloud' || declared === 'legacy'
     ? declared
     : undefined;
-}
-
-/**
- * The words of the batch sentence for a registry's groups: the compact sets'
- * when `HandlerBatch` is served, the full sets' when `BatchBegin` is, none
- * when the registry serves no batch tool.
- */
-function batchWordsOf(groups: IHandlerGroup[]): ToolSetKind | undefined {
-  const names = new Set(
-    groups.flatMap((group) =>
-      group.getHandlers().map((entry) => entry.toolDefinition.name),
-    ),
-  );
-  if (names.has('HandlerBatch')) return 'compact';
-  if (names.has('BatchBegin')) return 'core';
-  return undefined;
 }

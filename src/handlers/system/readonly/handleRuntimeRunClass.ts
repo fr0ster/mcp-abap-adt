@@ -58,7 +58,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeRunClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.',
+    '[runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

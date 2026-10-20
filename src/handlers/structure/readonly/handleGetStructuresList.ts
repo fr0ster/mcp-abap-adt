@@ -37,8 +37,8 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. ' +
       'Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). ' +
-      'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the ' +
-      'DDIC structure/table endpoints this needs are not present there (issue #207).',
+      'Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; ' +
+      'legacy systems (BASIS < 7.50) refuse it (issue #207).',
   ),
   inputSchema: {
     type: 'object',

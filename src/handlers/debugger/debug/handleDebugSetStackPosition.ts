@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugSetStackPosition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Selects the stack frame variables are read in; what runs next does not change. Needs a stopped debuggee.',
+    '[debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: {

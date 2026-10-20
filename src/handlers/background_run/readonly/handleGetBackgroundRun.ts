@@ -5,7 +5,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetBackgroundRun',
   description:
-    '[runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). Reading does not remove it; a finished run is kept until you discard it.',
+    '[runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). A read keeps the run; a finished run is kept until you discard it.',
   inputSchema: {
     type: 'object',
     properties: {

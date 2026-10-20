@@ -43,7 +43,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Locks the group, writes, and unlocks it.",
+    "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.",
   inputSchema: {
     type: 'object',
     properties: {

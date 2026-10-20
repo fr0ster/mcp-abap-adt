@@ -4,7 +4,7 @@ import type { ArgsOf, HandlerContext } from '../../handlers/index';
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunGet',
   description:
-    'Reads one of your background runs by its run_handle: running, or finished with what HandlerProfileRun answered (the system answer as it is, an error included). Reading does not remove it.',
+    'Reads one of your background runs by its run_handle: running, or finished with what HandlerProfileRun answered (the system answer as it is, an error included). A read keeps the run.',
   inputSchema: {
     type: 'object',
     properties: {

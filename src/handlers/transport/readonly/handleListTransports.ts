@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
   name: 'ListTransports',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers — not sent to ADT as filters.",
+    "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers; ADT receives the default search alone.",
   ),
   inputSchema: {
     type: 'object',

@@ -54,7 +54,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTransportTask',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Create a task under an existing transport request, owned by a named user, and give it a type. The task is itself a request resource — it reads, writes and releases like one — and is what AddTransportObject and RemoveTransportObject address, since a request's objects live on its tasks. `target_user` is required: without it the server resolves an empty owner and refuses with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses AddTransportObject on premise with SCTS_ADT_MSG 009 / TK127.",
+    "Create a task under an existing transport request, owned by a named user, and give it a type. The task is itself a request resource — it reads, writes and releases like one — and is what AddTransportObject and RemoveTransportObject address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses AddTransportObject on premise with SCTS_ADT_MSG 009 / TK127.",
   inputSchema: {
     type: 'object',
     properties: {

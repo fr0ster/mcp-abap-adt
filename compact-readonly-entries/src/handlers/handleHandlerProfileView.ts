@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerProfileView',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.',
+    'Runtime profiling view. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.',
   ),
   inputSchema: compactProfileViewSchema,
 } as const;

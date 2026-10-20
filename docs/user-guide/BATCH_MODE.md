@@ -374,7 +374,7 @@ no raw part.
 | `CreatePackage` | when the connection is HTTP | POST /sap/bc/adt/packages; over RFC the create runs in an ABAP session of its own, outside the batch |
 | `CreateProgram` | every call | POST /sap/bc/adt/programs/programs: the create alone |
 | `CreateServiceBinding` | when activate is false | POST /sap/bc/adt/businessservices/bindings: the create alone (nothing activated) |
-| `CreateServiceDefinition` | when activate is false and source_code is not given | POST /sap/bc/adt/ddic/srvd/sources: the create alone (no source written, nothing activated) |
+| `CreateServiceDefinition` | when activate is false and source_code is absent | POST /sap/bc/adt/ddic/srvd/sources: the create alone (no source written, nothing activated) |
 | `CreateTable` | every call | POST /sap/bc/adt/ddic/tables: the create alone |
 | `CreateTransport` | every call | POST /sap/bc/adt/cts/transportrequests |
 | `CreateTransportTask` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/tasks |
@@ -396,7 +396,7 @@ no raw part.
 | `GetDdlVersions` | every call | GET /sap/bc/adt/ddic/ddl/sources/{name}/versions |
 | `GetDdlVersionSource` | every call | GET the content_uri given |
 | `GetDomain` | every call | GET /sap/bc/adt/ddic/domains/{name} |
-| `GetEnhancements` | when object_type is one of CLASS, CLAS, CLAS/OC, FUNCTION_GROUP, FUNCTIONGROUP, FUGR, FUGR/F, PROGRAM, PROG, PROG/P and include_nested is not true | GET {object uri}/source/main/enhancements/elements for a class, program or function group named by its type (any other type is resolved by probing metadata first, so it is not listed) |
+| `GetEnhancements` | when object_type is one of CLASS, CLAS, CLAS/OC, FUNCTION_GROUP, FUNCTIONGROUP, FUGR, FUGR/F, PROGRAM, PROG, PROG/P and include_nested is any value but true | GET {object uri}/source/main/enhancements/elements for a class, program or function group named by its type (any other type is resolved by probing metadata first, so it is not listed) |
 | `GetFunctionGroup` | every call | GET /sap/bc/adt/functions/groups/{name} |
 | `GetFunctionInclude` | every call | one request: GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/includes/{name} (part metadata) |
 | `GetFunctionModule` | every call | one request at the group given: GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/fmodules/{name} (part metadata) |
@@ -442,7 +442,7 @@ no raw part.
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
 | `GetTableVersionSource` | every call | GET the content_uri given |
 | `GetTransport` | every call | GET /sap/bc/adt/cts/transportrequests/{number}?includeObjects=…&includeTasks=… |
-| `GetWhereUsed` | when enable_all_types is not true and enable_only_types is not given and disable_types is not given and objects is not given | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
+| `GetWhereUsed` | when enable_all_types is any value but true and enable_only_types is absent and disable_types is absent and objects is absent | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
 | `ListServiceBindingTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `MoveTransportObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
 | `ReadTransportActionLog` | every call | GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs |
@@ -453,11 +453,11 @@ no raw part.
 | `RuntimeGetDumpById` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
 | `RuntimeGetGatewayErrorLog` | every call | GET /sap/bc/adt/gw/errorlog, or the error_url given |
 | `RuntimeGetProfilerTraceData` | every call | GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses |
-| `RuntimeListFeeds` | when feed_type is one of descriptors, variants (absent reads as descriptors) and feed_types is not given | GET /sap/bc/adt/feeds (descriptors, or the variants read from the same list; the dumps, system messages and gateway errors feeds are read page by page, so they are not listed) |
+| `RuntimeListFeeds` | when feed_type is one of descriptors, variants (absent reads as descriptors) and feed_types is absent | GET /sap/bc/adt/feeds (descriptors, or the variants read from the same list; the dumps, system messages and gateway errors feeds are read page by page, so they are not listed) |
 | `RuntimeListProfilerTraceFiles` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |
 | `RuntimeListSystemMessages` | every call | GET /sap/bc/adt/runtime/systemmessages |
-| `RuntimeRunClass` | when profile is not true | POST /sap/bc/adt/oo/classrun/{name} (without profile: with it the trace is also scheduled and listed) |
-| `RuntimeRunProgram` | when profile is not true | POST /sap/bc/adt/programs/programrun/{name} (without profile: with it the trace is scheduled first) |
+| `RuntimeRunClass` | when profile is any value but true | POST /sap/bc/adt/oo/classrun/{name} (without profile: with it the trace is also scheduled and listed) |
+| `RuntimeRunProgram` | when profile is any value but true | POST /sap/bc/adt/programs/programrun/{name} (without profile: with it the trace is scheduled first) |
 | `SearchObject` | every call | GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
 | `SortAndCompressTransportTask` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress |
 | `ValidateServiceBinding` | every call | POST /sap/bc/adt/cts/transportchecks |
@@ -466,10 +466,10 @@ no raw part.
 
 | Tool | Recorded | Sends |
 |---|---|---|
-| `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
+| `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
 | `HandlerActivate` | when objects is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
-| `HandlerActivate` | when objects is not given and object_adt_type is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
-| `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
+| `HandlerActivate` | when objects is absent and object_adt_type is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
 | `HandlerCdsUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
 | `HandlerCdsUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
 | `HandlerCheckRun` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |

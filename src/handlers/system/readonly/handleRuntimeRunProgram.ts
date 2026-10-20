@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgram',
   available_in: ['onprem'] as const,
   description:
-    '[runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).',
+    '[runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so the traceId arrives later, through that list).',
   inputSchema: {
     type: 'object',
     properties: {

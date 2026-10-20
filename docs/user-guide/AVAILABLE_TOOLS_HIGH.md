@@ -207,7 +207,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works for a run started with wait=true or wait=false. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -219,7 +219,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** Ask whether an ATC run has ended. Takes the run_id from RunATC (only a run started with wait=false has one). Answers the status the server reports and whether it is finished — finished means ended, not that the checks passed. Read what it found with GetATCFindings, by worklist_id.
+**Description:** Ask whether an ATC run has ended. Takes the run_id from RunATC (only a run started with wait=false has one). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. Read what it found with GetATCFindings, by worklist_id.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -230,7 +230,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings for either value of wait. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -320,7 +320,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
+**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -435,7 +435,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -1280,7 +1280,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Locks the group, writes, and unlocks it.
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -1482,7 +1482,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+**Description:** Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. A message class is in effect once saved.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -1549,7 +1549,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** Read one message (by number) of an ABAP message class (MSAG/T100) in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as not found.
+**Description:** Read one message (by number) of an ABAP message class (MSAG/T100) in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -1574,7 +1574,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -1644,7 +1644,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="deletepackage-high-level-package"></a>
 #### DeletePackage (High-Level / Package)
-**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server save a package on a session apart from this one, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
 
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
@@ -1685,7 +1685,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Not available on cloud.
+**Description:** Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Available on premise.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -1980,7 +1980,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -2098,7 +2098,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Create a task under an existing transport request, owned by a named user, and give it a type. The task is itself a request resource — it reads, writes and releases like one — and is what AddTransportObject and RemoveTransportObject address, since a request's objects live on its tasks. `target_user` is required: without it the server resolves an empty owner and refuses with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses AddTransportObject on premise with SCTS_ADT_MSG 009 / TK127.
+**Description:** Create a task under an existing transport request, owned by a named user, and give it a type. The task is itself a request resource — it reads, writes and releases like one — and is what AddTransportObject and RemoveTransportObject address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses AddTransportObject on premise with SCTS_ADT_MSG 009 / TK127.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
@@ -2278,7 +2278,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
+**Description:** Get the result of an ABAP Unit test run by its run_id, for a run still running when its start answered. Waits for it within a bound.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -2406,4 +2406,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 ---
 
-*Last updated: 2026-10-17*
+*Last updated: 2026-10-20*

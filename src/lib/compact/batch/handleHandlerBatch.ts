@@ -19,9 +19,9 @@ import type { ArgsOf, HandlerContext } from '../../handlers/index';
  * the actions where the full set names a tool.
  */
 export const HANDLER_BATCH_DESCRIPTION = [
-  "action 'begin': Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (HandlerCreate, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. action 'end' sends the recorded calls; read their answers by number with action 'answers'. Over HTTP, send the state_handle this answers in the request header on every call of the batch.",
-  "action 'end': Sends every call recorded since action 'begin', in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with action 'answers'.",
-  "action 'answers' (with number or numbers): The answers of the last batch, by number: each is the answer the tool gives for that call, built when action 'end' sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.",
+  "action 'begin': Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.",
+  "action 'end': Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.",
+  "action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.",
 ].join(' ');
 
 export const TOOL_DEFINITION = {

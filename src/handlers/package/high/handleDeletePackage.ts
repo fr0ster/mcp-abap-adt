@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'DeletePackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
+    'Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server save a package on a session apart from this one, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

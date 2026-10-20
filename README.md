@@ -236,8 +236,8 @@ the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT a
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. Every tool's description ends with
-one sentence saying whether it is recorded, for which arguments, refused, or not served in batch
-mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
+one sentence saying how it behaves in batch mode: recordable, recordable for the arguments it
+names, or run outside batch mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
 `x-mcp-state-handle` request header on every call of the batch. See
 [Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
 

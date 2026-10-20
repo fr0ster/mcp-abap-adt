@@ -60,13 +60,13 @@ describe('the debugger descriptions', () => {
     );
   });
 
-  it('the set is described as shared by the key and replaced as a whole', () => {
+  it('the set is described as shared by the key and rewritten as a whole', () => {
     for (const name of ['DebugSetBreakpoints', ...START_TOOLS]) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
       expect(tool.description).toMatch(
         /shared by every IDE of the same SAP user \(in user mode, debugging the same request user; in terminal mode, whatever its ids\)/,
       );
-      expect(tool.description).toMatch(/replaces that set as a whole/);
+      expect(tool.description).toMatch(/rewrites that set as a whole/);
     }
   });
 

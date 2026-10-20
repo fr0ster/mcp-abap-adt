@@ -18,7 +18,7 @@ import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../../embeddable/ConnectionContext';
 import { isBatchTool } from '../../../lib/batch/batchTools';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
-import { batchSentence, eligibleSentence } from '../../../lib/batch/sentence';
+import { batchSentence } from '../../../lib/batch/sentence';
 import type { ToolSetKind } from '../../../lib/config/binaries';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
@@ -53,18 +53,15 @@ const isCompact = (kind: ToolSetKind) =>
 
 // The spec's words (§3), copied here, never imported: the test is the copy.
 const BEGIN_WORDS =
-  "Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (compact: HandlerCreate, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle this answers in the request header on every call of the batch.";
+  'Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.';
 const END_WORDS =
-  'Sends every call recorded since BatchBegin, in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.';
+  "Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.";
 const ANSWERS_WORDS =
-  "The answers of the last batch, by number: each is the answer the tool gives for that call, built when BatchEnd sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.";
-const ELIGIBLE_WORDS =
-  'In batch mode (BatchBegin) a call is recorded and returns nothing; calls are numbered in the order made, and their answers are read by number with BatchAnswers once BatchEnd has run.';
-const INELIGIBLE_WORDS =
-  "In batch mode (BatchBegin) this tool is refused: a request of it depends on another's answer.";
-// The controller's wording (for the owner to confirm), copied here.
-const NOT_SERVED_WORDS =
-  'In batch mode this tool is not served: run it outside batch mode.';
+  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.";
+const RECORDABLE_TAIL =
+  'recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.';
+const ELIGIBLE_WORDS = `Recordable: ${RECORDABLE_TAIL.slice('recordable: '.length)}`;
+const OUTSIDE_WORDS = 'Runs outside batch mode.';
 
 class SurfaceServer extends BaseMcpServer {
   constructor(
@@ -146,59 +143,43 @@ describe('the batch tools on the surface', () => {
   });
 
   it.each(SETS.map(([kind, set]) => [kind, set] as const))(
-    "every tool's description in %s ends with its sentence (eligible, eligible-by-arguments, ineligible; compact names HandlerBatch)",
+    "every tool's description in %s ends with its sentence (recordable, recordable for some arguments, outside batch mode)",
     async (kind, set) => {
       const { client } = await served(registryOf(set, 'stdio'), {
         batch: new InstanceBatch({ keepRawParts: false }),
       });
       const { tools } = await client.listTools();
       expect(tools.length).toBeGreaterThan(10);
-      const connectionless = new Set(
-        set
-          .groups({ connection: undefined as never }, 'stdio')
-          .flatMap((group) => group.getHandlers())
-          .filter((entry) => entry.connectionless === true)
-          .map((entry) => entry.toolDefinition.name),
-      );
       for (const tool of tools) {
         const description = tool.description ?? '';
         if (isBatchTool(tool.name)) {
-          expect(description).not.toContain('In batch mode (');
+          expect(description).not.toContain(RECORDABLE_TAIL);
+          expect(description).not.toContain(OUTSIDE_WORDS);
           continue;
         }
-        const sentence = batchSentence(tool.name, kind, {
-          connectionless: connectionless.has(tool.name),
-        });
         expect({
           tool: tool.name,
-          ends: description.endsWith(` ${sentence}`),
+          ends: description.endsWith(` ${batchSentence(tool.name)}`),
         }).toEqual({
           tool: tool.name,
           ends: true,
         });
-        if (sentence === NOT_SERVED_WORDS) continue;
-        if (isCompact(kind)) {
-          expect(description).toContain("(HandlerBatch action 'begin')");
-          expect(description).not.toContain('BatchBegin');
-        } else {
-          expect(description).toContain('(BatchBegin)');
-        }
       }
       const byName = new Map(tools.map((t) => [t.name, t.description ?? '']));
       if (kind === 'core') {
-        // Eligible for every call, for some arguments, and refused.
+        // Recordable for every call, for some arguments, and outside batch mode.
         expect(byName.get('GetClass')?.endsWith(`. ${ELIGIBLE_WORDS}`)).toBe(
           true,
         );
-        expect(byName.get('CreatePackage')).toContain(
-          `${ELIGIBLE_WORDS} Only these calls are recorded, any other is refused: the connection is HTTP.`,
-        );
         expect(
-          byName.get('UpdateClass')?.endsWith(` ${INELIGIBLE_WORDS}`),
+          byName
+            .get('CreatePackage')
+            ?.endsWith(` With the connection is HTTP, ${RECORDABLE_TAIL}`),
         ).toBe(true);
-        // Not served, for a reason other than a dependency: no request, the
+        // A request that depends on another's answer, no request, the
         // debugger's own connection, a background run, a leftover session.
         for (const name of [
+          'UpdateClass',
           'GetAbapAST',
           'DebugStep',
           'GetBackgroundRun',
@@ -206,16 +187,16 @@ describe('the batch tools on the surface', () => {
         ]) {
           expect({
             name,
-            ends: byName.get(name)?.endsWith(` ${NOT_SERVED_WORDS}`),
+            ends: byName.get(name)?.endsWith(` ${OUTSIDE_WORDS}`),
           }).toEqual({ name, ends: true });
         }
       }
       if (kind === 'compact') {
         expect(byName.get('HandlerLock')).toContain(
-          `${eligibleSentence('compact')} Only these calls are recorded, any other is refused: object_type is one of CLASS,`,
+          ' With object_type is one of CLASS,',
         );
         expect(byName.get('HandlerLock')).toContain(
-          '; or object_type is PACKAGE and the connection is HTTP.',
+          `; or object_type is PACKAGE and the connection is HTTP, ${RECORDABLE_TAIL}`,
         );
         expect(byName.get('HandlerGet')).toContain(
           'part is source (absent reads as source)',
@@ -227,14 +208,14 @@ describe('the batch tools on the surface', () => {
         ]) {
           expect({
             name,
-            ends: byName.get(name)?.endsWith(` ${NOT_SERVED_WORDS}`),
+            ends: byName.get(name)?.endsWith(` ${OUTSIDE_WORDS}`),
           }).toEqual({ name, ends: true });
         }
       }
     },
   );
 
-  it("BatchBegin's and BatchEnd's descriptions are the spec's words", async () => {
+  it("BatchBegin's, BatchEnd's and BatchAnswers' descriptions are the spec's words", async () => {
     const { client } = await served(registryOf(fullToolSet, 'http'), {
       batch: new InstanceBatch({ keepRawParts: false }),
     });
@@ -251,13 +232,17 @@ describe('the batch tools on the surface', () => {
       const { tools } = await client.listTools();
       expect(
         tools
-          .filter((t) => (t.description ?? '').includes('In batch mode'))
+          .filter(
+            (t) =>
+              (t.description ?? '').includes(RECORDABLE_TAIL) ||
+              (t.description ?? '').includes(OUTSIDE_WORDS),
+          )
           .map((t) => t.name),
       ).toEqual([]);
     }
   });
 
-  it("a registry's own tool gets the not-served sentence where the instance has a batch owner", async () => {
+  it("a registry's own tool gets the outside-batch sentence where the instance has a batch owner", async () => {
     const own = (): IHandlersRegistry =>
       ({
         registerAllTools: (server: {
@@ -277,7 +262,7 @@ describe('the batch tools on the surface', () => {
     });
     const listed = (await withOwner.client.listTools()).tools;
     expect(listed.find((t) => t.name === 'OwnTool')?.description).toBe(
-      `Does its own thing. ${NOT_SERVED_WORDS}`,
+      `Does its own thing. ${OUTSIDE_WORDS}`,
     );
     const withoutOwner = await served(own());
     expect(

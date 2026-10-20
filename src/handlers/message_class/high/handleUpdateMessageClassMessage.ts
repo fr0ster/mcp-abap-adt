@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.',
+    'Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).',
   inputSchema: {
     type: 'object',
     properties: {

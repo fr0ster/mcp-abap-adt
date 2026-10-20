@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.',
+    'Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. A message class is in effect once saved.',
   inputSchema: {
     type: 'object',
     properties: {

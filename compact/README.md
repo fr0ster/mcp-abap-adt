@@ -31,8 +31,8 @@ by its number. A tool that builds a request from an earlier answer is refused; r
 phases, each its own batch — create (`HandlerCreate`), lock (`HandlerLock`),
 write (`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). A batch holds one kind of
 request — LOCK, UNLOCK or stateless, as its first recorded call decides; a call of another kind is
-refused `batch_other_kind`: record it in the next batch. Every tool's description ends with one sentence saying whether it is
-recorded, for which arguments, refused, or not served in batch mode. Over Streamable HTTP send the
+refused `batch_other_kind`: record it in the next batch. Every tool's description ends with one sentence saying how it behaves
+in batch mode: recordable, recordable for the arguments it names, or run outside batch mode. Over Streamable HTTP send the
 `state_handle` `action: 'begin'` answers in the `x-mcp-state-handle` header on every call of the
 batch. See
 [Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md).

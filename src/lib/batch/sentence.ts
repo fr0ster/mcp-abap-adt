@@ -6,11 +6,9 @@
  * Which sentence a tool gets is read from the eligibility table alone
  * (`tools/batch-handlers.json`): a tool every call of which is recorded, a
  * tool recorded only for some arguments (the table's `when` and
- * `connection`, rendered into words), or a tool refused. The compact sets
- * name `HandlerBatch` and its actions where the full sets name a tool.
+ * `connection`, rendered into words), or a tool that runs outside batch
+ * mode. The words name no batch tool, so every set uses the same ones.
  */
-import type { ToolSetKind } from '../config/binaries';
-import { isDebuggerOwnConnectionTool } from '../debugger/ownConnectionTools';
 import {
   absentReadsAs,
   type BatchEntry,
@@ -18,61 +16,25 @@ import {
   type WhenRule,
 } from './eligibility';
 
-/** How a set names beginning, ending and reading a batch. */
-interface Names {
-  begin: string;
-  end: string;
-  answers: string;
-}
+/**
+ * The sentence of a tool every call of which is recorded (spec §3). The
+ * same words serve every set: they name no batch tool.
+ */
+export const RECORDABLE_SENTENCE =
+  'Recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.';
 
-const FULL_NAMES: Names = {
-  begin: 'BatchBegin',
-  end: 'BatchEnd',
-  answers: 'BatchAnswers',
-};
-
-const COMPACT_NAMES: Names = {
-  begin: "HandlerBatch action 'begin'",
-  end: "HandlerBatch action 'end'",
-  answers: "HandlerBatch action 'answers'",
-};
-
-const namesOf = (set: ToolSetKind): Names =>
-  set === 'compact' || set === 'compact-ro' ? COMPACT_NAMES : FULL_NAMES;
-
-/** The sentence of a tool every call of which is recorded. */
-export function eligibleSentence(set: ToolSetKind): string {
-  const names = namesOf(set);
-  return `In batch mode (${names.begin}) a call is recorded and returns nothing; calls are numbered in the order made, and their answers are read by number with ${names.answers} once ${names.end} has run.`;
-}
-
-/** The sentence of a tool refused in batch mode because a request of it depends on another's answer. */
-export function ineligibleSentence(set: ToolSetKind): string {
-  return `In batch mode (${namesOf(set).begin}) this tool is refused: a request of it depends on another's answer.`;
+/** The sentence of a tool recorded only for some arguments, `when` in words. */
+export function recordableWhenSentence(when: string): string {
+  return `With ${when}, recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.`;
 }
 
 /**
- * The sentence of a tool batch mode does not serve for a reason other than
- * a dependency: it sends no request, works on a connection of its own (the
- * debugger), or works on none (the background-run and leftover-session
- * tools), or is a registry's own tool. (The controller's wording, for the
- * owner to confirm.)
+ * The sentence of every other tool: one whose request depends on another's
+ * answer, one that sends no request, works on a connection of its own (the
+ * debugger) or on none (the background-run and leftover-session tools), and
+ * a registry's own tool.
  */
-export const NOT_SERVED_SENTENCE =
-  'In batch mode this tool is not served: run it outside batch mode.';
-
-/**
- * The tools that send no request to SAP (measured with the eligibility
- * proof): nothing of theirs can go into an envelope.
- */
-export const SENDS_NO_REQUEST: readonly string[] = [
-  'GetAbapAST',
-  'GetAbapSemanticAnalysis',
-  'GetAbapSystemSymbols',
-  'GetTransaction',
-  'GetObjectNodeFromCache',
-];
-const SENDS_NONE = new Set(SENDS_NO_REQUEST);
+export const OUTSIDE_BATCH_SENTENCE = 'Runs outside batch mode.';
 
 const listed = (values: string[]): string =>
   values.length === 1 ? values[0] : values.join(', ');
@@ -82,7 +44,7 @@ function ruleWords(tool: string, rule: WhenRule[number]): string[] {
   const words: string[] = [];
   const name = rule.argument;
   if (rule.present === true) words.push(`${name} is given`);
-  if (rule.present === false) words.push(`${name} is not given`);
+  if (rule.present === false) words.push(`${name} is absent`);
   if (rule.equals !== undefined) {
     const absent = absentReadsAs(tool, name);
     const fallback =
@@ -99,8 +61,8 @@ function ruleWords(tool: string, rule: WhenRule[number]): string[] {
   if (rule.notEquals !== undefined) {
     words.push(
       rule.notEquals.length === 1
-        ? `${name} is not ${rule.notEquals[0]}`
-        : `${name} is none of ${listed(rule.notEquals)}`,
+        ? `${name} is any value but ${rule.notEquals[0]}`
+        : `${name} is any value but ${listed(rule.notEquals)}`,
     );
   }
   return words;
@@ -119,44 +81,25 @@ export function entryWords(entry: BatchEntry): string {
 }
 
 /**
- * The sentence `tool`'s description ends with in a set of `set`'s kind:
- * recorded, recorded only for some arguments (which, from its entries), or
- * refused. A tool the eligibility table does not list is refused — not
- * served when it is `connectionless` (the background-run and
- * leftover-session tools), a debugger tool on its own connection, or one
- * that sends no request; else for the dependency of its requests.
+ * The sentence `tool`'s description ends with: recordable for every call,
+ * recordable for some arguments (which, from its entries, in words), or —
+ * for a tool the eligibility table does not list — run outside batch mode.
  */
-export function batchSentence(
-  tool: string,
-  set: ToolSetKind,
-  options: { connectionless?: boolean } = {},
-): string {
+export function batchSentence(tool: string): string {
   const entries = batchEntries().filter((entry) => entry.tool === tool);
-  if (entries.length === 0) {
-    return options.connectionless === true ||
-      isDebuggerOwnConnectionTool(tool) ||
-      SENDS_NONE.has(tool)
-      ? NOT_SERVED_SENTENCE
-      : ineligibleSentence(set);
-  }
+  if (entries.length === 0) return OUTSIDE_BATCH_SENTENCE;
   const always = entries.some(
     (entry) =>
       (entry.when === undefined || entry.when.length === 0) &&
       entry.connection === undefined,
   );
-  if (always) return eligibleSentence(set);
-  const cases = entries.map(entryWords);
-  return `${eligibleSentence(set)} Only these calls are recorded, any other is refused: ${cases.join('; or ')}.`;
+  if (always) return RECORDABLE_SENTENCE;
+  return recordableWhenSentence(entries.map(entryWords).join('; or '));
 }
 
 /** `description` with `tool`'s batch sentence appended. */
-export function withBatchSentence(
-  description: string,
-  tool: string,
-  set: ToolSetKind,
-  options: { connectionless?: boolean } = {},
-): string {
-  const sentence = batchSentence(tool, set, options);
+export function withBatchSentence(description: string, tool: string): string {
+  const sentence = batchSentence(tool);
   const trimmed = description.trimEnd();
   return trimmed.length === 0 ? sentence : `${trimmed} ${sentence}`;
 }

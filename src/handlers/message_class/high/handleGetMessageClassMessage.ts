@@ -8,7 +8,7 @@ export const TOOL_DEFINITION = {
   name: 'GetMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read one message (by number) of an ABAP message class (MSAG/T100) in one request: the class\'s ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as not found.',
+    'Read one message (by number) of an ABAP message class (MSAG/T100) in one request: the class\'s ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.',
   inputSchema: {
     type: 'object',
     properties: {

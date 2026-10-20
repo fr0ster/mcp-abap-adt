@@ -617,6 +617,27 @@ debuggee. The owner decided it ships in 19.0.0.
 - [ ] **Step 7:** All gates (CI's step list). Commit `feat(batch): BatchEnd splits the envelope; a number's answer is built when read`.
 - [ ] **Step 8 (live, on the owner's word):** the communication-batch and debugger-batch live tests (HTTP and RFC) rerun green; SM04/SM05 checked minutes later.
 
+### Task 37: A leftover-session file goes only once the logoff completed
+
+**Files:** `src/lib/leftoverSessions/LeftoverSessions.ts`, `src/lib/ownedConnections.ts` (if the hook lives there), their unit tests, `docs/` where leftover sessions and the forced close are described, CHANGELOG 19.0.0 (date = the day of the change).
+
+- [ ] **Step 1:** Failing tests: a tracked connection's file stays after its logoff is written and is removed only once its `flushGoodbye()` settled; a process that exits without that flush (the forced close, a crash) leaves the file, so `ListLeftoverSessions` lists the session.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Remove the file on the flush's completion, never on the write alone.
+- [ ] **Step 4:** Run — PASS; break-it (remove on the write again) red, reverted.
+- [ ] **Step 5:** Docs: the forced close's sessions are visible as files and through `ListLeftoverSessions` / `LogoffLeftoverSession`; CHANGELOG.
+- [ ] **Step 6:** All gates (CI's step list). Commit `fix(leftover): a session file goes only once its logoff completed`.
+
+### Task 38 (live, on the owner's word): DebugStop with a failed listener stop
+
+**Files:** `src/__tests__/integration/debugger/DebuggerHandlers.test.ts`, a fault-injection seam test-only.
+
+- [ ] **Step 1:** The case starts with a sweeping DebugStop (whatever an earlier killed run left: listener, breakpoints, a held debuggee).
+- [ ] **Step 2:** The run is caught at the probe's breakpoint in a loop; a DebugStop whose `stopListener` and one by-id delete are refused through the seam answers the failure and releases no debuggee (the run is still held).
+- [ ] **Step 3:** A clean DebugStop: breakpoints gone, debuggee released, the run ends; `caseSession.cleanup` in `finally`; harness logoff awaited.
+- [ ] **Step 4:** Twice in a row on HTTP and RFC — green both times (idempotent); SM04/SM05 checked minutes later.
+- [ ] **Step 5:** Commit `test(debugger): live DebugStop with a failed listener stop`.
+
 ### Task 35: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).

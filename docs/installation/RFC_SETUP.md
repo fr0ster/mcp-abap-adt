@@ -101,7 +101,7 @@ SAP_SYSID=ABC
 - `SAP_GROUP` — the logon group. When absent, connection uses `PUBLIC`; the server adds no default of its own.
 - `SAP_SAPROUTER` — a SAProuter string. It works with either addressing (message server or application server).
 - Each is also a CLI option (`--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`) and a YAML key of the same name. Precedence is that of the connection type: CLI, then the environment (the `--env` / `--env-path` `.env` value joins it, never over one already set), then YAML. The server passes them to connection as configured and decides nothing.
-- **Not yet run against a live message server** (connection 18.0.0). The address follows the SAP NW RFC SDK's own parameters. `SAP_MSHOST` + `SAP_MSSERV` without `SAP_SYSID` is accepted but unconfirmed; if the SDK refuses it, add `SAP_SYSID`.
+- **Implemented and unit-tested; not yet measured on a live system** (as of 2026-10-20: none of the systems available for the check has a reachable message server). The address follows the SAP NW RFC SDK's own parameters. `SAP_MSHOST` + `SAP_MSSERV` without `SAP_SYSID` is accepted but unconfirmed; if the SDK refuses it, add `SAP_SYSID`.
 
 ## SNC (passwordless logon)
 

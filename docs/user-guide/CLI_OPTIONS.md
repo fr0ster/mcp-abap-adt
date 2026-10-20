@@ -197,6 +197,8 @@ mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=onprem
   `SAP_SAPROUTER`), which the `--env` / `--env-path` `.env` may also state (it joins the
   environment, never over a value already set), and a YAML key of the option's name. Precedence,
   as for `--connection-type`: the CLI flag, then the environment, then YAML.
+- Logon through a message server is implemented and unit-tested, but not yet measured on a live
+  system (as of 2026-10-20); see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 See [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 

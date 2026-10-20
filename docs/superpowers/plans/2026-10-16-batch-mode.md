@@ -647,7 +647,8 @@ Rule (owner): a description is purely functional and names the function on what 
 - [ ] **Step 1:** The query set: each query with its `required` groups (interchangeable tools per step), per role (reader: read-only tools; developer: all), over the full set's catalog (name + description + parameter names, as `tools/list` serves them).
 - [ ] **Step 2:** The retrieval test, offline: BM25 over that corpus; every required group within top-K per role (K as the consumer's production cap); and the first sentence of every description unique within each set. Run — FAIL on today's offenders (#270 GetDdl, #271 cases), listed by query.
 - [ ] **Step 2a:** The same queries by vectors, through the local Ollama (`http://127.0.0.1:11434`, its embedding models, e.g. `nomic-embed-text`, `bge-m3`, `mxbai-embed-large`): cosine alone and hybrid (0.7 cosine + 0.3 BM25), every required group within top-K per role and model. A live test that states where it runs: it runs when the Ollama answers with the model, and skips elsewhere (CI) with that reason. No SAP AI Core, no other remote service. Run — the failures listed by query and model.
-- [ ] **Step 3:** Rewrite the failing descriptions, and every description built around a vague subject, to the rule; `descriptionsFunctional.test.ts` stays green; regenerate the tool docs.
+- [ ] **Step 2b:** `descriptionsFunctional.test.ts` also refuses a description naming another tool of its set, and a read tool (one that changes nothing) without its `[read-only]` marker. Run — FAIL on today's offenders (the triage counted 61 and 27).
+- [ ] **Step 3:** Rewrite the failing descriptions, and every description built around a vague subject (the triage counted 22), naming another tool, or missing `[read-only]`, to the rule; `descriptionsFunctional.test.ts` stays green; regenerate the tool docs.
 - [ ] **Step 4:** Run — PASS. Break-it: put GetDdl's old description back — red; revert.
 - [ ] **Step 5:** All gates (CI's step list). Commit `docs: tool descriptions found by what users ask (#270, #271)`.
 
@@ -656,6 +657,16 @@ Rule (owner): a description is purely functional and names the function on what 
 The consumer (cloud-llm-hub) measures retrieval in its own repository and hands over its findings, as #271 did; this repository runs nothing of the consumer's and the consumer changes nothing here.
 
 - [ ] **Step 1:** Each finding the consumer reports for 19.0.0 becomes a query in the Task 39 set and a description fix, in 19.0.x.
+
+### Task 41: stdio recovers after a lost session (#295)
+
+**Files:** `server/src/__tests__/` (a StdioServer case), `src/__tests__/helpers/adtStandIn.ts` (an answer with a new session cookie), CHANGELOG 19.0.0 (date = the day of the change).
+
+- [ ] **Step 1:** The test: a stdio server started (`connectAtStart`), the stand-in answers a request with another session's cookie → that call answers SESSION_REPLACED (no retry); the next call logs on again and succeeds; the replaced connection is logged off.
+- [ ] **Step 2:** Run against the branch — PASS (the fix is `b8c3b3ab`); break-it: reuse the held connection when spent — red; revert.
+- [ ] **Step 3:** CHANGELOG 19.0.0 *Fixed*: stdio logs on again after SAP ended its session (#295).
+- [ ] **Step 4 (live, on the owner's word):** a stdio server against the test system; the owner deletes its session in SM05; the next tool call answers on a new session; SM05 checked minutes later.
+- [ ] **Step 5:** All gates (CI's step list). Commit `test(stdio): a lost session is replaced at the next call (#295)`.
 
 ### Task 35: Final consistency
 

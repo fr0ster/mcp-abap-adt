@@ -73,6 +73,11 @@ function wordsOf(text: string): string[] {
   return words;
 }
 
+/** A listed word, or any contracted negation (a token ending in n't). */
+function isNegation(word: string): boolean {
+  return FORBIDDEN.has(word) || word.endsWith("n't");
+}
+
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 const SETS: ReadonlyArray<readonly [ToolSetKind, ToolSet]> = [
@@ -136,6 +141,21 @@ describe('tool descriptions are purely functional', () => {
     ]);
   });
 
+  it('reads every contracted negation, straight or curly, in any case', () => {
+    expect(
+      wordsOf("wouldn’t SHOULDN'T Aren’t WASN'T hasn't Doesn’t").map(
+        isNegation,
+      ),
+    ).toEqual([true, true, true, true, true, true]);
+    expect(wordsOf("NOT Never NOTHING tool's runs").map(isNegation)).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
   it.each(SETS.map(([kind, set]) => [kind, set] as const))(
     'every served tool of %s states only what it does, its parameters and its result',
     async (kind, set) => {
@@ -150,7 +170,7 @@ describe('tool descriptions are purely functional', () => {
           )) {
             seen += 1;
             for (const word of new Set(wordsOf(tool.description))) {
-              if (!FORBIDDEN.has(word)) continue;
+              if (!isNegation(word)) continue;
               const finding = `${tool.name}: "${word}"`;
               if (!offenders.includes(finding)) offenders.push(finding);
             }

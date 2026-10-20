@@ -642,6 +642,15 @@ debuggee. The owner decided it ships in 19.0.0.
 
 **Files:** a labelled query set under `src/__tests__/unit/descriptions/` (from cloud-llm-hub's `tools/tool-rag-queries.json`, plus the #270 and #271 cases), the retrieval test beside it, the handler descriptions it fails on, regenerated tool docs, CHANGELOG 19.0.0 (date = the day of the change).
 
+**Three texts per tool (owner, 2026-10-20).** Search methods differ and do not share a text, so each tool carries three, and the consumer takes the one its search uses:
+- `description` — what `tools/list` serves for the model's choice: purely functional (below);
+- `keywords` — for lexical search (BM25): the terms, synonyms and object kinds users ask with (an array of strings);
+- `semantic` — for vector search: one or two natural sentences of what a user wants when this tool is the answer.
+
+`keywords` and `semantic` live in one table, `tools/tool-search.json` (tool name → `{ keywords, semantic }`), shipped in the package like `tools/batch-handlers.json` and bundled (`require`). Every tool of every set has an entry (a source test). lib exports them (`@mcp-abap-adt/lib/tool-search`: `toolSearchText(name)` and the whole map), and `tools/list` carries them on each tool as `_meta["mcp-abap-adt/search"] = { keywords, semantic }`. A consumer that knows none of it reads `description` as today.
+
+The gate: BM25 over name + parameter names + `keywords`; vectors over `semantic`; `description` checked functional and first-sentence unique.
+
 Rule (owner): a description is purely functional and names the function on what the parameters name ("Finds where the object named by object_name and object_type is used …", "Reads the CDS view named by ddl_name …"), never a vague "an ABAP object" subject.
 
 - [ ] **Step 1:** The query set: each query with its `required` groups (interchangeable tools per step), per role (reader: read-only tools; developer: all), over the full set's catalog (name + description + parameter names, as `tools/list` serves them).

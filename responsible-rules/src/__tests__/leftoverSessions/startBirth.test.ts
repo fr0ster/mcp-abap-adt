@@ -27,7 +27,10 @@ import {
 } from '../../../../src/lib/activeTools';
 import { ClosedInstanceRefusal } from '../../../../src/lib/auth/failures';
 import { ServerRefusal } from '../../../../src/lib/auth/serverRefusal';
-import { ownedConnections } from '../../../../src/lib/ownedConnections';
+import {
+  logoffsAnswered,
+  ownedConnections,
+} from '../../../../src/lib/ownedConnections';
 import { requireSystemContextForCreate } from '../../../../src/lib/systemContextGuard';
 import { responsibleRules } from '../../index';
 
@@ -295,6 +298,8 @@ describe('ABAP Cloud: the system information at the start', () => {
       message: expect.stringContaining('systeminformation'),
     });
     await until(() => stand.standIn.logoffs() === 1);
+    // The file goes once the logoff completed (its flush), not at its write.
+    await logoffsAnswered();
     expect(stand.files()).toEqual([]);
   });
 
@@ -305,6 +310,8 @@ describe('ABAP Cloud: the system information at the start', () => {
     stand.standIn.answer(isLookup, 500);
     await expect(stand.start()).rejects.toBeDefined();
     await until(() => stand.standIn.logoffs() === 1);
+    // The file goes once the logoff completed (its flush), not at its write.
+    await logoffsAnswered();
     expect(stand.files()).toEqual([]);
   });
 
@@ -327,7 +334,8 @@ describe('ABAP Cloud: the system information at the start', () => {
     await until(() => stand.standIn.logoffs() === 1);
     expect(stand.standIn.loggedOff()).toEqual([session]);
     expect(ownedConnections(stand.server)).toEqual([]);
-    // Logged off: its file is gone with it.
+    // Logged off: its file is gone with it, once the logoff completed.
+    await logoffsAnswered();
     expect(stand.files()).toEqual([]);
   });
 

@@ -42,6 +42,7 @@ Documentation for deployment, Docker, and release flow.
 Technical documentation about the system architecture, design decisions, and internal structure.
 
 - `TOOLS_ARCHITECTURE.md` - MCP tools architecture and handler structure
+- `REQUEST_HEADERS.md` - The request header pairs the server sends, its one-shot `406`/`415` correction kept per system, and `@mcp-abap-adt/lib/adt-headers` for embedders
 - `README.md` - Architecture documentation index
 
 ### [development/](development/) - For Developers

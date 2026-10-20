@@ -454,7 +454,9 @@ or a crash outside a tool (then exit `1`) the server, in this order:
 2. **logs off every ADT session it opened, at once** — the logoff is what releases a lock a tool
    holds — and interrupts the running tools: **nothing waits for a running tool**, a queued call
    never starts, and a started write's `UNLOCK` that was still to come never goes out (its lock
-   goes with the logoff). No state undo is sent: the logoff ends the held state (a debug session);
+   goes with the logoff). No state undo is sent: the logoff ends the held state (a debug session).
+   Each logoff is let finish — until SAP answered it or its connection failed: SAP ends a session
+   only once it received the logoff whole;
 3. closes the MCP server;
 4. closes the credential gate, ends the logins, waits for the provider calls in flight and
    writes every pending session secret.

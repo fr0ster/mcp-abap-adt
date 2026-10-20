@@ -95,10 +95,13 @@ connection's tools, instance and background runs are not touched.
 
 ## Shutdown
 
-On `SIGTERM` / `SIGINT` the server stops listening and takes no new call (a `POST` arriving after
+On `SIGTERM` / `SIGINT` / `SIGHUP` / `SIGQUIT` (`SIGBREAK` on Windows), or a crash outside a
+tool (then exit `1`), the server stops listening and takes no new call (a `POST` arriving after
 it is answered "The server is shutting down." and reaches no tool), **logs off every ADT session
 of the process at once** and interrupts the running tools — nothing waits for a running tool —,
-then ends every stream. It exits `0`. There is no deadline. A second signal, or
+lets each logoff finish (until SAP answered it or its connection failed), then ends every stream.
+It exits `0`. There is no deadline. A killed process (`SIGKILL`, out of memory) sends no logoff:
+SAP keeps its sessions until its own timeout. A second signal, or
 `--shutdown-timeout=<seconds>` (no default), matters only while a logoff is still being written:
 exit `1` naming the requests still running.
 

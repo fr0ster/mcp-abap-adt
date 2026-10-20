@@ -69,7 +69,8 @@ reach into the connection's session.
 - **A reopen only when SAP lost the session**: stdio keeps its connection for the
   instance's life.
 - **The debugger's session is its own**: a debug session opens connections of its
-  own, stateful for their life, and ends them with the debug session.
+  own, stateful for their life (the program run of a start excepted: a stateless
+  connection), and ends them with the debug session.
 - **Batch mode sends LOCK and UNLOCK in envelopes of their own**: a recorded call's
   `LOCK` or `UNLOCK` is marked stateful in the batch (the recorder forwards the
   member's `setSessionType` to adt-clients' `AdtBatchConnection`, touching no

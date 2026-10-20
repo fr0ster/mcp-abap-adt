@@ -30,7 +30,9 @@ The debugger has a batch of its own — `DebugBatchBegin` / `DebugBatchEnd`, com
    in the order made, from 1 — one number per call, covering every request it put into the
    batch (`GetObjectVersionDiff` sends its two version reads together, under its one number).
    A call refused, or one whose handler refused its arguments before sending anything, takes no
-   number. A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
+   number: a call no entry of the table below admits is refused `batch_not_recordable`, and a
+   long read given a `timeout` `batch_no_timeout` ("in batch mode a read takes no timeout: the
+   batch is sent at BatchEnd, with no deadline"). A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
    call decides which; a call of another kind is refused `batch_other_kind` (see Phases).
 3. **`BatchEnd`** sends every recorded call, in one envelope, with the credentials in force now, and
    leaves batch mode whatever happens. Nothing is sent twice and nothing is retried. It answers
@@ -306,6 +308,24 @@ failures").
 
 The members, their default pairs and the correction in full:
 [Request headers](../architecture/REQUEST_HEADERS.md).
+
+## Over Streamable HTTP
+
+Every HTTP request is an MCP session of its own, served by a pooled server instance. Send the
+`state_handle` `BatchBegin` answers in the `x-mcp-state-handle` request header on every call of
+the batch, `BatchEnd` and `BatchAnswers` included: the pool routes the call to the instance that
+holds the batch, one request at a time, in the order they arrive. A call without the header
+reaches an instance where no batch is open. A tool call whose handle the pool does not know — one
+that never existed, or whose state ended — is answered `state is not available` by the pool itself,
+before any instance is made and with nothing logged on; a JSON-RPC array holding a tool call is
+answered the same, one such answer per request in it that has an `id` (an array whose tool call
+carries a `state_handle` argument is answered `400`: "a JSON-RPC batch cannot carry
+state_handle"). The header comes first;
+without it the pool routes by a `tools/call`'s `state_handle` argument, which only the debugger
+tools take — no batch tool takes one. The handle is a bearer secret: whoever holds it reaches the
+batch. A client that leaves during `BatchEnd` does not stop it: the answers are kept for the next
+`BatchAnswers` with the header. On stdio and SSE nothing is needed: the batch is the process's
+(stdio) or the connection's (SSE).
 
 ## Credentials and failures
 

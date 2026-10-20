@@ -213,7 +213,8 @@ no new request, **logs off every ADT session** it opened **at once** (the logoff
 tool holds) and interrupts the running tools — it does not wait for them: a write whose `UNLOCK` was
 still to come never sends it, and its lock goes with the logoff —, then exits `0`. It has no
 deadline of its own; docker's stop grace (`--time`, `stop_grace_period`, 10 s by default) or
-Kubernetes' `terminationGracePeriodSeconds` only has to cover the logoffs' writes — a kill sends no
+Kubernetes' `terminationGracePeriodSeconds` only has to cover the logoffs, each let finish until SAP
+answered it or its connection failed — a kill sends no
 logoff, and SAP keeps the sessions and their locks until its own timeout. `--shutdown-timeout`
 (`MCP_SHUTDOWN_TIMEOUT`) bounds that wait: at the timeout the server stops waiting and exits `1`.
 

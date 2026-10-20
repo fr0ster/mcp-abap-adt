@@ -12,9 +12,10 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
 - the **system** tools — where-used, type and object information, the ABAP AST and semantic
   analysis, SQL queries, dumps, profiler traces, and the class and program runs
   (`RuntimeRunClass`, `RuntimeRunProgram`);
-- **search** (`SearchObject`).
+- **search** (`SearchObject`);
+- the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-66 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger and
+69 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger and
 background runs — those are
 `mcp-abap-adt-http`'s ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)).
 

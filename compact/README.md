@@ -62,8 +62,8 @@ mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothin
 ```
 
 **The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 29 tools (every access, which
-is what a local server gives), the four debugger tools, the leftover-session list and logoff, the
-background-run tools and `HandlerBatch` — 39. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
+is what a local server gives), the four debugger tools, the debugger batch (`HandlerDebugBatch`),
+the leftover-session list and logoff, the background-run tools and `HandlerBatch` — 40. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
 where-used, checks and validations, the unit-test status and result reads, the profiler list and
 view, the dump list and view, the service-binding type list — with `HandlerBatch` and the
 leftover-session list and logoff — 20; its tool list is exactly these, so a client calls only them. `--exposition`

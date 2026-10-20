@@ -572,7 +572,7 @@ design. Send a long run to the background where the tool offers it.
   came. The connection is replaced only when SAP ended its session. The hold ends at the
   `UNLOCK`. Compact `HandlerUpdate` is the write
   alone under a `lock_handle` (see "compact users").
-- **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
+- **The debugger's sessions are its own**, stateful for their life (the program run of a start excepted: a stateless connection), and end with the debug session.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
 
@@ -971,6 +971,12 @@ make two calls, or one with the part you need.
   `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` /
   `SAP_DEBUG_IDE_ID` of the environment; a destination's `.env` (and its `SAP_DEBUG_*`) is read only
   by `mcp-abap-adt` (stdio).
+- **A tool call with an unknown or ended state handle is answered by the pool**, `state is not
+  available` — the same answer for every such handle — before any instance is made: nothing logs
+  on and no system information is read (before, such a call made a new instance that logged on and off).
+  A JSON-RPC array holding a tool call with such a handle gets one such answer per request in it
+  with an `id`. A request without a handle, or a protocol request (`initialize`, a list) carrying
+  one, gets a new instance as before.
 - **Every ADT session ends with a logoff.** A request's instance logs off its ADT session when it
   leaves the pool: after the request when it holds nothing; for a pooled instance, when its state
   ends (its stop tool or the idle bound). An instance whose undo fails is kept for a retry, its
@@ -982,9 +988,10 @@ make two calls, or one with the part you need.
   work, its session logged off then; a pooled instance keeps its state and its sessions until its
   stop tool or the idle bound.
 - **Shutdown logs off at once** (no 30-second deadline, and no wait for a running tool):
-  `SIGTERM` / `SIGINT` stops new requests (`503`), logs off every ADT session of every instance —
-  pooled ones and their held state's included, no state undo sent: the logoff ends it — and
-  interrupts the running tools; exit `0`. Their later requests fail against the ended sessions.
+  `SIGTERM` / `SIGINT` / `SIGHUP` / `SIGQUIT` (`SIGBREAK` on Windows) stops new requests (`503`),
+  logs off every ADT session of every instance — pooled ones and their held state's included, no
+  state undo sent: the logoff ends it — and interrupts the running tools; each logoff is let
+  finish (until SAP answered it or its connection failed); exit `0`. Their later requests fail against the ended sessions.
   A second signal or **`--shutdown-timeout=<seconds>`** only matters while a logoff is still being
   written: exit `1` naming the requests still running. In a container, set it below the
   orchestrator's kill grace.
@@ -1056,8 +1063,9 @@ transport's options only:
   write binary. The sections above apply to each as to its counterpart; only the tool list differs.
 - **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
   serves the 29 tools, the four debugger tools (`HandlerDebugBreakpoints`, `…Session`, `…Step`, `…Maintain`),
-  the three background-run tools, `HandlerBatch` and the two leftover-session tools (list, logoff) — 39
-  (`-compact-http` and `-compact-sse` the same without the leftover-session tools — 37);
+  the debugger batch (`HandlerDebugBatch`), the three background-run tools, `HandlerBatch` and the
+  two leftover-session tools (list, logoff) — 40 (`-compact-http` and `-compact-sse` the same
+  without the leftover-session tools — 38);
   `mcp-abap-adt-compact-ro` the 17 that change nothing, `HandlerBatch` and the leftover-session list
   and logoff — 20 (`-compact-http-ro` and `-compact-sse-ro` the 17 and `HandlerBatch`). `--exposition`, with `ro`, `rw`, `debug` or any word,
   stops the start.
@@ -1402,13 +1410,17 @@ transport's options only:
   `[MCP] A session write did not land: …`, **whatever `DEBUG_AUTH_LOG` says** (18.x: only with
   `DEBUG_AUTH_LOG=true`).
 - **The client's close and the shutdown log off at once** (18.x gave up after 30 seconds). On the
-  end of stdin (your client closed the transport), `SIGTERM` or `SIGINT` the server stops taking
+  end of stdin (your client closed the transport), a broken pipe (`EPIPE`) on stdin or stdout (the
+  client is gone), `SIGTERM`, `SIGINT`, `SIGHUP` (the terminal closed, an SSH session dropped),
+  `SIGQUIT` or, on Windows, `SIGBREAK` the server stops taking
   calls (a call read from then on is answered "The server is shutting down."), **logs off every ADT
   session it opened at once** — its connection, the debugger's, a long read's, a background run's
   (the logoff is what releases a lock a tool left) —, interrupts the running tools and drops the
   queued calls: **nothing waits for a running tool**, so a write's `UNLOCK` that was still to come
   never goes out, and its lock is released by the logoff. No state undo is sent: the logoff ends
-  the held state. Then it writes the pending session secrets and exits `0`, or `1` with one stderr
+  the held state. Each logoff is let finish — until SAP answered it or its connection failed: SAP
+  ends a session only once it received the logoff whole. Then it writes the pending session
+  secrets and exits `0`, or `1` with one stderr
   line per fact not done. stdin's `end` and `close` are one trigger. No interactive login starts
   once the shutdown began.
 - **Ending the waiting early**: a second `SIGTERM` / `SIGINT`, or **`--shutdown-timeout=<seconds>`**
@@ -1419,9 +1431,9 @@ transport's options only:
   system that never takes the bytes) keeps the process until it is killed (`SIGKILL`). What it
   costs: a session write lost — a discarded refresh token can come back on the next start.
 - **A crash outside a tool logs off too** (every binary): an uncaught exception or an unhandled
-  promise rejection runs the forced close — every ADT session logged off, one stderr line
-  `[MCP] The process failed (<ErrorClass>): …`, exit `1` (18.x exited with Node's default and
-  logged nothing off). A killed process (`SIGKILL`, out of memory) cannot log off: SAP's own idle
+  promise rejection runs the orderly shutdown — every ADT session logged off, each logoff let
+  finish, one stderr line `[MCP] The process failed (<ErrorClass>): …`, exit `1` (18.x exited with
+  Node's default and logged nothing off); a crash during a shutdown lets it finish. A killed process (`SIGKILL`, out of memory) cannot log off: SAP's own idle
   timeout ends its sessions and their locks.
 - **The startup check builds the credential.** A destination the broker refuses (a missing client
   field, say) now stops the start, exit `1`, instead of failing the first tool call.
@@ -1513,7 +1525,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
 
 ## Embedders
 
-- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17.1**,
+- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **18**,
   `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **20**,
   `@mcp-abap-adt/adt-clients` **36** (and `@mcp-abap-adt/adt-strategies` 0.13). None of them takes a
   signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no
@@ -1546,11 +1558,12 @@ build argument `VARIANT` (the package's name without its scope), installing that
     enhoxhh | enhsxsb` (`enhoxh` and `enhsxs` are gone; the codes are SAP's `ENHO/XHB`, `ENHO/XHH`,
     `ENHS/XSB`), and a custom result set for a class, program, function group or include needs
     `enhancementElements` and `enhancementOptions` — lib's `resultsFor` reads both `verbatim`;
-  - `@mcp-abap-adt/connection` 11 → 17.1: `docs/MIGRATION-12.0.md` (the authentication error
+  - `@mcp-abap-adt/connection` 11 → 18: `docs/MIGRATION-12.0.md` (the authentication error
     contract), `-13.0` (interfaces-auth 7, auth-errors 2, auth-providers 6), `-14.0` (the bundled
     `sap-abap-auth` command gone), `-15.0` (the `unknown` default above), `-16.0` (one instance is
     one SAP session; `disconnect()` resolves once the logoff is written; `createConnection`),
-    `-17.0` (no deadline but the caller's; an instance built on an existing session);
+    `-17.0` (no deadline but the caller's; an instance built on an existing session), `-18.0`
+    (RFC through a message server; `rfcParamsFrom` returns `RfcAddress`);
   - `@mcp-abap-adt/auth-providers` 5 → 6, `@mcp-abap-adt/auth-broker` 4 → 5,
     `@mcp-abap-adt/auth-stores` 3 → 5, `@mcp-abap-adt/interfaces-auth` 3 → 7 and
     `@mcp-abap-adt/auth-errors` 2 (new): every failure of the chain is an `AuthProviderFailure`
@@ -1756,9 +1769,9 @@ build argument `VARIANT` (the package's name without its scope), installing that
   registry does not add it: a registry of your own that should offer batch mode adds
   `new BatchHandlersGroup(context)`. The handlers reach the owner as `HandlerContext.batch`. Where
   the instance has an owner (`batch`), every tool's description but a batch tool's is registered
-  with one sentence appended — recorded in batch mode, recorded only for some arguments, refused,
-  or not served (a registry that registers its own tools gets "not served" on each); without an
-  owner no description changes. A client that compares tool descriptions sees them change.
+  with one sentence appended — "Recordable: …", "When <arguments>, recordable: …" or "Runs
+  outside batch mode." (a registry that registers its own tools gets "Runs outside batch mode." on
+  each); without an owner no description changes. A client that compares tool descriptions sees them change.
 - **`HandlerEntry.connectionless?: true | ((args) => boolean)`** marks a tool that works on no
   connection of the instance: the server calls it without building or connecting one, its
   context's `connection` absent. The leftover-session tools are such tools (a list or a logoff

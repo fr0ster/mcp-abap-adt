@@ -84,7 +84,8 @@ optional `x-mcp-state-handle` request header; without the header the pool reads 
 `state_handle` argument, as the debugger tools send it. A tool call whose handle the pool does
 not know — one that never existed, or whose state ended — is answered `state is not available`
 by the pool itself, the same answer whatever the handle was, and no instance is made and nothing
-logs on for it; another request carrying such a handle (an `initialize`, a list) gets a new
+logs on for it — a JSON-RPC array holding a tool call too, one such answer per request in it with
+an `id` (an array whose tool call carries a `state_handle` argument is answered `400`); another request carrying such a handle (an `initialize`, a list) gets a new
 instance, as a request without a handle does. The handle is a bearer secret: whoever holds it reaches the state. Held state ends
 by its stop tool, the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's
 stop. See
@@ -122,7 +123,9 @@ a call already accepted whose body arrives later reaches no tool), stops listeni
 every ADT session of every instance at once** — pooled instances and their held state's included;
 no state undo is sent, the logoff ends the state — and interrupts the running tools: **nothing
 waits for a running tool**, and a write whose `UNLOCK` was still to come never sends it (the
-logoff releases its lock). It exits `0`. There is no deadline. A second signal, or
+logoff releases its lock). Each logoff is let finish — until SAP answered it or its connection
+failed. It exits `0`. There is no deadline. A killed process (`SIGKILL`, out of memory) sends no
+logoff: SAP keeps its sessions until its own timeout. A second signal, or
 `--shutdown-timeout=<seconds>` (no default), matters only while a logoff is still being written:
 exit `1` naming the requests still running.
 

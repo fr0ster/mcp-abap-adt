@@ -29,7 +29,7 @@ There is no `--transport`: a binary is its transport.
 carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, stdio).
 
 **The tools are fixed by the binary**: all 29, the four debugger tools (`HandlerDebugBreakpoints`,
-`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the background-run tools and `HandlerBatch` — 37. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools and `HandlerBatch` — 38. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
 (`mcp-abap-adt-compact-sse-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
 users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming

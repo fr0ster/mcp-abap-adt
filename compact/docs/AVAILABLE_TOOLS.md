@@ -9,7 +9,7 @@ definitions a client receives.
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
 - Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both; no `-compact-http` or `-compact-sse` binary serves them
 - Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)
-- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, refused, or not served; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))
+- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))
 - Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)
 
 ## How it works
@@ -35,7 +35,8 @@ per request.
 - `object_type` — ABAP object type for routed compact operation.
 - `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced).
 - `package_name` — Package name.
-- `max_results` — Maximum number of members listed (part contents).
+- `package_names` — Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.
+- `max_results` — Maximum number of members listed per package (part contents).
 - `class_name` — Class name.
 - `interface_name` — Interface name.
 - `program_name` — Program name.

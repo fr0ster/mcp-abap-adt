@@ -8,9 +8,9 @@ HTTP and SSE, each `-ro` binary a package of its own:
 
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
-| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, batch mode; on stdio the leftover-session list and logoff |
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger and its batch (`HandlerDebugBatch`), background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
 | compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, `HandlerBatch`; on stdio the leftover-session list and logoff |
 
 No `-ro` binary carries a debugger or a background run, no binary a resume of a leftover session
@@ -27,10 +27,11 @@ saying how a call of it behaves in batch mode: recordable, recordable for the ar
 run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
-Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 / 252; core-ro
-71 / 69 (each with the 3 batch tools); compact 37 / 35 (27 + 4 debugger tools + 3 background-run +
-`HandlerBatch`, + the 2 leftover-session tools, list and logoff, on stdio); compact-ro 19 / 17
-(16 + `HandlerBatch`, + the leftover-session list and logoff on stdio).
+Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
+stdio / http and sse: core 256 / 254 (with the 3 batch tools and the debugger batch's 2); core-ro
+71 / 69 (each with the 3 batch tools); compact 40 / 38 (29 + 4 debugger tools + `HandlerDebugBatch`
++ 3 background-run + `HandlerBatch`, + the 2 leftover-session tools, list and logoff, on stdio);
+compact-ro 20 / 18 (17 + `HandlerBatch`, + the leftover-session list and logoff on stdio).
 
 ## Handler Sets
 

@@ -140,7 +140,10 @@ keep the instance:
 
 **The debuggee session is the debugger's own.** The connections a debug session
 opens are stateful for their whole life — attach and the steps need the ABAP
-session that attached — and they are not a tool's session: no other tool runs on
+session that attached —, except the program run a start sends (`DebugStartListener`,
+`AmdpDebugStart`): it goes on a stateless connection of its own (measured
+2026-10-17: a run on a stateless connection is caught and held as on a stateful
+one). They are not a tool's session: no other tool runs on
 them, and they end with the debug session (its stop, the idle bound's stop, the
 host's stop or the instance's end), each with its logoff. A tool's own session is
 stateful only for a lock's `LOCK` and `UNLOCK`; the debugger's are the one place
@@ -238,7 +241,7 @@ or a continue — on the AMDP session's command connection:
 
 No `-ro` binary serves them. The batch tools take no `state_handle`: the batch is the instance's (over
 Streamable HTTP the `x-mcp-state-handle` header reaches the instance, as for the communication
-batch, see [BATCH_MODE.md](BATCH_MODE.md)); begin answers `{ debug_batch: 'on', state_handle }`.
+batch, see [BATCH_MODE.md](BATCH_MODE.md#over-streamable-http)); begin answers `{ debug_batch: 'on', state_handle }`.
 
 **What is recorded**, one request each:
 
@@ -550,10 +553,12 @@ debugging. Close the IDE's debugger otherwise.
 Nothing ends on a timer of the server's, with one exception (below). A session
 ends by:
 
-- **`DebugStop`**: releases a stopped debuggee, then stops the
-  listener — which deletes the key's breakpoints, those of every IDE sharing the
-  key included (measured in user mode; in terminal mode the session takes the
-  set as gone after the stop, not measured) — and closes the connections, ABAP and AMDP alike. Only when the
+- **`DebugStop`**: stops the listener first — which deletes the key's breakpoints, those of
+  every IDE sharing the key included (measured in user mode; in terminal mode the session takes
+  the set as gone after the stop, not measured) — then releases a stopped debuggee and any
+  release an earlier stop left owed, so a debuggee let go from a breakpoint inside a loop runs to
+  its end instead of stopping there again (measured on premise, 2026-10-19), and closes the
+  connections, ABAP and AMDP alike. Only when the
   listener's stop fails are this session's breakpoints deleted one by one; when the
   system refuses it for the user (`403` `notAuthorized`, `404` `invalidUser`),
   nothing is deleted and the answer names the breakpoints left on the system; the

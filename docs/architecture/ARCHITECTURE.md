@@ -270,7 +270,7 @@ never reach each other.
 #### The stateful window and the main flow
 
 **Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
-stateless.** Both requests are marked by adt-clients (31.1), not by the server: the
+stateless.** Both requests are marked by adt-clients (since 31.1), not by the server: the
 `LOCK` alone and the `UNLOCK` alone, each inside `inStatefulSession` or a
 `try`/`finally` that sets the connection back to stateless whatever the request
 answered. The write under the lock goes outside the lock's context, as Eclipse sends
@@ -289,7 +289,7 @@ target's forwards included; `src/__tests__/unit/sources/statefulSites.test.ts`
 holds the scan of the server's sources and adt-clients' installed `dist` equal to it.
 
 **One MCP session = one connector = one main flow.** The session type is the
-connection's (connection 17.1): adt-clients switches it with `setSessionType` around
+connection's (since connection 17.1): adt-clients switches it with `setSessionType` around
 the request, and the connection reads it when the request is built, after an
 `await`. Two calls at once on one connection would cross — a read sent while another
 call's `LOCK` is in flight goes stateful, an `UNLOCK` whose credential is still
@@ -454,7 +454,8 @@ where the host gave one, the instance's batch owner (`batch`, an `InstanceBatch`
 instance's connection in its turn, holds it for the whole `execute()`, and every recorded handler then
 builds its answer from what SAP answered; batch mode ends whatever fails. Where the instance has a
 batch owner, every tool's description, as registered, ends with one sentence (`src/lib/batch/sentence.ts`)
-saying whether it is recorded, for which arguments, refused, or not served in batch mode. See [Batch Mode](../user-guide/BATCH_MODE.md).
+saying how a call of it behaves in batch mode: "Recordable: …", "When <arguments>, recordable: …"
+(the arguments in words, from the table's `when` and `connection`) or "Runs outside batch mode.". See [Batch Mode](../user-guide/BATCH_MODE.md).
 
 #### Transport Servers
 

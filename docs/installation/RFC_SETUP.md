@@ -199,7 +199,7 @@ resets the buffered state from inside the session. Measured over RFC on premise
 
 So an update leaves the buffer as a create does, and the state belongs to the
 session, not to an enqueue: C updates while A and B are still open.
-`DeletePackageLow` takes `force_new_connection: true` for exactly this; the
+`DeletePackage` takes `force_new_connection: true` for exactly this; the
 package integration test creates, updates and deletes on three connections.
 
 **Over HTTP too.** One stateful HTTP session cannot save a package twice either.
@@ -223,9 +223,9 @@ per ABAP session.
   - With #60, only stateful requests (`LOCK`, `UNLOCK`) carry `x-sap-adt-sessiontype: stateful` and `sap-contextid`. Everything else runs outside the context, as Eclipse ADT does. The `PUT`'s save then ends with its own ABAP session, and one connection can update and delete a package repeatedly.
   - Measured on BASIS 816 and on BASIS 756. Before, the older release answered every package `PUT` on the same connection with `423` "invalid lock handle".
 - **RFC: in this server** (`src/lib/packageSessions.ts`). An RFC connection has no stateless request: every call shares its one ABAP session. So over RFC:
-  - `CreatePackage` / `CreatePackageLow` run on a new connection, closed when they answer.
-  - `LockPackageLow` opens a new connection, locks on it, and keeps it under the lock handle. `UpdatePackageLow` with that handle runs on it, and `UnlockPackageLow` unlocks there and closes it, whatever the unlock answered.
-- **`DeletePackageLow`:** `force_new_connection: true` still deletes from a new session, for a package saved elsewhere through the same connection.
+  - `CreatePackage`, `UpdatePackage` and compact `HandlerCreate` of a `PACKAGE` run on a new connection, closed when they answer.
+  - Compact `HandlerLock` of a `PACKAGE` opens a new connection, locks on it, and keeps it under the lock handle. `HandlerUpdate` with that handle runs on it, and `HandlerUnlock` unlocks there and closes it, whatever the unlock answered.
+- **`DeletePackage`:** `force_new_connection: true` still deletes from a new session, for a package saved elsewhere through the same connection.
 
 The package integration test (create, two updates through the tools on one connection, delete) passes on RFC and on HTTP.
 

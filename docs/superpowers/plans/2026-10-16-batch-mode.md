@@ -650,10 +650,11 @@ Rule (owner): a description is purely functional and names the function on what 
 - [ ] **Step 4:** Run — PASS. Break-it: put GetDdl's old description back — red; revert.
 - [ ] **Step 5:** All gates (CI's step list). Commit `docs: tool descriptions found by what users ask (#270, #271)`.
 
-### Task 40 (after publish, on the owner's AI Core access): retrieval measured in the consumer
+### Task 40 (after publish): retrieval findings from the consumer
 
-- [ ] **Step 1:** cloud-llm-hub's `tools/measure-tool-rag.ts` on lib 18.1.0's corpus and on 19.0.0's (published), same queries, same embedder/rerank settings; the per-query results kept.
-- [ ] **Step 2:** Any query 19.0.0 loses that 18.1.0 won, or a #270/#271 case still lost, is fixed in 19.0.x with the Task 39 gate extended by that query.
+The consumer (cloud-llm-hub) measures retrieval in its own repository and hands over its findings, as #271 did; this repository runs nothing of the consumer's and the consumer changes nothing here.
+
+- [ ] **Step 1:** Each finding the consumer reports for 19.0.0 becomes a query in the Task 39 set and a description fix, in 19.0.x.
 
 ### Task 35: Final consistency
 

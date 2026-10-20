@@ -527,8 +527,9 @@ error (§6). `BatchEnd` fails when:
 
 - `execute()` rejected — what came, as it came: SAP's outer response or the error; a credential
   refusal per §5.4;
-- the parts that came are not as many as the requests sent (`batch_parts_mismatch`: "<received> of
-  <sent> parts came; the answers cannot be matched to the calls");
+- the parts that came are not as many as the requests sent (`batch_parts_mismatch`: fewer —
+  "<received> of <sent> parts came; the answers cannot be matched to the calls"; more — "more parts
+  came than the <sent> requests sent; the answers cannot be matched to the calls");
 - the map cannot be built from what came (`batch_unsplit`: "the envelope's answer could not be split
   into the calls' parts").
 
@@ -562,7 +563,9 @@ call"); there is no map, and every number read answers the same refusal.
 - a number of the map whose handler has not answered yet: its handler, waiting at its first
   request, is resumed with its parts and builds the number's answer (§5.3). The numbers asked in one
   call are processed in parallel. The answer is kept: a number read again answers it, and the
-  handler runs once. A request the resumed handler sends is refused (`batch_ended`: "the batch has
+  handler runs once. A lock read this way is held by the instance only while the SAP session the
+  envelope went out on (the connection `BatchEnd` took) is still its live one; otherwise the read
+  answers the lock answer and the instance holds nothing. A request the resumed handler sends is refused (`batch_ended`: "the batch has
   ended; this call can send nothing more") and that refusal is its answer;
 - a number of a batch whose `BatchEnd` failed: that error, as `BatchEnd` answered it;
 - otherwise `{ number, error: 'no_answer', message: 'no answer with that number' }` — the last

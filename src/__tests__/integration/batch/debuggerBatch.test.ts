@@ -407,9 +407,12 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       end_ms: Math.round(Number(endedAt - endAt) / 1e6),
     });
     expect(ended.isError).not.toBe(true);
-    expect(summary.recorded).toBe(calls.length);
-    expect(summary.came).toBeUndefined();
-    expect(summary.failed).toEqual([]);
+    // One request per debugger operation; every part came.
+    expect(summary).toEqual({
+      recorded: calls.length,
+      sent: calls.length,
+      received: calls.length,
+    });
     const entries = (payloadOf(
       await served.call('BatchAnswers', { numbers: [1, 2, 3] }),
     ) ?? []) as Entry[];
@@ -662,9 +665,12 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       end_ms: Math.round(Number(endedAt - endAt) / 1e6),
     });
     expect(ended.isError).not.toBe(true);
-    expect(summary.recorded).toBe(calls.length);
-    expect(summary.came).toBeUndefined();
-    expect(summary.failed).toEqual([]);
+    // One request per debugger operation; every part came.
+    expect(summary).toEqual({
+      recorded: calls.length,
+      sent: calls.length,
+      received: calls.length,
+    });
     const entries = (payloadOf(
       await served.call('BatchAnswers', { numbers: [1, 2] }),
     ) ?? []) as Entry[];

@@ -1,6 +1,10 @@
 /**
- * `BatchAnswers`: the answers of the last executed batch, by number (spec §6).
- * Nothing is sent; served while a batch is open, so the previous phase's
+ * `BatchAnswers`: the map of the last ended batch, read by number (spec §6).
+ * A number's handler, waiting at its first request, is resumed with its
+ * parts when the number is first read and builds its answer; the numbers
+ * asked in one call are processed in parallel, and the answer is kept. A
+ * number of a batch whose `BatchEnd` failed answers that error. Nothing is
+ * sent to SAP; served while a batch is open, so the previous phase's
  * answers stay readable while the next phase is recorded.
  */
 import type { McpResult } from '../answer';
@@ -43,20 +47,25 @@ function numbersAsked(ask: AnswersAsk): number[] {
 
 /**
  * One entry per number asked, in the order asked — a number asked twice is
- * answered twice: its kept answer, or "no answer with that number" when the
- * last executed batch has none (or no batch has run on this instance).
+ * answered twice, by one run of its handler: its answer, or "no answer with
+ * that number" when the last ended batch has none (or no batch has ended on
+ * this instance). The ask is checked first: a refused ask throws its words
+ * before any handler is resumed.
  */
 export function readAnswers(
   owner: InstanceBatch,
   ask: AnswersAsk,
-): AnswerEntry[] {
-  return numbersAsked(ask).map(
-    (number) =>
-      owner.answer(number) ?? {
-        number,
-        error: 'no_answer',
-        message: NO_ANSWER_WORDS,
-      },
+): Promise<AnswerEntry[]> {
+  const asked = numbersAsked(ask);
+  return Promise.all(
+    asked.map(
+      (number): Promise<AnswerEntry> | AnswerEntry =>
+        owner.answer(number) ?? {
+          number,
+          error: 'no_answer',
+          message: NO_ANSWER_WORDS,
+        },
+    ),
   );
 }
 

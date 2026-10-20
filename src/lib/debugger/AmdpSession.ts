@@ -715,7 +715,13 @@ export class AmdpSession<O = unknown> {
    * `debugger` over the session's command connection, whose envelope goes
    * out on it. Sends nothing; refused with no break.
    */
-  openBatch(options: { logger?: ILogger } = {}): AdtBatchConnection {
+  openBatch(
+    options: {
+      logger?: ILogger;
+      /** What the batch's envelopes go out through, placed over the connection (the envelope watch). */
+      through?: (connection: IAbapConnection) => IAbapConnection;
+    } = {},
+  ): AdtBatchConnection {
     const commands =
       this.open && !this.open.stopping && this.debuggeeId !== undefined
         ? this.open.commands
@@ -724,7 +730,7 @@ export class AmdpSession<O = unknown> {
           : undefined;
     if (commands === undefined)
       throw new DebugStateError('no AMDP debuggee is stopped');
-    return new AdtBatchConnection(commands, {
+    return new AdtBatchConnection(options.through?.(commands) ?? commands, {
       endpoint: 'debugger',
       ...(options.logger !== undefined ? { logger: options.logger } : {}),
     });

@@ -372,7 +372,11 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         const ended = await call(held, 'DebugBatchEnd', {});
         batchOpen = false;
         expect(ended.isError).not.toBe(true);
-        expect(payloadOf(ended)).toMatchObject({ recorded: 2, failed: [] });
+        expect(payloadOf(ended)).toEqual({
+          recorded: 2,
+          sent: 2,
+          received: 2,
+        });
         const entries = (payloadOf(
           await call(held, 'BatchAnswers', { numbers: [1, 2] }),
         ) ?? []) as Entry[];

@@ -5,7 +5,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'BatchAnswers',
   description:
-    "Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.",
+    "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.",
   inputSchema: {
     type: 'object',
     properties: {

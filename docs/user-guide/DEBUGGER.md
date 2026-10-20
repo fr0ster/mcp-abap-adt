@@ -277,19 +277,21 @@ breakpoints, watchpoints, the listener, start / wait / take-over / stop, attach,
 `release_debugger`, terminate, memory sizes and snapshots, settings, and every non-debugger tool.
 
 **The end** sends the envelope on the connection the batch was begun on — the ABAP stop's, or the
-AMDP session's command connection — keeps each call's answer by number — the answer the tool gives
-for what SAP answered to its part — ends the batch whatever happens and answers `{ recorded,
-failed }`. It leaves the debug session as it was: the stop, its view and its connection stay; when
+AMDP session's command connection — splits SAP's answer by number into the map, ends the batch
+whatever happens and answers `{ recorded, sent, received }`, or its own error, as `BatchEnd` does
+([BATCH_MODE.md](BATCH_MODE.md#the-flow)): then there is no map, and every number answers that
+error. A number's answer is built when it is read — the answer the tool gives for what SAP
+answered to its part. It leaves the debug session as it was: the stop, its view and its connection stay; when
 a recorded step's answer says the program ended, that answer under its number shows it, and the
 next ordinary debugger call learns it from SAP. At an AMDP break the full set's session keeps its
 debuggee until its event read reports the next `ON_BREAK` or `ON_EXECUTION_END`: after a recorded
 step, `AmdpDebugWait` answers where the debuggee went.
 
-**The answers stay** readable (`BatchAnswers`, compact `HandlerDebugBatch` `answers`) until the
+**The map stays** readable (`BatchAnswers`, compact `HandlerDebugBatch` `answers`) until the
 next batch's end, the debug state's complete stop or the idle bound: a complete `DebugStop`, or an
-`AmdpDebugStop` that ends the whole debug state, lets the debugger batch's answers go with the
+`AmdpDebugStop` that ends the whole debug state, lets the debugger batch's map go with the
 state, so the state's handle ends with the stop and then answers `state is not available`. A
-stop that is refused, or leaves anything held, keeps them. A communication batch's answers are
+stop that is refused, or leaves anything held, keeps it. A communication batch's map is
 not touched by a debugger stop.
 
 **Refusals.** Begin needs an ABAP stop or an AMDP break (`no debuggee is stopped in this debug
@@ -301,7 +303,7 @@ session`); while a communication batch is open, or the debugger batch already is
 
 | Destination | The debugger batch at an ABAP stop | The AMDP gate |
 |---|---|---|
-| On premise over HTTP | passed: step over, stack and one variable recorded through the full server over stdio and sent in one `DebugBatchEnd` — 3 recorded, none failed; the stack stood on the line after the step, the variable held what the step left; the end took about 120 ms | passed (on HANA) |
+| On premise over HTTP | passed: step over, stack and one variable recorded through the full server over stdio and sent in one `DebugBatchEnd` — 3 recorded, no number answering an error (measured before the map: `DebugBatchEnd` then built every answer itself); the stack stood on the line after the step, the variable held what the step left; the end took about 120 ms | passed (on HANA) |
 | On premise over RFC | passed, the same answers; the end took about 120 ms | passed (on HANA) |
 | ABAP Cloud | not run: no ABAP Cloud destination was configured | not measured there (the gate is measured on premise on HANA) |
 

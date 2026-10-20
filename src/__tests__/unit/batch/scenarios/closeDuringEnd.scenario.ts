@@ -155,7 +155,7 @@ const group = {
   await turns(40);
 
   let settled = false;
-  void Promise.all(recorded.map((call) => call.answer)).then(() => {
+  void Promise.all(recorded.map((call) => call.settled)).then(() => {
     settled = true;
   });
   await turns();

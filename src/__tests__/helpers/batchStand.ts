@@ -18,7 +18,7 @@
  *     systemKindOf: jest.fn(() => 'onprem'),
  *   }));
  */
-import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
+import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapRequestOptions,
   IAdtWireResponse,
@@ -32,7 +32,7 @@ import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../embeddable/ConnectionContext';
 import type { AnswerEntry } from '../../lib/batch/answers';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
-import { LateBoundConnection } from '../../lib/batch/lateBound';
+import { communicationBatch } from '../../lib/batch/tools';
 import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import {
@@ -265,17 +265,16 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     },
     executes,
     begin: () => {
-      const target = new LateBoundConnection();
-      const batch = new AdtBatchConnection(target, {
-        endpoint: 'communication',
-      });
+      // As BatchBegin opens it: the envelope watch included.
+      const open = communicationBatch();
+      const batch = open.connection;
       const execute = batch.execute.bind(batch);
       batch.execute = (() => {
         executes();
         return execute();
       }) as typeof batch.execute;
       last = batch;
-      owner.begin('communication', { connection: batch, target, recorded: [] });
+      owner.begin('communication', open);
     },
     loseSession: () => {
       const last = built[built.length - 1];

@@ -51,13 +51,13 @@ const FULL_BATCH = ['BatchBegin', 'BatchEnd', 'BatchAnswers'];
 const isCompact = (kind: ToolSetKind) =>
   kind === 'compact' || kind === 'compact-ro';
 
-// The spec's words (§3), copied here, never imported: the test is the copy.
+// The spec's words (§3; BatchEnd's and BatchAnswers' answer as §5.3 and §6 have it), copied here, never imported: the test is the copy.
 const BEGIN_WORDS =
   'Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.';
 const END_WORDS =
-  "Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.";
+  "Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.";
 const ANSWERS_WORDS =
-  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.";
+  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.";
 const RECORDABLE_TAIL =
   'recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.';
 const ELIGIBLE_WORDS = `Recordable: ${RECORDABLE_TAIL.slice('recordable: '.length)}`;

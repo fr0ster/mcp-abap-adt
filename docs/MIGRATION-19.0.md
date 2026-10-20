@@ -1139,7 +1139,7 @@ transport's options only:
   not right gets SAP's refusal as it came. When SAP ended that session (a timeout, a logoff, an
   administrator) the connection is replaced and its locks are held no more: a later
   `HandlerUpdate` or `HandlerUnlock` under them is refused, sending nothing; lock again. In batch mode the same chain holds across batches: the locks a lock batch recorded are held
-  once `BatchEnd` answered them, and the write and unlock batches send the instance's
+  once their numbers' answers were read after `BatchEnd`, and the write and unlock batches send the instance's
   `state_handle`. **A service binding open in an editing session**: its LOCK answers `403`, read as
   a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
   SERVICE_BINDING takes that empty `lock_handle` and sends the publication; `HandlerUnlock` with it
@@ -1755,11 +1755,13 @@ build argument `VARIANT` (the package's name without its scope), installing that
 - **Batch mode: give each instance its own owner, or the batch tools are refused.**
   `EmbeddableMcpServer` and `BaseMcpServer` take `batch?: InstanceBatch`
   (`@mcp-abap-adt/lib/embeddable`): `new InstanceBatch({ keepRawParts })`, created by you **for one
-  instance** and never shared with another — it holds that instance's open batch and the answers of
-  its last batch. It is attached to the instance's state: while a batch is open or answers are kept
-  the instance holds state (kept by your routing between requests, under the idle bound
-  `stateIdleMinutes`, which is the only clock that touches it); the state's undo drops the open batch
-  with nothing sent, and the answers. Absent: the batch tools answer `batch_mode_unavailable`
+  instance** and never shared with another — it holds that instance's open batch and the map of
+  its last batch (each number's recorded call, whose answer its handler builds when the number is
+  first read; after a failed `BatchEnd`, no map — every number answers that error). It is attached
+  to the instance's state: while a batch is open or a map is kept the instance holds state (kept
+  by your routing between requests, under the idle bound `stateIdleMinutes`, which is the only
+  clock that touches it); the state's undo drops the open batch with nothing sent, and the map —
+  a handler never read is let go with it. Absent: the batch tools answer `batch_mode_unavailable`
   ("batch mode is not available here: the host gave this server none"). `StdioServer` takes the same
   option (core's launcher passes one for its one instance); `StreamableHttpServer` and `SseServer`
   take `batch?: { keepRawParts }` and create one `InstanceBatch` per pooled instance / per SSE
@@ -1767,7 +1769,9 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `MCP_BATCH_KEEP_RAW_PARTS` / YAML `batch.keepRawParts` (default `false`, read by
   `readBatchKeepRawParts`). `ServerRefusalCode` / `FailureCode` add `batch_mode_unavailable`,
   `batch_mode_on`, `batch_mode_other`, `batch_mode_off`, `batch_not_recordable`,
-  `batch_other_kind` and `batch_no_timeout`. A batch holds one
+  `batch_other_kind`, `batch_no_timeout`, `batch_ended`, `batch_parts_mismatch` and
+  `batch_unsplit`. `BatchEnd` answers `{ recorded, sent, received }` or its own error;
+  `BatchAnswers` builds each number's answer when it is first read. A batch holds one
   session kind — LOCK, UNLOCK or stateless, `InstanceBatch.kind()`, decided by its first recorded
   request — so every batch end sends one envelope; a call whose request is of another kind is
   refused `batch_other_kind` before it records anything.

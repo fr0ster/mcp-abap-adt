@@ -179,7 +179,11 @@ it('BatchBegin holds state and answers the handle; a later call with the header 
 
   const ended = await s.call('BatchEnd', {}, withHeader(handle));
   expect(ended.isError).toBe(false);
-  expect(JSON.parse(ended.text)).toMatchObject({ recorded: 1, failed: [] });
+  expect(JSON.parse(ended.text)).toMatchObject({
+    recorded: 1,
+    sent: 1,
+    received: 1,
+  });
   expect(envelopes().filter((r) => r.method === 'POST')).toHaveLength(1);
 
   const answers = await s.call(
@@ -220,7 +224,11 @@ it('a call without the header while a batch is open is not recorded there', asyn
     expect.stringContaining('/prog_d/'),
   ]);
   const ended = await s.call('BatchEnd', {}, withHeader(handle));
-  expect(JSON.parse(ended.text)).toMatchObject({ recorded: 0, failed: [] });
+  expect(JSON.parse(ended.text)).toMatchObject({
+    recorded: 0,
+    sent: 0,
+    received: 0,
+  });
 });
 
 it('a dropped BatchEnd request keeps its answers', async () => {
@@ -316,7 +324,11 @@ it('two requests with the same header at once: both recorded, numbered in arriva
   expect(programReads()).toEqual([]);
 
   const ended = await s.call('BatchEnd', {}, withHeader(handle));
-  expect(JSON.parse(ended.text)).toMatchObject({ recorded: 2, failed: [] });
+  expect(JSON.parse(ended.text)).toMatchObject({
+    recorded: 2,
+    sent: 2,
+    received: 2,
+  });
   const one = await s.call('BatchAnswers', { number: 1 }, withHeader(handle));
   const two = await s.call('BatchAnswers', { number: 2 }, withHeader(handle));
   expect(one.text).toContain(partOf('PROG_A'));

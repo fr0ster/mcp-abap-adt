@@ -27,6 +27,7 @@ import {
   BATCH_MODE_ON_WORDS,
   BATCH_MODE_OTHER_WORDS,
   batchNotServedWords,
+  batchPartsMismatchWords,
 } from '../../../lib/auth/serverRefusal';
 import { endsBatch } from '../../../lib/batch/batchTools';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
@@ -53,7 +54,9 @@ import {
   fullToolSet,
 } from '../../../lib/toolSet';
 import {
+  type EnvelopeAnswer,
   envelopeConnection,
+  envelopeResponse,
   type InnerRequest,
   type PartAnswer,
   partByPart,
@@ -146,6 +149,8 @@ interface Stand {
   opened: Fake[];
   /** How the debuggee's envelope is answered, part by part. */
   part: { answer: (inner: InnerRequest) => PartAnswer };
+  /** How a debuggee's envelope is answered as a whole, when set; else part by part. */
+  envelope: { answer?: EnvelopeAnswer };
   handle(): string;
   /** Whether the instance still holds state (its handle valid). */
   holds(): boolean;
@@ -158,6 +163,7 @@ interface Stand {
 }
 
 async function stand(set: SetKind): Promise<Stand> {
+  const envelope: { answer?: EnvelopeAnswer } = {};
   const part = { answer: debuggerPart };
   const opened: Fake[] = [];
   // As `openFreshConnection` does: a connection opens from the origin's own
@@ -167,7 +173,8 @@ async function stand(set: SetKind): Promise<Stand> {
       throw new Error(OPENED_FROM_ELSEWHERE);
     }
     const fake = envelopeConnection(
-      partByPart((p) => part.answer(p)),
+      (parts, seen) =>
+        (envelope.answer ?? partByPart((p) => part.answer(p)))(parts, seen),
       direct,
     );
     opened.push(fake);
@@ -231,6 +238,7 @@ async function stand(set: SetKind): Promise<Stand> {
     main,
     opened,
     part,
+    envelope,
     handle: () => server.stateHandle,
     holds: () => server.state.holdsState(),
     call: (name, args = {}) =>
@@ -382,6 +390,32 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     expect(s.main.envelopes).toHaveLength(0);
   });
 
+  it(`${NAMES.end[set]} answered with fewer parts than requests: batch_parts_mismatch, no map, every number answers it`, async () => {
+    await s.attach();
+    await s.call(NAMES.begin[set], beginArgs(set));
+    for (const [tool, args] of stepStackVariables(set, s.handle())) {
+      expect(await within(s.call(tool, args))).toEqual({ content: [] });
+    }
+    s.envelope.answer = (parts) =>
+      envelopeResponse(parts.slice(0, 2).map(debuggerPart));
+    const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
+    expect(ended.isError).toBe(true);
+    expect(jsonOf(ended)).toEqual({
+      error: 'batch_parts_mismatch',
+      message: batchPartsMismatchWords(2, 3),
+    });
+    expect(s.owner.mode()).toBe('off');
+    const read = await s.call(
+      set === 'compact' ? 'HandlerDebugBatch' : 'BatchAnswers',
+      set === 'compact'
+        ? { action: 'answers', numbers: [1, 2, 3] }
+        : { numbers: [1, 2, 3] },
+    );
+    for (const entry of jsonOf(read) as Array<{ content: unknown }>) {
+      expect(entry.content).toEqual(ended.content);
+    }
+  });
+
   it('the second recorded call is recorded while the first waits', async () => {
     await s.attach();
     await s.call(NAMES.begin[set], beginArgs(set));
@@ -392,7 +426,7 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
       content: [],
     });
     const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 2, failed: [] });
+    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
     expect(s.stopConnection().envelopes[0]?.parts).toHaveLength(2);
   });
 
@@ -412,7 +446,7 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
       expect(await within(s.call(tool, args))).toEqual({ content: [] });
     }
     const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 3, failed: [] });
+    expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
     expect(s.owner.mode()).toBe('off');
     const answers = await answersOf(s, set, [1, 2, 3]);
     expect(answers.map((a) => a.number)).toEqual([1, 2, 3]);
@@ -578,7 +612,8 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     expect(jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))))).toEqual(
       {
         recorded: 0,
-        failed: [],
+        sent: 0,
+        received: 0,
       },
     );
     expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
@@ -705,7 +740,7 @@ describe.each(SETS)('every record path, %s set', (set) => {
         const summary = jsonOf(
           await settled(s.call(NAMES.end[set], endArgs(set))),
         );
-        expect(summary).toEqual({ recorded: 1, failed: [] });
+        expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
         const envelopes = s.opened.flatMap((fake) => fake.envelopes);
         expect(envelopes).toHaveLength(1);
         const parts = (envelopes[0]?.parts ?? []).map(
@@ -747,7 +782,7 @@ describe('the debugger batch, compact step to line', () => {
       // Refused before anything was recorded: no number, nothing sent.
       expect(
         jsonOf(await s.call('HandlerDebugBatch', { action: 'end' })),
-      ).toEqual({ recorded: 0, failed: [] });
+      ).toEqual({ recorded: 0, sent: 0, received: 0 });
       expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
     } finally {
       await s.close();

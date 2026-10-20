@@ -49,7 +49,10 @@ export type FailureCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout';
+  | 'batch_no_timeout'
+  | 'batch_ended'
+  | 'batch_parts_mismatch'
+  | 'batch_unsplit';
 
 /**
  * A failure as it was read: the fields of the failure answer, and the chain's

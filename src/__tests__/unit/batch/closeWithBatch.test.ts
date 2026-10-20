@@ -30,6 +30,7 @@ import { runPlainNode } from '../../helpers/plainNode';
 const SCENARIO = 'src/__tests__/unit/batch/scenarios/batchDrop.scenario.ts';
 const DURING_END =
   'src/__tests__/unit/batch/scenarios/closeDuringEnd.scenario.ts';
+const UNREAD = 'src/__tests__/unit/batch/scenarios/unreadNumbers.scenario.ts';
 
 const sap = (inner: InnerRequest): PartAnswer => ({
   status: 200,
@@ -44,10 +45,10 @@ const turns = async (n = 20) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
 };
 
-/** Whether every recorded call's answer has settled within a few turns. */
+/** Whether every recorded call's handler has settled within a few turns. */
 async function settled(recorded: RecordedCall[]): Promise<boolean> {
   let done = false;
-  void Promise.all(recorded.map((call) => call.answer)).then(() => {
+  void Promise.all(recorded.map((call) => call.settled)).then(() => {
     done = true;
   });
   await turns();
@@ -82,9 +83,6 @@ describe('the instance close with a batch open', () => {
     await closing;
 
     expect(await settled(recorded)).toBe(true);
-    for (const answer of await Promise.all(recorded.map((c) => c.answer))) {
-      expect(answer.isError).toBe(true);
-    }
     expect(s.executes).not.toHaveBeenCalled();
     for (const fake of s.built) expect(fake.envelopes).toEqual([]);
     expect(s.owner.holdsState()).toBe(false);
@@ -104,7 +102,6 @@ describe('the instance close with a batch open', () => {
         executes: 0,
         direct: [],
         settled: true,
-        recordedErrors: [true, true],
         unhandled: [],
       });
     },
@@ -142,7 +139,11 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
     // A batch executed: its answer 1 is kept.
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
-    expect((await s.end()).summary).toEqual({ recorded: 1, failed: [] });
+    expect((await s.end()).summary).toEqual({
+      recorded: 1,
+      sent: 1,
+      received: 1,
+    });
     expect(s.owner.answer(1)).toBeDefined();
     const sentBefore = s.built.map((fake) => fake.envelopes.length);
 
@@ -179,4 +180,24 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
     expect(s.executes).toHaveBeenCalledTimes(1);
     await s.close();
   });
+});
+
+describe('numbers never read (spec §6)', () => {
+  it.each(['replace', 'close'])(
+    'plain node, the map %s: a handler never read was waiting, awaited by nothing, and is let go with no unhandled rejection',
+    async (how) => {
+      const report = await runPlainNode(UNREAD, [how]);
+      expect(report).toEqual({
+        numbers: [1, 2],
+        summary: { recorded: 2, sent: 3, received: 3 },
+        read: [[1, [{ type: 'text', text: 'a' }]]],
+        // The batch's one envelope; the replacing batch was empty.
+        envelopes: [3],
+        settledBefore: false,
+        settled: true,
+        holdsState: false,
+        unhandled: [],
+      });
+    },
+  );
 });

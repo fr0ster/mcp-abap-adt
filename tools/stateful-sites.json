@@ -9,6 +9,15 @@
     "whose": "server"
   },
   {
+    "file": "src/lib/batch/envelopeWatch.ts",
+    "function": "EnvelopeWatch.over",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none of its own: the envelope watch under a batch's AdtBatchConnection forwards the batch connection's envelope session type to the connection it is placed over (the late-bound target, or a debugger batch's stop or command connection)",
+    "stateless": "execute()'s finally restores the previous session type through this member",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/batch/lateBound.ts",
     "function": "LateBoundConnection.setSessionType",
     "site": "setSessionType(type: Session)",
@@ -57,8 +66,8 @@
     "file": "src/lib/batch/recorder.ts",
     "function": "createRecorder",
     "site": "setSessionType(unswitched)",
-    "count": 1,
-    "window": "none on the wire: a request refused batch_other_kind is not recorded, so the batch connection's mode its member asked for (scoped to its next recorded request) is set back to the batch connection's default, as its own recording would; no connection is touched",
+    "count": 2,
+    "window": "none on the wire: a request refused batch_other_kind, or batch_ended after its batch ended, is not recorded, so the batch connection's mode its member asked for (scoped to its next recorded request) is set back to the batch connection's default, as its own recording would; no connection is touched",
     "stateless": "in the same call: the default is set at once (stateless for a communication batch)",
     "whose": "server"
   },

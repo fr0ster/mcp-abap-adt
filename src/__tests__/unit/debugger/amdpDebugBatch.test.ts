@@ -43,7 +43,9 @@ import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGr
 import type { IHandlerGroup } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
+  type EnvelopeAnswer,
   envelopeConnection,
+  envelopeResponse,
   type InnerRequest,
   type PartAnswer,
   partByPart,
@@ -151,6 +153,8 @@ interface Stand {
   opened: Fake[];
   scripted: ReturnType<typeof scriptedAmdp>;
   part: { answer: (inner: InnerRequest) => PartAnswer };
+  /** How a debuggee's envelope is answered as a whole, when set; else part by part. */
+  envelope: { answer?: EnvelopeAnswer };
   handle(): string;
   /** Whether the instance still holds state (its handle valid). */
   holds(): boolean;
@@ -163,11 +167,14 @@ interface Stand {
 }
 
 async function stand(set: SetKind): Promise<Stand> {
+  const envelope: { answer?: EnvelopeAnswer } = {};
   const part = { answer: amdpPart };
   const opened: Fake[] = [];
   const scripted = scriptedAmdp();
   const open = async () => {
-    const fake = envelopeConnection(partByPart((p) => part.answer(p)));
+    const fake = envelopeConnection((parts, seen) =>
+      (envelope.answer ?? partByPart((p) => part.answer(p)))(parts, seen),
+    );
     opened.push(fake);
     return fake.connection as unknown as IAbapConnection;
   };
@@ -235,6 +242,7 @@ async function stand(set: SetKind): Promise<Stand> {
     opened,
     scripted,
     part,
+    envelope,
     handle: () => server.stateHandle,
     holds: () => server.state.holdsState(),
     call: (name, args = {}) =>
@@ -392,7 +400,7 @@ describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
     expect(s.scripted.direct).toEqual([]);
 
     const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 3, failed: [] });
+    expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
     expect(s.owner.mode()).toBe('off');
 
     const commands = s.commands();
@@ -432,6 +440,25 @@ describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
     }
   });
 
+  it('the end answered with fewer parts than requests: batch_parts_mismatch, no map, every number answers it', async () => {
+    await s.breakAt();
+    await s.call(NAMES.begin[set], beginArgs(set));
+    for (const [tool, args] of previewStepContinue(set, s.handle())) {
+      expect(await within(s.call(tool, args))).toEqual({ content: [] });
+    }
+    s.envelope.answer = (parts) =>
+      envelopeResponse(parts.slice(0, 1).map(amdpPart));
+    const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
+    expect(ended.isError).toBe(true);
+    expect(jsonOf(ended)).toEqual({
+      error: 'batch_parts_mismatch',
+      message: refusals.batchPartsMismatchWords(1, 3),
+    });
+    for (const entry of await answersOf(s, set, [1, 2, 3])) {
+      expect(entry.content).toEqual(ended.content);
+    }
+  });
+
   it('the second recorded call is recorded while the first waits', async () => {
     await s.breakAt();
     await s.call(NAMES.begin[set], beginArgs(set));
@@ -441,7 +468,7 @@ describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
       content: [],
     });
     const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 2, failed: [] });
+    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
     expect(s.commands().envelopes[0]?.parts).toHaveLength(2);
   });
 
@@ -453,7 +480,7 @@ describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
       const summary = jsonOf(
         await settled(s.call(NAMES.end[set], endArgs(set))),
       );
-      expect(summary).toEqual({ recorded: 1, failed: [] });
+      expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
       expect(s.commands().envelopes.at(-1)?.parts).toHaveLength(1);
     }
     expect(s.commands().envelopes).toHaveLength(3);
@@ -477,7 +504,7 @@ describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
       message: batchNotServedWords(tool),
     });
     expect(jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))))).toEqual(
-      { recorded: 0, failed: [] },
+      { recorded: 0, sent: 0, received: 0 },
     );
   });
 
@@ -552,25 +579,36 @@ describe('a complete stop ends the debugger batch answers with the debug state (
   });
 });
 
-describe('InstanceBatch: the kept answers by the kind of their batch', () => {
-  const answer = { isError: false, content: [] } as never;
-  it("dropDebuggerAnswers drops a debugger batch's answers and keeps a communication batch's", () => {
+describe('InstanceBatch: the kept map by the kind of its batch', () => {
+  const answer = { number: 1, content: [] };
+  /** A batch whose one recorded call answers `answer` when read. */
+  const recordedOne = () => ({
+    connection: {} as never,
+    recorded: [
+      {
+        number: 1,
+        parts: () => [],
+        resume: async () => answer,
+        settled: Promise.resolve(),
+      },
+    ],
+  });
+  it("dropDebuggerAnswers drops a debugger batch's map and keeps a communication batch's", async () => {
     const debug = new InstanceBatch({ keepRawParts: false });
-    debug.begin('debugger', { connection: {} as never, recorded: [] });
-    debug.end(new Map([[1, answer]]));
+    const debugged = recordedOne();
+    debug.begin('debugger', debugged);
+    debug.end(debugged);
     debug.dropDebuggerAnswers();
     expect(debug.holdsState()).toBe(false);
     expect(debug.answer(1)).toBeUndefined();
 
     const communication = new InstanceBatch({ keepRawParts: false });
-    communication.begin('communication', {
-      connection: {} as never,
-      recorded: [],
-    });
-    communication.end(new Map([[1, answer]]));
+    const communicated = recordedOne();
+    communication.begin('communication', communicated);
+    communication.end(communicated);
     communication.dropDebuggerAnswers();
     expect(communication.holdsState()).toBe(true);
-    expect(communication.answer(1)).toBe(answer);
+    await expect(communication.answer(1)).resolves.toBe(answer);
   });
 });
 

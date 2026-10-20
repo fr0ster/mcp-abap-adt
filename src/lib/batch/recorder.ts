@@ -3,7 +3,12 @@
  * in batch mode, over the open batch's `AdtBatchConnection`.
  *
  * Every member forwards to the batch connection, so a request is recorded,
- * never sent: its promise settles only when `BatchEnd` executes the batch.
+ * never sent: its part settles when `BatchEnd` executes the batch, and the
+ * promise the handler awaits settles with that part only once the call's
+ * number is read (`release()`, spec §6) — `BatchEnd` resumes no handler.
+ * Once the batch has ended (or was dropped), a request is not recorded: it
+ * is refused `batch_ended`, and that refusal is what the resumed handler
+ * meets.
  * At the call's first `makeAdtRequest` the recorder takes the batch's next
  * number for the call and keeps it for every further request of the call —
  * a call may put several independent parts into the envelope (a source and
@@ -26,11 +31,12 @@
  *
  * Every request the recorder hands back is raced against the batch's signal
  * (taken when the recorder is created): a drop (`drop()`, `dispose()`, the
- * instance close) aborts it, and the handler's wait for a part that will
- * never come ends with `RequestAbortedError` — adt-clients has no discard,
- * its part promise stays pending and is let go with the batch connection.
- * Nothing is sent by the drop. `BatchEnd` never aborts the signal, so an
- * executed part reaches the handler as it came.
+ * instance close), a failed `BatchEnd` and the replacement of the batch's
+ * map abort it, and the handler's wait for a part it will never be given
+ * ends with `RequestAbortedError` — adt-clients has no discard, its part
+ * promise stays pending and is let go with the batch connection. Nothing is
+ * sent by the drop. An end that keeps the map never aborts the signal, so
+ * an executed part reaches the handler, when read, as it came.
  */
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -40,7 +46,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { batchOtherKindWords, ServerRefusal } from '../auth/serverRefusal';
 import { raceRequestSignal } from '../requestSignal';
-import type { InstanceBatch, RawPart } from './InstanceBatch';
+import type { InstanceBatch, PartSettlement, RawPart } from './InstanceBatch';
 import { requestKind, sessionKindLabel } from './sessionKind';
 
 type Session = 'stateful' | 'stateless';
@@ -68,6 +74,10 @@ export interface Recorder extends IAbapConnection {
    * refusal.
    */
   otherKind(): ServerRefusal | undefined;
+  /** How each request's part settled, in the order recorded. */
+  parts(): PartSettlement[];
+  /** The call's number was read: every request the handler awaits settles with its part. */
+  release(): void;
 }
 
 /** The raw part of a settled request: the inner response, or a failure's `response`. */
@@ -124,6 +134,11 @@ export function createRecorder(
   let count = 0;
   const listeners: Array<() => void> = [];
   const raw: Array<RawPart | undefined> = [];
+  const settled: PartSettlement[] = [];
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const recorder: Recorder = {
     connect: () => batch.connect(),
     getBaseUrl: () => batch.getBaseUrl(),
@@ -138,6 +153,15 @@ export function createRecorder(
       // undone as its own recording would undo it. Once a part of the call
       // was refused, every later part is refused with it: the call records
       // nothing more and takes no number.
+      // The batch ended (or was dropped): nothing more is recorded or sent.
+      if (owner.opened()?.connection !== batch) {
+        batch.setSessionType(unswitched);
+        const ended = Promise.reject<IAdtWireResponse<T, D>>(
+          new ServerRefusal('batch_ended'),
+        );
+        ended.catch(() => undefined);
+        return ended;
+      }
       const kind = requestKind(request, batch.getSessionType(), endpoint);
       const holds = owner.kind();
       if (refused !== undefined || (holds !== undefined && holds !== kind)) {
@@ -166,6 +190,16 @@ export function createRecorder(
         onRecorded(taken);
       }
       count += 1;
+      const at = settled.length;
+      settled.push({ state: 'pending' });
+      recorded.then(
+        (value) => {
+          settled[at] = { state: 'resolved', value };
+        },
+        (error: unknown) => {
+          settled[at] = { state: 'rejected', error };
+        },
+      );
       if (owner.keepRawParts) {
         const index = raw.length;
         raw.push(undefined);
@@ -183,7 +217,11 @@ export function createRecorder(
         );
       }
       for (const listener of [...listeners]) listener();
-      const answered = raceRequestSignal(recorded, dropped);
+      // The handler meets its part only when its number is read.
+      const answered = raceRequestSignal(
+        released.then(() => recorded),
+        dropped,
+      );
       // A handler that left (it threw on an earlier part) never reads this
       // one: its rejection — the drop's above all — is never unhandled.
       answered.catch(() => undefined);
@@ -196,6 +234,8 @@ export function createRecorder(
     },
     rawParts: () => raw.filter((part): part is RawPart => part !== undefined),
     otherKind: () => refused,
+    parts: () => [...settled],
+    release: () => release(),
   };
   return recorder;
 }

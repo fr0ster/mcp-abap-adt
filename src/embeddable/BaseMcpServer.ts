@@ -51,7 +51,7 @@ import {
 } from '../lib/batch/availability.js';
 import { endsBatch, isBatchTool } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
-import { batchRefusal, endBeforeExecute } from '../lib/batch/execute.js';
+import { batchRefusal, endWithFailure } from '../lib/batch/execute.js';
 import type {
   BatchAnswer,
   InstanceBatch,
@@ -1523,6 +1523,15 @@ export abstract class BaseMcpServer extends McpServer {
               // A failed tool returns an isError result — it does not throw.
               // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
               if ((result as ToolResultLike | undefined)?.isError) {
+                // `BatchEnd` answering its own error: every number of its
+                // batch answers the same (spec §5.3).
+                if (this.batch !== undefined && ending !== undefined) {
+                  endWithFailure(
+                    this.batch,
+                    { content, isError: true },
+                    ending,
+                  );
+                }
                 return { content, isError: true };
               }
 
@@ -1538,17 +1547,14 @@ export abstract class BaseMcpServer extends McpServer {
               // which the SDK's own error.message would discard.
               const failed = this.refusalAnswer(error);
               // `BatchEnd` failing before `execute()` — taking the connection,
-              // the system lookup — ends batch mode: every recorded call's
-              // answer is this failure, as the call answers it; nothing is
-              // sent. Failing after, its batch has already ended — and a
-              // batch begun since is not this call's to end.
-              if (
-                this.batch !== undefined &&
-                endingKind !== undefined &&
-                ending !== undefined &&
-                this.batch.opened() === ending
-              ) {
-                endBeforeExecute(this.batch, failed, endingKind);
+              // the system lookup — ends batch mode with no map: every number
+              // answers this failure, as the call answers it; nothing is
+              // sent. Failing after (its own error thrown: a credential
+              // refusal, `batch_parts_mismatch`, `batch_unsplit`), its batch
+              // has already ended with no map, and its numbers answer this
+              // same answer. A batch begun since is not this call's to end.
+              if (this.batch !== undefined && ending !== undefined) {
+                endWithFailure(this.batch, failed, ending);
               }
               return failed;
             } finally {
@@ -1774,13 +1780,24 @@ export abstract class BaseMcpServer extends McpServer {
       (number) => {
         open.recorded.push({
           number,
-          answer: handlerStarted.then(({ handler }) =>
-            this.recordedAnswer(
-              number,
-              handler,
-              owner,
-              () => recorder.rawParts(),
-              () => recorder.otherKind(),
+          parts: () => recorder.parts(),
+          // Read by its number: the handler, waiting at its first request,
+          // meets its parts now and builds the number's answer.
+          resume: () =>
+            handlerStarted.then(({ handler }) => {
+              recorder.release();
+              return this.recordedAnswer(
+                number,
+                handler,
+                owner,
+                () => recorder.rawParts(),
+                () => recorder.otherKind(),
+              );
+            }),
+          settled: handlerStarted.then(({ handler }) =>
+            handler.then(
+              () => undefined,
+              () => undefined,
             ),
           ),
         });
@@ -1848,8 +1865,9 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * A recorded call's answer under its number: the tool's answer its
-   * handler built from all its parts, as this wrapper answers a tool — its
+   * A recorded call's answer under its number, built when the number is
+   * first read: the tool's answer its handler, resumed then, built from all
+   * its parts, as this wrapper answers a tool — its
    * content, `isError` when it failed; a throw read by the failure reader,
    * else `return_error`. A call a part of which was refused for its session
    * kind (`otherKind`) answers that refusal, whatever its handler built.

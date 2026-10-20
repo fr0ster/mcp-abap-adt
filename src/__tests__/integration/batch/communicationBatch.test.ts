@@ -32,8 +32,10 @@
  *    `activated: true`;
  * 8. reads — `HandlerGet` × N: the sources and the document as written.
  *
- * Every recorded call answers nothing; `end` answers how many were recorded
- * and which failed; every number's answer is checked on its own.
+ * Every recorded call answers nothing; `end` answers how many calls were
+ * recorded, how many requests were sent and how many parts came — as many
+ * as were sent; every number's answer, built when it is read, is checked on
+ * its own.
  *
  * Cleanup, in `finally`, whatever happened: a lock still held is released;
  * `HandlerDeletionCheck` × created objects, then `HandlerDelete` × the ones
@@ -268,7 +270,7 @@ async function serve(kind: Kind): Promise<Served> {
 type Call = { tool: string; args: Record<string, unknown> };
 
 type Phase = {
-  summary: { recorded?: number; failed?: number[]; came?: unknown };
+  summary: { recorded?: number; sent?: number; received?: number };
   entries: Entry[];
   recordMs: number;
   endMs: number;
@@ -318,11 +320,15 @@ async function phase(
       `calls=${calls.length}`,
       `record_ms=${recordMs.toFixed(0)}`,
       `end_ms=${endMs.toFixed(0)}`,
-      `failed=${JSON.stringify(summary.failed ?? null)}`,
+      `sent=${JSON.stringify(summary.sent ?? null)}`,
+      `received=${JSON.stringify(summary.received ?? null)}`,
     ].join('\t')}\n`,
   );
+  expect(ended.isError).not.toBe(true);
   expect(summary.recorded).toBe(calls.length);
-  expect(summary.came).toBeUndefined();
+  // Every call sends one request at least; every part came.
+  expect(summary.sent).toBeGreaterThanOrEqual(calls.length);
+  expect(summary.received).toBe(summary.sent);
   expect(entries.map((entry) => entry.number)).toEqual(numbers);
   return { summary, entries, recordMs, endMs };
 }
@@ -338,7 +344,6 @@ function expectAllAnswered(label: string, calls: Call[], result: Phase): void {
   if (failures.length > 0) {
     throw new Error(`${label}: ${failures.join('\n')}`);
   }
-  expect(result.summary.failed).toEqual([]);
 }
 
 type TestObject = {

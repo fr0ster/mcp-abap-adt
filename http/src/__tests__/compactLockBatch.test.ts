@@ -129,7 +129,8 @@ async function batch(
   const ended = await s.call('BatchEnd', {}, withHeader(handle));
   expect(JSON.parse(ended.text)).toMatchObject({
     recorded: calls.length,
-    failed: [],
+    sent: calls.length,
+    received: calls.length,
   });
   const answers: Array<Record<string, unknown>> = [];
   for (let n = 1; n <= calls.length; n += 1) {

@@ -20,7 +20,7 @@ const untagged = (description: string): string =>
     : description;
 
 const ANSWERS_WORDS =
-  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.";
+  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.";
 
 /** `HandlerDebugBatch`'s description: the full set's sentences, one per action. */
 export const HANDLER_DEBUG_BATCH_DESCRIPTION = [

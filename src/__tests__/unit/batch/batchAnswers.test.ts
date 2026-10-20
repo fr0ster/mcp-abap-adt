@@ -1,6 +1,7 @@
 /**
- * `BatchAnswers` (spec §6): the answers of the last executed batch, by number,
- * in the order asked; nothing sent; served while a batch is open.
+ * `BatchAnswers` (spec §6): the map of the last ended batch read by number,
+ * in the order asked — each number's handler resumed when first read;
+ * nothing sent; served while a batch is open.
  */
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
@@ -16,6 +17,7 @@ import {
 import {
   type BatchAnswer,
   InstanceBatch,
+  type OpenBatch,
 } from '../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { batchStand } from '../../helpers/batchStand';
@@ -25,15 +27,21 @@ const answerOf = (number: number): BatchAnswer => ({
   content: [{ type: 'text', text: `answer ${number}` }],
 });
 
-/** An owner whose last batch answered 1, 2 and 3. */
+/** An owner whose last batch recorded 1, 2 and 3, each answering `answer <n>` when read. */
 function answered(): InstanceBatch {
   const owner = new InstanceBatch({ keepRawParts: false });
-  owner.begin('communication', {
+  const open: OpenBatch = {
     connection: {} as never,
     target: new LateBoundConnection(),
-    recorded: [],
-  });
-  owner.end(new Map([1, 2, 3].map((n) => [n, answerOf(n)])));
+    recorded: [1, 2, 3].map((number) => ({
+      number,
+      parts: () => [],
+      resume: async () => answerOf(number),
+      settled: Promise.resolve(),
+    })),
+  };
+  owner.begin('communication', open);
+  owner.end(open);
   return owner;
 }
 
@@ -44,10 +52,10 @@ const none = (number: number) => ({
 });
 
 describe('BatchAnswers', () => {
-  it('number and numbers, in the order asked', () => {
+  it('number and numbers, in the order asked', async () => {
     const owner = answered();
-    expect(readAnswers(owner, { number: 2 })).toEqual([answerOf(2)]);
-    expect(readAnswers(owner, { numbers: [3, 1, 2] })).toEqual([
+    expect(await readAnswers(owner, { number: 2 })).toEqual([answerOf(2)]);
+    expect(await readAnswers(owner, { numbers: [3, 1, 2] })).toEqual([
       answerOf(3),
       answerOf(1),
       answerOf(2),
@@ -65,7 +73,7 @@ describe('BatchAnswers', () => {
     );
   });
 
-  it('0, -1, 1.5 refused before anything runs; duplicates answered per occurrence', () => {
+  it('0, -1, 1.5 refused before anything runs; duplicates answered per occurrence', async () => {
     const owner = answered();
     const asked = jest.spyOn(owner, 'answer');
     for (const bad of [0, -1, 1.5, Number.NaN, '1']) {
@@ -77,7 +85,7 @@ describe('BatchAnswers', () => {
       );
     }
     expect(asked).not.toHaveBeenCalled();
-    expect(readAnswers(owner, { numbers: [2, 2, 9, 2] })).toEqual([
+    expect(await readAnswers(owner, { numbers: [2, 2, 9, 2] })).toEqual([
       answerOf(2),
       answerOf(2),
       none(9),
@@ -85,10 +93,13 @@ describe('BatchAnswers', () => {
     ]);
   });
 
-  it('before any batch and an unknown number: no answer with that number', () => {
+  it('before any batch and an unknown number: no answer with that number', async () => {
     const fresh = new InstanceBatch({ keepRawParts: false });
-    expect(readAnswers(fresh, { numbers: [1, 2] })).toEqual([none(1), none(2)]);
-    expect(readAnswers(answered(), { number: 4 })).toEqual([none(4)]);
+    expect(await readAnswers(fresh, { numbers: [1, 2] })).toEqual([
+      none(1),
+      none(2),
+    ]);
+    expect(await readAnswers(answered(), { number: 4 })).toEqual([none(4)]);
   });
 
   it("served while a batch is open: the last batch's answers, nothing sent, nothing recorded", async () => {

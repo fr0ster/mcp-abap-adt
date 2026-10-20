@@ -130,7 +130,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="batchend-read-only-batch"></a>
 #### BatchEnd (Read-Only / Batch)
-**Description:** Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.
+**Description:** Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
 
 **Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
 
@@ -141,7 +141,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="batchanswers-read-only-batch"></a>
 #### BatchAnswers (Read-Only / Batch)
-**Description:** Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.
+**Description:** Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
 
 **Source:** `src/handlers/batch/batch/handleBatchAnswers.ts`
 

@@ -35,26 +35,42 @@ The debugger has a batch of its own — `DebugBatchBegin` / `DebugBatchEnd`, com
    batch is sent at BatchEnd, with no deadline"). A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
    call decides which; a call of another kind is refused `batch_other_kind` (see Phases).
 3. **`BatchEnd`** sends every recorded call, in one envelope, with the credentials in force now, and
-   leaves batch mode whatever happens. Nothing is sent twice and nothing is retried. It answers
-   `{ "recorded": <count>, "failed": [<numbers>] }` — a number fails when its answer is an error
-   — and, when the envelope itself failed, `came` beside it: what came for that failure (the
-   error as it is, with its `step`).
-4. **`BatchAnswers`** reads the answers by number: `number` (one) or `numbers` (a list, answered
-   in the order given). Each answer is the answer the tool gives for that call outside batch
-   mode, built from what SAP answered when `BatchEnd` sent it — its projection of a success, the
-   failure as the tool answers it, or, when the envelope failed, that failure.
-   A number the last batch does not have answers `{ "number": n, "error": "no_answer", "message":
-   "no answer with that number" }`.
+   leaves batch mode whatever happens. Nothing is sent twice and nothing is retried. It splits
+   SAP's answer by number into **the map** — each number, the parts of its call's requests, in
+   the order sent — and builds no call's answer. It answers
+   `{ "recorded": <calls>, "sent": <requests>, "received": <parts> }`, `sent` equal to
+   `received`. Or it answers its own error, and then there is no map:
+   - the envelope failed — what came, as it came: SAP's answer to the envelope (its status and
+     body, with `step: "execute"`), the transport's error, or a credential refusal;
+   - fewer parts came than requests were sent — `batch_parts_mismatch` ("1 of 2 parts came; the
+     answers cannot be matched to the calls");
+   - the answer could not be split into parts — `batch_unsplit` ("the envelope's answer could
+     not be split into the calls' parts").
 
-The answers stay readable until the next `BatchEnd` replaces them (or the server instance ends),
-so a phase can read the lock handles of the previous one while it is being recorded.
+   Which part belongs to which call is known only when `BatchEnd` worked without error; after
+   its error, every number of that batch answers that same error.
+4. **`BatchAnswers`** reads the map by number: `number` (one) or `numbers` (a list, answered
+   in the order given). A number's answer is built when it is first read: the call's handler,
+   waiting since its request was recorded, is given its parts and builds the answer the tool
+   gives for that call outside batch mode for the same SAP answer — its projection of a
+   success, or the failure as the tool answers it. The numbers asked in one call are built in
+   parallel; an answer, once built, is kept, and a number read again answers the same. A
+   handler that would send another request after its parts is refused `batch_ended` ("the batch
+   has ended; this call can send nothing more"), and that is its answer. A number of a batch
+   whose `BatchEnd` failed answers that error. A number the last batch does not have answers
+   `{ "number": n, "error": "no_answer", "message": "no answer with that number" }`.
+
+The map stays readable until the next `BatchEnd` replaces it (or the server instance ends),
+so a phase can read the lock handles of the previous one while it is being recorded. A number
+never read is left with its map: when the map is replaced or the instance ends, its call is let
+go, nothing sent for it.
 `BatchAnswers` is served while a batch is open; nothing else of the batch runs on a clock — the
 held state's idle bound (`stateIdleMinutes`, 30 minutes by default) is the one clock that touches
 it.
 
 When the server instance ends with a batch open — the client closes its connection (stdio, an SSE
 stream), the HTTP pool lets the instance go, the process shuts down — or the idle bound ends the
-held state, the open batch is dropped: nothing recorded is sent, and the last batch's answers go
+held state, the open batch is dropped: nothing recorded is sent, and the last batch's map goes
 with it. A `BatchEnd` after the idle bound is refused `batch_mode_off`, and `BatchAnswers` answers
 "no answer with that number".
 
@@ -217,9 +233,10 @@ request. Each phase was one `HandlerBatch` begin, the calls, end, then the answe
 | on premise (RFC) | passed | 2 |
 | ABAP Cloud | not run: the test configuration names no ABAP Cloud destination | — |
 
-On both, every recorded call answered nothing, every batch end answered `recorded: 3` (1 for the
-domain document) with no envelope failure, and every number's answer was its own: phases 1 and 11
-failed `[1, 2, 3]` with `404` each, every other phase failed none. The objects' entries went into
+On both, every recorded call answered nothing, every batch end recorded 3 calls (1 for the
+domain document) with no envelope failure, and every number's answer was its own: in phases 1 and
+11 numbers 1, 2 and 3 answered `404` each, in every other phase no number answered an error. (This
+run predates the map: `BatchEnd` then built every answer itself.) The objects' entries went into
 the configured transport request; no other request was created. The server, stopped by the end of
 its stdin, logged its sessions off and exited `0`. Over RFC the server connected to the RFC
 gateway only, with no HTTP connection to the system.
@@ -323,17 +340,18 @@ carries a `state_handle` argument is answered `400`: "a JSON-RPC batch cannot ca
 state_handle"). The header comes first;
 without it the pool routes by a `tools/call`'s `state_handle` argument, which only the debugger
 tools take — no batch tool takes one. The handle is a bearer secret: whoever holds it reaches the
-batch. A client that leaves during `BatchEnd` does not stop it: the answers are kept for the next
+batch. A client that leaves during `BatchEnd` does not stop it: the map is kept for the next
 `BatchAnswers` with the header. On stdio and SSE nothing is needed: the batch is the process's
 (stdio) or the connection's (SSE).
 
 ## Credentials and failures
 
 `BatchEnd` sends on the instance's connection as it is at that moment, with the credential in
-force then; it holds that connection for the whole send. A credential refusal ends `BatchEnd` and
-reaches the caller as it came; every recorded call's answer is what it met. If `BatchEnd` fails
-before anything is sent (taking the connection, the system lookup), batch mode ends too, and every
-recorded call's answer is that failure.
+force then; it holds that connection for the whole send. A credential refusal — refused before
+SAP was asked, or SAP's `401` the credential could not renew — ends `BatchEnd` and reaches the
+caller as it came; there is no map, and every number read answers the same refusal. If
+`BatchEnd` fails before anything is sent (taking the connection, the system lookup), batch mode
+ends too, there is no map, and every number read answers that failure.
 
 A part SAP answered `401`, `406` or `415` is that call's answer, as any other failure: in batch
 mode nothing recorded is corrected and sent again.
@@ -342,8 +360,8 @@ mode nothing recorded is corrected and sent again.
 
 With `--batch-keep-raw-parts` (`MCP_BATCH_KEEP_RAW_PARTS`, YAML `batch.keepRawParts`; default
 off) each answer also carries SAP's raw parts of its call's requests, in the order sent:
-`{ status, status_text, headers, body }`, `body` `""` when a part had none. A request not sent has
-no raw part.
+`{ status, status_text, headers, body }`, `body` `""` when a part had none. A number of a batch
+whose `BatchEnd` failed answers that error alone, with no raw part.
 
 ## Which calls are recorded
 

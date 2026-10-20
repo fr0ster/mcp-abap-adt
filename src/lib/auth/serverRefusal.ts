@@ -32,7 +32,10 @@ export type ServerRefusalCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout';
+  | 'batch_no_timeout'
+  | 'batch_ended'
+  | 'batch_parts_mismatch'
+  | 'batch_unsplit';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -171,6 +174,28 @@ export const BATCH_NO_TIMEOUT_WORDS =
   'in batch mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline';
 
 /**
+ * A request of a recorded call after its batch ended: a handler resumed when
+ * its number is read sends nothing more, and this refusal is its answer.
+ */
+export const BATCH_ENDED_WORDS =
+  'the batch has ended; this call can send nothing more';
+
+/** `BatchEnd`'s error: the envelope's answer did not split into parts. */
+export const BATCH_UNSPLIT_WORDS =
+  "the envelope's answer could not be split into the calls' parts";
+
+/**
+ * `BatchEnd`'s error: the parts that came are not as many as the requests
+ * sent, so no part can be matched to its call.
+ */
+export function batchPartsMismatchWords(
+  received: number,
+  sent: number,
+): string {
+  return `${received} of ${sent} parts came; the answers cannot be matched to the calls`;
+}
+
+/**
  * A call no entry of `tools/batch-handlers.json` admits, in a communication
  * batch: a request of it depends on another's answer (or it sends none).
  */
@@ -212,7 +237,8 @@ type WordedCode =
   | 'destination_refused'
   | 'background_run_limit'
   | 'batch_not_recordable'
-  | 'batch_other_kind';
+  | 'batch_other_kind'
+  | 'batch_parts_mismatch';
 
 /** The refusals whose words are fixed. */
 type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
@@ -236,6 +262,8 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_mode_other: BATCH_MODE_OTHER_WORDS,
   batch_mode_off: BATCH_MODE_OFF_WORDS,
   batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
+  batch_ended: BATCH_ENDED_WORDS,
+  batch_unsplit: BATCH_UNSPLIT_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */
@@ -255,7 +283,8 @@ export class ServerRefusal extends Error {
    * user's own input (a path they gave) — never a file's content.
    * `background_run_limit` in `backgroundRunLimitWords`.
    * `batch_not_recordable` in `batchNotRecordableWords` or
-   * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`.
+   * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`;
+   * `batch_parts_mismatch` in `batchPartsMismatchWords`.
    */
   constructor(code: WordedCode, words: string);
   constructor(code: ServerRefusalCode, words?: string) {
@@ -263,7 +292,8 @@ export class ServerRefusal extends Error {
       code === 'destination_refused' ||
       code === 'background_run_limit' ||
       code === 'batch_not_recordable' ||
-      code === 'batch_other_kind'
+      code === 'batch_other_kind' ||
+      code === 'batch_parts_mismatch'
         ? (words ?? '')
         : WORDS[code];
     super(text);

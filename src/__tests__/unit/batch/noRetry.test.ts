@@ -74,7 +74,7 @@ describe('no retry in batch mode', () => {
     await s.call('GetProgram', { program_name: 'PROG_A' });
     await s.call('HandlerUpdate', WRITE);
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, failed: [1, 2] });
+    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
     const envelopes = s.built.flatMap((b) => b.envelopes);
     expect(envelopes).toHaveLength(1);
     expect(envelopes[0]?.parts.map((p) => p.method)).toEqual(['GET', 'PUT']);
@@ -99,12 +99,12 @@ describe('no retry in batch mode', () => {
     });
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
-    const { summary } = await s.end();
-    expect(summary).toMatchObject({
-      recorded: 1,
-      failed: [1],
-      came: { status: 406, step: 'execute' },
-    });
+    const { answer, summary } = await s.end();
+    // BatchEnd's error, as it came; its one number answers the same.
+    expect(answer.isError).toBe(true);
+    expect(summary).toMatchObject({ status: 406, step: 'execute' });
+    const [entry] = await s.answers([1]);
+    expect(entry).toEqual({ number: 1, ...answer });
     const envelopes = s.built.flatMap((b) => b.envelopes);
     expect(envelopes).toHaveLength(1);
     expect(envelopes[0]?.accept).toBe('multipart/mixed');

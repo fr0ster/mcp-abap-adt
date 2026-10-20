@@ -17,7 +17,12 @@ import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { answerRead } from '../../../lib/auth/answerFailure';
 import { failureOf } from '../../../lib/auth/failures';
-import { BATCH_MODE_OFF_WORDS } from '../../../lib/auth/serverRefusal';
+import {
+  BATCH_ENDED_WORDS,
+  BATCH_MODE_OFF_WORDS,
+  BATCH_UNSPLIT_WORDS,
+  batchPartsMismatchWords,
+} from '../../../lib/auth/serverRefusal';
 import { endsCommunicationBatch } from '../../../lib/batch/batchTools';
 import type { BatchAnswer } from '../../../lib/batch/InstanceBatch';
 import type {
@@ -33,6 +38,7 @@ import {
   LOCK_SUCCESS_XML,
   payloadOf,
 } from '../../helpers/batchStand';
+import { withinTurns } from '../../helpers/withinTurns';
 
 /** SAP: a lock answers its handle, an unlock nothing, `missing` 404, any other read its address. */
 function sap(inner: InnerRequest): PartAnswer {
@@ -87,6 +93,48 @@ const refusal = () =>
 
 afterEach(() => jest.restoreAllMocks());
 
+const READ = {
+  url: '/sap/bc/adt/programs/programs/prog_a/source/main',
+  method: 'GET',
+  timeout: 0,
+} as const;
+
+/**
+ * A group serving `name` with `handler`, as the shipped groups do: two
+ * parameters, so the server hands `(context, args)` by the arity.
+ */
+function own(
+  name: string,
+  handler: (context: HandlerContext) => Promise<unknown>,
+): IHandlerGroup {
+  return {
+    getName: () => `own-${name}`,
+    getHandlers: () => [
+      {
+        toolDefinition: {
+          name,
+          description: name,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              program_name: { type: 'string' },
+              class_name: { type: 'string' },
+            },
+          },
+        },
+        handler: async (context: HandlerContext, _args: unknown) =>
+          handler(context),
+      },
+    ],
+    registerHandlers: () => {},
+  } as unknown as IHandlerGroup;
+}
+
+const built = (text: string) => ({
+  isError: false,
+  content: [{ type: 'text', text }],
+});
+
 describe('BatchEnd', () => {
   it('envelopes go on the connection BatchEnd took; none on the replaced one; the replaced one is not logged off under BatchEnd', async () => {
     let release!: () => void;
@@ -129,7 +177,7 @@ describe('BatchEnd', () => {
     expect(taken?.connection.disconnect).not.toHaveBeenCalled();
     release();
     const { summary } = await ending;
-    expect(summary).toEqual({ recorded: 1, failed: [] });
+    expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
     await later;
     expect(recording?.envelopes).toEqual([]);
     expect(taken?.envelopes).toHaveLength(1);
@@ -157,14 +205,17 @@ describe('BatchEnd', () => {
       object_name: 'CLAS_B',
     });
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBeFalsy();
-    expect(summary).toMatchObject({ recorded: 2, failed: [1, 2] });
-    expect(summary.came).toMatchObject({
+    expect(answer.isError).toBe(true);
+    expect(summary).toMatchObject({
       origin: 'connection',
       message: 'socket hang up',
       step: 'execute',
     });
     expect(s.owner.mode()).toBe('off');
+    // No map: every number of the batch answers BatchEnd's error.
+    for (const entry of await s.answers([1, 2])) {
+      expect(asAnswer(entry)).toEqual(answer);
+    }
     const again = await s.call('BatchEnd');
     expect(again.isError).toBe(true);
     expect(payloadOf(again)).toEqual({
@@ -197,7 +248,11 @@ describe('BatchEnd', () => {
         object_name: 'CLAS_A',
       }),
     ).toEqual({ content: [] });
-    expect((await s.end()).summary).toEqual({ recorded: 1, failed: [] });
+    expect((await s.end()).summary).toEqual({
+      recorded: 1,
+      sent: 1,
+      received: 1,
+    });
     const locked = await s.answers([1]);
     s.begin();
     for (const answer of [
@@ -207,7 +262,7 @@ describe('BatchEnd', () => {
       expect(answer).toEqual({ content: [] });
     }
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, failed: [2] });
+    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
     const entries = [...locked, ...(await s.answers([1, 2]))];
     expect(entries.map((e) => e.number)).toEqual([1, 1, 2]);
     expect(entries.map(asAnswer)).toEqual(direct);
@@ -232,7 +287,7 @@ describe('BatchEnd', () => {
     await s.call('GetObjectVersionDiff', DIFF_ARGS);
     await s.call('GetProgram', { program_name: 'PROG_A' });
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, failed: [] });
+    expect(summary).toEqual({ recorded: 2, sent: 3, received: 3 });
     const [envelope] = s.built[0]?.envelopes ?? [];
     expect(envelope?.parts).toHaveLength(3);
     const [first] = await s.answers([1]);
@@ -242,21 +297,7 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it("an envelope answered 500: every part's answer and BatchEnd's carry it as it came", async () => {
-    // Outside batch mode, the same tools on a request SAP answers 500 the same way.
-    const plain = await batchStand({
-      tools: TOOLS,
-      part: () => ({
-        status: 500,
-        statusText: 'Internal Server Error',
-        body: '<html>dump placeholder</html>',
-      }),
-    });
-    const direct = [
-      await plain.call('GetProgram', { program_name: 'PROG_A' }),
-      await plain.call('GetInterface', { interface_name: 'INTF_A' }),
-    ];
-    await plain.close();
+  it("an envelope answered 500: BatchEnd answers SAP's outer answer as it came, every number the same", async () => {
     const outer = () =>
       statusError(
         500,
@@ -273,63 +314,24 @@ describe('BatchEnd', () => {
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
     await s.call('GetInterface', { interface_name: 'INTF_A' });
-    const { summary } = await s.end();
+    const { answer, summary } = await s.end();
+    expect(answer.isError).toBe(true);
     expect(summary).toEqual({
-      recorded: 2,
-      failed: [1, 2],
-      came: {
-        message: 'Request failed with status code 500',
-        origin: 'connection',
-        step: 'execute',
-        status: 500,
-        messages: expect.any(Array),
-        raw_body: '<html>dump placeholder</html>',
-      },
+      message: 'Request failed with status code 500',
+      origin: 'connection',
+      step: 'execute',
+      status: 500,
+      messages: expect.any(Array),
+      raw_body: '<html>dump placeholder</html>',
     });
-    const entries = await s.answers([1, 2]);
-    for (const [index, entry] of entries.entries()) {
-      expect(payloadOf(entry as Answer)).toMatchObject({
-        status: 500,
-        raw_body: '<html>dump placeholder</html>',
-      });
-      // As the tool answers SAP's 500 outside batch mode, but for the
-      // request: the envelope's failure names none of the call's own.
-      const { request: _a, ...inBatch } = payloadOf(entry as Answer);
-      const { request: _b, ...outside } = payloadOf(direct[index] as Answer);
-      expect(inBatch).toEqual(outside);
-    }
-    await s.close();
-  });
-
-  it('the one envelope failing with no answer: every part answers that failure, none "not sent"', async () => {
-    const s = await batchStand({
-      tools: TOOLS,
-      part: sap,
-      envelope: async () => {
-        throw Object.assign(new Error('socket hang up'), {
-          code: 'ECONNRESET',
-        });
-      },
-    });
-    s.begin();
-    await s.call('HandlerLock', {
-      object_type: 'CLASS',
-      object_name: 'CLAS_A',
-    });
-    await s.call('HandlerLock', {
-      object_type: 'CLASS',
-      object_name: 'CLAS_B',
-    });
-    await s.end();
     for (const entry of await s.answers([1, 2])) {
-      expect((entry as BatchAnswer).isError).toBe(true);
-      expect(payloadOf(entry as Answer).message).toBe('socket hang up');
+      expect(asAnswer(entry)).toEqual(answer);
     }
-    expect(s.built[0]?.envelopes).toHaveLength(1);
+    expect(s.owner.mode()).toBe('off');
     await s.close();
   });
 
-  it('summary { recorded, failed }', async () => {
+  it('BatchEnd answers { recorded, sent, received }; a 404 part is no failure of BatchEnd', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
     await s.call('GetProgram', { program_name: 'MISSING' });
@@ -337,7 +339,7 @@ describe('BatchEnd', () => {
     await s.call('GetInterface', { interface_name: 'MISSING_TOO' });
     const { answer, summary } = await s.end();
     expect(answer.isError).toBeFalsy();
-    expect(summary).toEqual({ recorded: 3, failed: [1, 3] });
+    expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
     await s.close();
   });
 
@@ -357,7 +359,7 @@ describe('BatchEnd', () => {
     expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(0);
     const ended = await s.call('HandlerBatch', { action: 'end' });
     expect(ended.isError).toBeFalsy();
-    expect(payloadOf(ended)).toEqual({ recorded: 2, failed: [1] });
+    expect(payloadOf(ended)).toEqual({ recorded: 2, sent: 2, received: 2 });
     expect(s.owner.mode()).toBe('off');
     expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
     const read = await s.call('HandlerBatch', {
@@ -373,7 +375,7 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it('empty batch answers { recorded: 0, failed: [] } and replaces the answers with none', async () => {
+  it('empty batch answers { recorded: 0, sent: 0, received: 0 } and replaces the map with an empty one', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
@@ -382,7 +384,7 @@ describe('BatchEnd', () => {
     expect((await s.answers([1]))[0]).not.toHaveProperty('error');
     s.begin();
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 0, failed: [] });
+    expect(summary).toEqual({ recorded: 0, sent: 0, received: 0 });
     expect(await s.answers([1])).toEqual([
       { number: 1, error: 'no_answer', message: 'no answer with that number' },
     ]);
@@ -392,7 +394,7 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it('credential refusal (own refusal.kind, refusal.reason, at; no response): BatchEnd answers it as answerRead does, every number answers it, mode off', async () => {
+  it('credential refusal (own refusal.kind, refusal.reason, at; no response): BatchEnd answers it as answerRead does, no map, every number read answers it, mode off', async () => {
     const refused = new AuthRefusedError(refusal(), 'request');
     const s = await batchStand({
       tools: TOOLS,
@@ -426,7 +428,7 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it("answered refusal (cause.response.status === 401): BatchEnd answers it; every part of the one envelope its handler's answer for it", async () => {
+  it('answered refusal (cause.response.status === 401): BatchEnd answers it as it came; no map, every number read answers the same refusal', async () => {
     const refused = new AuthRefusedError(
       refusal(),
       'request',
@@ -452,20 +454,14 @@ describe('BatchEnd', () => {
     const expected = answerRead(failureOf(refused) as never);
     expect(answer).toEqual({ content: expected.content, isError: true });
     expect(s.owner.mode()).toBe('off');
-    // SAP answered: each handler reads SAP's 401 as the method's error.
-    for (const lock of await s.answers([1, 2])) {
-      expect((lock as BatchAnswer).isError).toBe(true);
-      expect(payloadOf(lock as Answer)).toMatchObject({
-        origin: 'connection',
-        status: 401,
-        message: failureOf(refused)?.message,
-      });
+    for (const entry of await s.answers([1, 2])) {
+      expect(asAnswer(entry)).toEqual(answer);
     }
     expect(s.built[0]?.envelopes).toHaveLength(1);
     await s.close();
   });
 
-  it("a resolve failing at BatchEnd: the call answers it, mode off, every recorded call's answer is it, nothing sent", async () => {
+  it('a resolve failing at BatchEnd: the call answers it, mode off, no map, every number read answers it as it came, nothing sent', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
@@ -564,7 +560,11 @@ describe('BatchEnd', () => {
     ] as const) {
       s.begin();
       await s.call(name, args);
-      expect((await s.end()).summary).toEqual({ recorded: 1, failed: [] });
+      expect((await s.end()).summary).toEqual({
+        recorded: 1,
+        sent: 1,
+        received: 1,
+      });
       entries.push(...(await s.answers([1])));
     }
     expect(
@@ -609,7 +609,7 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it("a recorded handler that throws: its number answers the handler's failure, the summary lists it, nothing rejects", async () => {
+  it("a recorded handler that throws: its number answers the handler's failure, nothing rejects", async () => {
     const throwing = {
       getName: () => 'throwing',
       getHandlers: () => [
@@ -649,7 +649,7 @@ describe('BatchEnd', () => {
     });
     const { answer, summary } = await s.end();
     expect(answer.isError).toBeFalsy();
-    expect(summary).toEqual({ recorded: 2, failed: [1] });
+    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
     const [first, second] = await s.answers([1, 2]);
     expect(first).toMatchObject({ number: 1, isError: true });
     expect(
@@ -677,5 +677,271 @@ describe('BatchEnd', () => {
     ]) {
       expect(endsCommunicationBatch(tool, { action: 'end' })).toBe(false);
     }
+  });
+});
+
+describe('BatchEnd splits, the read answers', () => {
+  it("BatchEnd resumes no handler: a handler's code after its request runs only when its number is read", async () => {
+    let after = false;
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      groups: [
+        own('GetProgram', async (context) => {
+          await context.connection.makeAdtRequest(READ);
+          after = true;
+          return built('built when read');
+        }),
+      ],
+    });
+    s.begin();
+    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+      content: [],
+    });
+    const { answer, summary } = await s.end();
+    expect(answer.isError).toBeFalsy();
+    expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
+    expect(after).toBe(false);
+    const [entry] = await s.answers([1]);
+    expect(after).toBe(true);
+    expect(asAnswer(entry)).toEqual({
+      content: [{ type: 'text', text: 'built when read' }],
+    });
+    await s.close();
+  });
+
+  it('the numbers asked in one BatchAnswers are processed in parallel', async () => {
+    let resumed = 0;
+    let bothResumed!: () => void;
+    const both = new Promise<void>((resolve) => {
+      bothResumed = resolve;
+    });
+    // Each handler, resumed, waits until the other is resumed too: read one
+    // after the other, the first would wait for ever.
+    const waitsForTheOther =
+      (text: string) => async (context: HandlerContext) => {
+        await context.connection.makeAdtRequest(READ);
+        resumed += 1;
+        if (resumed === 2) bothResumed();
+        await both;
+        return built(text);
+      };
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      groups: [
+        own('GetProgram', waitsForTheOther('first')),
+        own('GetClass', waitsForTheOther('second')),
+      ],
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('GetClass', { class_name: 'CLAS_B' });
+    await s.end();
+    const entries = await withinTurns(s.answers([1, 2]), 500);
+    expect(entries.map(asAnswer)).toEqual([
+      { content: [{ type: 'text', text: 'first' }] },
+      { content: [{ type: 'text', text: 'second' }] },
+    ]);
+    await s.close();
+  });
+
+  it('a number read twice runs its handler once: the answer is kept', async () => {
+    let runs = 0;
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      groups: [
+        own('GetProgram', async (context) => {
+          await context.connection.makeAdtRequest(READ);
+          runs += 1;
+          return built(`run ${runs}`);
+        }),
+      ],
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.end();
+    const twice = await s.answers([1, 1]);
+    const again = await s.answers([1]);
+    expect(runs).toBe(1);
+    expect([...twice, ...again].map(asAnswer)).toEqual(
+      new Array(3).fill({ content: [{ type: 'text', text: 'run 1' }] }),
+    );
+    await s.close();
+  });
+
+  it("a resumed handler's further request is refused batch_ended, and that is its answer; nothing is sent", async () => {
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      groups: [
+        own('GetProgram', async (context) => {
+          await context.connection.makeAdtRequest(READ);
+          await context.connection.makeAdtRequest({
+            ...READ,
+            url: '/sap/bc/adt/programs/programs/prog_a',
+          });
+          return built('never');
+        }),
+      ],
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    expect((await s.end()).summary).toEqual({
+      recorded: 1,
+      sent: 1,
+      received: 1,
+    });
+    const [entry] = await s.answers([1]);
+    expect(asAnswer(entry)).toEqual({
+      content: expect.any(Array),
+      isError: true,
+    });
+    expect(payloadOf(entry as Answer)).toEqual({
+      error: 'batch_ended',
+      message: BATCH_ENDED_WORDS,
+    });
+    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
+    expect(s.built.flatMap((b) => b.directs)).toEqual([]);
+    await s.close();
+  });
+
+  it('a number never read is awaited by nothing: replacing the map lets its handler finish', async () => {
+    let finished = false;
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      groups: [
+        own('GetProgram', async (context) => {
+          try {
+            await context.connection.makeAdtRequest(READ);
+            return built('read');
+          } finally {
+            finished = true;
+          }
+        }),
+      ],
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.end();
+    for (let turn = 0; turn < 20; turn += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(finished).toBe(false);
+    // The next batch's end replaces the map: number 1 is never read.
+    s.begin();
+    await s.end();
+    for (let turn = 0; turn < 20 && !finished; turn += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(finished).toBe(true);
+    expect(await s.answers([1])).toEqual([
+      { number: 1, error: 'no_answer', message: 'no answer with that number' },
+    ]);
+    await s.close();
+  });
+});
+
+describe("BatchEnd's error, no map", () => {
+  /** A batch of two recorded calls whose handlers note when they run on. */
+  async function twoCalls(
+    envelope: Parameters<typeof batchStand>[0]['envelope'],
+  ) {
+    const ran: string[] = [];
+    const noting = (name: string) => async (context: HandlerContext) => {
+      await context.connection.makeAdtRequest(READ);
+      ran.push(name);
+      return built(name);
+    };
+    const s = await batchStand({
+      tools: [],
+      part: sap,
+      envelope,
+      groups: [own('GetProgram', noting('a')), own('GetClass', noting('b'))],
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('GetClass', { class_name: 'CLAS_B' });
+    return { s, ran };
+  }
+
+  it('fewer parts than requests: batch_parts_mismatch, every number answers it, no handler resumed', async () => {
+    const { s, ran } = await twoCalls(async (parts) =>
+      envelopeResponse(parts.slice(0, 1).map(sap)),
+    );
+    const { answer, summary } = await s.end();
+    expect(answer.isError).toBe(true);
+    expect(summary).toEqual({
+      error: 'batch_parts_mismatch',
+      message: batchPartsMismatchWords(1, 2),
+    });
+    expect(batchPartsMismatchWords(1, 2)).toBe(
+      '1 of 2 parts came; the answers cannot be matched to the calls',
+    );
+    for (const entry of await s.answers([1, 2])) {
+      expect(asAnswer(entry)).toEqual(answer);
+    }
+    expect(ran).toEqual([]);
+    expect(s.owner.mode()).toBe('off');
+    await s.close();
+  });
+
+  it('an answer that cannot be split: batch_unsplit, every number answers it, no handler resumed', async () => {
+    const { s, ran } = await twoCalls(async () => ({
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'text/plain' },
+      data: 'not a multipart answer',
+    }));
+    const { answer, summary } = await s.end();
+    expect(answer.isError).toBe(true);
+    expect(summary).toEqual({
+      error: 'batch_unsplit',
+      message: BATCH_UNSPLIT_WORDS,
+    });
+    expect(BATCH_UNSPLIT_WORDS).toBe(
+      "the envelope's answer could not be split into the calls' parts",
+    );
+    for (const entry of await s.answers([1, 2])) {
+      expect(asAnswer(entry)).toEqual(answer);
+    }
+    expect(ran).toEqual([]);
+    await s.close();
+  });
+
+  it('the kept map is replaced by none: a number of the failed batch answers its error, any other no answer', async () => {
+    let fail = false;
+    const s = await batchStand({
+      tools: TOOLS,
+      part: sap,
+      envelope: async (parts) => {
+        if (fail) {
+          throw Object.assign(new Error('socket hang up'), {
+            code: 'ECONNRESET',
+          });
+        }
+        return envelopeResponse(parts.map(sap));
+      },
+    });
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('GetProgram', { program_name: 'PROG_B' });
+    await s.end();
+    expect((await s.answers([2]))[0]).not.toHaveProperty('error');
+    fail = true;
+    s.begin();
+    await s.call('GetProgram', { program_name: 'PROG_C' });
+    const { answer } = await s.end();
+    expect(answer.isError).toBe(true);
+    const [first, second] = await s.answers([1, 2]);
+    expect(asAnswer(first)).toEqual(answer);
+    expect(second).toEqual({
+      number: 2,
+      error: 'no_answer',
+      message: 'no answer with that number',
+    });
+    await s.close();
   });
 });

@@ -670,14 +670,17 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       'GetProgram',
     );
     createAdtClient(recorder);
-    await expect(
-      recorder.makeAdtRequest({
-        url: '/sap/bc/adt/placeholder',
-        method: 'GET',
-        timeout: 0,
-        headers: { Accept: 'application/xml' },
-      }),
-    ).rejects.toMatchObject({ response: { status: 406 } });
+    const answered = recorder.makeAdtRequest({
+      url: '/sap/bc/adt/placeholder',
+      method: 'GET',
+      timeout: 0,
+      headers: { Accept: 'application/xml' },
+    });
+    // The handler meets its part when its number is read.
+    recorder.release();
+    await expect(answered).rejects.toMatchObject({
+      response: { status: 406 },
+    });
     expect(sent).toHaveLength(1);
   });
 

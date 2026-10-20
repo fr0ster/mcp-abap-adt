@@ -9,7 +9,7 @@
  * parts: one awaits its one part and lets its failure throw; the other
  * records two parts and awaits them one after the other, so when the first
  * fails it never reads the second. Reports what was sent, whether every
- * recorded answer settled, and every unhandled rejection the process saw.
+ * recorded handler settled, and every unhandled rejection the process saw.
  */
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -134,14 +134,9 @@ const group = {
   else await server.dispose();
 
   let settled = false;
-  const recordedAnswers = Promise.all(recorded.map((call) => call.answer)).then(
-    (all) => {
-      settled = true;
-      return all;
-    },
-  );
-  await turns();
-  const built = settled ? await recordedAnswers : [];
+  void Promise.all(recorded.map((call) => call.settled)).then(() => {
+    settled = true;
+  });
   await turns();
   report({
     callAnswers: answers.map((a) => a.content),
@@ -152,7 +147,6 @@ const group = {
     executes,
     direct,
     settled,
-    recordedErrors: built.map((a) => a.isError === true),
   });
 })().catch((error: unknown) => {
   process.stderr.write(

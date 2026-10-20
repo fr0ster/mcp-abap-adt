@@ -1498,12 +1498,21 @@ export class DebugSession<O = unknown> {
    * `debugger` over the stop's connection — the attached stateful session —
    * whose envelope goes out on it. Sends nothing; refused with no stop.
    */
-  openBatch(options: { logger?: ILogger } = {}): AdtBatchConnection {
+  openBatch(
+    options: {
+      logger?: ILogger;
+      /** What the batch's envelopes go out through, placed over the connection (the envelope watch). */
+      through?: (connection: IAbapConnection) => IAbapConnection;
+    } = {},
+  ): AdtBatchConnection {
     const stop = this.requireStop();
-    return new AdtBatchConnection(stop.connection, {
-      endpoint: 'debugger',
-      ...(options.logger !== undefined ? { logger: options.logger } : {}),
-    });
+    return new AdtBatchConnection(
+      options.through?.(stop.connection) ?? stop.connection,
+      {
+        endpoint: 'debugger',
+        ...(options.logger !== undefined ? { logger: options.logger } : {}),
+      },
+    );
   }
 
   /**

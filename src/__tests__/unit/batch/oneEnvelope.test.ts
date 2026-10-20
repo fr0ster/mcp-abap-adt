@@ -124,7 +124,7 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
     expect(await s.call('HandlerLock', lock('CLAS_B'))).toEqual({
       content: [],
     });
-    expect(await set.end(s)).toEqual({ recorded: 2, failed: [] });
+    expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
     expect(envelopes(s)).toEqual([
       {
         session: 'stateful',
@@ -170,7 +170,7 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
     expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
       content: [],
     });
-    expect(await set.end(s)).toEqual({ recorded: 2, failed: [] });
+    expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
     const sent = envelopes(s);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.session).toBe('stateless');
@@ -202,7 +202,7 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
     expect(await s.call('HandlerUnlock', unlock('CLAS_B'))).toEqual({
       content: [],
     });
-    expect(await set.end(s)).toEqual({ recorded: 2, failed: [] });
+    expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
     expect(envelopes(s)).toEqual([
       {
         session: 'stateful',
@@ -219,19 +219,19 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     await set.begin(s);
     await s.call('HandlerLock', lock('CLAS_A'));
-    expect(await set.end(s)).toEqual({ recorded: 1, failed: [] });
+    expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
     expect(s.owner.kind()).toBeUndefined();
     await set.begin(s);
     expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
       content: [],
     });
     expect(s.owner.kind()).toBe('stateless');
-    expect(await set.end(s)).toEqual({ recorded: 1, failed: [] });
+    expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
     await set.begin(s);
     expect(await s.call('HandlerUnlock', unlock('CLAS_A'))).toEqual({
       content: [],
     });
-    expect(await set.end(s)).toEqual({ recorded: 1, failed: [] });
+    expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
     expect(envelopes(s).map((e) => [e.session, e.parts.length])).toEqual([
       ['stateful', 1],
       ['stateless', 1],
@@ -315,7 +315,11 @@ describe('a call with a part of another kind', () => {
     expect(await s.call('GetClass', { class_name: 'CLAS_B' })).toEqual({
       content: [],
     });
-    expect((await s.end()).summary).toEqual({ recorded: 2, failed: [] });
+    expect((await s.end()).summary).toEqual({
+      recorded: 2,
+      sent: 2,
+      received: 2,
+    });
     const sent = envelopes(s);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.session).toBe('stateless');
@@ -339,7 +343,11 @@ describe('a call with a part of another kind', () => {
       message: words,
     });
     expect(s.owner.kind()).toBe('stateless');
-    expect((await s.end()).summary).toEqual({ recorded: 1, failed: [1] });
+    expect((await s.end()).summary).toEqual({
+      recorded: 1,
+      sent: 1,
+      received: 1,
+    });
     // The earlier part went; nothing after the refused one, nothing stateful.
     expect(envelopes(s)).toEqual([
       {
@@ -374,7 +382,11 @@ describe('a call with a part of another kind', () => {
     expect(await s.call('GetClass', { class_name: 'CLAS_B' })).toEqual({
       content: [],
     });
-    expect((await s.end()).summary).toEqual({ recorded: 2, failed: [] });
+    expect((await s.end()).summary).toEqual({
+      recorded: 2,
+      sent: 2,
+      received: 2,
+    });
     const sent = envelopes(s);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.session).toBe('stateless');

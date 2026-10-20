@@ -10,6 +10,7 @@
  * opens a new one (`session-<n>`), and every request records the session it
  * ran in (`session`) and its `x-sap-adt-sessiontype` (`sessionType`) — so a
  * suite can tell which connection sent what, and which one was logged off.
+ * A session the suite ends (`endSession`) is gone: its cookie opens a new one.
  */
 
 import * as http from 'node:http';
@@ -94,6 +95,12 @@ export interface AdtStandIn {
    * and `body` decide again. Takes precedence over `body`.
    */
   systemInformation(user: string | null | undefined, systemId?: string): void;
+  /**
+   * From now on a request carrying `session`'s cookie runs in a new session,
+   * whose cookie it is answered with: SAP ended the old one (its idle
+   * timeout) and opened another, as it does after the old one is gone.
+   */
+  endSession(session: string): void;
   /** The logoffs received so far: `disconnect()` reached the system. */
   logoffs(): number;
   /** The sessions logged off so far, in order. */
@@ -166,11 +173,16 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     headers?: Record<string, string>;
   }> = [];
   let sessions = 0;
+  /** The sessions SAP ended (`endSession`): their cookie opens a new one. */
+  const ended = new Set<string>();
   /** What `systemInformation` set: the user, or `null` for a `404`. */
   let systemInfo: { user: string | null; systemId: string } | undefined;
   const server = http.createServer((req, res) => {
     const carried = sessionOf(req.headers.cookie);
-    const session = carried ?? `session-${++sessions}`;
+    const session =
+      carried !== undefined && !ended.has(carried)
+        ? carried
+        : `session-${++sessions}`;
     const sessionType = req.headers['x-sap-adt-sessiontype'];
     const contentType = req.headers['content-type'];
     const request: StandInRequest = {
@@ -310,6 +322,9 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     },
     systemInformation: (user, systemId = 'SID') => {
       systemInfo = user === undefined ? undefined : { user, systemId };
+    },
+    endSession: (session) => {
+      ended.add(session);
     },
     logoffs: () => requests.filter((r) => isLogoff(r.url)).length,
     loggedOff: () =>

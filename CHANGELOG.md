@@ -94,6 +94,7 @@ The server split by transport and tool set into packages of their own — sevent
 ### Fixed
 
 - **`ReadTransportObjects` on a request answers each task entry once, with its `task` number** (compact `HandlerGet` `TRANSPORT` too). A request's document also carries `tm:all_objects`, the request's aggregate list, and it was collected beside the tasks' entries, so every object came twice (measured: 684 rows for 342 entries). A task read is unchanged.
+- **stdio logs on again after SAP ended its session** (#295). In 18.1.0 the connection the start made was reused after a `SESSION_REPLACED`, so every later call answered `NOT_CONNECTED`. Now the call that meets the replaced session still answers `SESSION_REPLACED` (nothing is retried); the next call ends the spent connection, logs on again and runs on the new session.
 
 ### Measured
 

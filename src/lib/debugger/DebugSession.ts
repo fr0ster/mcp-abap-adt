@@ -268,6 +268,13 @@ export class DebugConflictError extends DebugListenerError {
 /** The polls the system has answered: whether an open poll has settled, read without waiting. */
 const settledPolls = new WeakSet<Promise<IAdtResponse<string>>>();
 
+/**
+ * The failure of a release a stop did not send: the listener's stop failed
+ * and a breakpoint's delete did not succeed, so the debuggee stays held.
+ */
+export const DEBUGGEE_KEPT_WORDS =
+  "not sent: the listener's stop failed and a breakpoint may still be set, where the debuggee would stop again. It stays held for the next stop.";
+
 interface Listener {
   connection: IAbapConnection;
   debugger: Debugger;
@@ -2266,6 +2273,18 @@ export class DebugSession<O = unknown> {
       // The releases an earlier stop left owed: one owed during this stop's
       // listener stop is this stop's failure, retried by the next.
       const owedBefore = [...this.owed];
+      /**
+       * Whether a breakpoint may still be set: the listener's stop failed and a
+       * delete by id did not succeed (or was not sent). A debuggee let go then
+       * could stop at it again — in a loop, at once — so no held debuggee is
+       * released: each stays held, a failure in fixed words, for the next stop.
+       */
+      let breakpointsMayStay = false;
+      const keptHeld = (step: string): boolean => {
+        if (!breakpointsMayStay) return false;
+        failures.push({ message: DEBUGGEE_KEPT_WORDS, step });
+        return true;
+      };
       // 1. The listener is stopped, and the key's breakpoints with it — first,
       // so a debuggee let go below runs to its end: a continue from a
       // breakpoint in a loop would stop there again while it is armed.
@@ -2337,6 +2356,7 @@ export class DebugSession<O = unknown> {
             if (deleted.ok) this.forget(id);
             else failures.push(failedEntry(deleted, `delete breakpoint ${id}`));
           }
+          breakpointsMayStay = this.armed.size > 0;
         }
       } else if (this.listener && !this.changed) {
         // Nothing was sent that changes the system: a listener here only closes.
@@ -2350,6 +2370,7 @@ export class DebugSession<O = unknown> {
       }
       for (const owed of owedBefore) {
         if (skipped(`release ${owed.what}`)) continue;
+        if (keptHeld(`release ${owed.what}`)) continue;
         const notReleased = await this.release(owed.debugger, owed.what);
         if (notReleased) {
           failures.push(notReleased); // kept: a later stop retries
@@ -2377,7 +2398,11 @@ export class DebugSession<O = unknown> {
       }
       // 2. A held stop is released, with no breakpoint left to stop it again.
       const stop = this.current;
-      if (stop && !skipped('release the debuggee')) {
+      if (
+        stop &&
+        !skipped('release the debuggee') &&
+        !keptHeld('release the debuggee')
+      ) {
         const released = await stop.debugger
           .step('stepContinue', { analyse: analyseDebuggeeEnd })
           .catch(asFailure);

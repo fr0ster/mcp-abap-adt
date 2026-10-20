@@ -559,7 +559,13 @@ ends by:
   release an earlier stop left owed, so a debuggee let go from a breakpoint inside a loop runs to
   its end instead of stopping there again (measured on premise, 2026-10-19), and closes the
   connections, ABAP and AMDP alike. Only when the
-  listener's stop fails are this session's breakpoints deleted one by one; when the
+  listener's stop fails are this session's breakpoints deleted one by one; when a delete fails
+  too, a breakpoint may still be set, so the stop releases no held debuggee — neither the
+  stopped one nor one an earlier stop owed: each stays held, answered as a failure with its step
+  (`release the debuggee`, `release <what>`) and the words "not sent: the listener's stop failed
+  and a breakpoint may still be set, where the debuggee would stop again. It stays held for the
+  next stop.", and the next stop releases it once the listener's stop or the deletes succeeded
+  (unit-tested, not measured: `DebugSessionCleanup.test.ts`); when the
   system refuses it for the user (`403` `notAuthorized`, `404` `invalidUser`),
   nothing is deleted and the answer names the breakpoints left on the system; the
   session ends when nothing else failed (another failure, such as a connection

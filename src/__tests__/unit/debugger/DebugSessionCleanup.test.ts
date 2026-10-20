@@ -8,9 +8,11 @@ import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,
   CONFLICT_409,
+  deferred,
   fakeWorld,
   IDS,
   INVALID_USER,
+  LISTEN_CATCH,
   LISTEN_NOTHING,
   rowsXml,
   START,
@@ -30,6 +32,8 @@ const ROWS = () =>
       { kind: 'exception', id: 'E1', clientId: 'bp2', exceptionClass: 'CX_A' },
     ]),
   );
+const DEBUGGEE_KEPT =
+  "not sent: the listener's stop failed and a breakpoint may still be set, where the debuggee would stop again. It stays held for the next stop.";
 const NOT_COMPLETE =
   'the cleanup of this debug session is not complete: DebugStop it, then start again';
 
@@ -99,6 +103,108 @@ describe('the cleanup', () => {
       },
     ]);
     expect(session.holdsState()).toBe(true);
+  });
+
+  // A debuggee let go while a breakpoint may still be set can stop there
+  // again — inside a loop, at once. So when the listener's stop failed and a
+  // breakpoint's delete by id failed too, the held debuggee is not released:
+  // it stays held for the next stop, which releases it once the breakpoints
+  // are gone.
+  it('a failed stopListener and a failed delete by id: the held debuggee is not released, it stays for the next stop', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async (_i: unknown, id: string) =>
+      id === 'E1'
+        ? refusedResponse('Breakpoint is locked')
+        : okResponse(undefined);
+    world.calls.length = 0;
+    await expect(session.stop()).rejects.toThrow(
+      /release the debuggee: not sent: the listener's stop failed and a breakpoint may still be set/,
+    );
+    expect(world.calls.filter((c) => c.startsWith('step:'))).toEqual([]);
+    expect(session.failures()).toEqual([
+      { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
+      {
+        message: 'Breakpoint is locked',
+        origin: 'refusal',
+        step: 'delete breakpoint E1',
+      },
+      {
+        message: DEBUGGEE_KEPT,
+        step: 'release the debuggee',
+      },
+    ]);
+    expect(session.holdsState()).toBe(true);
+    // The next stop: the listener's stop succeeds first, then the release.
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+    world.calls.length = 0;
+    await expect(session.stop()).resolves.toEqual([]);
+    const release = world.calls.indexOf('step:stepContinue:analysed');
+    expect(release).toBeGreaterThan(world.calls.indexOf('stopListener'));
+    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a release an earlier stop owed is not sent either while a breakpoint may still be set', async () => {
+    const world = fakeWorld();
+    const attach = deferred<any>();
+    world.attachAnswers.push(() => attach.promise);
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.some((c) => c.startsWith('attach:')));
+    (session as any).generation++; // the listener moved on while the attach ran
+    world.override.step = async () => refusedResponse('work process busy');
+    attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(0);
+    delete world.override.step;
+    // Owed now; the stop that follows fails its listener stop and a delete.
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async (_i: unknown, id: string) =>
+      id === 'E1'
+        ? refusedResponse('Breakpoint is locked')
+        : okResponse(undefined);
+    world.calls.length = 0;
+    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+    expect(world.calls.filter((c) => c.startsWith('step:'))).toEqual([]);
+    expect(session.failures()).toContainEqual({
+      message: DEBUGGEE_KEPT,
+      step: 'release the debuggee',
+    });
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+    world.calls.length = 0;
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.indexOf('step:stepContinue:analysed')).toBeGreaterThan(
+      world.calls.indexOf('stopListener'),
+    );
+    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
+    expect(session.holdsState()).toBe(false);
+  });
+
+  it('a failed stopListener whose deletes by id all succeeded: the held debuggee is released, after the deletes', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.calls.length = 0;
+    await expect(session.stop()).rejects.toThrow(
+      /stop listener: listener busy/,
+    );
+    const release = world.calls.indexOf('step:stepContinue:analysed');
+    expect(release).toBeGreaterThan(
+      world.calls.lastIndexOf('deleteBreakpoint:E1'),
+    );
+    expect(session.listBreakpoints()).toEqual([]);
+    expect(session.failures()).toEqual([
+      { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
+    ]);
   });
 
   it('a start that failed after a change runs the same cleanup: stopListener, no deletion by id', async () => {

@@ -8,7 +8,8 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugCancel',
   available_in: ['onprem', 'cloud'] as const,
-  description: "[debug] Cancels the stopped AMDP debuggee's execution.",
+  description:
+    "[read-only] [debug] Cancels the stopped AMDP debuggee's execution.",
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

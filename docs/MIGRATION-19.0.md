@@ -950,7 +950,8 @@ make two calls, or one with the part you need.
 A client that picks tools by searching their descriptions (RAG tool selection, an embedding
 index, a reranker) re-indexes them: every description now names the function on what its
 parameters name ("Reads the CDS view (or classic DDL view) named by ddl_name …"), every tool
-that changes nothing starts with `[read-only]` — a `[runtime]`, `[debug]` or `[session]` marker
+that changes no repository object (source, metadata, transports — the meaning of the
+`-ro` binaries) starts with `[read-only]`, every debugger tool included — a `[runtime]`, `[debug]` or `[session]` marker
 follows it where the tool has one (`GetPackageTree`'s was `[high-level]`) —, and none names
 another tool. Each tool also carries `_meta["mcp-abap-adt/search"]` = `{ keywords, semantic }`
 in `tools/list` — `keywords` for a lexical (BM25) index, `semantic` for a vector index;

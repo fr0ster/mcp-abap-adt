@@ -84,7 +84,9 @@ const READ_ONLY_OF: Readonly<Record<ToolSetKind, ToolSetKind>> = {
 /**
  * The tools a read-only set serves that change something: they run code,
  * schedule a trace or log a session off. (The batch tools are aside: they
- * record and send other calls.)
+ * record and send other calls.) `[read-only]` means the tool changes no
+ * repository object, the meaning of the `-ro` binaries; the debugger family
+ * is marked whole, though its tools change the debug session.
  */
 const CHANGING_IN_READ_ONLY_SETS: ReadonlySet<string> = new Set([
   'RuntimeRunClass',
@@ -106,6 +108,15 @@ const READ_BY_NAME: ReadonlySet<string> = new Set([
   'MemorySnapshotDelta',
   'HandlerBackgroundRunGet',
   'HandlerBackgroundRunList',
+]);
+
+/** The compact debugger tools, each marked `[read-only]` like the full set's. */
+const COMPACT_DEBUG_TOOLS: ReadonlySet<string> = new Set([
+  'HandlerDebugSession',
+  'HandlerDebugStep',
+  'HandlerDebugMaintain',
+  'HandlerDebugBreakpoints',
+  'HandlerDebugBatch',
 ]);
 
 /** The family prefixes a tool name may carry before its verb. */
@@ -130,6 +141,13 @@ function startsWithWord(name: string, word: string): boolean {
   return next === '' || next === next.toUpperCase();
 }
 
+/** Whether `tool` is of the debugger family: a `[debug]` tag, or a compact debugger tool. */
+function isDebuggerTool(tool: ServedTool): boolean {
+  return (
+    COMPACT_DEBUG_TOOLS.has(tool.name) || tool.description.includes('[debug] ')
+  );
+}
+
 /**
  * Whether `tool` changes nothing, and so must carry `[read-only]` (beside
  * its family's `[runtime]`, `[debug]` or `[session]`): served by the set's
@@ -141,6 +159,7 @@ function mustBeMarkedReadOnly(
   tool: ServedTool,
   readOnly: ReadonlySet<string>,
 ): boolean {
+  if (isDebuggerTool(tool)) return true;
   if (isBatchTool(tool.name)) return false;
   if (CHANGING_IN_READ_ONLY_SETS.has(tool.name)) return false;
   if (readOnly.has(tool.name) || READ_BY_NAME.has(tool.name)) return true;
@@ -269,7 +288,15 @@ describe('tool descriptions are purely functional', () => {
     expect(mustBeMarkedReadOnly(tool('DebugSetBreakpoints', 'x'), none)).toBe(
       false,
     );
-    expect(mustBeMarkedReadOnly(tool('DebugStep', 'x'), none)).toBe(false);
+    expect(mustBeMarkedReadOnly(tool('DebugStep', '[debug] x'), none)).toBe(
+      true,
+    );
+    expect(mustBeMarkedReadOnly(tool('HandlerDebugStep', 'x'), none)).toBe(
+      true,
+    );
+    expect(
+      mustBeMarkedReadOnly(tool('DebugBatchBegin', '[debug] x'), none),
+    ).toBe(true);
     expect(
       mustBeMarkedReadOnly(
         tool('RuntimeRunClass', 'x'),

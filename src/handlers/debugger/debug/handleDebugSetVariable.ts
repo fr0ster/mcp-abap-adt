@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugSetVariable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.',
+    '[read-only] [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: {

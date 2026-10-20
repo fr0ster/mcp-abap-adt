@@ -13,7 +13,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugSetBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. ${AMDP_CATCH_SENTENCE}`,
+  description: `[read-only] [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. ${AMDP_CATCH_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

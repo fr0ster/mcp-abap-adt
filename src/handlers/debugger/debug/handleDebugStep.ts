@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugStep',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.',
+    '[read-only] [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.',
   inputSchema: {
     type: 'object',
     properties: {

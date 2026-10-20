@@ -14,7 +14,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugStart',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${AMDP_CATCH_SENTENCE}`,
+  description: `[read-only] [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${AMDP_CATCH_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

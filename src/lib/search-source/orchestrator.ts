@@ -465,7 +465,25 @@ async function runSearchSourceInPhases(
       : null;
   const deadlinePassed = (): boolean =>
     deadline != null && Date.now() >= deadline;
-  // (1) The quickSearch of every package mask.
+  // Cut before the targets are known: their count is unknown too —
+  // `total_targets` is left out — and the call goes on from where it was
+  // asked to start.
+  const cutBeforeTargets = (packages: number): OrchestratorResult => {
+    const cut: OrchestratorResult = {
+      results: [],
+      scanned: { packages, objects: 0, sources: 0 },
+      next_start_at: startAt,
+      truncated: {
+        by_object_cap: false,
+        by_max_objects: false,
+        by_timeout: true,
+      },
+    };
+    if (emitNoHits) cut.no_hits = [];
+    return cut;
+  };
+  // (1) The quickSearch of every package mask; the deadline is checked
+  // before its envelope.
   const searches = new Map<string, PhaseResult<string[]>>();
   const askedSearches: SearchObjectsArgs[] = [];
   const resolverDeps: PackageResolverDeps = {
@@ -473,6 +491,7 @@ async function runSearchSourceInPhases(
   };
   await resolvePackagePatterns(resolverDeps, input.packages);
   if (askedSearches.length > 0) {
+    if (deadlinePassed()) return cutBeforeTargets(0);
     const answered = await searchPackagesInPhase(ctx, askedSearches);
     endOnCredential(answered.values());
     for (const [key, answer] of answered) searches.set(key, answer);
@@ -507,23 +526,8 @@ async function runSearchSourceInPhases(
             },
           );
   } catch (error) {
-    if (error === PAST_DEADLINE) {
-      // The walk was cut: the targets are not known, so neither is their
-      // count — `total_targets` is left out — and the call goes on from
-      // where it was asked to start.
-      const cut: OrchestratorResult = {
-        results: [],
-        scanned: { packages: resolved.length, objects: 0, sources: 0 },
-        next_start_at: startAt,
-        truncated: {
-          by_object_cap: false,
-          by_max_objects: false,
-          by_timeout: true,
-        },
-      };
-      if (emitNoHits) cut.no_hits = [];
-      return cut;
-    }
+    // The walk was cut.
+    if (error === PAST_DEADLINE) return cutBeforeTargets(resolved.length);
     throw error;
   }
   const fetchPackageContents: PackageContentsFetcher = async (packageName) => {

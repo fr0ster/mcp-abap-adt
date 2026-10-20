@@ -314,6 +314,26 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
       expect('next_start_at' in payloadOf(result)).toBe(false);
     });
 
+    it("a deadline passed before the package masks' envelope: nothing is sent, next_start_at = start_at", async () => {
+      const fake = on({ ...programs(650), masks: { 'ZB*': ['ZBIG'] } });
+      // Every reading of the clock moves it past the budget.
+      spy.mockImplementation(() => {
+        clock += 10_000;
+        return clock;
+      });
+      const result = await search(fake, ['ZB*'], {
+        time_budget_ms: 5_000,
+        start_at: 7,
+      });
+      expect(fake.envelopes).toHaveLength(0);
+      const p = payloadOf(result);
+      expect(p.results).toEqual([]);
+      expect(p.next_start_at).toBe(7);
+      expect('total_targets' in p).toBe(false);
+      expect(p.truncated.by_timeout).toBe(true);
+      expect(p.scanned).toEqual({ packages: 0, objects: 0, sources: 0 });
+    });
+
     it('a deadline during the package walk: next_start_at = start_at, total_targets unknown (absent)', async () => {
       const fake = on(programs(650), passingAfter(1));
       const result = await search(fake, ['ZBIG'], {

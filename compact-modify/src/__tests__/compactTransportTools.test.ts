@@ -168,10 +168,11 @@ describe('the compact transport sort and move tools', () => {
     expect(compactAnswer.isError).toBe(false);
   });
 
-  it('name HandlerGet, not the full read, in their descriptions', () => {
+  it('name no other tool in their descriptions: the re-read is the task objects, object_type TRANSPORT', () => {
     for (const tool of [CompactSort, CompactMove]) {
       expect(tool.description).not.toContain('ReadTransportObjects');
-      expect(tool.description).toContain('HandlerGet');
+      expect(tool.description).not.toContain('HandlerGet');
+      expect(tool.description).toContain('(object_type TRANSPORT)');
     }
   });
 

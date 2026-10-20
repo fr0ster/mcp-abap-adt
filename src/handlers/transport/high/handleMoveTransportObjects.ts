@@ -59,7 +59,7 @@ export const TOOL_DEFINITION = {
   name: 'MoveTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Move object entries from one transport task to another. Each entry is named by its position in the source task's object list.",
+    "Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.",
   inputSchema: {
     type: 'object',
     properties: {

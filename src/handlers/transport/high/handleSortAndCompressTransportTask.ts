@@ -29,7 +29,7 @@ export const TOOL_DEFINITION = {
   name: 'SortAndCompressTransportTask',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Sort a transport task's object list and merge its duplicate entries. A task holding the same entry twice refuses RemoveTransportObject until this has run.",
+    'Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.',
   inputSchema: {
     type: 'object',
     properties: {

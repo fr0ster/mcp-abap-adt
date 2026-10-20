@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP service binding in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
+    '[read-only] Reads the OData service binding named by service_binding_name in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {

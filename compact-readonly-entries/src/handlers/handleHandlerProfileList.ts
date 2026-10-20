@@ -5,7 +5,8 @@ import { handleRuntimeListProfilerTraceFiles } from '@mcp-abap-adt/lib/handlers/
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileList',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Runtime profiling list. Response: JSON.',
+  description:
+    '[read-only] Lists the ABAP profiler trace files. Response: JSON.',
   inputSchema: compactProfileListSchema,
 } as const;
 

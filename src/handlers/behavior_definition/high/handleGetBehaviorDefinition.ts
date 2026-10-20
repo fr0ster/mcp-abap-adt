@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP behavior definition in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {

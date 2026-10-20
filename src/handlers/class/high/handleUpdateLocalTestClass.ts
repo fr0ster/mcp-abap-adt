@@ -53,7 +53,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Write the local test classes include of a class under the class lock, and optionally activate the class.',
+    'Writes test_class_code as the local test classes include of the ABAP class named by class_name. The include is written under the class lock; with activate_on_update the class is activated.',
   inputSchema: {
     type: 'object',
     properties: {

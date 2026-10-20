@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetProgram',
   available_in: ['onprem'] as const,
   description:
-    'Read an ABAP program in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update the ABAP Unit tests of a class: replace its local test classes and activate the class.',
+    "Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.",
   inputSchema: {
     type: 'object',
     properties: {

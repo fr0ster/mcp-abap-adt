@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugGetStack',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Call stack of the stopped debuggee, each frame as an object address and as its technical place. Needs a stopped debuggee.',
+    '[debug] Call stack of the stopped debuggee of the debug session named by state_handle, each frame with its ADT object address and its technical place. Needs a stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
+    '[runtime] Reads the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, and lists the runtime feeds and their variants: also system messages and SAP Gateway errors, by feed_type; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
   ),
   inputSchema: {
     type: 'object',

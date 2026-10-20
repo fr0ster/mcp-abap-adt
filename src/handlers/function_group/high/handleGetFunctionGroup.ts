@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'GetFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP function group in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.',
+    '[read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {

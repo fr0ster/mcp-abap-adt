@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
+    "[read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
   inputSchema: {
     type: 'object',
     properties: {

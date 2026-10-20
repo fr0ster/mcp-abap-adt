@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerProfileView',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Runtime profiling view. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.',
+    '[read-only] Reads the ABAP profiler trace named by trace_id_or_uri in the view given (hit list, statements or database accesses), raw or analysed. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.',
   ),
   inputSchema: compactProfileViewSchema,
 } as const;

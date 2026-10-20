@@ -945,6 +945,17 @@ make two calls, or one with the part you need.
 
 `ReadTransportObjects` (and compact `HandlerGet` `object_type: TRANSPORT`) given a **request** number answers every task's entries, each once, and each entry carries `task`, the number of the task it is on — the task `RemoveTransportObject` and `MoveTransportObjects` address. 18.x also collected the request's aggregate list (`tm:all_objects`), so each object came twice, once without a usable task. A consumer that counted a request's rows, or dropped the doubles itself, now gets each entry once; one that looked for the holding task reads `task`. A **task** read is unchanged.
 
+## Every binary: tool descriptions reworded, and search texts beside them
+
+A client that picks tools by searching their descriptions (RAG tool selection, an embedding
+index, a reranker) re-indexes them: every description now names the function on what its
+parameters name ("Reads the CDS view (or classic DDL view) named by ddl_name …"), every read
+tool's starts with `[read-only]` (`GetPackageTree`'s was `[high-level]`), and none names
+another tool. Each tool also carries `_meta["mcp-abap-adt/search"]` = `{ keywords, semantic }`
+in `tools/list` — `keywords` for a lexical (BM25) index, `semantic` for a vector index;
+`@mcp-abap-adt/lib/tool-search` answers the same table without a server. A client that reads
+only `description` needs nothing else. See [Tool search](user-guide/TOOL_SEARCH.md).
+
 ## HTTP users
 
 - **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see

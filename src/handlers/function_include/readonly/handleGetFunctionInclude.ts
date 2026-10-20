@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an include of an ABAP function group in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata"). Returns the part read.',
+    '[read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata"). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {

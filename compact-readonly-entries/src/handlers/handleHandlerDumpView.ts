@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDumpView',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runtime dump view. Required: dump_id* (id or URI). Optional: view(default|summary|formatted). Response: JSON.',
+    '[read-only] Reads the ABAP short dump (runtime error) named by dump_id in the view given. Required: dump_id* (id or URI). Optional: view(default|summary|formatted). Response: JSON.',
   inputSchema: compactDumpViewSchema,
 } as const;
 

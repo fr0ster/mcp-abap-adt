@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingValidate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Service binding validate before create. Required: service_binding_name*, service_definition_name*. Optional: service_binding_version, package_name, description. Response: JSON.',
+    '[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, before it is created. Required: service_binding_name*, service_definition_name*. Optional: service_binding_version, package_name, description. Response: JSON.',
   inputSchema: compactServiceBindingValidateSchema,
 } as const;
 

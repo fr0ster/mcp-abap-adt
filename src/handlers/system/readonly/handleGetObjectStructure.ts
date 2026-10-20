@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve ADT object structure as a compact JSON tree.',
+    '[read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.',
   inputSchema: {
     type: 'object',
     properties: {

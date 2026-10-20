@@ -125,24 +125,25 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectVersionDiff',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.',
+    "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
   inputSchema: {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
-        description: 'Object type (same value used in GetObjectVersions).',
+        description:
+          'Object type (the same value the version history was read with).',
         enum: [...VERSIONED_OBJECT_TYPES],
       },
       content_uri_from: {
         type: 'string',
         description:
-          'Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).',
+          "Opaque content_uri of the OLD/base version (from the object's version history).",
       },
       content_uri_to: {
         type: 'string',
         description:
-          'Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).',
+          "Opaque content_uri of the NEW/compare version (from the object's version history).",
       },
     },
     required: ['object_type', 'content_uri_from', 'content_uri_to'],

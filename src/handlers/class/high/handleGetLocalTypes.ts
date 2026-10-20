@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetLocalTypes',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Read the local types include of a class (its implementations include), active or inactive version. Returns { class_name, version, part: 'source', source }.",
+    "[read-only] Reads the local types include (the implementations include) of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.",
   inputSchema: {
     type: 'object',
     properties: {

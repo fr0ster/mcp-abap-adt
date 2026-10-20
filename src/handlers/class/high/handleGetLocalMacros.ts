@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetLocalMacros',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Read the local macros include of a class, active or inactive version. Returns { class_name, version, part: 'source', source }.",
+    "[read-only] Reads the local macros include of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.",
   inputSchema: {
     type: 'object',
     properties: {

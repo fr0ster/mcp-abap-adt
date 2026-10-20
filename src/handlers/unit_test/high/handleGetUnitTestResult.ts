@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Get the result of an ABAP Unit test run by its run_id, for a run still running when its start answered. Waits for it within a bound.',
+    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.',
   inputSchema: {
     type: 'object',
     properties: {

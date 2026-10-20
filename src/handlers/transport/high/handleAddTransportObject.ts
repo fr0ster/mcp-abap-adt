@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'AddTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Add an existing ABAP object to a transport task, so it travels with the task's request.",
+    "Adds the existing object named by object_name and object_type to the transport task named by transport_number, so it travels with the task's request.",
   inputSchema: {
     type: 'object',
     properties: {

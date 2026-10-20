@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
+    'Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

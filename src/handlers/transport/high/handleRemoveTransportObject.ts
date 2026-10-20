@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
   name: 'RemoveTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Remove an object's entry from the transport task that holds it.",
+    'Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.',
   inputSchema: {
     type: 'object',
     properties: {

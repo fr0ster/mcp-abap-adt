@@ -4,7 +4,7 @@ import type { ArgsOf, HandlerContext } from '../../handlers/index';
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunList',
   description:
-    "Lists your background runs: run_handle, tool, object, when it started, and running or finished. A run's output is read with HandlerBackgroundRunGet by its run_handle.",
+    "Lists your background runs: run_handle, tool, object, when it started, and running or finished. A run's output is read by its run_handle.",
   inputSchema: {
     type: 'object',
     properties: {},

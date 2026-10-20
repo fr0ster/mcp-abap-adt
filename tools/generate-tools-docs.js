@@ -499,7 +499,7 @@ function loadObjectVersionTools() {
 
     tools.push({
       name: `Get${display}Versions`,
-      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${display}VersionSource.`,
+      description: `[read-only] Lists the version history of the ${label} named by ${nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.`,
       inputSchema: { properties: versionsProps, required: versionsRequired },
       inputSchemaRef: null,
       availableIn,
@@ -510,12 +510,12 @@ function loadObjectVersionTools() {
     });
     tools.push({
       name: `Get${display}VersionSource`,
-      description: `[read-only] Fetch the source of a specific ${label} version by its content_uri (taken from a Get${display}Versions entry).`,
+      description: `[read-only] Reads the source of the ${label} version named by content_uri, an entry of the ${label}'s version history.`,
       inputSchema: {
         properties: {
           content_uri: {
             type: 'string',
-            description: `Opaque content_uri taken from a Get${display}Versions entry.`,
+            description: `Opaque content_uri of a version, from the ${label}'s version history.`,
           },
         },
         required: ['content_uri'],
@@ -529,16 +529,16 @@ function loadObjectVersionTools() {
     });
     tools.push({
       name: `Get${display}VersionDiff`,
-      description: `[read-only] Compute a unified diff between two ${label} versions, by their content_uris (taken from Get${display}Versions entries).`,
+      description: `[read-only] Compares the two ${label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.`,
       inputSchema: {
         properties: {
           content_uri_from: {
             type: 'string',
-            description: `Opaque content_uri of the OLD/base version (from a Get${display}Versions entry).`,
+            description: `Opaque content_uri of the OLD/base version, from the ${label}'s version history.`,
           },
           content_uri_to: {
             type: 'string',
-            description: `Opaque content_uri of the NEW/compare version (from a Get${display}Versions entry).`,
+            description: `Opaque content_uri of the NEW/compare version, from the ${label}'s version history.`,
           },
         },
         required: ['content_uri_from', 'content_uri_to'],

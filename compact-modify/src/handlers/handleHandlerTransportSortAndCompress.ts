@@ -7,7 +7,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerTransportSortAndCompress',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Transport task sort and compress: sorts a task's object list and merges its duplicate entries. Required: transport_number* (a task). A task holding the same entry twice refuses removing an entry until this has run. Response: JSON — acceptance only; a re-read of the task's objects with HandlerGet (object_type TRANSPORT) confirms it.",
+    "Sorts the object list of the transport task named by transport_number and merges its duplicate entries. Required: transport_number* (a task). A task holding the same entry twice refuses removing an entry until this has run. Response: JSON — acceptance only; a re-read of the task's objects (object_type TRANSPORT) confirms it.",
   inputSchema: compactTransportSortAndCompressSchema,
 } as const;
 

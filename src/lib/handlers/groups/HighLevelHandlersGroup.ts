@@ -621,7 +621,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateDomain_Tool,
           name: 'ActivateDomain',
           description:
-            'Activate an ABAP domain. Use after CreateDomain or UpdateDomain if the object remains inactive.',
+            'Activates the ABAP domain named by domain_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateDomain),
       },
@@ -630,7 +630,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateDataElement_Tool,
           name: 'ActivateDataElement',
           description:
-            'Activate an ABAP data element. Use after CreateDataElement or UpdateDataElement if the object remains inactive.',
+            'Activates the ABAP data element named by data_element_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateDataElement),
       },
@@ -639,7 +639,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateTable_Tool,
           name: 'ActivateTable',
           description:
-            'Activate an ABAP table. Use after CreateTable or UpdateTable if the object remains inactive.',
+            'Activates the ABAP database table named by table_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateTable),
       },
@@ -648,7 +648,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateStructure_Tool,
           name: 'ActivateStructure',
           description:
-            'Activate an ABAP structure. Use after CreateStructure or UpdateStructure if the object remains inactive.',
+            'Activates the ABAP structure named by structure_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateStructure),
       },
@@ -657,7 +657,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateDdl_Tool,
           name: 'ActivateDdl',
           description:
-            'Activate a CDS view. Use after CreateDdl or UpdateDdl if the object remains inactive.',
+            'Activates the CDS view (DDL source) named by ddl_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateDdl),
       },
@@ -666,7 +666,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateClass_Tool,
           name: 'ActivateClass',
           description:
-            'Activate an ABAP class. Use after CreateClass or UpdateClass if the object remains inactive.',
+            'Activates the ABAP class named by class_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateClass),
       },
@@ -675,7 +675,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateInterface_Tool,
           name: 'ActivateInterface',
           description:
-            'Activate an ABAP interface. Use after CreateInterface or UpdateInterface if the object remains inactive.',
+            'Activates the ABAP interface named by interface_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateInterface),
       },
@@ -684,7 +684,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateProgram_Tool,
           name: 'ActivateProgram',
           description:
-            'Activate an ABAP program. Use after CreateProgram or UpdateProgram if the object remains inactive.',
+            'Activates the ABAP program (report) named by program_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateProgram),
       },
@@ -693,7 +693,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateFunctionModule_Tool,
           name: 'ActivateFunctionModule',
           description:
-            'Activate an ABAP function module. Use after UpdateFunctionModule if the object remains inactive.',
+            'Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateFunctionModule),
       },
@@ -702,7 +702,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateFunctionGroup_Tool,
           name: 'ActivateFunctionGroup',
           description:
-            'Activate an ABAP function group. Use after CreateFunctionGroup or UpdateFunctionGroup if the object remains inactive.',
+            'Activates the ABAP function group named by function_group_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateFunctionGroup),
       },
@@ -711,7 +711,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateBehaviorDefinition_Tool,
           name: 'ActivateBehaviorDefinition',
           description:
-            'Activate a RAP behavior definition. Use after CreateBehaviorDefinition or UpdateBehaviorDefinition if the object remains inactive.',
+            'Activates the RAP behavior definition named by name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateBehaviorDefinition),
       },
@@ -720,7 +720,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateMetadataExtension_Tool,
           name: 'ActivateMetadataExtension',
           description:
-            'Activate a CDS metadata extension. Use after CreateMetadataExtension or UpdateMetadataExtension if the object remains inactive.',
+            'Activates the CDS metadata extension named by name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateMetadataExtension),
       },
@@ -729,7 +729,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateServiceDefinition_Tool,
           name: 'ActivateServiceDefinition',
           description:
-            'Activate an ABAP service definition. Use after CreateServiceDefinition or UpdateServiceDefinition if the object remains inactive.',
+            'Activates the service definition named by name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateServiceDefinition),
       },
@@ -738,7 +738,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           ...ActivateServiceBinding_Tool,
           name: 'ActivateServiceBinding',
           description:
-            'Activate an ABAP service binding. Use after CreateServiceBinding or UpdateServiceBinding if the object remains inactive.',
+            'Activates the OData service binding named by name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateServiceBinding),
       },

@@ -36,7 +36,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.',
+    'Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.',
   inputSchema: {
     type: 'object',
     properties: {

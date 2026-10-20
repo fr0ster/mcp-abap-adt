@@ -43,7 +43,7 @@ export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve a list of enhancements for a given ABAP object. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
+    '[read-only] Lists the enhancements (enhancement implementations) of the program, include or class named by object_name and object_type. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
   inputSchema: {
     type: 'object',
     properties: {

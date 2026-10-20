@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

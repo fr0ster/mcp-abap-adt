@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP package named by package_name. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

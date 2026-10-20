@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP function module, BAPI or RFC-enabled ones included, in one request at the function group given: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {

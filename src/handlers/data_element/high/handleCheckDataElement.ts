@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP data element named by data_element_name. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

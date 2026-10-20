@@ -44,7 +44,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
+    'Updates the header of the ABAP message class named by message_class_name: its description.',
   inputSchema: {
     type: 'object',
     properties: {

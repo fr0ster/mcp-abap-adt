@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP class. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

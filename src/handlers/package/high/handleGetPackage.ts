@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP package in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
+    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
   inputSchema: {
     type: 'object',
     properties: {

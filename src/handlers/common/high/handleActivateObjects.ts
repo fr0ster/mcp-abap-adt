@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'ActivateObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Activate one or multiple ABAP repository objects. Use after Create/Update when objects remain inactive, or for group activation of related objects (e.g., domains + data elements + tables together). Works with any object type.',
+    'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.',
   inputSchema: {
     type: 'object',
     properties: {

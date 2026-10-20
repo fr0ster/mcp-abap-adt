@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP metadata extension (DDLX). Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the CDS metadata extension (DDLX) named by name. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

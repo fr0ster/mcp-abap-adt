@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'ListServiceBindingTypes',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'List available service binding types (for example ODataV2/ODataV4) from ADT Business Services endpoint.',
+    '[read-only] Lists the available service binding types (for example ODataV2/ODataV4) from the ADT Business Services endpoint, in the response_format given.',
   inputSchema: {
     type: 'object',
     properties: {

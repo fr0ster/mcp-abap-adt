@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateProgramUnitTest',
   available_in: ['onprem'] as const,
   description:
-    'Create ABAP Unit tests for a report: a test include with its local test classes, included into the report and activated.',
+    'Creates the ABAP Unit test classes of the report named by program_name, from test_class_source. They are written to a test include, which is included into the report, and the report is activated.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingListTypes',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Service binding types list. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.',
+    '[read-only] Lists the available service binding types. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.',
   inputSchema: compactServiceBindingListTypesSchema,
 } as const;
 

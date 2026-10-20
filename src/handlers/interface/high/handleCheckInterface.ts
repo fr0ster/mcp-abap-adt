@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckInterface',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP interface named by interface_name. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

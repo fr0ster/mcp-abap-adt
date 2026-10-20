@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP function module named by function_module_name in the function group named by function_group_name. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

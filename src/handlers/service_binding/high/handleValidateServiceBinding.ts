@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
   name: 'ValidateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Validate service binding parameters (name, service definition, package, version) via ADT validation endpoint.',
+    '[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Where-used list of an ABAP object: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON.',
+    '[read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON.',
   ),
   inputSchema: compactWhereUsedSchema,
 } as const;

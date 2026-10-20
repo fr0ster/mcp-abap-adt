@@ -151,7 +151,7 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] List the SAP version history of a ${row.label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${row.display}VersionSource.`,
+    description: `[read-only] Lists the version history of the ${row.label} named by ${row.nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.`,
     inputSchema: {
       type: 'object',
       properties,
@@ -220,13 +220,13 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionSource`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Fetch the source of a specific ${row.label} version by its content_uri (taken from a Get${row.display}Versions entry).`,
+    description: `[read-only] Reads the source of the ${row.label} version named by content_uri, an entry of the ${row.label}'s version history.`,
     inputSchema: {
       type: 'object',
       properties: {
         content_uri: {
           type: 'string',
-          description: `Opaque content_uri taken from a Get${row.display}Versions entry.`,
+          description: `Opaque content_uri of a version, from the ${row.label}'s version history.`,
         },
       },
       required: ['content_uri'],
@@ -278,17 +278,17 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionDiff`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Compute a unified diff between two ${row.label} versions, by their content_uris (taken from Get${row.display}Versions entries).`,
+    description: `[read-only] Compares the two ${row.label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.`,
     inputSchema: {
       type: 'object',
       properties: {
         content_uri_from: {
           type: 'string',
-          description: `Opaque content_uri of the OLD/base version (from a Get${row.display}Versions entry).`,
+          description: `Opaque content_uri of the OLD/base version, from the ${row.label}'s version history.`,
         },
         content_uri_to: {
           type: 'string',
-          description: `Opaque content_uri of the NEW/compare version (from a Get${row.display}Versions entry).`,
+          description: `Opaque content_uri of the NEW/compare version, from the ${row.label}'s version history.`,
         },
       },
       required: ['content_uri_from', 'content_uri_to'],

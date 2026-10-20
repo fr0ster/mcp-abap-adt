@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectVersions',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.',
+    "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
   inputSchema: {
     type: 'object',
     properties: {

@@ -1,7 +1,10 @@
 /**
  * Every served tool's description is purely functional (spec §3, "Wording"):
  * what the tool does, its parameters and its result — no negation, no
- * pointer to replaced or migrated work.
+ * pointer to replaced or migrated work, no other tool of its set named, a
+ * read tool marked `[read-only]`, a first sentence no other tool of its set
+ * shares, and no vague subject ("an ABAP object", "an object", "a given …")
+ * in it: it names the function on what the parameters name.
  *
  * The descriptions are taken as a client receives them: every set, every
  * transport, every system type, served by a `BaseMcpServer` with a batch
@@ -10,23 +13,15 @@
  * Words are split with plain code, no regular expression: letters and
  * apostrophes are word characters, anything else a separator.
  */
-import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
-import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
+import { isBatchTool } from '../../../lib/batch/batchTools';
 import type { ToolSetKind } from '../../../lib/config/binaries';
-import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
 import {
-  compactReadOnlyToolSetOf,
-  compactToolSetOf,
-  fullReadOnlyToolSet,
-  fullToolSet,
-  registryOf,
-  type ServedTransport,
-  type ToolSet,
-} from '../../../lib/toolSet';
+  SETS,
+  type ServedTool,
+  SYSTEM_TYPES,
+  servedCatalog,
+  TRANSPORTS,
+} from '../descriptions/catalog';
 
 const FORBIDDEN: ReadonlySet<string> = new Set([
   'not',
@@ -78,54 +73,108 @@ function isNegation(word: string): boolean {
   return FORBIDDEN.has(word) || word.endsWith("n't");
 }
 
-const silent = { info() {}, debug() {}, warn() {}, error() {} };
+/** The read-only set beside each set: its tools change nothing. */
+const READ_ONLY_OF: Readonly<Record<ToolSetKind, ToolSetKind>> = {
+  core: 'core-ro',
+  'core-ro': 'core-ro',
+  compact: 'compact-ro',
+  'compact-ro': 'compact-ro',
+};
 
-const SETS: ReadonlyArray<readonly [ToolSetKind, ToolSet]> = [
-  ['core', fullToolSet],
-  ['core-ro', fullReadOnlyToolSet],
-  [
-    'compact',
-    compactToolSetOf({
-      readOnly: compactReadOnlyEntries,
-      modify: compactModifyEntries,
-    }),
-  ],
-  ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
+/** The markers that name a tool's own family in place of `[read-only]`. */
+const FAMILY_MARKERS = ['[runtime]', '[debug]', '[session]'];
+
+/** The verbs a full-set read tool's name begins with. */
+const READ_VERBS = [
+  'Get',
+  'List',
+  'Read',
+  'Search',
+  'Describe',
+  'Check',
+  'Validate',
 ];
-const TRANSPORTS: readonly ServedTransport[] = ['stdio', 'http', 'sse'];
-const SYSTEM_TYPES = ['onprem', 'cloud', 'legacy'] as const;
 
-class DescribedServer extends BaseMcpServer {
-  constructor(
-    registry: IHandlersRegistry,
-    systemType: (typeof SYSTEM_TYPES)[number],
-  ) {
-    super({
-      name: 'descriptions-functional',
-      version: '1.0.0',
-      logger: silent as never,
-      systemType,
-      batch: new InstanceBatch({ keepRawParts: false }),
-    });
-    this.registerHandlers(registry);
+/**
+ * Whether `tool` of a set whose read-only set serves `readOnly` is a read
+ * tool that must carry `[read-only]`: served by the read-only set, or (full
+ * set) named by a read verb — a batch tool, a leftover-session tool and a
+ * tool marked with its family's marker aside.
+ */
+function mustBeMarkedReadOnly(
+  tool: ServedTool,
+  readOnly: ReadonlySet<string>,
+): boolean {
+  if (isBatchTool(tool.name) || tool.name.includes('LeftoverSession')) {
+    return false;
   }
+  if (FAMILY_MARKERS.some((marker) => tool.description.startsWith(marker))) {
+    return false;
+  }
+  if (readOnly.has(tool.name)) return true;
+  if (tool.name.startsWith('Handler')) return false;
+  return READ_VERBS.some((verb) => {
+    if (!tool.name.startsWith(verb)) return false;
+    const next = tool.name.charAt(verb.length);
+    return next !== '' && next === next.toUpperCase();
+  });
 }
 
-async function servedDescriptions(
-  set: ToolSet,
-  transport: ServedTransport,
-  systemType: (typeof SYSTEM_TYPES)[number],
-): Promise<Array<{ name: string; description: string }>> {
-  const server = new DescribedServer(registryOf(set, transport), systemType);
-  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'descriptions', version: '1.0.0' });
-  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
-  const { tools } = await client.listTools();
-  await client.close();
-  return tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description ?? '',
-  }));
+/** The identifiers of `text`: runs of letters, digits and underscores. */
+function identifiersOf(text: string): string[] {
+  const identifiers: string[] = [];
+  let current = '';
+  for (const character of text) {
+    const word =
+      character === '_' ||
+      (character >= '0' && character <= '9') ||
+      character.toLowerCase() !== character.toUpperCase();
+    if (word) {
+      current += character;
+      continue;
+    }
+    if (current !== '') identifiers.push(current);
+    current = '';
+  }
+  if (current !== '') identifiers.push(current);
+  return identifiers;
+}
+
+/**
+ * The first sentence of `text`: up to the first `.`, `!` or `?` followed by
+ * white space or the end — "e.g." and "i.e." do not end it.
+ */
+function firstSentence(text: string): string {
+  const characters = [...text];
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index] as string;
+    if (character !== '.' && character !== '!' && character !== '?') continue;
+    const next = characters[index + 1];
+    if (next !== undefined && next !== ' ' && next !== '\n') continue;
+    const sentence = characters.slice(0, index + 1).join('');
+    if (sentence.endsWith('e.g.') || sentence.endsWith('i.e.')) continue;
+    return sentence;
+  }
+  return text;
+}
+
+/** The vague subjects a first sentence must not be built around. */
+const VAGUE_SUBJECTS = ['an abap object', 'an object', 'a given'];
+
+/** Every tool `kind`'s set serves, on every transport and system type, each once. */
+async function everyServed(kind: ToolSetKind): Promise<ServedTool[]> {
+  const set = SETS.find(([each]) => each === kind)?.[1];
+  if (set === undefined) throw new Error(`no set ${kind}`);
+  const tools = new Map<string, ServedTool>();
+  for (const transport of TRANSPORTS) {
+    for (const systemType of SYSTEM_TYPES) {
+      for (const tool of await servedCatalog(set, transport, systemType)) {
+        const key = `${tool.name}\u0000${tool.description}`;
+        if (!tools.has(key)) tools.set(key, tool);
+      }
+    }
+  }
+  return [...tools.values()];
 }
 
 describe('tool descriptions are purely functional', () => {
@@ -156,29 +205,108 @@ describe('tool descriptions are purely functional', () => {
     ]);
   });
 
-  it.each(SETS.map(([kind, set]) => [kind, set] as const))(
+  it('reads identifiers, first sentences and read tools with plain code', () => {
+    expect(identifiersOf('names GetClass_x, (BatchEnd)-done')).toEqual([
+      'names',
+      'GetClass_x',
+      'BatchEnd',
+      'done',
+    ]);
+    expect(firstSentence('Reads X (e.g. Y). Then Z.')).toBe(
+      'Reads X (e.g. Y).',
+    );
+    expect(firstSentence('No end')).toBe('No end');
+    const tool = (name: string, description: string): ServedTool => ({
+      name,
+      description,
+      parameters: [],
+      search: undefined,
+    });
+    const none = new Set<string>();
+    expect(mustBeMarkedReadOnly(tool('GetClass', 'x'), none)).toBe(true);
+    expect(mustBeMarkedReadOnly(tool('Getaway', 'x'), none)).toBe(false);
+    expect(mustBeMarkedReadOnly(tool('UpdateClass', 'x'), none)).toBe(false);
+    expect(
+      mustBeMarkedReadOnly(tool('GetBackgroundRun', '[runtime] x'), none),
+    ).toBe(false);
+    expect(
+      mustBeMarkedReadOnly(
+        tool('HandlerDumpList', 'x'),
+        new Set(['HandlerDumpList']),
+      ),
+    ).toBe(true);
+    expect(
+      mustBeMarkedReadOnly(
+        tool('BatchAnswers', 'x'),
+        new Set(['BatchAnswers']),
+      ),
+    ).toBe(false);
+  });
+
+  it.each(SETS.map(([kind]) => kind))(
     'every served tool of %s states only what it does, its parameters and its result',
-    async (kind, set) => {
-      const offenders: string[] = [];
-      let seen = 0;
-      for (const transport of TRANSPORTS) {
-        for (const systemType of SYSTEM_TYPES) {
-          for (const tool of await servedDescriptions(
-            set,
-            transport,
-            systemType,
-          )) {
-            seen += 1;
-            for (const word of new Set(wordsOf(tool.description))) {
-              if (!isNegation(word)) continue;
-              const finding = `${tool.name}: "${word}"`;
-              if (!offenders.includes(finding)) offenders.push(finding);
-            }
+    async (kind) => {
+      const tools = await everyServed(kind);
+      const names = new Set(tools.map((tool) => tool.name));
+      const readOnly = new Set(
+        (await everyServed(READ_ONLY_OF[kind])).map((tool) => tool.name),
+      );
+      const negations: string[] = [];
+      const otherTools: string[] = [];
+      const unmarked: string[] = [];
+      const vague: string[] = [];
+      const firstSentences = new Map<string, string[]>();
+      const add = (list: string[], finding: string) => {
+        if (!list.includes(finding)) list.push(finding);
+      };
+      for (const tool of tools) {
+        for (const word of new Set(wordsOf(tool.description))) {
+          if (isNegation(word)) add(negations, `${tool.name}: "${word}"`);
+        }
+        for (const identifier of new Set(identifiersOf(tool.description))) {
+          if (identifier !== tool.name && names.has(identifier)) {
+            add(otherTools, `${tool.name}: ${identifier}`);
           }
         }
+        if (
+          mustBeMarkedReadOnly(tool, readOnly) &&
+          !tool.description.startsWith('[read-only]')
+        ) {
+          add(unmarked, tool.name);
+        }
+        const first = firstSentence(tool.description);
+        const lower = ` ${first.toLowerCase()}`;
+        for (const subject of VAGUE_SUBJECTS) {
+          if (
+            lower.includes(` ${subject} `) ||
+            lower.includes(` ${subject}:`)
+          ) {
+            add(vague, `${tool.name}: "${subject}"`);
+          }
+        }
+        const sharing = firstSentences.get(first.toLowerCase()) ?? [];
+        if (!sharing.includes(tool.name)) sharing.push(tool.name);
+        firstSentences.set(first.toLowerCase(), sharing);
       }
-      expect(seen).toBeGreaterThan(10);
-      expect({ set: kind, offenders }).toEqual({ set: kind, offenders: [] });
+      const shared = [...firstSentences.entries()]
+        .filter(([, sharing]) => sharing.length > 1)
+        .map(([sentence, sharing]) => `${sharing.join(', ')}: "${sentence}"`);
+      expect(tools.length).toBeGreaterThan(10);
+      expect({
+        set: kind,
+        negations,
+        otherTools,
+        unmarked,
+        vague,
+        shared,
+      }).toEqual({
+        set: kind,
+        negations: [],
+        otherTools: [],
+        unmarked: [],
+        vague: [],
+        shared: [],
+      });
     },
   );
 });

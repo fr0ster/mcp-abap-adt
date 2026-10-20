@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP DDL source (CDS) in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {

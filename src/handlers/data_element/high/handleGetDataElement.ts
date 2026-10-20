@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'GetDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read an ABAP data element in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.',
+    '[read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {

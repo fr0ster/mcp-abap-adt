@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerSearch',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Search ABAP repository objects by name or mask. Required: query*. Optional: object_type, max_results (default 100). Response: one object per line.',
+    '[read-only] Searches the ABAP repository for the objects whose name matches query, a name or a mask. Required: query*. Optional: object_type, max_results (default 100). Response: one object per line.',
   ),
   inputSchema: compactSearchSchema,
 } as const;

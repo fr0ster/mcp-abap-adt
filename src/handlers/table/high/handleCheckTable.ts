@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP table. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

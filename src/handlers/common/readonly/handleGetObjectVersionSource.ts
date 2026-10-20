@@ -23,19 +23,20 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectVersionSource',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.',
+    "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
   inputSchema: {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
-        description: 'Object type (same value used in GetObjectVersions).',
+        description:
+          'Object type (the same value the version history was read with).',
         enum: [...VERSIONED_OBJECT_TYPES],
       },
       content_uri: {
         type: 'string',
         description:
-          'Opaque content_uri taken from a GetObjectVersions version entry.',
+          "Opaque content_uri of a version, from the object's version history.",
       },
     },
     required: ['object_type', 'content_uri'],

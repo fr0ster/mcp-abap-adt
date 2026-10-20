@@ -12,7 +12,8 @@ import { projectRun, runAndWait } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'RunProgramUnitTest',
   available_in: ['onprem'] as const,
-  description: 'Run the ABAP Unit tests of a report and return the result.',
+  description:
+    'Runs the ABAP Unit tests of the report named by program_name and returns the result.',
   inputSchema: {
     type: 'object',
     properties: {

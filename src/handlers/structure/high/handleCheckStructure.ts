@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP structure. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP structure named by structure_name. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

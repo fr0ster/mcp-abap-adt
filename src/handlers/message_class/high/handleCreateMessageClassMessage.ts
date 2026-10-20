@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).',
+    'Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.',
   inputSchema: {
     type: 'object',
     properties: {

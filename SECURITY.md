@@ -80,7 +80,9 @@ http:            # or sse:
   session the server holds, so that a killed process's session can be taken up
   by the next stdio process of the same destination at its start, or logged
   off later by their user (the leftover-session tools). Each file is
-  deleted once its session's logoff is written. An HTTP or SSE server writes
+  deleted only once its session's logoff completed (written, and SAP answered
+  it or its connection failed); a forced close exits before that, so its
+  sessions keep their files. An HTTP or SSE server writes
   none and serves no leftover-session tool: it holds the sessions of many users.
   - **A runtime file is a bearer secret.** Its cookies act as that SAP user for
     as long as the session lives, locks included. On Linux and macOS the

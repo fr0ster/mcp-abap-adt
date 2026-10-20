@@ -190,13 +190,14 @@ the same orderly sequence, exit `1`; a crash during a shutdown lets it finish an
 **The forced close** (`forceClose()` again, without waiting for the sequence's last steps) serves
 the two escapes only: a second signal and `--shutdown-timeout`. It is the one end that does not
 wait for SAP's answers, a deliberate exception: it exits once each logoff is written, so a session
-whose logoff SAP had not received whole can stay until SAP's security-session timeout. Nothing
-names such a session afterwards: a stdio runtime file is deleted once its connection's logoff is
-written (`LeftoverSessions.track`, `whenLoggedOff`), so `ListLeftoverSessions` does not list it,
-and Streamable HTTP and SSE keep no runtime files. Only a logoff whose write failed keeps its file
-— stdio, HTTP connections only (an RFC connection has none) — for `ListLeftoverSessions` and
-`LogoffLeftoverSession` of a later stdio process of the same destination, or for that process's
-start to take up when it is the destination's only one. A server run from source through
+whose logoff SAP had not received whole can stay until SAP's security-session timeout. On stdio
+such a session keeps its runtime file: a file is deleted only once its connection's logoff
+completed — written, and its `flushGoodbye()` settled (`LeftoverSessions.track`,
+`whenLogoffCompleted`) — which the forced close does not wait for. So, like a logoff whose write
+failed — stdio, HTTP connections only (an RFC connection has none) — it is there for
+`ListLeftoverSessions` and `LogoffLeftoverSession` of a later stdio process of the same
+destination, or for that process's start to take up when it is the destination's only one.
+Streamable HTTP and SSE keep no runtime files. A server run from source through
 `tsx` (the integration tests' served servers) gets only `SIGINT` and `SIGTERM` from it: `tsx`
 forwards those two to the script it runs, and `SIGHUP` or `SIGQUIT` reach the wrapper, not the
 server (measured 2026-10-19) — send them to the server's own process. An installed bin runs on
@@ -296,9 +297,14 @@ two explicit tools; with several the server picks none.
   come from the destination the process serves; the file adds the cookies and the system
   information, so a resume asks SAP nothing more. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
   Rewritten after a request whose answer changed the cookies (the owner wraps
-  `makeAdtRequest`); deleted from inside the connection's end once its `disconnect()` resolved —
-  `whenLoggedOff` in `ownedConnections.ts` — so the terminal close, a replacement and the forced
-  close all delete it after the logoff is written, and a logoff that failed keeps it. Never
+  `makeAdtRequest`); deleted only once the connection's logoff completed — its `disconnect()`
+  resolved (written) and then its `flushGoodbye()` resolved — from inside the answer's follow-up
+  (`whenLogoffCompleted` in `ownedConnections.ts`), before it settles, so whoever awaits the answers
+  (`logoffsAnswered`: the orderly end, an instance's terminal close) awaits the deletion too. The
+  terminal close, a replacement and the orderly end delete it; the forced close, which exits after
+  the writes, a logoff that failed, and a flush that did not complete keep it.
+  `LogoffLeftoverSession` deletes the claimed file the same way: only once `logoffCompleted`
+  answered `true`; else the file is given back as a leftover. Never
   logged, never in an answer. RFC keeps no file, and neither does an instance that serves no
   destination (`ConnectionContext.destination`, set by `StdioServer`). Nothing is asked of SAP
   to write it (`sessionOf` → `sessionIdentity(destination, settings, login)`).

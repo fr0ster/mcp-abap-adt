@@ -5,11 +5,14 @@
  * those of the destination the instance serves; another destination's file
  * and an unknown handle get the same answer — and never for a live
  * process's. Logoff sends the ICF logoff with the session's cookies and no
- * `Authorization`, then deletes the file. (The resume is a stdio start's:
+ * `Authorization`, and deletes the file only once that logoff completed (its
+ * `flushGoodbye()` settled); until then the file stays claimed. (The resume is a stdio start's:
  * `startBirth.test.ts`.)
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
+import { AdtOnPremConnector } from '@mcp-abap-adt/connection';
+import { LEFTOVER_LOGOFF_NOT_COMPLETED_WORDS } from '../../../embeddable/BaseMcpServer';
 import { LEFTOVER_SESSION_NOT_AVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import { isLogoff, PROBE_PATH } from '../../helpers/adtStandIn';
 import {
@@ -29,7 +32,11 @@ beforeEach(() => {
   jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 
+/** Held logoff answers, let go before the close (which awaits them). */
+const heldAnswers: Array<() => void> = [];
+
 afterEach(async () => {
+  for (const release of heldAnswers.splice(0)) release();
   await stand?.close();
   jest.restoreAllMocks();
 });
@@ -139,6 +146,37 @@ describe('LogoffLeftoverSession', () => {
     const answer = await stand.call('LogoffLeftoverSession', { handle });
     expect(json(answer.text)).toEqual({ handle, state: 'logged_off' });
     expect(stand.files()).toEqual([]);
+  });
+});
+
+describe('LogoffLeftoverSession: the file goes only once the logoff completed', () => {
+  it('keeps the claimed file while the logoff is written and not answered; deletes it once answered', async () => {
+    stand = await leftoverStand();
+    const { handle } = await stand.leftover();
+    const held = stand.standIn.hold((r) => isLogoff(r.url));
+    heldAnswers.push(held.release);
+    const answering = stand.call('LogoffLeftoverSession', { handle });
+    await held.arrived;
+    // Written, not answered: the record stays, claimed by this process.
+    expect(stand.files()).toEqual([
+      expect.stringMatching(new RegExp(`^${handle}\\.claimed\\.${OUR_PID}\\.`)),
+    ]);
+    held.release();
+    const answer = await answering;
+    expect(json(answer.text)).toEqual({ handle, state: 'logged_off' });
+    expect(stand.files()).toEqual([]);
+  });
+
+  it('gives the file back as a leftover when the flush did not complete', async () => {
+    stand = await leftoverStand();
+    const { handle } = await stand.leftover();
+    jest
+      .spyOn(AdtOnPremConnector.prototype, 'flushGoodbye')
+      .mockRejectedValue(new Error('not answered'));
+    const answer = await stand.call('LogoffLeftoverSession', { handle });
+    expect(answer.isError).toBe(true);
+    expect(answer.text).toContain(LEFTOVER_LOGOFF_NOT_COMPLETED_WORDS);
+    expect(stand.files()).toEqual([handle]);
   });
 });
 

@@ -5,9 +5,12 @@
  * `chmod` sets only the read-only flag, so the directory's ACL applies and
  * the modes are not checked there); written after
  * `connect()`, rewritten when a request changed the session's cookies, and
- * deleted once that connection's logoff is written: the terminal close, a
- * replacement, the forced close (the crash path's). A logoff that was not
- * written leaves the file. RFC keeps none.
+ * deleted only once that connection's logoff completed — its
+ * `flushGoodbye()` settled, SAP's answer received or its transport failed:
+ * the terminal close, a replacement, the orderly end. A logoff that was
+ * written and not completed (the forced close exits without the flush, a
+ * crash, a stand-in whose flush rejects) leaves the file, and the next
+ * process lists it; one that was not written leaves it too. RFC keeps none.
  */
 
 import * as fs from 'node:fs';
@@ -22,8 +25,13 @@ import {
   LeftoverSessions,
   sessionIdentity,
 } from '../../../lib/leftoverSessions/LeftoverSessions';
-import { endConnection, forceClose, own } from '../../../lib/ownedConnections';
-import { PROBE_PATH } from '../../helpers/adtStandIn';
+import {
+  endConnection,
+  forceClose,
+  logoffsAnswered,
+  own,
+} from '../../../lib/ownedConnections';
+import { isLogoff, PROBE_PATH } from '../../helpers/adtStandIn';
 import {
   DESTINATION,
   fakeProbe,
@@ -42,7 +50,11 @@ beforeEach(() => {
   jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 
+/** Held logoff answers, let go before the close (which awaits them). */
+const heldAnswers: Array<() => void> = [];
+
 afterEach(async () => {
+  for (const release of heldAnswers.splice(0)) release();
   await stand?.close();
   stand = undefined;
   jest.restoreAllMocks();
@@ -108,7 +120,7 @@ it('rewritten when a request changed the cookies (a stateful context)', async ()
   expect(stand.file(handle ?? '').cookies).toContain('sap-contextid=context-1');
 });
 
-it('deleted once the logoff is written: the terminal close', async () => {
+it('deleted once the logoff completed: the terminal close', async () => {
   stand = await leftoverStand();
   await stand.call('ProbeAdt', { id: 'first' });
   expect(stand.files()).toHaveLength(1);
@@ -117,13 +129,61 @@ it('deleted once the logoff is written: the terminal close', async () => {
   await until(() => stand?.standIn.logoffs() === 1);
 });
 
-it('deleted once the logoff is written: the forced close (the crash path)', async () => {
+it('kept while the logoff is written and not answered; deleted once its flush settled', async () => {
   stand = await leftoverStand();
   await stand.call('ProbeAdt', { id: 'first' });
-  expect(stand.files()).toHaveLength(1);
-  await forceClose();
+  const [handle] = stand.files();
+  const held = stand.standIn.hold((r) => isLogoff(r.url));
+  heldAnswers.push(held.release);
+  const connection = (stand.server as unknown as { built?: { ready?: object } })
+    .built?.ready;
+  if (connection === undefined) throw new Error('no built connection');
+  // Resolves once the logoff is written; SAP has not answered it.
+  await endConnection(connection);
+  await held.arrived;
+  expect(stand.files()).toEqual([handle]);
+  held.release();
+  await logoffsAnswered();
   expect(stand.files()).toEqual([]);
-  await until(() => stand?.standIn.logoffs() === 1);
+});
+
+it('kept by the forced close, which exits after the logoff’s write without its answer: the next process lists it', async () => {
+  stand = await leftoverStand();
+  await stand.call('ProbeAdt', { id: 'first' });
+  const [handle] = stand.files();
+  const held = stand.standIn.hold((r) => isLogoff(r.url));
+  heldAnswers.push(held.release);
+  await forceClose();
+  await held.arrived;
+  expect(stand.files()).toEqual([handle]);
+  // The next start of the same destination: this process is gone.
+  const next = new LeftoverSessions({
+    directory: stand.dir,
+    probe: fakeProbe(OUR_PID + 1, new Set()),
+    report: () => {},
+  });
+  const identity = sessionIdentity(
+    DESTINATION,
+    settingsFor(stand.standIn.url, 'LEFT_USER'),
+  );
+  if (!identity) throw new Error('no identity');
+  expect(next.list(identity).map((s) => s.handle)).toEqual([handle]);
+  held.release();
+  await logoffsAnswered();
+});
+
+it('kept when the flush did not complete (a stand-in whose flush rejects)', async () => {
+  stand = await leftoverStand();
+  await stand.call('ProbeAdt', { id: 'first' });
+  const [handle] = stand.files();
+  const connection = (stand.server as unknown as { built?: { ready?: object } })
+    .built?.ready as { flushGoodbye(): Promise<void> } | undefined;
+  if (connection === undefined) throw new Error('no built connection');
+  connection.flushGoodbye = async () => {
+    throw new Error('not answered');
+  };
+  await stand.server.terminalClose();
+  expect(stand.files()).toEqual([handle]);
 });
 
 it('kept when the logoff could not be written', async () => {
@@ -141,7 +201,7 @@ it('kept when the logoff could not be written', async () => {
 });
 
 describe('a debugger connection', () => {
-  it('is kept with role debugger, and deleted with its logoff', async () => {
+  it('is kept with role debugger, and deleted once its logoff completed', async () => {
     stand = await leftoverStand();
     const dir = stand.dir;
     const owner = new LeftoverSessions({
@@ -172,6 +232,7 @@ describe('a debugger connection', () => {
     );
     expect(roles.sort()).toEqual(['built', 'debugger']);
     await endConnection(debug);
+    await logoffsAnswered();
     expect(
       fs
         .readdirSync(dir)
@@ -180,6 +241,7 @@ describe('a debugger connection', () => {
         ),
     ).toEqual(['built']);
     await endConnection(origin);
+    await logoffsAnswered();
     expect(fs.readdirSync(dir)).toEqual([]);
   });
 });

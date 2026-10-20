@@ -106,6 +106,7 @@ import {
   closeOwnedConnections,
   endConnection,
   isEnded,
+  logoffCompleted,
   own,
   refuseIfClosed,
   refuseWhenClosed,
@@ -333,7 +334,8 @@ export abstract class BaseMcpServer extends McpServer {
     /**
      * The owner of the process's runtime session files, created by the host
      * and shared by its instances: each owned HTTP connection holding a
-     * session keeps a file there until its logoff is written, and the
+     * session keeps a file there until its logoff completed (written, and its
+     * `flushGoodbye()` settled), and the
      * leftover-session tools read it. Absent: no file, and those tools
      * answer "not available here".
      */
@@ -2256,12 +2258,15 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Logoff (any role): the platform's ICF logoff with the session's cookies
-   * and no credential, then the file deleted. connection 17.1 sends it from
-   * an instance built on the session and disconnected without `connect()`:
-   * the logoff and nothing else — no CSRF fetch before it, the credential's
-   * `prepare()` never called — resolving once it is written. Its answer is
-   * not read, so whether the session still lived is SAP's to know. It
-   * touches neither the instance's connection nor its main flow.
+   * and no credential, then the file deleted — only once the logoff
+   * completed: written, and the connection's `flushGoodbye()` settled
+   * (`logoffCompleted`, no timer). connection 17.1 sends it from an instance
+   * built on the session and disconnected without `connect()`: the logoff
+   * and nothing else — no CSRF fetch before it, the credential's `prepare()`
+   * never called. Its answer is not read, so whether the session still
+   * lived is SAP's to know. A logoff not written, or not completed, gives
+   * the file back as a leftover. It touches neither the instance's
+   * connection nor its main flow.
    */
   private async logoffLeftover(
     handle: string,
@@ -2287,6 +2292,10 @@ export abstract class BaseMcpServer extends McpServer {
         failed = true;
       });
       if (failed) throw new Error(LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS);
+      // The file goes only once the logoff completed, never on the write.
+      if (!(await logoffCompleted(connection))) {
+        throw new Error(LEFTOVER_LOGOFF_NOT_COMPLETED_WORDS);
+      }
       owner.forget(claimed);
       settled = true;
       return { handle: claimed.handle, state: 'logged_off' };
@@ -2553,6 +2562,10 @@ function isSpent(connection: AbapConnection): boolean {
 /** The fixed words of a leftover session's logoff that was not written. */
 export const LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS =
   'the logoff of the leftover session could not be written; its record is kept';
+
+/** The fixed words of a leftover session's logoff that was written and did not complete. */
+export const LEFTOVER_LOGOFF_NOT_COMPLETED_WORDS =
+  'the logoff of the leftover session did not complete; its record is kept';
 
 /**
  * Whether SAP's answer to the request in a resumed session says the session

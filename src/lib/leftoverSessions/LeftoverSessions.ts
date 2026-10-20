@@ -26,8 +26,11 @@
  * (`sessionCookies()`) — no credential. Written once the connection holds
  * a session, again once its system information is known, and again after a
  * request whose answer changed its cookies;
- * deleted once that connection's logoff is written — so it survives only a
- * process that died without its logoff. Never logged, never shown to the
+ * deleted only once that connection's logoff completed — written, and its
+ * `flushGoodbye()` settled (`whenLogoffCompleted`) — so it survives a
+ * process that died without its logoff and one that exited before the
+ * logoff completed (the forced close exits after the writes, without the
+ * flush): the next process of the destination lists it. Never logged, never shown to the
  * model: the cookies act as the user while the session lives.
  *
  * RFC connections get no file: an RFC session is its conversation (a
@@ -58,7 +61,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { resolveSystemKind } from '../connectionFactory';
-import { isEnded, whenLoggedOff } from '../ownedConnections';
+import { isEnded, whenLogoffCompleted } from '../ownedConnections';
 import {
   nodeProcessProbe,
   type ProcessProbe,
@@ -165,7 +168,7 @@ interface Tracked {
   cookies: string | null;
   /** The system information to write; `null` while not known. */
   system: FileSystem | null;
-  /** Its logoff was written: nothing is written for it any more. */
+  /** Its logoff completed: nothing is written for it any more. */
   ended: boolean;
   /** The claimed file of a resumed session, kept until `<handle>` landed. */
   claimedFile?: string;
@@ -390,8 +393,9 @@ export class LeftoverSessions {
   /**
    * Keeps a file of `connection`'s session from now on, under `handle` (a
    * new one by default): written now if it holds a session, again after a
-   * request whose answer changed its cookies, deleted once its logoff is
-   * written. A connection already ended, or already kept, is left alone.
+   * request whose answer changed its cookies, deleted once its logoff
+   * completed (written, then its `flushGoodbye()` settled) and never on the
+   * write alone. A connection already ended, or already kept, is left alone.
    */
   track(
     connection: object,
@@ -410,7 +414,7 @@ export class LeftoverSessions {
       ended: false,
     };
     this.tracked.set(connection, entry);
-    whenLoggedOff(connection, () => {
+    whenLogoffCompleted(connection, () => {
       entry.ended = true;
       if (entry.cookies !== null) this.remove(entry.handle);
     });
@@ -547,7 +551,10 @@ export class LeftoverSessions {
     }
   }
 
-  /** The claimed session is gone, or logged off: its file is deleted. */
+  /**
+   * The claimed session was logged off — its logoff completed (the caller
+   * awaited `logoffCompleted`) — or is gone: its file is deleted.
+   */
   forget(claimed: ClaimedSession): void {
     this.removeFile(claimed.file);
   }

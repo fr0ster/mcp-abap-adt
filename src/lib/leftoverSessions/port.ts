@@ -12,7 +12,7 @@ export interface SapAnswer {
   status: number;
 }
 
-/** The logoff was written (its answer is not read); the file is deleted. */
+/** The logoff completed — written, then answered or its connection failed (the answer is not read); then the file is deleted. */
 export type LogoffOutcome = { handle: string; state: 'logged_off' };
 
 export interface LeftoverSessionTools {

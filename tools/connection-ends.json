@@ -190,6 +190,13 @@
   },
   {
     "file": "src/lib/ownedConnections.ts",
+    "function": "completions",
+    "site": "WeakMap<OwnedConnection, Promise<boolean>>",
+    "end": "none needed: keyed weakly; it holds no connection open, only whether its logoff completed (written, then its flushGoodbye() resolved)",
+    "why": "a leftover session's file is deleted only once its logoff completed (logoffCompleted)"
+  },
+  {
+    "file": "src/lib/ownedConnections.ts",
     "function": "owners",
     "site": "WeakMap<OwnedConnection, object | undefined>",
     "end": "none needed: keyed weakly, holds owners, not connections",

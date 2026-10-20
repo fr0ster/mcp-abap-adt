@@ -270,10 +270,10 @@ still running (`Still running at the forced close: <tool>`) and the step cut sho
 **What it costs**: a session write lost — a refresh token the token endpoint refused can come back
 on the next start. It is also the one end that does not wait for SAP's answers to the logoffs, a
 deliberate exception: a session whose logoff SAP had not received whole can stay until SAP's
-security-session timeout, and nothing lists it (on stdio its runtime file is deleted once its
-logoff is written; Streamable HTTP and SSE keep none). Only a stdio logoff whose write failed keeps
-its file, for `ListLeftoverSessions` and `LogoffLeftoverSession` of the next process of the
-destination. Set it against the time your supervisor waits before it kills the process (a
+security-session timeout. On stdio it keeps its runtime file (a file is deleted only once its
+logoff completed, which the forced close does not wait for), as a logoff whose write failed does,
+for `ListLeftoverSessions` and `LogoffLeftoverSession` of the next process of the destination;
+Streamable HTTP and SSE keep no runtime files, so there nothing lists it. Set it against the time your supervisor waits before it kills the process (a
 container's stop grace, a service manager's `TimeoutStopSec`), a few seconds below it.
 
 A crash outside a tool (an uncaught exception, an unhandled promise rejection) writes one stderr

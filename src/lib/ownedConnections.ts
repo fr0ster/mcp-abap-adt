@@ -85,11 +85,20 @@ const owned = new Map<OwnedConnection, Owned>();
 const ending = new WeakMap<OwnedConnection, Promise<void>>();
 const endListeners = new WeakMap<OwnedConnection, Array<() => void>>();
 /**
- * Who wants to know a connection's logoff was WRITTEN (its `disconnect()`
- * resolved): the leftover-session files, deleted only then. Run inside the
- * end itself, so the forced close, which awaits every end, awaits them too.
+ * Who wants to know a connection's logoff COMPLETED — written, and its
+ * `flushGoodbye()` settled (SAP's answer, or its transport's failure): the
+ * leftover-session files, deleted only then. Run inside the follow-up of the
+ * answer (`answering`), before it settles, so whoever awaits the answers (the
+ * orderly end, an instance's terminal close) awaits them too. The forced
+ * close does not wait for the answers, so its sessions keep their files.
  */
 const logoffListeners = new WeakMap<OwnedConnection, Array<() => void>>();
+/**
+ * Each ended connection's completion: `true` once its logoff was written
+ * and its `flushGoodbye()` resolved; `false` when the logoff was not
+ * written, the connection has no `flushGoodbye()`, or it rejected.
+ */
+const completions = new WeakMap<OwnedConnection, Promise<boolean>>();
 /**
  * Logoffs asked for and not yet written: a connection leaves `owned` when
  * its end begins, and stays here until its `disconnect()` settles, so the
@@ -198,14 +207,20 @@ export function whenEnded(connection: object, listener: () => void): void {
 }
 
 /**
- * Calls `listener` once `connection`'s logoff is written — its one
- * `disconnect()` resolved — and never when that `disconnect()` failed. Run
- * synchronously inside the end, before the end's promise settles, so
- * whoever awaits the end (the terminal close, the forced close) awaits it.
- * A connection whose end already began is not followed: its listener never
- * runs.
+ * Calls `listener` once `connection`'s logoff completed — its one
+ * `disconnect()` resolved (written) and then its `flushGoodbye()` resolved —
+ * and never otherwise: not when the `disconnect()` failed, not when the
+ * connection has no `flushGoodbye()` or it rejected, not when the process
+ * ended before (the forced close exits after the writes). Run
+ * synchronously inside the answer's follow-up, before it settles, so
+ * whoever awaits the answers (`logoffsAnswered`: the orderly end, an
+ * instance's terminal close) awaits it. A connection whose end already
+ * began is not followed: its listener never runs.
  */
-export function whenLoggedOff(connection: object, listener: () => void): void {
+export function whenLogoffCompleted(
+  connection: object,
+  listener: () => void,
+): void {
   if (ending.has(connection)) return;
   const listeners = logoffListeners.get(connection) ?? [];
   listeners.push(listener);
@@ -226,6 +241,13 @@ export function endConnection(
   const running = ending.get(connection);
   if (running) return running;
   owned.delete(connection);
+  let complete!: (completed: boolean) => void;
+  completions.set(
+    connection,
+    new Promise<boolean>((resolve) => {
+      complete = resolve;
+    }),
+  );
   const closable = connection as { disconnect?: () => Promise<void> };
   const closing = (async () => {
     try {
@@ -234,6 +256,7 @@ export function endConnection(
       }
     } catch {
       logoffListeners.delete(connection);
+      complete(false);
       try {
         onFailure();
       } catch {
@@ -241,16 +264,7 @@ export function endConnection(
       }
       return;
     }
-    followAnswer(connection);
-    const written = logoffListeners.get(connection) ?? [];
-    logoffListeners.delete(connection);
-    for (const listener of written) {
-      try {
-        listener();
-      } catch {
-        // A listener that throws changes nothing of the close.
-      }
-    }
+    followAnswer(connection, complete);
   })();
   ending.set(connection, closing);
   writing.add(closing);
@@ -277,17 +291,42 @@ export function endConnection(
   return closing;
 }
 
-/** Follows a written logoff until it is answered or its transport fails (`answering`). */
-function followAnswer(connection: object): void {
+/**
+ * Follows a written logoff until it is answered or its transport fails
+ * (`answering`); once its `flushGoodbye()` resolved, the logoff completed:
+ * the completion listeners run, before the follow-up settles.
+ */
+function followAnswer(
+  connection: object,
+  complete: (completed: boolean) => void,
+): void {
   const flush = (connection as { flushGoodbye?: () => Promise<void> })
     .flushGoodbye;
-  if (typeof flush !== 'function') return;
+  if (typeof flush !== 'function') {
+    // Nothing to wait for the answer with: the logoff never completes here.
+    logoffListeners.delete(connection);
+    complete(false);
+    return;
+  }
   const answered = (async () => {
+    let completed = false;
     try {
       await flush.call(connection);
+      completed = true;
     } catch {
-      // The library's flush never rejects; a stand-in that does ends the wait.
+      // The library's flush never rejects; a stand-in that does ends the
+      // wait, and the logoff did not complete.
     }
+    const listeners = completed ? (logoffListeners.get(connection) ?? []) : [];
+    logoffListeners.delete(connection);
+    for (const listener of listeners) {
+      try {
+        listener();
+      } catch {
+        // A listener that throws changes nothing of the close.
+      }
+    }
+    complete(completed);
   })();
   answering.add(answered);
   const owner = owners.get(connection);
@@ -312,6 +351,17 @@ export async function logoffsAnswered(owner?: object): Promise<void> {
   const pendingNow =
     owner === undefined ? [...answering] : [...(answeringFor.get(owner) ?? [])];
   await Promise.all(pendingNow);
+}
+
+/**
+ * Whether `connection`'s logoff completed: resolves `true` once its logoff
+ * was written and its `flushGoodbye()` resolved (no timer: as long as SAP
+ * takes to answer, or its transport to fail), `false` when the logoff was
+ * not written or its flush did not complete. A connection whose end was
+ * never asked for answers `false`.
+ */
+export function logoffCompleted(connection: object): Promise<boolean> {
+  return completions.get(connection) ?? Promise.resolve(false);
 }
 
 /** The connections `owner` owns and has not ended (every owner's: none given). */

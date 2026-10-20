@@ -34,7 +34,7 @@ export interface StdioServerOptions {
   sentenceFor?: (error: IAuthProviderError) => string | undefined;
   /**
    * The owner of the process's runtime session files (the launcher's): the
-   * SAP sessions this server holds, kept until their logoff is written, and
+   * SAP sessions this server holds, kept until their logoff completed (written and answered), and
    * the leftover-session tools. Absent: none kept, the tools not available.
    */
   leftoverSessions?: LeftoverSessions;

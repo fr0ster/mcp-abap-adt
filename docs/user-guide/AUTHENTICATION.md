@@ -475,10 +475,11 @@ written (one whose write never completes keeps the process until it is killed), 
 finished at the forced close: <step>`. What it costs: a session write lost (a discarded refresh
 token can come back on the next start). It is also the one end that does not wait for SAP's
 answers to the logoffs, a deliberate exception: a session whose logoff SAP had not received whole
-can stay until SAP's security-session timeout, and nothing lists it — its runtime file is deleted
-once its logoff is written, so `ListLeftoverSessions` does not show it. Only a logoff whose write
-failed keeps its file (HTTP connections only; an RFC session has none), for `ListLeftoverSessions`
-and `LogoffLeftoverSession` of the next process of the destination.
+can stay until SAP's security-session timeout. Such a session keeps its runtime file (HTTP
+connections only; an RFC session has none): a file is deleted only once its logoff completed,
+which the forced close does not wait for. So `ListLeftoverSessions` of the next process of the
+destination lists it, and `LogoffLeftoverSession` logs it off — as for a logoff whose write
+failed.
 
 Nothing is written to stdout.
 

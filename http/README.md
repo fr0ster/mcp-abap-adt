@@ -131,7 +131,7 @@ answered: exit `1` naming the requests still running. That forced close is the o
 not wait for SAP's answers, a deliberate exception: it exits once each logoff is written, so a
 session whose logoff SAP had not received whole can stay until SAP's security-session timeout.
 This server keeps no runtime session files, so nothing lists such a session
-(`ListLeftoverSessions` is stdio's).
+(`ListLeftoverSessions` is stdio's, where such a session keeps its file for the next process).
 
 ## Health
 

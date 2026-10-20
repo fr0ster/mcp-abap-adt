@@ -276,9 +276,11 @@ the `responsible` and `master_system` `systeminformation` answered — the sessi
 system id —, `null` until known and while an on-premise system gives no information) and the
 session's cookies — no credential. It is written once the connection holds a session, again once
 its system information is known, and again after a request that changed the session's cookies (a
-stateful request's context cookie), and deleted once that connection's logoff is written — at every end: a tool's
-end, a replacement, the instance's close, the shutdown, the forced close and a crash's. So a file
-survives only a process that died without its logoff, or a logoff that could not be written.
+stateful request's context cookie), and deleted only once that connection's logoff completed —
+written, and the connection's `flushGoodbye()` settled (SAP answered it or its connection failed):
+a tool's end, a replacement, the instance's close, the shutdown and a crash's. So a file survives
+a process that died without its logoff, a logoff that could not be written, and a process that
+exited before its logoffs completed — the forced close, which exits after the writes.
 There is no expiry: a file stays until you act, and SAP's answer decides whether its session
 still lives.
 
@@ -333,7 +335,7 @@ data change, so the `-ro` ones serve them too:
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
 | `ListLeftoverSessions` | `HandlerLeftoverSessionList` | the sessions of this server's destination a killed process left: `handle`, `role`, `destination` (`name`, `url`, `client`, `system`), `user` (`null` for a token credential), `written_at` — never a cookie; nothing is sent to SAP |
-| `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: one request — the platform's ICF logoff with the session's cookies, no credential, no discovery or CSRF fetch before it (connection 17.1's `disconnect()` without `connect()`); every lock of the session is released. It answers `state: "logged_off"` once the logoff is written — SAP's answer is not read, so a session that had already ended is answered the same — and the file is deleted |
+| `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: one request — the platform's ICF logoff with the session's cookies, no credential, no discovery or CSRF fetch before it (connection 17.1's `disconnect()` without `connect()`); every lock of the session is released. It answers `state: "logged_off"` once the logoff completed — written, and answered or its connection failed; SAP's answer is not read, so a session that had already ended is answered the same — and only then is the file deleted |
 
 - **Only your own.** A file is yours when it names the destination this process serves, pointing
   where it points. Another destination's file, an unknown handle and a file whose process still runs (process id
@@ -1437,11 +1439,12 @@ transport's options only:
   costs: a session write lost — a discarded refresh token can come back on the next start. It is
   also the one end that does not wait for SAP's answers to the logoffs, a deliberate exception: a
   session whose logoff SAP had not received whole can stay until SAP's security-session timeout.
-  Nothing lists such a session: its runtime file is deleted once its logoff is written, so
-  `ListLeftoverSessions` does not show it. Only a logoff whose write failed keeps its file (HTTP
-  connections only; an RFC session has none), listed by `ListLeftoverSessions` and logged off by
-  `LogoffLeftoverSession` of the next process of the destination, or taken up by its start when it
-  is the destination's only one.
+  On stdio such a session keeps its runtime file — a file is deleted only once its logoff
+  completed, which the forced close does not wait for — so it is listed by `ListLeftoverSessions`
+  and logged off by `LogoffLeftoverSession` of the next process of the destination, or taken up by
+  its start when it is the destination's only one; so is a logoff whose write failed (HTTP
+  connections only; an RFC session has none). Streamable HTTP and SSE keep no runtime files, so
+  there nothing lists it.
 - **A crash outside a tool logs off too** (every binary): an uncaught exception or an unhandled
   promise rejection runs the orderly shutdown — every ADT session logged off, each logoff let
   finish, one stderr line `[MCP] The process failed (<ErrorClass>): …`, exit `1` (18.x exited with
@@ -1708,7 +1711,8 @@ build argument `VARIANT` (the package's name without its scope), installing that
   takes `leftoverSessions?: LeftoverSessions` (`@mcp-abap-adt/lib/embeddable`): one per process,
   created by you — `new LeftoverSessions({ directory: runtimeDirectory() })` — and handed to every
   instance; no module global. With it, each HTTP connection an instance builds and holds a session
-  on keeps a runtime file until its logoff is written, and the two leftover-session tools work —
+  on keeps a runtime file until its logoff completed (written, and its `flushGoodbye()` settled),
+  and the two leftover-session tools work —
   when the instance also serves a destination: `ConnectionContext.destination` (new, optional), who
   its leftover sessions belong to; `StdioServer` sets it to the destination it serves. Without the
   owner or the destination they answer `leftover_sessions_unavailable` and no file is kept, as on an

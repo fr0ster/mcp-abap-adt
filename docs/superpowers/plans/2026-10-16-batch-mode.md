@@ -646,6 +646,7 @@ Rule (owner): a description is purely functional and names the function on what 
 
 - [ ] **Step 1:** The query set: each query with its `required` groups (interchangeable tools per step), per role (reader: read-only tools; developer: all), over the full set's catalog (name + description + parameter names, as `tools/list` serves them).
 - [ ] **Step 2:** The retrieval test, offline: BM25 over that corpus; every required group within top-K per role (K as the consumer's production cap); and the first sentence of every description unique within each set. Run — FAIL on today's offenders (#270 GetDdl, #271 cases), listed by query.
+- [ ] **Step 2a:** The same queries by vectors, through the local Ollama (`http://127.0.0.1:11434`, its embedding models, e.g. `nomic-embed-text`, `bge-m3`, `mxbai-embed-large`): cosine alone and hybrid (0.7 cosine + 0.3 BM25), every required group within top-K per role and model. A live test that states where it runs: it runs when the Ollama answers with the model, and skips elsewhere (CI) with that reason. No SAP AI Core, no other remote service. Run — the failures listed by query and model.
 - [ ] **Step 3:** Rewrite the failing descriptions, and every description built around a vague subject, to the rule; `descriptionsFunctional.test.ts` stays green; regenerate the tool docs.
 - [ ] **Step 4:** Run — PASS. Break-it: put GetDdl's old description back — red; revert.
 - [ ] **Step 5:** All gates (CI's step list). Commit `docs: tool descriptions found by what users ask (#270, #271)`.

@@ -136,7 +136,10 @@ async function start(
     atBirth?: (
       shutdown: () => void,
       signal: (name: 'SIGTERM' | 'SIGINT') => void,
+      exits: readonly number[],
     ) => Promise<void>;
+    /** Replaces the in-memory transport's `start` (a transport that cannot open). */
+    openTransport?: () => Promise<void>;
   } = {},
 ) {
   const args = [
@@ -154,7 +157,9 @@ async function start(
     opened += 1;
     // What SAP had seen when the transport opened.
     seenAtOpen = standIn.requests.length;
-    return open();
+    return options.openTransport === undefined
+      ? open()
+      : options.openTransport();
   };
   let seenAtOpen = -1;
   const stderr: string[] = [];
@@ -193,6 +198,7 @@ async function start(
     options.atBirth?.(
       () => processLike.stdin.emit('end'),
       (name) => processLike.emit(name),
+      exits,
     ),
   ]);
   const client = new Client({ name: 'start', version: '1.0.0' });
@@ -489,6 +495,61 @@ it.each([500, 405, 501])(
     expect(runtimeFiles(runtime)).toEqual([]);
   },
 );
+
+// The logoff of a failed start is answered before the process ends: SAP
+// ends a security session only once it received the logoff whole, so an
+// exit right after the write would leave the session in SM05.
+it('a start that fails after the logon exits 1 only once SAP answered its logoff', async () => {
+  standIn.answer(isLookup, 500);
+  const logoff = standIn.hold((r) => isLogoff(r.url));
+  let exitsWhileHeld: number[] | undefined;
+  const s = await start({
+    kind: 'cloud',
+    atBirth: async (_shutdown, _signal, exits) => {
+      await logoff.arrived;
+      // Long enough for an exit that does not wait to be recorded.
+      await new Promise((r) => setTimeout(r, 100));
+      exitsWhileHeld = [...exits];
+      logoff.release();
+    },
+  });
+  expect(exitsWhileHeld).toEqual([]);
+  expect(s.exits).toEqual([1]);
+  expect(s.opened()).toBe(0);
+  expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
+  expect(standIn.logoffs()).toBe(1);
+});
+
+// A launch that rejects once the connector is born (the transport cannot
+// open) settles only once the logoff of what the process owns is answered:
+// the bin's exit follows the rejection.
+it('a transport that cannot open: the launch rejects only once SAP answered the logoff', async () => {
+  const logoff = standIn.hold((r) => isLogoff(r.url));
+  let settledWhileHeld: boolean | undefined;
+  let launchSettled = false;
+  const failure = new Error('the transport cannot open');
+  await expect(
+    start({
+      openTransport: async () => {
+        // Seen from inside the launch: the logoff comes only after this
+        // rejection, so the check runs beside it.
+        void (async () => {
+          await logoff.arrived;
+          await new Promise((r) => setTimeout(r, 100));
+          settledWhileHeld = launchSettled;
+          logoff.release();
+        })();
+        throw failure;
+      },
+      atBirth: async () => undefined,
+    }).finally(() => {
+      launchSettled = true;
+    }),
+  ).rejects.toBe(failure);
+  expect(settledWhileHeld).toBe(false);
+  expect(standIn.logoffs()).toBe(1);
+  expect(ownedConnections()).toEqual([]);
+});
 
 /** systeminformation answers that name no user: missing, empty, blank, not a string, not JSON, JSON that is no object. */
 const WITHOUT_USER: Array<[string, string]> = [

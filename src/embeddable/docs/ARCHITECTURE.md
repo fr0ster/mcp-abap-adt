@@ -173,7 +173,9 @@ refusal. A connection whose `connect()` was under way at the latch was swept wit
 **The process's logoffs** (`logOffAtOnce()`, lib's `shutdownSequence.ts`): `forceClose()` — the
 logoff of every connection the process owns, background runs' included, joined where one is under
 way — and `interrupt()` of every live call, in one tick. Every launcher's shutdown begins with it
-(stdio's on the end of stdin too): nothing waits for a running tool. It does await each logoff —
+(stdio's on the end of stdin too): nothing waits for a running tool. stdio's launcher runs it too
+before the exit `1` of a start that fails after its logon, and before its launch rejects (the
+bin's exit follows the rejection). It does await each logoff —
 these and any a site wrote before — until SAP answered it or its transport failed (the
 connection's `flushGoodbye()`, no timer, the answer not read): SAP ends a security session, and
 every user session in it, only once it has received the logoff request whole

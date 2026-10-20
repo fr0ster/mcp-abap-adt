@@ -24,7 +24,11 @@ import {
   runtimeDirectory,
   sapAnswerOf,
 } from '@mcp-abap-adt/lib/embeddable';
-import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
+import {
+  logOffAtOnce,
+  type StateLogger,
+  stderrStateLogger,
+} from '@mcp-abap-adt/lib/state';
 import {
   fullToolSet,
   registryOf,
@@ -674,8 +678,28 @@ async function checkAndSummarise(
  * served, a logon or resume that fails, a system lookup that fails: each
  * ends the process with exit `1` and the failure's words on stderr, before
  * any transport opens.
+ *
+ * No exit and no rejection comes before the logoffs are answered: a start
+ * that fails after its logon exits `1` only once SAP answered the logoff
+ * (`logOffAtOnce`: every connection the process owns logged off, each
+ * logoff followed to its answer, no timer), and a launch that rejects — the
+ * bin's exit follows — rejects only then. SAP ends a security session only
+ * once it received the logoff whole.
  */
 export async function launch(
+  config: CoreConfig,
+  options: LauncherOptions,
+  deps: LauncherDeps,
+): Promise<void> {
+  try {
+    await launchStdio(config, options, deps);
+  } catch (error) {
+    await logOffAtOnce();
+    throw error;
+  }
+}
+
+async function launchStdio(
   config: CoreConfig,
   options: LauncherOptions,
   deps: LauncherDeps,
@@ -855,6 +879,9 @@ export async function launch(
       deps.stderr(
         `[MCP] ${startConnectionWords(error, destination, factory, deps.platform ?? process.platform)}`,
       );
+      // The birth logged off what it logged on; the exit waits for SAP's
+      // answer to that logoff, so the session ends with the process.
+      if (!birth.shutdownBegan()) await logOffAtOnce();
       if (!birth.shutdownBegan()) deps.exit(1);
       return;
     }

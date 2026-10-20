@@ -182,7 +182,7 @@ wording. The words below follow it; the plan's description sweep holds every oth
   one place, so no handler file changes), positive in every case:
   - a recordable tool — "Recordable: in batch mode a call is recorded under the next number and
     answers with empty content; its answer is read by number after the batch ends.";
-  - a tool recordable for some arguments — the same sentence, prefixed "With <the entry's `when`
+  - a tool recordable for some arguments — the same sentence, prefixed "When <the entry's `when`
     in words>,";
   - any other tool — "Runs outside batch mode."
   In the compact sets the sentences name `HandlerBatch`'s actions where the full sets name the batch

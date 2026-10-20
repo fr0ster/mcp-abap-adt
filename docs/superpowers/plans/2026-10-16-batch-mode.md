@@ -594,7 +594,7 @@ debuggee. The owner decided it ships in 19.0.0.
 - Create: `src/__tests__/unit/sources/descriptionsFunctional.test.ts`
 
 **Interfaces:**
-- Produces: every description states what the tool does, its parameters and its result; the appended sentences are spec §3's ("Recordable: …", "With …, recordable: …", "Runs outside batch mode.").
+- Produces: every description states what the tool does, its parameters and its result; the appended sentences are spec §3's ("Recordable: …", "When …, recordable: …", "Runs outside batch mode.").
 
 - [ ] **Step 1: Write the failing test** — `descriptionsFunctional.test.ts`: for every served tool in every set (taken from the registered tool lists, the appended sentence included), split the description into word tokens with plain code (letters and apostrophes kept, everything else a separator — no regular expression) and assert none of the tokens, lower-cased, is in the list `not`, `no`, `never`, `nothing`, `none`, `neither`, `nor`, `without`, `cannot`, `can't`, `doesn't`, `don't`, `isn't`, `won't`, `instead`, `formerly`, `deprecated`, `removed`, `replaces`, `migrate`; the failure names the tool and the token.
 - [ ] **Step 2:** Run — FAIL (listing today's offenders).

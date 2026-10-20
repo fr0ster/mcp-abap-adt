@@ -25,7 +25,7 @@ export const RECORDABLE_SENTENCE =
 
 /** The sentence of a tool recorded only for some arguments, `when` in words. */
 export function recordableWhenSentence(when: string): string {
-  return `With ${when}, recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.`;
+  return `When ${when}, recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.`;
 }
 
 /**

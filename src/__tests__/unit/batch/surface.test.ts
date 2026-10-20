@@ -174,7 +174,7 @@ describe('the batch tools on the surface', () => {
         expect(
           byName
             .get('CreatePackage')
-            ?.endsWith(` With the connection is HTTP, ${RECORDABLE_TAIL}`),
+            ?.endsWith(` When the connection is HTTP, ${RECORDABLE_TAIL}`),
         ).toBe(true);
         // A request that depends on another's answer, no request, the
         // debugger's own connection, a background run, a leftover session.
@@ -193,7 +193,7 @@ describe('the batch tools on the surface', () => {
       }
       if (kind === 'compact') {
         expect(byName.get('HandlerLock')).toContain(
-          ' With object_type is one of CLASS,',
+          ' When object_type is one of CLASS,',
         );
         expect(byName.get('HandlerLock')).toContain(
           `; or object_type is PACKAGE and the connection is HTTP, ${RECORDABLE_TAIL}`,

@@ -13,6 +13,10 @@ import {
   type AdtHeaderPort,
 } from '../lib/adtHeaders/AdtHeaderPairs.js';
 import { asRecordedCall } from '../lib/adtHeaders/scope.js';
+import {
+  adtSystemKey,
+  withoutTrailingSlashes,
+} from '../lib/adtHeaders/systemKey.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
 import { CurrentCredential } from '../lib/auth/currentCredential.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
@@ -2621,17 +2625,7 @@ function targetOf(settings: {
   client?: string;
   connectionType?: string;
 }): string {
-  return JSON.stringify([
-    withoutTrailingSlashes((settings.url ?? '').trim()),
-    (settings.client ?? '').trim(),
-    settings.connectionType ?? 'http',
-  ]);
-}
-
-function withoutTrailingSlashes(url: string): string {
-  let end = url.length;
-  while (end > 0 && url[end - 1] === '/') end -= 1;
-  return url.slice(0, end);
+  return adtSystemKey(settings);
 }
 
 function getDefaultLogger(): Logger {

@@ -556,6 +556,56 @@ instances; the stdio server's one instance keeps its own.
 
 adt-clients' `enableAcceptCorrection` is gone (interfaces-adt 20): drop it.
 
+### Using the header machinery directly: `@mcp-abap-adt/lib/adt-headers`
+
+An embedder that calls adt-clients members itself — outside the library's tools — sends the same
+pairs and applies the same correction through `@mcp-abap-adt/lib/adt-headers`:
+
+- `DEFAULT_ADT_HEADERS` (with `AdtOperation`, `adtOperation`) — the starting pairs, one per
+  operation. They were measured on one SAP version; what another version serves differently is
+  learned by the correction below.
+- `AdtHeaderPairs` / `AdtHeaderPort` — the corrected pairs, kept per system and operation, one
+  owner per process; `adtSystemKey(settings)` — the system key the server uses (the URL without
+  trailing slashes, the client, the connection type): two destinations to one system share it.
+- `withAdtHeaders(context, operation, call)` — the call with the system's pair, sent once more
+  with the type SAP named on a `406` / `415`, the corrected pair kept for the system.
+
+```typescript
+import {
+  AdtHeaderPairs,
+  adtSystemKey,
+  withAdtHeaders,
+} from '@mcp-abap-adt/lib/adt-headers';
+
+const pairs = new AdtHeaderPairs(); // one per process
+const port = pairs.forSystem(adtSystemKey({ url, client, connectionType: 'http' }));
+const answer = await withAdtHeaders({ adtHeaders: port }, 'class.check', (headers) =>
+  cls.check({ className }, undefined, { headers }),
+);
+```
+
+What the correction can and cannot do:
+
+- **It needs SAP to name the type**: a `406` with T100 `SADT_RESOURCE` 044 and its list of
+  accepted types (`Accepted content types: …`), or a `415` with `Supported Media Types: …`.
+- **A `406` with T100 `SADT_RESOURCE` 037 names nothing** and is not corrected: the refusal
+  reaches the caller as SAP gave it. 037 is the not-acceptable exception's generic default
+  text. Known places, from the endpoint corpus and the handlers' code: the GETs of the plugin
+  ("blue") resources with a wrong Accept — behaviour definitions, service bindings, data
+  elements, metadata extensions, domains, service definitions, structures, tables, table types,
+  BAdI implementations, authorization fields, CDS scalar function definitions and
+  implementation references, packages, feature toggles, the application log's objects (their
+  properties and their `/source/main`) — and the runtime dump.
+  The same 037 also answers a bad parameter value on some reads (an unknown object type in a
+  search), so 037 is never read as an Accept mismatch.
+- **The first call per system and operation may cost one refusal and one resend**; the kept pair
+  is sent from the start after it.
+- Seeding the kept pairs from a per-system header corpus (`header:discovery`) is planned after
+  this release.
+
+Left internal: the batch-mode scope (`adtCallScope`, `asRecordedCall`), the correction's own
+reader (`correctedPair`) and the server's context reader (`adtHeadersOf`).
+
 ## Direct adt-clients consumers
 
 adt-clients never retries: a `406` / `415` is the call's answer, nothing is sent again or
@@ -608,4 +658,6 @@ corrected pair is the consumer's.
 ## Exports
 
 - `AdtHeaderPairs`, `AdtHeaderPort` — `@mcp-abap-adt/lib/embeddable`.
-- `DEFAULT_ADT_HEADERS` and `withAdtHeaders` are not exported from a public entry of the library.
+- `@mcp-abap-adt/lib/adt-headers` — `DEFAULT_ADT_HEADERS`, `AdtOperation`, `AdtObjectWith`,
+  `adtOperation`, `AdtHeaderPairs`, `AdtHeaderPort`, `adtSystemKey`, `withAdtHeaders`,
+  `AdtHeadersContext` (above).

@@ -1563,7 +1563,9 @@ build argument `VARIANT` (the package's name without its scope), installing that
   connection you inject too. Anything you did with adt-clients' `enableAcceptCorrection` is gone:
   drop it. To share the corrected pairs between your instances, pass each the same
   `adtHeaderPairs: new AdtHeaderPairs()` (`@mcp-abap-adt/lib/embeddable`); without it each
-  instance keeps its own.
+  instance keeps its own. To call adt-clients members yourself with the same pairs and the same
+  correction, import `@mcp-abap-adt/lib/adt-headers` (`DEFAULT_ADT_HEADERS`, `AdtHeaderPairs`,
+  `adtSystemKey`, `withAdtHeaders`; docs/architecture/REQUEST_HEADERS.md).
 - **`makeAdtRequestWithTimeout`, `getTimeout` and `getTimeoutConfig` are gone from
   `@mcp-abap-adt/lib/utils`.** The last two were connection's, re-exported, and connection 17 no
   longer has them; `makeAdtRequestWithTimeout` turned a name (`'default'`, `'csrf'`, `'long'`) into

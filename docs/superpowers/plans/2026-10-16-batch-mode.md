@@ -677,6 +677,22 @@ The consumer (cloud-llm-hub) measures retrieval in its own repository and hands 
 - [ ] **Step 4 (live, on the owner's word):** a stdio server against the test system; the owner deletes its session in SM05; the next tool call answers on a new session; SM05 checked minutes later.
 - [ ] **Step 5:** All gates (CI's step list). Commit `test(stdio): a lost session is replaced at the next call (#295)`.
 
+### Task 42: CheckProgram / CheckFunctionGroup check the active version by default (#181)
+
+**Files:** the two handlers (and every `Check<Type>` with the same default), their unit tests, regenerated tool docs, CHANGELOG 19.0.0 (date = the day of the change).
+
+- [ ] **Step 1:** Failing test: without `version`, the check run is sent for the active version; with `version: "inactive"`, for the inactive one.
+- [ ] **Step 2:** Default `version` to active; fix the stale "no version parameter" comments; the description states the default.
+- [ ] **Step 3:** Run — PASS; break-it (inactive default) red; revert. All gates. Commit `fix(check): a check runs on the active version unless asked otherwise (#181)`.
+
+### Task 43: `shared:check` reads the shared objects on the system (#238)
+
+**Files:** `src/__tests__/admin/shared-deps/check.test.ts` (or a sibling `verify` admin script), `tests/README.md`, the package script.
+
+- [ ] **Step 1:** Beside the offline consistency checks, one read per shared name (its type's read): present / absent, listed by name; nothing written. It runs only as the admin script (`npm run shared:check`), never inside `npm test`, and states where it runs.
+- [ ] **Step 2 (live, on the owner's word):** `npm run shared:check` against the test system: every shared object present.
+- [ ] **Step 3:** All gates. Commit `test(shared): shared:check reads every shared object on the system (#238)`.
+
 ### Task 35: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).

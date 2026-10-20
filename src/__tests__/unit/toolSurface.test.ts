@@ -382,6 +382,13 @@ describe('the MCP tool surface', () => {
    * profiler tools do what they did. Their rows left the snapshot; every
    * other row was checked unchanged.
    */
+  /**
+   * **The fifth deliberate move: `SearchSource` is available on cloud too
+   * (19.0.0).** It scans what the package walk and the source reads answer,
+   * and both answered on an SAP BTP ABAP trial (2026-10-21); its row's
+   * `available_in` moved from `onprem` to `cloud, onprem`, every other row
+   * was checked unchanged.
+   */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(
       (tool) => !read(frozen).has(tool),

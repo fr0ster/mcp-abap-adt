@@ -1395,7 +1395,7 @@
     "group": "search",
     "name": "SearchSource",
     "inputs": "query*, query2, exclude, packages*, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, emit_no_hits, max_objects, concurrency, version, time_budget_ms",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "search",

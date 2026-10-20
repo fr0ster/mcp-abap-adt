@@ -3,10 +3,10 @@
  *
  * Uses AdtClient.getFunctionGroup().check from @mcp-abap-adt/adt-clients 19.
  *
- * No `version` parameter exists on this tool, so `status` is always
- * `undefined`. The shipped `check(config, status, options)` reads `status
- * === 'active' ? 'active' : 'inactive'`, so an omitted status checks the
- * inactive version. Verified against `AdtFunctionGroup.js`.
+ * The shipped `check(config, status, options)` reads `status === 'active' ?
+ * 'active' : 'inactive'`, so the handler names the version itself: active
+ * unless `version` is `inactive` (#181). Verified against
+ * `AdtFunctionGroup.js`.
  */
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
@@ -36,7 +36,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.',
+          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
       },
       ...DETAIL_PROPERTY,
     },
@@ -70,10 +70,14 @@ export async function handleCheckFunctionGroup(
       withAdtHeaders(context, 'functionGroup.check', (headers) =>
         createAdtClient(connection, logger)
           .getFunctionGroup(resultsFor(functionGroupDocuments))
-          .check({ functionGroupName }, args.version, {
-            headers,
-            analyse: analyseException,
-          }),
+          .check(
+            { functionGroupName },
+            args.version === 'inactive' ? 'inactive' : 'active',
+            {
+              headers,
+              analyse: analyseException,
+            },
+          ),
       ),
     project(detail, terseCheck),
   );

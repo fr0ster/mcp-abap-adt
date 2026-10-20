@@ -149,7 +149,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/checkruns",
-          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/packages/pkg_a\" chkrun:version=\"inactive\"/>\n\n</chkrun:checkObjectList>",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/packages/pkg_a\" chkrun:version=\"active\"/>\n\n</chkrun:checkObjectList>",
           "headers": {
             "Accept": "application/vnd.sap.adt.checkmessages+xml",
             "Content-Type": "application/vnd.sap.adt.checkobjects+xml"

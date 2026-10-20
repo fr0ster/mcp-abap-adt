@@ -78,7 +78,7 @@ export async function handleCheckPackage(
       withAdtHeaders(context, 'package.check', (headers) =>
         createAdtClient(connection, logger)
           .getPackage(resultsFor(packageDocuments))
-          .check({ packageName }, undefined, {
+          .check({ packageName }, 'active', {
             headers,
             analyse: analyseException,
           }),

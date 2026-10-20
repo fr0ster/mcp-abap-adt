@@ -293,11 +293,11 @@ export async function handleCheckObject(
             ),
           );
         case 'package':
-          // A package check takes no version: the low tool sent none.
+          // A package check runs on the active version, like every check.
           return withAdtHeaders(context, 'package.check', (headers) =>
             client
               .getPackage(resultsFor(packageDocuments))
-              .check({ packageName: objectName }, undefined, {
+              .check({ packageName: objectName }, 'active', {
                 headers,
                 analyse: analyseException,
               }),

@@ -57,13 +57,13 @@ describe('CheckDomainLow', () => {
     });
   });
 
-  it('hands check its own analyseException, and status undefined (the inactive default)', async () => {
+  it('hands check its own analyseException, and status active (the default)', async () => {
     fakeClient = seen.client;
     await handleCheckDomain(context as any, { domain_name: 'ZD' });
     const call = seen.calls.filter((c) => c.member === 'check').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 });
 

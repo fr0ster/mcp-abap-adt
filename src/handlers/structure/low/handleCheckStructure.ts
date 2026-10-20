@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
       version: {
         type: 'string',
         description:
-          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive",
+          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Without `version` the active version is checked.",
         enum: ['active', 'inactive'],
       },
       ...DETAIL_PROPERTY,
@@ -70,7 +70,7 @@ export async function handleCheckStructure(
 
   const structureName = structure_name.toUpperCase();
   const checkVersion =
-    version && version.toLowerCase() === 'active' ? 'active' : 'inactive';
+    version && version.toLowerCase() === 'inactive' ? 'inactive' : 'active';
   const detail = detailOf(args);
 
   return answer(

@@ -293,13 +293,13 @@ describe('class', () => {
 });
 
 describe('interface', () => {
-  it("CheckInterfaceLow leaves the check member's status undefined (the shipped inactive default)", async () => {
+  it("CheckInterfaceLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckInterface(context as any, { interface_name: 'ZIF_X' });
     const call = callTo('check');
     expect(call?.factory).toBe('getInterface');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   it('UpdateInterfaceLow passes source via options, not config — the shipped AdtInterface.update() only reads it there', async () => {
@@ -343,13 +343,13 @@ describe('interface', () => {
 });
 
 describe('behavior_definition', () => {
-  it("CheckBdefLow leaves the check member's status undefined (the shipped inactive default)", async () => {
+  it("CheckBdefLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckBehaviorDefinition(context as any, { name: 'ZBDEF_X' });
     const call = callTo('check');
     expect(call?.factory).toBe('getBehaviorDefinition');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   it('UpdateBehaviorDefinitionLow passes source via options and transportRequest via config — the shipped AdtBehaviorDefinition.update() only reads source there', async () => {
@@ -396,7 +396,7 @@ describe('behavior_definition', () => {
 });
 
 describe('ddl', () => {
-  it("CheckDdlLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_source via config.source — checkDdl reads it, unlike most sibling families in this cluster", async () => {
+  it("CheckDdlLow defaults the check member's status to 'active' when version is omitted, and forwards ddl_source via config.source — checkDdl reads it, unlike most sibling families in this cluster", async () => {
     await handleCheckDdl(context as any, {
       ddl_name: 'ZVW_X',
       ddl_source: 'define view ZVW_X as select from t000 {client};',
@@ -409,7 +409,7 @@ describe('ddl', () => {
       ddlName: 'ZVW_X',
       source: 'define view ZVW_X as select from t000 {client};',
     });
-    expect(call?.args[1]).toBe('inactive');
+    expect(call?.args[1]).toBe('active');
   });
 
   it('CheckDdlLow passes "active" through to the check member\'s second parameter when asked', async () => {
@@ -518,7 +518,7 @@ describe('ddlx (metadataExtension)', () => {
 });
 
 describe('structure', () => {
-  it("CheckStructureLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_code via config.source — checkStructure reads it", async () => {
+  it("CheckStructureLow defaults the check member's status to 'active' when version is omitted, and forwards ddl_code via config.source — checkStructure reads it", async () => {
     await handleCheckStructure(context as any, {
       structure_name: 'ZST_X',
       ddl_code: 'define structure zst_x { client : abap.clnt; }',
@@ -531,7 +531,7 @@ describe('structure', () => {
       structureName: 'ZST_X',
       source: 'define structure zst_x { client : abap.clnt; }',
     });
-    expect(call?.args[1]).toBe('inactive');
+    expect(call?.args[1]).toBe('active');
   });
 
   it('CheckStructureLow passes "active" through to the check member\'s second parameter when asked', async () => {
@@ -580,7 +580,7 @@ describe('structure', () => {
 });
 
 describe('table', () => {
-  it("CheckTableLow defaults the check member's status to 'new' when version is omitted, and forwards no source — runTableCheckRun's source argument is hardcoded undefined", async () => {
+  it("CheckTableLow defaults the check member's status to 'active' when version is omitted, and forwards no source — runTableCheckRun's source argument is hardcoded undefined", async () => {
     await handleCheckTable(context as any, {
       table_name: 'ZT_X',
       ddl_code: 'define table zt_x { client : abap.clnt; }',
@@ -592,7 +592,7 @@ describe('table', () => {
     // ddl_code is accepted by the tool but never reaches config — unlike
     // structure's sibling handler, table's check has nothing to forward it to.
     expect(call?.args[0]).toEqual({ tableName: 'ZT_X' });
-    expect(call?.args[1]).toBe('new');
+    expect(call?.args[1]).toBe('active');
   });
 
   it('CheckTableLow passes "active" through to the check member\'s second parameter when asked', async () => {
@@ -645,14 +645,14 @@ describe('table', () => {
 });
 
 describe('program', () => {
-  it("CheckProgramLow leaves the check member's status undefined — no version parameter exists on this tool", async () => {
+  it("CheckProgramLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckProgram(context as any, { program_name: 'Z_X' });
     const call = callTo('check');
     expect(call?.factory).toBe('getProgram');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({ programName: 'Z_X' });
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   it('UpdateProgramLow passes source via options, not config — the shipped AdtProgram.update() only reads it there', async () => {
@@ -750,7 +750,7 @@ describe('program', () => {
 });
 
 describe('function (function group)', () => {
-  it("CheckFunctionGroupLow leaves the check member's status undefined — no version parameter exists on this tool", async () => {
+  it("CheckFunctionGroupLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckFunctionGroup(context as any, {
       function_group_name: 'ZFG_X',
     });
@@ -759,7 +759,7 @@ describe('function (function group)', () => {
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({ functionGroupName: 'ZFG_X' });
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   it('ActivateFunctionGroupLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -857,7 +857,7 @@ describe('function (function module)', () => {
 // ---------------------------------------------------------------------------
 
 describe('data_element', () => {
-  it("CheckDataElementLow leaves the check member's status undefined (the shipped inactive default)", async () => {
+  it("CheckDataElementLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckDataElement(context as any, {
       data_element_name: 'ZDT_X',
     });
@@ -865,7 +865,7 @@ describe('data_element', () => {
     expect(call?.factory).toBe('getDataElement');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   /**
@@ -885,7 +885,7 @@ describe('data_element', () => {
     expect(callTo('check')?.args[1]).toBe('active');
   });
 
-  it('CheckDomainLow passes version through to the check member, and leaves it undefined when not given', async () => {
+  it('CheckDomainLow passes version through to the check member, and sends active when not given', async () => {
     await handleCheckDomainLowForVersion(
       context as any,
       {
@@ -900,7 +900,7 @@ describe('data_element', () => {
         domain_name: 'ZDM_X',
       } as any,
     );
-    expect(callTo('check')?.args[1]).toBeUndefined();
+    expect(callTo('check')?.args[1]).toBe('active');
   });
 
   it('CheckDataElementLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {
@@ -1314,7 +1314,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
 });
 
 describe('package — no Activate tool (a package is a container, no activation)', () => {
-  it("CheckPackageLow forwards no superPackage — checkPackage takes only the package name — and leaves the check member's status undefined", async () => {
+  it("CheckPackageLow forwards no superPackage — checkPackage takes only the package name — and passes status 'active' to the check member", async () => {
     await handleCheckPackage(context as any, {
       package_name: 'ZP_X',
       super_package: 'ZP',
@@ -1322,7 +1322,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     const call = callTo('check');
     expect(call?.factory).toBe('getPackage');
     expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
   });
@@ -1594,6 +1594,6 @@ describe('check tools pass version through to the check member', () => {
     await handler(context as any, { ...args, version: 'active' });
     expect(callTo('check')?.args[1]).toBe('active');
     await handler(context as any, args);
-    expect(callTo('check')?.args[1]).toBeUndefined();
+    expect(callTo('check')?.args[1]).toBe('active');
   });
 });

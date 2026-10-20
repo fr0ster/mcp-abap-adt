@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.',
+          'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
       },
     },
     required: ['domain_name'],

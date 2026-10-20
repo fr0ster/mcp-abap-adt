@@ -36,7 +36,7 @@ export const TOOL_DEFINITION = {
       version: {
         type: 'string',
         description:
-          "Version to check: 'active' or 'inactive'. Default: inactive.",
+          "Version to check: 'active' or 'inactive'. Without `version` the active version is checked.",
         enum: ['active', 'inactive'],
       },
       ddl_code: {

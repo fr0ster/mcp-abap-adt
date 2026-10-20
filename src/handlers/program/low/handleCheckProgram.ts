@@ -3,15 +3,12 @@
  *
  * Uses AdtClient.getProgram().check from @mcp-abap-adt/adt-clients 19.
  *
- * **No `version` parameter on this tool, so `status` is always `undefined`.**
  * The shipped `check(config, status, options)` reads `status === 'active' ?
- * 'active' : 'inactive'`, so an omitted status checks the inactive version —
- * the same shipped default `CheckDomainLow`/`CheckTableLow` rely on. Unlike
- * those two, `checkProgram(connection, config.programName, version,
- * config.source, contentType)` DOES read a fourth argument for an
- * unsaved source, but no `source_code` parameter existed on this tool before
- * this migration, so nothing is forwarded there either. Verified against
- * `AdtProgram.js`, not the declaration file.
+ * 'active' : 'inactive'`, so the handler names the version itself: active
+ * unless `version` is `inactive` (#181). `checkProgram(connection,
+ * config.programName, version, config.source, contentType)` also reads a
+ * fourth argument for an unsaved source; this tool has no `source_code`
+ * parameter, so nothing is forwarded there. Verified against `AdtProgram.js`.
  */
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
@@ -41,7 +38,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.',
+          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
       },
       ...DETAIL_PROPERTY,
     },
@@ -83,10 +80,14 @@ export async function handleCheckProgram(
       withAdtHeaders(context, 'program.check', (headers) =>
         createAdtClient(connection, logger)
           .getProgram(resultsFor(programDocuments))
-          .check({ programName }, args.version, {
-            headers,
-            analyse: analyseException,
-          }),
+          .check(
+            { programName },
+            args.version === 'inactive' ? 'inactive' : 'active',
+            {
+              headers,
+              analyse: analyseException,
+            },
+          ),
       ),
     project(detail, terseCheck),
   );

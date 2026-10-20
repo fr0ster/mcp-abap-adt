@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
       version: {
         type: 'string',
         description:
-          "Version to check: 'active' selects the last activated version. 'inactive' and 'new' are accepted for compatibility but indistinguishable — the shipped check endpoint treats anything other than 'active' as 'inactive'. Default: new.",
+          "Version to check: 'active' selects the last activated version. 'inactive' and 'new' both check the inactive version. Without `version` the active version is checked.",
         enum: ['active', 'inactive', 'new'],
       },
       reporter: {
@@ -84,7 +84,7 @@ export async function handleCheckTable(
   const checkVersion =
     version && validVersions.includes(version.toLowerCase())
       ? version.toLowerCase()
-      : 'new';
+      : 'active';
   const detail = detailOf(args);
 
   return answer(

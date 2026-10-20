@@ -1430,7 +1430,14 @@ transport's options only:
   line per tool still running and the step that was cut short. The
   forced close does wait for each logoff to be written: a logoff whose write never completes (a
   system that never takes the bytes) keeps the process until it is killed (`SIGKILL`). What it
-  costs: a session write lost — a discarded refresh token can come back on the next start.
+  costs: a session write lost — a discarded refresh token can come back on the next start. It is
+  also the one end that does not wait for SAP's answers to the logoffs, a deliberate exception: a
+  session whose logoff SAP had not received whole can stay until SAP's security-session timeout.
+  Nothing lists such a session: its runtime file is deleted once its logoff is written, so
+  `ListLeftoverSessions` does not show it. Only a logoff whose write failed keeps its file (HTTP
+  connections only; an RFC session has none), listed by `ListLeftoverSessions` and logged off by
+  `LogoffLeftoverSession` of the next process of the destination, or taken up by its start when it
+  is the destination's only one.
 - **A crash outside a tool logs off too** (every binary): an uncaught exception or an unhandled
   promise rejection runs the orderly shutdown — every ADT session logged off, each logoff let
   finish, one stderr line `[MCP] The process failed (<ErrorClass>): …`, exit `1` (18.x exited with

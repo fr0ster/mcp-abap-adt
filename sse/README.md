@@ -102,8 +102,12 @@ of the process at once** and interrupts the running tools — nothing waits for 
 lets each logoff finish (until SAP answered it or its connection failed), then ends every stream.
 It exits `0`. There is no deadline. A killed process (`SIGKILL`, out of memory) sends no logoff:
 SAP keeps its sessions until its own timeout. A second signal, or
-`--shutdown-timeout=<seconds>` (no default), matters only while a logoff is still being written:
-exit `1` naming the requests still running.
+`--shutdown-timeout=<seconds>` (no default), matters only while a logoff is still being written or
+answered: exit `1` naming the requests still running. That forced close is the one end that does
+not wait for SAP's answers, a deliberate exception: it exits once each logoff is written, so a
+session whose logoff SAP had not received whole can stay until SAP's security-session timeout.
+This server keeps no runtime session files, so nothing lists such a session
+(`ListLeftoverSessions` is stdio's).
 
 ## Health
 

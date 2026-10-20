@@ -188,7 +188,15 @@ stdin and a broken pipe (`EPIPE`) on stdin or stdout, `beforeExit`, and a crash 
 (`uncaughtException`, `unhandledRejection`): one fixed-words line naming the failure by its class,
 the same orderly sequence, exit `1`; a crash during a shutdown lets it finish and exits `1`.
 **The forced close** (`forceClose()` again, without waiting for the sequence's last steps) serves
-the two escapes only: a second signal and `--shutdown-timeout`. A server run from source through
+the two escapes only: a second signal and `--shutdown-timeout`. It is the one end that does not
+wait for SAP's answers, a deliberate exception: it exits once each logoff is written, so a session
+whose logoff SAP had not received whole can stay until SAP's security-session timeout. Nothing
+names such a session afterwards: a stdio runtime file is deleted once its connection's logoff is
+written (`LeftoverSessions.track`, `whenLoggedOff`), so `ListLeftoverSessions` does not list it,
+and Streamable HTTP and SSE keep no runtime files. Only a logoff whose write failed keeps its file
+— stdio, HTTP connections only (an RFC connection has none) — for `ListLeftoverSessions` and
+`LogoffLeftoverSession` of a later stdio process of the same destination, or for that process's
+start to take up when it is the destination's only one. A server run from source through
 `tsx` (the integration tests' served servers) gets only `SIGINT` and `SIGTERM` from it: `tsx`
 forwards those two to the script it runs, and `SIGHUP` or `SIGQUIT` reach the wrapper, not the
 server (measured 2026-10-19) — send them to the server's own process. An installed bin runs on

@@ -473,7 +473,12 @@ from a file), when:
 is waited for — not a session write, not a flush — but each ADT session's logoff, which is still
 written (one whose write never completes keeps the process until it is killed), and the exit is `1` with `Still running at the forced close: <tool>` per tool and `Not
 finished at the forced close: <step>`. What it costs: a session write lost (a discarded refresh
-token can come back on the next start).
+token can come back on the next start). It is also the one end that does not wait for SAP's
+answers to the logoffs, a deliberate exception: a session whose logoff SAP had not received whole
+can stay until SAP's security-session timeout, and nothing lists it — its runtime file is deleted
+once its logoff is written, so `ListLeftoverSessions` does not show it. Only a logoff whose write
+failed keeps its file (HTTP connections only; an RFC session has none), for `ListLeftoverSessions`
+and `LogoffLeftoverSession` of the next process of the destination.
 
 Nothing is written to stdout.
 

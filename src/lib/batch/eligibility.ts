@@ -16,7 +16,6 @@
  * lock over RFC opens an ABAP session of its own, outside the batch).
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /** One condition on a named argument; an entry's `when` holds when all of them do. */
@@ -46,7 +45,9 @@ export type Eligibility =
 /**
  * The table's place: `tools/` at the package root, three levels above this
  * module both in `src/lib/batch` and in `dist/lib/batch` (the package ships
- * the file, `package.json` `files`).
+ * the file, `package.json` `files`). The table is loaded by a `require` of
+ * this same place written as a literal, so a bundler (the portable build's
+ * single executable, which has no file beside its code) carries it inside.
  */
 export const BATCH_HANDLERS_FILE = path.join(
   __dirname,
@@ -59,12 +60,12 @@ export const BATCH_HANDLERS_FILE = path.join(
 
 let table: ReadonlyMap<string, readonly BatchEntry[]> | undefined;
 
-/** The entries, by tool — read from the file at the first use, then kept. */
+/** The entries, by tool — loaded at the first use, then kept. */
 function entriesByTool(): ReadonlyMap<string, readonly BatchEntry[]> {
   if (table === undefined) {
-    const entries = JSON.parse(
-      fs.readFileSync(BATCH_HANDLERS_FILE, 'utf8'),
-    ) as BatchEntry[];
+    // `BATCH_HANDLERS_FILE`, as a literal a bundler inlines.
+    const entries =
+      require('../../../tools/batch-handlers.json') as readonly BatchEntry[];
     const byTool = new Map<string, BatchEntry[]>();
     for (const entry of entries) {
       const listed = byTool.get(entry.tool) ?? [];

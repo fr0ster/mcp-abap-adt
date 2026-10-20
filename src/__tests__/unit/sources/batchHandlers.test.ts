@@ -168,6 +168,24 @@ describe('tools/batch-handlers.json', () => {
     expect(manifest.files).toContain('tools/batch-handlers.json');
   });
 
+  // The portable build bundles the bin into a single executable, where no
+  // file lies beside the code: the table must travel inside the bundle. A
+  // `require` of a literal path is what a bundler inlines; a file read at
+  // run time is not.
+  it('is read through one require of a literal path, which a bundler inlines — no file read at run time', () => {
+    const source = fs.readFileSync(
+      path.join(REPO, 'src/lib/batch/eligibility.ts'),
+      'utf8',
+    );
+    const literal = "require('../../../tools/batch-handlers.json')";
+    expect(source.split(literal)).toHaveLength(2);
+    expect(source).not.toContain('readFileSync');
+    expect(source).not.toContain("from 'node:fs'");
+    expect(
+      path.resolve(REPO, 'src/lib/batch', '../../../tools/batch-handlers.json'),
+    ).toBe(path.resolve(BATCH_HANDLERS_FILE));
+  });
+
   it('every entry has the shape: tool, set, handler, sends, and a well-formed when / connection', () => {
     for (const entry of entries) {
       const keys = Object.keys(entry).filter(

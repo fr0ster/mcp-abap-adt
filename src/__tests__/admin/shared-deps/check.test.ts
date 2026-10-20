@@ -31,7 +31,7 @@ import {
 import { createTestLogger } from '../../integration/helpers/loggerHelpers';
 import { primeSystemContext } from '../../integration/helpers/primeSystemContext';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
-import { presenceReport, readShared } from './presence';
+import { connectionFailureWords, presenceReport, readShared } from './presence';
 
 const testsLogger = createTestLogger('shared-check');
 
@@ -330,7 +330,7 @@ const liveIt = TEST_CONFIG_PRESENT ? it : it.skip;
 
 describe('Live: shared_dependencies exist on the system', () => {
   let client: AdtClient | undefined;
-  let connectionError: Error | undefined;
+  let connectionError: unknown;
 
   beforeAll(async () => {
     if (!TEST_CONFIG_PRESENT) return;
@@ -351,9 +351,7 @@ describe('Live: shared_dependencies exist on the system', () => {
       // An admin script runs only when asked for: a system it cannot reach
       // is a failure, not a skip.
       if (connectionError || !client) {
-        throw new Error(
-          `No connection to the system, nothing was read: ${connectionError?.message ?? 'no client'}`,
-        );
+        throw new Error(connectionFailureWords(connectionError));
       }
       const sharedConfig = getSharedDependenciesConfig();
       if (!sharedConfig) {

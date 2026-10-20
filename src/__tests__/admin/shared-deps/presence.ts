@@ -86,6 +86,32 @@ function safeCode(code: unknown): string | undefined {
 }
 
 /**
+ * The words for a connection that could not be made: fixed text, with only
+ * the HTTP status and a constant-shaped code the failure carried — never its
+ * message, which may hold anything the layer below put there.
+ */
+export function connectionFailureWords(error: unknown): string {
+  const facts: string[] = [];
+  if (error === undefined) facts.push('no client');
+  else {
+    let status: unknown;
+    let code: unknown;
+    try {
+      const e = error as { response?: { status?: unknown }; code?: unknown };
+      status = e?.response?.status;
+      code = e?.code;
+    } catch {
+      // A failure whose fields cannot be read carries no facts.
+    }
+    if (Number.isInteger(status)) facts.push(`HTTP ${status}`);
+    const safe = safeCode(code);
+    if (safe) facts.push(safe);
+    if (!facts.length) facts.push('connection failed');
+  }
+  return `No connection to the system, nothing was read (${facts.join(', ')})`;
+}
+
+/**
  * What a read said about the object. `absent` only when SAP answered that it
  * is not there (a response with status 404, whatever its origin: the library
  * files a transport-refused status under 'connection'); any other refusal — 401, 5xx, no answer

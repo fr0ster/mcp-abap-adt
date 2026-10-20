@@ -1,5 +1,6 @@
 import {
   classifyRead,
+  connectionFailureWords,
   presenceReport,
   readShared,
   SHARED_READS,
@@ -181,5 +182,37 @@ describe('shared:check readShared', () => {
     expect(report.message).toContain('ECONNRESET');
     expect(report.message).not.toContain('SECRET');
     expect(report.absent).toEqual(['tables: ZMISSING']);
+  });
+});
+
+describe('connectionFailureWords', () => {
+  it('keeps only the status and a constant-shaped code of a failed connection, never its message', () => {
+    const words = connectionFailureWords(
+      Object.assign(new Error('Bearer SECRET at http://host/sap?pw=SECRET'), {
+        code: 'ERR_BAD_REQUEST',
+        response: { status: 401, data: 'SECRET body' },
+      }),
+    );
+    expect(words).toBe(
+      'No connection to the system, nothing was read (HTTP 401, ERR_BAD_REQUEST)',
+    );
+    expect(words).not.toContain('SECRET');
+  });
+
+  it('a failure with no status or usable code reads as a failed connection', () => {
+    expect(
+      connectionFailureWords(
+        Object.assign(new Error('SECRET'), { code: 'has spaces SECRET' }),
+      ),
+    ).toBe('No connection to the system, nothing was read (connection failed)');
+    expect(connectionFailureWords('SECRET')).toBe(
+      'No connection to the system, nothing was read (connection failed)',
+    );
+  });
+
+  it('no client and no failure is said so', () => {
+    expect(connectionFailureWords(undefined)).toBe(
+      'No connection to the system, nothing was read (no client)',
+    );
   });
 });

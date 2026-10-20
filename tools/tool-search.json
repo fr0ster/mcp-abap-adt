@@ -3681,9 +3681,12 @@
       "code search",
       "occurrences",
       "statement",
-      "packages"
+      "packages",
+      "cursor",
+      "continue",
+      "next_start_at"
     ],
-    "semantic": "Search the source code of the programs, classes and function groups in a package for a text or statement."
+    "semantic": "Search the source code of the programs, classes and function groups in a package for a text or statement; a scan that stops early answers a cursor to continue from."
   },
   "SortAndCompressTransportTask": {
     "keywords": [

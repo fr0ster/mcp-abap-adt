@@ -387,6 +387,107 @@ describe('SearchSource on internal batches', () => {
     expect(textOf(result)).toBe(textOf(sequential));
   });
 
+  describe('the cursor: start_at in, next_start_at out', () => {
+    // The five targets, in (package, type, name) order: ZPROG_O, ZFG_A,
+    // ZPROG_A, ZPROG_B, ZCL_A.
+    const scanned = (result: unknown) =>
+      [...payloadOf(result).results, ...(payloadOf(result).no_hits ?? [])]
+        .map((h: { object_name: string }) => h.object_name)
+        .sort();
+
+    it('orders the targets by (package, type, name): the sources are read in that order', async () => {
+      const fake = system();
+      await search(fake);
+      expect(partKeys(fake.envelopes[5])).toEqual([
+        'PROGRAM ZPROG_O',
+        'STRUCTURE ZFG_A',
+        'PROGRAM ZPROG_A',
+        'PROGRAM ZPROG_B',
+        'CLASS ZCL_A',
+      ]);
+    });
+
+    it('start_at 0, max_objects 2: next_start_at 2, as the sequential version', async () => {
+      const result = await search(system(), {
+        start_at: 0,
+        max_objects: 2,
+      });
+      const p = payloadOf(result);
+      expect(p.scanned.objects).toBe(2);
+      expect(p.next_start_at).toBe(2);
+      expect(p.total_targets).toBe(5);
+      expect(p.truncated.by_max_objects).toBe(true);
+      const sequential = await search(
+        system(),
+        { start_at: 0, max_objects: 2 },
+        true,
+      );
+      expect(textOf(result)).toBe(textOf(sequential));
+    });
+
+    it('start_at 4 reads the last target only; no next_start_at', async () => {
+      const fake = system();
+      const result = await search(fake, { start_at: 4, max_objects: 2 });
+      const p = payloadOf(result);
+      expect(scanned(result)).toEqual(['ZCL_A']);
+      expect('next_start_at' in p).toBe(false);
+      expect(p.total_targets).toBe(5);
+      expect(p.truncated.by_max_objects).toBe(false);
+      expect(fake.envelopes.slice(5).map(partKeys)).toEqual([['CLASS ZCL_A']]);
+      const sequential = await search(
+        system(),
+        { start_at: 4, max_objects: 2 },
+        true,
+      );
+      expect(textOf(result)).toBe(textOf(sequential));
+    });
+
+    it.each([5, 9])(
+      'start_at %i: no hits, no cursor, total_targets 5; no source read',
+      async (at) => {
+        const fake = system();
+        const result = await search(fake, { start_at: at, max_objects: 2 });
+        const p = payloadOf(result);
+        expect(p.results).toEqual([]);
+        expect('next_start_at' in p).toBe(false);
+        expect(p.total_targets).toBe(5);
+        expect(fake.envelopes).toHaveLength(5);
+        const sequential = await search(
+          system(),
+          { start_at: at, max_objects: 2 },
+          true,
+        );
+        expect(textOf(result)).toBe(textOf(sequential));
+      },
+    );
+
+    it('three calls (0, 2, 4) hold the hits of one call over all five', async () => {
+      const whole = await search(system(), {
+        max_objects: 5,
+        emit_no_hits: true,
+      });
+      const parts: unknown[] = [];
+      for (const at of [0, 2, 4]) {
+        parts.push(
+          await search(system(), {
+            start_at: at,
+            max_objects: 2,
+            emit_no_hits: true,
+          }),
+        );
+      }
+      expect(parts.map((r) => payloadOf(r).next_start_at)).toEqual([
+        2,
+        4,
+        undefined,
+      ]);
+      expect(parts.flatMap((r) => hitNames(r)).sort()).toEqual(
+        hitNames(whole).sort(),
+      );
+      expect(parts.flatMap((r) => scanned(r)).sort()).toEqual(scanned(whole));
+    });
+  });
+
   describe('time_budget_ms checked between phases, truncated.by_timeout as today', () => {
     let clock = 0;
     let spy: jest.SpyInstance<number, []>;

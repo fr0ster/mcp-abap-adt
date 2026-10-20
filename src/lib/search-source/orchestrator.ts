@@ -53,6 +53,8 @@ export interface OrchestratorInput {
   max_hits_per_object?: number;
   emit_no_hits?: boolean;
   max_objects?: number;
+  /** Index of the first scan target to read (default 0): `next_start_at` of the previous answer. */
+  start_at?: number;
   concurrency?: number;
   version?: SourceVersion;
   /** Internal scan deadline in ms. When exceeded, returns hits gathered so far with truncated.by_timeout=true. */
@@ -88,6 +90,10 @@ export interface OrchestratorResult {
   /** Objects whose read failed, beside the others' hits; present only when any did. */
   failures?: FailedObject[];
   scanned: { packages: number; objects: number; sources: number };
+  /** The scan targets of the walk, before the slice. */
+  total_targets: number;
+  /** Present only when targets remain after the slice: pass it as `start_at` to go on. */
+  next_start_at?: number;
   truncated: {
     by_object_cap: boolean;
     by_max_objects: boolean;
@@ -114,6 +120,23 @@ const DEFAULTS = {
   concurrency: 8,
   version: 'active' as SourceVersion,
 };
+
+/**
+ * The slice of the walk's sorted targets one call reads: `[start_at,
+ * start_at + max_objects)`. The one place the slice end is computed.
+ */
+function sliceTargets<T>(
+  all: readonly T[],
+  startAt: number,
+  maxObjects: number,
+): { targets: T[]; total: number; next: number | undefined } {
+  const end = startAt + maxObjects;
+  return {
+    targets: all.slice(startAt, end),
+    total: all.length,
+    next: end < all.length ? end : undefined,
+  };
+}
 
 async function runWithLimit<T>(
   items: T[],
@@ -192,10 +215,9 @@ export async function runSearchSource(
     resolvedPackages.length === 0
       ? []
       : await enumerateScanTargets(deps.fetchPackageContents, enumerateInput);
-  const truncatedByMaxObjects = allTargets.length > maxObjects;
-  const targets = truncatedByMaxObjects
-    ? allTargets.slice(0, maxObjects)
-    : allTargets;
+  const slice = sliceTargets(allTargets, input.start_at ?? 0, maxObjects);
+  const targets = slice.targets;
+  const truncatedByMaxObjects = slice.next !== undefined;
 
   const allHits: SearchHit[] = [];
   const noHits: NoHitEntry[] = [];
@@ -325,12 +347,14 @@ export async function runSearchSource(
       objects: targets.length,
       sources: sourcesScanned,
     },
+    total_targets: slice.total,
     truncated: {
       by_object_cap: truncatedByObjectCap,
       by_max_objects: truncatedByMaxObjects,
       by_timeout: timedOut,
     },
   };
+  if (slice.next !== undefined) result.next_start_at = slice.next;
   if (emitNoHits) result.no_hits = noHits;
   if (failures.length > 0) {
     failures.sort((a, b) => {
@@ -390,17 +414,20 @@ async function runSearchSourceInPhases(
   const timedOut = (
     packages: number,
     objects: number,
-    byMaxObjects: boolean,
+    totalTargets: number,
+    next: number | undefined,
   ): OrchestratorResult => {
     const result: OrchestratorResult = {
       results: [],
       scanned: { packages, objects, sources: 0 },
+      total_targets: totalTargets,
       truncated: {
         by_object_cap: false,
-        by_max_objects: byMaxObjects,
+        by_max_objects: next !== undefined,
         by_timeout: true,
       },
     };
+    if (next !== undefined) result.next_start_at = next;
     if (emitNoHits) result.no_hits = [];
     return result;
   };
@@ -447,7 +474,8 @@ async function runSearchSourceInPhases(
             },
           );
   } catch (error) {
-    if (error === PAST_DEADLINE) return timedOut(resolved.length, 0, false);
+    if (error === PAST_DEADLINE)
+      return timedOut(resolved.length, 0, 0, undefined);
     throw error;
   }
   const fetchPackageContents: PackageContentsFetcher = async (packageName) => {
@@ -467,8 +495,8 @@ async function runSearchSourceInPhases(
     resolved.length === 0
       ? []
       : await enumerateScanTargets(fetchPackageContents, enumerateInput);
-  const truncatedByMaxObjects = allTargets.length > maxObjects;
-  const targets = allTargets.slice(0, maxObjects);
+  const slice = sliceTargets(allTargets, input.start_at ?? 0, maxObjects);
+  const targets = slice.targets;
 
   // (3) The source reads of the targets: each phase holds the reads the
   // answers so far name — the main sources and function group structures,
@@ -500,7 +528,7 @@ async function runSearchSourceInPhases(
     for (const [key, answer] of answered) sources.set(key, answer);
   }
   if (passed && sources.size === 0) {
-    return timedOut(resolved.length, targets.length, truncatedByMaxObjects);
+    return timedOut(resolved.length, targets.length, slice.total, slice.next);
   }
 
   // The scan, over the phases' answers: the sequential version's own.

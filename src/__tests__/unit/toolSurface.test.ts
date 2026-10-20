@@ -261,6 +261,8 @@ describe('the MCP tool surface', () => {
           'feed_types',
         ],
         'high/CreateTransportTask': ['task_type'],
+        // 19.0.0: SearchSource's cursor, `start_at` (from `next_start_at`), optional.
+        'search/SearchSource': ['start_at'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
         // part per call, `part` (source | metadata, default source), optional.
         'high/GetClass': ['part'],

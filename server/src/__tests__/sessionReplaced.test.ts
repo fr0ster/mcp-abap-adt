@@ -5,7 +5,9 @@
  * real connection's own identity check answers that call
  * `SESSION_REPLACED`, nothing retried; the connection is spent from then on,
  * so the next call logs on again and runs on the new session, and the
- * replaced connection is ended.
+ * replaced connection is ended. The session that replaced the old one is
+ * logged off before its cookies are dropped (connection 18.0.1), so SAP is
+ * left no session of the replaced connection.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -75,7 +77,7 @@ async function serveAtStart() {
 const sessionOfProbe = (id: string) =>
   standIn.requests.find((r) => r.url === `${PROBE_PATH}${id}`)?.session;
 
-it('stdio: a call that meets a session SAP replaced answers SESSION_REPLACED; the next call logs on again, runs on the new session, and the replaced connection is ended', async () => {
+it('stdio: a call that meets a session SAP replaced answers SESSION_REPLACED and logs off the replacing session; the next call logs on again, runs on the new session, and the replaced connection is ended', async () => {
   // Every disconnect() of the real connector, with the instance it ended.
   const disconnect = jest.spyOn(AdtOnPremConnector.prototype, 'disconnect');
   const { server, client, call } = await serveAtStart();
@@ -102,6 +104,10 @@ it('stdio: a call that meets a session SAP replaced answers SESSION_REPLACED; th
       standIn.requests.filter((r) => r.url === `${PROBE_PATH}two`),
     ).toHaveLength(1);
     expect(logons()).toBe(1);
+    // The probe landed in a session SAP opened for it.
+    const replacing = sessionOfProbe('two');
+    expect(replacing).toBeDefined();
+    expect(replacing).not.toBe(first);
 
     // The next call logs on again and runs on the new session.
     expect(await call('three')).toEqual({ text: 'three', isError: false });
@@ -119,12 +125,14 @@ it('stdio: a call that meets a session SAP replaced answers SESSION_REPLACED; th
     await client.close();
     await server.terminalClose();
     closed = true;
-    // The replacement ends at the instance's close, with its logoff. (The
-    // replaced one's disconnect() writes none: connection 18 dropped the
-    // session's cookies when it raised the loss.)
+    // The replacement ends at the instance's close, with its logoff. The
+    // session that replaced the old one was logged off once, by the
+    // connection when it raised the loss (connection 18.0.1, the answer not
+    // awaited there); the replaced connection's disconnect() wrote no second
+    // one, its cookies already dropped.
     expect(disconnect).toHaveBeenCalledTimes(2);
     expect(disconnect.mock.contexts[1]).not.toBe(retired);
-    expect(standIn.loggedOff()).toContain(third);
+    expect(standIn.loggedOff()).toEqual([replacing, third]);
   } finally {
     if (!closed) {
       await client.close();

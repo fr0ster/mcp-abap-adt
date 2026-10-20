@@ -53,7 +53,7 @@ Some tests depend on shared SAP objects (tables, CDS views, classes). Create the
 npm run shared:setup
 ```
 
-Verify with `npm run shared:check`. These objects persist across test runs — no need to re-create unless deleted via `npm run shared:teardown`.
+Verify with `npm run shared:check` (it reads every shared object from the system and lists the absent ones by name). These objects persist across test runs — no need to re-create unless deleted via `npm run shared:teardown`.
 
 ### 4. Run tests
 
@@ -118,7 +118,7 @@ Persistent SAP objects used across multiple tests (tables, CDS views, classes). 
 ```bash
 npm run shared:setup     # Create all shared objects
 npm run shared:teardown  # Delete all shared objects
-npm run shared:check     # Verify shared objects exist
+npm run shared:check     # Config consistency; with a test config, also reads every shared object from the system
 ```
 
 ## Debugging

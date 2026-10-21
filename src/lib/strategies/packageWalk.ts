@@ -525,7 +525,7 @@ export async function walkPackages(
   options: WalkOptions = {},
   roots?: readonly PhaseResult<unknown>[],
 ): Promise<PhaseResult<WalkedItem[]>[]> {
-  const withShortDescriptions = options.includeDescriptions !== false;
+  const withShortDescriptions = options.includeDescriptions === true;
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
   const failures = new Map<number, unknown>();
   const seen = packageNames.map((name) => new Set([name.toUpperCase()]));
@@ -643,7 +643,7 @@ export async function walkPackage(
   if (seen.has(pkg)) return [];
   seen.add(pkg);
 
-  const withShortDescriptions = options.includeDescriptions !== false;
+  const withShortDescriptions = options.includeDescriptions === true;
   const root = levelOf(
     await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
   );

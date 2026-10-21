@@ -47,7 +47,9 @@ export const TOOL_DEFINITION = {
     include_descriptions: z
       .boolean()
       .optional()
-      .describe('Include object descriptions in response (default: true)'),
+      .describe(
+        "Include each object's description in the response. Where the system serves ADT batch, each description is read from the object's metadata: one more read per object, which on a large package takes most of the call (default: false)",
+      ),
   },
 } as const;
 
@@ -87,28 +89,30 @@ export async function handleGetPackageContents(
     // many requests cannot take an IResultStrategy, and a flat list and a tree
     // are two conveniences over one walk. This is the same walk that handler
     // uses, assembled the other way — level by level, each level's requests in
-    // one envelope (spec §11), then every object's description from its
-    // metadata in one more; one package after another where the system has
-    // no communication batch.
+    // one envelope (spec §11), then, when descriptions are asked for, every
+    // object's description from its metadata in one more; one package after
+    // another where the system has no communication batch.
     const walked = await withSequentialFallback(
       context,
-      async () =>
-        describeFromMetadata(
-          context,
-          await walkPackages(
-            batchReader<NodeRequest, unknown>(context, (request, c) =>
-              readNode(
-                nodeStructureOn(
-                  context,
-                  createAdtClient(c, logger).getUtils(ourUtils),
-                ),
-                request,
+      async () => {
+        const levels = await walkPackages(
+          batchReader<NodeRequest, unknown>(context, (request, c) =>
+            readNode(
+              nodeStructureOn(
+                context,
+                createAdtClient(c, logger).getUtils(ourUtils),
               ),
+              request,
             ),
-            packageNames,
-            options,
           ),
-        ),
+          packageNames,
+          options,
+        );
+        // Descriptions only when asked for: each is its object's metadata.
+        return options.includeDescriptions === true
+          ? describeFromMetadata(context, levels)
+          : levels;
+      },
       () => {
         const utils = createAdtClient(connection, logger).getUtils(ourUtils);
         return rootByRoot(packageNames, (name) =>

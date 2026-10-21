@@ -292,6 +292,20 @@ function answerOf(
 }
 
 /**
+ * A node structure request sent alone with `withShortDescriptions: false` is
+ * answered without `DESCRIPTION`; inside an envelope SAP ignores the flag
+ * (measured, 2026-10-18), so an envelope part keeps them.
+ */
+function alone(request: IAbapRequestOptions, body: string): string {
+  const flag = (
+    request.params as { withShortDescriptions?: unknown } | undefined
+  )?.withShortDescriptions;
+  return request.url.includes('/repository/nodestructure') && flag === false
+    ? body.replace(/<DESCRIPTION>[^<]*<\/DESCRIPTION>|<DESCRIPTION\/>/g, '')
+    : body;
+}
+
+/**
  * The system: envelopes answered part by part, direct requests one by one;
  * `envelope` / `direct` replace either answer (a refusal thrown).
  */
@@ -316,7 +330,7 @@ function system(
         status: a.status,
         statusText: a.statusText ?? 'OK',
         headers: a.headers ?? {},
-        data: a.body ?? '',
+        data: alone(request, a.body ?? ''),
       } as IAdtWireResponse;
     },
   );
@@ -445,11 +459,6 @@ describe('GetPackageContents', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
-      [
-        'GET /sap/bc/adt/packages/zsub_a',
-        'GET /sap/bc/adt/oo/classes/zcl_a',
-        'GET /sap/bc/adt/programs/programs/zprog_a',
-      ],
     ]);
     expect(fake.directs).toHaveLength(0);
   });
@@ -484,7 +493,7 @@ describe('GetPackageContents', () => {
       }),
     );
     expect(two.envelopes).toHaveLength(one.envelopes.length);
-    expect(two.envelopes).toHaveLength(5);
+    expect(two.envelopes).toHaveLength(4);
     const entries = payloadOf(result);
     expect(
       entries.map((e: { package_name: string }) => e.package_name),
@@ -608,7 +617,6 @@ describe('HandlerGet part contents', () => {
     expect(fake.envelopes.map(partKeys)).toEqual([
       [nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
-      ['GET /sap/bc/adt/packages/zsub_a', 'GET /sap/bc/adt/oo/classes/zcl_a'],
     ]);
   });
 
@@ -634,18 +642,16 @@ describe('HandlerGet part contents', () => {
         contents({ package_names: ['ZROOT_A', 'ZROOT_B'] }),
       ) as Promise<unknown>,
     );
-    expect(fake.envelopes).toHaveLength(3);
+    expect(fake.envelopes).toHaveLength(2);
     const entries = payloadOf(result);
     expect(entries).toEqual([
       {
         package_name: 'ZROOT_A',
-        contents:
-          'name\ttype\tdescription\nZSUB_A\tDEVC/K\tSub A\nZCL_A\tCLAS/OC\tClass A',
+        contents: 'name\ttype\tdescription\nZSUB_A\tDEVC/K\t\nZCL_A\tCLAS/OC\t',
       },
       {
         package_name: 'ZROOT_B',
-        contents:
-          'name\ttype\tdescription\nZSUB_B\tDEVC/K\t\nZIF_B\tINTF/OI\tInterface B',
+        contents: 'name\ttype\tdescription\nZSUB_B\tDEVC/K\t\nZIF_B\tINTF/OI\t',
       },
     ]);
   });
@@ -722,11 +728,6 @@ describe('GetPackageTree', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
-      [
-        'GET /sap/bc/adt/packages/zsub_a',
-        'GET /sap/bc/adt/oo/classes/zcl_a',
-        'GET /sap/bc/adt/programs/programs/zprog_a',
-      ],
     ]);
   });
 
@@ -750,7 +751,7 @@ describe('GetPackageTree', () => {
         package_names: ['ZROOT_A', 'ZROOT_B'],
       }),
     );
-    expect(fake.envelopes).toHaveLength(5);
+    expect(fake.envelopes).toHaveLength(4);
     const entries = payloadOf(result);
     expect(
       entries.map((e: { package_name: string }) => e.package_name),
@@ -951,10 +952,6 @@ describe('GetObjectInfo', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
-      [
-        'GET /sap/bc/adt/oo/classes/zcl_a',
-        'GET /sap/bc/adt/programs/programs/zprog_a',
-      ],
       ['SEARCH|ZROOT_A', 'SEARCH|ZSUB_A'],
     ]);
   });
@@ -987,7 +984,7 @@ describe('GetObjectInfo', () => {
         maxDepth: 2,
       }),
     );
-    expect(fake.envelopes).toHaveLength(6);
+    expect(fake.envelopes).toHaveLength(5);
     const [a, b] = payloadOf(result);
     expect(a.OBJECT_NAME).toBe('ZROOT_A');
     expect(b.CHILDREN[0].CHILDREN[0].OBJECT_NAME).toBe('ZPROG_B');
@@ -1161,7 +1158,7 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
     );
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(6);
+    expect(fake.envelopes).toHaveLength(5);
   });
 });
 
@@ -1282,7 +1279,7 @@ function leakingSystem(model: Model = {}) {
         status: a.status,
         statusText: a.statusText ?? 'OK',
         headers: a.headers ?? {},
-        data: a.body ?? '',
+        data: alone(request, a.body ?? ''),
       } as IAdtWireResponse;
     },
   );
@@ -1298,6 +1295,7 @@ const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
         package_names: ['ZROOT_A', 'ZROOT_B'],
         include_subpackages: true,
         max_depth: 2,
+        include_descriptions: true,
       }),
   },
   {
@@ -1307,12 +1305,16 @@ const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
         object_type: 'PACKAGE',
         part: 'contents',
         package_names: ['ZROOT_A', 'ZROOT_B'],
+        include_descriptions: true,
       }) as Promise<unknown>,
   },
   {
     tool: 'GetPackageTree',
     call: (c) =>
-      handleGetPackageTree(c, { package_names: ['ZROOT_A', 'ZROOT_B'] }),
+      handleGetPackageTree(c, {
+        package_names: ['ZROOT_A', 'ZROOT_B'],
+        include_descriptions: true,
+      }),
   },
   {
     tool: 'GetObjectInfo',
@@ -1323,6 +1325,7 @@ const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
           { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
         ],
         maxDepth: 2,
+        include_descriptions: true,
       }),
   },
 ];
@@ -1412,5 +1415,127 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
       fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/oo/classes/')),
     ).toBe(false);
     expect(textOf(result)).toContain('Class A');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// include_descriptions: false — the batched walks read no metadata (#300)
+// ---------------------------------------------------------------------------
+
+describe('include_descriptions: false', () => {
+  const walkEnvelopes = [
+    [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
+    [nodeKey('DEVC/K', 'ZSUB_A')],
+    [nodeKey('DEVC/K', 'ZSUB_A', '30')],
+  ];
+
+  it('GetPackageContents: the walk alone, no description in the answer', async () => {
+    const fake = system();
+    const result = await withinTurns(
+      handleGetPackageContents(contextOn(fake), {
+        package_name: 'ZROOT_A',
+        include_subpackages: true,
+        max_depth: 2,
+        include_descriptions: false,
+      }),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(fake.envelopes.map(partKeys)).toEqual([
+      [nodeKey('DEVC/K', 'ZROOT_A')],
+      ...walkEnvelopes,
+    ]);
+    expect(fake.directs).toHaveLength(0);
+    expect(payloadOf(result).map((i: { name: string }) => i.name)).toEqual([
+      'ZSUB_A',
+      'ZCL_A',
+      'ZPROG_A',
+    ]);
+    expect(textOf(result)).not.toContain('Class A');
+  });
+
+  it('GetPackageTree: the walk alone, no description in the answer', async () => {
+    const fake = system();
+    const result = await withinTurns(
+      handleGetPackageTree(contextOn(fake), {
+        package_name: 'ZROOT_A',
+        include_descriptions: false,
+      }),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(fake.envelopes.map(partKeys)).toEqual([
+      ['GET /sap/bc/adt/packages/zroot_a', nodeKey('DEVC/K', 'ZROOT_A')],
+      ...walkEnvelopes,
+    ]);
+    expect(fake.directs).toHaveLength(0);
+    const tree = payloadOf(result).tree;
+    expect(tree.children.map((c: { name: string }) => c.name)).toEqual([
+      'ZSUB_A',
+      'ZCL_A',
+    ]);
+    expect(textOf(result)).not.toContain('Class A');
+  });
+});
+
+describe.each([
+  {
+    tool: 'GetPackageContents',
+    call: ((c) =>
+      handleGetPackageContents(c, {
+        package_name: 'ZROOT_A',
+        include_subpackages: true,
+        max_depth: 2,
+      })) as Call,
+  },
+  {
+    tool: 'HandlerGet part contents',
+    call: ((c) =>
+      handleHandlerGet(c, {
+        object_type: 'PACKAGE',
+        part: 'contents',
+        package_name: 'ZROOT_A',
+      }) as Promise<unknown>) as Call,
+  },
+  {
+    tool: 'GetPackageTree',
+    call: ((c) => handleGetPackageTree(c, { package_name: 'ZROOT_A' })) as Call,
+  },
+  {
+    tool: 'GetObjectInfo',
+    call: ((c) =>
+      handleGetObjectInfo(c, {
+        parent_type: 'DEVC/K',
+        parent_name: 'ZROOT_A',
+        maxDepth: 2,
+      })) as Call,
+  },
+])('$tool without include_descriptions', ({ call }) => {
+  it('batched: no metadata read, no description', async () => {
+    const fake = system();
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(
+      fake.envelopes
+        .flatMap(partKeys)
+        .some((k) => k.startsWith('GET /sap/bc/adt/oo/')),
+    ).toBe(false);
+    expect(textOf(result)).toContain('ZCL_A');
+    expect(textOf(result)).not.toContain('Class A');
+  });
+
+  it('sequential: node structures asked without descriptions', async () => {
+    const fake = system();
+    const result = await withinTurns(call(contextOn(fake, 'absent')));
+    const asked = fake.directs.filter((r) =>
+      r.url.includes('/repository/nodestructure'),
+    );
+    expect(asked.length).toBeGreaterThan(0);
+    expect(
+      asked.every(
+        (r) =>
+          (r.params as { withShortDescriptions?: unknown })
+            ?.withShortDescriptions === false,
+      ),
+    ).toBe(true);
+    expect(textOf(result)).not.toContain('Class A');
   });
 });

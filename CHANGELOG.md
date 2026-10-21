@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [19.1.0] - 2026-10-21
+
+### Changed
+
+- **Package listings answer no descriptions unless asked: `include_descriptions` defaults to `false`** in `GetPackageContents`, `GetPackageTree` and compact `HandlerGet` part `contents`, which takes the parameter now ([#300](https://github.com/fr0ster/mcp-abap-adt/issues/300)). **`GetObjectInfo` takes `include_descriptions` too** (default `false`): its leaves carry a description only when `true`, on the batched path from each leaf's metadata as before; `enrich` (the search for each node's description and package) is unchanged. Whether to pay for the descriptions is the consumer's choice; by default the server answers the fastest listing. With `include_descriptions: true`, on a destination that serves ADT batch, each description is read from the object's metadata, one read per object, in one more envelope after the walk: measured on an on-premise system, about 23 s for a flat package of 2 033 objects whose walk alone takes about 1.5 s. Without a communication batch the node structures are asked with descriptions only when `true`. Migration: a consumer that relied on the descriptions — of package objects or of `GetObjectInfo`'s leaves — passes `include_descriptions: true`.
+
+### Fixed
+
+- **`include_descriptions: false` no longer reads object metadata on the batched path** of `GetPackageContents` and `GetPackageTree`: the metadata pass ran for descriptions the answer did not carry. Inside one envelope SAP answers almost every node structure part after the first with other parts' `DESCRIPTION` texts (measured: 2 023 of 2 033 objects of one package), so those parts' descriptions stay unused and the descriptions come from the metadata.
+
 ## [19.0.0] - 2026-10-21
 
 The server split by transport and tool set into packages of their own — seventeen packages, twelve binaries — on the 6.0 auth chain (`auth-broker` 5, `auth-providers` 6, `auth-stores` 5) and the removal chain (`connection` 18, `interfaces-adt-connection` 3, `interfaces-adt` 20, `adt-clients` 36): the system type required, the low set gone, a logoff at every session end, no cancellation of a started tool. Migration: [`docs/MIGRATION-19.0.md`](docs/MIGRATION-19.0.md).

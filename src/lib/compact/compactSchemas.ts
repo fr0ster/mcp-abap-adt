@@ -210,6 +210,12 @@ export const compactGetSchema = {
       description:
         'Maximum number of members listed per package (part contents).',
     },
+    include_descriptions: {
+      type: 'boolean',
+      default: false,
+      description:
+        "Include each member's description (part contents). Where the system serves ADT batch, each description is read from the member's metadata: one more read per member, which on a large package takes most of the call.",
+    },
     class_name: { type: 'string', description: 'Class name.' },
     interface_name: { type: 'string', description: 'Interface name.' },
     program_name: { type: 'string', description: 'Program name.' },

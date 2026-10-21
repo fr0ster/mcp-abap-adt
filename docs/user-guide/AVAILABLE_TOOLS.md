@@ -956,6 +956,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
+- `include_descriptions` (boolean, optional (default: false)) - [read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)
 - `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or parent_type and parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name
@@ -3136,7 +3137,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `debug` (boolean, optional (default: false)) - Include diagnostic metadata in response (counts, types, hierarchy info). Default: false
-- `include_descriptions` (boolean, optional (default: true)) - Include object descriptions in response. Default: true
+- `include_descriptions` (boolean, optional (default: false)) - Include each object's description in the response. Where the system serves ADT batch, each description is read from the object's metadata: one more read per object, which on a large package takes most of the call. Default: false
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
 - `package_name` (string, optional) - Package name (give this or package_names)
@@ -4057,4 +4058,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-20*
+*Last updated: 2026-10-21*

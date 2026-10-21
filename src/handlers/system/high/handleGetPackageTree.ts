@@ -70,8 +70,9 @@ export const TOOL_DEFINITION = {
       },
       include_descriptions: {
         type: 'boolean',
-        description: 'Include object descriptions in response. Default: true',
-        default: true,
+        description:
+          "Include each object's description in the response. Where the system serves ADT batch, each description is read from the object's metadata: one more read per object, which on a large package takes most of the call. Default: false",
+        default: false,
       },
       debug: {
         type: 'boolean',
@@ -188,7 +189,10 @@ async function readTreesBatched(
     options,
     kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
   );
-  const described = await describeFromMetadata(context, walked);
+  // Descriptions only when asked for: each is its object's metadata.
+  const described = options.includeDescriptions
+    ? await describeFromMetadata(context, walked)
+    : walked;
   kept.forEach((i, k) => {
     (reads[i] as TreeRead).walked = described[k];
   });
@@ -285,7 +289,7 @@ export async function handleGetPackageTree(
     const options: TreeOptions = {
       includeSubpackages: args.include_subpackages !== false,
       maxDepth: args.max_depth || 5,
-      includeDescriptions: args.include_descriptions !== false,
+      includeDescriptions: args.include_descriptions === true,
     };
 
     logger?.info(

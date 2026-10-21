@@ -70,6 +70,7 @@
 - Modify: `server/package.json`, `server/tsconfig.json`; `compact/`, `compact-ro/`, `core-ro/` — `src/launcher.ts`, `bin/*.js`, `package.json`, `tsconfig.json`
 - Modify: root `package.json` (`build` order: runtime after `compact-modify`, before `server`; `prebuild` clean list; `jest.roots` + `<rootDir>/server-runtime/src`; exact `moduleNameMapper` for `@mcp-abap-adt/server-runtime/stdio`, `/stdio/server`, `/auth`), `tsconfig.test.json` (`paths` for the same three, `include` of `server-runtime/src/**/*`), `scripts/publish-all.sh` (`./server-runtime` after `./compact-modify`, before `./server`; "eighteen")
 - Modify: `src/__tests__/unit/packages/dependencyRule.test.ts` (runtime among the sibling dirs; the `core` rows: core reaches the runtime's stdio paths and the auth chain through it; `compactOver` / `readOnlyOver` rows for compact, compact-ro, core-ro: they reach `server-runtime/stdio`, not `core`)
+- Modify: `src/__tests__/unit/binSmoke.test.ts` and `src/__tests__/helpers/installedRelease.ts` — the packed-package inventory gains `server-runtime` (the first task where a package depends on it, so the packed install takes it from this checkout, never from the registry)
 - Test: `server/src/__tests__/exports.test.ts`
 
 **Interfaces:**
@@ -80,7 +81,7 @@
 - [ ] **Step 3: Failing test** `server/src/__tests__/exports.test.ts`: every name 19.1.0's `@mcp-abap-adt/core`, `/launcher` and `/auth` exported is still exported (the list written into the test from the 19.1.0 `dist`); `new StdioServer({...})` from `@mcp-abap-adt/core` without `version` answers `CORE_VERSION` with the runtime's version module mocked to another value.
 - [ ] **Step 4:** core's re-export modules; `StdioServer` exported as a subclass defaulting `opts.version` to `CORE_VERSION`; `server/tsconfig.json` `paths` for the three runtime exports into `../server-runtime/dist/…`; `server/package.json` depends on `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, nothing it no longer imports; core's bin calls the runtime's `main` with its tool set, program, own version and package name.
 - [ ] **Step 5:** the three stdio wrappers import `@mcp-abap-adt/server-runtime/stdio` (bin: `launcherFailedLine` from it); their `tsconfig.json` `paths` map it into `../server-runtime/dist/stdio/…`; manifests drop `core`, add `server-runtime`, `background-runs-memory`, `responsible-rules`.
-- [ ] **Step 6:** `dependencyRule.test.ts` rows for stdio migrated (Files above); the moved stdio suites report their tests run; full gate list green.
+- [ ] **Step 6:** `dependencyRule.test.ts` rows for stdio migrated (Files above); `binSmoke`'s inventory includes the runtime; the moved stdio suites report their tests run; full gate list green, `binSmoke` included.
 - [ ] **Step 7:** commit `refactor: stdio launch code in @mcp-abap-adt/server-runtime; core and its wrappers on it (#303)`.
 
 ### Task 4: the http transport, end to end
@@ -132,10 +133,10 @@
 ### Task 8: pipelines
 
 **Files:**
-- Modify: `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `src/__tests__/unit/releaseMetadata.test.ts`, `src/__tests__/helpers/installedRelease.ts`, `src/__tests__/unit/binSmoke.test.ts`, `scripts/ci/check-images.mjs`, `scripts/portable/build.mjs`
+- Modify: `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `src/__tests__/unit/releaseMetadata.test.ts`, `scripts/ci/check-images.mjs`, `scripts/portable/build.mjs`
 
 - [ ] **Step 1:** workflows: the runtime's `lint:check` and `test:check`; the transports' `test:check` steps point at the runtime; `./server-runtime` in both `npm pack` lists and in every hard-coded package inventory of the install and Docker steps.
-- [ ] **Step 2:** `releaseMetadata.test.ts`: the runtime has no registry entry; `installedRelease.ts` / `binSmoke` pack it; `check-images.mjs` verifies the runtime in each image came from the tarball; `build.mjs` substitutes `runtimeVersion` as it substitutes `coreVersion`.
+- [ ] **Step 2:** `releaseMetadata.test.ts`: the runtime has no registry entry; `check-images.mjs` verifies the runtime in each image came from the tarball; `build.mjs` substitutes `runtimeVersion` as it substitutes `coreVersion`.
 - [ ] **Step 3:** full gate list green; commit `ci: server-runtime in the pipelines (#303)`.
 
 ### Task 9: the install matrix and the portable check

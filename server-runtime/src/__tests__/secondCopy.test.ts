@@ -189,3 +189,77 @@ describe('each binary passes its own package name', () => {
     expect(source).toContain(`packageName: ${constant},`);
   });
 });
+
+/**
+ * The old launcher paths take 19.1.0's options: `main({ toolSet, program,
+ * version })` with no `packageName` names the path's own package in the line;
+ * a `packageName` given passes through.
+ */
+describe("the old launcher paths: 19.1.0's options, the path's own package", () => {
+  const oldPaths: ReadonlyArray<
+    readonly [
+      string,
+      string,
+      (
+        options: { toolSet: unknown; program: string; version: string },
+        edges: LauncherEdges,
+      ) => Promise<unknown>,
+    ]
+  > = [
+    [
+      '@mcp-abap-adt/core/launcher',
+      'server',
+      require('../../../server/src/launcher').main,
+    ],
+    [
+      '@mcp-abap-adt/http/launcher',
+      'http',
+      require('../../../http/src/launcher').main,
+    ],
+    [
+      '@mcp-abap-adt/sse/launcher',
+      'sse',
+      require('../../../sse/src/launcher').main,
+    ],
+  ];
+
+  it.each(oldPaths)(
+    '%s without packageName: the line names its own package',
+    async (modulePath, dir, main) => {
+      register(FIRST, SECOND);
+      const { edges, record } = recordingEdges(['--version']);
+      await main(
+        {
+          toolSet: fullToolSet,
+          program: 'mcp-abap-adt-test',
+          version: '9.9.9',
+        },
+        edges,
+      );
+      expect(record.exits).toEqual([1]);
+      expect(record.stderr).toEqual([lineFor(manifestName(dir))]);
+      // The path's own package: `@mcp-abap-adt/core`, `/http`, `/sse`.
+      expect(record.stderr[0]).toContain(
+        `reinstall ${modulePath.split('/launcher')[0]} `,
+      );
+    },
+  );
+
+  it.each(oldPaths)(
+    '%s with packageName: that package',
+    async (_path, _dir, main) => {
+      register(FIRST, SECOND);
+      const { edges, record } = recordingEdges(['--version']);
+      await main(
+        {
+          toolSet: fullToolSet,
+          program: 'mcp-abap-adt-test',
+          version: '9.9.9',
+          packageName: '@mcp-abap-adt/test-package',
+        } as { toolSet: unknown; program: string; version: string },
+        edges,
+      );
+      expect(record.stderr).toEqual([lineFor('@mcp-abap-adt/test-package')]);
+    },
+  );
+});

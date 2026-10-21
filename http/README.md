@@ -142,7 +142,9 @@ credentials.
 
 `new StreamableHttpServer(handlersRegistry, options)` — the same options, and `app` to register
 the routes on your own Express (or CAP) application instead of listening itself. `main({ toolSet,
-program, version, packageName })` is the binary's launcher (`@mcp-abap-adt/http/launcher`). An embedder that stops the
+program, version, packageName })` is the binary's launcher (`@mcp-abap-adt/http/launcher`;
+`packageName`, the package a second copy of lib asks to reinstall, is optional on this path and
+defaults to `@mcp-abap-adt/http`, as 19.1.0's `{ toolSet, program, version }` still compiles). An embedder that stops the
 server itself calls `stop()`: admission stops, the listener closes, the pool's instances are
 disposed (their state undone) and logged off. The binary's own shutdown does not wait: it logs
 every session off at once (lib's `installTransportShutdown`, with `releaseConnections()` after the

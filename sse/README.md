@@ -117,7 +117,9 @@ This server keeps no runtime session files, so nothing lists such a session
 
 `new SseServer(handlersRegistry, options)` — the same options, and `app` to register the routes on
 your own Express (or CAP) application. `main({ toolSet, program, version, packageName })` is the binary's launcher
-(`@mcp-abap-adt/sse/launcher`). An embedder that stops the server itself calls `stop()`: the listener
+(`@mcp-abap-adt/sse/launcher`; `packageName`, the package a second copy of lib asks to reinstall,
+is optional on this path and defaults to `@mcp-abap-adt/sse`, as 19.1.0's
+`{ toolSet, program, version }` still compiles). An embedder that stops the server itself calls `stop()`: the listener
 closes and every open connection gets the close above — its ADT sessions logged off at once, its
 running tools interrupted, no state undo sent —, joined where one is already closing; it never
 rejects. The binary's own shutdown calls `stopListening()`, logs every session of the process off

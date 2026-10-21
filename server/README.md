@@ -52,8 +52,10 @@ this package depends on.
 which is installed with this package; this package holds the `mcp-abap-adt` binary and its
 version. Its exports are unchanged, as re-exports: `@mcp-abap-adt/core` of
 `server-runtime/stdio/server` (its `StdioServer` answers core's version when constructed without
-one), `@mcp-abap-adt/core/launcher` of `server-runtime/stdio`, `@mcp-abap-adt/core/auth` of
-`server-runtime/auth`. No other server package depends on this one: `compact`, `core-ro` and
+one), `@mcp-abap-adt/core/launcher` of `server-runtime/stdio` (its `main` and `launch` take
+19.1.0's options, `{ toolSet, program, version }`: `packageName` — required on
+`server-runtime/stdio` — is optional here and defaults to `@mcp-abap-adt/core`),
+`@mcp-abap-adt/core/auth` of `server-runtime/auth`. No other server package depends on this one: `compact`, `core-ro` and
 `compact-ro` run the same launcher from `server-runtime`, so each server is installed on its own.
 
 ## Licence

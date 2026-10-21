@@ -19,6 +19,7 @@
 
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -86,17 +87,19 @@ export async function handleCreateFunctionModule(
   return answer(
     { tool: 'CreateFunctionModule', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionModule(resultsFor(functionModuleDocuments))
-        .create(
-          {
-            functionGroupName,
-            functionModuleName,
-            description: args.description || functionModuleName,
-            transportRequest: args.transport_request,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'functionModule.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionModule(resultsFor(functionModuleDocuments))
+          .create(
+            {
+              functionGroupName,
+              functionModuleName,
+              description: args.description || functionModuleName,
+              transportRequest: args.transport_request,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

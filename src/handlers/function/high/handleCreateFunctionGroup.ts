@@ -28,6 +28,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -35,6 +36,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -113,26 +115,70 @@ export async function handleCreateFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
-      const created = await obj.create(
-        {
-          functionGroupName,
-          description: args.description || functionGroupName,
-          packageName: args.package_name,
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      let created = await atStep('create', () =>
+        withAdtHeaders(context, 'functionGroup.create', (headers) =>
+          obj.create(
+            {
+              functionGroupName,
+              description: args.description || functionGroupName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+        ),
+      )();
+
+      // SAP's one refusal that can accompany a create that landed: the
+      // generated interface include was not created. Read the group back; if
+      // it is there, the create landed.
+      if (!created.ok && isInterfaceNotCreated(created.getError())) {
+        logger?.warn(
+          `CreateFunctionGroup answered the interface 400 for ${functionGroupName}; reading it back to see whether it exists`,
+        );
+        const readBack = await obj.readMetadata(
+          { functionGroupName },
+          { analyse: analyseException },
+        );
+        if (readBack.ok) {
+          logger?.info(
+            `CreateFunctionGroup: ${functionGroupName} reads back, so the create landed`,
+          );
+          created = readBack as unknown as typeof created;
+        }
+      }
 
       if (!created.ok || !shouldActivate) {
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate(
-        { functionGroupName },
-        { analyse: analyseActivation },
-      );
+      return atStep('activate', () =>
+        withAdtHeaders(context, 'functionGroup.activate', (headers) =>
+          obj.activate(
+            { functionGroupName },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
+      )();
     },
     project(detail, terseWrite),
+  );
+}
+
+/**
+ * ADT's one refusal that can accompany a successful create.
+ *
+ * Matched on the message because that is where ADT puts it — the status is
+ * 400 for a dozen unrelated reasons, and the `exc:exception` type id is the
+ * generic one. Both fragments are required so that a message mentioning only
+ * one of them does not trigger a read-back that would answer a different
+ * question.
+ */
+function isInterfaceNotCreated(error: { message?: string }): boolean {
+  const message = error?.message ?? '';
+  return (
+    message.includes('Interface SAPL') &&
+    message.includes('has not been created')
   );
 }

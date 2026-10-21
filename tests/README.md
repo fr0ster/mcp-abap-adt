@@ -80,6 +80,10 @@ async function main() {
 main();
 ```
 
+## Shared objects: `npm run shared:check`
+
+An admin script, never part of `npm test`. It runs the offline consistency checks of `shared_dependencies` (no system needed) and, where `tests/test-config.yaml` (or the file `MCP_TEST_CONFIG` names) is present, one read per shared name through its type's read. It lists every absent object, category and name, in one failure; it creates, changes and deletes nothing. A system it cannot reach is a failure. Without a test config the live read is skipped and its title says where it runs.
+
 ## ⚠️ Important
 
 - `test-config.yaml` is **not tracked in git** (contains transport requests)
@@ -122,7 +126,6 @@ To enable S4HANA tests, set `enabled: true` in `test-config.yaml` for the corres
   node tests/deprecated/test-activate-object.js
   ```
   
-  See [README_GROUP_ACTIVATION.md](README_GROUP_ACTIVATION.md) for detailed guide.
 
 ### Enhancement Tests
 - `test-enhancement-by-name.js` - Test getting enhancements by specific name

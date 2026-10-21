@@ -1,7 +1,7 @@
 /**
  * Integration tests for SearchSource handler.
  *
- * Onprem-only — `available_in: ['onprem', 'legacy']`. Skipped on cloud.
+ * On premise and cloud — `available_in: ['onprem', 'cloud']`.
  *
  * The tests scan the package configured under `shared_dependencies.package`
  * (default `ZADT_BLD_PKG03`) and rely on the shared FM `Z_MCP_BLD_SHR_FM`

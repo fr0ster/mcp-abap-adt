@@ -4,78 +4,85 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 374
+- Total tools: 266
 - Read-only tools: 68
-- High-level tools: 159
-- Low-level tools: 117
-- Debug tools: 30
+- High-level tools: 161
+- Debug tools: 32
+- Session tools: 2
+- Batch tools: 3
 
 ## Handler Sets
 
-- `readonly` -> [Read-Only Group](#read-only-group)
-- `high` -> [High-Level Group](#high-level-group)
-- `low` -> [Low-Level Group](#low-level-group)
-- `debug` (opt-in) -> [Debug Group](#debug-group)
-- `compact` -> [High-Level / Compact](#high-level-compact)
+The binary fixes its tool set (19.0.0); there is no `--exposition`.
+
+- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` (and `-http`, `-sse`). The read-only binaries (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, on stdio the leftover-session list and logoff, and the run tools without `background`
+- `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
+- `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
+- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
+- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it
+- compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation
 
-- [Compact Set](#high-level-compact)
 - [Read-Only Group](#read-only-group)
+  - [Background Run](#read-only-background-run)
+    - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
+    - [GetBackgroundRun](#getbackgroundrun-read-only-background-run)
+    - [ListBackgroundRuns](#listbackgroundruns-read-only-background-run)
   - [Behavior Definition](#read-only-behavior-definition)
-    - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
+    - [GetBehaviorDefinition](#getbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
-    - [ReadBehaviorImplementation](#readbehaviorimplementation-read-only-behavior-implementation)
+    - [GetBehaviorImplementation](#getbehaviorimplementation-read-only-behavior-implementation)
   - [Class](#read-only-class)
-    - [ReadClass](#readclass-read-only-class)
+    - [GetClass](#getclass-read-only-class)
   - [Common](#read-only-common)
     - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
   - [Data Element](#read-only-data-element)
-    - [ReadDataElement](#readdataelement-read-only-data-element)
+    - [GetDataElement](#getdataelement-read-only-data-element)
   - [Ddl](#read-only-ddl)
-    - [ReadDdl](#readddl-read-only-ddl)
+    - [GetDdl](#getddl-read-only-ddl)
   - [Domain](#read-only-domain)
-    - [ReadDomain](#readdomain-read-only-domain)
+    - [GetDomain](#getdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
     - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
     - [GetEnhancements](#getenhancements-read-only-enhancement)
     - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
   - [Function Group](#read-only-function-group)
-    - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+    - [GetFunctionGroup](#getfunctiongroup-read-only-function-group)
   - [Function Include](#read-only-function-include)
+    - [GetFunctionInclude](#getfunctioninclude-read-only-function-include)
     - [ListFunctionGroupIncludes](#listfunctiongroupincludes-read-only-function-include)
     - [ListFunctionModules](#listfunctionmodules-read-only-function-include)
-    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
   - [Function Module](#read-only-function-module)
-    - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
+    - [GetFunctionModule](#getfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
     - [GetInclude](#getinclude-read-only-include)
     - [GetIncludesList](#getincludeslist-read-only-include)
   - [Interface](#read-only-interface)
-    - [ReadInterface](#readinterface-read-only-interface)
+    - [GetInterface](#getinterface-read-only-interface)
   - [Message Class](#read-only-message-class)
-    - [ReadMessageClass](#readmessageclass-read-only-message-class)
-    - [ReadMessageClassMessage](#readmessageclassmessage-read-only-message-class)
+    - [GetMessageClass](#getmessageclass-read-only-message-class)
+    - [GetMessageClassMessage](#getmessageclassmessage-read-only-message-class)
   - [Metadata Extension](#read-only-metadata-extension)
-    - [ReadMetadataExtension](#readmetadataextension-read-only-metadata-extension)
+    - [GetMetadataExtension](#getmetadataextension-read-only-metadata-extension)
   - [Package](#read-only-package)
+    - [GetPackage](#getpackage-read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
-    - [ReadPackage](#readpackage-read-only-package)
   - [Program](#read-only-program)
-    - [ReadProgram](#readprogram-read-only-program)
+    - [GetProgram](#getprogram-read-only-program)
   - [Search](#read-only-search)
     - [GetObjectsByType](#getobjectsbytype-read-only-search)
     - [GetObjectsList](#getobjectslist-read-only-search)
     - [SearchObject](#searchobject-read-only-search)
   - [Service Binding](#read-only-service-binding)
-    - [ReadServiceBinding](#readservicebinding-read-only-service-binding)
+    - [GetServiceBinding](#getservicebinding-read-only-service-binding)
   - [Service Definition](#read-only-service-definition)
-    - [ReadServiceDefinition](#readservicedefinition-read-only-service-definition)
+    - [GetServiceDefinition](#getservicedefinition-read-only-service-definition)
   - [Structure](#read-only-structure)
+    - [GetStructure](#getstructure-read-only-structure)
     - [GetStructuresList](#getstructureslist-read-only-structure)
-    - [ReadStructure](#readstructure-read-only-structure)
   - [System](#read-only-system)
     - [DescribeByList](#describebylist-read-only-system)
     - [GetAbapAST](#getabapast-read-only-system)
@@ -87,7 +94,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
     - [GetObjectStructure](#getobjectstructure-read-only-system)
     - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
-    - [GetSession](#getsession-read-only-system)
     - [GetSqlQuery](#getsqlquery-read-only-system)
     - [GetTransaction](#gettransaction-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
@@ -101,13 +107,11 @@ Generated from code in `src/handlers/**` (not from docs).
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
     - [RuntimeRunClass](#runtimerunclass-read-only-system)
-    - [RuntimeRunClassWithProfiling](#runtimerunclasswithprofiling-read-only-system)
     - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
-    - [RuntimeRunProgramWithProfiling](#runtimerunprogramwithprofiling-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
+    - [GetTable](#gettable-read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
-    - [ReadTable](#readtable-read-only-table)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
@@ -238,7 +242,9 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Package](#high-level-package)
     - [CheckPackage](#checkpackage-high-level-package)
     - [CreatePackage](#createpackage-high-level-package)
+    - [DeletePackage](#deletepackage-high-level-package)
     - [GetPackage](#getpackage-high-level-package)
+    - [UpdatePackage](#updatepackage-high-level-package)
   - [Program](#high-level-program)
     - [CheckProgram](#checkprogram-high-level-program)
     - [CreateProgram](#createprogram-high-level-program)
@@ -300,142 +306,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateFunctionGroupUnitTest](#updatefunctiongroupunittest-high-level-unit-test)
     - [UpdateProgramUnitTest](#updateprogramunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
-- [Low-Level Group](#low-level-group)
-  - [Behavior Definition](#low-level-behavior-definition)
-    - [ActivateBehaviorDefinitionLow](#activatebehaviordefinitionlow-low-level-behavior-definition)
-    - [CheckBdefLow](#checkbdeflow-low-level-behavior-definition)
-    - [CreateBehaviorDefinitionLow](#createbehaviordefinitionlow-low-level-behavior-definition)
-    - [DeleteBehaviorDefinitionLow](#deletebehaviordefinitionlow-low-level-behavior-definition)
-    - [LockBehaviorDefinitionLow](#lockbehaviordefinitionlow-low-level-behavior-definition)
-    - [UnlockBehaviorDefinitionLow](#unlockbehaviordefinitionlow-low-level-behavior-definition)
-    - [UpdateBehaviorDefinitionLow](#updatebehaviordefinitionlow-low-level-behavior-definition)
-    - [ValidateBehaviorDefinitionLow](#validatebehaviordefinitionlow-low-level-behavior-definition)
-  - [Behavior Implementation](#low-level-behavior-implementation)
-    - [CreateBehaviorImplementationLow](#createbehaviorimplementationlow-low-level-behavior-implementation)
-    - [LockBehaviorImplementationLow](#lockbehaviorimplementationlow-low-level-behavior-implementation)
-    - [ValidateBehaviorImplementationLow](#validatebehaviorimplementationlow-low-level-behavior-implementation)
-  - [Class](#low-level-class)
-    - [ActivateClassLow](#activateclasslow-low-level-class)
-    - [CheckClassLow](#checkclasslow-low-level-class)
-    - [CreateClassLow](#createclasslow-low-level-class)
-    - [DeleteClassLow](#deleteclasslow-low-level-class)
-    - [LockClassLow](#lockclasslow-low-level-class)
-    - [UnlockClassLow](#unlockclasslow-low-level-class)
-    - [UpdateClassLow](#updateclasslow-low-level-class)
-    - [ValidateClassLow](#validateclasslow-low-level-class)
-  - [Common](#low-level-common)
-    - [ActivateObjectLow](#activateobjectlow-low-level-common)
-    - [CheckObjectLow](#checkobjectlow-low-level-common)
-    - [DeleteObjectLow](#deleteobjectlow-low-level-common)
-    - [LockObjectLow](#lockobjectlow-low-level-common)
-    - [UnlockObjectLow](#unlockobjectlow-low-level-common)
-    - [ValidateObjectLow](#validateobjectlow-low-level-common)
-  - [Data Element](#low-level-data-element)
-    - [ActivateDataElementLow](#activatedataelementlow-low-level-data-element)
-    - [CheckDataElementLow](#checkdataelementlow-low-level-data-element)
-    - [CreateDataElementLow](#createdataelementlow-low-level-data-element)
-    - [DeleteDataElementLow](#deletedataelementlow-low-level-data-element)
-    - [LockDataElementLow](#lockdataelementlow-low-level-data-element)
-    - [UnlockDataElementLow](#unlockdataelementlow-low-level-data-element)
-    - [UpdateDataElementLow](#updatedataelementlow-low-level-data-element)
-    - [ValidateDataElementLow](#validatedataelementlow-low-level-data-element)
-  - [Ddl](#low-level-ddl)
-    - [ActivateDdlLow](#activateddllow-low-level-ddl)
-    - [CheckDdlLow](#checkddllow-low-level-ddl)
-    - [CreateDdlLow](#createddllow-low-level-ddl)
-    - [DeleteDdlLow](#deleteddllow-low-level-ddl)
-    - [LockDdlLow](#lockddllow-low-level-ddl)
-    - [UnlockDdlLow](#unlockddllow-low-level-ddl)
-    - [UpdateDdlLow](#updateddllow-low-level-ddl)
-    - [ValidateDdlLow](#validateddllow-low-level-ddl)
-  - [Ddlx](#low-level-ddlx)
-    - [ActivateMetadataExtensionLow](#activatemetadataextensionlow-low-level-ddlx)
-    - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low-level-ddlx)
-    - [CreateMetadataExtensionLow](#createmetadataextensionlow-low-level-ddlx)
-    - [DeleteMetadataExtensionLow](#deletemetadataextensionlow-low-level-ddlx)
-    - [LockMetadataExtensionLow](#lockmetadataextensionlow-low-level-ddlx)
-    - [UnlockMetadataExtensionLow](#unlockmetadataextensionlow-low-level-ddlx)
-    - [UpdateMetadataExtensionLow](#updatemetadataextensionlow-low-level-ddlx)
-    - [ValidateMetadataExtensionLow](#validatemetadataextensionlow-low-level-ddlx)
-  - [Domain](#low-level-domain)
-    - [ActivateDomainLow](#activatedomainlow-low-level-domain)
-    - [CheckDomainLow](#checkdomainlow-low-level-domain)
-    - [CreateDomainLow](#createdomainlow-low-level-domain)
-    - [DeleteDomainLow](#deletedomainlow-low-level-domain)
-    - [LockDomainLow](#lockdomainlow-low-level-domain)
-    - [UnlockDomainLow](#unlockdomainlow-low-level-domain)
-    - [UpdateDomainLow](#updatedomainlow-low-level-domain)
-    - [ValidateDomainLow](#validatedomainlow-low-level-domain)
-  - [Function](#low-level-function)
-    - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low-level-function)
-    - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low-level-function)
-    - [CheckFunctionGroupLow](#checkfunctiongrouplow-low-level-function)
-    - [CheckFunctionModuleLow](#checkfunctionmodulelow-low-level-function)
-    - [CreateFunctionGroupLow](#createfunctiongrouplow-low-level-function)
-    - [CreateFunctionModuleLow](#createfunctionmodulelow-low-level-function)
-    - [DeleteFunctionGroupLow](#deletefunctiongrouplow-low-level-function)
-    - [DeleteFunctionModuleLow](#deletefunctionmodulelow-low-level-function)
-    - [LockFunctionGroupLow](#lockfunctiongrouplow-low-level-function)
-    - [LockFunctionModuleLow](#lockfunctionmodulelow-low-level-function)
-    - [UnlockFunctionGroupLow](#unlockfunctiongrouplow-low-level-function)
-    - [UnlockFunctionModuleLow](#unlockfunctionmodulelow-low-level-function)
-    - [UpdateFunctionModuleLow](#updatefunctionmodulelow-low-level-function)
-    - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low-level-function)
-    - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low-level-function)
-  - [Interface](#low-level-interface)
-    - [ActivateInterfaceLow](#activateinterfacelow-low-level-interface)
-    - [CheckInterfaceLow](#checkinterfacelow-low-level-interface)
-    - [CreateInterfaceLow](#createinterfacelow-low-level-interface)
-    - [DeleteInterfaceLow](#deleteinterfacelow-low-level-interface)
-    - [LockInterfaceLow](#lockinterfacelow-low-level-interface)
-    - [UnlockInterfaceLow](#unlockinterfacelow-low-level-interface)
-    - [UpdateInterfaceLow](#updateinterfacelow-low-level-interface)
-    - [ValidateInterfaceLow](#validateinterfacelow-low-level-interface)
-  - [Package](#low-level-package)
-    - [CheckPackageLow](#checkpackagelow-low-level-package)
-    - [CreatePackageLow](#createpackagelow-low-level-package)
-    - [DeletePackageLow](#deletepackagelow-low-level-package)
-    - [LockPackageLow](#lockpackagelow-low-level-package)
-    - [UnlockPackageLow](#unlockpackagelow-low-level-package)
-    - [UpdatePackageLow](#updatepackagelow-low-level-package)
-    - [ValidatePackageLow](#validatepackagelow-low-level-package)
-  - [Program](#low-level-program)
-    - [ActivateProgramLow](#activateprogramlow-low-level-program)
-    - [CheckProgramLow](#checkprogramlow-low-level-program)
-    - [CreateProgramLow](#createprogramlow-low-level-program)
-    - [DeleteProgramLow](#deleteprogramlow-low-level-program)
-    - [LockProgramLow](#lockprogramlow-low-level-program)
-    - [UnlockProgramLow](#unlockprogramlow-low-level-program)
-    - [UpdateProgramLow](#updateprogramlow-low-level-program)
-    - [ValidateProgramLow](#validateprogramlow-low-level-program)
-  - [Service Binding](#low-level-service-binding)
-    - [ActivateServiceBindingLow](#activateservicebindinglow-low-level-service-binding)
-  - [Service Definition](#low-level-service-definition)
-    - [ActivateServiceDefinitionLow](#activateservicedefinitionlow-low-level-service-definition)
-  - [Structure](#low-level-structure)
-    - [ActivateStructureLow](#activatestructurelow-low-level-structure)
-    - [CheckStructureLow](#checkstructurelow-low-level-structure)
-    - [CreateStructureLow](#createstructurelow-low-level-structure)
-    - [DeleteStructureLow](#deletestructurelow-low-level-structure)
-    - [LockStructureLow](#lockstructurelow-low-level-structure)
-    - [UnlockStructureLow](#unlockstructurelow-low-level-structure)
-    - [UpdateStructureLow](#updatestructurelow-low-level-structure)
-    - [ValidateStructureLow](#validatestructurelow-low-level-structure)
-  - [System](#low-level-system)
-    - [GetNodeStructureLow](#getnodestructurelow-low-level-system)
-    - [GetObjectStructureLow](#getobjectstructurelow-low-level-system)
-    - [GetVirtualFoldersLow](#getvirtualfolderslow-low-level-system)
-  - [Table](#low-level-table)
-    - [ActivateTableLow](#activatetablelow-low-level-table)
-    - [CheckTableLow](#checktablelow-low-level-table)
-    - [CreateTableLow](#createtablelow-low-level-table)
-    - [DeleteTableLow](#deletetablelow-low-level-table)
-    - [LockTableLow](#locktablelow-low-level-table)
-    - [UnlockTableLow](#unlocktablelow-low-level-table)
-    - [UpdateTableLow](#updatetablelow-low-level-table)
-    - [ValidateTableLow](#validatetablelow-low-level-table)
-  - [Transport](#low-level-transport)
-    - [CreateTransportLow](#createtransportlow-low-level-transport)
 - [Debug Group](#debug-group)
   - [Debugger](#debug-debugger)
     - [AmdpDebugCancel](#amdpdebugcancel-debug-debugger)
@@ -445,6 +315,8 @@ Generated from code in `src/handlers/**` (not from docs).
     - [AmdpDebugStep](#amdpdebugstep-debug-debugger)
     - [AmdpDebugStop](#amdpdebugstop-debug-debugger)
     - [AmdpDebugWait](#amdpdebugwait-debug-debugger)
+    - [DebugBatchBegin](#debugbatchbegin-debug-debugger)
+    - [DebugBatchEnd](#debugbatchend-debug-debugger)
     - [DebugCreateMemorySnapshot](#debugcreatememorysnapshot-debug-debugger)
     - [DebugCreateWatchpoint](#debugcreatewatchpoint-debug-debugger)
     - [DebugDeleteBreakpoint](#debugdeletebreakpoint-debug-debugger)
@@ -468,54 +340,102 @@ Generated from code in `src/handlers/**` (not from docs).
     - [MemorySnapshotDelta](#memorysnapshotdelta-debug-debugger)
     - [MemorySnapshotGet](#memorysnapshotget-debug-debugger)
     - [MemorySnapshotList](#memorysnapshotlist-debug-debugger)
+- [Session Group](#session-group)
+  - [Leftover Session](#session-leftover-session)
+    - [ListLeftoverSessions](#listleftoversessions-session-leftover-session)
+    - [LogoffLeftoverSession](#logoffleftoversession-session-leftover-session)
+- [Batch Group](#batch-group)
+  - [Batch](#batch-batch)
+    - [BatchAnswers](#batchanswers-batch-batch)
+    - [BatchBegin](#batchbegin-batch-batch)
+    - [BatchEnd](#batchend-batch-batch)
 
 ---
 
 <a id="read-only-group"></a>
 ## Read-Only Group
 
+<a id="read-only-background-run"></a>
+### Read-Only / Background Run
+
+<a id="discardbackgroundrun-read-only-background-run"></a>
+#### DiscardBackgroundRun (Read-Only / Background Run)
+**Description:** [read-only] [runtime] Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.
+
+**Source:** `src/handlers/background_run/readonly/handleDiscardBackgroundRun.ts`
+
+**Parameters:**
+- `run_handle` (string, required) - The run_handle a run started with background=true answered.
+
+---
+
+<a id="getbackgroundrun-read-only-background-run"></a>
+#### GetBackgroundRun (Read-Only / Background Run)
+**Description:** [read-only] [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). A read keeps the run; a finished run is kept until you discard it.
+
+**Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
+
+**Parameters:**
+- `run_handle` (string, required) - The run_handle a run started with background=true answered.
+
+---
+
+<a id="listbackgroundruns-read-only-background-run"></a>
+#### ListBackgroundRuns (Read-Only / Background Run)
+**Description:** [read-only] [runtime] Lists your background runs: run_handle, tool, object, when it started, and running or finished. A run's output is read by its run_handle.
+
+**Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
+
+**Parameters:**
+- None
+
+---
+
 <a id="read-only-behavior-definition"></a>
 ### Read-Only / Behavior Definition
 
-<a id="readbehaviordefinition-read-only-behavior-definition"></a>
-#### ReadBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.
+<a id="getbehaviordefinition-read-only-behavior-definition"></a>
+#### GetBehaviorDefinition (Read-Only / Behavior Definition)
+**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
+**Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
 **Parameters:**
-- `behavior_definition_name` (string, required) - Behavior definition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `behavior_definition_name` (string, required) - BehaviorDefinition name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="read-only-behavior-implementation"></a>
 ### Read-Only / Behavior Implementation
 
-<a id="readbehaviorimplementation-read-only-behavior-implementation"></a>
-#### ReadBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Read ABAP RAP behavior implementation source code and metadata. Answers: "show behavior implementation", "display behavior pool code", "view RAP implementation X". Returns source code, package, responsible, description.
+<a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
+#### GetBehaviorImplementation (Read-Only / Behavior Implementation)
+**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts`
+**Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_implementation_name` (string, required) - Behavior implementation name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `behavior_implementation_name` (string, required) - BehaviorImplementation name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="read-only-class"></a>
 ### Read-Only / Class
 
-<a id="readclass-read-only-class"></a>
-#### ReadClass (Read-Only / Class)
-**Description:** [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
+<a id="getclass-read-only-class"></a>
+#### GetClass (Read-Only / Class)
+**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/class/readonly/handleReadClass.ts`
+**Source:** `src/handlers/class/high/handleGetClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -524,20 +444,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectversiondiff-read-only-common"></a>
 #### GetObjectVersionDiff (Read-Only / Common)
-**Description:** [read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.
+**Description:** [read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).
-- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
+- `object_type` (string, required) - Object type (the same value the version history was read with).
 
 ---
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+**Description:** [read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -550,58 +470,59 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectversionsource-read-only-common"></a>
 #### GetObjectVersionSource (Read-Only / Common)
-**Description:** [read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.
+**Description:** [read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetObjectVersions version entry.
-- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+- `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
+- `object_type` (string, required) - Object type (the same value the version history was read with).
 
 ---
 
 <a id="read-only-data-element"></a>
 ### Read-Only / Data Element
 
-<a id="readdataelement-read-only-data-element"></a>
-#### ReadDataElement (Read-Only / Data Element)
-**Description:** [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.
+<a id="getdataelement-read-only-data-element"></a>
+#### GetDataElement (Read-Only / Data Element)
+**Description:** [read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
 
-**Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
+**Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="read-only-ddl"></a>
 ### Read-Only / Ddl
 
-<a id="readddl-read-only-ddl"></a>
-#### ReadDdl (Read-Only / Ddl)
-**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+<a id="getddl-read-only-ddl"></a>
+#### GetDdl (Read-Only / Ddl)
+**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
+**Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="read-only-domain"></a>
 ### Read-Only / Domain
 
-<a id="readdomain-read-only-domain"></a>
-#### ReadDomain (Read-Only / Domain)
-**Description:** [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.
+<a id="getdomain-read-only-domain"></a>
+#### GetDomain (Read-Only / Domain)
+**Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
 
-**Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
+**Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -622,13 +543,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
-**Description:** [read-only] Retrieve a list of enhancements for a given ABAP object.
+**Description:** [read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Name of the ABAP object
-- `object_type` (string, required) - [read-only] Type of the ABAP object
+- `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects)
+- `object_type` (string, optional) - [read-only] Type of the ABAP object
+- `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
 
 ---
 
@@ -646,20 +568,34 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-function-group"></a>
 ### Read-Only / Function Group
 
-<a id="readfunctiongroup-read-only-function-group"></a>
-#### ReadFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Read ABAP function group source code and metadata. Answers: "show function group code", "display FUGR source", "view function group X", "get function group includes". Returns source code, package, responsible, description.
+<a id="getfunctiongroup-read-only-function-group"></a>
+#### GetFunctionGroup (Read-Only / Function Group)
+**Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.
 
-**Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
+**Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `function_group_name` (string, required) - FunctionGroup name.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="read-only-function-include"></a>
 ### Read-Only / Function Include
+
+<a id="getfunctioninclude-read-only-function-include"></a>
+#### GetFunctionInclude (Read-Only / Function Include)
+**Description:** [read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata"). Returns the part read.
+
+**Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group containing the include.
+- `include_name` (string, required) - Include name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+
+---
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
@@ -683,32 +619,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="readfunctioninclude-read-only-function-include"></a>
-#### ReadFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
-
-**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name containing the include.
-- `include_name` (string, required) - Include name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-
----
-
 <a id="read-only-function-module"></a>
 ### Read-Only / Function Module
 
-<a id="readfunctionmodule-read-only-function-module"></a>
-#### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature, and its package, responsible and description.
+<a id="getfunctionmodule-read-only-function-module"></a>
+#### GetFunctionModule (Read-Only / Function Module)
+**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
+**Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -717,7 +641,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). This is the correct tool for include names (PROG/I) — ReadProgram does not read includes.
+**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). Reads includes (PROG/I) by name.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -728,52 +652,54 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include.
+**Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
-- `object_name` (string, required) - Name of the ABAP program or include
-- `object_type` (string, required) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
-- `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
+- `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
+- `object_type` (string, optional) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
+- `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="read-only-interface"></a>
 ### Read-Only / Interface
 
-<a id="readinterface-read-only-interface"></a>
-#### ReadInterface (Read-Only / Interface)
-**Description:** [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
+<a id="getinterface-read-only-interface"></a>
+#### GetInterface (Read-Only / Interface)
+**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
+**Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="read-only-message-class"></a>
 ### Read-Only / Message Class
 
-<a id="readmessageclass-read-only-message-class"></a>
-#### ReadMessageClass (Read-Only / Message Class)
-**Description:** [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
+<a id="getmessageclass-read-only-message-class"></a>
+#### GetMessageClass (Read-Only / Message Class)
+**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
 
-**Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
+**Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
 **Parameters:**
 - `message_class_name` (string, required) - Message class name.
 
 ---
 
-<a id="readmessageclassmessage-read-only-message-class"></a>
-#### ReadMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of a message class", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
+<a id="getmessageclassmessage-read-only-message-class"></a>
+#### GetMessageClassMessage (Read-Only / Message Class)
+**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.
 
-**Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
+**Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
 - `message_class_name` (string, required) - Parent message class name.
@@ -784,24 +710,37 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-metadata-extension"></a>
 ### Read-Only / Metadata Extension
 
-<a id="readmetadataextension-read-only-metadata-extension"></a>
-#### ReadMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.
+<a id="getmetadataextension-read-only-metadata-extension"></a>
+#### GetMetadataExtension (Read-Only / Metadata Extension)
+**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
+**Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
-- `metadata_extension_name` (string, required) - Metadata extension name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `metadata_extension_name` (string, required) - MetadataExtension name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="read-only-package"></a>
 ### Read-Only / Package
 
+<a id="getpackage-read-only-package"></a>
+#### GetPackage (Read-Only / Package)
+**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
+
+**Source:** `src/handlers/package/high/handleGetPackage.ts`
+
+**Parameters:**
+- `package_name` (string, required) - Package name.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
 <a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
-**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.
+**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
@@ -810,30 +749,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="readpackage-read-only-package"></a>
-#### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
-
-**Source:** `src/handlers/package/readonly/handleReadPackage.ts`
-
-**Parameters:**
-- `package_name` (string, required) - Package name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-
----
-
 <a id="read-only-program"></a>
 ### Read-Only / Program
 
-<a id="readprogram-read-only-program"></a>
-#### ReadProgram (Read-Only / Program)
-**Description:** [read-only] Read a MAIN ABAP program (report) source code and metadata by name. Works ONLY for main programs (adtcore type PROG/P); NOT for includes — use GetInclude for include source. Include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.
+<a id="getprogram-read-only-program"></a>
+#### GetProgram (Read-Only / Program)
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/program/readonly/handleReadProgram.ts`
+**Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -842,7 +770,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Retrieves all ABAP objects of a specific type (classes, tables, programs, interfaces, etc.) under a given parent node. Useful for listing all objects of one type within a package or composite object.
+**Description:** [read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
@@ -858,21 +786,23 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Recursively retrieves all child ABAP repository objects for a given parent — programs (PROG), function groups (FUGR), classes (CLAS), packages (DEVC), and other composite objects — including nested includes and subcomponents.
+**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
 **Parameters:**
-- `parent_name` (string, required) - [read-only] Parent object name
-- `parent_tech_name` (string, required) - [read-only] Parent technical name
-- `parent_type` (string, required) - [read-only] Parent object type (e.g. PROG/P, FUGR)
+- `objects` (array, optional) - [read-only] Several parents, read together (give this or parent_name)
+- `parent_name` (string, optional) - [read-only] Parent object name (with parent_tech_name and parent_type; or give objects)
+- `parent_tech_name` (string, optional) - [read-only] Parent technical name
+- `parent_type` (string, optional) - [read-only] Parent object type (e.g. PROG/P, FUGR)
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `with_short_descriptions` (boolean, optional (default: true))) - [read-only] Include short descriptions (default: true)
 
 ---
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.).
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
@@ -880,63 +810,69 @@ Generated from code in `src/handlers/**` (not from docs).
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="read-only-service-binding"></a>
 ### Read-Only / Service Binding
 
-<a id="readservicebinding-read-only-service-binding"></a>
-#### ReadServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.
+<a id="getservicebinding-read-only-service-binding"></a>
+#### GetServiceBinding (Read-Only / Service Binding)
+**Description:** [read-only] Reads the OData service binding named by service_binding_name in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
 
-**Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
+**Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `service_binding_name` (string, required) - Service binding name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
+- `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
 ---
 
 <a id="read-only-service-definition"></a>
 ### Read-Only / Service Definition
 
-<a id="readservicedefinition-read-only-service-definition"></a>
-#### ReadServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.
+<a id="getservicedefinition-read-only-service-definition"></a>
+#### GetServiceDefinition (Read-Only / Service Definition)
+**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
+**Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `service_definition_name` (string, required) - Service definition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `service_definition_name` (string, required) - ServiceDefinition name.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="read-only-structure"></a>
 ### Read-Only / Structure
 
+<a id="getstructure-read-only-structure"></a>
+#### GetStructure (Read-Only / Structure)
+**Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+
+**Source:** `src/handlers/structure/high/handleGetStructure.ts`
+
+**Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `structure_name` (string, required) - Structure name.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+
+---
+
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the DDIC structure/table endpoints this needs are not present there (issue #207).
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; legacy systems (BASIS < 7.50) refuse it (issue #207). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
 **Parameters:**
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
-- `structure_name` (string, required) - Structure name.
-- `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-
----
-
-<a id="readstructure-read-only-structure"></a>
-#### ReadStructure (Read-Only / Structure)
-**Description:** [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
-
-**Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
-
-**Parameters:**
-- `structure_name` (string, required) - Structure name.
+- `structure_name` (string, optional) - Structure name (or give structure_names).
+- `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -946,12 +882,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.
+**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
 **Parameters:**
 - `objects` (array, required) - [read-only] Object name (required, must be valid ABAP object name or mask)
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -979,12 +916,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getabapsystemsymbols-read-only-system"></a>
 #### GetAbapSystemSymbols (Read-Only / System)
-**Description:** [read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.
+**Description:** [read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetAbapSystemSymbols.ts`
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to analyze and resolve symbols for
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1001,7 +939,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Get a list of inactive ABAP objects — modified but not yet activated, pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.
+**Description:** [read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
@@ -1012,15 +950,17 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectinfo-read-only-system"></a>
 #### GetObjectInfo (Read-Only / System)
-**Description:** [read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true.
+**Description:** [read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
 
 **Parameters:**
 - `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
 - `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
-- `parent_name` (string, required) - [read-only] Parent object name
-- `parent_type` (string, required) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)
+- `objects` (array, optional) - [read-only] Several objects, read together (give this or parent_type and parent_name)
+- `parent_name` (string, optional) - [read-only] Parent object name
+- `parent_type` (string, optional) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1039,7 +979,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Retrieve ADT object structure as a compact JSON tree.
+**Description:** [read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
@@ -1051,7 +991,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and says what is missing rather than guessing. A Web API binding has no preview page and answers the service URLs instead.
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -1065,26 +1005,16 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="getsession-read-only-system"></a>
-#### GetSession (Read-Only / System)
-**Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
-
-**Source:** `src/handlers/system/readonly/handleGetSession.ts`
-
-**Parameters:**
-- `force_new` (boolean, optional) - Force creation of a new session even if one exists. Default: false
-
----
-
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries.
+**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
 **Parameters:**
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1113,7 +1043,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Where-used list of an ABAP object: every object that uses, calls or references it, with its type and package.
+**Description:** [read-only] Lists where the object named by object_name and object_type is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -1121,18 +1051,21 @@ Generated from code in `src/handlers/**` (not from docs).
 - `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
 - `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
 - `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
-- `object_name` (string, required) - Name of the ABAP object. For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
+- `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
+- `object_type` (string, optional) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
+- `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).
+**Description:** [read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
 **Parameters:**
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `top` (number, optional) - Number of top rows for summary. Default: 10.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
 - `view` (string, optional (default: hitlist)) - 
@@ -1142,7 +1075,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimecreateprofilertraceparameters-read-only-system"></a>
 #### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+**Description:** [read-only] [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -1166,7 +1099,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
+**Description:** [read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
@@ -1179,7 +1112,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
+**Description:** [read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
@@ -1194,13 +1127,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.
+**Description:** [read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
 **Parameters:**
 - `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold (for statements view).
 - `id` (number, optional) - Statement node ID (for statements view).
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
 - `view` (string, required) - Trace view to retrieve.
 - `with_details` (boolean, optional) - Include statement details (for statements view).
@@ -1210,19 +1144,21 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request.
+**Description:** [read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
 **Parameters:**
 - `component` (string, optional) - Dumps whose application component contains this text, in any case.
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
-- `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
+- `feed_type` (string, optional) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
+- `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.
 - `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
 - `package` (string, optional) - Dumps whose object package contains this text, in any case.
 - `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.
 - `user` (string, optional) - Entries of this SAP user (exact match).
 
@@ -1230,7 +1166,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
+**Description:** [read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
@@ -1241,7 +1177,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
+**Description:** [read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
@@ -1255,7 +1191,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimerunclass-read-only-system"></a>
 #### RuntimeRunClass (Read-Only / System)
-**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.
+**Description:** [read-only] [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
 
@@ -1268,6 +1204,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `all_procedural_units` (boolean, optional) - 
 - `all_system_kernel_events` (boolean, optional) - 
 - `amdp_trace` (boolean, optional) - 
+- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `class_name` (string, required) - ABAP class name to execute.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
 - `explicit_on_off` (boolean, optional) - 
@@ -1282,37 +1219,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="runtimerunclasswithprofiling-read-only-system"></a>
-#### RuntimeRunClassWithProfiling (Read-Only / System)
-**Description:** [runtime][deprecated] Execute ABAP class with profiler enabled: schedules a trace, runs the class under it, then searches the profiler feed for the trace id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). trace_id is absent if the trace has not appeared within that bound. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunClassWithProfiling.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `class_name` (string, required) - ABAP class name to execute.
-- `description` (string, optional) - Profiler trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Increase for slow systems (e.g. SAP trial cloud).
-- `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000).
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
 <a id="runtimerunprogram-read-only-system"></a>
 #### RuntimeRunProgram (Read-Only / System)
-**Description:** [runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).
+**Description:** [read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
 
@@ -1325,6 +1234,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `all_procedural_units` (boolean, optional) - 
 - `all_system_kernel_events` (boolean, optional) - 
 - `amdp_trace` (boolean, optional) - 
+- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
@@ -1336,34 +1246,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="runtimerunprogramwithprofiling-read-only-system"></a>
-#### RuntimeRunProgramWithProfiling (Read-Only / System)
-**Description:** [runtime][deprecated] Execute ABAP program with profiler enabled and return created profilerId. Prefer RuntimeRunProgram with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunProgramWithProfiling.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, optional) - Profiler trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). `packages` accepts `*` masks (Z*, /NS/Z*) alongside exact names; mask resolution is best-effort and scoped to the ADT repository-search result window — there is no guarantee that every matching package is scanned. If you need certainty, pass concrete package names. When using masks, narrow the mask itself and use `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply after package resolution. Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `"` comments. The `version` parameter affects PROG and CLAS main include reads only — FUGR subinclude reads always go against the active version (the include endpoint exposes no version selector). `truncated.by_object_cap` means at least one object had MORE hits than `max_hits_per_object`, so that object's hits were capped — it is NOT a limit on the number of objects scanned. The object-count limit is `max_objects` (which sets `truncated.by_max_objects`). To avoid `by_object_cap`, raise `max_hits_per_object`. `concurrency` is capped at 16 per call. Run only ONE SearchSource per destination at a time — multiple parallel SearchSource calls against the same SAP system saturate the scan backend and can make all of them time out. Prefer combining terms into a single call over parallel calls.
+**Description:** [read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). `packages` accepts `*` masks (Z*, /NS/Z*) alongside exact names; mask resolution is best-effort and scoped to the ADT repository-search result window — some matching packages may be left unscanned. For certainty, pass concrete package names. When using masks, narrow the mask itself and use `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply after package resolution. Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `"` comments. The `version` parameter affects PROG and CLAS main include reads only — FUGR subinclude reads always go against the active version (the include endpoint reads the active version alone). `truncated.by_object_cap` means at least one object had MORE hits than `max_hits_per_object`, so that object's hits were capped. The object-count limit is `max_objects` (which sets `truncated.by_max_objects`). To avoid `by_object_cap`, raise `max_hits_per_object`. The scan is read in ADT batch envelopes: the searches of the package masks, each level of the package walk, then the sources of the scanned objects in envelopes of at most 300 reads (main sources and function group structures, then function group includes and function modules); `time_budget_ms` is checked before every envelope, and a scan it stops answers whole objects. Run only ONE SearchSource per destination at a time — multiple parallel SearchSource calls against the same SAP system saturate the scan backend and can make all of them time out. Prefer combining terms into a single call over parallel calls. A scan that stops before its last target answers `next_start_at`; pass it as `start_at` to go on. When `next_start_at` equals `start_at`, `time_budget_ms` passed before the first object was answered: raise `time_budget_ms` or lower `max_objects`. The answer carries `total_targets`, the scan targets of the walk; it is absent when `time_budget_ms` passed during the walk. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
@@ -1375,26 +1260,27 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-table"></a>
 ### Read-Only / Table
 
+<a id="gettable-read-only-table"></a>
+#### GetTable (Read-Only / Table)
+**Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+
+**Source:** `src/handlers/table/high/handleGetTable.ts`
+
+**Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `table_name` (string, required) - Table name.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+
+---
+
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Retrieve contents (data preview) of an ABAP database table or CDS view. Returns rows of data like SE16/SE16N.
+**Description:** [read-only] Retrieve contents (data preview) of an ABAP database table or CDS view. Returns rows of data like SE16/SE16N. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
 **Parameters:**
 - None
-
----
-
-<a id="readtable-read-only-table"></a>
-#### ReadTable (Read-Only / Table)
-**Description:** [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.
-
-**Source:** `src/handlers/table/readonly/handleReadTable.ts`
-
-**Parameters:**
-- `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -1416,19 +1302,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers — not sent to ADT as filters.
+**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers; ADT receives the default search alone. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
 **Parameters:**
 - `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
-- `user` (string, optional) - SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `user` (string, optional) - The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
 
 ---
 
 <a id="readtransportactionlog-read-only-transport"></a>
 #### ReadTransportActionLog (Read-Only / Transport)
-**Description:** [read-only] Read the action log of a transport request: one entry per lifecycle event — created, object added, object deleted, owner changed. This is what confirms a RemoveTransportObject landed, since that call answers by echoing what it was asked.
+**Description:** [read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
@@ -1439,12 +1326,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
-**Description:** [read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. Objects live on TASKS: a request shows its tasks' entries, but a removal addressed at the request is refused. Read a task number to get entries that can be acted on.
+**Description:** [read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
 **Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
+- `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
 
@@ -1453,7 +1340,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1470,29 +1357,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.
+**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
-- `worklist_id` (string, required) - Worklist identifier answered by RunATC.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** Ask whether an ATC run has ended. Takes the run_id from RunATC (only a run started with wait=false has one). Answers the status the server reports and whether it is finished — finished means ended, not that the checks passed. Read what it found with GetATCFindings, by worklist_id.
+**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
 **Parameters:**
-- `run_id` (string, required) - Run identifier answered by RunATC when wait was false.
+- `run_id` (string, required) - Run identifier an ATC run started with wait=false answered.
 
 ---
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -1509,13 +1397,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Perform syntax check on an ABAP behavior definition (BDEF). Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the RAP behavior definition (BDEF) named by name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
 **Parameters:**
 - `name` (string, required) - BehaviorDefinition name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -1551,13 +1439,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Retrieve ABAP behavior definition definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1581,7 +1470,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
+**Description:** Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -1608,13 +1497,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Retrieve ABAP behavior implementation definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1638,7 +1528,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
-**Description:** Perform syntax check on an ABAP class. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
@@ -1651,7 +1541,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
+**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -1695,7 +1585,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -1708,7 +1598,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clear the local test classes include of a class under the class lock, and optionally activate the class.
+**Description:** Clears the local test classes include of the ABAP class named by class_name. The include is cleared under the class lock; with activate_on_delete the class is activated.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -1734,61 +1624,62 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** Retrieve ABAP class source code. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.
+**Description:** [read-only] Reads the local definitions include (the definitions include) of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** [read-only] Reads the local macros include of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** Read the local test classes include of a class. Active or inactive version.
+**Description:** [read-only] Reads the local test classes include of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.
+**Description:** [read-only] Reads the local types include (the implementations include) of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1836,7 +1727,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Write the local test classes include of a class under the class lock, and optionally activate the class.
+**Description:** Writes test_class_code as the local test classes include of the ABAP class named by class_name. The include is written under the class lock; with activate_on_update the class is activated.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -1867,7 +1758,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activate one or multiple ABAP repository objects. Use after Create/Update when objects remain inactive, or for group activation of related objects (e.g., domains + data elements + tables together). Works with any object type.
+**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
@@ -1879,19 +1770,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviordefinitionversiondiff-high-level-common"></a>
 #### GetBehaviorDefinitionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two RAP behavior definition versions, by their content_uris (taken from GetBehaviorDefinitionVersions entries).
+**Description:** [read-only] Compares the two RAP behavior definition versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetBehaviorDefinitionVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetBehaviorDefinitionVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the RAP behavior definition's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the RAP behavior definition's version history.
 
 ---
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a RAP behavior definition. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetBehaviorDefinitionVersionSource.
+**Description:** [read-only] Lists the version history of the RAP behavior definition named by behavior_definition_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1902,30 +1793,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviordefinitionversionsource-high-level-common"></a>
 #### GetBehaviorDefinitionVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific RAP behavior definition version by its content_uri (taken from a GetBehaviorDefinitionVersions entry).
+**Description:** [read-only] Reads the source of the RAP behavior definition version named by content_uri, an entry of the RAP behavior definition's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetBehaviorDefinitionVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the RAP behavior definition's version history.
 
 ---
 
 <a id="getclassversiondiff-high-level-common"></a>
 #### GetClassVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP class versions, by their content_uris (taken from GetClassVersions entries).
+**Description:** [read-only] Compares the two ABAP class versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetClassVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetClassVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP class's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP class's version history.
 
 ---
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetClassVersionSource.
+**Description:** [read-only] Lists the version history of the ABAP class named by class_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1936,30 +1827,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclassversionsource-high-level-common"></a>
 #### GetClassVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP class version by its content_uri (taken from a GetClassVersions entry).
+**Description:** [read-only] Reads the source of the ABAP class version named by content_uri, an entry of the ABAP class's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetClassVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP class's version history.
 
 ---
 
 <a id="getddlversiondiff-high-level-common"></a>
 #### GetDdlVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two CDS view (DDL source) versions, by their content_uris (taken from GetDdlVersions entries).
+**Description:** [read-only] Compares the two CDS view (DDL source) versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDdlVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDdlVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS view (DDL source)'s version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS view (DDL source)'s version history.
 
 ---
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDdlVersionSource.
+**Description:** [read-only] Lists the version history of the CDS view (DDL source) named by ddl_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1970,30 +1861,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getddlversionsource-high-level-common"></a>
 #### GetDdlVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific CDS view (DDL source) version by its content_uri (taken from a GetDdlVersions entry).
+**Description:** [read-only] Reads the source of the CDS view (DDL source) version named by content_uri, an entry of the CDS view (DDL source)'s version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetDdlVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS view (DDL source)'s version history.
 
 ---
 
 <a id="getfunctionmoduleversiondiff-high-level-common"></a>
 #### GetFunctionModuleVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP function module versions, by their content_uris (taken from GetFunctionModuleVersions entries).
+**Description:** [read-only] Compares the two ABAP function module versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionModuleVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionModuleVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP function module's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP function module's version history.
 
 ---
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionModuleVersionSource.
+**Description:** [read-only] Lists the version history of the ABAP function module named by function_module_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2005,30 +1896,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmoduleversionsource-high-level-common"></a>
 #### GetFunctionModuleVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP function module version by its content_uri (taken from a GetFunctionModuleVersions entry).
+**Description:** [read-only] Reads the source of the ABAP function module version named by content_uri, an entry of the ABAP function module's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionModuleVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP function module's version history.
 
 ---
 
 <a id="getinterfaceversiondiff-high-level-common"></a>
 #### GetInterfaceVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP interface versions, by their content_uris (taken from GetInterfaceVersions entries).
+**Description:** [read-only] Compares the two ABAP interface versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetInterfaceVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetInterfaceVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP interface's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP interface's version history.
 
 ---
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
+**Description:** [read-only] Lists the version history of the ABAP interface named by interface_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2039,30 +1930,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getinterfaceversionsource-high-level-common"></a>
 #### GetInterfaceVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP interface version by its content_uri (taken from a GetInterfaceVersions entry).
+**Description:** [read-only] Reads the source of the ABAP interface version named by content_uri, an entry of the ABAP interface's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetInterfaceVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP interface's version history.
 
 ---
 
 <a id="getmetadataextensionversiondiff-high-level-common"></a>
 #### GetMetadataExtensionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two CDS metadata extension versions, by their content_uris (taken from GetMetadataExtensionVersions entries).
+**Description:** [read-only] Compares the two CDS metadata extension versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetMetadataExtensionVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetMetadataExtensionVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS metadata extension's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS metadata extension's version history.
 
 ---
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a CDS metadata extension. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetMetadataExtensionVersionSource.
+**Description:** [read-only] Lists the version history of the CDS metadata extension named by metadata_extension_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2073,30 +1964,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmetadataextensionversionsource-high-level-common"></a>
 #### GetMetadataExtensionVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific CDS metadata extension version by its content_uri (taken from a GetMetadataExtensionVersions entry).
+**Description:** [read-only] Reads the source of the CDS metadata extension version named by content_uri, an entry of the CDS metadata extension's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetMetadataExtensionVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS metadata extension's version history.
 
 ---
 
 <a id="getprogramversiondiff-high-level-common"></a>
 #### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP program versions, by their content_uris (taken from GetProgramVersions entries).
+**Description:** [read-only] Compares the two ABAP program versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetProgramVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetProgramVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP program's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP program's version history.
 
 ---
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetProgramVersionSource.
+**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2107,30 +1998,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getprogramversionsource-high-level-common"></a>
 #### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP program version by its content_uri (taken from a GetProgramVersions entry).
+**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetProgramVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP program's version history.
 
 ---
 
 <a id="getstructureversiondiff-high-level-common"></a>
 #### GetStructureVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP structure versions, by their content_uris (taken from GetStructureVersions entries).
+**Description:** [read-only] Compares the two ABAP structure versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetStructureVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetStructureVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP structure's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP structure's version history.
 
 ---
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP structure. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetStructureVersionSource.
+**Description:** [read-only] Lists the version history of the ABAP structure named by structure_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2141,30 +2032,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructureversionsource-high-level-common"></a>
 #### GetStructureVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP structure version by its content_uri (taken from a GetStructureVersions entry).
+**Description:** [read-only] Reads the source of the ABAP structure version named by content_uri, an entry of the ABAP structure's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetStructureVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP structure's version history.
 
 ---
 
 <a id="gettableversiondiff-high-level-common"></a>
 #### GetTableVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP table versions, by their content_uris (taken from GetTableVersions entries).
+**Description:** [read-only] Compares the two ABAP table versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetTableVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetTableVersions entry).
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP table's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP table's version history.
 
 ---
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP table. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetTableVersionSource.
+**Description:** [read-only] Lists the version history of the ABAP table named by table_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2175,12 +2066,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="gettableversionsource-high-level-common"></a>
 #### GetTableVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP table version by its content_uri (taken from a GetTableVersions entry).
+**Description:** [read-only] Reads the source of the ABAP table version named by content_uri, an entry of the ABAP table's version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetTableVersions entry.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP table's version history.
 
 ---
 
@@ -2189,13 +2080,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
-**Description:** Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP data element named by data_element_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
+- `version` (string, optional) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -2240,7 +2131,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** Retrieve ABAP data element definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -2282,20 +2173,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
-**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
 **Parameters:**
 - `ddl_name` (string, required) - CDS view name to check, passed as ddl_name.
 - `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
 
 ---
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
+**Description:** Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -2322,19 +2213,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** Retrieve ABAP DDL source definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
+**Description:** Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -2351,7 +2243,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
-**Description:** Perform syntax check on an ABAP metadata extension (DDLX). Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the CDS metadata extension (DDLX) named by name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
@@ -2397,13 +2289,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
-**Description:** Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP domain named by domain_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
+- `version` (string, optional) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -2445,7 +2337,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** Retrieve ABAP domain definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -2483,19 +2375,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
-**Description:** Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP function group named by function_group_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
 <a id="checkfunctionmodule-high-level-function"></a>
 #### CheckFunctionModule (High-Level / Function)
-**Description:** Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP function module named by function_module_name in the function group named by function_group_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
 
@@ -2538,7 +2430,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -2581,7 +2473,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** Retrieve ABAP function group definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -2654,14 +2546,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature. Active or inactive version.
+**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name containing the function module.
-- `function_module_name` (string, required) - FunctionModule name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `function_group_name` (string, required) - Function group containing the function module.
+- `function_module_name` (string, required) - Function module name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -2670,13 +2563,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
-**Description:** Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP interface named by interface_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -2709,13 +2602,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** Retrieve ABAP interface definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -2738,7 +2632,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+**Description:** Creates the ABAP message class (T100) named by message_class_name, with its description, in the package named by package_name: a shell whose messages are added afterwards. A message class is in effect once saved.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -2753,7 +2647,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
+**Description:** Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -2794,7 +2688,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
+**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -2805,7 +2699,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). There is no per-message resource: ADT answers the ENTIRE parent class document (XML) under the `message` field, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
+**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -2817,7 +2711,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
+**Description:** Updates the header of the ABAP message class named by message_class_name: its description.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
@@ -2830,7 +2724,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -2861,13 +2755,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** Retrieve ABAP metadata extension definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -2876,7 +2771,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP package named by package_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -2897,9 +2792,22 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletepackage-high-level-package"></a>
+#### DeletePackage (High-Level / Package)
+**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server save a package on a session apart from this one, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+
+**Source:** `src/handlers/package/high/handleDeletePackage.ts`
+
+**Parameters:**
+- `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
+
+---
+
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -2909,18 +2817,31 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatepackage-high-level-package"></a>
+#### UpdatePackage (High-Level / Package)
+**Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
+
+**Source:** `src/handlers/package/high/handleUpdatePackage.ts`
+
+**Parameters:**
+- `description` (string, required) - New description for the package.
+- `package_name` (string, required) - Package name. Package must already exist.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
+
+---
+
 <a id="high-level-program"></a>
 ### High-Level / Program
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Not available on cloud.
+**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. Available on premise.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
 **Parameters:**
 - `program_name` (string, required) - Program name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -2955,13 +2876,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** Retrieve ABAP program definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -3018,11 +2940,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** Retrieve ABAP service binding source/metadata by name via ADT Business Services endpoint.
+**Description:** [read-only] Reads the OData service binding named by service_binding_name in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
@@ -3030,7 +2953,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** List available service binding types (for example ODataV2/ODataV4) from ADT Business Services endpoint.
+**Description:** [read-only] Lists the available service binding types (for example ODataV2/ODataV4) from the ADT Business Services endpoint, in the response_format given.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
@@ -3057,7 +2980,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** Validate service binding parameters (name, service definition, package, version) via ADT validation endpoint.
+**Description:** [read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
@@ -3104,13 +3027,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** Retrieve ABAP service definition definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -3133,14 +3057,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
-**Description:** Perform syntax check on an ABAP structure. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP structure named by structure_name. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
 
 ---
 
@@ -3176,13 +3100,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** Retrieve ABAP structure definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -3205,7 +3130,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.
+**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -3214,7 +3139,9 @@ Generated from code in `src/handlers/**` (not from docs).
 - `include_descriptions` (boolean, optional (default: true)) - Include object descriptions in response. Default: true
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
-- `package_name` (string, required) - Package name
+- `package_name` (string, optional) - Package name (give this or package_names)
+- `package_names` (array, optional) - Several package names, read together (give this or package_name)
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -3223,14 +3150,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
-**Description:** Perform syntax check on an ABAP table. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `table_name` (string, required) - Table name.
-- `version` (string, optional) - Version to check: 'active', 'inactive', or 'new'. Default: new.
+- `version` (string, optional) - Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.
 
 ---
 
@@ -3263,13 +3190,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** Retrieve ABAP table definition. Supports reading active or inactive version.
+**Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -3292,7 +3220,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Add an existing ABAP object to a transport task, so it travels with the task's request.
+**Description:** Adds the existing object named by object_name and object_type to the transport task named by transport_number, so it travels with the task's request.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
@@ -3320,12 +3248,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Create a task under an existing transport request, owned by a named user, and give it a type. The task is itself a request resource — it reads, writes and releases like one — and is what AddTransportObject and RemoveTransportObject address, since a request's objects live on its tasks. `target_user` is required: without it the server resolves an empty owner and refuses with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses AddTransportObject on premise with SCTS_ADT_MSG 009 / TK127.
+**Description:** Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
 **Parameters:**
-- `target_user` (string, required) - SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
+- `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
 - `task_type` (string, optional (default: S)) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
 - `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
 
@@ -3333,7 +3261,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="movetransportobjects-high-level-transport"></a>
 #### MoveTransportObjects (High-Level / Transport)
-**Description:** Move object entries from one transport task to another. Each entry is named by its position in the source task's object list.
+**Description:** Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
@@ -3346,7 +3274,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Remove an object's entry from the transport task that holds it.
+**Description:** Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -3361,7 +3289,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="sortandcompresstransporttask-high-level-transport"></a>
 #### SortAndCompressTransportTask (High-Level / Transport)
-**Description:** Sort a transport task's object list and merge its duplicate entries. A task holding the same entry twice refuses RemoveTransportObject until this has run.
+**Description:** Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
@@ -3375,7 +3303,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create ABAP Unit tests for a CDS view: check the view supports CDS test doubles, create a test class holding the local test classes, activate it.
+**Description:** Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -3390,7 +3318,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctiongroupunittest-high-level-unit-test"></a>
 #### CreateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Create ABAP Unit tests for a function group: a test include with its local test classes, activated with the group.
+**Description:** Creates the ABAP Unit test classes of the function group named by function_group_name, from test_class_source. They are written to a test include, which is activated with the group.
 
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
@@ -3403,7 +3331,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createprogramunittest-high-level-unit-test"></a>
 #### CreateProgramUnitTest (High-Level / Unit Test)
-**Description:** Create ABAP Unit tests for a report: a test include with its local test classes, included into the report and activated.
+**Description:** Creates the ABAP Unit test classes of the report named by program_name, from test_class_source. They are written to a test include, which is included into the report, and the report is activated.
 
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
@@ -3416,7 +3344,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Create ABAP Unit tests for a class: write its local test classes and activate the class.
+**Description:** Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -3429,7 +3357,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Delete the ABAP Unit tests of a CDS view: delete its test class.
+**Description:** Deletes the CDS view test class named by class_name, with the ABAP Unit test classes it holds.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
@@ -3441,7 +3369,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Delete the ABAP Unit tests of a class: remove its local test classes, keeping the class.
+**Description:** Deletes the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are deleted, and the class stays.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -3453,7 +3381,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
+**Description:** [read-only] Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -3464,7 +3392,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
+**Description:** [read-only] Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -3477,7 +3405,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id. 
+**Description:** [read-only] Retrieve CDS unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 
@@ -3489,7 +3417,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.
+**Description:** [read-only] Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
@@ -3500,7 +3428,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3511,7 +3439,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunitteststatus-high-level-unit-test"></a>
 #### GetUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status for a run_id.
+**Description:** [read-only] Retrieve ABAP Unit test run status for a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestStatus.ts`
 
@@ -3523,7 +3451,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a CDS view and return the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the CDS view test class named by class_name and returns the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -3534,7 +3462,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Run all ABAP Unit tests of a function group and return the result.
+**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3545,7 +3473,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a function module and return the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -3556,7 +3484,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a report and return the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3567,7 +3495,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a class and return the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -3578,7 +3506,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update the ABAP Unit tests of a CDS view: replace the local test classes in its test class and activate it.
+**Description:** Writes test_class_source as the ABAP Unit test classes of the CDS view test class named by class_name. The local test classes in the test class are rewritten, and it is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -3591,7 +3519,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctiongroupunittest-high-level-unit-test"></a>
 #### UpdateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Update the ABAP Unit tests of a function group: replace the local test classes in its test include and activate it.
+**Description:** Writes test_class_source as the ABAP Unit test classes of the function group named by function_group_name. The local test classes in its test include are rewritten, and it is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
@@ -3604,7 +3532,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateprogramunittest-high-level-unit-test"></a>
 #### UpdateProgramUnitTest (High-Level / Unit Test)
-**Description:** Update the ABAP Unit tests of a report: replace the local test classes in its test include and activate it.
+**Description:** Writes test_class_source as the ABAP Unit test classes of the report named by program_name. The local test classes in its test include are rewritten, and it is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
@@ -3617,7 +3545,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Update the ABAP Unit tests of a class: replace its local test classes and activate the class.
+**Description:** Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 
@@ -3625,1755 +3553,6 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
-
----
-
-<a id="low-level-group"></a>
-## Low-Level Group
-
-<a id="low-level-behavior-definition"></a>
-### Low-Level / Behavior Definition
-
-<a id="activatebehaviordefinitionlow-low-level-behavior-definition"></a>
-#### ActivateBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
-
-**Parameters:**
-- `name` (string, required) - Behavior definition name (root entity).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkbdeflow-low-level-behavior-definition"></a>
-#### CheckBdefLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Perform syntax check on an ABAP behavior definition. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/behavior_definition/low/handleCheckBehaviorDefinition.ts`
-
-**Parameters:**
-- `name` (string, required) - BehaviorDefinition name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
-
----
-
-<a id="createbehaviordefinitionlow-low-level-behavior-definition"></a>
-#### CreateBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Create a new ABAP Behavior Definition. - use CreateBehaviorDefinition (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/behavior_definition/low/handleCreateBehaviorDefinition.ts`
-
-**Parameters:**
-- `description` (string, required) - Behavior Definition description.
-- `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.
-- `name` (string, required) - Behavior Definition name.
-- `package_name` (string, required) - Package name.
-- `root_entity` (string, required) - Root entity name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required.
-
----
-
-<a id="deletebehaviordefinitionlow-low-level-behavior-definition"></a>
-#### DeleteBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/behavior_definition/low/handleDeleteBehaviorDefinition.ts`
-
-**Parameters:**
-- `name` (string, required) - BehaviorDefinition name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockbehaviordefinitionlow-low-level-behavior-definition"></a>
-#### LockBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Lock an ABAP behavior definition for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/behavior_definition/low/handleLockBehaviorDefinition.ts`
-
-**Parameters:**
-- `name` (string, required) - BehaviorDefinition name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockbehaviordefinitionlow-low-level-behavior-definition"></a>
-#### UnlockBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Unlock an ABAP behavior definition after modification. Must use the same session_id and lock_handle from LockBehaviorDefinition operation.
-
-**Source:** `src/handlers/behavior_definition/low/handleUnlockBehaviorDefinition.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockBehaviorDefinition operation.
-- `name` (string, required) - BehaviorDefinition name.
-- `session_id` (string, required) - Session ID from LockBehaviorDefinition operation. Must be the same as used in LockBehaviorDefinition.
-- `session_state` (object, optional) - Session state from LockBehaviorDefinition (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updatebehaviordefinitionlow-low-level-behavior-definition"></a>
-#### UpdateBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Update source code of an existing ABAP behavior definition. Requires lock handle from LockObject. - use UpdateBehaviorDefinition (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/behavior_definition/low/handleUpdateBehaviorDefinition.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `name` (string, required) - Behavior definition name. Behavior definition must already exist.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `source_code` (string, required) - Complete behavior definition source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validatebehaviordefinitionlow-low-level-behavior-definition"></a>
-#### ValidateBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Validate an ABAP behavior definition name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/behavior_definition/low/handleValidateBehaviorDefinition.ts`
-
-**Parameters:**
-- `description` (string, required) - BehaviorDefinition description. Required for validation.
-- `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.
-- `name` (string, required) - BehaviorDefinition name to validate.
-- `package_name` (string, required) - Package name. Required for validation.
-- `root_entity` (string, required) - Root entity name. Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-behavior-implementation"></a>
-### Low-Level / Behavior Implementation
-
-<a id="createbehaviorimplementationlow-low-level-behavior-implementation"></a>
-#### CreateBehaviorImplementationLow (Low-Level / Behavior Implementation)
-**Description:** [low-level] Create a new ABAP behavior implementation class. With implementation_code, also locks, writes it to the implementations include, and unlocks. This does NOT write the FOR BEHAVIOR OF main source — the class will not be bound to behavior_definition until a caller writes that separately (e.g. via UpdateClass). - use CreateBehaviorImplementation (high-level) for additional validation.
-
-**Source:** `src/handlers/behavior_implementation/low/handleCreateBehaviorImplementation.ts`
-
-**Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name. Required.
-- `class_name` (string, required) - Behavior Implementation class name.
-- `description` (string, required) - Class description.
-- `implementation_code` (string, optional) - Implementation code for the implementations include (optional). When given, the class is locked, the code is written to the implementations include, and unlocked, right after creation. Does NOT write the FOR BEHAVIOR OF main source — the class is not bound to behavior_definition by this alone.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="lockbehaviorimplementationlow-low-level-behavior-implementation"></a>
-#### LockBehaviorImplementationLow (Low-Level / Behavior Implementation)
-**Description:** [low-level] Lock an ABAP behavior implementation class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/behavior_implementation/low/handleLockBehaviorImplementation.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Behavior Implementation class name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="validatebehaviorimplementationlow-low-level-behavior-implementation"></a>
-#### ValidateBehaviorImplementationLow (Low-Level / Behavior Implementation)
-**Description:** [low-level] Validate an ABAP behavior implementation class name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/behavior_implementation/low/handleValidateBehaviorImplementation.ts`
-
-**Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name. Required for validation.
-- `class_name` (string, required) - Behavior Implementation class name to validate.
-- `description` (string, required) - Class description. Required for validation.
-- `package_name` (string, required) - Package name. Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-class"></a>
-### Low-Level / Class
-
-<a id="activateclasslow-low-level-class"></a>
-#### ActivateClassLow (Low-Level / Class)
-**Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/class/low/handleActivateClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkclasslow-low-level-class"></a>
-#### CheckClassLow (Low-Level / Class)
-**Description:** [low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/class/low/handleCheckClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
-- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
-
----
-
-<a id="createclasslow-low-level-class"></a>
-#### CreateClassLow (Low-Level / Class)
-**Description:** [low-level] Create a new ABAP class. - use CreateClass (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/class/low/handleCreateClass.ts`
-
-**Parameters:**
-- `abstract` (boolean, optional (default: false).)) - Mark class as abstract (optional, default: false).
-- `class_name` (string, required) - Class name.
-- `create_protected` (boolean, optional (default: false).)) - Create protected section (optional, default: false).
-- `description` (string, required) - Class description.
-- `final` (boolean, optional (default: false).)) - Mark class as final (optional, default: false).
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `superclass` (string, optional) - Superclass name (optional).
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deleteclasslow-low-level-class"></a>
-#### DeleteClassLow (Low-Level / Class)
-**Description:** [low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/class/low/handleDeleteClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockclasslow-low-level-class"></a>
-#### LockClassLow (Low-Level / Class)
-**Description:** [low-level] Lock an ABAP class for modification. Uses session from HandlerContext. Returns lock handle that must be used in subsequent update/unlock operations.
-
-**Source:** `src/handlers/class/low/handleLockClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-
----
-
-<a id="unlockclasslow-low-level-class"></a>
-#### UnlockClassLow (Low-Level / Class)
-**Description:** [low-level] Unlock an ABAP class after modification. Uses session from HandlerContext. Must use the same lock_handle from LockClass operation.
-
-**Source:** `src/handlers/class/low/handleUnlockClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `lock_handle` (string, required) - Lock handle from LockClass operation.
-
----
-
-<a id="updateclasslow-low-level-class"></a>
-#### UpdateClassLow (Low-Level / Class)
-**Description:** [low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/class/low/handleUpdateClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name. Class must already exist.
-- `lock_handle` (string, required) - Lock handle from LockClass operation. Required for update operation.
-- `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validateclasslow-low-level-class"></a>
-#### ValidateClassLow (Low-Level / Class)
-**Description:** [low-level] Validate an ABAP class name before creation. Checks if the name is valid, available, and validates package, description, and superclass if provided. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/class/low/handleValidateClass.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name to validate
-- `description` (string, required) - Description for validation (required).
-- `package_name` (string, required) - Package name for validation (required).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `superclass` (string, optional) - Optional superclass name for validation (e.g., CL_OBJECT)
-
----
-
-<a id="low-level-common"></a>
-### Low-Level / Common
-
-<a id="activateobjectlow-low-level-common"></a>
-#### ActivateObjectLow (Low-Level / Common)
-**Description:** [low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.
-
-**Source:** `src/handlers/common/low/handleActivateObject.ts`
-
-**Parameters:**
-- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.
-- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Honored only when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family) — the per-object activate() this tool prefers for a single object has no preaudit parameter at all.
-
----
-
-<a id="checkobjectlow-low-level-common"></a>
-#### CheckObjectLow (Low-Level / Common)
-**Description:** [low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.
-
-**Source:** `src/handlers/common/low/handleCheckObject.ts`
-
-**Parameters:**
-- `object_name` (string, required) - Object name
-- `object_type` (string, required) - Object type
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 'active' or 'inactive' (default active)
-
----
-
-<a id="deleteobjectlow-low-level-common"></a>
-#### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for local objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.
-
-**Source:** `src/handlers/common/low/handleDeleteObject.ts`
-
-**Parameters:**
-- `function_group_name` (string, optional) - Required only for function_module type
-- `object_name` (string, required) - Object name
-- `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
-- `transport_request` (string, optional) - Transport request number, not a task
-
----
-
-<a id="lockobjectlow-low-level-common"></a>
-#### LockObjectLow (Low-Level / Common)
-**Description:** [low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/common/low/handleLockObject.ts`
-
-**Parameters:**
-- `object_name` (string, required) - Object name. For function modules, use format GROUP|FM_NAME
-- `object_type` (string, required) - Object type
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, optional) - Super package (required for package locking)
-
----
-
-<a id="unlockobjectlow-low-level-common"></a>
-#### UnlockObjectLow (Low-Level / Common)
-**Description:** [low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.
-
-**Source:** `src/handlers/common/low/handleUnlockObject.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockObject operation
-- `object_name` (string, required) - Object name. For function modules, use format GROUP|FM_NAME
-- `object_type` (string, required) - Object type
-- `session_id` (string, required) - Session ID from LockObject operation. Must be the same session.
-- `session_state` (object, optional) - Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="validateobjectlow-low-level-common"></a>
-#### ValidateObjectLow (Low-Level / Common)
-**Description:** [low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/common/low/handleValidateObject.ts`
-
-**Parameters:**
-- `behavior_definition` (string, optional) - Optional behavior definition name (required for behavior_implementation validation)
-- `description` (string, optional) - Optional description for validation
-- `implementation_type` (string, optional) - Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)
-- `object_name` (string, required) - Object name to validate
-- `object_type` (string, required) - Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'
-- `package_name` (string, optional) - Optional package name for validation
-- `root_entity` (string, optional) - Root entity name (required for behavior_definition validation)
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-data-element"></a>
-### Low-Level / Data Element
-
-<a id="activatedataelementlow-low-level-data-element"></a>
-#### ActivateDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - Data element name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkdataelementlow-low-level-data-element"></a>
-#### CheckDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/data_element/low/handleCheckDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - DataElement name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
-
----
-
-<a id="createdataelementlow-low-level-data-element"></a>
-#### CreateDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Create a new ABAP data element. - use CreateDataElement (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/data_element/low/handleCreateDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - DataElement name.
-- `data_type` (string, optional) - Does not reach creation — the shipped create endpoint never reads it (only sends name/description/package/transport). Use UpdateDataElementLow (with lock_handle) after creating to set the data type or domain name.
-- `decimals` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the decimal places.
-- `description` (string, required) - DataElement description.
-- `length` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the data type length.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-- `type_kind` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type kind ('E'/'domain', 'P'/'predefinedAbapType', etc.).
-- `type_name` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type name (domain, data element, or class name depending on type_kind).
-
----
-
-<a id="deletedataelementlow-low-level-data-element"></a>
-#### DeleteDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/data_element/low/handleDeleteDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - DataElement name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockdataelementlow-low-level-data-element"></a>
-#### LockDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Lock an ABAP data element for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/data_element/low/handleLockDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - DataElement name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockdataelementlow-low-level-data-element"></a>
-#### UnlockDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.
-
-**Source:** `src/handlers/data_element/low/handleUnlockDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - DataElement name.
-- `lock_handle` (string, required) - Lock handle from LockDataElement operation.
-- `session_id` (string, required) - Session ID from LockDataElement operation. Must be the same as used in LockDataElement.
-- `session_state` (object, optional) - Session state from LockDataElement (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updatedataelementlow-low-level-data-element"></a>
-#### UpdateDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/data_element/low/handleUpdateDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - Data element name. Data element must already exist.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `properties` (object, required) - Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="validatedataelementlow-low-level-data-element"></a>
-#### ValidateDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Validate an ABAP data element name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/data_element/low/handleValidateDataElement.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - DataElement name to validate.
-- `description` (string, required) - DataElement description. Required for validation.
-- `package_name` (string, required) - Package name. Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-ddl"></a>
-### Low-Level / Ddl
-
-<a id="activateddllow-low-level-ddl"></a>
-#### ActivateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkddllow-low-level-ddl"></a>
-#### CheckDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
-
-**Source:** `src/handlers/ddl/low/handleCheckDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name.
-- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
-
----
-
-<a id="createddllow-low-level-ddl"></a>
-#### CreateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Create a new ABAP DDL source. - use CreateDdl (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/ddl/low/handleCreateDdl.ts`
-
-**Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `ddl_name` (string, required) - DDL source name.
-- `description` (string, required) - DDL source description.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deleteddllow-low-level-ddl"></a>
-#### DeleteDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockddllow-low-level-ddl"></a>
-#### LockDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/ddl/low/handleLockDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockddllow-low-level-ddl"></a>
-#### UnlockDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Unlock an ABAP DDL source after modification. Must use the same session_id and lock_handle from LockDdlLow operation.
-
-**Source:** `src/handlers/ddl/low/handleUnlockDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name.
-- `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
-- `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
-- `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updateddllow-low-level-ddl"></a>
-#### UpdateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name. DDL source must already exist.
-- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
-- `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validateddllow-low-level-ddl"></a>
-#### ValidateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Validate an ABAP DDL source name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/ddl/low/handleValidateDdl.ts`
-
-**Parameters:**
-- `ddl_name` (string, required) - DDL source name to validate.
-- `description` (string, required) - DDL source description. Required for validation.
-- `package_name` (string, required) - Package name. Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-ddlx"></a>
-### Low-Level / Ddlx
-
-<a id="activatemetadataextensionlow-low-level-ddlx"></a>
-#### ActivateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
-
-**Parameters:**
-- `name` (string, required) - Metadata Extension name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkmetadataextensionlow-low-level-ddlx"></a>
-#### CheckMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/ddlx/low/handleCheckMetadataExtension.ts`
-
-**Parameters:**
-- `name` (string, required) - MetadataExtension name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional (default: active)) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.
-
----
-
-<a id="createmetadataextensionlow-low-level-ddlx"></a>
-#### CreateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Create a new ABAP Metadata Extension. - use CreateMetadataExtension (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/ddlx/low/handleCreateMetadataExtension.ts`
-
-**Parameters:**
-- `description` (string, required) - Metadata Extension description.
-- `master_language` (string, optional) - Master language (optional, e.g., 'EN').
-- `name` (string, required) - Metadata Extension name.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Optional for local objects.
-
----
-
-<a id="deletemetadataextensionlow-low-level-ddlx"></a>
-#### DeleteMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.
-
-**Source:** `src/handlers/ddlx/low/handleDeleteMetadataExtension.ts`
-
-**Parameters:**
-- `name` (string, required) - MetadataExtension name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockmetadataextensionlow-low-level-ddlx"></a>
-#### LockMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Lock an ABAP metadata extension for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/ddlx/low/handleLockMetadataExtension.ts`
-
-**Parameters:**
-- `name` (string, required) - Metadata Extension name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockmetadataextensionlow-low-level-ddlx"></a>
-#### UnlockMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtensionLow operation.
-
-**Source:** `src/handlers/ddlx/low/handleUnlockMetadataExtension.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockMetadataExtensionLow operation.
-- `name` (string, required) - Metadata Extension name.
-- `session_id` (string, required) - Session ID from LockMetadataExtensionLow operation. Must be the same as used in LockMetadataExtensionLow.
-- `session_state` (object, optional) - Session state from LockMetadataExtensionLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updatemetadataextensionlow-low-level-ddlx"></a>
-#### UpdateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Update source code of an existing ABAP metadata extension. Requires lock handle from LockObject. - use UpdateMetadataExtension (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/ddlx/low/handleUpdateMetadataExtension.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `name` (string, required) - Metadata extension name. Metadata extension must already exist.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `source_code` (string, required) - Complete metadata extension source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validatemetadataextensionlow-low-level-ddlx"></a>
-#### ValidateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Validate an ABAP metadata extension name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/ddlx/low/handleValidateMetadataExtension.ts`
-
-**Parameters:**
-- `description` (string, required) - Metadata Extension description. Required for validation.
-- `name` (string, required) - Metadata Extension name to validate.
-- `package_name` (string, required) - Package name. Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-domain"></a>
-### Low-Level / Domain
-
-<a id="activatedomainlow-low-level-domain"></a>
-#### ActivateDomainLow (Low-Level / Domain)
-**Description:** [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/domain/low/handleActivateDomain.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - Domain name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkdomainlow-low-level-domain"></a>
-#### CheckDomainLow (Low-Level / Domain)
-**Description:** [low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/domain/low/handleCheckDomain.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - Domain name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
-
----
-
-<a id="createdomainlow-low-level-domain"></a>
-#### CreateDomainLow (Low-Level / Domain)
-**Description:** [low-level] Create a new ABAP domain. - use CreateDomain (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/domain/low/handleCreateDomain.ts`
-
-**Parameters:**
-- `description` (string, required) - Domain description.
-- `domain_name` (string, required) - Domain name.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deletedomainlow-low-level-domain"></a>
-#### DeleteDomainLow (Low-Level / Domain)
-**Description:** [low-level] Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/domain/low/handleDeleteDomain.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - Domain name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockdomainlow-low-level-domain"></a>
-#### LockDomainLow (Low-Level / Domain)
-**Description:** [low-level] Lock an ABAP domain for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/domain/low/handleLockDomain.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - Domain name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockdomainlow-low-level-domain"></a>
-#### UnlockDomainLow (Low-Level / Domain)
-**Description:** [low-level] Unlock an ABAP domain after modification. Must use the same session_id and lock_handle from LockDomain operation.
-
-**Source:** `src/handlers/domain/low/handleUnlockDomain.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - Domain name.
-- `lock_handle` (string, required) - Lock handle from LockDomain operation.
-- `session_id` (string, required) - Session ID from LockDomain operation. Must be the same as used in LockDomain.
-- `session_state` (object, optional) - Session state from LockDomain (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updatedomainlow-low-level-domain"></a>
-#### UpdateDomainLow (Low-Level / Domain)
-**Description:** [low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/domain/low/handleUpdateDomain.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - Domain name. Domain must already exist.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `properties` (object, required) - Domain properties object. Can include: description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, etc.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="validatedomainlow-low-level-domain"></a>
-#### ValidateDomainLow (Low-Level / Domain)
-**Description:** [low-level] Validate an ABAP domain name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/domain/low/handleValidateDomain.ts`
-
-**Parameters:**
-- `description` (string, required) - Domain description (required for validation).
-- `domain_name` (string, required) - Domain name to validate.
-- `package_name` (string, required) - Package name (required for validation).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-function"></a>
-### Low-Level / Function
-
-<a id="activatefunctiongrouplow-low-level-function"></a>
-#### ActivateFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Activate an ABAP function group. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="activatefunctionmodulelow-low-level-function"></a>
-#### ActivateFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `function_module_name` (string, required) - Function module name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkfunctiongrouplow-low-level-function"></a>
-#### CheckFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/function/low/handleCheckFunctionGroup.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
-
----
-
-<a id="checkfunctionmodulelow-low-level-function"></a>
-#### CheckFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/function/low/handleCheckFunctionModule.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name
-- `function_module_name` (string, required) - Function module name
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
-
----
-
-<a id="createfunctiongrouplow-low-level-function"></a>
-#### CreateFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Create a new ABAP function group. - use CreateFunctionGroup (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/function/low/handleCreateFunctionGroup.ts`
-
-**Parameters:**
-- `description` (string, required) - Function group description.
-- `function_group_name` (string, required) - Function group name.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="createfunctionmodulelow-low-level-function"></a>
-#### CreateFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Create a new ABAP function module. - use CreateFunctionModule (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/function/low/handleCreateFunctionModule.ts`
-
-**Parameters:**
-- `description` (string, required) - Function module description.
-- `function_group_name` (string, required) - Function group name.
-- `function_module_name` (string, required) - Function module name.
-- `package_name` (string, required) - Accepted for compatibility; not sent to the server. A function module lives inside its function group's package — the shipped create endpoint takes no package of its own.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deletefunctiongrouplow-low-level-function"></a>
-#### DeleteFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/function/low/handleDeleteFunctionGroup.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="deletefunctionmodulelow-low-level-function"></a>
-#### DeleteFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/function/low/handleDeleteFunctionModule.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `function_module_name` (string, required) - Function module name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockfunctiongrouplow-low-level-function"></a>
-#### LockFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Lock an ABAP function group for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/function/low/handleLockFunctionGroup.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="lockfunctionmodulelow-low-level-function"></a>
-#### LockFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Lock an ABAP function module for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/function/low/handleLockFunctionModule.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `function_module_name` (string, required) - Function module name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockfunctiongrouplow-low-level-function"></a>
-#### UnlockFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Unlock an ABAP function group after modification. Must use the same session_id and lock_handle from LockFunctionGroup operation.
-
-**Source:** `src/handlers/function/low/handleUnlockFunctionGroup.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name.
-- `lock_handle` (string, required) - Lock handle from LockFunctionGroup operation.
-- `session_id` (string, required) - Session ID from LockFunctionGroup operation. Must be the same as used in LockFunctionGroup.
-- `session_state` (object, optional) - Session state from LockFunctionGroup (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockfunctionmodulelow-low-level-function"></a>
-#### UnlockFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Unlock an ABAP function module after modification. Must use the same session_id and lock_handle from LockFunctionModule operation.
-
-**Source:** `src/handlers/function/low/handleUnlockFunctionModule.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `function_module_name` (string, required) - Function module name.
-- `lock_handle` (string, required) - Lock handle from LockFunctionModule operation.
-- `session_id` (string, required) - Session ID from LockFunctionModule operation. Must be the same as used in LockFunctionModule.
-- `session_state` (object, optional) - Session state from LockFunctionModule (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updatefunctionmodulelow-low-level-function"></a>
-#### UpdateFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Update source code of an existing ABAP function module. Requires lock handle from LockObject and function group name. - use UpdateFunctionModule (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/function/low/handleUpdateFunctionModule.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name containing the function module.
-- `function_module_name` (string, required) - Function module name. Function module must already exist.
-- `lock_handle` (string, required) - Lock handle from LockFunctionModule. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `source_code` (string, required) - Complete ABAP function module source code.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects locked in a request.
-
----
-
-<a id="validatefunctiongrouplow-low-level-function"></a>
-#### ValidateFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Validate an ABAP function group name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/function/low/handleValidateFunctionGroup.ts`
-
-**Parameters:**
-- `description` (string, optional) - Optional description for validation. Defaults to the function group name when omitted — the endpoint requires a non-empty description.
-- `function_group_name` (string, required) - FunctionGroup name to validate.
-- `package_name` (string, optional) - Package name for validation (optional but recommended).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="validatefunctionmodulelow-low-level-function"></a>
-#### ValidateFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Validate an ABAP function module name before creation. Checks if the name is valid and available. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/function/low/handleValidateFunctionModule.ts`
-
-**Parameters:**
-- `description` (string, optional) - Optional description for validation
-- `function_group_name` (string, required) - Function group name
-- `function_module_name` (string, required) - Function module name to validate
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-interface"></a>
-### Low-Level / Interface
-
-<a id="activateinterfacelow-low-level-interface"></a>
-#### ActivateInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/interface/low/handleActivateInterface.ts`
-
-**Parameters:**
-- `interface_name` (string, required) - Interface name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkinterfacelow-low-level-interface"></a>
-#### CheckInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/interface/low/handleCheckInterface.ts`
-
-**Parameters:**
-- `interface_name` (string, required) - Interface name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
-
----
-
-<a id="createinterfacelow-low-level-interface"></a>
-#### CreateInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Create a new ABAP interface. - use CreateInterface (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/interface/low/handleCreateInterface.ts`
-
-**Parameters:**
-- `description` (string, required) - Interface description.
-- `interface_name` (string, required) - Interface name.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deleteinterfacelow-low-level-interface"></a>
-#### DeleteInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/interface/low/handleDeleteInterface.ts`
-
-**Parameters:**
-- `interface_name` (string, required) - Interface name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockinterfacelow-low-level-interface"></a>
-#### LockInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Lock an ABAP interface for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/interface/low/handleLockInterface.ts`
-
-**Parameters:**
-- `interface_name` (string, required) - Interface name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockinterfacelow-low-level-interface"></a>
-#### UnlockInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.
-
-**Source:** `src/handlers/interface/low/handleUnlockInterface.ts`
-
-**Parameters:**
-- `interface_name` (string, required) - Interface name.
-- `lock_handle` (string, required) - Lock handle from LockInterface operation.
-- `session_id` (string, required) - Session ID from LockInterface operation. Must be the same as used in LockInterface.
-- `session_state` (object, optional) - Session state from LockInterface (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updateinterfacelow-low-level-interface"></a>
-#### UpdateInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Update source code of an existing ABAP interface. Requires lock handle from LockObject. - use UpdateInterface (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/interface/low/handleUpdateInterface.ts`
-
-**Parameters:**
-- `interface_name` (string, required) - Interface name. Interface must already exist.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `source_code` (string, required) - Complete ABAP interface source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validateinterfacelow-low-level-interface"></a>
-#### ValidateInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/interface/low/handleValidateInterface.ts`
-
-**Parameters:**
-- `description` (string, required) - Interface description. Required for validation.
-- `interface_name` (string, required) - Interface name to validate.
-- `package_name` (string, required) - Package name. Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-package"></a>
-### Low-Level / Package
-
-<a id="checkpackagelow-low-level-package"></a>
-#### CheckPackageLow (Low-Level / Package)
-**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. super_package is accepted but not read by the check endpoint — see its own parameter description.
-
-**Source:** `src/handlers/package/low/handleCheckPackage.ts`
-
-**Parameters:**
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, optional) - Optional, and it does not reach the check endpoint — the shipped check() call takes only the package name. Kept for compatibility with ValidatePackage/CreatePackage, which do read it (LockPackage/UnlockPackage/UpdatePackage do not either). Requiring it here refused the call before any request was made.
-
----
-
-<a id="createpackagelow-low-level-package"></a>
-#### CreatePackageLow (Low-Level / Package)
-**Description:** [low-level] Create a new ABAP package. - use CreatePackage (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/package/low/handleCreatePackage.ts`
-
-**Parameters:**
-- `application_component` (string, optional) - Application component (e.g., BC-ABA).
-- `description` (string, required) - Package description.
-- `package_name` (string, required) - Package name.
-- `package_type` (string, optional) - Package type (development/structure). Defaults to development.
-- `record_changes` (boolean, optional) - Enable change recording for the package. Required for a transportable package. Default: false.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
-- `super_package` (string, required) - Super package (parent package) name. Required.
-- `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deletepackagelow-low-level-package"></a>
-#### DeletePackageLow (Low-Level / Package)
-**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
-
-**Source:** `src/handlers/package/low/handleDeletePackage.ts`
-
-**Parameters:**
-- `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
-- `package_name` (string, required) - Package name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockpackagelow-low-level-package"></a>
-#### LockPackageLow (Low-Level / Package)
-**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description. Always unlock. A package can be saved only once per ABAP session (SAP answers PAK/058 "Package … is already locked" otherwise). Over RFC, where every call shares one session, the lock is taken in an ABAP session of its own, kept under the returned lock_handle for UpdatePackageLow and UnlockPackageLow, and closed by UnlockPackageLow. Over HTTP the connection keeps the stateful context of the lock to the lock and unlock requests, so the update runs outside it.
-
-**Source:** `src/handlers/package/low/handleLockPackage.ts`
-
-**Parameters:**
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Does not reach the lock endpoint — the shipped lockPackage() call takes only the package name. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
-
----
-
-<a id="unlockpackagelow-low-level-package"></a>
-#### UnlockPackageLow (Low-Level / Package)
-**Description:** [low-level] Unlock an ABAP package after modification. Requires lock_handle from LockPackage — must use the same session_id and lock_handle it returned. super_package is required by this schema but not read by the unlock endpoint — see its own parameter description.
-
-**Source:** `src/handlers/package/low/handleUnlockPackage.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockObject operation
-- `package_name` (string, required) - Package name. Package must already exist.
-- `session_id` (string, required) - Session ID from LockObject operation. Must be the same as used in LockObject.
-- `session_state` (object, optional) - Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Does not reach the unlock endpoint — the shipped unlockPackage() call takes only the package name and lock handle. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
-
----
-
-<a id="updatepackagelow-low-level-package"></a>
-#### UpdatePackageLow (Low-Level / Package)
-**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.
-
-**Source:** `src/handlers/package/low/handleUpdatePackage.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `package_name` (string, required) - Package name. Package must already exist.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-- `updated_description` (string, required) - New description for the package.
-
----
-
-<a id="validatepackagelow-low-level-package"></a>
-#### ValidatePackageLow (Low-Level / Package)
-**Description:** [low-level] Validate an ABAP package name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/package/low/handleValidatePackage.ts`
-
-**Parameters:**
-- `package_name` (string, required) - Package name to validate.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Parent (super) package name. The new package will be created under this package.
-
----
-
-<a id="low-level-program"></a>
-### Low-Level / Program
-
-<a id="activateprogramlow-low-level-program"></a>
-#### ActivateProgramLow (Low-Level / Program)
-**Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/program/low/handleActivateProgram.ts`
-
-**Parameters:**
-- `program_name` (string, required) - Program name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="checkprogramlow-low-level-program"></a>
-#### CheckProgramLow (Low-Level / Program)
-**Description:** [low-level] Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/program/low/handleCheckProgram.ts`
-
-**Parameters:**
-- `program_name` (string, required) - Program name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
-
----
-
-<a id="createprogramlow-low-level-program"></a>
-#### CreateProgramLow (Low-Level / Program)
-**Description:** [low-level] Create a new ABAP program. - use CreateProgram (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/program/low/handleCreateProgram.ts`
-
-**Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `description` (string, required) - Program description.
-- `package_name` (string, required) - Package name.
-- `program_name` (string, required) - Program name.
-- `program_type` (string, optional) - Program type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deleteprogramlow-low-level-program"></a>
-#### DeleteProgramLow (Low-Level / Program)
-**Description:** [low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/program/low/handleDeleteProgram.ts`
-
-**Parameters:**
-- `program_name` (string, required) - Program name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockprogramlow-low-level-program"></a>
-#### LockProgramLow (Low-Level / Program)
-**Description:** [low-level] Lock an ABAP program for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/program/low/handleLockProgram.ts`
-
-**Parameters:**
-- `program_name` (string, required) - Program name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="unlockprogramlow-low-level-program"></a>
-#### UnlockProgramLow (Low-Level / Program)
-**Description:** [low-level] Unlock an ABAP program after modification. Must use the same session_id and lock_handle from LockProgram operation.
-
-**Source:** `src/handlers/program/low/handleUnlockProgram.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockProgram operation.
-- `program_name` (string, required) - Program name.
-- `session_id` (string, required) - Session ID from LockProgram operation. Must be the same as used in LockProgram.
-- `session_state` (object, optional) - Session state from LockProgram (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="updateprogramlow-low-level-program"></a>
-#### UpdateProgramLow (Low-Level / Program)
-**Description:** [low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/program/low/handleUpdateProgram.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `program_name` (string, required) - Program name. Program must already exist.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `source_code` (string, required) - Complete ABAP program source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validateprogramlow-low-level-program"></a>
-#### ValidateProgramLow (Low-Level / Program)
-**Description:** [low-level] Validate an ABAP program name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/program/low/handleValidateProgram.ts`
-
-**Parameters:**
-- `description` (string, required) - Program description. Required for validation.
-- `package_name` (string, required) - Package name. Required for validation.
-- `program_name` (string, required) - Program name to validate.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-service-binding"></a>
-### Low-Level / Service Binding
-
-<a id="activateservicebindinglow-low-level-service-binding"></a>
-#### ActivateServiceBindingLow (Low-Level / Service Binding)
-**Description:** [low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
-
-**Parameters:**
-- `name` (string, required) - Service binding name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-service-definition"></a>
-### Low-Level / Service Definition
-
-<a id="activateservicedefinitionlow-low-level-service-definition"></a>
-#### ActivateServiceDefinitionLow (Low-Level / Service Definition)
-**Description:** [low-level] Activate an ABAP service definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
-
-**Parameters:**
-- `name` (string, required) - Service definition name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="low-level-structure"></a>
-### Low-Level / Structure
-
-<a id="activatestructurelow-low-level-structure"></a>
-#### ActivateStructureLow (Low-Level / Structure)
-**Description:** [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/structure/low/handleActivateStructure.ts`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name.
-
----
-
-<a id="checkstructurelow-low-level-structure"></a>
-#### CheckStructureLow (Low-Level / Structure)
-**Description:** [low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
-
-**Source:** `src/handlers/structure/low/handleCheckStructure.ts`
-
-**Parameters:**
-- `ddl_code` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name.
-- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
-
----
-
-<a id="createstructurelow-low-level-structure"></a>
-#### CreateStructureLow (Low-Level / Structure)
-**Description:** [low-level] Create a new ABAP structure. - use CreateStructure (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/structure/low/handleCreateStructure.ts`
-
-**Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `description` (string, required) - Structure description.
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name.
-- `structure_type` (string, optional) - Accepted for compatibility; not forwarded to the create request. (These values name ABAP program subtypes — a DDIC structure has no structure-type concept of its own.)
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deletestructurelow-low-level-structure"></a>
-#### DeleteStructureLow (Low-Level / Structure)
-**Description:** [low-level] Delete a structure from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/structure/low/handleDeleteStructure.ts`
-
-**Parameters:**
-- `structure_name` (string, required) - Structure name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="lockstructurelow-low-level-structure"></a>
-#### LockStructureLow (Low-Level / Structure)
-**Description:** [low-level] Lock a structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/structure/low/handleLockStructure.ts`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name.
-
----
-
-<a id="unlockstructurelow-low-level-structure"></a>
-#### UnlockStructureLow (Low-Level / Structure)
-**Description:** [low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructureLow operation.
-
-**Source:** `src/handlers/structure/low/handleUnlockStructure.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockStructureLow operation.
-- `session_id` (string, required) - Session ID from LockStructureLow operation. Must be the same as used in LockStructureLow.
-- `session_state` (object, optional) - Session state from LockStructureLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name.
-
----
-
-<a id="updatestructurelow-low-level-structure"></a>
-#### UpdateStructureLow (Low-Level / Structure)
-**Description:** [low-level] Update DDL source code of an existing ABAP structure. Requires lock handle from LockObject. - use UpdateStructureSource for full workflow with lock/unlock.
-
-**Source:** `src/handlers/structure/low/handleUpdateStructure.ts`
-
-**Parameters:**
-- `ddl_code` (string, required) - Complete DDL source code for the structure definition.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name. Structure must already exist.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="validatestructurelow-low-level-structure"></a>
-#### ValidateStructureLow (Low-Level / Structure)
-**Description:** [low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/structure/low/handleValidateStructure.ts`
-
-**Parameters:**
-- `description` (string, required) - Structure description. Required for validation.
-- `package_name` (string, required) - Package name. Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name to validate.
-
----
-
-<a id="low-level-system"></a>
-### Low-Level / System
-
-<a id="getnodestructurelow-low-level-system"></a>
-#### GetNodeStructureLow (Low-Level / System)
-**Description:** [low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/system/low/handleGetNodeStructure.ts`
-
-**Parameters:**
-- `node_id` (string, optional (default: 000000)) - Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: the server answers it with an empty body.
-- `parent_name` (string, required) - Parent object name
-- `parent_type` (string, required) - Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `with_short_descriptions` (boolean, optional (default: true)) - Include short descriptions in response
-
----
-
-<a id="getobjectstructurelow-low-level-system"></a>
-#### GetObjectStructureLow (Low-Level / System)
-**Description:** [low-level] Retrieve ADT object structure as compact JSON tree. Returns XML response with object structure tree. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/system/low/handleGetObjectStructure.ts`
-
-**Parameters:**
-- `object_name` (string, required) - Object name
-- `object_type` (string, required) - Object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K", "DDLS/DF")
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="getvirtualfolderslow-low-level-system"></a>
-#### GetVirtualFoldersLow (Low-Level / System)
-**Description:** [low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.
-
-**Source:** `src/handlers/system/low/handleGetVirtualFolders.ts`
-
-**Parameters:**
-- `facet_order` (array, optional (default: ['package)) - Order of facets in response (e.g., ["package", "group", "type"]). Default: ["package", "group", "type"]
-- `ignore_short_descriptions` (boolean, optional (default: false)) - Ignore short descriptions in response
-- `object_search_pattern` (string, optional (default: *)) - Object search pattern: "*" matches any name, and a trailing "*" matches a prefix. Default: "*"
-- `preselection` (array, optional) - Optional preselection filters (facet-value pairs for filtering)
-- `with_versions` (boolean, optional (default: false)) - Include version information in response
-
----
-
-<a id="low-level-table"></a>
-### Low-Level / Table
-
-<a id="activatetablelow-low-level-table"></a>
-#### ActivateTableLow (Low-Level / Table)
-**Description:** [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/table/low/handleActivateTable.ts`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name.
-
----
-
-<a id="checktablelow-low-level-table"></a>
-#### CheckTableLow (Low-Level / Table)
-**Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/table/low/handleCheckTable.ts`
-
-**Parameters:**
-- `ddl_code` (string, optional) - Accepted for compatibility; not sent to the server. The shipped check endpoint takes no source of its own — it checks whatever is already saved.
-- `reporter` (string, optional) - Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name
-- `version` (string, optional) - Version to check: 'active' selects the last activated version. 'inactive' and 'new' are accepted for compatibility but indistinguishable — the shipped check endpoint treats anything other than 'active' as 'inactive'. Default: new.
-
----
-
-<a id="createtablelow-low-level-table"></a>
-#### CreateTableLow (Low-Level / Table)
-**Description:** [low-level] Create a new ABAP table. - use CreateTable (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/table/low/handleCreateTable.ts`
-
-**Parameters:**
-- `package_name` (string, required) - Package name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-
----
-
-<a id="deletetablelow-low-level-table"></a>
-#### DeleteTableLow (Low-Level / Table)
-**Description:** [low-level] Delete a table from the SAP system via ADT deletion API. Transport request optional for local objects.
-
-**Source:** `src/handlers/table/low/handleDeleteTable.ts`
-
-**Parameters:**
-- `table_name` (string, required) - Table name.
-- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
-
----
-
-<a id="locktablelow-low-level-table"></a>
-#### LockTableLow (Low-Level / Table)
-**Description:** [low-level] Lock a table for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/table/low/handleLockTable.ts`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name.
-
----
-
-<a id="unlocktablelow-low-level-table"></a>
-#### UnlockTableLow (Low-Level / Table)
-**Description:** [low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTableLow operation.
-
-**Source:** `src/handlers/table/low/handleUnlockTable.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockTableLow operation.
-- `session_id` (string, required) - Session ID from LockTableLow operation. Must be the same as used in LockTableLow.
-- `session_state` (object, optional) - Session state from LockTableLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name.
-
----
-
-<a id="updatetablelow-low-level-table"></a>
-#### UpdateTableLow (Low-Level / Table)
-**Description:** [low-level] Update DDL source code of an existing ABAP table. Requires lock handle from LockObject. - use CreateTable for full workflow with lock/unlock.
-
-**Source:** `src/handlers/table/low/handleUpdateTable.ts`
-
-**Parameters:**
-- `ddl_code` (string, required) - Complete DDL source code for the table definition.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name. Table must already exist.
-- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
-
----
-
-<a id="validatetablelow-low-level-table"></a>
-#### ValidateTableLow (Low-Level / Table)
-**Description:** [low-level] Validate an ABAP table name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/table/low/handleValidateTable.ts`
-
-**Parameters:**
-- `description` (string, required) - Table description. Required for validation.
-- `package_name` (string, required) - Package name. Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name to validate
-
----
-
-<a id="low-level-transport"></a>
-### Low-Level / Transport
-
-<a id="createtransportlow-low-level-transport"></a>
-#### CreateTransportLow (Low-Level / Transport)
-**Description:** [low-level] Create a new ABAP transport request.
-
-**Source:** `src/handlers/transport/low/handleCreateTransport.ts`
-
-**Parameters:**
-- `description` (string, required) - Transport request description.
-- `transport_type` (string, optional (default: workbench').)) - Transport type: 'workbench' or 'customizing' (optional, default: 'workbench').
 
 ---
 
@@ -5385,7 +3564,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugcancel-debug-debugger"></a>
 #### AmdpDebugCancel (Debug / Debugger)
-**Description:** [debug] Cancels the stopped AMDP debuggee's execution.
+**Description:** [read-only] [debug] Cancels the stopped AMDP debuggee's execution.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
 
@@ -5397,7 +3576,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebuggettable-debug-debugger"></a>
 #### AmdpDebugGetTable (Debug / Debugger)
-**Description:** [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
+**Description:** [read-only] [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
 
@@ -5411,7 +3590,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Replaces the AMDP breakpoints of a debug session, as confirmed by the system. Catches every request of the connected SAP user, not only programs run by this server.
+**Description:** [read-only] [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
@@ -5424,7 +3603,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, not only programs run by this server.
+**Description:** [read-only] [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 
@@ -5438,7 +3617,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugstep-debug-debugger"></a>
 #### AmdpDebugStep (Debug / Debugger)
-**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
+**Description:** [read-only] [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStep.ts`
 
@@ -5451,7 +3630,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; a part that could not be undone is reported and kept.
+**Description:** [read-only] [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
@@ -5463,7 +3642,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugwait-debug-debugger"></a>
 #### AmdpDebugWait (Debug / Debugger)
-**Description:** [debug] AMDP events of a debug session after waiting up to hold_seconds.
+**Description:** [read-only] [debug] AMDP events of a debug session after waiting up to hold_seconds.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
 
@@ -5474,9 +3653,31 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="debugbatchbegin-debug-debugger"></a>
+#### DebugBatchBegin (Debug / Debugger)
+**Description:** [read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+
+**Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="debugbatchend-debug-debugger"></a>
+#### DebugBatchEnd (Debug / Debugger)
+**Description:** [read-only] [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
+
+**Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
+
+**Parameters:**
+- None
+
+---
+
 <a id="debugcreatememorysnapshot-debug-debugger"></a>
 #### DebugCreateMemorySnapshot (Debug / Debugger)
-**Description:** [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
+**Description:** [read-only] [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
@@ -5488,7 +3689,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugcreatewatchpoint-debug-debugger"></a>
 #### DebugCreateWatchpoint (Debug / Debugger)
-**Description:** [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
+**Description:** [read-only] [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
 
@@ -5502,7 +3703,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. Refused for an id the session does not hold.
+**Description:** [read-only] [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
@@ -5515,7 +3716,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugdeletewatchpoint-debug-debugger"></a>
 #### DebugDeleteWatchpoint (Debug / Debugger)
-**Description:** [debug] Removes a watchpoint.
+**Description:** [read-only] [debug] Removes a watchpoint.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
@@ -5528,7 +3729,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debuggetmemorysizes-debug-debugger"></a>
 #### DebugGetMemorySizes (Debug / Debugger)
-**Description:** [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
 
@@ -5540,7 +3741,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debuggetstack-debug-debugger"></a>
 #### DebugGetStack (Debug / Debugger)
-**Description:** [debug] Call stack of the stopped debuggee, each frame as an object address and as its technical place. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Call stack of the stopped debuggee of the debug session named by state_handle, each frame with its ADT object address and its technical place. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
 
@@ -5552,7 +3753,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debuggetvariables-debug-debugger"></a>
 #### DebugGetVariables (Debug / Debugger)
-**Description:** [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
 
@@ -5566,7 +3767,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debuglistbreakpoints-debug-debugger"></a>
 #### DebugListBreakpoints (Debug / Debugger)
-**Description:** [debug] Breakpoints a debug session armed.
+**Description:** [read-only] [debug] Breakpoints a debug session armed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
 
@@ -5578,7 +3779,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debuglistwatchpoints-debug-debugger"></a>
 #### DebugListWatchpoints (Debug / Debugger)
-**Description:** [debug] Watchpoints of the stopped debuggee.
+**Description:** [read-only] [debug] Watchpoints of the stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
 
@@ -5590,7 +3791,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints no longer placed, and any answer row it cannot pair with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
+**Description:** [read-only] [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
@@ -5603,7 +3804,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugsetsettings-debug-debugger"></a>
 #### DebugSetSettings (Debug / Debugger)
-**Description:** [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
+**Description:** [read-only] [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
 
@@ -5620,7 +3821,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugsetstackposition-debug-debugger"></a>
 #### DebugSetStackPosition (Debug / Debugger)
-**Description:** [debug] Selects the stack frame variables are read in; what runs next does not change. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
 
@@ -5633,7 +3834,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugsetvariable-debug-debugger"></a>
 #### DebugSetVariable (Debug / Debugger)
-**Description:** [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
+**Description:** [read-only] [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
@@ -5647,7 +3848,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
+**Description:** [read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
@@ -5663,7 +3864,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
+**Description:** [read-only] [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
@@ -5676,7 +3877,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugsteptoline-debug-debugger"></a>
 #### DebugStepToLine (Debug / Debugger)
-**Description:** [debug] Runs or jumps the stopped debuggee to a line.
+**Description:** [read-only] [debug] Runs or jumps the stopped debuggee to a line.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
@@ -5694,7 +3895,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; a part that could not be undone is reported and kept.
+**Description:** [read-only] [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
@@ -5706,7 +3907,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
+**Description:** [read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
@@ -5722,7 +3923,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugterminate-debug-debugger"></a>
 #### DebugTerminate (Debug / Debugger)
-**Description:** [debug] Ends the stopped debuggee where it stands; the program does not run on.
+**Description:** [read-only] [debug] Ends the stopped debuggee and its program where it stands.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
@@ -5734,7 +3935,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugwait-debug-debugger"></a>
 #### DebugWait (Debug / Debugger)
-**Description:** [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
+**Description:** [read-only] [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
 
 **Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
 
@@ -5747,7 +3948,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="memorysnapshotdelta-debug-debugger"></a>
 #### MemorySnapshotDelta (Debug / Debugger)
-**Description:** [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
 
@@ -5763,7 +3964,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="memorysnapshotget-debug-debugger"></a>
 #### MemorySnapshotGet (Debug / Debugger)
-**Description:** [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
 
@@ -5778,7 +3979,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="memorysnapshotlist-debug-debugger"></a>
 #### MemorySnapshotList (Debug / Debugger)
-**Description:** [debug] Memory snapshots the system lists. Empty without the memory snapshot authorization.
+**Description:** [read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
 
@@ -5788,4 +3989,72 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-10-12*
+<a id="session-group"></a>
+## Session Group
+
+<a id="session-leftover-session"></a>
+### Session / Leftover Session
+
+<a id="listleftoversessions-session-leftover-session"></a>
+#### ListLeftoverSessions (Session / Leftover Session)
+**Description:** [read-only] [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (absent for a token login) and when it was last recorded. Read from the session records alone, on this machine. Only sessions of ended processes are listed. Log one off by its handle. A server process that starts while exactly one instance session (built) of its destination is left is born on it, before any tool call; with several, all stay here, untaken.
+
+**Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="logoffleftoversession-session-leftover-session"></a>
+#### LogoffLeftoverSession (Session / Leftover Session)
+**Description:** [read-only] [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
+
+**Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
+
+**Parameters:**
+- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
+
+---
+
+<a id="batch-group"></a>
+## Batch Group
+
+<a id="batch-batch"></a>
+### Batch / Batch
+
+<a id="batchanswers-batch-batch"></a>
+#### BatchAnswers (Batch / Batch)
+**Description:** [read-only] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
+
+**Source:** `src/handlers/batch/batch/handleBatchAnswers.ts`
+
+**Parameters:**
+- `number` (integer, optional) - One batch number to read (an integer of at least 1); give this or numbers, not both.
+- `numbers` (array, optional) - Several batch numbers to read, answered in the order given; give this or number, not both.
+
+---
+
+<a id="batchbegin-batch-batch"></a>
+#### BatchBegin (Batch / Batch)
+**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+
+**Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="batchend-batch-batch"></a>
+#### BatchEnd (Batch / Batch)
+**Description:** [read-only] Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
+
+**Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
+
+**Parameters:**
+- None
+
+---
+
+*Last updated: 2026-10-20*

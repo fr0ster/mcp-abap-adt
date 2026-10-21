@@ -8,7 +8,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
-import { LowLevelHandlersGroup } from '../groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
@@ -50,7 +49,6 @@ export function createFullServer(context: HandlerContext): McpServer {
   const handlersRegistry = new CompositeHandlersRegistry([
     new ReadOnlyHandlersGroup(context),
     new HighLevelHandlersGroup(context),
-    new LowLevelHandlersGroup(context),
     new SystemHandlersGroup(context),
     new SearchHandlersGroup(context),
   ]);
@@ -89,9 +87,6 @@ export function createDynamicServer(context: HandlerContext): McpServer {
   // Remove a group if needed
   // handlersRegistry.removeHandlerGroup("HighLevelHandlers");
 
-  // Add low-level handlers if needed
-  handlersRegistry.addHandlerGroup(new LowLevelHandlersGroup(context));
-
   return mcpServer;
 }
 
@@ -118,9 +113,6 @@ export function createCustomServer(
   // if (config.includeHighLevel) {
   //   handlerGroups.push(new HighLevelHandlersGroup() as IHandlerGroup);
   // }
-  // if (config.includeLowLevel) {
-  //   handlerGroups.push(new LowLevelHandlersGroup() as IHandlerGroup);
-  // }
   // if (config.includeSystem) {
   //   handlerGroups.push(new SystemHandlersGroup() as IHandlerGroup);
   // }
@@ -128,9 +120,8 @@ export function createCustomServer(
   //   handlerGroups.push(new SearchHandlersGroup() as IHandlerGroup);
   // }
 
-  // Example: Add high-level, low-level, system, and search groups
+  // Example: Add high-level, system, and search groups
   handlerGroups.push(new HighLevelHandlersGroup(context) as IHandlerGroup);
-  handlerGroups.push(new LowLevelHandlersGroup(context) as IHandlerGroup);
   handlerGroups.push(new SystemHandlersGroup(context) as IHandlerGroup);
   handlerGroups.push(new SearchHandlersGroup(context) as IHandlerGroup);
 

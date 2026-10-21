@@ -5,6 +5,7 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { succeededWith } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -29,7 +30,7 @@ export const TOOL_DEFINITION = {
   name: 'RunATC',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.',
+    "[read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -159,24 +160,30 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
       if (given) {
         checkVariant = given;
       } else {
-        const variant = await atc.resolveCheckVariant({
-          analyse: analyseException,
-        });
+        const variant = await atStep('resolve check variant', () =>
+          atc.resolveCheckVariant({
+            analyse: analyseException,
+          }),
+        )();
         if (!variant.ok) return variant as never;
         checkVariant = variant.getResult().value;
       }
 
-      const worklist = await atc.createWorklist(checkVariant, {
-        analyse: analyseException,
-      });
+      const worklist = await atStep('create worklist', () =>
+        atc.createWorklist(checkVariant, {
+          analyse: analyseException,
+        }),
+      )();
       if (!worklist.ok) return worklist as never;
       const worklistId = worklist.getResult().value;
 
-      const run = await atc.startRun(worklistId, target, {
-        analyse: analyseException,
-        wait,
-        maximumVerdicts,
-      });
+      const run = await atStep('start run', () =>
+        atc.startRun(worklistId, target, {
+          analyse: analyseException,
+          wait,
+          maximumVerdicts,
+        }),
+      )();
       if (!run.ok) return run as never;
 
       return succeededWith({

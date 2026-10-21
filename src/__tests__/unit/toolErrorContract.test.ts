@@ -7,6 +7,13 @@ import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { withSystemInformation } from '../helpers/systemInformationStandIn';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 const FORBIDDEN_PREFIX =
   /\bMcpError:\s|\bMCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /;
@@ -100,7 +107,7 @@ class TestServer extends BaseMcpServer {
   }
   // Stubs never touch SAP; bypass the real connection.
   protected async getConnection(): Promise<any> {
-    return {} as any;
+    return withSystemInformation() as any;
   }
 }
 
@@ -210,7 +217,7 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
 
     const server = new McpServer({ name: 'group-test', version: '1.0.0' });
     const group = new Group({
-      connection: {} as any,
+      connection: withSystemInformation() as any,
       logger: undefined as any,
     });
     // Drive registration through the registry — this is the branch production

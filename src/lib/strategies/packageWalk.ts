@@ -1,4 +1,31 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAdtError,
+  IAdtFailure,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import type { HandlerContext } from '../../handlers/interfaces';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../adtHeaders/withAdtHeaders';
+import {
+  failureEntry,
+  isCredentialFailure,
+  isCredentialPayload,
+} from '../answer';
+import { failureOf } from '../auth/failures';
+import { type PhaseResult, runPhase } from '../batch/phases';
+import { createAdtClient } from '../clients';
+import {
+  type MetadataRead,
+  type MetadataTarget,
+  metadataKeyOf,
+  metadataReadOf,
+} from './metadataReads';
+import { atStep, carryingFailure } from './step';
 
 /**
  * The one call this walk needs, named structurally.
@@ -12,8 +39,123 @@ export interface NodeStructureSource {
   fetchNodeStructure(
     parentType: string,
     parentName: string,
-    options?: { nodeId?: string; withShortDescriptions?: boolean },
+    options?: {
+      nodeId?: string;
+      withShortDescriptions?: boolean;
+      analyse?: typeof analyseException;
+    },
   ): Promise<unknown>;
+}
+
+/** The options a node structure read takes, beside its header pair. */
+type NodeStructureOptions = {
+  nodeId?: string;
+  withShortDescriptions?: boolean;
+  analyse?: typeof analyseException;
+};
+
+/** The utilities' `fetchNodeStructure` as adt-clients declares it: it takes its header pair. */
+export interface NodeStructureMembers<R> {
+  fetchNodeStructure(
+    parentType: string,
+    parentName: string,
+    options: { headers: IAdtHeaders } & NodeStructureOptions,
+  ): Promise<R>;
+}
+
+/**
+ * `utils`' node structure read with the header pair of
+ * `utils.fetchNodeStructure` for the call's system (`withAdtHeaders`).
+ */
+export function nodeStructureOn<R>(
+  context: AdtHeadersContext,
+  utils: NodeStructureMembers<R>,
+): {
+  fetchNodeStructure(
+    parentType: string,
+    parentName: string,
+    options?: NodeStructureOptions,
+  ): Promise<R>;
+} {
+  return {
+    fetchNodeStructure: (parentType, parentName, options) =>
+      withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+        utils.fetchNodeStructure(parentType, parentName, {
+          ...options,
+          headers,
+        }),
+      ),
+  };
+}
+
+/** Reads every item of one level; each item's settlement, in item order. */
+export type LevelReader<I, R> = (
+  items: readonly I[],
+) => Promise<PhaseResult<R>[]>;
+
+/**
+ * One level's reads in one ADT batch envelope (spec §11): `read(item,
+ * connection)` for every item, on the phase's batch connection (`runPhase`).
+ */
+export function batchReader<I, R>(
+  context: HandlerContext,
+  read: (item: I, connection: IAbapConnection) => Promise<R>,
+): LevelReader<I, R> {
+  return (items) => runPhase(context, items, read);
+}
+
+/**
+ * Whether a root's failure ends a call that reads several roots: a failure
+ * the server's reader answers (a chain failure, the server's own refusal), or
+ * a credential failure — a `401` SAP answered included (`isCredentialFailure`).
+ */
+export function endsTheCall(thrown: unknown): boolean {
+  return failureOf(thrown) !== undefined || isCredentialFailure(thrown);
+}
+
+/**
+ * The sequential version of a call that reads several roots (spec §11: the
+ * handler's own code path, where the destination has no communication
+ * batch): `read(root)` for one root after another; each root's settlement,
+ * in order. A failure that ends the call (`endsTheCall`) is thrown as it
+ * came, and no root after it is read.
+ */
+export async function rootByRoot<I, R>(
+  roots: readonly I[],
+  read: (root: I) => Promise<R>,
+): Promise<PhaseResult<R>[]> {
+  const out: PhaseResult<R>[] = [];
+  for (const root of roots) {
+    try {
+      out.push({ ok: true, value: await read(root) });
+    } catch (error) {
+      if (endsTheCall(error)) throw error;
+      out.push({ ok: false, error });
+    }
+  }
+  return out;
+}
+
+/** One node structure request of a walk. */
+export interface NodeRequest {
+  parentType: string;
+  parentName: string;
+  nodeId?: string;
+  withShortDescriptions: boolean;
+  /** Read with `analyseException`: a refusal answered as `ok: false`. */
+  analysed?: boolean;
+}
+
+/** `request` read on `utils`: one `fetchNodeStructure`. */
+export function readNode(
+  utils: NodeStructureSource,
+  request: NodeRequest,
+): Promise<unknown> {
+  return utils.fetchNodeStructure(request.parentType, request.parentName, {
+    ...(request.analysed ? { analyse: analyseException } : {}),
+    ...(request.nodeId !== undefined ? { nodeId: request.nodeId } : {}),
+    withShortDescriptions: request.withShortDescriptions,
+  });
 }
 
 /**
@@ -121,8 +263,19 @@ function levelOf(answer: unknown): NodeLevel {
     getResult?: () => { value: unknown };
     data?: unknown;
   };
+  if (a?.ok === false) {
+    const error = (answer as { getError: () => IAdtError }).getError();
+    // A level that is not there stays what it was: empty. Any other refusal
+    // is the method's error as it is, with the step — not an empty level that
+    // reads as "nothing here".
+    if (error?.response?.status === 404) return { objects: [], childNodes: [] };
+    throw carryingFailure(
+      new Error(error.message),
+      error,
+      'read package node structure',
+    );
+  }
   if (typeof a?.getResult === 'function') {
-    if (a.ok === false) return { objects: [], childNodes: [] };
     const value = a.getResult().value;
     // The injected reading may be ours, the library's own, or the raw wire;
     // each is recognised by what it carries, never assumed. Having
@@ -320,6 +473,158 @@ export interface WalkOptions {
   includeDescriptions?: boolean;
 }
 
+/** A package of a walk: what was found in it, and the subpackages walked from it. */
+interface PackageWalk {
+  root: number;
+  name: string;
+  depth: number;
+  found: WalkedItem[];
+  subs: PackageWalk[];
+}
+
+/**
+ * An object of a batched level, found in `packageName`, without the
+ * description its part carried: a node structure part after the first of an
+ * envelope can carry another part's `DESCRIPTION` (measured, 2026-10-18), so
+ * a batched walk takes the description from the object's metadata
+ * (`describeFromMetadata`).
+ */
+function undescribed(
+  object: NodeLevel['objects'][number],
+  packageName: string,
+): WalkedItem {
+  const { description: _part, ...rest } = object;
+  return { ...rest, packageName };
+}
+
+function flatten(walk: PackageWalk): WalkedItem[] {
+  return [...walk.found, ...walk.subs.flatMap(flatten)];
+}
+
+/**
+ * Every object in each package of `packageNames`, walked one level at a time
+ * (spec §11): per level, (a) the root node structure of every package of the
+ * level, read together; (b) every type node those roots list, read together;
+ * the next level is the subpackages found — walked only when asked for, and
+ * never past `maxDepth`. `read` reads one level's requests in one envelope
+ * (`batchReader`): no request of a level needs another's answer. Where the
+ * destination has no communication batch the handler runs `walkPackage`.
+ * The objects carry no description: a caller that answers descriptions
+ * reads them with `describeFromMetadata`.
+ *
+ * One settlement per package asked, in the order asked: its objects — the
+ * package's own, then those of each subpackage walked from it, depth first —
+ * or its failure: the first refused read of its walk (a level that is not
+ * there, `404`, stays empty); a credential failure (a `401` SAP answered
+ * included) ends the walk, thrown as it came. `roots`: the first level's root answers, when
+ * the caller read them already in a phase of its own.
+ */
+export async function walkPackages(
+  read: LevelReader<NodeRequest, unknown>,
+  packageNames: readonly string[],
+  options: WalkOptions = {},
+  roots?: readonly PhaseResult<unknown>[],
+): Promise<PhaseResult<WalkedItem[]>[]> {
+  const withShortDescriptions = options.includeDescriptions !== false;
+  const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
+  const failures = new Map<number, unknown>();
+  const seen = packageNames.map((name) => new Set([name.toUpperCase()]));
+  const walks: PackageWalk[] = packageNames.map((name, root) => ({
+    root,
+    name: name.toUpperCase(),
+    depth: 1,
+    found: [],
+    subs: [],
+  }));
+
+  /** The level an answer carries, or undefined once its package failed. */
+  const settle = (
+    walk: PackageWalk,
+    result: PhaseResult<unknown>,
+  ): NodeLevel | undefined => {
+    if (failures.has(walk.root)) return undefined;
+    try {
+      if (!result.ok) throw result.error;
+      return levelOf(result.value);
+    } catch (error) {
+      // A credential failure is every root's: it ends the walk as it came.
+      if (endsTheCall(error)) throw error;
+      failures.set(walk.root, error);
+      return undefined;
+    }
+  };
+  const alive = (walk: PackageWalk) => !failures.has(walk.root);
+
+  let level = walks;
+  let first = roots;
+  while (level.length > 0) {
+    const rootAnswers =
+      first ??
+      (await read(
+        level.map((walk) => ({
+          parentType: 'DEVC/K',
+          parentName: walk.name,
+          withShortDescriptions,
+        })),
+      ));
+    first = undefined;
+    const typeNodes: Array<{ walk: PackageWalk; nodeId: string }> = [];
+    level.forEach((walk, i) => {
+      const root = settle(walk, rootAnswers[i]);
+      if (root === undefined) return;
+      walk.found.push(...root.objects.map((o) => undescribed(o, walk.name)));
+      for (const child of root.childNodes) {
+        typeNodes.push({ walk, nodeId: child.nodeId });
+      }
+    });
+
+    if (typeNodes.length > 0) {
+      const typeAnswers = await read(
+        typeNodes.map(({ walk, nodeId }) => ({
+          parentType: 'DEVC/K',
+          parentName: walk.name,
+          nodeId,
+          withShortDescriptions,
+        })),
+      );
+      typeNodes.forEach(({ walk }, i) => {
+        const typed = settle(walk, typeAnswers[i]);
+        if (typed === undefined) return;
+        walk.found.push(...typed.objects.map((o) => undescribed(o, walk.name)));
+      });
+    }
+
+    if (!options.includeSubpackages) break;
+    const next: PackageWalk[] = [];
+    for (const walk of level) {
+      if (!alive(walk) || walk.depth >= limit) continue;
+      for (const item of walk.found) {
+        if (kindOf(item.type) !== 'package') continue;
+        const name = item.name.toUpperCase();
+        const own = seen[walk.root] as Set<string>;
+        if (own.has(name)) continue;
+        own.add(name);
+        const sub: PackageWalk = {
+          root: walk.root,
+          name,
+          depth: walk.depth + 1,
+          found: [],
+          subs: [],
+        };
+        walk.subs.push(sub);
+        next.push(sub);
+      }
+    }
+    level = next.filter(alive);
+  }
+
+  return walks.map((walk) =>
+    failures.has(walk.root)
+      ? { ok: false, error: failures.get(walk.root) }
+      : { ok: true, value: flatten(walk) },
+  );
+}
+
 /**
  * Every object in a package, walked one level at a time.
  *
@@ -381,7 +686,142 @@ export type WalkedItem = {
   type: string;
   description?: string;
   packageName?: string;
+  techName?: string;
+  uri?: string;
 };
+
+/** The step of a failed object metadata read. */
+export const METADATA_STEP = 'read object metadata';
+
+/** The `adtcore:description` of a metadata document's root element. */
+export function metadataDescriptionOf(xml: string): string | undefined {
+  let doc: unknown;
+  try {
+    doc = parser.parse(xml);
+  } catch {
+    return undefined;
+  }
+  if (doc === null || typeof doc !== 'object') return undefined;
+  for (const [name, root] of Object.entries(doc as Record<string, unknown>)) {
+    if (name.startsWith('?') || root === null || typeof root !== 'object') {
+      continue;
+    }
+    const description = (root as Record<string, unknown>)[
+      'adtcore:description'
+    ];
+    return typeof description === 'string'
+      ? description.trim() || undefined
+      : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The document a metadata reading answered: `AdtReading.raw`, or the
+ * document itself where the type's read answers it whole.
+ */
+function rawOf(value: unknown): string {
+  if (typeof value === 'string') return value;
+  const raw = (value as { raw?: unknown } | undefined)?.raw;
+  return typeof raw === 'string' ? raw : '';
+}
+
+/** The descriptions a metadata phase read, and the refusal that ended it. */
+export interface MetadataDescriptions {
+  /** Each object's description, by `metadataKeyOf`. */
+  descriptions: Map<string, string | undefined>;
+  /** A metadata read SAP refused with a credential failure, with its step. */
+  refused?: IAdtFailure;
+}
+
+/**
+ * The description of every object of `targets`, read in one ADT batch
+ * envelope (`runPhase`): one metadata read per distinct object, the one its
+ * type's `Get<Type>` handler sends (`metadataReadOf`), keyed by
+ * `metadataKeyOf`. An object of a type with no metadata read, or whose read
+ * failed, has no entry. A failure the server's reader answers ends the call,
+ * thrown as it came; a read SAP refused with a credential failure is
+ * answered as `refused`, the method's error with its step.
+ */
+export async function metadataDescriptions(
+  context: HandlerContext,
+  targets: readonly MetadataTarget[],
+): Promise<MetadataDescriptions> {
+  const reads = new Map<string, MetadataRead>();
+  for (const target of targets) {
+    const key = metadataKeyOf(target);
+    const read = metadataReadOf(target);
+    if (key !== undefined && read !== undefined && !reads.has(key)) {
+      reads.set(key, read);
+    }
+  }
+  const keys = [...reads.keys()];
+  const descriptions = new Map<string, string | undefined>();
+  if (keys.length === 0) return { descriptions };
+  const results = await runPhase(context, keys, (key, connection) =>
+    atStep(
+      METADATA_STEP,
+      reads.get(key) as MetadataRead,
+    )(createAdtClient(connection, context.logger)),
+  );
+  let refused: IAdtFailure | undefined;
+  results.forEach((result, i) => {
+    if (!result.ok) {
+      if (endsTheCall(result.error)) throw result.error;
+      return;
+    }
+    const response = result.value;
+    if (response.ok) {
+      descriptions.set(
+        keys[i] as string,
+        metadataDescriptionOf(rawOf(response.getResult().value)),
+      );
+      return;
+    }
+    if (
+      refused === undefined &&
+      isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
+    ) {
+      refused = response;
+    }
+  });
+  return refused === undefined ? { descriptions } : { descriptions, refused };
+}
+
+/**
+ * Every walked object's description from its metadata (spec §11, the batched
+ * walks): one phase over the objects of every walk that answered, each
+ * object's description its metadata's `adtcore:description`. An object of a
+ * type with no metadata read (`metadataKeyOf`), or whose read failed, has no
+ * description. A metadata read SAP refused with a credential failure ends
+ * the call: thrown, carrying the method's error with its step.
+ */
+export async function describeFromMetadata(
+  context: HandlerContext,
+  walked: readonly PhaseResult<WalkedItem[]>[],
+): Promise<PhaseResult<WalkedItem[]>[]> {
+  const { descriptions, refused } = await metadataDescriptions(
+    context,
+    walked.flatMap((result) => (result.ok ? result.value : [])),
+  );
+  if (refused !== undefined) {
+    const error = refused.getError();
+    throw carryingFailure(new Error(error.message), error, METADATA_STEP);
+  }
+  return walked.map((result) =>
+    result.ok
+      ? {
+          ok: true,
+          value: result.value.map((item) => {
+            const key = metadataKeyOf(item);
+            const description =
+              key === undefined ? undefined : descriptions.get(key);
+            return description === undefined ? item : { ...item, description };
+          }),
+        }
+      : result,
+  );
+}
 
 /** The flat listing. */
 export function assembleList(

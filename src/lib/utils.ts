@@ -1,14 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
-import {
-  getTimeout,
-  getTimeoutConfig,
-  type SapConfig,
-  sapConfigSignature,
-} from '@mcp-abap-adt/connection';
+import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
+import { answerFailure } from './answer';
+import { answerRead } from './auth/answerFailure';
+import { failureOf } from './auth/failures';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
+import { applyMessageServerFields } from './config/messageServer.js';
 import { parseAuthType } from './config/parseAuthType.js';
 import {
   notifyConnectionResetListeners,
@@ -18,13 +17,29 @@ import { createAbapConnection } from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
+import { endConnection } from './ownedConnections.js';
+import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
 let overrideConfig: SapConfig | undefined;
 let overrideConnection: IAbapConnection | undefined;
+/** Whether `overrideConnection` was built here, from a config: then it is ours to end. */
+let overrideBuilt = false;
 let cachedConnection: IAbapConnection | undefined;
+
+/**
+ * The end of a connection this module built: its one `disconnect()` —
+ * the logoff —, when it is replaced or dropped. One a caller handed in
+ * (`setConnectionOverride`) is the caller's, never closed here.
+ */
+function endManaged(
+  connection: IAbapConnection | undefined,
+  built: boolean,
+): void {
+  if (connection !== undefined && built) void endConnection(connection);
+}
 let cachedConfigSignature: string | undefined;
 
 // AsyncLocalStorage for storing session context
@@ -42,7 +57,7 @@ export const sessionContext = new AsyncLocalStorage<{
 // should import these from the SDK directly.
 export { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 export type { AxiosResponse };
-export { getTimeout, getTimeoutConfig, logger };
+export { logger };
 
 /**
  * Encodes SAP object names for use in URLs.
@@ -226,7 +241,86 @@ export function extractAdtErrorMessage(
   return fallback;
 }
 
+/** Whether `c` is a whitespace code unit (space, tab, line feed, CR, VT, FF). */
+function isSpace(c: number): boolean {
+  return c === 32 || (c >= 9 && c <= 13);
+}
+
+/**
+ * The host after the first `ENOTFOUND` followed by whitespace, up to the
+ * next whitespace; `undefined` without one. Plain code.
+ */
+function hostAfterNotFound(text: string): string | undefined {
+  const marker = 'ENOTFOUND';
+  for (
+    let at = text.indexOf(marker);
+    at >= 0;
+    at = text.indexOf(marker, at + 1)
+  ) {
+    const afterMarker = at + marker.length;
+    let start = afterMarker;
+    while (start < text.length && isSpace(text.charCodeAt(start))) start += 1;
+    if (start === afterMarker || start === text.length) continue;
+    let end = start;
+    while (end < text.length && !isSpace(text.charCodeAt(end))) end += 1;
+    return text.slice(start, end);
+  }
+  return undefined;
+}
+
+/** `MCP error -<n>: ` at `at`: its length, else 0. */
+function mcpErrorPrefixAt(text: string, at: number): number {
+  const head = 'MCP error ';
+  if (!text.startsWith(head, at)) return 0;
+  let i = at + head.length;
+  if (text[i] === '-') i += 1;
+  const digits = i;
+  while (
+    i < text.length &&
+    text.charCodeAt(i) >= 48 &&
+    text.charCodeAt(i) <= 57
+  )
+    i += 1;
+  if (i === digits || !text.startsWith(': ', i)) return 0;
+  return i + 2 - at;
+}
+
+/**
+ * `text` without the SDK's leading `McpError: ` / `MCP error -<n>: `
+ * prefixes, however many are stacked. Plain code.
+ */
+function withoutMcpErrorPrefixes(text: string): string {
+  let at = 0;
+  for (;;) {
+    if (text.startsWith('McpError: ', at)) {
+      at += 'McpError: '.length;
+      continue;
+    }
+    const length = mcpErrorPrefixAt(text, at);
+    if (length === 0) break;
+    at += length;
+  }
+  return text.slice(at);
+}
+
 export function return_error(error: any) {
+  // The failure reader first: a chain failure or the server's own
+  // refusal is answered as the failure answer — never its message.
+  const read = failureOf(error);
+  if (read !== undefined) return answerRead(read);
+  // A method's error carried on a throw: answered as it is, with its step —
+  // the same payload the `answer()` path gives.
+  const carried = methodFailureOf(error);
+  if (carried !== undefined) return answerFailure(carried);
+  // A throw that carries its whole answer (several failures, each as it is).
+  const payload = payloadCarriedBy(error);
+  if (payload !== undefined) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    };
+  }
+
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object
   let errorText: string;
@@ -245,10 +339,7 @@ export function return_error(error: any) {
         errorCode === 'ENOTFOUND' ||
         errorMessage.includes('getaddrinfo ENOTFOUND')
       ) {
-        const hostnameMatch =
-          errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
-          errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
-        const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
+        const hostname = hostAfterNotFound(errorMessage) ?? 'unknown host';
 
         errorText =
           `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
@@ -316,10 +407,7 @@ export function return_error(error: any) {
         errorMessage.includes('getaddrinfo ENOTFOUND') ||
         errorMessage.includes('ENOTFOUND')
       ) {
-        const hostnameMatch =
-          errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
-          errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
-        const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
+        const hostname = hostAfterNotFound(errorMessage) ?? 'unknown host';
 
         errorText =
           `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
@@ -370,7 +458,7 @@ export function return_error(error: any) {
   // registration paths route any thrown error through here. Schema-validation
   // errors are unaffected: the SDK raises those before our code runs and never
   // reaches return_error.
-  errorText = errorText.replace(/^(?:McpError: |MCP error -?\d+: )+/, '');
+  errorText = withoutMcpErrorPrefixes(errorText);
 
   return {
     isError: true,
@@ -479,7 +567,8 @@ export function getManagedConnection(): IAbapConnection {
       },
     );
 
-    /* cleanup */
+    // The connection it replaces was built here: it ends with its logoff.
+    endManaged(cachedConnection, true);
 
     // Generate unique session ID for fallback connections to prevent session sharing
     // When sessionContext is not available, each connection should have its own isolated session
@@ -519,10 +608,6 @@ export function getManagedConnection(): IAbapConnection {
     }
     cachedConfigSignature = signature;
 
-    // Don't call enableStatefulSession during module import - it may trigger connection attempts
-    // Session ID is already set via createAbapConnection() constructor
-    // enableStatefulSession() will be called lazily when first request is made (if needed)
-
     // Don't call connect() here - it will be called lazily on first request
     // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
     // The retry logic in makeAdtRequest will handle connection establishment automatically
@@ -535,39 +620,6 @@ export function getManagedConnection(): IAbapConnection {
   return cachedConnection;
 }
 
-/**
- * Restore session state in connection
- * Note: Session state management (getSessionState/setSessionState) was removed in connection 0.2.0
- * Session state persistence is now handled by @mcp-abap-adt/auth-broker package
- * This function now only sets session type to stateful and session ID
- */
-export async function restoreSessionInConnection(
-  connection: IAbapConnection,
-  sessionId: string,
-  _sessionState: {
-    cookies?: string | null;
-    csrf_token?: string | null;
-    cookie_store?: Record<string, string>;
-  },
-): Promise<void> {
-  // Cast to access internal methods (not in interface but available in implementation)
-  const connectionWithStateful = connection as any;
-
-  try {
-    // Set session ID first (if not already set via constructor)
-    if (connectionWithStateful.setSessionId) {
-      connectionWithStateful.setSessionId(sessionId);
-    }
-    // Enable stateful session mode (adds x-sap-adt-sessiontype: stateful header)
-    connection.setSessionType('stateful');
-  } catch (error: any) {
-    logger?.warn('Failed to restore session in connection', {
-      sessionId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
 export function setConfigOverride(override?: SapConfig) {
   connectionManagerLogger?.debug(
     `[DEBUG] setConfigOverride - Setting config override`,
@@ -577,7 +629,7 @@ export function setConfigOverride(override?: SapConfig) {
     },
   );
   overrideConfig = override;
-  /* cleanup */
+  endManaged(overrideConnection, overrideBuilt);
   overrideConnection = override
     ? createAbapConnection(
         override,
@@ -585,9 +637,10 @@ export function setConfigOverride(override?: SapConfig) {
         loggerAdapter,
       )
     : undefined;
+  overrideBuilt = override !== undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
-  /* cleanup */
+  endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
@@ -603,15 +656,13 @@ export function setConnectionOverride(connection?: IAbapConnection) {
   );
   // Use a local variable to avoid TDZ issues
   const currentOverride = overrideConnection;
-  if (currentOverride) {
-    /* cleanup */
-  }
+  endManaged(currentOverride, overrideBuilt);
   // Assign after reading to avoid TDZ
   overrideConnection = connection;
+  overrideBuilt = false;
   overrideConfig = undefined;
 
-  const _currentCached = cachedConnection;
-  /* cleanup */
+  endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
@@ -625,9 +676,10 @@ export function cleanup() {
       hadCachedConnection: !!cachedConnection,
     },
   );
-  /* cleanup */
-  /* cleanup */
+  endManaged(overrideConnection, overrideBuilt);
+  endManaged(cachedConnection, true);
   overrideConnection = undefined;
+  overrideBuilt = false;
   overrideConfig = undefined;
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
@@ -647,13 +699,14 @@ export function invalidateConnectionCache() {
       hadOverrideConnection: !!overrideConnection,
     },
   );
-  /* cleanup */
+  endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   // Also invalidate override connection if it exists
   if (overrideConnection) {
-    /* cleanup */
+    endManaged(overrideConnection, overrideBuilt);
     overrideConnection = undefined;
+    overrideBuilt = false;
   }
   notifyConnectionResetListeners();
 }
@@ -672,37 +725,6 @@ registerConnectionResetHook(() => {
 
 export async function getBaseUrl() {
   return getManagedConnection().getBaseUrl();
-}
-
-/**
- * Makes an ADT request with specified timeout
- * @param url Request URL
- * @param method HTTP method
- * @param timeoutType Timeout type ('default', 'csrf', 'long') or custom number in ms
- * @param data Optional request data
- * @param params Optional request parameters
- * @param headers Optional custom headers
- * @returns Promise with the response
- */
-export async function makeAdtRequestWithTimeout(
-  connection: IAbapConnection,
-  url: string,
-  method: string,
-  timeoutType: 'default' | 'csrf' | 'long' | number = 'default',
-  data?: any,
-  params?: any,
-  headers?: Record<string, string>,
-): Promise<AxiosResponse> {
-  const timeout = getTimeout(timeoutType);
-  return makeAdtRequest(
-    connection,
-    url,
-    method,
-    timeout,
-    data,
-    params,
-    headers,
-  );
 }
 
 export async function makeAdtRequest(
@@ -727,14 +749,14 @@ export async function makeAdtRequest(
 /**
  * Get system information from SAP ADT
  * Returns the system context resolved during connection init, as the current
- * request sees it (see getEffectiveSystemContext)
+ * request sees it (see getStatedSystemContext)
  */
 export async function getSystemInformation(): Promise<{
   systemID?: string;
   userName?: string;
 } | null> {
-  const { getEffectiveSystemContext } = await import('./systemContext.js');
-  const ctx = getEffectiveSystemContext();
+  const { getStatedSystemContext } = await import('./systemContext.js');
+  const ctx = getStatedSystemContext();
   if (!ctx.masterSystem && !ctx.responsible) return null;
   return { systemID: ctx.masterSystem, userName: ctx.responsible };
 }
@@ -978,587 +1000,11 @@ export async function safeCheckOperation<T>(
     throw checkError;
   }
 }
-/**
- * Display help message
- */
-export function showHelp(): void {
-  const help = `
-MCP ABAP ADT Server - SAP ABAP Development Tools MCP Integration
-
-USAGE:
-  mcp-abap-adt [options]
-
-DESCRIPTION:
-  MCP server for interacting with SAP ABAP systems via ADT (ABAP Development Tools).
-  Supports multiple transport modes: HTTP (default), stdio, and SSE.
-
-TRANSPORT MODES:
-  Default: stdio (for MCP clients like Cline, Cursor, Claude Desktop)
-  HTTP:    --transport=http (for web interfaces, receives config via HTTP headers)
-  SSE:     --transport=sse
-
-OPTIONS:
-  --help                           Show this help message
-  --conf=<path>                    Path to YAML configuration file
-  --config=<path>                  Alias for --conf
-                                   If file doesn't exist, generates a template and exits
-                                   Command-line arguments override YAML values
-                                   Example: --conf=config.yaml
-
-YAML CONFIGURATION:
-  Instead of passing many command-line arguments, you can use a YAML config file:
-
-    mcp-abap-adt --conf=config.yaml
-
-  If the file doesn't exist, a template will be generated automatically and the command will exit.
-  Edit the template to configure your server settings, then run the command again.
-
-  The YAML file is validated on load - invalid configurations will cause the command to exit with an error.
-
-  Command-line arguments always override YAML values for flexibility.
-
-  See docs/configuration/YAML_CONFIG.md for detailed documentation.
-
-ENVIRONMENT FILE:
-  --env=<name>                     Env destination name (resolved to sessions/<name>.env)
-  --env <name>                     Alternative syntax for --env
-  --env-path=<path|file>           Explicit .env file path (or relative file name)
-                                   Nothing is looked up in the working directory: a .env
-                                   there is read only when named (--env-path=./.env)
-  --auth-broker-path=<path>        Base directory of the service-keys and sessions subdirectories
-                                   Example: --auth-broker-path=~/prj/tmp/
-                                   This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
-  --mcp=<destination>              Default destination: service-keys/<destination>.json and
-                                   sessions/<destination>.env, read field by field
-                                   Example: --mcp=TRIAL
-                                   Works with every transport
-                                   x-mcp-destination overrides it per request, only with
-                                   --allow-destination-header
-  --allow-destination-header       Honour the x-mcp-destination header (HTTP/SSE, off by default)
-  --unsafe                         Write named destinations' sessions to disk (default: in memory)
-  --browser=<name>                 Browser for a login: chrome|edge|firefox|system|headless|none
-  --browser-auth-port=<port>       Login callback port, 1-65535 (default: 61001)
-
-TRANSPORT SELECTION:
-  --transport=<type>               Transport type: stdio|http|streamable-http|sse
-                                   Default: stdio (for MCP clients)
-
-HTTP/STREAMABLE-HTTP OPTIONS:
-  --http-port=<port>               HTTP server port (default: 3000)
-  --http-host=<host>               HTTP server host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
-  --http-json-response             Enable JSON response format
-  --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
-                                   Example: --http-allowed-origins=http://localhost:3000,https://example.com
-  --http-allowed-hosts=<list>      Comma-separated allowed hosts
-  --http-enable-dns-protection     Enable DNS rebinding protection
-
-SSE (SERVER-SENT EVENTS) OPTIONS:
-  --sse-port=<port>                SSE server port (default: 3001)
-  --sse-host=<host>                SSE server host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
-  --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
-                                   Example: --sse-allowed-origins=http://localhost:3000
-  --sse-allowed-hosts=<list>       Comma-separated allowed hosts
-  --sse-enable-dns-protection     Enable DNS rebinding protection
-
-ENVIRONMENT VARIABLES:
-  MCP_ENV_PATH                     Explicit .env file path (same as --env-path)
-  MCP_UNSAFE                       Same as --unsafe (true|false)
-  MCP_BROWSER                      Same as --browser
-  MCP_BROWSER_AUTH_PORT            Same as --browser-auth-port (default: 61001)
-  MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
-  MCP_TRANSPORT                    Transport type (stdio|http|sse)
-                                   Default: stdio if not specified
-  MCP_HTTP_PORT                    Default HTTP port (default: 3000)
-  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
-  MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
-  MCP_HTTP_ALLOWED_ORIGINS         Allowed CORS origins (comma-separated)
-  MCP_HTTP_ALLOWED_HOSTS           Allowed hosts (comma-separated)
-  MCP_HTTP_ENABLE_DNS_PROTECTION   Enable DNS protection (true|false)
-  MCP_SSE_PORT                     Default SSE port (default: 3001)
-  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
-  MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
-  MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
-  MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
-  AUTH_BROKER_PATH                 Base directory of service-keys/ and sessions/
-                                   If not set, uses platform defaults:
-                                   Unix: ~/.config/mcp-abap-adt/service-keys
-                                   Windows: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys
-  DEBUG_AUTH_LOG                   Enable debug logging for auth-broker (true|false)
-                                   Default: false (only info messages shown)
-                                   When true: shows detailed debug messages
-  DEBUG_AUTH_BROKER                Alias for DEBUG_AUTH_LOG (true|false)
-                                   Same as DEBUG_AUTH_LOG - enables debug logging for auth-broker
-                                   When true: automatically sets DEBUG_AUTH_LOG=true
-  DEBUG_HTTP_REQUESTS              Enable logging of HTTP requests and MCP calls (true|false)
-                                   Default: false
-                                   When true: logs all incoming HTTP requests, methods, URLs,
-                                   headers (sensitive data redacted), and MCP JSON-RPC calls
-                                   Also enabled by DEBUG_CONNECTORS=true
-  DEBUG_CONNECTORS                  Enable debug logging for connection layer (true|false)
-                                   Default: false
-                                   When true: shows HTTP requests, CSRF tokens, cookies,
-                                   session management, and connection details
-                                   Also enables DEBUG_HTTP_REQUESTS automatically
-  DEBUG_HANDLERS                    Enable debug logging for MCP handlers (true|false)
-                                   Default: false
-                                   When true: shows handler entry/exit, session state,
-                                   lock handles, property validation
-  DEBUG_CONNECTION_MANAGER          Enable debug logging for connection manager (true|false)
-                                   Default: false
-                                   When true: shows connection cache operations
-
-SAP CONNECTION (.env file):
-  SAP_URL                          SAP system URL (required)
-                                   Example: https://your-system.sap.com
-  SAP_CLIENT                       SAP client number (required for basic auth)
-                                   Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|snc|jwt (required)
-                                   saml, certificate and kerberos are not supported
-  SAP_GRANT_TYPE                   With jwt (required): authorization_code|none
-  SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
-                                   Precedence: --connection-type, then the environment
-                                   (the .env joins it, never over a value set), then YAML
-  SAP_USERNAME                     SAP username (required for basic auth)
-  SAP_PASSWORD                     SAP password (required for basic auth)
-  SAP_JWT_TOKEN                    JWT token (with SAP_GRANT_TYPE=none)
-  SAP_SNC_PARTNERNAME              snc (RFC only, no user, no password): the system's SNC name
-  SAP_SNC_QOP / SAP_SNC_LIB / SAP_SNC_MYNAME   snc, optional
-  XSUAA_MCP_URL                    An XSUAA service key's system URL, in sessions/<destination>.env
-
-GENERATING A .ENV (JWT Authentication):
-  The mcp-auth command ships in @mcp-abap-adt/auth-broker-cli:
-
-    npm install -g @mcp-abap-adt/auth-broker-cli
-    mcp-auth generate-env --grant authorization_code
-
-  mcp-auth --help lists the other flags. A jwt .env must state SAP_GRANT_TYPE.
-
-EXAMPLES:
-  # Default stdio mode (for MCP clients, requires .env file or --mcp parameter)
-  mcp-abap-adt
-
-  # HTTP mode (for web interfaces)
-  mcp-abap-adt --transport=http
-
-  # HTTP server on custom port, localhost only (default)
-  mcp-abap-adt --transport=http --http-port=8080
-
-  # HTTP server accepting connections from all interfaces
-  mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=8080
-
-  # Use YAML configuration file
-  mcp-abap-adt --conf=config.yaml
-
-  # Use stdio mode with --mcp parameter (a named destination, skips .env file)
-  mcp-abap-adt --mcp=TRIAL
-
-  # A .env in the current directory is read only when named
-  mcp-abap-adt --env-path=./.env
-
-  # Use custom base directory (service-keys and sessions subdirectories)
-  mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
-
-  # Use SSE transport with --mcp parameter
-  mcp-abap-adt --transport=sse --mcp=TRIAL
-
-  # Use env destination from sessions store
-  mcp-abap-adt --env=trial
-
-  # Use explicit .env file from custom path
-  mcp-abap-adt --env-path=/path/to/my.env
-
-  # Start HTTP server with CORS enabled
-  mcp-abap-adt --transport=http --http-port=3000 \\
-                --http-allowed-origins=http://localhost:3000,https://example.com
-
-  # Start SSE server on custom port
-  mcp-abap-adt --transport=sse --sse-port=3001
-
-  # Start SSE server with CORS and DNS protection
-  mcp-abap-adt --transport=sse --sse-port=3001 \\
-                --sse-allowed-origins=http://localhost:3000 \\
-                --sse-enable-dns-protection
-
-QUICK REFERENCE:
-  Transport types:
-    http            - HTTP StreamableHTTP transport (default)
-    streamable-http - Same as http
-    stdio           - Standard input/output (for MCP clients, requires .env file or --mcp parameter)
-    sse             - Server-Sent Events transport
-
-  Common use cases:
-    Web interfaces (HTTP):        mcp-abap-adt (default, no .env needed)
-    MCP clients (Cline, Cursor):  mcp-abap-adt --transport=stdio
-    MCP clients with a destination: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
-    Web interfaces (SSE):         mcp-abap-adt --transport=sse --sse-port=3001
-    SSE with a destination:       mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
-
-DOCUMENTATION:
-  https://github.com/fr0ster/mcp-abap-adt
-  Installation:    docs/installation/INSTALLATION.md
-  Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
-
-AUTHENTICATION:
-  Four authentications: basic, snc (RFC only), jwt/authorization_code (browser login),
-  jwt/none (a token you hold). A jwt .env must state SAP_GRANT_TYPE.
-  To write a .env: npm install -g @mcp-abap-adt/auth-broker-cli, then
-  mcp-auth generate-env --grant authorization_code
-
-SERVICE KEYS (Destination-Based Authentication):
-  The server supports destination-based authentication using service keys stored locally.
-  This allows you to configure authentication once per destination and reuse it.
-
-  How to Save Service Keys:
-
-  Linux:
-    1. Create service keys directory:
-       mkdir -p ~/.config/mcp-abap-adt/service-keys
-
-    2. Download service key from SAP BTP (from the corresponding service instance)
-       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
-
-    Storage locations:
-      Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-      Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
-
-  macOS:
-    1. Create service keys directory:
-       mkdir -p ~/.config/mcp-abap-adt/service-keys
-
-    2. Download service key from SAP BTP (from the corresponding service instance)
-       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
-
-    Storage locations:
-      Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-      Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
-
-  Windows:
-    1. Create service keys directory (PowerShell):
-       New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\Documents\\mcp-abap-adt\\service-keys"
-
-    2. Download service key from SAP BTP (from the corresponding service instance)
-       and copy it to: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
-       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
-
-    Or using Command Prompt (cmd):
-       mkdir "%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys"
-       (Then copy the downloaded service key file to this directory)
-
-    Storage locations:
-      Service keys: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
-      Sessions:     %USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\{destination}.env
-
-  Service Key:
-    Download the service key JSON file from SAP BTP (from the corresponding service instance)
-    and save it as {destination}.json (e.g., TRIAL.json).
-    The filename without .json extension becomes the destination name (case-sensitive).
-
-  Using Destinations:
-    --mcp=TRIAL on any transport, or in HTTP headers (with --allow-destination-header):
-      x-mcp-destination: TRIAL    (URL derived from the destination)
-
-    The destination name must exactly match the service key filename (without .json extension, case-sensitive).
-
-    Example Cline configurations (~/.cline/mcp.json):
-
-    1. Stdio with .env file:
-      {
-        "mcpServers": {
-          "mcp-abap-adt-stdio": {
-            "type": "stdio",
-            "command": "mcp-abap-adt",
-            "args": ["--env-path=/path/to/.env"],
-            "timeout": 60
-          }
-        }
-      }
-
-    2. Stdio with MCP destination (requires service key):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-mcp": {
-            "type": "stdio",
-            "command": "mcp-abap-adt",
-            "args": ["--unsafe", "--mcp=trial"],
-            "timeout": 60,
-            "autoApprove": []
-          }
-        }
-      }
-
-    3. SSE with .env (requires server running):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-sse": {
-            "type": "sse",
-            "url": "http://localhost:3001/sse",
-            "timeout": 60
-          }
-        }
-      }
-
-    4. HTTP with destination (the server runs with --allow-destination-header):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-http": {
-            "type": "streamableHttp",
-            "url": "http://localhost:3001/mcp/stream/http",
-            "headers": {
-              "x-mcp-destination": "trial"
-            },
-            "timeout": 60
-          }
-        }
-      }
-
-    5. HTTP with a token you hold (the server does not renew it):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-direct": {
-            "type": "streamableHttp",
-            "url": "http://localhost:3000/mcp/stream/http",
-            "headers": {
-              "x-sap-url": "https://your-system.com",
-              "x-sap-jwt-token": "your-token"
-            },
-            "timeout": 60
-          }
-        }
-      }
-
-  First-Time Authentication:
-    - Server reads service key from {destination}.json
-    - Opens browser for OAuth2 authentication (if no valid session exists), callback port 61001
-    - Keeps the session in memory, or saves it to sessions/{destination}.env with --unsafe
-    - Subsequent requests use the stored token automatically
-
-  Automatic Token Management:
-    - Validates tokens before use
-    - Refreshes expired tokens using refresh tokens
-    - Caches valid tokens for performance
-    - Falls back to browser authentication if refresh fails
-
-  Custom Paths:
-    Set AUTH_BROKER_PATH environment variable to override the default base directory:
-      Linux/macOS: export AUTH_BROKER_PATH="/custom/path"
-      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path
-
-    Or use --auth-broker-path command-line option:
-      mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
-      This uses the service-keys and sessions subdirectories of the specified path.
-
-  For more details, see: docs/user-guide/AUTHENTICATION.md
-
-`;
-  console.log(help);
-  process.exit(0);
-}
-
-export type TransportConfig =
-  | { type: 'stdio' }
-  | {
-      type: 'streamable-http';
-      host: string;
-      port: number;
-      enableJsonResponse: boolean;
-      allowedOrigins?: string[];
-      allowedHosts?: string[];
-      enableDnsRebindingProtection: boolean;
-    }
-  | {
-      type: 'sse';
-      host: string;
-      port: number;
-      allowedOrigins?: string[];
-      allowedHosts?: string[];
-      enableDnsRebindingProtection: boolean;
-    };
-
-export function getArgValue(name: string): string | undefined {
-  const args = process.argv;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith(`${name}=`)) {
-      return arg.slice(name.length + 1);
-    }
-    if (arg === name && i + 1 < args.length) {
-      return args[i + 1];
-    }
-  }
-  return undefined;
-}
-
-export function hasFlag(name: string): boolean {
-  return process.argv.includes(name);
-}
-
-export function parseBoolean(value?: string): boolean {
-  if (!value) {
-    return false;
-  }
-  const normalized = value.trim().toLowerCase();
-  return (
-    normalized === '1' ||
-    normalized === 'true' ||
-    normalized === 'yes' ||
-    normalized === 'on'
-  );
-}
-
-export function resolvePortOption(
-  argName: string,
-  envName: string,
-  defaultValue: number,
-): number {
-  const rawValue = getArgValue(argName) ?? process.env[envName];
-  if (!rawValue) {
-    return defaultValue;
-  }
-
-  const port = Number.parseInt(rawValue, 10);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`Invalid port value for ${argName}: ${rawValue}`);
-  }
-
-  return port;
-}
-
-export function resolveBooleanOption(
-  argName: string,
-  envName: string,
-  defaultValue: boolean,
-): boolean {
-  const argValue = getArgValue(argName);
-  if (argValue !== undefined) {
-    return parseBoolean(argValue);
-  }
-  if (hasFlag(argName)) {
-    return true;
-  }
-  const envValue = process.env[envName];
-  if (envValue !== undefined) {
-    return parseBoolean(envValue);
-  }
-  return defaultValue;
-}
-
-export function resolveListOption(
-  argName: string,
-  envName: string,
-): string[] | undefined {
-  const rawValue = getArgValue(argName) ?? process.env[envName];
-  if (!rawValue) {
-    return undefined;
-  }
-  const items = rawValue
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-  return items.length > 0 ? items : undefined;
-}
-
-export function parseTransportConfig(transportType: string): TransportConfig {
-  // Use the transport type provided as parameter
-  const normalized = transportType;
-
-  if (
-    normalized &&
-    normalized !== 'stdio' &&
-    normalized !== 'http' &&
-    normalized !== 'streamable-http' &&
-    normalized !== 'server' &&
-    normalized !== 'sse'
-  ) {
-    throw new Error(`Unsupported transport: ${normalized}`);
-  }
-
-  const sseRequested = normalized === 'sse' || hasFlag('--sse');
-
-  if (sseRequested) {
-    const port = resolvePortOption('--sse-port', 'MCP_SSE_PORT', 3001);
-    // Default to localhost (127.0.0.1)
-    // Use 0.0.0.0 to accept connections from all interfaces
-    const host =
-      getArgValue('--sse-host') ?? process.env.MCP_SSE_HOST ?? '127.0.0.1';
-    const allowedOrigins = resolveListOption(
-      '--sse-allowed-origins',
-      'MCP_SSE_ALLOWED_ORIGINS',
-    );
-    const allowedHosts = resolveListOption(
-      '--sse-allowed-hosts',
-      'MCP_SSE_ALLOWED_HOSTS',
-    );
-    const enableDnsRebindingProtection = resolveBooleanOption(
-      '--sse-enable-dns-protection',
-      'MCP_SSE_ENABLE_DNS_PROTECTION',
-      false,
-    );
-
-    return {
-      type: 'sse',
-      host,
-      port,
-      allowedOrigins,
-      allowedHosts,
-      enableDnsRebindingProtection,
-    };
-  }
-
-  const httpRequested =
-    normalized === 'http' ||
-    normalized === 'streamable-http' ||
-    normalized === 'server' ||
-    hasFlag('--http') ||
-    // Note: Default is stdio (set in runtimeConfig), so this only applies if explicitly requested
-    (!sseRequested && normalized !== 'stdio');
-
-  if (httpRequested) {
-    const port = resolvePortOption('--http-port', 'MCP_HTTP_PORT', 3000);
-    // Default to localhost (127.0.0.1)
-    // Use 0.0.0.0 to accept connections from all interfaces
-    const host =
-      getArgValue('--http-host') ?? process.env.MCP_HTTP_HOST ?? '127.0.0.1';
-    const enableJsonResponse = resolveBooleanOption(
-      '--http-json-response',
-      'MCP_HTTP_ENABLE_JSON_RESPONSE',
-      false,
-    );
-    const allowedOrigins = resolveListOption(
-      '--http-allowed-origins',
-      'MCP_HTTP_ALLOWED_ORIGINS',
-    );
-    const allowedHosts = resolveListOption(
-      '--http-allowed-hosts',
-      'MCP_HTTP_ALLOWED_HOSTS',
-    );
-    const enableDnsRebindingProtection = resolveBooleanOption(
-      '--http-enable-dns-protection',
-      'MCP_HTTP_ENABLE_DNS_PROTECTION',
-      false,
-    );
-
-    return {
-      type: 'streamable-http',
-      host,
-      port,
-      enableJsonResponse,
-      allowedOrigins,
-      allowedHosts,
-      enableDnsRebindingProtection,
-    };
-  }
-
-  return { type: 'stdio' };
-}
-
 let sapConfigOverride: SapConfig | undefined;
 
 export interface ServerOptions {
   sapConfig?: SapConfig;
   connection?: IAbapConnection;
-  transportConfig?: TransportConfig;
   allowProcessExit?: boolean;
   registerSignalHandlers?: boolean;
 }
@@ -1712,6 +1158,9 @@ export function getConfig(): SapConfig {
     config.client = client;
   }
 
+  // RFC through a message server: carried as configured, no default.
+  applyMessageServerFields(config, process.env);
+
   if (authType === 'jwt') {
     const jwtToken = process.env.SAP_JWT_TOKEN;
     if (!jwtToken) {
@@ -1749,40 +1198,13 @@ export function getConfig(): SapConfig {
   return config;
 }
 
-/**
- * Mask sensitive values (tokens, secrets) for safe logging
- *
- * Rules:
- * - Long values (>20 chars): show first 4 and last 4 chars with *** in between
- * - Short values (<=20 chars): fully mask with asterisks
- * - Empty/undefined: return placeholder
- *
- * @param value - The sensitive value to mask
- * @param placeholder - Placeholder for empty values (default: '(not set)')
- * @returns Masked string safe for logging
- */
-export function maskSensitiveValue(
-  value: string | undefined | null,
-  placeholder = '(not set)',
-): string {
-  if (!value || value.trim() === '') {
-    return placeholder;
-  }
-
-  const trimmed = value.trim();
-
-  // Long values: show first 4 and last 4 chars
-  if (trimmed.length > 20) {
-    return `${trimmed.substring(0, 4)}***${trimmed.substring(trimmed.length - 4)}`;
-  }
-
-  // Short values: fully mask
-  return '*'.repeat(trimmed.length);
-}
+/** What the summary says of a value it holds: that it is there. */
+const PRESENT = 'set';
 
 /**
  * Format auth configuration for display at server startup
- * Shows connection details with masked sensitive values
+ * Shows connection details; a secret is shown by its presence only (`set`),
+ * never by a character of it
  */
 export interface AuthDisplayConfig {
   envFile?: string;
@@ -1845,22 +1267,16 @@ export function formatAuthConfigForDisplay(
       lines.push(`║  Username:      ${config.username.padEnd(45)}║`);
     }
     if (config.password) {
-      lines.push(
-        `║  Password:      ${maskSensitiveValue(config.password).padEnd(45)}║`,
-      );
+      lines.push(`║  Password:      ${PRESENT.padEnd(45)}║`);
     }
   }
 
   if (config.authType === 'jwt') {
     if (config.jwtToken) {
-      lines.push(
-        `║  JWT Token:     ${maskSensitiveValue(config.jwtToken).padEnd(45)}║`,
-      );
+      lines.push(`║  JWT Token:     ${PRESENT.padEnd(45)}║`);
     }
     if (config.refreshToken) {
-      lines.push(
-        `║  Refresh Token: ${maskSensitiveValue(config.refreshToken).padEnd(45)}║`,
-      );
+      lines.push(`║  Refresh Token: ${PRESENT.padEnd(45)}║`);
     }
     if (config.uaaUrl) {
       const uaaUrl =
@@ -1870,14 +1286,10 @@ export function formatAuthConfigForDisplay(
       lines.push(`║  UAA URL:       ${uaaUrl.padEnd(45)}║`);
     }
     if (config.uaaClientId) {
-      lines.push(
-        `║  UAA Client ID: ${maskSensitiveValue(config.uaaClientId).padEnd(45)}║`,
-      );
+      lines.push(`║  UAA Client ID: ${PRESENT.padEnd(45)}║`);
     }
     if (config.uaaClientSecret) {
-      lines.push(
-        `║  UAA Secret:    ${maskSensitiveValue(config.uaaClientSecret).padEnd(45)}║`,
-      );
+      lines.push(`║  UAA Secret:    ${PRESENT.padEnd(45)}║`);
     }
   }
 

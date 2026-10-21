@@ -50,7 +50,7 @@ the create/update prompt), `--auth-broker-path=<dir>`, `--browser-auth-port=<por
 ## MCP CRUD Smoke Runner
 
 **`mcp-crud-smoke.js`** — a real MCP client that runs `CreateProgram -> GetProgram -> UpdateProgram
--> GetProgram -> DeleteProgramLow` against a running server, from the YAML cases in
+-> GetProgram -> DeleteProgram` against a running server, from the YAML cases in
 `tests/test-config.yaml` (`create_program.test_cases`).
 
 ```bash
@@ -63,7 +63,7 @@ node tools/mcp-crud-smoke.js --help
 Defaults not given on the command line come from `tests/test-config.yaml` →
 `environment.integration_hard_mode`. For `--transport=stdio` pass the server command with
 `--stdio-command=` and `--stdio-arg=` (repeat); the default is the installed `mcp-abap-adt`
-(`--transport=stdio --env-path=.env`).
+(`--env-path=.env`; the server has no transport option, a binary is its transport).
 
 **`mcp-crud-matrix.js`** — runs the same smoke cases over one protocol from the YAML
 (`--protocol=http|sse|stdio` to override) or, explicitly, several (`--protocols=http,sse,stdio`).
@@ -94,8 +94,8 @@ Run it after adding, removing or redescribing tools. The compact tool list is ge
 - `bulk-update-interface-handlers.sh` — a one-time migration script, kept for history.
 - `sample-service-key.json` — the shape of a service key, with placeholder values.
 
-## Service keys and the `sap-abap-auth` CLI
+## Service keys and the `mcp-auth` CLI
 
-`npx sap-abap-auth` (from `@mcp-abap-adt/connection`; `npm run auth`) logs in through a browser and
-writes a `.env` from a service key. How a destination states its authentication — `basic`, `snc`, or `jwt` with
+`mcp-auth` (from `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`)
+logs in through a browser and writes a `.env` from a service key; `npm run auth` is gone. How a destination states its authentication — `basic`, `snc`, or `jwt` with
 `SAP_GRANT_TYPE` — is in [Authentication](../docs/user-guide/AUTHENTICATION.md).

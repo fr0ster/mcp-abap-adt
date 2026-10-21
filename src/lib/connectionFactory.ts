@@ -11,40 +11,34 @@
  */
 
 import {
-  AdtCloudConnector,
-  AdtOnPremConnector,
-  CloudHttpTransport,
+  createConnection,
   type ILogger,
-  OnPremHttpTransport,
-  RfcTransport,
-  rfcConversationFrom,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import { ServerRefusal } from './auth/serverRefusal';
 
-export type AbapSystemKind = 'onprem' | 'cloud';
+import { type AbapSystemKind, statedSystemKind } from './systemKind';
+
+export type { AbapSystemKind } from './systemKind';
+export { statedSystemKind } from './systemKind';
 
 /**
- * Which system this config dials.
- *
- * `SAP_SYSTEM_TYPE` states it outright and wins — `legacy` is an on-premise
- * system, just an older one. Absent that, a JWT means cloud, which is what the
- * removed factory did and what every existing deployment is therefore running
- * on; changing that default silently would re-route live connections.
- *
- * The point of reading the variable first is that the guess now has an
- * override: a bearer token against an on-premise system finally has a way to
- * say so.
+ * Which system this config dials: what `SAP_SYSTEM_TYPE` states (set by
+ * `--system-type`, the environment, the `--env` file or YAML
+ * `system-type`). It is required: nothing else decides it — not the
+ * credential (a JWT is no sign of a cloud system), not the URL. None, or a
+ * value other than `onprem`, `cloud` or `legacy`, is refused
+ * (`system_type_required`) before anything is sent.
  */
 export function resolveSystemKind(
-  config: SapConfig,
+  _config: SapConfig,
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
 ): AbapSystemKind {
-  const declared = env.SAP_SYSTEM_TYPE?.trim().toLowerCase();
-  if (declared === 'cloud') return 'cloud';
-  if (declared === 'onprem' || declared === 'legacy') return 'onprem';
-  return config.authType === 'jwt' ? 'cloud' : 'onprem';
+  const kind = statedSystemKind(env.SAP_SYSTEM_TYPE);
+  if (kind === undefined) throw new ServerRefusal('system_type_required');
+  return kind;
 }
 
 /**
@@ -273,6 +267,11 @@ function withHttpWireLog<T>(connection: T): T {
 /** How a connection was built, so a sibling can be opened exactly like it. */
 export interface ConnectionRecord {
   settings: SapConfig;
+  /**
+   * The system kind it was built for, as stated when it was built: a sibling
+   * is built for this kind, never for what `SAP_SYSTEM_TYPE` says later.
+   */
+  kind: AbapSystemKind;
   credential: IAuthProvider;
   logger?: ILogger | null;
 }
@@ -280,24 +279,29 @@ export interface ConnectionRecord {
 const records = new WeakMap<object, ConnectionRecord>();
 
 /**
- * The system kind a connection was built for: `resolveSystemKind` of the
- * settings the factory recorded. A connection the factory did not build (an
- * embedder's own) has no settings: the kind the server states for it
- * (`declared`, the server's `systemType` option) wins, then
- * `SAP_SYSTEM_TYPE`, else on-premise. The URL decides nothing.
+ * The system kind a connection was built for: the kind the factory
+ * recorded when it built it (`resolveSystemKind` then). A connection the
+ * factory did not build (an embedder's own) has no settings: the kind the
+ * server states for it (`declared`, the server's `systemType` option) wins,
+ * then `SAP_SYSTEM_TYPE`; `undefined` when neither states one — the kind is
+ * never guessed, not from the URL either. What a missing kind means is the
+ * host's rules'.
  */
 export function systemKindOf(
   connection: object,
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
   declared?: string,
-): AbapSystemKind {
+): AbapSystemKind | undefined {
   const record = records.get(connection);
-  if (record) return resolveSystemKind(record.settings, env);
-  const stated = declared ? { SAP_SYSTEM_TYPE: declared } : env;
-  return resolveSystemKind({} as SapConfig, stated);
+  if (record) return record.kind;
+  return statedSystemKind(declared ? declared : env.SAP_SYSTEM_TYPE);
 }
 
-/** The record of a connection this factory built; undefined for any other. */
+/**
+ * The record of a connection this factory built — its settings, credential
+ * and the kind it was built for, so a sibling is built exactly like it
+ * (`createAbapConnection(…, record.kind)`); undefined for any other.
+ */
 export function siblingRecordOf(
   connection: object,
 ): ConnectionRecord | undefined {
@@ -309,49 +313,79 @@ export function createAbapConnection(
   credential: IAuthProvider,
   logger?: ILogger | null,
   sessionId?: string,
+  /**
+   * An existing SAP session to build the instance on (connection 17): the
+   * cookies an earlier instance's `sessionCookies()` returned. `connect()`
+   * then logs on nowhere and asks SAP, without the credential, whether that
+   * session lives. HTTP only: over RFC connection refuses it.
+   */
+  session?: string,
+  /**
+   * The system kind to build for, when it is already known: a sibling of a
+   * connection this factory built passes the kind recorded for it
+   * (`siblingRecordOf`), never the current `SAP_SYSTEM_TYPE`. Absent, the
+   * kind is what `SAP_SYSTEM_TYPE` states now (`resolveSystemKind`).
+   */
+  kind: AbapSystemKind = resolveSystemKind(settings),
 ): IAbapConnection {
-  const transportOptions = { client: settings.client, baseUrl: settings.url };
-
+  // connection's `createConnection` with the system and the wire stated: the
+  // choice is this server's, made from the settings as before; the connector
+  // and its transport are connection's (connection 16).
+  const common = {
+    config: settings,
+    credential,
+    logger,
+    ...(sessionId !== undefined ? { sessionId } : {}),
+  };
+  const resumed = session !== undefined ? { session } : {};
   const built = ((): IAbapConnection => {
-    if (resolveSystemKind(settings) === 'cloud') {
+    if (kind === 'cloud') {
       return withHttpWireLog(
-        new AdtCloudConnector(
-          settings,
-          credential,
-          new CloudHttpTransport(() => ({}), logger, transportOptions),
-          logger,
-          sessionId,
-        ) as unknown as IAbapConnection,
+        createConnection({
+          ...common,
+          ...resumed,
+          system: 'cloud',
+          transport: 'http',
+          wireLogger: logger,
+        }),
       );
     }
 
     if (settings.connectionType === 'rfc') {
-      return new AdtOnPremConnector(
-        settings,
-        credential,
-        new RfcTransport(
-          rfcConversationFrom(settings),
-          wireLogger(logger),
-          rfcWireOptions(),
-        ),
-        logger,
-        sessionId,
-      ) as unknown as IAbapConnection;
+      // No `session` over RFC: its session is a conversation, which cannot
+      // be taken over (no runtime file is kept of one).
+      if (session !== undefined) {
+        throw new Error(
+          'An RFC session cannot be taken over by another process',
+        );
+      }
+      return createConnection({
+        ...common,
+        system: 'onprem',
+        transport: 'rfc',
+        wireLogger: wireLogger(logger),
+        rfc: rfcWireOptions(),
+      });
     }
 
     // TLS material reaches the wire through the logon, not through the
     // transport's options.
     return withHttpWireLog(
-      new AdtOnPremConnector(
-        settings,
-        credential,
-        new OnPremHttpTransport(() => ({}), logger, transportOptions),
-        logger,
-        sessionId,
-      ) as unknown as IAbapConnection,
+      createConnection({
+        ...common,
+        ...resumed,
+        system: 'onprem',
+        transport: 'http',
+        wireLogger: logger,
+      }),
     );
   })();
 
-  records.set(built as unknown as object, { settings, credential, logger });
+  records.set(built as unknown as object, {
+    settings,
+    credential,
+    logger,
+    kind,
+  });
   return built;
 }

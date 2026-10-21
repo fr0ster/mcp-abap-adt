@@ -13,7 +13,7 @@
  */
 
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
-import { getTimeout } from '../helpers/configHelpers';
+import { getTimeout, loadTestEnv } from '../helpers/configHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
 type RegisteredToolsMap = Record<string, unknown>;
@@ -25,7 +25,15 @@ function getRegisteredToolNames(server: EmbeddableMcpServer): Set<string> {
 }
 
 describe('EmbeddableMcpServer systemType option (real connection)', () => {
-  const ORIGINAL_SAP_SYSTEM_TYPE = process.env.SAP_SYSTEM_TYPE;
+  // Read after the test env is loaded: it states the configured system type
+  // once per process, so a value read earlier is `undefined` and `afterEach`
+  // would delete the configured one.
+  let ORIGINAL_SAP_SYSTEM_TYPE: string | undefined;
+
+  beforeAll(async () => {
+    await loadTestEnv();
+    ORIGINAL_SAP_SYSTEM_TYPE = process.env.SAP_SYSTEM_TYPE;
+  });
 
   afterEach(() => {
     if (ORIGINAL_SAP_SYSTEM_TYPE === undefined) {

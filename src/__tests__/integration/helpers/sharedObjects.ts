@@ -20,6 +20,7 @@ import {
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
@@ -131,7 +132,10 @@ export async function ensureSharedPackage(
         packageType: 'development',
         transportRequest,
       },
-      { analyse: analyseException },
+      {
+        headers: DEFAULT_ADT_HEADERS['package.create'],
+        analyse: analyseException,
+      },
     );
     if (!createdPackage.ok) {
       throw new Error(createdPackage.getError().message);
@@ -244,7 +248,10 @@ export async function ensureSharedDependency(
           description: depConfig.description || 'Shared test table',
           transportRequest,
         },
-        { analyse: analyseException },
+        {
+          headers: DEFAULT_ADT_HEADERS['table.create'],
+          analyse: analyseException,
+        },
       );
       if (!created.ok) throw new Error(created.getError().message);
 
@@ -257,6 +264,7 @@ export async function ensureSharedDependency(
             obj.update(
               { tableName: name, transportRequest },
               {
+                headers: DEFAULT_ADT_HEADERS['table.update'],
                 source: depConfig.source,
                 lockHandle,
                 analyse: analyseException,
@@ -271,7 +279,10 @@ export async function ensureSharedDependency(
 
         const activated = await obj.activate(
           { tableName: name },
-          { analyse: analyseActivation },
+          {
+            headers: DEFAULT_ADT_HEADERS['table.activate'],
+            analyse: analyseActivation,
+          },
         );
         if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared table ${name} activated`);
@@ -284,7 +295,10 @@ export async function ensureSharedDependency(
           description: depConfig.description || 'Shared test view',
           transportRequest,
         },
-        { analyse: analyseException },
+        {
+          headers: DEFAULT_ADT_HEADERS['ddl.create'],
+          analyse: analyseException,
+        },
       );
       if (!created.ok) throw new Error(created.getError().message);
 
@@ -297,6 +311,7 @@ export async function ensureSharedDependency(
             obj.update(
               { ddlName: name, transportRequest },
               {
+                headers: DEFAULT_ADT_HEADERS['ddl.update'],
                 source: depConfig.source,
                 lockHandle,
                 analyse: analyseException,
@@ -311,7 +326,10 @@ export async function ensureSharedDependency(
 
         const activated = await obj.activate(
           { ddlName: name },
-          { analyse: analyseActivation },
+          {
+            headers: DEFAULT_ADT_HEADERS['ddl.activate'],
+            analyse: analyseActivation,
+          },
         );
         if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared view ${name} activated`);
@@ -326,7 +344,10 @@ export async function ensureSharedDependency(
           description: depConfig.description || 'Shared test BDEF',
           transportRequest,
         },
-        { analyse: analyseException },
+        {
+          headers: DEFAULT_ADT_HEADERS['behaviorDefinition.create'],
+          analyse: analyseException,
+        },
       );
       if (!created.ok) throw new Error(created.getError().message);
 
@@ -339,6 +360,7 @@ export async function ensureSharedDependency(
             obj.update(
               { name, transportRequest },
               {
+                headers: DEFAULT_ADT_HEADERS['behaviorDefinition.update'],
                 source: depConfig.source,
                 lockHandle,
                 analyse: analyseException,
@@ -351,7 +373,10 @@ export async function ensureSharedDependency(
 
         const activated = await obj.activate(
           { name },
-          { analyse: analyseActivation },
+          {
+            headers: DEFAULT_ADT_HEADERS['behaviorDefinition.activate'],
+            analyse: analyseActivation,
+          },
         );
         if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared behavior definition ${name} activated`);

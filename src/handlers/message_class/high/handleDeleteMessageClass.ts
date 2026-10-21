@@ -66,6 +66,8 @@ export async function handleDeleteMessageClass(
     { tool: 'DeleteMessageClass', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'messageClass',
         createAdtClient(connection, logger).getMessageClass(
           resultsFor(messageClassDocuments),
         ),

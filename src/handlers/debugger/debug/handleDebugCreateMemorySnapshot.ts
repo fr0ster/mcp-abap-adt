@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugCreateMemorySnapshot',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Writes a memory snapshot of the stopped debuggee and answers the file written.',
+    '[read-only] [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

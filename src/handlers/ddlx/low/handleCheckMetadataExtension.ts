@@ -31,19 +31,20 @@
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckMetadataExtensionLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -58,21 +59,6 @@ export const TOOL_DEFINITION = {
         description:
           "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.",
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['name'],
@@ -82,12 +68,6 @@ export const TOOL_DEFINITION = {
 interface CheckMetadataExtensionArgs {
   name: string;
   version?: 'active' | 'inactive';
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -96,14 +76,10 @@ export async function handleCheckMetadataExtension(
   args: CheckMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  const { name, version, session_id, session_state } = args;
+  const { name, version } = args;
 
   if (!name) {
     return return_error(new Error('name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const ddlxName = name.toUpperCase();
@@ -114,9 +90,14 @@ export async function handleCheckMetadataExtension(
   return answer(
     { tool: 'CheckMetadataExtensionLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .check({ name: ddlxName }, checkVersion, { analyse: analyseException }),
+      withAdtHeaders(context, 'metadataExtension.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+          .check({ name: ddlxName }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

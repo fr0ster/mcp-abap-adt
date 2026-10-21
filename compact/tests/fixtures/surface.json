@@ -2,7 +2,7 @@
   {
     "group": "compact",
     "name": "HandlerValidate",
-    "inputs": "object_type*, object_name*, package_name, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, session_id, session_state",
+    "inputs": "object_type*, object_name*, package_name, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version",
     "available_in": "cloud, onprem"
   },
   {
@@ -14,19 +14,25 @@
   {
     "group": "compact",
     "name": "HandlerLock",
-    "inputs": "object_type*, object_name*, super_package, session_id, session_state",
+    "inputs": "object_type*, object_name*, super_package",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerUnlock",
-    "inputs": "object_type*, object_name*, lock_handle*, session_id*, session_state",
+    "inputs": "object_type*, object_name*, lock_handle*",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerCheckRun",
-    "inputs": "object_type*, object_name*, version, session_id, session_state",
+    "inputs": "object_type*, object_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDeletionCheck",
+    "inputs": "object_type*, object_name*",
     "available_in": "cloud, onprem"
   },
   {
@@ -61,8 +67,14 @@
   },
   {
     "group": "compact",
+    "name": "HandlerProfileSchedule",
+    "inputs": "description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
     "name": "HandlerProfileRun",
-    "inputs": "target_type*, class_name, program_name, profiling, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing",
+    "inputs": "target_type*, class_name, program_name, profiler_id, background",
     "available_in": "cloud, onprem"
   },
   {
@@ -109,26 +121,38 @@
   },
   {
     "group": "compact",
+    "name": "HandlerTransportSortAndCompress",
+    "inputs": "transport_number*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerTransportMoveObjects",
+    "inputs": "transport_number*, target_number*, objects*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
     "name": "HandlerCreate",
-    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, activate, program_type, application, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, name, root_entity, implementation_type, behavior_definition, cds_view_name, fields, test_class_source",
+    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, master_language, super_package, package_type, software_component, transport_layer, record_changes, application_component, transport_type, target_system, owner, superclass, final, create_protected, program_type, application, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, service_version, binding_variant, name, implementation_type",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerGet",
-    "inputs": "object_type*, part, package_name, class_name, interface_name, program_name, domain_name, data_element_name, table_name, structure_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, run_id, response_format, version",
+    "inputs": "object_type, part, package_name, class_name, interface_name, program_name, domain_name, data_element_name, table_name, structure_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, run_id, response_format, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerUpdate",
-    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, ddl_source, transport_request, activate, description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, name, behavior_definition, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state",
+    "inputs": "object_type*, lock_handle*, transport_request, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, ddl_source, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, service_version, name, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerDelete",
-    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name",
+    "inputs": "object_type*, lock_handle, package_name, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name",
     "available_in": "cloud, onprem"
   },
   {
@@ -151,26 +175,38 @@
   },
   {
     "group": "compact",
-    "name": "HandlerDebugStart",
-    "inputs": "kind*, breakpoints*, take_over, request_user, debugging_mode, settings, run, detail",
+    "name": "HandlerDebugBreakpoints",
+    "inputs": "state_handle, kind*, operation*, breakpoints, sync_scope, sync_objects, breakpoint_id, variable_name, condition, watchpoint_id, request_user, debugging_mode, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
-    "name": "HandlerDebugWait",
-    "inputs": "state_handle*, hold_seconds, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "compact",
-    "name": "HandlerDebugView",
-    "inputs": "state_handle*, what*, names, detail",
+    "name": "HandlerDebugSession",
+    "inputs": "state_handle, kind*, operation*, hold_seconds, take_over, debuggee_id, server, settings, request_user, debugging_mode, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerDebugStep",
-    "inputs": "state_handle*, action*, object_type, object_name, line, include, parent_name, detail",
+    "inputs": "state_handle*, kind*, operation*, object_type, object_name, line, include, parent_name, position, debuggee_id, detail",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugMaintain",
+    "inputs": "state_handle*, kind*, operation*, names, parents, variable_name, value, debuggee_id, query, row_number, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugBatch",
+    "inputs": "action*, number, numbers",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerBatch",
+    "inputs": "action*, number, numbers",
+    "available_in": "all"
   }
 ]

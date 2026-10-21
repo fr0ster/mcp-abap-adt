@@ -37,6 +37,7 @@ import { handleSearchObject } from '../../../handlers/search/readonly/handleSear
 import { handleUpdateServiceDefinition } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
+import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import {
   type ActivationRunSource,
@@ -100,12 +101,15 @@ async function forceSaveViewSource(
   // unreleased lock is named after it rather than instead of it.
   const failures: string[] = [];
   try {
-    const updated = await client
-      .getDdl()
-      .update(
-        { ddlName: viewName, transportRequest },
-        { source: ddlSource, lockHandle, analyse: analyseException },
-      );
+    const updated = await client.getDdl().update(
+      { ddlName: viewName, transportRequest },
+      {
+        headers: DEFAULT_ADT_HEADERS['ddl.update'],
+        source: ddlSource,
+        lockHandle,
+        analyse: analyseException,
+      },
+    );
     if (!updated.ok) {
       failures.push(`write refused: ${updated.getError().message}`);
     }
@@ -410,7 +414,10 @@ describe('Admin: Setup shared dependencies', () => {
                   source: item.source,
                   transportRequest,
                 },
-                { analyse: analyseException },
+                {
+                  headers: DEFAULT_ADT_HEADERS['table.create'],
+                  analyse: analyseException,
+                },
               );
               if (!createdTable.ok) {
                 throw new Error(createdTable.getError().message);
@@ -532,7 +539,10 @@ describe('Admin: Setup shared dependencies', () => {
                     description: item.description || 'Shared test structure',
                     transportRequest,
                   },
-                  { analyse: analyseException },
+                  {
+                    headers: DEFAULT_ADT_HEADERS['structure.create'],
+                    analyse: analyseException,
+                  },
                 );
                 if (!createdStructure.ok) {
                   throw new Error(createdStructure.getError().message);
@@ -580,12 +590,13 @@ describe('Admin: Setup shared dependencies', () => {
               );
               testsLogger?.info?.(`Updated structure ${item.name} source`);
             }
-            const activatedStructure = await client
-              .getStructure()
-              .activate(
-                { structureName: item.name },
-                { analyse: analyseActivation },
-              );
+            const activatedStructure = await client.getStructure().activate(
+              { structureName: item.name },
+              {
+                headers: DEFAULT_ADT_HEADERS['structure.activate'],
+                analyse: analyseActivation,
+              },
+            );
             if (!activatedStructure.ok) {
               throw new Error(activatedStructure.getError().message);
             }
@@ -645,7 +656,10 @@ describe('Admin: Setup shared dependencies', () => {
                   source: item.source,
                   transportRequest,
                 },
-                { analyse: analyseException },
+                {
+                  headers: DEFAULT_ADT_HEADERS['ddl.create'],
+                  analyse: analyseException,
+                },
               );
               if (!createdDdl.ok) {
                 throw new Error(createdDdl.getError().message);
@@ -775,7 +789,10 @@ describe('Admin: Setup shared dependencies', () => {
                     source: item.source,
                     transportRequest,
                   },
-                  { analyse: analyseException },
+                  {
+                    headers: DEFAULT_ADT_HEADERS['behaviorDefinition.create'],
+                    analyse: analyseException,
+                  },
                 );
               if (!createdBehaviorDefinition.ok) {
                 throw new Error(createdBehaviorDefinition.getError().message);
@@ -896,7 +913,10 @@ describe('Admin: Setup shared dependencies', () => {
                   description: item.description || 'Shared test class',
                   transportRequest,
                 },
-                { analyse: analyseException },
+                {
+                  headers: DEFAULT_ADT_HEADERS['class.create'],
+                  analyse: analyseException,
+                },
               );
               if (!createdClass.ok) {
                 throw new Error(createdClass.getError().message);
@@ -1028,7 +1048,10 @@ describe('Admin: Setup shared dependencies', () => {
                     packageName,
                     transportRequest,
                   },
-                  { analyse: analyseException },
+                  {
+                    headers: DEFAULT_ADT_HEADERS['functionGroup.create'],
+                    analyse: analyseException,
+                  },
                 );
               if (!createdFunctionGroup.ok) {
                 throw new Error(createdFunctionGroup.getError().message);
@@ -1123,7 +1146,10 @@ describe('Admin: Setup shared dependencies', () => {
                       item.description || 'Shared test function module',
                     transportRequest,
                   },
-                  { analyse: analyseException },
+                  {
+                    headers: DEFAULT_ADT_HEADERS['functionModule.create'],
+                    analyse: analyseException,
+                  },
                 );
               if (!createdFunctionModule.ok) {
                 throw new Error(createdFunctionModule.getError().message);
@@ -1166,6 +1192,7 @@ describe('Admin: Setup shared dependencies', () => {
                       transportRequest,
                     },
                     {
+                      headers: DEFAULT_ADT_HEADERS['functionModule.update'],
                       source: item.source,
                       lockHandle,
                       analyse: analyseException,
@@ -1306,7 +1333,10 @@ describe('Admin: Setup shared dependencies', () => {
                     source: item.source,
                     transportRequest,
                   },
-                  { analyse: analyseException },
+                  {
+                    headers: DEFAULT_ADT_HEADERS['serviceDefinition.create'],
+                    analyse: analyseException,
+                  },
                 );
               if (!createdServiceDefinition.ok) {
                 throw new Error(createdServiceDefinition.getError().message);
@@ -1529,7 +1559,10 @@ describe('Admin: Setup shared dependencies', () => {
                   packageName,
                   description: item.description || 'Shared append structure',
                 },
-                { analyse: analyseException },
+                {
+                  headers: DEFAULT_ADT_HEADERS['appendStructure.create'],
+                  analyse: analyseException,
+                },
               );
             if (!createdAppendStructure.ok) {
               throw new Error(createdAppendStructure.getError().message);
@@ -1548,6 +1581,7 @@ describe('Admin: Setup shared dependencies', () => {
                 obj.update(
                   { appendStructureName: item.name },
                   {
+                    headers: DEFAULT_ADT_HEADERS['appendStructure.update'],
                     source: item.source,
                     lockHandle,
                     analyse: analyseException,
@@ -1678,6 +1712,7 @@ describe('Admin: Setup shared dependencies', () => {
             // — see `lib/strategies/activationRun.ts`.
             const utils = client.getUtils(ourUtils);
             const started = await utils.activateObjectsGroup(toActivate, true, {
+              headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
               analyse: analyseException,
             });
             if (!started.ok) {
@@ -1688,6 +1723,9 @@ describe('Admin: Setup shared dependencies', () => {
               started.getResult().value,
               analyseException,
             );
+            if (outcome.failure) {
+              throw new Error(outcome.failure.message);
+            }
             testsLogger?.info?.(
               `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}, ${outcome.messages.length} message(s)`,
             );
@@ -1778,6 +1816,7 @@ describe('Admin: Setup shared dependencies', () => {
                 // id.
                 const utils = client.getUtils(ourUtils);
                 const resp = await utils.activateObjectsGroup(chunk, true, {
+                  headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
                   analyse: analyseException,
                 });
                 if (!resp.ok) {
@@ -1788,6 +1827,9 @@ describe('Admin: Setup shared dependencies', () => {
                   resp.getResult().value,
                   analyseException,
                 );
+                if (chunkOutcome.failure) {
+                  throw new Error(chunkOutcome.failure.message);
+                }
                 const errs = chunkOutcome.messages.filter(isRefusal);
                 if (errs.length > 0) {
                   recordFailure(

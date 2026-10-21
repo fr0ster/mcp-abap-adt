@@ -64,6 +64,8 @@ export async function handleDeleteFunctionGroup(
     { tool: 'DeleteFunctionGroup', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'functionGroup',
         createAdtClient(connection, logger).getFunctionGroup(
           resultsFor(functionGroupDocuments),
         ),

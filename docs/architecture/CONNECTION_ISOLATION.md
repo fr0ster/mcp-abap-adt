@@ -18,22 +18,25 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio**: one instance for the life of the process; its connection is built on the first tool call and kept.
-- **SSE**: one instance per session.
-- **HTTP (streamable)**: one instance per request, so a request never sees another request's connection.
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built at the process's start, before the MCP transport opens (the destination's one leftover session taken up, or a logon; a failure ends the process), and kept for the instance's life: only a session SAP already lost replaces it. On stdio the user is fixed for the process: the session is renewed (refresh token, or a new login when the refresh fails) and written back by the same provider — the same user — so the leftover-session tools' caller is the destination the instance serves (matched from the process's own settings and credential, with no request to SAP), and the background-run tools' caller is the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
+- **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
+- **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 
-What a connection is built from is its `ConnectionContext`: the **settings** (`connectionParams`: URL, client, authentication type, connection type -- no secret) and the **credential** (an `IAuthProvider`). The two come from separate sources:
+Each instance has one **connection source** (`ConnectionSource`, `src/embeddable/ConnectionContext.ts`), filled by its package; per call it answers the **settings** (URL, client, authentication type, connection type -- no secret) and the **credential** (an `IAuthProvider`):
 
-| Request carries | Settings | Credential |
-|:---|:---|:---|
-| `x-mcp-destination` (with `--allow-destination-header`) or the default destination | `IDestinations.settingsFor(destination)` | `IDestinations.getProvider(destination)` |
-| `x-sap-url` + `x-sap-jwt-token`, or + `x-sap-login` and `x-sap-password` | from the headers | built from the headers, owned by that request |
+| Package | Source | Settings | Credential |
+|:---|:---|:---|:---|
+| core (stdio) | `destinationSource` | `IDestinations.settingsFor(destination)` | `IDestinations.getProvider(destination, { signal })` |
+| http, sse | `headerSource` (`@mcp-abap-adt/lib/http-transport`) | `x-sap-url`, `x-sap-client` | built from `x-sap-jwt-token`, or `x-sap-login` and `x-sap-password`, owned by that request (http) or connection (sse) |
+| an embedder | `{ kind: 'injected', connection }` | — | the consumer's connection, used as given |
+
+A request to http or sse without credentials is answered `400`, and so is one carrying `x-mcp-destination`: destinations are served only by core, over stdio.
 
 ### Implementation Details
 
 #### 1. A credential per destination, shared; a credential per header request, not
 
-`AuthBrokerFactory` builds one broker, and one provider, per destination, on first use, and hands the provider out counted (so that shutdown can wait for what is in flight). Two sessions on the same destination share the provider: one token, one refresh token, one renewal in flight. Each is still its own connection (cookie jar, CSRF token, session). A connection built from headers has a credential of its own, built from those headers, and shares nothing.
+`AuthBrokerFactory` (core) builds one broker, and one provider, for the process's destination, and hands the provider out counted (so that shutdown can wait for what is in flight). A connection built from headers has a credential of its own, built from those headers, and shares nothing: nothing is stored, shared or cached across requests (http) or connections (sse). The one exception is held state (a debug session): the connections it opened stay with it until it ends.
 
 #### 2. Request-scoped values
 
@@ -41,33 +44,75 @@ Values that belong to one request, such as the master language of created object
 
 #### 3. Connection construction
 
-`BaseMcpServer.getConnection()` builds the connector once, in one place (`src/lib/connectionFactory.ts`), from the context's settings and credential, and calls `connect()`. The credential is the one the caller hands in; the factory builds none from `settings.authType`.
+`BaseMcpServer.getConnection(signal)` resolves the source, then builds the connector in one place (`src/lib/connectionFactory.ts`) from the settings and credential, and calls `connect()` — once per credential object: kept while the source answers the same one, built anew for a new one (http, sse). stdio's source answers the same provider for the process's life, so only a session SAP already lost replaces its connection, built with that same provider. The factory builds no credential from `settings.authType`.
 
 ### Session Lifecycle
 
-1. **Session Creation**: a new client connects (SSE), or a request arrives (HTTP): a server instance is created
-2. **Context**: the destination's settings and provider, or the headers' settings and credential, become the instance's `ConnectionContext`
-3. **Connection Creation**: the first tool call builds and connects the connector
-4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt
-5. **Shutdown**: on `SIGTERM`/`SIGINT` the transports stop accepting, the factory waits up to 30 s for provider calls in flight, and every broker is flushed
+1. **Session Creation**: stdio starts, a client opens an SSE connection, or an HTTP request arrives: a server instance is created (or, for HTTP, the pooled one a `state_handle` names is taken)
+2. **Source**: the destination (stdio) or the headers (http, sse) become the instance's `ConnectionSource`
+3. **Connection Creation**: stdio's launcher builds and connects the connector at the start, before the transport opens (`connectAtStart`), any failure ending the process with exit `1`; http, sse and an embedder's instance at the first tool call, which resolves the source and builds and connects it. With the connection the server makes its parameters — the responsible, the user, the system — by `@mcp-abap-adt/responsible-rules` (the servers; an embedder only when it passes the rules), once per destination
+4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt. A header credential is fixed: nothing renews it
+5. **The end**: on `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT` (`SIGBREAK` on Windows) — and on stdio's stdin closing or a broken pipe on it, or an SSE stream closing, for that instance — every ADT session is logged off at once and the running tools interrupted, with no wait for a tool, and each logoff is let finish (`flushGoodbye()`, until SAP answered it or its transport failed); core's factory then waits for provider calls in flight and flushes its broker. Over Streamable HTTP a dropped request closes nothing: the instance ends after its work, or at its state's stop or the idle bound
+
+### The stateful window and the main flow
+
+**Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
+stateless**. adt-clients (31.1) marks the two requests, each a request of its
+own, and sets the connection back to stateless in a `finally` whatever the request
+answered. The server sets no tool's session stateful (`tools/stateful-sites.json`).
+
+**One MCP session = one connector = one main flow.** The calls of an instance that
+work on its connection run strictly one after another, whatever the client sends at
+once — the server enforces it. The shared connections are stdio's kept one and an SSE
+connection's; Streamable HTTP builds one per request. Every send on the instance's
+connection is inside the order; the system lookup (`systeminformation`, once per destination)
+comes with the connection, when it is created, before any tool can use it; a background run, a listed
+long read and the debugger tools that work on the debugger's own connections are
+outside it. A long call on the main connection holds the flow; `background: true` or a
+tool on its own connection does not. Once in the flow, a queued call checks its
+connection again: when the call ahead found the session lost, it takes the replacement before its
+tool runs, so only the call that met the loss fails (it is not replayed). Taking up a
+leftover session is the stdio connector's birth at the process's start, before the transport
+opens, not a change of a connector: there is no resume tool, so it takes no turn in the flow and
+replaces nothing. Over Streamable HTTP the held connection takes each request's credential
+(a renewed token, a new basic pair: the same user) and keeps its SAP session; it is replaced only
+when SAP ended that session.
+
+- **Compact's `HandlerLock`** leaves the lock in the session until `HandlerUnlock`
+  (the consumer's choice) where the connection lives across calls — stdio and SSE —
+  with every call between them stateless; the instance's logoff ends it at the
+  latest. Over Streamable HTTP the lock is the pooled instance's state: a request on
+  its `state_handle` reaches the held connection — with that request's credential, in the
+  same SAP session — and the lock with it, until the `UNLOCK` or until SAP ends the session.
+- **A tool call cannot be cancelled**: it ends with its result or with the session.
+  A client's cancel aborts nothing — a queued call keeps its place, a running one
+  runs to its end; no logoff, no new session. When the client closes its connection
+  (stdio's stdin, an SSE stream) and at the process shutdown, the instance's sessions
+  are logged off at once and its calls interrupted — nothing waits for a running tool
+  or a request in flight; over Streamable HTTP a dropped request closes nothing.
+- **A reopen only when SAP lost the session**: stdio's source answers the same
+  provider for the process's life (the user is fixed; the session is renewed and
+  written back by that provider), so its connection is replaced only then; a
+  reopen of a live session would leave a lock held in it behind, or collide with the
+  next one.
 
 ### Benefits
 
 1. **Security**: no data leakage between clients: nothing about a connection is global
-2. **Multi-Tenancy**: clients may connect to different SAP systems at once (by header, or by destination with `--allow-destination-header`)
-3. **One login**: a destination's logins are serialised and its token is shared by the sessions that use it
+2. **Multi-Tenancy**: over http and sse, clients may connect to different SAP systems at once, each with its own headers
+3. **One login**: stdio's destination logs in through its one provider, whose logins are serialised
 
 ## Example Flow
 
 ```
-Client A (destination A, via x-mcp-destination):
-  Request 1 → server instance → settingsFor(A) + getProvider(A) → connection A
-Client B (destination B, via x-mcp-destination):
-  Request 1 → server instance → settingsFor(B) + getProvider(B) → connection B
-Client C (x-sap-* headers):
-  Request 1 → server instance → settings + credential from the headers → connection C
+mcp-abap-adt-http, Client A (x-sap-* headers, user A):
+  Request 1 → server instance → headerSource → credential A → connection A
+mcp-abap-adt-http, Client B (x-sap-* headers, user B), at the same time:
+  Request 1 → server instance → headerSource → credential B → connection B
+mcp-abap-adt (stdio), destination D:
+  Tool call → destinationSource → settingsFor(D) + getProvider(D) → connection D, kept
 
-Each connection has its own session; A and B each have their own provider and token.
+No two of them share a credential or a connection.
 ```
 
 ## Related Documentation

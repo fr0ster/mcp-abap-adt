@@ -7,21 +7,26 @@ Platform walk-throughs: [Windows](./platforms/INSTALL_WINDOWS.md), [macOS](./pla
 ## Installation variants
 
 Two choices make a variant: **which server** and **how it connects to the ABAP system**. They are
-independent — either server connects every way.
+independent — every server connects every way. **The server fixes its tool set** (19.0.0): there
+is no `--exposition`, so choosing the server is choosing the tools. Each server below is stdio; its
+Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`, `sse`, `http-ro`,
+`sse-ro`, `compact-http`, `compact-sse`, `compact-http-ro`, `compact-sse-ro`).
 
 ### Which server
 
 | Package | What it is | Command |
 |---|---|---|
-| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …), in the `readonly`, `high` and `low` sets. | `mcp-abap-adt` |
-| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request. Configuration is the full server's. | `mcp-abap-adt-compact` |
-| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Libraries, not servers: the tool handlers and an embeddable server for your own application. | — |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …): the `readonly`, `high` and `debug` sets, the leftover sessions (stdio only) and background runs. The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
+| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) | **The read-only full server**: the `readonly` tools (with system and search), the leftover-session list and logoff — no high, debugger, background-run or resume tool. Configuration is the full server's. | `mcp-abap-adt-ro` |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request — with the four debugger tools. Configuration is the full server's. | `mcp-abap-adt-compact` |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) | **The read-only compact server**: the 17 compact tools that change nothing, the leftover-session list and logoff. | `mcp-abap-adt-compact-ro` |
+| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify), [`background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory), [`responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Libraries, not servers: the tool handlers, an embeddable server for your own application, the in-memory store of background runs, and the rules that name a call's responsible, user and system. | — |
 
 ### How it connects
 
 | Connection | Authentication (`SAP_AUTH_TYPE`) | What the machine needs besides Node.js |
 |---|---|---|
-| **HTTP** (default) | `basic`, or `jwt` (browser login with a service key, or a token you hold) | Nothing. |
+| **HTTP** (default) | `basic`, or `jwt` (browser login with a service key; a token you hold goes in the `x-sap-jwt-token` header of the HTTP and SSE binaries, not over stdio) | Nothing. |
 | **RFC** (`SAP_CONNECTION_TYPE=rfc`) | `basic` | The SAP NW RFC SDK and a C++ build toolchain **at install time** — the RFC module is compiled by `npm install`. |
 | **SNC** (RFC, passwordless) | `snc` | Everything RFC needs, plus an SNC product logged on — typically SAP Secure Login Client. No user, no password in the `.env`. |
 
@@ -33,7 +38,9 @@ The authentications in full: [Authentication & Destinations](../user-guide/AUTHE
 
 ```bash
 npm install -g @mcp-abap-adt/core        # mcp-abap-adt
+npm install -g @mcp-abap-adt/core-ro     # mcp-abap-adt-ro: the readonly tools alone
 npm install -g @mcp-abap-adt/compact     # mcp-abap-adt-compact
+npm install -g @mcp-abap-adt/compact-ro  # mcp-abap-adt-compact-ro: the compact tools that change nothing
 ```
 
 **RFC and SNC** — the same command, run **after** the SDK and the toolchain are in place and with
@@ -88,14 +95,22 @@ read for either. See [Migrating to 17.0.0](../MIGRATION-17.0.md).
 
 ## Installing
 
-After `npm install -g @mcp-abap-adt/core` you have the `mcp-abap-adt` command (default: stdio);
-`--transport=http` and `--transport=sse` serve the other MCP transports. `@mcp-abap-adt/compact` gives
-`mcp-abap-adt-compact`, which takes the same options.
+After `npm install -g @mcp-abap-adt/core` you have the `mcp-abap-adt` command: stdio, one destination
+through the auth broker. A binary is its transport: `npm install -g @mcp-abap-adt/http` gives
+`mcp-abap-adt-http` (Streamable HTTP), `npm install -g @mcp-abap-adt/sse` gives `mcp-abap-adt-sse`
+(HTTP+SSE); both take credentials only from each request's `x-sap-*` headers. There is no
+`--transport` option. `@mcp-abap-adt/compact` gives `mcp-abap-adt-compact`, which takes
+`mcp-abap-adt`'s options; each `-ro` package (`core-ro`, `http-ro`, `sse-ro`, `compact-ro`,
+`compact-http-ro`, `compact-sse-ro`) gives the read-only binary of the same transport, with its
+write counterpart's options. There is no `--exposition` option: the binary fixes its tool set.
+Each binary reads only its own options (`<binary> --help`); another
+binary's, on the command line or in the config file, stops the start, naming the binary that serves
+it. Another binary's environment variables are not read, so one shell can serve several binaries.
 
-**To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` and `mcp-sso` ship in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
+**To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` ships in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
 ```bash
 npm install -g @mcp-abap-adt/auth-broker-cli
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap   # --type xsuaa for an XSUAA key; `mcp-auth --help` lists the rest
 ```
 A `jwt` `.env` must state `SAP_GRANT_TYPE`.
 
@@ -116,7 +131,7 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
-# System type: cloud (default for tools), onprem, or legacy
+# System type, required (no default): cloud, onprem, or legacy
 # Controls tool availability (e.g. Programs require onprem)
 SAP_SYSTEM_TYPE=onprem
 EOF
@@ -127,8 +142,8 @@ For JWT authentication (SAP BTP) with browser login, put the service key in `~/.
 # One-time setup: the CLI that writes destination files
 npm install -g @mcp-abap-adt/auth-broker-cli
 
-# Write a .env that states its authentication and grant
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+# Log in and write a .env that states its authentication and grant (--type xsuaa for an XSUAA key)
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap   # `mcp-auth --help` lists the rest
 ```
 
 For RFC with basic authentication, add `SAP_CONNECTION_TYPE=rfc` to the basic `.env` above.
@@ -146,27 +161,22 @@ SAP_RESPONSIBLE=<your ABAP user>
 Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`). For a URL
 whose port follows no such rule (an `https` port such as `44300`), set `SAP_SYSNR` in the process
 environment. See [RFC Setup](RFC_SETUP.md).
+Through a message server and a logon group instead, add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one is required), and optionally `SAP_GROUP` (default `PUBLIC`, connection's) and `SAP_SAPROUTER`; then no host and no system number come from `SAP_URL` and `SAP_SYSNR` is not read. See [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 **Run the server:**
 ```bash
-# Default stdio mode (bare command starts stdio; HTTP/SSE require --transport=http/--transport=sse)
-# Note: a named destination is chosen with `--mcp=<destination>` on every transport,
-# and per request on HTTP/SSE with the x-mcp-destination header (--allow-destination-header)
-mcp-abap-adt
-
-# stdio mode (for MCP clients, requires --env, --env-path or --mcp)
-# Example: mcp-abap-adt --transport=stdio --mcp=TRIAL
-mcp-abap-adt --transport=stdio
+# stdio (for MCP clients): name the destination with --mcp, --env or --env-path
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Or specify env destination from sessions store
-mcp-abap-adt --env=trial
+mcp-abap-adt --env=trial --system-type=cloud
 
 # Or explicit .env location
-mcp-abap-adt --env-path=/path/to/my.env
-mcp-abap-adt --env-path ~/configs/sap-dev.env
+mcp-abap-adt --env-path=/path/to/my.env --system-type=<onprem|cloud>
+mcp-abap-adt --env-path ~/configs/sap-dev.env --system-type=<onprem|cloud>
 
-# Start HTTP server on custom port
-mcp-abap-adt --transport=http --port=8080
+# Streamable HTTP server on a custom port (credentials from each request's x-sap-* headers)
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 **Environment File Priority:**
@@ -208,12 +218,12 @@ Install in your project directory:
 ```bash
 cd /path/to/your/project
 npm install @mcp-abap-adt/core
-npx mcp-abap-adt --transport=http --port=3000
+npx mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 #### Configuration
 
-The server supports **four authentications** — basic (HTTP or RFC), SNC (RFC, passwordless), JWT with browser login and JWT you hold — see [Authentication & Destinations](../user-guide/AUTHENTICATION.md). A destination lives in one of two places:
+`mcp-abap-adt` (stdio) supports **three authentications** — basic (HTTP or RFC), SNC (RFC, passwordless) and JWT with browser login; a JWT you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse` — see [Authentication & Destinations](../user-guide/AUTHENTICATION.md). A destination lives in one of two places:
 
 1. **Named destination** (`--mcp=<destination>`): `service-keys/<destination>.json` and `sessions/<destination>.env`, read field by field
 2. **A `.env` file** (`--env` or `--env-path`): one file, read and written back with a renewed token
@@ -237,24 +247,17 @@ cat > ~/.config/mcp-abap-adt/service-keys/TRIAL.json << 'EOF'
 }
 EOF
 
-# Run the server with the destination; the first tool call opens a browser login
+# Run the server with the destination; the browser login opens at the start
 # (callback port 61001 unless --browser-auth-port says otherwise)
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 An XSUAA service key carries the UAA, not the system: state the system's URL as `XSUAA_MCP_URL` in `~/.config/mcp-abap-adt/sessions/TRIAL.env`.
 
-**Choosing the destination per request (HTTP/SSE):** start the server with `--allow-destination-header` and send
-
-```json
-{
-  "headers": {
-    "x-mcp-destination": "TRIAL"
-  }
-}
-```
-
-See [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md#destinations) for details.
+Destinations are served only by `mcp-abap-adt` (stdio). `mcp-abap-adt-http` and `mcp-abap-adt-sse`
+take no destination: a request carrying `x-mcp-destination` is answered `400` ("destinations are served
+only by mcp-abap-adt (stdio); send x-sap-* headers"). See
+[Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md) for details.
 
 ##### Option 2: .env File
 
@@ -263,14 +266,15 @@ For single-configuration scenarios, you can use a `.env` file:
 After installation, create a `.env` file with your SAP connection details:
 
 ```bash
-# Create .env file (a JWT you hold)
+# Create .env file (basic; a token you hold goes in the x-sap-jwt-token header
+# of mcp-abap-adt-http / mcp-abap-adt-sse, never in a stdio .env)
 cat > .env << 'EOF'
 SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=your-jwt-token
-# System type: cloud (default), onprem, or legacy
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=<your ABAP user>
+SAP_PASSWORD=<your password>
+# System type, required (no default): cloud, onprem, or legacy
 SAP_SYSTEM_TYPE=cloud
 EOF
 ```
@@ -280,41 +284,39 @@ A `.env` is read once per process: a change to it takes effect on restart.
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port=3000
+mcp-abap-adt --env-path /path/to/custom/.env --system-type=<onprem|cloud>
 ```
 
 #### Usage Examples
 
-**Example 1: Start HTTP server on default port (3000)**
+**Example 1: stdio with a named destination**
 ```bash
-mcp-abap-adt --transport=http
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
-**Example 2: Start HTTP server on custom port**
+**Example 2: Streamable HTTP server on a custom port** (`@mcp-abap-adt/http`)
 ```bash
-mcp-abap-adt --transport=http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
-**Example 3: Start HTTP server accessible from network**
+**Example 3: Streamable HTTP server accessible from network**
 ```bash
-mcp-abap-adt --transport=http --host=0.0.0.0 --port=3000
+mcp-abap-adt-http --host=0.0.0.0 --port=3000 --system-type=<onprem|cloud>
 ```
 
-**Example 4: Use custom environment file**
+**Example 4: SSE server** (`@mcp-abap-adt/sse`)
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
-```
-
-**Example 5: Start SSE server**
-```bash
-mcp-abap-adt --transport=sse --port=3000
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 #### Command Line Options
 
-All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-adt --transport=sse`) support the following options:
+Each binary takes only its own options; an option of another binary, or `--transport`, stops the
+start naming the binary that serves it. Every binary takes `--help`, `--version`, `--conf`,
+`--system-type` and `--state-idle-minutes`; `--exposition` is gone (19.0.0) and stops the start,
+naming the binary that serves the tools it asked for.
 
-**General Options:**
+**`mcp-abap-adt` (stdio):**
 - `--help` - Show complete help message with all available options
 - `--mcp=<destination>` - Named destination (`service-keys/<destination>.json` + `sessions/<destination>.env`)
 - `--auth-broker-path=<path>` - Base directory of the `service-keys` and `sessions` subdirectories
@@ -322,45 +324,46 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--env=<destination>` - Destination env file from sessions store (`<destination>.env`)
 - `--env-path=<path|file>` - Explicit path to a `.env` file
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
-- `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login
-- `--allow-destination-header` - Honour `x-mcp-destination` (HTTP/SSE)
+- `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
+- `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
+- `--connection-type=http|rfc` - SAP connection type (default `http`)
+- `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … in the `.env`); see [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group)
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.
 
-**Transport Selection:**
-- `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
-
-**HTTP Server Options (for `mcp-abap-adt --transport=http`):**
-- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
-- `--port=<port>` - Server port (default: 3000 for http)
+**`mcp-abap-adt-http` (Streamable HTTP):**
+- `--host=<host>` / `--http-host` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` / `--http-port` - Server port (default: 3000)
 - `--path=<path>` / `--http-path=<path>` (alias) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-json-response` - Enable JSON response format
 - `--http-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3000`)
 - `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--http-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
-**SSE Server Options (for `mcp-abap-adt --transport=sse`):**
-- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
-- `--port=<port>` - Server port (default: 3001 for sse)
+- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together)
+
+**`mcp-abap-adt-sse` (HTTP+SSE):**
+- `--sse-host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--sse-port=<port>` - Server port (default: 3001)
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
 - `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
 - `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
+- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together)
 
 **Environment Variables:**
 
 You can also configure the server using environment variables.
 
 *MCP Server Configuration:*
-- `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`)
-- `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
-- `MCP_HTTP_PORT` - Default HTTP port
+- `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`; `mcp-abap-adt`)
+- `MCP_HTTP_PORT` - Default HTTP port (`mcp-abap-adt-http`; so are the other `MCP_HTTP_*`)
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
 - `MCP_HTTP_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3000`)
 - `MCP_HTTP_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
 - `MCP_HTTP_ENABLE_DNS_PROTECTION` - Enable HTTP Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
-- `MCP_SSE_PORT` - Default SSE port
+- `MCP_SSE_PORT` - Default SSE port (`mcp-abap-adt-sse`; so are the other `MCP_SSE_*`)
 - `MCP_SSE_HOST` - Default SSE host (default: 127.0.0.1)
 - `MCP_SSE_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3001`)
 - `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
@@ -383,13 +386,13 @@ You can also configure the server using environment variables.
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: basic|snc|jwt (required)
-- `SAP_GRANT_TYPE` - `authorization_code` or `none`; required with jwt
+- `SAP_GRANT_TYPE` - `authorization_code`; required with jwt
 - `SAP_SNC_PARTNERNAME`, `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` - SNC (RFC only; no user, no password)
-- `SAP_SYSTEM_TYPE` - System type: `cloud` (default), `onprem`, or `legacy`. Controls tool availability (e.g. Programs require `onprem`)
+- `SAP_SYSTEM_TYPE` - System type, required (or `--system-type`; no default): `cloud`, `onprem`, or `legacy`. Controls tool availability (e.g. Programs require `onprem`), the connector, and how the system's answers are read
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
-- `SAP_JWT_TOKEN` - JWT token (with `SAP_GRANT_TYPE=none`)
+- `SAP_JWT_TOKEN` - The session's token, written by `mcp-auth` or the server (a token you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`)
 - `SAP_REFRESH_TOKEN` - Refresh token for token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2
 - `SAP_UAA_CLIENT_ID` - UAA Client ID
@@ -404,18 +407,18 @@ For complete list see [CLI Options](../user-guide/CLI_OPTIONS.md#environment-var
 mcp-abap-adt --help
 
 # Use custom .env from different location
-mcp-abap-adt --env=~/configs/sap-production.env
+mcp-abap-adt --env-path=~/configs/sap-production.env --system-type=<onprem|cloud>
 
-# Start HTTP server
-mcp-abap-adt --transport=http --port=8080
+# Start a Streamable HTTP server
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 
-# Start SSE server
-mcp-abap-adt --transport=sse --port=3001
+# Start an SSE server
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**
 ```bash
-mcp-abap-adt
+mcp-abap-adt --system-type=<onprem|cloud>
 ```
 
 #### Updating the Package

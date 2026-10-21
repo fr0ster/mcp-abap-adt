@@ -25,6 +25,10 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -40,6 +44,7 @@ import {
   sequence,
   succeededWith,
 } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 
 type Answer = IAdtResponse<AdtReading<unknown>, IAdtError>;
@@ -78,19 +83,30 @@ export async function writeClassTests(
   ).getLocalTestClass(resultsFor(classDocuments));
   const written = await withLock(
     () => tests.lock({ className: name }, { analyse: analyseLock }),
-    (lockHandle) =>
-      tests.update(
-        { className: name, transportRequest },
-        { source, lockHandle, analyse: analyseException },
+    atStep('update', (lockHandle) =>
+      withAdtHeaders(context, 'localTestClass.update', (headers) =>
+        tests.update(
+          { className: name, transportRequest },
+          { headers, source, lockHandle, analyse: analyseException },
+        ),
       ),
+    ),
     (lockHandle) =>
       tests.unlock({ className: name }, lockHandle, {
         analyse: analyseException,
       }),
   );
   if (!written.ok) return written as Answer;
-  return carryCleanup(written, () =>
-    tests.activate({ className: name }, { analyse: analyseActivation }),
+  return carryCleanup(
+    written,
+    atStep('activate', () =>
+      withAdtHeaders(context, 'localTestClass.activate', (headers) =>
+        tests.activate(
+          { className: name },
+          { headers, analyse: analyseActivation },
+        ),
+      ),
+    ),
   ) as Promise<Answer>;
 }
 
@@ -120,30 +136,39 @@ export async function writeProgramTests(
   const transportRequest = options.transportRequest;
 
   if (options.create) {
-    const metadata = await program.readMetadata(
-      { programName: name },
-      { analyse: analyseException },
-    );
+    const metadata = await atStep('read program metadata', () =>
+      program.readMetadata(
+        { programName: name },
+        { analyse: analyseException },
+      ),
+    )();
     if (!metadata.ok) return metadata as unknown as Answer;
-    const created = await include.create(
-      {
-        includeName,
-        packageName: packageOf(metadata.getResult().value.raw),
-        description: `ABAP Unit tests of ${name}`,
-        transportRequest,
-      },
-      { analyse: analyseException },
-    );
+    const created = await atStep('create include', () =>
+      withAdtHeaders(context, 'include.create', (headers) =>
+        include.create(
+          {
+            includeName,
+            packageName: packageOf(metadata.getResult().value.raw),
+            description: `ABAP Unit tests of ${name}`,
+            transportRequest,
+          },
+          { headers, analyse: analyseException },
+        ),
+      ),
+    )();
     if (!created.ok) return created as unknown as Answer;
   }
 
   const written = await withLock(
     () => include.lock({ includeName }, { analyse: analyseLock }),
-    (lockHandle) =>
-      include.update(
-        { includeName, transportRequest },
-        { source, lockHandle, analyse: analyseException },
+    atStep('update', (lockHandle) =>
+      withAdtHeaders(context, 'include.update', (headers) =>
+        include.update(
+          { includeName, transportRequest },
+          { headers, source, lockHandle, analyse: analyseException },
+        ),
       ),
+    ),
     (lockHandle) =>
       include.unlock({ includeName }, lockHandle, {
         analyse: analyseException,
@@ -155,9 +180,22 @@ export async function writeProgramTests(
   // lock the write could not release still reaches the caller.
   const activateBoth = () =>
     sequence(
-      () => include.activate({ includeName }, { analyse: analyseActivation }),
-      () =>
-        program.activate({ programName: name }, { analyse: analyseActivation }),
+      atStep('activate include', () =>
+        withAdtHeaders(context, 'include.activate', (headers) =>
+          include.activate(
+            { includeName },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
+      ),
+      atStep('activate program', () =>
+        withAdtHeaders(context, 'program.activate', (headers) =>
+          program.activate(
+            { programName: name },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
+      ),
     ) as Promise<Answer>;
 
   return carryCleanup(written, async (): Promise<Answer> => {
@@ -171,22 +209,29 @@ export async function writeProgramTests(
     const linked = await withLock(
       () => program.lock({ programName: name }, { analyse: analyseLock }),
       async (lockHandle): Promise<Answer> => {
-        const current = await program.read({ programName: name }, 'inactive', {
-          analyse: analyseException,
-        });
+        const current = await atStep('read program', () =>
+          program.read({ programName: name }, 'inactive', {
+            analyse: analyseException,
+          }),
+        )();
         if (!current.ok) return current as unknown as Answer;
         const reportSource = current.getResult().value.raw;
         if (pulledIn.test(reportSource)) {
           return current as unknown as Answer;
         }
-        return program.update(
-          { programName: name, transportRequest },
-          {
-            source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
-            lockHandle,
-            analyse: analyseException,
-          },
-        ) as Promise<Answer>;
+        return atStep('update program', () =>
+          withAdtHeaders(context, 'program.update', (headers) =>
+            program.update(
+              { programName: name, transportRequest },
+              {
+                headers,
+                source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+          ),
+        )() as Promise<Answer>;
       },
       (lockHandle) =>
         program.unlock({ programName: name }, lockHandle, {
@@ -220,31 +265,41 @@ export async function writeFunctionGroupTests(
   const transportRequest = options.transportRequest;
 
   if (options.create) {
-    const created = await include.create(
-      {
-        ...target,
-        description: `ABAP Unit tests of ${groupName}`,
-        transportRequest,
-      },
-      { analyse: analyseException },
-    );
+    const created = await atStep('create include', () =>
+      withAdtHeaders(context, 'functionInclude.create', (headers) =>
+        include.create(
+          {
+            ...target,
+            description: `ABAP Unit tests of ${groupName}`,
+            transportRequest,
+          },
+          { headers, analyse: analyseException },
+        ),
+      ),
+    )();
     if (!created.ok) return created as unknown as Answer;
   }
 
   const written = await withLock(
     () => include.lock(target, { analyse: analyseLock }),
-    (lockHandle) =>
-      include.update(
-        { ...target, transportRequest },
-        { source, lockHandle, analyse: analyseException },
+    atStep('update', (lockHandle) =>
+      withAdtHeaders(context, 'functionInclude.update', (headers) =>
+        include.update(
+          { ...target, transportRequest },
+          { headers, source, lockHandle, analyse: analyseException },
+        ),
       ),
+    ),
     (lockHandle) =>
       include.unlock(target, lockHandle, { analyse: analyseException }),
   );
   if (!written.ok) return written as Answer;
 
-  return carryCleanup(written, () =>
-    activateWithMainProgram(client, groupName, includeName),
+  return carryCleanup(
+    written,
+    atStep('activate', () =>
+      activateWithMainProgram(context, client, groupName, includeName),
+    ),
   );
 }
 
@@ -257,6 +312,9 @@ export function functionGroupMainProgram(functionGroupName: string): string {
   const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
   return namespaced ? `${namespaced[1]}SAPL${namespaced[2]}` : `SAPL${name}`;
 }
+
+/** How many long polls the activation run is waited for. */
+const ACTIVATION_POLLS = 6;
 
 /**
  * Activate the test include, the group and its main program in one run.
@@ -271,23 +329,29 @@ export function functionGroupMainProgram(functionGroupName: string): string {
  * is accepted, not done, so its results are read before answering.
  */
 async function activateWithMainProgram(
+  context: AdtHeadersContext,
   client: ReturnType<typeof createAdtClient>,
   groupName: string,
   includeName: string,
 ): Promise<Answer> {
   const utils = client.getUtils(ourUtils);
-  const started = await utils.activateObjectsGroup(
-    [
-      { type: 'FUGR/I', name: includeName, parentName: groupName },
-      { type: 'FUGR/F', name: groupName },
-      {
-        type: 'FUGR/I',
-        name: functionGroupMainProgram(groupName),
-        parentName: groupName,
-      },
-    ],
-    false,
-    { analyse: analyseException },
+  const started = await withAdtHeaders(
+    context,
+    'utils.activateObjectsGroup',
+    (headers) =>
+      utils.activateObjectsGroup(
+        [
+          { type: 'FUGR/I', name: includeName, parentName: groupName },
+          { type: 'FUGR/F', name: groupName },
+          {
+            type: 'FUGR/I',
+            name: functionGroupMainProgram(groupName),
+            parentName: groupName,
+          },
+        ],
+        false,
+        { headers, analyse: analyseException },
+      ),
   );
   if (!started.ok) return started as unknown as Answer;
   // Long polls back to back, no timer of ours: the server holds each one
@@ -296,22 +360,32 @@ async function activateWithMainProgram(
     utils as unknown as ActivationRunSource,
     started.getResult().value,
     analyseException,
-    6,
+    ACTIVATION_POLLS,
     0,
   );
+  // Reading the run failed: the method's error as it is, with its step.
+  if (outcome.failure !== undefined) return failedWith(outcome.failure);
   const refusals = outcome.messages.filter(isRefusal);
   if (
-    !outcome.settled ||
-    refusals.length > 0 ||
-    outcome.status === 'failed' ||
-    outcome.status === 'error'
+    outcome.settled &&
+    (refusals.length > 0 ||
+      outcome.status === 'failed' ||
+      outcome.status === 'error')
   ) {
+    // SAP reported the run failed: its messages as they are.
     return failedWith({
       origin: 'refusal',
       message: refusals.length
         ? `Activation failed: ${refusals.map((m) => m.text).join('; ')}`
-        : `Activation run ${outcome.runId} did not finish (status ${outcome.status || 'unknown'})`,
+        : `Activation run ${outcome.runId} ended with status ${outcome.status}`,
     });
+  }
+  if (!outcome.settled) {
+    // Not SAP's refusal: our wait bound ran out while the run went on. Said
+    // as a failure on our side, never dressed as SAP's answer.
+    throw new Error(
+      `The activation run ${outcome.runId} had not finished after ${ACTIVATION_POLLS} polls — the wait bound ran out (status ${outcome.status || 'unknown'}); the run may still be going on in SAP.`,
+    );
   }
   // The run's results as the reading: a write's terse answer reads the
   // status, and `raw` shows what SAP said about the activation.

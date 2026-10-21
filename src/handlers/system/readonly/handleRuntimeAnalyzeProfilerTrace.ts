@@ -2,17 +2,20 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeProfilerTrace',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[runtime] Read profiler trace view and return compact analysis summary (totals + top entries).',
+  description: withLongToolAdvice(
+    '[read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       trace_id_or_uri: {
         type: 'string',
         description: 'Profiler trace ID or full trace URI.',

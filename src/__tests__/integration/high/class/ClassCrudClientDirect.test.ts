@@ -19,7 +19,8 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
+import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import { createAbapConnection } from '../../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../../lib/credentialSources';
@@ -422,9 +423,10 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           if (!client) {
             throw new Error('Client not initialized');
           }
-          createResponse = await client
-            .getClass()
-            .create(createParams, { analyse: analyseException });
+          createResponse = await client.getClass().create(createParams, {
+            headers: DEFAULT_ADT_HEADERS['class.create'],
+            analyse: analyseException,
+          });
         } catch (createError: any) {
           // Log error details for debugging (only if DEBUG_TESTS is enabled)
           if (process.env.DEBUG_TESTS === 'true') {
@@ -482,7 +484,10 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         }
         const checkResponse = await client
           .getClass()
-          .check(checkParams, undefined, { analyse: analyseException });
+          .check(checkParams, undefined, {
+            headers: DEFAULT_ADT_HEADERS['class.check'],
+            analyse: analyseException,
+          });
         // The old assertion just confirmed a status field existed on the
         // envelope — true of every response before this migration and true
         // of none after it (`ok` is always a defined boolean; success carries

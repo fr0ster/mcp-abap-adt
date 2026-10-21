@@ -1,0 +1,3583 @@
+{
+  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so.",
+  "rows": [
+    {
+      "tool": "CreatePackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleCreatePackage.ts",
+      "low_call": {
+        "package_name": "PKG_A",
+        "super_package": "PKG_SUPER",
+        "description": "Text",
+        "package_type": "development",
+        "software_component": "SWC_A",
+        "transport_layer": "TL_A",
+        "transport_request": "XXXK900001",
+        "record_changes": true,
+        "application_component": "APC_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "PACKAGE",
+            "package_name": "PKG_A",
+            "super_package": "PKG_SUPER",
+            "description": "Text",
+            "package_type": "development",
+            "software_component": "SWC_A",
+            "transport_layer": "TL_A",
+            "transport_request": "XXXK900001",
+            "record_changes": true,
+            "application_component": "APC_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/packages?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<pak:package xmlns:pak=\"http://www.sap.com/adt/packages\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"PKG_A\" adtcore:type=\"DEVC/K\" adtcore:version=\"active\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_A\"/>\n  <pak:attributes pak:isEncapsulated=\"false\" pak:packageType=\"development\" pak:recordChanges=\"true\"/>\n  <pak:superPackage adtcore:name=\"PKG_SUPER\"/>\n  <pak:applicationComponent pak:name=\"APC_A\"/>\n  <pak:transport>\n    <pak:softwareComponent pak:name=\"SWC_A\"/>\n    <pak:transportLayer pak:name=\"TL_A\"/>\n  </pak:transport>\n  <pak:translation/>\n  <pak:useAccesses/>\n  <pak:packageInterfaces/>\n  <pak:subPackages/>\n</pak:package>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.packages.v2+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidatePackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleValidatePackage.ts",
+      "low_call": {
+        "package_name": "PKG_A",
+        "super_package": "PKG_SUPER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "PACKAGE",
+            "object_name": "PKG_A",
+            "super_package": "PKG_SUPER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/packages/validation?objname=PKG_A&packagename=PKG_SUPER&description=PKG_A&packagetype=development&checkmode=basic",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockPackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleLockPackage.ts",
+      "low_call": {
+        "package_name": "PKG_A",
+        "super_package": "PKG_SUPER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "PACKAGE",
+            "object_name": "PKG_A",
+            "super_package": "PKG_SUPER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/packages/pkg_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockPackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleUnlockPackage.ts",
+      "low_call": {
+        "package_name": "PKG_A",
+        "super_package": "PKG_SUPER",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "PACKAGE",
+            "object_name": "PKG_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/packages/pkg_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "CheckPackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleCheckPackage.ts",
+      "low_call": {
+        "package_name": "PKG_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "PACKAGE",
+            "object_name": "PKG_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/packages/pkg_a\" chkrun:version=\"active\"/>\n\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdatePackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleUpdatePackage.ts",
+      "low_call": {
+        "package_name": "PKG_A",
+        "super_package": "PKG_SUPER",
+        "updated_description": "New text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerGet",
+          "args": {
+            "object_type": "PACKAGE",
+            "package_name": "PKG_A",
+            "part": "metadata"
+          }
+        },
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "PACKAGE",
+            "package_name": "PKG_A",
+            "source_code": "<?xml version=\"1.0\" encoding=\"utf-8\"?><pak:package adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:name=\"ZMCP_SHR_PKG\" adtcore:type=\"DEVC/K\" adtcore:changedAt=\"2026-09-10T00:00:00Z\" adtcore:version=\"active\" adtcore:createdAt=\"2026-09-10T00:00:00Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:descriptionTextLimit=\"60\" adtcore:language=\"EN\" xmlns:pak=\"http://www.sap.com/adt/packages\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/devck/object_name/ZMCP_SHR_PKG\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/applicationcomponents\" rel=\"applicationcomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Application Components Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/softwarecomponents\" rel=\"softwarecomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Software Components Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/softwarecomponents{?name,data}\" rel=\"allowedsoftwarecomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Software Components Value Help based on Package Constrains\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/transportlayers\" rel=\"transportlayers\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Transport Layers Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/abaplanguageversions\" rel=\"abaplanguageversions\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"ABAP Language Version Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/checkruns{?reporters}\" rel=\"supportsPackageCheckActions\" type=\"application/vnd.sap.adt.checkobjects+xml\" title=\"Supports Package Check actions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_shr_pkg\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zmcp_shr_pkg\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZMCP_SHR_PKG\" adtcore:description=\"Shared test dependencies package\"/><pak:attributes pak:packageType=\"development\" pak:isPackageTypeEditable=\"false\" pak:isAddingObjectsAllowed=\"false\" pak:isAddingObjectsAllowedEditable=\"true\" pak:isEncapsulated=\"false\" pak:isEncapsulationEditable=\"true\" pak:isEncapsulationVisible=\"true\" pak:recordChanges=\"false\" pak:isRecordChangesEditable=\"false\" pak:isSwitchVisible=\"false\" pak:languageVersion=\"5\" pak:isLanguageVersionVisible=\"true\" pak:isLanguageVersionEditable=\"true\"/><pak:superPackage adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/><pak:applicationComponent pak:name=\"\" pak:description=\"No application component assigned\" pak:isVisible=\"false\" pak:isEditable=\"false\"/><pak:transport><pak:softwareComponent pak:name=\"ZLOCAL\" pak:description=\"Software Component for local development\" pak:type=\"J\" pak:typeDescription=\"Local Developer Extensibility\" pak:isVisible=\"true\" pak:isEditable=\"false\"/><pak:transportLayer pak:name=\"\" pak:description=\"\" pak:isVisible=\"true\" pak:isEditable=\"false\"/></pak:transport><pak:useAccesses pak:isVisible=\"true\"/><pak:packageInterfaces pak:isVisible=\"true\"/><pak:subPackages/></pak:package>",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "GET",
+          "url": "/sap/bc/adt/packages/pkg_a?version=active",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml"
+          }
+        },
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/packages/pkg_a?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"utf-8\"?><pak:package adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:name=\"ZMCP_SHR_PKG\" adtcore:type=\"DEVC/K\" adtcore:changedAt=\"2026-09-10T00:00:00Z\" adtcore:version=\"active\" adtcore:createdAt=\"2026-09-10T00:00:00Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:descriptionTextLimit=\"60\" adtcore:language=\"EN\" xmlns:pak=\"http://www.sap.com/adt/packages\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/devck/object_name/ZMCP_SHR_PKG\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/applicationcomponents\" rel=\"applicationcomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Application Components Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/softwarecomponents\" rel=\"softwarecomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Software Components Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/softwarecomponents{?name,data}\" rel=\"allowedsoftwarecomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Software Components Value Help based on Package Constrains\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/transportlayers\" rel=\"transportlayers\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Transport Layers Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/abaplanguageversions\" rel=\"abaplanguageversions\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"ABAP Language Version Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/checkruns{?reporters}\" rel=\"supportsPackageCheckActions\" type=\"application/vnd.sap.adt.checkobjects+xml\" title=\"Supports Package Check actions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_shr_pkg\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zmcp_shr_pkg\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZMCP_SHR_PKG\" adtcore:description=\"Shared test dependencies package\"/><pak:attributes pak:packageType=\"development\" pak:isPackageTypeEditable=\"false\" pak:isAddingObjectsAllowed=\"false\" pak:isAddingObjectsAllowedEditable=\"true\" pak:isEncapsulated=\"false\" pak:isEncapsulationEditable=\"true\" pak:isEncapsulationVisible=\"true\" pak:recordChanges=\"false\" pak:isRecordChangesEditable=\"false\" pak:isSwitchVisible=\"false\" pak:languageVersion=\"5\" pak:isLanguageVersionVisible=\"true\" pak:isLanguageVersionEditable=\"true\"/><pak:superPackage adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/><pak:applicationComponent pak:name=\"\" pak:description=\"No application component assigned\" pak:isVisible=\"false\" pak:isEditable=\"false\"/><pak:transport><pak:softwareComponent pak:name=\"ZLOCAL\" pak:description=\"Software Component for local development\" pak:type=\"J\" pak:typeDescription=\"Local Developer Extensibility\" pak:isVisible=\"true\" pak:isEditable=\"false\"/><pak:transportLayer pak:name=\"\" pak:description=\"\" pak:isVisible=\"true\" pak:isEditable=\"false\"/></pak:transport><pak:useAccesses pak:isVisible=\"true\"/><pak:packageInterfaces pak:isVisible=\"true\"/><pak:subPackages/></pak:package>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.packages.v2+xml",
+            "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml"
+          }
+        }
+      ],
+      "note": "Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle."
+    },
+    {
+      "tool": "DeletePackageLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/package/low/handleDeletePackage.ts",
+      "low_call": {
+        "package_name": "PKG_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "PACKAGE",
+            "package_name": "PKG_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "note": "The deletion request alone, as the low tool sent it, on the call's connection. The low tool's force_new_connection has no compact counterpart: compact locks and writes a package in an ABAP session of its own, so the call's session never holds a saved package; the full set's DeletePackage keeps force_new_connection.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/packages/pkg_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ],
+      "unmeasured": "What SAP answers to the deletion check of a package is not measured; the stand-in answers it empty."
+    },
+    {
+      "tool": "CreateDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleCreateDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "DOMAIN",
+            "domain_name": "DOM_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/domains?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><doma:domain xmlns:doma=\"http://www.sap.com/dictionary/domain\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"DOM_A\" adtcore:type=\"DOMA/DD\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</doma:domain>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.domains.v2+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleValidateDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "DOMAIN",
+            "object_name": "DOM_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/domains/validation?objtype=doma&objname=DOM_A&packagename=PKG_TARGET&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleLockDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "DOMAIN",
+            "object_name": "DOM_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/domains/dom_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleUnlockDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "DOMAIN",
+            "object_name": "DOM_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/domains/dom_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "CheckDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleCheckDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "DOMAIN",
+            "object_name": "DOM_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/domains/dom_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleActivateDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "DOMAIN",
+            "object_name": "DOM_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/domains/dom_a\" adtcore:name=\"DOM_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleUpdateDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A",
+        "properties": {
+          "description": "New text"
+        },
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerGet",
+          "args": {
+            "object_type": "DOMAIN",
+            "domain_name": "DOM_A",
+            "part": "metadata"
+          }
+        },
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "DOMAIN",
+            "domain_name": "DOM_A",
+            "source_code": "<?xml version=\"1.0\" encoding=\"utf-8\"?><doma:domain adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:abapLanguageVersion=\"cloudDevelopment\" adtcore:name=\"ZMCP_BLD_CRT_DOM\" adtcore:type=\"DOMA/DD\" adtcore:changedAt=\"2026-09-11T08:57:16Z\" adtcore:version=\"inactive\" adtcore:createdAt=\"2026-09-11T08:57:16Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:language=\"EN\" xmlns:doma=\"http://www.sap.com/dictionary/domain\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/domadd/object_name/ZMCP_BLD_CRT_DOM\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_bld_crt_dom\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/><doma:content><doma:typeInformation><doma:datatype/><doma:length>000000</doma:length><doma:decimals>000000</doma:decimals></doma:typeInformation><doma:outputInformation><doma:length>000000</doma:length><doma:style>00</doma:style><doma:conversionExit/><doma:signExists>false</doma:signExists><doma:lowercase>false</doma:lowercase><doma:ampmFormat>false</doma:ampmFormat></doma:outputInformation><doma:valueInformation><doma:valueTableRef/><doma:appendExists>false</doma:appendExists><doma:fixValues/></doma:valueInformation></doma:content></doma:domain>",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "note": "Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle.",
+      "low_requests": [
+        {
+          "method": "GET",
+          "url": "/sap/bc/adt/ddic/domains/dom_a",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+          }
+        },
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/ddic/domains/dom_a?lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": "<?xml version=\"1.0\" encoding=\"utf-8\"?><doma:domain adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:abapLanguageVersion=\"cloudDevelopment\" adtcore:name=\"ZMCP_BLD_CRT_DOM\" adtcore:type=\"DOMA/DD\" adtcore:changedAt=\"2026-09-11T08:57:16Z\" adtcore:version=\"inactive\" adtcore:createdAt=\"2026-09-11T08:57:16Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:language=\"EN\" xmlns:doma=\"http://www.sap.com/dictionary/domain\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/domadd/object_name/ZMCP_BLD_CRT_DOM\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_bld_crt_dom\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/><doma:content><doma:typeInformation><doma:datatype/><doma:length>000000</doma:length><doma:decimals>000000</doma:decimals></doma:typeInformation><doma:outputInformation><doma:length>000000</doma:length><doma:style>00</doma:style><doma:conversionExit/><doma:signExists>false</doma:signExists><doma:lowercase>false</doma:lowercase><doma:ampmFormat>false</doma:ampmFormat></doma:outputInformation><doma:valueInformation><doma:valueTableRef/><doma:appendExists>false</doma:appendExists><doma:fixValues/></doma:valueInformation></doma:content></doma:domain>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.domains.v2+xml; charset=utf-8"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteDomainLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/domain/low/handleDeleteDomain.ts",
+      "low_call": {
+        "domain_name": "DOM_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "DOMAIN",
+            "domain_name": "DOM_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/ddic/domains/dom_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleCreateDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "data_element_name": "DTEL_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/dataelements?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><blue:wbobj xmlns:blue=\"http://www.sap.com/wbobj/dictionary/dtel\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"DTEL_A\" adtcore:type=\"DTEL/DE\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</blue:wbobj>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml",
+            "Content-Type": "application/vnd.sap.adt.dataelements.v2+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleValidateDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "object_name": "DTEL_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/dataelements/validation?objtype=dtel&objname=DTEL_A&packagename=PKG_TARGET&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleLockDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "object_name": "DTEL_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?_action=LOCK&accessMode=MODIFY",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleUnlockDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "object_name": "DTEL_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
+        }
+      ]
+    },
+    {
+      "tool": "CheckDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleCheckDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "object_name": "DTEL_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/dataelements/dtel_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleActivateDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "object_name": "DTEL_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/dataelements/dtel_a\" adtcore:name=\"DTEL_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Accept": "application/xml",
+            "Content-Type": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleUpdateDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A",
+        "properties": {
+          "description": "New text"
+        },
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerGet",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "data_element_name": "DTEL_A",
+            "part": "metadata"
+          }
+        },
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "data_element_name": "DTEL_A",
+            "source_code": "<?xml version=\"1.0\" encoding=\"utf-8\"?><blue:wbobj adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:abapLanguageVersion=\"cloudDevelopment\" adtcore:name=\"ZMCP_BLD_CRT_DTEL\" adtcore:type=\"DTEL/DE\" adtcore:changedAt=\"2026-09-11T08:59:37Z\" adtcore:version=\"inactive\" adtcore:createdAt=\"2026-09-11T08:59:37Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:language=\"EN\" xmlns:blue=\"http://www.sap.com/wbobj/dictionary/dtel\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/dtelde/object_name/ZMCP_BLD_CRT_DTEL\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_bld_crt_dtel\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/></blue:wbobj>",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "note": "Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle.",
+      "low_requests": [
+        {
+          "method": "GET",
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+          }
+        },
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": "<?xml version=\"1.0\" encoding=\"utf-8\"?><blue:wbobj adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:abapLanguageVersion=\"cloudDevelopment\" adtcore:name=\"ZMCP_BLD_CRT_DTEL\" adtcore:type=\"DTEL/DE\" adtcore:changedAt=\"2026-09-11T08:59:37Z\" adtcore:version=\"inactive\" adtcore:createdAt=\"2026-09-11T08:59:37Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:language=\"EN\" xmlns:blue=\"http://www.sap.com/wbobj/dictionary/dtel\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/dtelde/object_name/ZMCP_BLD_CRT_DTEL\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_bld_crt_dtel\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/></blue:wbobj>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml",
+            "Content-Type": "application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteDataElementLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/data_element/low/handleDeleteDataElement.ts",
+      "low_call": {
+        "data_element_name": "DTEL_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "data_element_name": "DTEL_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/ddic/dataelements/dtel_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateTransportLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/transport/low/handleCreateTransport.ts",
+      "low_call": {
+        "description": "Text",
+        "transport_type": "workbench"
+      },
+      "compact": [
+        {
+          "tool": "HandlerTransportCreate",
+          "args": {
+            "description": "Text",
+            "transport_type": "workbench"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/cts/transportrequests",
+          "data": "<?xml version=\"1.0\" encoding=\"ASCII\"?>\n<tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\">\n  <tm:request tm:desc=\"Text\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\">\n    <tm:task tm:owner=\"USER_PLACEHOLDER\"/>\n  </tm:request>\n</tm:root>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.transportorganizer.v1+xml",
+            "Content-Type": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleCreateTable.ts",
+      "low_call": {
+        "table_name": "TAB_A",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "TABLE",
+            "table_name": "TAB_A",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/tables?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><blue:blueSource xmlns:blue=\"http://www.sap.com/wbobj/blue\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"TAB_A\" adtcore:language=\"EN\" adtcore:name=\"TAB_A\" adtcore:type=\"TABL/DT\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n\n</blue:blueSource>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml",
+            "Content-Type": "application/vnd.sap.adt.tables.v2+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleValidateTable.ts",
+      "low_call": {
+        "table_name": "TAB_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "TABLE",
+            "object_name": "TAB_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/tables/validation?objtype=tabldt&objname=TAB_A&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleLockTable.ts",
+      "low_call": {
+        "table_name": "TAB_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "TABLE",
+            "object_name": "TAB_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/tables/tab_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleUnlockTable.ts",
+      "low_call": {
+        "table_name": "TAB_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "TABLE",
+            "object_name": "TAB_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/tables/tab_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null,
+          "headers": {}
+        }
+      ]
+    },
+    {
+      "tool": "CheckTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleCheckTable.ts",
+      "low_call": {
+        "table_name": "TAB_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "TABLE",
+            "object_name": "TAB_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "CheckTableLow accepted ddl_code and reporter and sent neither.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n    <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/tables/tab_a\" chkrun:version=\"active\"/>\n  </chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleActivateTable.ts",
+      "low_call": {
+        "table_name": "TAB_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "TABLE",
+            "object_name": "TAB_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/tables/tab_a\" adtcore:name=\"TAB_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleUpdateTable.ts",
+      "low_call": {
+        "table_name": "TAB_A",
+        "ddl_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "TABLE",
+            "table_name": "TAB_A",
+            "ddl_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteTableLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/table/low/handleDeleteTable.ts",
+      "low_call": {
+        "table_name": "TAB_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "TABLE",
+            "table_name": "TAB_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/ddic/tables/tab_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleCreateStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "STRUCTURE",
+            "structure_name": "STRU_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "note": "HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock).",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/structures?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><blue:blueSource xmlns:blue=\"http://www.sap.com/wbobj/blue\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"STRU_A\" adtcore:type=\"TABL/DS\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</blue:blueSource>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml",
+            "Content-Type": "application/vnd.sap.adt.structures.v2+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleValidateStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "STRUCTURE",
+            "object_name": "STRU_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/structures/validation?objtype=stru&objname=STRU_A&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleLockStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "STRUCTURE",
+            "object_name": "STRU_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/structures/stru_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleUnlockStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "STRUCTURE",
+            "object_name": "STRU_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/structures/stru_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "CheckStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleCheckStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A",
+        "version": "inactive",
+        "ddl_code": "source text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "STRUCTURE",
+            "object_name": "STRU_A",
+            "version": "inactive",
+            "source_code": "source text"
+          }
+        }
+      ],
+      "note": "The low tool's ddl_code is HandlerCheckRun's source_code.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/structures/stru_a\" chkrun:version=\"inactive\">\n    <chkrun:artifacts>\n      <chkrun:artifact chkrun:contentType=\"text/plain; charset=utf-8\" chkrun:uri=\"/sap/bc/adt/ddic/structures/stru_a/source/main\">\n        <chkrun:content>c291cmNlIHRleHQ=</chkrun:content>\n      </chkrun:artifact>\n    </chkrun:artifacts>\n  </chkrun:checkObject>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleActivateStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "STRUCTURE",
+            "object_name": "STRU_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/structures/stru_a\" adtcore:name=\"STRU_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleUpdateStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A",
+        "ddl_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "STRUCTURE",
+            "structure_name": "STRU_A",
+            "ddl_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Accept": "application/xml, application/json, text/plain, */*",
+            "Content-Type": "text/plain; charset=utf-8"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteStructureLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/structure/low/handleDeleteStructure.ts",
+      "low_call": {
+        "structure_name": "STRU_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "STRUCTURE",
+            "structure_name": "STRU_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/ddic/structures/stru_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleCreateDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "DDL",
+            "ddl_name": "DDL_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddl/sources?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ddl:ddlSource xmlns:ddl=\"http://www.sap.com/adt/ddic/ddlsources\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"DDL_A\" adtcore:type=\"DDLS/DF\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</ddl:ddlSource>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource+xml",
+            "Content-Type": "application/vnd.sap.adt.ddlSource+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleValidateDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "DDL",
+            "object_name": "DDL_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddl/validation?objtype=ddls&objname=DDL_A&packagename=PKG_TARGET&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleLockDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "DDL",
+            "object_name": "DDL_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleUnlockDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "DDL",
+            "object_name": "DDL_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "CheckDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleCheckDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A",
+        "version": "inactive",
+        "ddl_source": "source text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "DDL",
+            "object_name": "DDL_A",
+            "version": "inactive",
+            "source_code": "source text"
+          }
+        }
+      ],
+      "note": "The low tool's ddl_source is HandlerCheckRun's source_code.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/ddl/sources/ddl_a\" chkrun:version=\"inactive\">\n    <chkrun:artifacts>\n      <chkrun:artifact chkrun:contentType=\"text/plain; charset=utf-8\" chkrun:uri=\"/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main\">\n        <chkrun:content>c291cmNlIHRleHQ=</chkrun:content>\n      </chkrun:artifact>\n    </chkrun:artifacts>\n  </chkrun:checkObject>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleActivateDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "DDL",
+            "object_name": "DDL_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/ddl/sources/ddl_a\" adtcore:name=\"DDL_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleUpdateDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A",
+        "ddl_source": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "DDL",
+            "ddl_name": "DDL_A",
+            "ddl_source": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteDdlLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddl/low/handleDeleteDdl.ts",
+      "low_call": {
+        "ddl_name": "DDL_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "DDL",
+            "ddl_name": "DDL_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/ddic/ddl/sources/ddl_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleCreateClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001",
+        "superclass": "CLAS_SUPER",
+        "final": true,
+        "abstract": false,
+        "create_protected": true
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "CLASS",
+            "class_name": "CLAS_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001",
+            "superclass": "CLAS_SUPER",
+            "final": true,
+            "create_protected": true
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><class:abapClass xmlns:class=\"http://www.sap.com/adt/oo/classes\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"CLAS_A\" adtcore:type=\"CLAS/OC\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" class:final=\"true\" class:visibility=\"protected\">\n\n\n\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n\n\n\n  \n\n\n\n\n\n  <class:include adtcore:name=\"CLAS/OC\" adtcore:type=\"CLAS/OC\" class:includeType=\"testclasses\"/>\n\n\n\n  <class:superClassRef adtcore:name=\"CLAS_SUPER\"/>\n\n\n\n</class:abapClass>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.oo.classes.v4+xml",
+            "Content-Type": "application/vnd.sap.adt.oo.classes.v4+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleValidateClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text",
+        "superclass": "CLAS_SUPER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "CLASS",
+            "object_name": "CLAS_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text",
+            "superclass": "CLAS_SUPER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/validation/objectname?objname=CLAS_A&objtype=CLAS%2FOC&packagename=PKG_TARGET&description=Text&superClass=CLAS_SUPER",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleLockClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "CLASS",
+            "object_name": "CLAS_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes/clas_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleUnlockClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "CLASS",
+            "object_name": "CLAS_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes/clas_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "CheckClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleCheckClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A",
+        "version": "inactive",
+        "source_code": "source text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "CLASS",
+            "object_name": "CLAS_A",
+            "version": "inactive",
+            "source_code": "source text"
+          }
+        }
+      ],
+      "note": "The low tool's source_code is HandlerCheckRun's source_code.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/oo/classes/clas_a\" chkrun:version=\"inactive\">\n    <chkrun:artifacts>\n      <chkrun:artifact chkrun:contentType=\"text/plain; charset=utf-8\" chkrun:uri=\"/sap/bc/adt/oo/classes/clas_a/source/main\">\n        <chkrun:content>c291cmNlIHRleHQ=</chkrun:content>\n      </chkrun:artifact>\n    </chkrun:artifacts>\n  </chkrun:checkObject>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleActivateClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "CLASS",
+            "object_name": "CLAS_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/oo/classes/clas_a\" adtcore:name=\"CLAS_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleUpdateClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A",
+        "source_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "CLASS",
+            "class_name": "CLAS_A",
+            "source_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/oo/classes/clas_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteClassLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/class/low/handleDeleteClass.ts",
+      "low_call": {
+        "class_name": "CLAS_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "CLASS",
+            "class_name": "CLAS_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/oo/classes/clas_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleCreateProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001",
+        "program_type": "executable",
+        "application": "S"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "PROGRAM",
+            "program_name": "PROG_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001",
+            "program_type": "executable",
+            "application": "S"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/programs/programs?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><program:abapProgram xmlns:program=\"http://www.sap.com/adt/programs/programs\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"PROG_A\" adtcore:type=\"PROG/P\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\" program:programType=\"1\" program:application=\"S\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</program:abapProgram>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.programs.programs.v2+xml",
+            "Content-Type": "application/vnd.sap.adt.programs.programs.v2+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleValidateProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "PROGRAM",
+            "object_name": "PROG_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/programs/validation?objname=PROG_A&objtype=PROG%2FP&packagename=PKG_TARGET&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleLockProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "PROGRAM",
+            "object_name": "PROG_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/programs/programs/prog_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleUnlockProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "PROGRAM",
+            "object_name": "PROG_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/programs/programs/prog_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "CheckProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleCheckProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "PROGRAM",
+            "object_name": "PROG_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/programs/programs/prog_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleActivateProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "PROGRAM",
+            "object_name": "PROG_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/programs/programs/prog_a\" adtcore:name=\"PROG_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleUpdateProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A",
+        "source_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "PROGRAM",
+            "program_name": "PROG_A",
+            "source_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/programs/programs/prog_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteProgramLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/program/low/handleDeleteProgram.ts",
+      "low_call": {
+        "program_name": "PROG_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "PROGRAM",
+            "program_name": "PROG_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/programs/programs/prog_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleCreateInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "INTERFACE",
+            "interface_name": "INTF_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/interfaces?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><intf:abapInterface xmlns:intf=\"http://www.sap.com/adt/oo/interfaces\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"INTF_A\" adtcore:type=\"INTF/OI\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n\n\n\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n\n\n\n</intf:abapInterface>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.oo.interfaces.v5+xml",
+            "Accept": "application/vnd.sap.adt.oo.interfaces.v5+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleValidateInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "INTERFACE",
+            "object_name": "INTF_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/validation/objectname?objname=INTF_A&objtype=INTF%2FOI&packagename=PKG_TARGET&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleLockInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "INTERFACE",
+            "object_name": "INTF_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/interfaces/intf_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleUnlockInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "INTERFACE",
+            "object_name": "INTF_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/interfaces/intf_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CheckInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleCheckInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "INTERFACE",
+            "object_name": "INTF_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/oo/interfaces/intf_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleActivateInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "INTERFACE",
+            "object_name": "INTF_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/oo/interfaces/intf_a\" adtcore:name=\"INTF_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleUpdateInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A",
+        "source_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "INTERFACE",
+            "interface_name": "INTF_A",
+            "source_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteInterfaceLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/interface/low/handleDeleteInterface.ts",
+      "low_call": {
+        "interface_name": "INTF_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "INTERFACE",
+            "interface_name": "INTF_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/oo/interfaces/intf_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleCreateFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "function_group_name": "FUGR_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "note": "On the 400 \"Interface SAPL… has not been created\" the low tool read the group back; HandlerCreate answers the 400 as it came — read the group with HandlerGet part metadata to see whether it landed.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/groups?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<group:abapFunctionGroup xmlns:group=\"http://www.sap.com/adt/functions/groups\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"FUGR_A\" adtcore:type=\"FUGR/F\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</group:abapFunctionGroup>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.functions.groups.v3+xml",
+            "Content-Type": "application/vnd.sap.adt.functions.groups.v3+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleValidateFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "object_name": "FUGR_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/validation?objtype=FUGR%2FF&objname=FUGR_A&packagename=PKG_TARGET&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleLockFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "object_name": "FUGR_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/groups/fugr_a?_action=LOCK&accessMode=MODIFY",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleUnlockFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "object_name": "FUGR_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/groups/fugr_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
+        }
+      ]
+    },
+    {
+      "tool": "CheckFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleCheckFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "object_name": "FUGR_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleActivateFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "object_name": "FUGR_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a\" adtcore:name=\"FUGR_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteFunctionGroupLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleDeleteFunctionGroup.ts",
+      "low_call": {
+        "function_group_name": "FUGR_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "FUNCTION_GROUP",
+            "function_group_name": "FUGR_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleCreateFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "function_module_name": "FM_A",
+            "function_group_name": "FUGR_A",
+            "description": "Text",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<fmodule:abapFunctionModule xmlns:fmodule=\"http://www.sap.com/adt/functions/fmodules\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:name=\"FM_A\" adtcore:type=\"FUGR/FF\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n  <adtcore:containerRef adtcore:name=\"FUGR_A\" adtcore:type=\"FUGR/F\" adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a\"/>\n</fmodule:abapFunctionModule>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.functions.fmodules+xml",
+            "Accept": "application/vnd.sap.adt.functions.fmodules+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleValidateFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "object_name": "FUGR_A|FM_A",
+            "description": "Text"
+          }
+        }
+      ],
+      "note": "The lifecycle tools name a function module GROUP|MODULE in object_name.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/validation?objtype=FUGR%2FFF&objname=FM_A&fugrname=FUGR_A&description=Text",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleLockFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "object_name": "FUGR_A|FM_A"
+          }
+        }
+      ],
+      "note": "The lifecycle tools name a function module GROUP|MODULE in object_name.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a?_action=LOCK&accessMode=MODIFY",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleUnlockFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "object_name": "FUGR_A|FM_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "note": "The lifecycle tools name a function module GROUP|MODULE in object_name.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+          "headers": {
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CheckFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleCheckFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "object_name": "FUGR_A|FM_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The lifecycle tools name a function module GROUP|MODULE in object_name.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleActivateFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "objects": [
+              {
+                "name": "FM_A",
+                "type": "FUGR/FF",
+                "parentName": "FUGR_A"
+              }
+            ]
+          }
+        }
+      ],
+      "accepted": {
+        "kind": "activation-run",
+        "reason": "HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation."
+      },
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a\" adtcore:name=\"FM_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleUpdateFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A",
+        "source_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "function_module_name": "FM_A",
+            "function_group_name": "FUGR_A",
+            "source_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteFunctionModuleLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/function/low/handleDeleteFunctionModule.ts",
+      "low_call": {
+        "function_module_name": "FM_A",
+        "function_group_name": "FUGR_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "FUNCTION_MODULE",
+            "function_module_name": "FM_A",
+            "function_group_name": "FUGR_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a\">\n    <del:transportNumber>XXXK900001</del:transportNumber>\n  </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleCreateBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001",
+        "root_entity": "BDEF_A",
+        "implementation_type": "Managed"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "name": "BDEF_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001",
+            "implementation_type": "Managed"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/bo/behaviordefinitions?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><blue:blueSource xmlns:blue=\"http://www.sap.com/wbobj/blue\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"BDEF_A\" adtcore:type=\"BDEF/BDO\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n    <adtcore:adtTemplate>\n        <adtcore:adtProperty adtcore:key=\"implementation_type\">Managed</adtcore:adtProperty>\n    </adtcore:adtTemplate>\n    <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n</blue:blueSource>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.blues.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.blues.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleValidateBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A",
+        "root_entity": "BDEF_A",
+        "implementation_type": "Managed",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "object_name": "BDEF_A",
+            "root_entity": "BDEF_A",
+            "implementation_type": "Managed",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "note": "ValidateBehaviorDefinitionLow validated the root entity's name; object_name carries it.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/bo/behaviordefinitions/validation?objname=BDEF_A&rootEntity=BDEF_A&description=Text&package=PKG_TARGET&implementationType=Managed",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleLockBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "object_name": "BDEF_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a?_action=LOCK&accessMode=MODIFY",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\">\n  <asx:values>\n    <DATA>\n      <LOCK_HANDLE/>\n      <CORRNR/>\n      <CORRUSER/>\n      <CORRTEXT/>\n      <IS_LOCAL>X</IS_LOCAL>\n      <IS_LINK_UP/>\n      <MODIFICATION_SUPPORT/>\n      <SCOPE_MESSAGES/>\n    </DATA>\n  </asx:values>\n</asx:abap>",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9",
+            "Content-Type": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleUnlockBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "object_name": "BDEF_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
+        }
+      ]
+    },
+    {
+      "tool": "CheckBdefLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleCheckBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "object_name": "BDEF_A",
+            "version": "active"
+          }
+        }
+      ],
+      "note": "The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n    <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/bo/behaviordefinitions/bdef_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "object_name": "BDEF_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/bo/behaviordefinitions/bdef_a\" adtcore:name=\"BDEF_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleUpdateBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A",
+        "source_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "name": "BDEF_A",
+            "source_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteBehaviorDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_definition/low/handleDeleteBehaviorDefinition.ts",
+      "low_call": {
+        "name": "BDEF_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "BEHAVIOR_DEFINITION",
+            "behavior_definition_name": "BDEF_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/deletion/delete",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n    <del:object adtcore:uri=\"/sap/bc/adt/bo/behaviordefinitions/bdef_a\">\n        <del:transportNumber>XXXK900001</del:transportNumber>\n    </del:object>\n</del:deletionRequest>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.deletion.response.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateBehaviorImplementationLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_implementation/low/handleCreateBehaviorImplementation.ts",
+      "low_call": {
+        "class_name": "BIMP_A",
+        "behavior_definition": "BDEF_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001",
+        "implementation_code": "source text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "class_name": "BIMP_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001"
+          }
+        },
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "object_name": "BIMP_A"
+          }
+        },
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "class_name": "BIMP_A",
+            "implementation_code": "source text",
+            "transport_request": "XXXK900001",
+            "lock_handle": "B92E65858E83454C783181344F429D4BFD8E395D"
+          }
+        },
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "object_name": "BIMP_A",
+            "lock_handle": "B92E65858E83454C783181344F429D4BFD8E395D"
+          }
+        }
+      ],
+      "note": "With implementation_code, four compact calls, one request each: the create, the lock, the write of the implementations include under the lock_handle the lock answered, the unlock.",
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes?corrNr=XXXK900001",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><class:abapClass xmlns:class=\"http://www.sap.com/adt/oo/classes\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"BIMP_A\" adtcore:type=\"CLAS/OC\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" class:final=\"false\" class:visibility=\"public\">\n\n\n\n  <adtcore:packageRef adtcore:name=\"PKG_TARGET\"/>\n\n\n\n  \n\n\n\n\n\n  <class:include adtcore:name=\"CLAS/OC\" adtcore:type=\"CLAS/OC\" class:includeType=\"testclasses\"/>\n\n\n\n  <class:superClassRef/>\n\n\n\n</class:abapClass>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.oo.classes.v4+xml",
+            "Content-Type": "application/vnd.sap.adt.oo.classes.v4+xml"
+          }
+        },
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes/bimp_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        },
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?lockHandle=B92E65858E83454C783181344F429D4BFD8E395D&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Accept": "text/plain"
+          }
+        },
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes/bimp_a?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+          "data": null
+        }
+      ]
+    },
+    {
+      "tool": "ValidateBehaviorImplementationLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_implementation/low/handleValidateBehaviorImplementation.ts",
+      "low_call": {
+        "class_name": "BIMP_A",
+        "behavior_definition": "BDEF_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "object_name": "BIMP_A",
+            "behavior_definition": "BDEF_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/validation/objectname?objname=BIMP_A&objtype=CLAS%2FOC&packagename=PKG_TARGET&description=Text&behaviorDefinition=BDEF_A",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockBehaviorImplementationLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/behavior_implementation/low/handleLockBehaviorImplementation.ts",
+      "low_call": {
+        "class_name": "BIMP_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "object_name": "BIMP_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/oo/classes/bimp_a?_action=LOCK&accessMode=MODIFY",
+          "data": null,
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "CreateMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleCreateMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A",
+        "description": "Text",
+        "package_name": "PKG_TARGET",
+        "transport_request": "XXXK900001",
+        "master_language": "EN"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCreate",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "name": "DDLX_A",
+            "description": "Text",
+            "package_name": "PKG_TARGET",
+            "transport_request": "XXXK900001",
+            "master_language": "EN"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddlx/sources",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ddlxsources:ddlxSource xmlns:ddlxsources=\"http://www.sap.com/adt/ddic/ddlxsources\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"Text\" adtcore:language=\"EN\" adtcore:name=\"DDLX_A\" adtcore:type=\"DDLX/EX\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"SYSTEM_PLACEHOLDER\" adtcore:responsible=\"USER_PLACEHOLDER\">\n    <adtcore:packageRef adtcore:name=\"PKG_TARGET\">\n    <adtcore:properties>\n      <adtcore:property adtcore:name=\"abapLanguageVersion\" adtcore:value=\"\"/>\n    </adtcore:properties>\n  </adtcore:packageRef>\n  <adtcore:transportInfo>\n    <adtcore:localObject/>\n  </adtcore:transportInfo>\n\n</ddlxsources:ddlxSource>",
+          "params": {
+            "corrNr": "XXXK900001"
+          },
+          "headers": {
+            "Accept": "application/vnd.sap.adt.ddic.ddlx.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.ddic.ddlx.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ValidateMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleValidateMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A",
+        "package_name": "PKG_TARGET",
+        "description": "Text"
+      },
+      "compact": [
+        {
+          "tool": "HandlerValidate",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "object_name": "DDLX_A",
+            "package_name": "PKG_TARGET",
+            "description": "Text"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddlx/sources/validation?objtype=ddlxex&objname=DDLX_A&description=Text&packagename=PKG_TARGET",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "LockMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleLockMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "object_name": "DDLX_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a?_action=LOCK&accessMode=MODIFY",
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UnlockMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleUnlockMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "object_name": "DDLX_A",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
+        }
+      ]
+    },
+    {
+      "tool": "CheckMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleCheckMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A",
+        "version": "active"
+      },
+      "compact": [
+        {
+          "tool": "HandlerCheckRun",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "object_name": "DDLX_A",
+            "version": "active"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/ddlx/sources/ddlx_a\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.checkmessages+xml",
+            "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleActivateMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "object_name": "DDLX_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/ddlx/sources/ddlx_a\" adtcore:name=\"DDLX_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Content-Type": "application/vnd.sap.adt.activation+xml",
+            "Accept": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "UpdateMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleUpdateMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A",
+        "source_code": "source text",
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerUpdate",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "name": "DDLX_A",
+            "source_code": "source text",
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "PUT",
+          "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?lockHandle=LOCK_HANDLE_PLACEHOLDER&corrNr=XXXK900001",
+          "data": "source text",
+          "headers": {
+            "Accept": "text/plain",
+            "Content-Type": "text/plain; charset=utf-8"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "DeleteMetadataExtensionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/ddlx/low/handleDeleteMetadataExtension.ts",
+      "low_call": {
+        "name": "DDLX_A",
+        "transport_request": "XXXK900001"
+      },
+      "compact": [
+        {
+          "tool": "HandlerDelete",
+          "args": {
+            "object_type": "METADATA_EXTENSION",
+            "metadata_extension_name": "DDLX_A",
+            "transport_request": "XXXK900001"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "DELETE",
+          "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a?corrNr=XXXK900001",
+          "headers": {
+            "Accept": "application/xml",
+            "Content-Type": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateServiceDefinitionLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/service_definition/low/handleActivateServiceDefinition.ts",
+      "low_call": {
+        "name": "SRVD_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "SERVICE_DEFINITION",
+            "object_name": "SRVD_A"
+          }
+        }
+      ],
+      "accepted": {
+        "kind": "activation-run",
+        "reason": "HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation."
+      },
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/srvd/sources/srvd_a\" adtcore:name=\"SRVD_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Accept": "application/xml",
+            "Content-Type": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateServiceBindingLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/service_binding/low/handleActivateServiceBinding.ts",
+      "low_call": {
+        "name": "SRVB_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "object_type": "SERVICE_BINDING",
+            "object_name": "SRVB_A"
+          }
+        }
+      ],
+      "accepted": {
+        "kind": "activation-run",
+        "reason": "HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation."
+      },
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\"><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/businessservices/bindings/srvb_a\" adtcore:name=\"SRVB_A\"/></adtcore:objectReferences>",
+          "headers": {
+            "Accept": "application/xml",
+            "Content-Type": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "ActivateObjectLow",
+      "group": "LowLevelHandlersGroup",
+      "handler": "src/handlers/common/low/handleActivateObject.ts",
+      "low_call": {
+        "objects": [
+          {
+            "name": "CLAS_A",
+            "type": "CLAS/OC"
+          },
+          {
+            "name": "INTF_A",
+            "type": "INTF/OI"
+          }
+        ],
+        "preaudit": true
+      },
+      "compact": [
+        {
+          "tool": "HandlerActivate",
+          "args": {
+            "objects": [
+              {
+                "name": "CLAS_A",
+                "type": "CLAS/OC"
+              },
+              {
+                "name": "INTF_A",
+                "type": "INTF/OI"
+              }
+            ],
+            "preaudit": true
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/oo/classes/clas_a\" adtcore:type=\"CLAS/OC\" adtcore:name=\"CLAS_A\"/>\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/oo/interfaces/intf_a\" adtcore:type=\"INTF/OI\" adtcore:name=\"INTF_A\"/>\n</adtcore:objectReferences>",
+          "headers": {
+            "Accept": "application/xml",
+            "Content-Type": "application/xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "GetVirtualFoldersLow",
+      "group": "SystemHandlersGroup",
+      "handler": "src/handlers/system/low/handleGetVirtualFolders.ts",
+      "low_call": {
+        "object_search_pattern": "OBJ*",
+        "preselection": [
+          {
+            "facet": "package",
+            "values": [
+              "PKG_TARGET"
+            ]
+          }
+        ],
+        "facet_order": [
+          "package",
+          "type"
+        ],
+        "with_versions": false,
+        "ignore_short_descriptions": false
+      },
+      "compact": [
+        {
+          "tool": "HandlerGet",
+          "args": {
+            "part": "virtual_folders",
+            "object_search_pattern": "OBJ*",
+            "preselection": [
+              {
+                "facet": "package",
+                "values": [
+                  "PKG_TARGET"
+                ]
+              }
+            ],
+            "facet_order": [
+              "package",
+              "type"
+            ],
+            "with_versions": false,
+            "ignore_short_descriptions": false
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/repository/informationsystem/virtualfolders/contents",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><vfs:virtualFoldersRequest xmlns:vfs=\"http://www.sap.com/adt/ris/virtualFolders\" objectSearchPattern=\"OBJ*\"><vfs:preselection facet=\"package\"><vfs:value>PKG_TARGET</vfs:value></vfs:preselection><vfs:facetorder><vfs:facet>package</vfs:facet><vfs:facet>type</vfs:facet></vfs:facetorder></vfs:virtualFoldersRequest>",
+          "params": {
+            "withVersions": "false",
+            "ignoreShortDescriptions": "false"
+          },
+          "headers": {
+            "Accept": "application/vnd.sap.adt.repository.virtualfolders.result.v1+xml",
+            "Content-Type": "application/vnd.sap.adt.repository.virtualfolders.request.v1+xml"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "GetNodeStructureLow",
+      "group": "SystemHandlersGroup",
+      "handler": "src/handlers/system/low/handleGetNodeStructure.ts",
+      "note": "A package's (DEVC/K) blank body: the low tool read the package's metadata to tell an empty package from an absent one; HandlerGet answers the empty listing with blank stating both readings, one request — read the package with HandlerGet part metadata to know which holds.",
+      "low_call": {
+        "parent_type": "CLAS/OC",
+        "parent_name": "CLAS_A",
+        "node_id": "000005",
+        "with_short_descriptions": true
+      },
+      "compact": [
+        {
+          "tool": "HandlerGet",
+          "args": {
+            "part": "node_structure",
+            "object_adt_type": "CLAS/OC",
+            "object_name": "CLAS_A",
+            "node_id": "000005",
+            "with_short_descriptions": true
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "POST",
+          "url": "/sap/bc/adt/repository/nodestructure",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\"><asx:values><DATA><TV_NODEKEY>000005</TV_NODEKEY></DATA></asx:values></asx:abap>",
+          "params": {
+            "parent_type": "CLAS/OC",
+            "parent_name": "CLAS_A",
+            "parent_tech_name": "CLAS_A",
+            "withShortDescriptions": true,
+            "node_id": "000005"
+          },
+          "headers": {
+            "Accept": "application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml",
+            "Content-Type": "application/vnd.sap.as+xml; charset=UTF-8; dataname=null"
+          }
+        }
+      ]
+    },
+    {
+      "tool": "GetObjectStructureLow",
+      "group": "SystemHandlersGroup",
+      "handler": "src/handlers/system/low/handleGetObjectStructure.ts",
+      "low_call": {
+        "object_type": "CLAS/OC",
+        "object_name": "CLAS_A"
+      },
+      "compact": [
+        {
+          "tool": "HandlerGet",
+          "args": {
+            "part": "object_structure",
+            "object_adt_type": "CLAS/OC",
+            "object_name": "CLAS_A"
+          }
+        }
+      ],
+      "low_requests": [
+        {
+          "method": "GET",
+          "url": "/sap/bc/adt/repository/objectstructure?objecttype=CLAS%2FOC&objectname=CLAS_A",
+          "headers": {
+            "Accept": "application/vnd.sap.adt.projectexplorer.objectstructure+xml, application/xml"
+          }
+        }
+      ]
+    }
+  ]
+}

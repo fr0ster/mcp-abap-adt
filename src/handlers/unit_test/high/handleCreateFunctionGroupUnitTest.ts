@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create ABAP Unit tests for a function group: a test include with its local test classes, activated with the group.',
+    'Creates the ABAP Unit test classes of the function group named by function_group_name, from test_class_source. They are written to a test include, which is activated with the group.',
   inputSchema: {
     type: 'object',
     properties: {

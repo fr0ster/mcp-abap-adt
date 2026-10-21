@@ -24,7 +24,7 @@ jest.mock('@mcp-abap-adt/lib/handlers/write', () => {
   const actual = jest.requireActual('@mcp-abap-adt/lib/handlers/write');
   return {
     ...actual,
-    handleActivateObject: (_context: unknown, args: unknown) => {
+    handleActivateObjectOnce: (_context: unknown, args: unknown) => {
       sent = args;
       return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
     },
@@ -131,7 +131,7 @@ describe('HandlerActivate and the type it was given', () => {
    * activation path actually calls — this case only checks that the fields
    * travel.
    */
-  it('activates a function module through the batch form, with its group', async () => {
+  it('activates a function module through objects[], with its group', async () => {
     await handleHandlerActivate(context, {
       objects: [
         { name: 'Z_AC_FM01', type: 'FUGR/FF', parentName: 'ZAC_FGR01' },
@@ -152,7 +152,7 @@ describe('HandlerActivate and the type it was given', () => {
     ).rejects.toThrow(/parentName/);
   });
 
-  it('still takes a batch untouched', async () => {
+  it('still takes objects[] untouched', async () => {
     await handleHandlerActivate(context, {
       objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }],
     });

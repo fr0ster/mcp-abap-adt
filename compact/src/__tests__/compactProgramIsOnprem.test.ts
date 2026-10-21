@@ -23,7 +23,7 @@ import { join } from 'node:path';
  */
 // The compact tools live in two packages now, so the scan covers both halves.
 const COMPACT_DIRS = [
-  join(__dirname, '../../../compact-readonly/src/handlers'),
+  join(__dirname, '../../../compact-readonly-entries/src/handlers'),
   join(__dirname, '../../../compact-modify/src/handlers'),
 ];
 

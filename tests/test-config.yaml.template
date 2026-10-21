@@ -95,6 +95,14 @@ environment:
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
   connection_type: "http"                    # "http" | "rfc"
+  # RFC through a message server and a logon group (optional; rfc only).
+  # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to
+  # dial the application server of SAP_URL. With mshost, msserv or sysid is required.
+  mshost: ""                                 # message server host
+  msserv: ""                                 # message server service (name or port)
+  sysid: ""                                  # system id
+  group: ""                                  # logon group (connection default: PUBLIC)
+  saprouter: ""                              # SAProuter string
   # Test defaults
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
@@ -104,12 +112,8 @@ environment:
     enabled: false
     transport: "stdio"
     mcp_destination: ""                      # MCP destination (optional, for hard mode)
-    exposition: "readonly,high"              # tool surface the spawned server serves.
-                                             # "high" and "low" are mutually exclusive —
-                                             # the launcher refuses the pair — so one run
-                                             # covers one tier: use "readonly,low" for low.
     launch_http: false                       # http only: launch the server binary on a free
-                                             # port with this destination and exposition,
+                                             # port with this destination,
                                              # instead of connecting to http_url.
 
 # ============================================================================
@@ -411,6 +415,26 @@ shared_dependencies:
           created_at
         }
 
+    # The table function of the AMDP debugger batch gate (debuggerBatch.test.ts),
+    # implemented by the shared class ZMCP_SHR_DBG_AMDP below; the two name each
+    # other and activate together. Running it changes nothing, so it can be
+    # shared. On premise on HANA only: an AMDP needs SAP HANA.
+    - name: "ZMCP_SHR_DBG_TF"
+      description: "Shared AMDP table function for the debugger batch"
+      available_in: ["onprem"]
+      source: |
+        @EndUserText.label: 'Shared AMDP table function for the debugger'
+        @ClientHandling.type: #CLIENT_INDEPENDENT
+        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        define table function ZMCP_SHR_DBG_TF
+          with parameters
+            p_limit : abap.int4
+          returns {
+            n      : abap.int4;
+            square : abap.int4;
+          }
+          implemented by method zmcp_shr_dbg_amdp=>tf;
+
   behavior_definitions:
     # Behaviour definition of ZI_MCP_SHR_ROOT for check_bdef_high. Managed
     # without an implementation class: nothing here needs one. Strict, so the
@@ -538,6 +562,37 @@ shared_dependencies:
         CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
           METHOD test_method.
             cl_abap_unit_assert=>assert_true( abap_true ).
+          ENDMETHOD.
+        ENDCLASS.
+    # The AMDP class of the debugger batch gate (debuggerBatch.test.ts): its
+    # table function ZMCP_SHR_DBG_TF (views above). `-- BP:tf` marks the
+    # SQLScript line the gate stops at. Running it changes nothing, so it can
+    # be shared. On premise on HANA only.
+    - name: "ZMCP_SHR_DBG_AMDP"
+      description: "Shared AMDP class for the debugger batch"
+      available_in: ["onprem"]
+      source: |
+        CLASS zmcp_shr_dbg_amdp DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_amdp_marker_hdb.
+            INTERFACES if_oo_adt_classrun.
+            CLASS-METHODS tf FOR TABLE FUNCTION zmcp_shr_dbg_tf.
+        ENDCLASS.
+
+        CLASS zmcp_shr_dbg_amdp IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            SELECT * FROM zmcp_shr_dbg_tf( p_limit = 3 ) INTO TABLE @DATA(lt_rows).
+            out->write( |rows { lines( lt_rows ) }| ).
+          ENDMETHOD.
+
+          METHOD tf BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT
+            OPTIONS READ-ONLY.
+            DECLARE lt_rows TABLE ( n INTEGER, square INTEGER );
+            DECLARE lv_i INTEGER;
+            FOR lv_i IN 1..:p_limit DO
+              :lt_rows.INSERT( ( :lv_i, :lv_i * :lv_i ) ); -- BP:tf
+            END FOR;
+            RETURN SELECT n, square FROM :lt_rows;
           ENDMETHOD.
         ENDCLASS.
 
@@ -871,80 +926,6 @@ create_behavior_implementation:
 
 # Behavior Implementation (Behavior Implementation - Low-Level)
 # Used in combined BDEF+BIMPL test — BDEF (ZMCP_BLD_I_BDFL) is created first in the same test
-create_behavior_implementation_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Behavior Implementation low-level handler full workflow test (combined with BDEF)"
-      params:
-        class_name: "ZBP_MCP_BLD_I_BDFL"
-        description: "Behavior Implementation for ZMCP_BLD_I_BDFL"
-        behavior_definition: "ZMCP_BLD_I_BDFL"
-        source_code: |
-          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
-            PRIVATE SECTION.
-
-              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-          ENDCLASS.
-
-          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
-
-            METHOD get_instance_authorizations.
-            ENDMETHOD.
-
-            METHOD get_global_authorizations.
-            ENDMETHOD.
-
-          ENDCLASS.
-        implementation_code: |
-          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
-            PRIVATE SECTION.
-
-              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-          ENDCLASS.
-
-          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
-
-            METHOD get_instance_authorizations.
-            ENDMETHOD.
-
-            METHOD get_global_authorizations.
-            ENDMETHOD.
-
-          ENDCLASS.
-        update_source_code: |
-          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
-            PRIVATE SECTION.
-
-              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-          ENDCLASS.
-
-          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
-
-            METHOD get_instance_authorizations.
-            ENDMETHOD.
-
-            METHOD get_global_authorizations.
-            ENDMETHOD.
-
-          ENDCLASS.
-
 # Create Metadata Extension (Low-Level Handler)
 
 # Class (Class)
@@ -1200,40 +1181,6 @@ create_data_element:
 # Create Interface
 
 # Data Element (Data Element - Low-Level)
-create_data_element_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "DataElement low-level handler full workflow test"
-      params:
-        data_element_name: "ZMCP_BLD_DTEL_L1"
-        description: "DataElement low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        type_kind: "predefinedAbapType"
-        type_name: "CHAR"
-        data_type: "CHAR"
-        length: 50
-        decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        domain_name: ""
-        properties:
-          # package_name: "ZMCP_BLD_PKG01"
-          description: "DataElement low-level handler test (updated)"
-          type_kind: "predefinedAbapType"
-          type_name: "CHAR"
-          data_type: "CHAR"
-          length: 50
-          decimals: 0
-          field_label_short: "Upd Test"
-          field_label_medium: "Updated Test Field"
-          field_label_long: "Updated Test Field Long Label"
-          field_label_heading: "Updated Test Heading"
-
 # Create Table (Low-Level Handler)
 
 # Domain (Domain)
@@ -1261,27 +1208,6 @@ create_domain:
 # Create Data Element
 
 # Domain (Domain - Low-Level)
-create_domain_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Domain low-level handler full workflow test"
-      params:
-        domain_name: "ZMCP_BLD_DOM_L1"
-        description: "Domain low-level handler test domain"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        datatype: "CHAR"
-        length: 10
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        properties:
-          description: "Domain low-level handler test domain (updated)"
-          datatype: "CHAR"
-          length: 10
-
 # Create Data Element (Low-Level Handler)
 
 # Function Group & Function Module (High-Level Tests)
@@ -1380,22 +1306,6 @@ create_interface:
 # Create Program
 
 # Interface (Interface - Low-Level)
-create_interface_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
-      description: "Interface low-level handler full workflow test"
-      params:
-        interface_name: "ZMCP_BLD_IF_L1"
-        description: "Interface low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        source_code: |
-          INTERFACE zadt_bld_if03.
-            METHODS: test_method.
-          ENDINTERFACE.
-
 # Create Structure (Low-Level Handler)
 
 # Metadata Extension (Metadata Extension - High-Level)
@@ -1429,41 +1339,6 @@ create_metadata_extension:
           }
 
 # Metadata Extension (Metadata Extension - Low-Level)
-create_metadata_extension_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Metadata Extension low-level handler full workflow test"
-      params:
-        name: "ZMCP_SHR_C_ROOT_0002"
-        description: "Metadata Extension low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        source_code: |
-          @Metadata.layer: #CUSTOMER
-          annotate entity ZMCP_SHR_C_ROOT
-            with
-          {
-              @EndUserText.label: 'Field 1 Label'
-              @UI.identification: [{ position: 10 }]
-              Fld1;
-
-              @EndUserText.label: 'Field 2 Label'
-              @UI.lineItem: [{ position: 20 }]
-              Fld2;
-
-              @EndUserText.label: 'Field 3 Label'
-              @UI.lineItem: [{ position: 30 }]
-              Fld3;
-
-              @EndUserText.label: 'Child Items'
-              @UI.lineItem: [{ position: 40 }]
-              @UI.selectionField: [{ position: 1 }]
-              _association_name;
-          }
-
-
 # Package (Package)
 create_package:
   test_cases:
@@ -1488,26 +1363,6 @@ create_package:
 # Create Domain
 
 # Package (Package - Low-Level)
-create_package_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Package low-level handler full workflow test"
-      params:
-        # package_name: "ZMCP_BLD_PKG01"          # Parent package (existing)
-        test_package: "ZMCP_BLD_PKG_L1"    # Package created by the test
-        description: "PackageBuilder workflow package"
-        updated_description: "PackageBuilder workflow package (UPDATED)"
-        package_type: "development"
-        software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
-        operation_delays:
-          create: 5000
-          update: 3000
-          unlock: 5000
-          delete: 20000
-          delete_retry: 20000
-
 # Create Behavior Definition (Low-Level Handler)
 
 # Program (Program)
@@ -1530,23 +1385,6 @@ create_program:
 # Create Table
 
 # Program (Program - Low-Level)
-create_program_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "legacy"]
-      description: "Program low-level handler full workflow test"
-      params:
-        program_name: "ZMCP_BLD_PROG_L1"
-        description: "Program low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        program_type: "1"
-        application: "*"
-        source_code: |
-          * Test program
-          WRITE: / 'Hello World'.
-
 # Create Interface (Low-Level Handler)
 
 # Structure (Structure)
@@ -1586,32 +1424,6 @@ create_structure:
 # Create View
 
 # Structure (Structure - Low-Level)
-create_structure_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Structure low-level handler full workflow test"
-      params:
-        structure_name: "ZMCP_BLD_STRU_L1"
-        description: "Structure low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        ddl_code: |
-          @EndUserText.label: 'Structure low-level handler test'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZMCP_BLD_STRU_L1 {
-            field1 : abap.char(10);
-            field2 : abap.char(20);
-          }
-        updated_ddl_code: |
-          @EndUserText.label: 'Structure low-level handler test'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZMCP_BLD_STRU_L1 {
-            field1 : abap.char(10);
-            field2 : abap.char(20);
-          }
-
 # Create Function Group (Low-Level Handler)
 
 # Table (Table)
@@ -1660,41 +1472,6 @@ create_table:
 # Create Structure
 
 # Table (Table - Low-Level)
-create_table_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Table low-level handler full workflow test"
-      params:
-        table_name: "ZMCP_BLD_TAB_L1"
-        description: "Table low-level handler test table"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        ddl_code: |
-          @EndUserText.label: 'Table low-level handler test table'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory: #TRANSPARENT
-          @AbapCatalog.deliveryClass: #A
-          @AbapCatalog.dataMaintenance: #RESTRICTED
-          define table ZMCP_BLD_TAB_L1 {
-            key mandt          : abap.clnt not null;
-            key test_id        : abap.char(10) not null;
-            description        : abap.char(40);
-          }
-        updated_ddl_code: |
-          @EndUserText.label: 'Table low-level handler test table (updated)'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory: #TRANSPARENT
-          @AbapCatalog.deliveryClass: #A
-          @AbapCatalog.dataMaintenance: #RESTRICTED
-          define table ZMCP_BLD_TAB_L1 {
-            key mandt          : abap.clnt not null;
-            key test_id        : abap.char(10) not null;
-            description        : abap.char(40);
-            additional_field   : abap.char(20);
-          }
-
 # Create View (Low-Level Handler)
 
 # Transport (Transport)
@@ -1727,37 +1504,6 @@ create_transported_object:
 # Create Function Group
 
 # View (View - Low-Level)
-create_ddl_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
-      description: "View low-level handler full workflow test"
-      params:
-        ddl_name: "ZMCP_BLD_VIEW_L1"
-        description: "View low-level handler test view"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        ddl_source: |
-          @AbapCatalog.viewEnhancementCategory: [#NONE]
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          @EndUserText.label: 'View low-level handler test view'
-          @Metadata.ignorePropagatedAnnotations: true
-          @Metadata.allowExtensions: true
-          define view entity ZMCP_BLD_VIEW_L1 as select from dummy {
-            key dummy.dummy as dummy_field
-          }
-        updated_ddl_source: |
-          @AbapCatalog.viewEnhancementCategory: [#NONE]
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          @EndUserText.label: 'View low-level handler test view (updated)'
-          @Metadata.ignorePropagatedAnnotations: true
-          @Metadata.allowExtensions: true
-          define view entity ZMCP_BLD_VIEW_L1 as select from dummy {
-            key dummy.dummy as dummy_field,
-            dummy.dummy as additional_field
-          }
-
 # Create Program (Low-Level Handler)
 
 # Service Definition (Service Definition - High-Level)
@@ -2083,7 +1829,7 @@ runtime_readonly_handlers:
         # Retries for trace files feed lookup (trace can appear with delay)
         trace_feed_retries: 6
         trace_feed_retry_delay_ms: 1000
-        # Executor-level trace polling (passed to RuntimeRunClassWithProfiling).
+        # Executor-level trace polling (passed to RuntimeRunClass with profile=true).
         # Increase for slow systems (e.g. SAP trial cloud) — default in client is 5×2000ms.
         profiled_run_max_trace_attempts: 15
         profiled_run_trace_retry_delay_ms: 2000
@@ -2120,21 +1866,23 @@ runtime_readonly_handlers:
 
 # Debugger Handlers (ABAP and AMDP debugger, memory)
 # Nothing else may debug for the same SAP user while this runs (an IDE with a
-# breakpoint set holds the user's debugging). The probes are created, run and
-# deleted by the test; they go into `package` with no transport, never into
-# the default package's request.
+# breakpoint set holds the user's debugging). The ABAP probe is created, run and
+# deleted by the test; it goes into `package` with no transport, never into
+# the default package's request. The AMDP chain reads and runs the shared AMDP
+# pair (shared_dependencies), created once by npm run shared:setup.
 debugger_handlers:
   test_cases:
     - name: "debugger_chain"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on probes the test creates and deletes"
+      description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on an ABAP probe the test creates and deletes, and the shared AMDP pair"
       params:
         package: "$TMP"
         transport: ""
         probe_class: "ZMCP_DBG_PROBE"
-        amdp_probe_class: "ZMCP_DBG_AMDP"
-        amdp_probe_ddl: "ZMCP_DBG_AMDP_TF"
+        # The shared AMDP pair the AMDP chain reads and runs (shared_dependencies)
+        amdp_class: "ZMCP_SHR_DBG_AMDP"
+        amdp_ddl: "ZMCP_SHR_DBG_TF"
         # Repetitions of each single step and of each baseline run, for the timings
         timing_repeats: 5
         keep_probe: false
@@ -2142,6 +1890,64 @@ debugger_handlers:
         # with basic authentication; the connected user needs the debug authorization
         # on that user. Empty: the another-user case is skipped.
         second_user_env: ""
+
+# Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
+# the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
+# HandlerUpdate, HandlerUnlock and HandlerActivate of three objects, each phase
+# one batch; the objects deleted at the end (HandlerDeletionCheck, HandlerDelete).
+# They go into environment.default_package / default_transport unless named here.
+# The names must be free: a name that reads is refused before anything is created.
+batch:
+  test_cases:
+    - name: "communication"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      description: "Communication batch through the served compact tools: create, lock, write, unlock, activate, delete"
+      params:
+        class_name: "ZMCP_BTC_CLS"
+        interface_name: "ZMCP_BTC_INTF"
+        domain_name: "ZMCP_BTC_DOM"
+        # package_name: "ZMCP_TEST"
+        # transport_request: ""
+    # src/__tests__/integration/batch/debuggerBatch.test.ts: the full server
+    # started over stdio stops in the shared class (shared_dependencies), and
+    # DebugBatchEnd sends a step, the stack and a variable in one envelope;
+    # then, on premise on HANA, the AMDP gate in process at the shared AMDP
+    # pair (shared_dependencies: ZMCP_SHR_DBG_AMDP, ZMCP_SHR_DBG_TF), only
+    # read; run npm run shared:setup first. Nothing else may debug for the
+    # same SAP user while it runs.
+    - name: "debugger"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      description: "Debugger batch at a live stop (step, stack, variables in one DebugBatchEnd); the AMDP gate"
+      params:
+        class_name: "ZMCP_SHR_PROF_CLS"
+        amdp_class: "ZMCP_SHR_DBG_AMDP"
+        amdp_ddl: "ZMCP_SHR_DBG_TF"
+    # src/__tests__/integration/batch/refusalFollowUps.test.ts, in process, a
+    # user and a password only: the logoff after a credential refusal asks
+    # nothing of the provider, and the debugger stop's second stopListener
+    # after a refusal (a line breakpoint in the shared class, nothing run).
+    # The refusal is made with a wrong password held in memory, one per check
+    # and run; a logon with the configured password follows. Nothing else may
+    # debug for the same SAP user while it runs.
+    # src/__tests__/integration/batch/amdpHttpHandle.test.ts: the AMDP debugger
+    # batch over Streamable HTTP behind one x-mcp-state-handle (the HTTP launcher
+    # from source, x-sap-* user and password headers from the session file), on
+    # the shared AMDP pair, with the session trace; on premise over HTTP on HANA.
+    - name: "amdp_http_handle"
+      enabled: false
+      available_in: ["onprem"]
+      description: "AMDP debugger batch over Streamable HTTP behind one state handle; every session logged off"
+      params:
+        amdp_class: "ZMCP_SHR_DBG_AMDP"
+        amdp_ddl: "ZMCP_SHR_DBG_TF"
+    - name: "refusal_follow_ups"
+      enabled: false
+      available_in: ["onprem"]
+      description: "After a credential refusal: the logoff asks no provider; the debugger stop's second stopListener"
+      params:
+        class_name: "ZMCP_SHR_PROF_CLS"
 
 # Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
 runtime_feed_handlers:
@@ -2413,7 +2219,7 @@ check_function_module_high:
         function_group_name: "ZMCP_SHR_FGRP"
         function_module_name: "Z_MCP_SHR_FM"
 
-# ReadFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
+# GetFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
 read_function_include_readonly:
   test_cases:
     - name: "read_top_include"

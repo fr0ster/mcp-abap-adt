@@ -27,6 +27,7 @@
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -132,23 +133,25 @@ export async function handleCreatePackage(
     // cannot change it again (PAK/058, lib/packageSessions.ts).
     () =>
       inOwnSessionOverRfc(connection, logger, 'CreatePackage', (own) =>
-        createAdtClient(own, logger)
-          .getPackage(resultsFor(packageDocuments))
-          .create(
-            {
-              packageName,
-              superPackage: args.super_package.toUpperCase(),
-              description: args.description || packageName,
-              packageType: args.package_type,
-              softwareComponent: args.software_component,
-              transportLayer: args.transport_layer,
-              transportRequest: args.transport_request,
-              recordChanges: args.record_changes,
-              applicationComponent: args.application_component,
-              masterLanguage: args.master_language,
-            },
-            { analyse: analyseException },
-          ),
+        withAdtHeaders(context, 'package.create', (headers) =>
+          createAdtClient(own, logger)
+            .getPackage(resultsFor(packageDocuments))
+            .create(
+              {
+                packageName,
+                superPackage: args.super_package.toUpperCase(),
+                description: args.description || packageName,
+                packageType: args.package_type,
+                softwareComponent: args.software_component,
+                transportLayer: args.transport_layer,
+                transportRequest: args.transport_request,
+                recordChanges: args.record_changes,
+                applicationComponent: args.application_component,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
       ),
     project(detail, terseWrite),
   );

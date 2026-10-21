@@ -23,7 +23,8 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -31,6 +32,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -101,20 +103,23 @@ export async function handleUpdateBehaviorDefinition(
       );
 
       const update = (lockHandle: string) =>
-        obj.update(
-          { name, transportRequest: args.transport_request },
-          {
-            source: args.source_code,
-            lockHandle,
-            analyse: analyseException,
-          },
+        withAdtHeaders(context, 'behaviorDefinition.update', (headers) =>
+          obj.update(
+            { name, transportRequest: args.transport_request },
+            {
+              headers,
+              source: args.source_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
         );
 
       const written = args.lock_handle
         ? await update(args.lock_handle)
         : await withLock(
             () => obj.lock({ name }, { analyse: analyseLock }),
-            update,
+            atStep('update', update),
             (lockHandle) =>
               obj.unlock({ name }, lockHandle, { analyse: analyseException }),
           );
@@ -123,20 +128,25 @@ export async function handleUpdateBehaviorDefinition(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Best-effort: wait for the write to be visible before activating.
+      // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
       await obj
         .read({ name }, 'inactive', {
           withLongPolling: true,
           analyse: analyseException,
         })
-        .catch(() => undefined);
+        .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ name }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
+            obj.activate({ name }, { headers, analyse: analyseActivation }),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

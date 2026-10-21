@@ -5,6 +5,7 @@ import {
   InstanceState,
   StateUnavailableError,
 } from '../../../lib/state/InstanceState';
+import { return_error } from '../../../lib/utils';
 
 const fake = (holds: boolean) =>
   ({
@@ -88,20 +89,40 @@ describe('DebuggerInstance', () => {
       abap: failing('abap: close refused'),
       amdp: failing('amdp: release refused'),
     });
-    await expect(dbg.stop()).rejects.toThrow(
-      'abap: close refused; amdp: release refused',
+    const error = await dbg.stop().then(
+      () => undefined,
+      (e: unknown) => e,
     );
+    expect(error).toBeInstanceOf(DebugCleanupError);
+    // Each side's throw is an entry of its own, with the step — not one text.
+    expect((error as DebugCleanupError).failures).toEqual([
+      { error: 'client_threw', message: 'abap: close refused', step: 'stop' },
+      {
+        error: 'client_threw',
+        message: 'amdp: release refused',
+        step: 'stop AMDP',
+      },
+    ]);
   });
 
   it('a side that fails does not lose the notes the other side answered', async () => {
-    const note =
-      'listener: notAuthorized; the breakpoints placed stay on the system: a line';
+    const note = {
+      message: 'notAuthorized',
+      origin: 'refusal',
+      step: 'stop listener',
+      cleanup: { message: 'the breakpoints placed stay on the system: a line' },
+    };
+    const refused = {
+      message: 'release refused',
+      origin: 'refusal',
+      step: 'release debuggee D1',
+    };
     const dbg = new DebuggerInstance({
       abap: { ...fake(true), stop: async () => [note] },
       amdp: {
         ...fake(true),
         stop: async () => {
-          throw new DebugCleanupError('amdp: release refused');
+          throw new DebugCleanupError([refused]);
         },
       },
     });
@@ -110,9 +131,13 @@ describe('DebuggerInstance', () => {
       (e: unknown) => e,
     );
     expect(error).toBeInstanceOf(DebugCleanupError);
-    expect((error as DebugCleanupError).message).toBe(
-      `amdp: release refused; ${note}`,
-    );
+    expect((error as DebugCleanupError).failures).toEqual([refused]);
     expect((error as DebugCleanupError).notes).toEqual([note]);
+    // The consumer gets both lists, each entry as it is.
+    const answered = JSON.parse(
+      (return_error(error) as { content: Array<{ text: string }> }).content[0]
+        .text,
+    );
+    expect(answered).toEqual({ failures: [refused], notes: [note] });
   });
 });

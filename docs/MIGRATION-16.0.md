@@ -45,8 +45,9 @@ know some of these; the server does not serve them. What to do instead:
    password but no type is refused with `Destination "X" lacks: authType`, and `SAP_JWT_TOKEN` alone no
    longer means `jwt`. Add `SAP_AUTH_TYPE=basic` (or `jwt`, `snc`).
 2. **A `jwt` `.env` states `SAP_GRANT_TYPE`** (`authorization_code` or `none`). Without it the
-   destination is refused: `Destination "X" lacks: grantType`, with a hint. Regenerate the file with
-   `mcp-auth generate-env --grant <grant>`, or add the line by hand. A token you hand over yourself
+   destination is refused: `Destination "X" lacks: grantType`, with a hint. Write the file again with
+   `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (auth-broker-cli 3), or add
+   the line by hand. A token you hand over yourself
    is `SAP_GRANT_TYPE=none`.
 3. **Install `mcp-auth` from `@mcp-abap-adt/auth-broker-cli`**, not from `@mcp-abap-adt/auth-broker`
    (which has no `bin` any more):
@@ -203,7 +204,7 @@ from a broker uses the broker's own token API with a provider of its own. The ne
 `@mcp-abap-adt/interfaces-auth-broker` contract (the secret alone, with `issuedFor` and `issuedBy`).
 
 An embedder that has its own credential passes it as `ConnectionContext.credential`; the server builds
-nothing from `settings.authType`. See [UNIFIED_BROKER_LOGIC.md](../src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
+nothing from `settings.authType`. See [UNIFIED_BROKER_LOGIC.md](../server/src/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
 and [CONNECTION_ISOLATION.md](architecture/CONNECTION_ISOLATION.md).
 
 `getPlatformPaths` no longer returns the working directory. `BaseMcpServer.setConnectionContext` builds no

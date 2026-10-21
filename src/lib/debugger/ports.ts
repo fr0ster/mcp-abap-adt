@@ -6,57 +6,81 @@ import {
   AbapDebugger,
   AdtExecutor,
   AmdpDebugger,
-  getSystemInformation,
   type IDebuggerListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
+import { ServerRefusal } from '../auth/serverRefusal';
+import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
+import { statedResponsibleOf } from '../requestSystemResolution';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
 import type { AmdpSessionPorts } from './AmdpSession';
 import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 
 /**
- * The user whose requests are caught: what the system says, else the login —
- * the request scope's before the process's — never the responsible.
- * `getSystemInformation` answers null only when the endpoint is absent; any
- * other failure (authentication, network) goes through to the caller.
+ * The user whose requests are caught: the responsible the call reads — the
+ * connection's parameters where a host's rules made them (the system's
+ * user, else on-premise the stated responsible, else the login), else the
+ * stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`) — else the
+ * login the request scope states (never the process's environment); upper
+ * case. None is the call's `system_user_unknown`. Sends nothing.
  */
-export async function requestUserOf(
-  connection: IAbapConnection,
-): Promise<string> {
-  const info = await getSystemInformation(connection);
-  const user =
-    info?.userName || getRequestContext()?.login || process.env.SAP_USERNAME;
-  if (!user?.trim()) {
-    throw new Error(
-      'the ABAP user of this connection is unknown: the system names none and no login is configured',
-    );
-  }
+export function requestUserOf(): string {
+  const user = statedResponsibleOf() || getRequestContext()?.login;
+  if (!user?.trim()) throw new ServerRefusal('system_user_unknown');
   return user.trim().toUpperCase();
 }
 
-async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
+/**
+ * A debugger connection of its own: stateful — every request on it in the
+ * one ABAP session its first stateful request opened — unless `session` is
+ * `stateless` (a run).
+ */
+async function openStateful(
+  context: HandlerContext,
+  session: 'stateful' | 'stateless' = 'stateful',
+): Promise<IAbapConnection> {
   const connection = await openFreshConnection(
     context.connection,
     context.logger,
   );
-  (
-    connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
-  ).setSessionType?.('stateful');
+  if (session === 'stateful')
+    (
+      connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
+    ).setSessionType?.('stateful');
+  // Held state's own: closed at its stop, the idle bound's stop, the host's
+  // stop and the instance's terminal close, whichever comes first.
+  own(connection, { role: 'state' });
+  // Its session is kept in a runtime file (role debugger) until its logoff
+  // is written, for the identity the call's connection was built for.
+  context.sessionFiles?.trackSibling(
+    connection,
+    'debugger',
+    context.connection,
+  );
   return connection;
 }
 
+/** The fixed words a session's close failure is reported back in. */
+export const LOGOFF_NOT_WRITTEN = 'its logoff could not be written';
+
 /**
- * Closes a session's own connection. A failure goes back to the session,
- * which keeps the connection for the next stop and reports it — never
- * swallowed here.
+ * Closes a session's own connection: its one `disconnect()` — the logoff —,
+ * joined if the instance's terminal close already asked for it. A failure
+ * goes back to the session in fixed words, which reports it and keeps the
+ * connection for the next stop; that retry joins the ended close (connection
+ * 16 refuses a second `disconnect()`), so nothing is sent twice.
  */
 async function closeOwn(connection: IAbapConnection): Promise<void> {
-  await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
+  let failed = false;
+  await endConnection(connection, () => {
+    failed = true;
+  });
+  if (failed) throw new Error(LOGOFF_NOT_WRITTEN);
 }
 
 /**
@@ -91,12 +115,16 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
-    // The system freed this ABAP session itself (terminateDebugger); the next request
-    // on it would answer 400, and a logoff is a request. Nothing to send: forget it.
-    dropConnection: () => {},
+    // The system freed this ABAP session itself (terminateDebugger); its HTTP
+    // security session is still the server's, so it ends like every owned
+    // connection: its one `disconnect()` (connection 16 sends the logoff only
+    // while it holds a live session, and without the ended ABAP context).
+    dropConnection: (connection) => {
+      void endConnection(connection);
+    },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       new AbapDebugger(c, undefined, undefined, { onConflict }),
-    requestUser: (context) => requestUserOf(context.connection),
+    requestUser: async () => requestUserOf(),
     run,
   };
 }
@@ -106,7 +134,7 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
     openConnection: openStateful,
     closeConnection: closeOwn,
     amdpDebugger: (c) => new AmdpDebugger(c),
-    requestUser: (context) => requestUserOf(context.connection),
+    requestUser: async () => requestUserOf(),
     run,
   };
 }

@@ -40,6 +40,8 @@ jest.mock('../../lib/clients', () => ({
 }));
 
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { createBatchAvailability } from '../../lib/batch/availability';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -78,6 +80,7 @@ describe('GetStructuresList append handling (#128)', () => {
     expect(result.isError).toBe(false);
     expect(mockGetWhereUsedScope).toHaveBeenCalledWith(
       expect.objectContaining({ object_name: 'ZS', object_type: 'structure' }),
+      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsedScope'] },
     );
     expect(mockModifyWhereUsedScope).toHaveBeenCalledWith(
       '<scope/>',
@@ -89,6 +92,7 @@ describe('GetStructuresList append handling (#128)', () => {
         object_type: 'structure',
         scopeXml: '<scope-modified/>',
       }),
+      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },
     );
     expect(payload(result).appends_unavailable).toBeUndefined();
   });
@@ -125,6 +129,45 @@ describe('GetStructuresList append handling (#128)', () => {
     const data = payload(result);
     expect(data.success).toBe(true);
     expect(data.appends_unavailable).toBe(true);
+  });
+
+  it('a 401 in the where-used lookup ends the call as it came, no second object_type', async () => {
+    mockGetWhereUsedScope.mockResolvedValue(
+      refusedResponse('Unauthorized', {
+        response: { status: 401, data: '' },
+      } as any),
+    );
+
+    // The sequential version: a destination known to have no communication
+    // batch. (The batched version reads both scopes in one envelope:
+    // `unit/batch/includeTrees.test.ts`.)
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
+    const result = await handleGetStructuresList(
+      { ...ctx, batchAvailability: notServed },
+      { structure_name: 'ZS' },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(payload(result)).toMatchObject({
+      status: 401,
+      message: 'Unauthorized',
+    });
+    expect(mockGetWhereUsedScope).toHaveBeenCalledTimes(1);
+  });
+
+  it('a 403 in the where-used lookup stays appends_unavailable', async () => {
+    mockGetWhereUsedScope.mockResolvedValue(
+      refusedResponse('No authorization', {
+        response: { status: 403, data: '' },
+      } as any),
+    );
+
+    const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
+
+    expect(result.isError).toBe(false);
+    expect(payload(result).appends_unavailable).toBe(true);
+    expect(mockGetWhereUsedScope).toHaveBeenCalledTimes(2);
   });
 
   it('does not run where-used (or flag) when include_extensions is false', async () => {

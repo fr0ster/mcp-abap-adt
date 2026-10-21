@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the five packages of this repository to npm, in dependency order.
+# Publish the seventeen packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
@@ -23,15 +23,33 @@ for arg in "$@"; do
   [ "$arg" = "--dry-run" ] && DRY="--dry-run"
 done
 
-# Order matters and is not cosmetic: server/tsconfig.json resolves
-# @mcp-abap-adt/lib through paths into ../dist, so the server cannot build
-# until the library has.
+# Order matters and is not cosmetic: dependency order. core (./server), http
+# and sse each resolve @mcp-abap-adt/lib through paths into ../dist, so none
+# can build until the library has; background-runs-memory and
+# responsible-rules depend on lib, and core, http and sse depend on both;
+# compact depends on core, compact-http on
+# http and compact-sse on sse. core, http and sse do not depend on one another.
+# The six read-only packages come last: core-ro and compact-ro depend on
+# core, http-ro and compact-http-ro on http, sse-ro and compact-sse-ro on sse,
+# and the compact ones on compact-readonly-entries.
 PACKAGES=(
   "."
-  "./compact-readonly"
+  "./background-runs-memory"
+  "./responsible-rules"
+  "./compact-readonly-entries"
   "./compact-modify"
   "./server"
+  "./http"
+  "./sse"
   "./compact"
+  "./compact-http"
+  "./compact-sse"
+  "./core-ro"
+  "./http-ro"
+  "./sse-ro"
+  "./compact-ro"
+  "./compact-http-ro"
+  "./compact-sse-ro"
 )
 
 PUBLISHED=0

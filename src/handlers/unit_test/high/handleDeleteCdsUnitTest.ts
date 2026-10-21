@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete the ABAP Unit tests of a CDS view: delete its test class.',
+    'Deletes the CDS view test class named by class_name, with the ABAP Unit test classes it holds.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -83,6 +83,8 @@ export async function handleDeleteCdsUnitTest(
     { tool: 'DeleteCdsUnitTest', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'class',
         createAdtClient(connection, logger).getClass(
           resultsFor(classDocuments),
         ),

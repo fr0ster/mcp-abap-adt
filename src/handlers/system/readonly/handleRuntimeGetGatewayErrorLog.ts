@@ -8,7 +8,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeGetGatewayErrorLog',
   available_in: ['onprem'] as const,
   description:
-    '[runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.',
+    '[read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.',
   inputSchema: {
     type: 'object',
     properties: {

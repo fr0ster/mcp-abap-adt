@@ -27,6 +27,7 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -39,7 +40,7 @@ export const TOOL_DEFINITION = {
   name: 'RemoveTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Remove an object's entry from the transport task that holds it.",
+    'Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -121,18 +122,20 @@ export async function handleRemoveTransportObject(
   return answer(
     { tool: 'RemoveTransportObject', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .removeObject(
-          args.transport_number,
-          {
-            name: args.object_name,
-            type: args.object_type,
-            position: args.position,
-            ...(args.pgmid ? { pgmid: args.pgmid } : {}),
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'request.removeObject', (headers) =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .removeObject(
+            args.transport_number,
+            {
+              name: args.object_name,
+              type: args.object_type,
+              position: args.position,
+              ...(args.pgmid ? { pgmid: args.pgmid } : {}),
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseRemoval),
   );
 }

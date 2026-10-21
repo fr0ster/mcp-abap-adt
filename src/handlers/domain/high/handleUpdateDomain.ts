@@ -39,7 +39,8 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -49,6 +50,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -185,37 +187,46 @@ export async function handleUpdateDomain(
         () => obj.lock({ domainName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('read metadata', () =>
               obj.readMetadata({ domainName }, { analyse: analyseException }),
-            (current) =>
-              obj.updateMetadata(
-                {
-                  domainName,
-                  transportRequest: args.transport_request,
-                },
-                {
-                  source: patchDomainXml(
-                    extractXmlString(current.raw, `domain ${domainName}`),
-                    {
-                      description: args.description,
-                      datatype: args.datatype,
-                      length: args.length,
-                      decimals: args.decimals,
-                      conversion_exit: args.conversion_exit,
-                      lowercase: args.lowercase,
-                      sign_exists: args.sign_exists,
-                      value_table: args.value_table,
-                      fixed_values: args.fixed_values,
-                    },
-                  ),
-                  lockHandle,
-                  analyse: analyseException,
-                },
+            ),
+            atStep('update metadata', (current) =>
+              withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+                obj.updateMetadata(
+                  {
+                    domainName,
+                    transportRequest: args.transport_request,
+                  },
+                  {
+                    headers,
+                    source: patchDomainXml(
+                      extractXmlString(current.raw, `domain ${domainName}`),
+                      {
+                        description: args.description,
+                        datatype: args.datatype,
+                        length: args.length,
+                        decimals: args.decimals,
+                        conversion_exit: args.conversion_exit,
+                        lowercase: args.lowercase,
+                        sign_exists: args.sign_exists,
+                        value_table: args.value_table,
+                        fixed_values: args.fixed_values,
+                      },
+                    ),
+                    lockHandle,
+                    analyse: analyseException,
+                  },
+                ),
               ),
-            () =>
-              obj.check({ domainName }, undefined, {
-                analyse: analyseException,
-              }),
+            ),
+            atStep('check', () =>
+              withAdtHeaders(context, 'domain.check', (headers) =>
+                obj.check({ domainName }, undefined, {
+                  headers,
+                  analyse: analyseException,
+                }),
+              ),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ domainName }, lockHandle, { analyse: analyseException }),
@@ -225,7 +236,7 @@ export async function handleUpdateDomain(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Best-effort: wait for the write to be visible before activating.
+      // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
       // Every outcome is discarded — activation answers explicitly if the
       // object still is not ready.
       await obj
@@ -233,14 +244,22 @@ export async function handleUpdateDomain(
           { domainName },
           { withLongPolling: true, analyse: analyseException },
         )
-        .catch(() => undefined);
+        .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ domainName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'domain.activate', (headers) =>
+            obj.activate(
+              { domainName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

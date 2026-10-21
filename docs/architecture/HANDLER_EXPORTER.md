@@ -98,7 +98,6 @@ By default, all handler groups are included. You can customize this:
 const exporter = new HandlerExporter({
   includeReadOnly: true,   // getProgram, getClass, getTable, etc.
   includeHighLevel: true,  // createProgram, updateClass, etc.
-  includeLowLevel: true,   // low-level ADT operations
   includeSystem: true,     // getInactiveObjects, etc.
   includeSearch: true,     // whereUsed, quickFix, etc.
 });
@@ -112,7 +111,6 @@ For a read-only server:
 const exporter = new HandlerExporter({
   includeReadOnly: true,
   includeHighLevel: false,
-  includeLowLevel: false,
   includeSystem: true,
   includeSearch: true,
 });
@@ -135,9 +133,11 @@ for (const entry of entries) {
 
 ### What `getHandlerEntries()` hands back
 
-Since 10.2.0 each entry's `handler` is wrapped, so that a call whose request
-carries no `responsible` or `masterSystem` can have them filled from an ABAP
-Cloud connection before the handler runs. Two things follow for an embedder:
+With a `systemContextResolver` (none by default since 19.0.0) each entry's
+`handler` is wrapped, so that the connection's parameters — the responsible and
+master system, made once by the `systemContextRules` you pass
+(`@mcp-abap-adt/responsible-rules`), else the system's information — are filled
+before the handler runs. Two things follow for an embedder:
 
 - The wrapper preserves the handler's arity, because embedders branch on it to
   choose between `handler(context, args)` and `handler(args)`. A wrapped
@@ -145,10 +145,11 @@ Cloud connection before the handler runs. Two things follow for an embedder:
 - The wrapper is built per call, so two calls to `getHandlerEntries()` return
   functions that are not identity-equal. Compare tool names, not functions.
 
-Pass `systemContextResolver: null` in the options to switch the filling off, or
-your own resolver to decide it yourself. The option reaches
-`getHandlerEntries()`; `createRegistry()` returns the groups themselves, and a
-group registered that way uses the default resolver.
+Without a resolver (the default) `getHandlerEntries()` hands the groups'
+handlers out unwrapped. The options reach `getHandlerEntries()`;
+`createRegistry()` returns the groups themselves, and a group registered that way
+looks nothing up unless its `HandlerContext` carries `systemContextResolver`
+(and `systemContextRules`).
 
 ## Creating Registry for v2 Servers
 

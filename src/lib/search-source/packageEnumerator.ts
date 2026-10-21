@@ -2,6 +2,7 @@ import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import {
   assembleList,
+  nodeStructureOn,
   type PackageItem,
   walkPackage,
 } from '../strategies/packageWalk';
@@ -106,7 +107,7 @@ export function createPackageContentsFetcher(
   ctx: HandlerContext,
 ): PackageContentsFetcher {
   const client = createAdtClient(ctx.connection, ctx.logger);
-  const utils = client.getUtils(ourUtils);
+  const utils = nodeStructureOn(ctx, client.getUtils(ourUtils));
   return async (packageName, options) =>
     assembleList(
       packageName,

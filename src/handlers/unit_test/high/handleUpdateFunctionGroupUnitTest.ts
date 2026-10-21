@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update the ABAP Unit tests of a function group: replace the local test classes in its test include and activate it.',
+    'Writes test_class_source as the ABAP Unit test classes of the function group named by function_group_name. The local test classes in its test include are rewritten, and it is activated.',
   inputSchema: {
     type: 'object',
     properties: {

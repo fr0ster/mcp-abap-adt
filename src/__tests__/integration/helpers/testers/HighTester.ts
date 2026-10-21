@@ -369,8 +369,6 @@ export class HighTester extends LambdaTester {
         function_module_description: params.function_module_description,
       }),
       ...(transportRequest && { transport_request: transportRequest }),
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -425,8 +423,6 @@ export class HighTester extends LambdaTester {
       }),
       ...(params.ddl_source &&
         !params.update_ddl_source && { ddl_source: params.ddl_source }),
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -436,8 +432,6 @@ export class HighTester extends LambdaTester {
     return {
       [nameField]: objectName,
       ...(transportRequest && { transport_request: transportRequest }),
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 

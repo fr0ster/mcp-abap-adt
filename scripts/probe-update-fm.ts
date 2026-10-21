@@ -22,12 +22,12 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import { getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
-import { handleReadFunctionModule } from '../src/handlers/function_module/readonly/handleReadFunctionModule';
+import { handleGetFunctionModule } from '../src/handlers/function_module/high/handleGetFunctionModule';
 import { handleCreateFunctionGroup } from '../src/handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../src/handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionModule } from '../src/handlers/function/high/handleUpdateFunctionModule';
-import { handleDeleteFunctionModule } from '../src/handlers/function/low/handleDeleteFunctionModule';
-import { handleDeleteFunctionGroup } from '../src/handlers/function/low/handleDeleteFunctionGroup';
+import { handleDeleteFunctionModule } from '../src/handlers/function_module/high/handleDeleteFunctionModule';
+import { handleDeleteFunctionGroup } from '../src/handlers/function_group/high/handleDeleteFunctionGroup';
 
 function getArg(args: string[], flag: string): string | undefined {
   const i = args.indexOf(flag);
@@ -65,18 +65,24 @@ function stripParamCommentBlock(src: string): string {
 }
 
 async function readFm(context: any, fm: string, group: string) {
-  const r = await handleReadFunctionModule(context, {
-    function_module_name: fm,
-    function_group_name: group,
-    version: 'active',
-  });
-  if (r.isError) {
-    return { error: r.content?.[0]?.text };
+  const read = (part: 'source' | 'metadata') =>
+    handleGetFunctionModule(context, {
+      function_module_name: fm,
+      function_group_name: group,
+      part,
+      version: 'active',
+    });
+  const s = await read('source');
+  if (s.isError) {
+    return { error: s.content?.[0]?.text };
   }
-  const d = parseHandlerResponse(r);
+  const m = await read('metadata');
+  if (m.isError) {
+    return { error: m.content?.[0]?.text };
+  }
   return {
-    source: (d.source_code ?? '') as string,
-    metadata: (d.metadata ?? '') as string,
+    source: (parseHandlerResponse(s).function_module_data ?? '') as string,
+    metadata: (parseHandlerResponse(m).metadata ?? '') as string,
   };
 }
 

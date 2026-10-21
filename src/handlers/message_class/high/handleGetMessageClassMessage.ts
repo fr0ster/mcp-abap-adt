@@ -8,7 +8,7 @@ export const TOOL_DEFINITION = {
   name: 'GetMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve a single message (by number) from an ABAP message class (MSAG/T100). There is no per-message resource: ADT answers the ENTIRE parent class document (XML) under the `message` field, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.',
+    '[read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class\'s ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -74,7 +74,8 @@ export async function handleGetMessageClassMessage(
       success: true,
       message_class_name: className,
       msgno,
-      message: document,
+      part: 'metadata',
+      metadata: document,
     }),
   );
 }

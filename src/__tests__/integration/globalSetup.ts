@@ -13,11 +13,20 @@
  * Requires: auth_broker.unsafe: true in test-config.yaml
  */
 
+// First, for its effect: the sibling packages below resolve to their sources.
+import './helpers/packageSources';
 import * as path from 'node:path';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
-import { AuthBrokerFactory } from '../../lib/auth/brokerFactory';
-import { describeAuthError } from '../../lib/auth/errors';
+import {
+  AuthBrokerFactory,
+  browserFor,
+  browserOf,
+  destinationFailureWords,
+  promptLogger,
+} from '@mcp-abap-adt/core/auth';
 import { createAbapConnection } from '../../lib/connectionFactory';
+import { endTestConnection } from './helpers/openConnections';
+import { restoreResolution } from './helpers/packageSources';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';
 
 function loadTestConfig(): any {
@@ -44,6 +53,14 @@ function loadTestConfig(): any {
 }
 
 export default async function globalSetup(): Promise<void> {
+  try {
+    await setUp();
+  } finally {
+    restoreResolution();
+  }
+}
+
+async function setUp(): Promise<void> {
   const config = loadTestConfig();
   if (!config) {
     return;
@@ -78,18 +95,27 @@ export default async function globalSetup(): Promise<void> {
     mcpDestination: destination,
     authBrokerPath: basePath,
     unsafe: useUnsafe,
-    browser: config?.auth_broker?.browser ?? 'system',
+    // The test config's browser word, mapped as the server maps --browser.
+    browser: browserOf(
+      browserFor(
+        { browser: config?.auth_broker?.browser ?? 'system' },
+        process.platform,
+      ),
+    ),
     ...(config?.auth_broker?.browser_auth_port !== undefined && {
       browserAuthPort: Number(config.auth_broker.browser_auth_port),
     }),
     ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
       connectionType: 'rfc' as const,
     }),
-    browserStrategy: ({ browser, port }) =>
-      browserCallbackStrategy({
-        browser,
-        ...(port !== undefined && { port }),
-      }),
+    browserStrategy: browserCallbackStrategy,
+    // A login's prompts reach the person running the tests, on stderr.
+    promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      debug: () => {},
+    }),
   });
 
   try {
@@ -99,18 +125,15 @@ export default async function globalSetup(): Promise<void> {
     const connection = createAbapConnection(settings, provider);
     await connection.connect();
     console.log(`[globalSetup] Session ready for "${destination}"`);
-    await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
+    await endTestConnection(connection);
   } catch (error: unknown) {
     console.log(
-      `[globalSetup] Auth failed: ${
-        describeAuthError(error) ??
-        (error instanceof Error ? error.constructor.name : typeof error)
-      }`,
+      `[globalSetup] Auth failed: ${destinationFailureWords(error, destination)}`,
     );
     // Don't throw — let tests handle missing auth gracefully (skip)
   } finally {
     // Writes the session the login produced (unsafe store).
-    const report = await factory.settle(30_000);
+    const report = await factory.settle();
     if (report.notStored.length > 0) {
       console.log(
         `[globalSetup] Session not stored: ${report.notStored.join(', ')}`,

@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugGetMemorySizes',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Memory the stopped debuggee uses. Needs a stopped debuggee.',
+    '[read-only] [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

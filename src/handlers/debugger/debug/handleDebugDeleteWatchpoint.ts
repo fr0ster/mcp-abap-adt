@@ -9,7 +9,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugDeleteWatchpoint',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Removes a watchpoint.',
+  description: '[read-only] [debug] Removes a watchpoint.',
   inputSchema: {
     type: 'object',
     properties: {

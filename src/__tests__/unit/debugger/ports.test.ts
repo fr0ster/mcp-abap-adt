@@ -1,33 +1,56 @@
 import { liveDebugPorts, requestUserOf } from '../../../lib/debugger/ports';
 import { runWithRequestContext } from '../../../lib/requestContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
-describe('the request user', () => {
-  it('is the user systeminformation names', async () => {
-    const conn = recordingConnection([
-      { status: 200, data: JSON.stringify({ userName: 'sapuser01' }) },
-    ]);
-    await expect(requestUserOf(conn as any)).resolves.toBe('SAPUSER01');
-  });
-  it('falls back to the login — the scope login before the process login — never the responsible', async () => {
-    const conn = recordingConnection([{ status: 404, data: '' }]);
-    const saved = {
-      SAP_USERNAME: process.env.SAP_USERNAME,
-      SAP_RESPONSIBLE: process.env.SAP_RESPONSIBLE,
-    };
-    process.env.SAP_USERNAME = 'processlogin';
-    process.env.SAP_RESPONSIBLE = 'SOMEONEELSE';
-    try {
-      await expect(requestUserOf(conn as any)).resolves.toBe('PROCESSLOGIN');
-      await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(requestUserOf(conn as any)).resolves.toBe('SCOPELOGIN');
-      });
-    } finally {
-      for (const [name, value] of Object.entries(saved)) {
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
-      }
+describe('the request user, no rules', () => {
+  const saved = {
+    SAP_USERNAME: process.env.SAP_USERNAME,
+  };
+  afterEach(() => {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
     }
+    resetSystemContextCache();
+  });
+
+  it('is the stated responsible, upper case, and sends nothing', async () => {
+    process.env.SAP_USERNAME = 'processlogin';
+    await runWithRequestContext({ responsible: 'resp_user' }, async () => {
+      expect(requestUserOf()).toBe('RESP_USER');
+    });
+  });
+  it('no responsible: the scope login; both: the responsible', async () => {
+    await runWithRequestContext({ login: 'scopelogin' }, async () => {
+      expect(requestUserOf()).toBe('SCOPELOGIN');
+    });
+    await runWithRequestContext(
+      { login: 'scopelogin', responsible: 'resp_user' },
+      async () => {
+        expect(requestUserOf()).toBe('RESP_USER');
+      },
+    );
+  });
+  it('the process SAP_USERNAME is no login: system_user_unknown', () => {
+    process.env.SAP_USERNAME = 'processlogin';
+    expect(() => requestUserOf()).toThrow(
+      expect.objectContaining({ serverRefusal: 'system_user_unknown' }),
+    );
+  });
+  it('neither: system_user_unknown', () => {
+    expect(() => requestUserOf()).toThrow(
+      expect.objectContaining({ serverRefusal: 'system_user_unknown' }),
+    );
+  });
+  it('the live ports ask the stated value, not the connection', async () => {
+    const conn = recordingConnection([]);
+    await runWithRequestContext({ login: 'scopelogin' }, async () => {
+      await expect(
+        liveDebugPorts().requestUser({ connection: conn as never }),
+      ).resolves.toBe('SCOPELOGIN');
+    });
+    expect(conn.requests).toHaveLength(0);
   });
 });
 

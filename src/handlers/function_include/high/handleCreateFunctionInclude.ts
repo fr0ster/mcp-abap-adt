@@ -14,6 +14,7 @@
 
 import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -81,17 +82,19 @@ export async function handleCreateFunctionInclude(
   return answer(
     { tool: 'CreateFunctionInclude', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionInclude(resultsFor(functionIncludeDocuments))
-        .create(
-          {
-            functionGroupName,
-            includeName,
-            description: args.description || includeName,
-            transportRequest: args.transport_request,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'functionInclude.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getFunctionInclude(resultsFor(functionIncludeDocuments))
+          .create(
+            {
+              functionGroupName,
+              includeName,
+              description: args.description || includeName,
+              transportRequest: args.transport_request,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

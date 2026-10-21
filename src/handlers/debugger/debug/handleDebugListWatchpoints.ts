@@ -10,7 +10,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugListWatchpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Watchpoints of the stopped debuggee.',
+  description: '[read-only] [debug] Watchpoints of the stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

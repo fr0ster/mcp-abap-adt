@@ -34,7 +34,8 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { patchDataElementXml } from '../../../lib/strategies/dataElementPatch';
@@ -44,6 +45,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -210,7 +212,7 @@ export async function handleCreateDataElement(
       );
 
       const checked = await sequence(
-        () =>
+        atStep('validate', () =>
           obj.validate(
             {
               dataElementName,
@@ -219,17 +221,21 @@ export async function handleCreateDataElement(
             },
             { analyse: analyseException },
           ),
-        () =>
-          obj.create(
-            {
-              dataElementName,
-              description: args.description || dataElementName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { analyse: analyseException },
+        ),
+        atStep('create', () =>
+          withAdtHeaders(context, 'dataElement.create', (headers) =>
+            obj.create(
+              {
+                dataElementName,
+                description: args.description || dataElementName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
+        ),
         () =>
           withLock(
             () => obj.lock({ dataElementName }, { analyse: analyseLock }),
@@ -237,71 +243,90 @@ export async function handleCreateDataElement(
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
               sequence(
-                () =>
+                atStep('read metadata', () =>
                   obj.readMetadata(
                     { dataElementName },
                     { analyse: analyseException },
                   ),
-                (current) =>
-                  obj.updateMetadata(
-                    {
-                      dataElementName,
-                      transportRequest: args.transport_request,
-                    },
-                    {
-                      source: patchDataElementXml(
-                        extractXmlString(
-                          current.raw,
-                          `data element ${dataElementName}`,
-                        ),
+                ),
+                atStep('update metadata', (current) =>
+                  withAdtHeaders(
+                    context,
+                    'dataElement.updateMetadata',
+                    (headers) =>
+                      obj.updateMetadata(
                         {
-                          description: args.description || dataElementName,
-                          type_kind: typeKind,
-                          type_name: args.type_name,
-                          data_type: args.data_type || 'CHAR',
-                          length: args.length || 100,
-                          decimals: args.decimals || 0,
-                          short_label: args.short_label,
-                          medium_label: args.medium_label,
-                          long_label: args.long_label,
-                          heading_label: args.heading_label,
-                          search_help: args.search_help,
-                          search_help_parameter: args.search_help_parameter,
-                          set_get_parameter: args.set_get_parameter,
+                          dataElementName,
+                          transportRequest: args.transport_request,
+                        },
+                        {
+                          headers,
+                          source: patchDataElementXml(
+                            extractXmlString(
+                              current.raw,
+                              `data element ${dataElementName}`,
+                            ),
+                            {
+                              description: args.description || dataElementName,
+                              type_kind: typeKind,
+                              type_name: args.type_name,
+                              data_type: args.data_type || 'CHAR',
+                              length: args.length || 100,
+                              decimals: args.decimals || 0,
+                              short_label: args.short_label,
+                              medium_label: args.medium_label,
+                              long_label: args.long_label,
+                              heading_label: args.heading_label,
+                              search_help: args.search_help,
+                              search_help_parameter: args.search_help_parameter,
+                              set_get_parameter: args.set_get_parameter,
+                            },
+                          ),
+                          lockHandle,
+                          analyse: analyseException,
                         },
                       ),
-                      lockHandle,
-                      analyse: analyseException,
-                    },
                   ),
+                ),
               ),
             (lockHandle) =>
               obj.unlock({ dataElementName }, lockHandle, {
                 analyse: analyseException,
               }),
           ),
-        // Best-effort: wait for the write to be visible, right before the
+        // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — see `handleCreateDomain.ts` for
         // why the wait sits here rather than after `check`.
-        async () => {
+        atStep('check', async () => {
           await obj
             .readMetadata(
               { dataElementName },
               { withLongPolling: true, analyse: analyseException },
             )
-            .catch(() => undefined);
-          return obj.check({ dataElementName }, undefined, {
-            analyse: analyseException,
-          });
-        },
+            .catch(unlessCredentialFailure);
+          return withAdtHeaders(context, 'dataElement.check', (headers) =>
+            obj.check({ dataElementName }, undefined, {
+              headers,
+              analyse: analyseException,
+            }),
+          );
+        }),
       );
 
       if (!checked.ok || !shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(checked, () =>
-        obj.activate({ dataElementName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        checked,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'dataElement.activate', (headers) =>
+            obj.activate(
+              { dataElementName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

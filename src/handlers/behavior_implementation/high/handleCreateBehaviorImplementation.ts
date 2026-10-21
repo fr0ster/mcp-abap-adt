@@ -21,6 +21,7 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -35,7 +36,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.',
+    'Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -105,20 +106,25 @@ export async function handleCreateBehaviorImplementation(
       // empty system context, so the responsible and master system go in the
       // config — the responsible guarded like every other create.
       const { responsible, masterSystem } = requireSystemContextForCreate();
-      return createAdtClient(connection, logger)
-        .getBehaviorImplementation(resultsFor(classDocuments))
-        .create(
-          {
-            className,
-            behaviorDefinition: args.behavior_definition.toUpperCase(),
-            packageName: args.package_name.toUpperCase(),
-            description: args.description || className,
-            transportRequest: args.transport_request,
-            responsible,
-            masterSystem,
-          },
-          { analyse: analyseException },
-        );
+      return withAdtHeaders(
+        context,
+        'behaviorImplementation.create',
+        (headers) =>
+          createAdtClient(connection, logger)
+            .getBehaviorImplementation(resultsFor(classDocuments))
+            .create(
+              {
+                className,
+                behaviorDefinition: args.behavior_definition.toUpperCase(),
+                packageName: args.package_name.toUpperCase(),
+                description: args.description || className,
+                transportRequest: args.transport_request,
+                responsible,
+                masterSystem,
+              },
+              { headers, analyse: analyseException },
+            ),
+      );
     },
     project(detail, terseWrite),
   );

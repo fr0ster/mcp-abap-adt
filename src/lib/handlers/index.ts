@@ -25,3 +25,8 @@ export {
 export * from './interfaces.js';
 // Registry implementations
 export { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
+export {
+  expositionGroups,
+  noConnectionContext,
+  registryForExposition,
+} from './registry/expositionRegistry.js';

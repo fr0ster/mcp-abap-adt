@@ -25,20 +25,23 @@ import {
   ddlDocuments,
   domainDocuments,
   functionGroupDocuments,
+  functionModuleDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
+  packageDocuments,
   programDocuments,
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckObjectLow',
@@ -60,35 +63,27 @@ export const TOOL_DEFINITION = {
           'program',
           'interface',
           'function_group',
+          'function_module',
           'table',
           'structure',
           'ddl',
           'domain',
           'data_element',
+          'package',
           'behavior_definition',
           'metadata_extension',
         ],
+      },
+      source_code: {
+        type: 'string',
+        description:
+          'Source to check instead of the saved one (class, structure, ddl only); nothing is saved.',
       },
       version: {
         type: 'string',
         description:
           "Version to check: 'active' or 'inactive' (default active)",
         enum: ['active', 'inactive'],
-      },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
       },
       ...DETAIL_PROPERTY,
     },
@@ -100,12 +95,7 @@ interface CheckObjectArgs {
   object_name: string;
   object_type: string;
   version?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
+  source_code?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -114,14 +104,19 @@ const VALID_TYPES = [
   'program',
   'interface',
   'function_group',
+  'function_module',
   'table',
   'structure',
   'ddl',
   'domain',
   'data_element',
+  'package',
   'behavior_definition',
   'metadata_extension',
 ];
+
+/** The types whose check can take source that is not saved. */
+const SOURCE_TYPES = ['class', 'structure', 'ddl'];
 
 export async function handleCheckObject(
   context: HandlerContext,
@@ -132,8 +127,7 @@ export async function handleCheckObject(
     object_name,
     object_type,
     version = 'active',
-    session_id,
-    session_state,
+    source_code,
   } = args as CheckObjectArgs;
 
   if (!object_name || !object_type) {
@@ -153,8 +147,25 @@ export async function handleCheckObject(
     ? (version.toLowerCase() as 'active' | 'inactive')
     : 'active';
 
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
+  if (source_code !== undefined && !SOURCE_TYPES.includes(objectType)) {
+    return return_error(
+      new Error(`source_code is checked only for: ${SOURCE_TYPES.join(', ')}`),
+    );
+  }
+
+  // A function module is addressed under its group: GROUP|MODULE, as the
+  // lock takes it.
+  let functionGroupName: string | undefined;
+  let functionModuleName: string | undefined;
+  if (objectType === 'function_module') {
+    const [group, module] = object_name.toUpperCase().split('|');
+    if (!group || !module) {
+      return return_error(
+        new Error('Function module name must be in format GROUP|FM_NAME'),
+      );
+    }
+    functionGroupName = group;
+    functionModuleName = module;
   }
 
   const objectName = object_name.toUpperCase();
@@ -166,71 +177,131 @@ export async function handleCheckObject(
     () => {
       switch (objectType) {
         case 'class':
-          return client
-            .getClass(resultsFor(classDocuments))
-            .check({ className: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'class.check', (headers) =>
+            client
+              .getClass(resultsFor(classDocuments))
+              .check(
+                { className: objectName, source: source_code },
+                checkVersion,
+                { headers, analyse: analyseException },
+              ),
+          );
         case 'program':
-          return client
-            .getProgram(resultsFor(programDocuments))
-            .check({ programName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'program.check', (headers) =>
+            client
+              .getProgram(resultsFor(programDocuments))
+              .check({ programName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'interface':
-          return client
-            .getInterface(resultsFor(interfaceDocuments))
-            .check({ interfaceName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'interface.check', (headers) =>
+            client
+              .getInterface(resultsFor(interfaceDocuments))
+              .check({ interfaceName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'function_group':
-          return client
-            .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .check({ functionGroupName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'functionGroup.check', (headers) =>
+            client
+              .getFunctionGroup(resultsFor(functionGroupDocuments))
+              .check({ functionGroupName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'table':
-          return client
-            .getTable(resultsFor(tableDocuments))
-            .check({ tableName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'table.check', (headers) =>
+            client
+              .getTable(resultsFor(tableDocuments))
+              .check({ tableName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'structure':
-          return client
-            .getStructure(resultsFor(structureDocuments))
-            .check({ structureName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'structure.check', (headers) =>
+            client
+              .getStructure(resultsFor(structureDocuments))
+              .check(
+                { structureName: objectName, source: source_code },
+                checkVersion,
+                { headers, analyse: analyseException },
+              ),
+          );
         case 'ddl':
-          return client
-            .getDdl(resultsFor(ddlDocuments))
-            .check({ ddlName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'ddl.check', (headers) =>
+            client
+              .getDdl(resultsFor(ddlDocuments))
+              .check(
+                { ddlName: objectName, source: source_code },
+                checkVersion,
+                { headers, analyse: analyseException },
+              ),
+          );
         case 'domain':
-          return client
-            .getDomain(resultsFor(domainDocuments))
-            .check({ domainName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'domain.check', (headers) =>
+            client
+              .getDomain(resultsFor(domainDocuments))
+              .check({ domainName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'data_element':
-          return client
-            .getDataElement(resultsFor(dataElementDocuments))
-            .check({ dataElementName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'dataElement.check', (headers) =>
+            client
+              .getDataElement(resultsFor(dataElementDocuments))
+              .check({ dataElementName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         case 'behavior_definition':
-          return client
-            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-            .check({ name: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(
+            context,
+            'behaviorDefinition.check',
+            (headers) =>
+              client
+                .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+                .check({ name: objectName }, checkVersion, {
+                  headers,
+                  analyse: analyseException,
+                }),
+          );
         case 'metadata_extension':
-          return client
-            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-            .check({ name: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+          return withAdtHeaders(context, 'metadataExtension.check', (headers) =>
+            client
+              .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+              .check({ name: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
+        case 'function_module':
+          return withAdtHeaders(context, 'functionModule.check', (headers) =>
+            client.getFunctionModule(resultsFor(functionModuleDocuments)).check(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: functionModuleName as string,
+              },
+              checkVersion,
+              { headers, analyse: analyseException },
+            ),
+          );
+        case 'package':
+          // A package check runs on the active version, like every check.
+          return withAdtHeaders(context, 'package.check', (headers) =>
+            client
+              .getPackage(resultsFor(packageDocuments))
+              .check({ packageName: objectName }, 'active', {
+                headers,
+                analyse: analyseException,
+              }),
+          );
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);

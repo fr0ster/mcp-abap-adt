@@ -34,7 +34,7 @@
  * and where no RAG runs; without it the next `$TMP` returns and nothing notices
  * until a consumer's retrieval degrades.
  */
-import { compactDebugEntries } from '../../../compact/src/debug/group';
+import { compactDebugEntries } from '../../lib/compact/debug/group';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 
 /**
@@ -124,23 +124,26 @@ const parametersOf = (definition: {
  * The tools that take no parameter at all — a fixed, tiny list, so a schema
  * shape that stops being read shows up here as a new name rather than as
  * silence. This one answers a feed with no argument; `HandlerProfileList` was the
- * other until the compact facade moved into `@mcp-abap-adt/compact-readonly`.
+ * other until the compact facade moved into `@mcp-abap-adt/compact-readonly-entries`.
  */
-const TAKES_NO_PARAMETERS = ['RuntimeListProfilerTraceFiles'];
+const TAKES_NO_PARAMETERS = [
+  'ListBackgroundRuns',
+  'RuntimeListProfilerTraceFiles',
+];
 
 describe('descriptions carry no incidental literals', () => {
   const tools = [
     ...new HandlerExporter({
+      systemType: 'onprem',
       includeReadOnly: true,
       includeHighLevel: true,
-      includeLowLevel: true,
       includeSystem: true,
       includeSearch: true,
       includeDebug: true,
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
-    // The compact debug verbs (their own package): their text joins the same rule.
+    // The compact debug tools (their own package): their text joins the same rule.
     ...compactDebugEntries().map((e) => e.toolDefinition),
   ];
 
@@ -180,7 +183,8 @@ describe('descriptions carry no incidental literals', () => {
   });
 
   it('sees every tool group', () => {
-    expect(tools.length).toBeGreaterThan(300);
+    // 19.0.0: the low set's tools left; compact's are read here too.
+    expect(tools.length).toBeGreaterThan(250);
   });
 
   it('reads the parameter descriptions it claims to read', () => {

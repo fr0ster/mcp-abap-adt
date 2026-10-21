@@ -17,6 +17,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -100,18 +101,20 @@ export async function handleGetVirtualFolders(
   return answer(
     { tool: 'GetVirtualFoldersLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getUtils(ourUtils)
-        .getVirtualFoldersContents(
-          {
-            objectSearchPattern: args.object_search_pattern || '*',
-            preselection: args.preselection,
-            facetOrder: args.facet_order || ['package', 'group', 'type'],
-            withVersions: args.with_versions,
-            ignoreShortDescriptions: args.ignore_short_descriptions,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'utils.getVirtualFoldersContents', (headers) =>
+        createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .getVirtualFoldersContents(
+            {
+              objectSearchPattern: args.object_search_pattern || '*',
+              preselection: args.preselection,
+              facetOrder: args.facet_order || ['package', 'group', 'type'],
+              withVersions: args.with_versions,
+              ignoreShortDescriptions: args.ignore_short_descriptions,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, (value) => value),
   );
 }

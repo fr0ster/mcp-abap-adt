@@ -1,5 +1,6 @@
 import type { EnumeratedObject } from '../../../lib/search-source/packageEnumerator';
 import {
+  createSourceReaderDeps,
   type FugrChild,
   type ReadSourceUnitsDeps,
   readSourceUnits,
@@ -83,7 +84,12 @@ describe('readSourceUnits', () => {
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_B' },
       { objecttype: 'FUGR/FF', objectname: 'VIEW_DIALOG_GEN' },
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_A' },
-      { objecttype: 'FUGR/PU', objectname: 'LZ_FGF01' },
+      {
+        objecttype: 'FUGR/PU',
+        objectname: 'LZ_FGF01',
+        objecturi:
+          '/sap/bc/adt/functions/groups/z_fg/includes/lz_fgf01/source/main#start=3,1',
+      },
     ];
     const { deps, calls } = makeDeps({
       async fetchFugrStructure(_) {
@@ -98,6 +104,122 @@ describe('readSourceUnits', () => {
     ]);
     expect(calls.fms).toEqual(['Z_FM_A', 'Z_FM_B']);
     expect(calls.includes).toEqual(['LZ_FGF01']);
+  });
+
+  it('FUGR reads what objecturi points at: one read per include, none for a screen, GUI status or title', async () => {
+    const G = '/sap/bc/adt/functions/groups/z_fg';
+    const VIT = '/sap/bc/adt/vit/wb/object_type';
+    const children: FugrChild[] = [
+      {
+        objecttype: 'FUGR/FF',
+        objectname: 'Z_FM_A',
+        objecturi: `${G}/fmodules/z_fm_a`,
+      },
+      {
+        objecttype: 'FUGR/I',
+        objectname: 'LZ_FGTOP',
+        objecturi: `${G}/includes/lz_fgtop`,
+      },
+      {
+        objecttype: 'FUGR/I',
+        objectname: 'LZ_FGF01',
+        objecturi: `${G}/includes/lz_fgf01`,
+      },
+      {
+        objecttype: 'FUGR/PD',
+        objectname: 'LZ_FGTOP',
+        objecturi: `${G}/includes/lz_fgtop/source/main#start=4,2`,
+      },
+      {
+        objecttype: 'FUGR/PO',
+        objectname: 'LZ_FGO01',
+        objecturi: `${G}/includes/lz_fgo01/source/main#start=1,7`,
+      },
+      {
+        objecttype: 'FUGR/PS',
+        objectname: 'SAPLZ_FG                                0100',
+        objecturi: `${VIT}/fugrps/object_name/SAPLZ_FG%20%200100`,
+      },
+      {
+        objecttype: 'FUGR/PC',
+        objectname: 'SAPLZ_FG',
+        objecturi: `${VIT}/fugrpc/object_name/SAPLZ_FG%20%20MAIN`,
+      },
+      {
+        objecttype: 'FUGR/PZ',
+        objectname: 'SAPLZ_FG',
+        objecturi: `${VIT}/fugrpz/object_name/SAPLZ_FG%20%200100`,
+      },
+    ];
+    const { deps, calls } = makeDeps({
+      async fetchFugrStructure(_) {
+        return children;
+      },
+    });
+    const units = await collect(readSourceUnits(deps, FUGR));
+    expect(calls.fms).toEqual(['Z_FM_A']);
+    expect(calls.includes).toEqual(['LZ_FGF01', 'LZ_FGO01', 'LZ_FGTOP']);
+    expect(units.map((u) => u.include)).toEqual([
+      'Z_FM_A',
+      'LZ_FGF01',
+      'LZ_FGO01',
+      'LZ_FGTOP',
+    ]);
+  });
+
+  it('FUGR without objecturi reads FUGR/FF as function modules and FUGR/I as includes, nothing else', async () => {
+    const children: FugrChild[] = [
+      { objecttype: 'FUGR/I', objectname: 'LZ_FGTOP' },
+      { objecttype: 'FUGR/FF', objectname: 'Z_FM_A' },
+      { objecttype: 'FUGR/PD', objectname: 'LZ_FGTOP' },
+      {
+        objecttype: 'FUGR/PS',
+        objectname: 'SAPLZ_FG                                0100',
+      },
+    ];
+    const { deps, calls } = makeDeps({
+      async fetchFugrStructure(_) {
+        return children;
+      },
+    });
+    await collect(readSourceUnits(deps, FUGR));
+    expect(calls.fms).toEqual(['Z_FM_A']);
+    expect(calls.includes).toEqual(['LZ_FGTOP']);
+  });
+
+  it('the structure is read through the objectStructure strategy: every FUGR node with its objecturi', async () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer">
+<projectexplorer:node nodeid="000053" parentid="000052" isfolder="false" objecttype="FUGR/PS" objectname="SAPLZ_FG                                0100" objecturi="/sap/bc/adt/vit/wb/object_type/fugrps/object_name/SAPLZ_FG%20%200100"/>
+<projectexplorer:node nodeid="000060" parentid="000059" isfolder="false" objecttype="FUGR/I" objectname="LZ_FGF01" objecturi="/sap/bc/adt/functions/groups/z_fg/includes/lz_fgf01"/>
+<projectexplorer:node nodeid="000070" parentid="000069" isfolder="false" objecttype="PROG/PX" objectname="SAPLZ_FG"/>
+</projectexplorer:objectstructure>`;
+    const asked: string[] = [];
+    const connection = {
+      async makeAdtRequest(req: { url: string }) {
+        asked.push(req.url);
+        return { status: 200, statusText: 'OK', headers: {}, data: xml };
+      },
+    };
+    const deps = createSourceReaderDeps({
+      connection,
+      logger: undefined,
+    } as any);
+    expect(await deps.fetchFugrStructure('Z_FG')).toEqual([
+      {
+        objecttype: 'FUGR/PS',
+        objectname: 'SAPLZ_FG                                0100',
+        objecturi:
+          '/sap/bc/adt/vit/wb/object_type/fugrps/object_name/SAPLZ_FG%20%200100',
+      },
+      {
+        objecttype: 'FUGR/I',
+        objectname: 'LZ_FGF01',
+        objecturi: '/sap/bc/adt/functions/groups/z_fg/includes/lz_fgf01',
+      },
+    ]);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain('/sap/bc/adt/repository/objectstructure');
   });
 
   it('CLAS yields the class main include only (no subincludes in v1)', async () => {

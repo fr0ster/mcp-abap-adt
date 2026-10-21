@@ -1,5 +1,6 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from '../../../lib/strategies/reading';
+import { atStep } from '../../../lib/strategies/step';
 
 /**
  * Reconstructing what the v18 convenience read did.
@@ -92,7 +93,7 @@ export async function pollUntilFinished<TResult>(
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
   let lastStatus: AdtReading<unknown> | undefined;
   for (let attempt = 0; attempt < MAX_STATUS_POLLS; attempt += 1) {
-    const statusResponse = await getStatus(runId, true);
+    const statusResponse = await atStep('read status', getStatus)(runId, true);
     if (!statusResponse.ok) {
       return statusResponse as unknown as IAdtResponse<
         RunOutcome<TResult>,
@@ -102,7 +103,7 @@ export async function pollUntilFinished<TResult>(
     const status = statusResponse.getResult().value;
     lastStatus = status;
     if (runIsFinished(status.value)) {
-      const resultResponse = await fetchResult();
+      const resultResponse = await atStep('read result', fetchResult)();
       if (!resultResponse.ok) {
         return resultResponse as unknown as IAdtResponse<
           RunOutcome<TResult>,

@@ -37,8 +37,9 @@ Credentials (`x-sap-*` headers) and state handles travel in every request, so
 The server serves HTTPS when it is given a certificate and its key:
 
 ```bash
-mcp-abap-adt --transport=http --host=0.0.0.0 --port=3000 \
+mcp-abap-adt-http --host=0.0.0.0 --port=3000 --system-type=<onprem|cloud> \
   --tls-cert=/path/server.crt --tls-key=/path/server.key [--tls-ca=/path/ca.crt]
+# HTTP+SSE: mcp-abap-adt-sse takes the same --tls-* options
 ```
 
 ```yaml
@@ -73,8 +74,35 @@ http:            # or sse:
   permissions, and with read-only mounts in a container.
 - **`x-sap-*` credentials** arrive with each request. The server keeps none of
   them.
-- **SAP sessions** are held in the server process. Their cookies never leave
-  it.
+- **SAP sessions** are held in the server process. Their cookies never reach
+  the model, an answer or a log line. On stdio one copy leaves the process on
+  purpose: the **runtime files** in `<config dir>/runtime/`, one per SAP
+  session the server holds, so that a killed process's session can be taken up
+  by the next stdio process of the same destination at its start, or logged
+  off later by their user (the leftover-session tools). Each file is
+  deleted only once its session's logoff completed (written, and SAP answered
+  it or its connection failed); a forced close exits before that, so its
+  sessions keep their files. An HTTP or SSE server writes
+  none and serves no leftover-session tool: it holds the sessions of many users.
+  - **A runtime file is a bearer secret.** Its cookies act as that SAP user for
+    as long as the session lives, locks included. On Linux and macOS the
+    directory is created `0700` and each file `0600`, owner-only. On Windows
+    Node cannot set these modes (`chmod` changes only the read-only flag): the
+    files get the ACL the directory inherits, so keep it in your own profile
+    (the default `Documents\mcp-abap-adt`) and do not move it to a folder
+    other accounts can read. Everywhere: keep the directory out of backups,
+    synchronised folders and images, and do not share it between OS users.
+  - A file holds the writing process (pid, start time), the role, the
+    destination's name and where it points (URL, client, system kind), the
+    SAP user the destination states (none for a token credential), the
+    system information the session was looked up with (on ABAP Cloud the
+    session user and the system id) and the session's cookies — no password,
+    token or other credential.
+  - The tools act only on files of the destination the process serves (its
+    name, pointing where it points): on stdio the user and the credential
+    are fixed for the process, so whoever controls the computer controls
+    them. They ask SAP nothing to decide it; any other handle is answered as
+    unknown.
 - **State handles.** A tool that creates state outliving one call, such as a
   debug session, returns a `state_handle`, and later calls send it back. The
   handle identifies an LLM session's state.
@@ -93,6 +121,13 @@ logged by class where a message could quote a file. Logs still carry object
 names, URLs and state handles: treat them as internal, and do not enable the
 wire trace on a shared machine.
 
+Without `--auth-debug` no line holds a secret, and the startup summary shows one
+by its presence only (`Password: set`). `--auth-debug` (the stdio binaries, the
+command line or YAML only — no environment variable turns it on) routes the auth
+chain's lines to stderr and names each secret a refused token request carried by
+its first and last four characters: use it on your own machine only, and keep
+that stderr out of shared logs.
+
 ## Deployment checklist
 
 - **stdio:** protect the machine and the destination's files.
@@ -101,9 +136,12 @@ wire trace on a shared machine.
   - HTTPS (`--tls-cert`/`--tls-key`);
   - DNS-rebinding protection with allowlists;
   - access restricted by a firewall or an authenticating proxy;
-  - only the destinations those callers are entitled to.
+  - each caller sends its own credential in the `x-sap-*` headers: the server
+    holds no destination to share.
 - **Isolation:** a container, a dedicated OS user, and read-only key mounts are
   the deployer's choice and responsibility.
+- **Runtime files (stdio):** keep `<config dir>/runtime/` owner-only and off
+  shared or backed-up storage.
 - **SAP TLS verification:** keep it on.
 
 ## Reporting a vulnerability

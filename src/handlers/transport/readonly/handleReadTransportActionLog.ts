@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadTransportActionLog',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read the action log of a transport request: one entry per lifecycle event — created, object added, object deleted, owner changed. This is what confirms a RemoveTransportObject landed, since that call answers by echoing what it was asked.',
+    '[read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.',
   inputSchema: {
     type: 'object',
     properties: {

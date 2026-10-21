@@ -1,0 +1,88 @@
+/**
+ * Task 28: why this compact facade carries no `detail` of its own.
+ *
+ * Both handlers this facade delegates to genuinely reach a `detail`-bearing
+ * projection: `handleValidateObject` (`common/low/handleValidateObject.ts`)
+ * answers through `project(detail, terseValidation)`, and so does the
+ * `SERVICE_BINDING` branch's `handleValidateServiceBinding` (fixed in this
+ * same task). Neither call below forwards a `detail` argument, so both
+ * siblings always answer at their default, terse — a fourth shape the
+ * brief's three rows do not name: a tool with a real reading behind it,
+ * reached only through another handler it delegates to.
+ *
+ * `handleValidateObject`'s own `TOOL_DEFINITION` (`ValidateObjectLow`) is
+ * not a registered tool — and since 19.0.0 no low set is served at all —
+ * so for every `object_type` except `SERVICE_BINDING`
+ * this compact facade is the ONLY way a caller reaches that function's
+ * logic at all. Deliberately kept off this facade's own reduced,
+ * `compactValidateSchema` surface (the same simplification `compact/` tools
+ * make everywhere: no `detail`, no low-level session knobs) rather than
+ * exposed here for the first time.
+ */
+
+import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactValidateSchema,
+  toLowObjectType,
+} from '@mcp-abap-adt/lib/compact-shared';
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import {
+  handleValidateObject,
+  handleValidateServiceBinding,
+} from '@mcp-abap-adt/lib/handlers/read';
+
+export const TOOL_DEFINITION = {
+  name: 'HandlerValidate',
+  available_in: ['onprem', 'cloud'] as const,
+  description:
+    '[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).',
+  inputSchema: compactValidateSchema,
+} as const;
+
+type HandlerValidateArgs = {
+  object_type: CompactObjectType;
+  object_name: string;
+  package_name?: string;
+  description?: string;
+  super_package?: string;
+  superclass?: string;
+  behavior_definition?: string;
+  root_entity?: string;
+  implementation_type?: string;
+  service_definition_name?: string;
+  service_binding_version?: string;
+};
+
+export async function handleHandlerValidate(
+  context: HandlerContext,
+  args: HandlerValidateArgs,
+) {
+  if (args.object_type === 'SERVICE_BINDING') {
+    return handleValidateServiceBinding(context, {
+      service_binding_name: args.object_name,
+      service_definition_name: args.service_definition_name,
+      service_binding_version: args.service_binding_version,
+      package_name: args.package_name,
+      description: args.description,
+    });
+  }
+
+  const lowType = toLowObjectType(args.object_type);
+  if (!lowType) {
+    throw new Error(
+      `Validate is not supported for object_type: ${args.object_type}`,
+    );
+  }
+
+  return handleValidateObject(context, {
+    object_name: args.object_name,
+    object_type: lowType,
+    package_name: args.package_name,
+    description: args.description,
+    super_package: args.super_package,
+    superclass: args.superclass,
+    behavior_definition: args.behavior_definition,
+    root_entity: args.root_entity,
+    implementation_type: args.implementation_type,
+  });
+}

@@ -10,11 +10,11 @@
  * - Extract session state directly from connection
  */
 
+import { randomUUID } from 'node:crypto';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
-import { generateSessionId } from '../../../lib/sessionUtils';
 import { createConnectionLogger, getTestDestination } from './authHelpers';
 import {
   getSapConfigFromEnv,
@@ -213,7 +213,7 @@ export async function createTestConnectionAndSession(): Promise<{
     await primeSystemContext(connection);
 
     // Generate session ID
-    const sessionId = generateSessionId();
+    const sessionId = randomUUID().replace(/-/g, '');
 
     // Get session state directly from connection (same as adt-clients tests)
     // Note: getCookies() and getCsrfToken() exist in concrete classes but not in IAbapConnection interface

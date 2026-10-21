@@ -29,7 +29,7 @@ Options:
   --include-disabled             Include disabled test cases
   --fail-fast                    Stop on first failed case
   --suffix=<text>                Suffix for object names to avoid collisions
-  --delete-tool=<name>           Delete tool name (default: DeleteProgramLow)
+  --delete-tool=<name>           Delete tool name (default: DeleteProgram)
 
 Stdio options:
   --stdio-command=<cmd>          Command to spawn (default: mcp-abap-adt, the installed server)
@@ -37,7 +37,6 @@ Stdio options:
                                  default args:
                                    --transport=stdio
                                    --env-path=.env
-                                   --exposition=readonly,high,low
 
 Examples:
   node tools/mcp-crud-smoke.js --transport=http
@@ -59,7 +58,7 @@ function parseArgs(argv) {
     includeDisabled: false,
     failFast: false,
     suffix: '',
-    deleteTool: 'DeleteProgramLow',
+    deleteTool: 'DeleteProgram',
     stdioCommand: process.execPath,
     stdioCommandExplicit: false,
     stdioArgs: [],
@@ -226,11 +225,7 @@ async function createTransport(args) {
     const stdioArgs =
       args.stdioArgs.length > 0
         ? args.stdioArgs
-        : [
-            '--transport=stdio',
-            '--env-path=.env',
-            '--exposition=readonly,high,low',
-          ];
+        : ['--env-path=.env'];
     return new StdioClientTransport({
       command: args.stdioCommand || 'mcp-abap-adt',
       args: stdioArgs,
@@ -276,11 +271,7 @@ async function main() {
   if (!args.stdioArgsExplicit && hard.env_path) {
     const envPath = String(hard.env_path);
     if (envPath.trim()) {
-      args.stdioArgs = [
-        '--transport=stdio',
-        `--env-path=${envPath}`,
-        '--exposition=readonly,high,low',
-      ];
+      args.stdioArgs = [`--env-path=${envPath}`];
     }
   }
 

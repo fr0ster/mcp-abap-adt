@@ -17,6 +17,7 @@
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -30,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
+    'Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -91,18 +92,20 @@ export async function handleCreateDdl(
   return answer(
     { tool: 'CreateDdl', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDdl(resultsFor(ddlDocuments))
-        .create(
-          {
-            ddlName,
-            description: args.description || ddlName,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'ddl.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getDdl(resultsFor(ddlDocuments))
+          .create(
+            {
+              ddlName,
+              description: args.description || ddlName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

@@ -76,7 +76,8 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -89,7 +90,8 @@ import {
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
-import { succeededWith } from '../../../lib/strategies/sequence';
+import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
+import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -201,55 +203,102 @@ function familyFor(typeCode: string): ActivationFamily | undefined {
 }
 
 function activateFamily(
+  context: HandlerContext,
   client: ReturnType<typeof createAdtClient>,
   family: ActivationFamily,
   name: string,
 ) {
   switch (family) {
     case 'class':
-      return client
-        .getClass(resultsFor(classDocuments))
-        .activate({ className: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'class.activate', (headers) =>
+        client
+          .getClass(resultsFor(classDocuments))
+          .activate(
+            { className: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'program':
-      return client
-        .getProgram(resultsFor(programDocuments))
-        .activate({ programName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'program.activate', (headers) =>
+        client
+          .getProgram(resultsFor(programDocuments))
+          .activate(
+            { programName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'interface':
-      return client
-        .getInterface(resultsFor(interfaceDocuments))
-        .activate({ interfaceName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'interface.activate', (headers) =>
+        client
+          .getInterface(resultsFor(interfaceDocuments))
+          .activate(
+            { interfaceName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'function_group':
-      return client
-        .getFunctionGroup(resultsFor(functionGroupDocuments))
-        .activate({ functionGroupName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'functionGroup.activate', (headers) =>
+        client
+          .getFunctionGroup(resultsFor(functionGroupDocuments))
+          .activate(
+            { functionGroupName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'table':
-      return client
-        .getTable(resultsFor(tableDocuments))
-        .activate({ tableName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'table.activate', (headers) =>
+        client
+          .getTable(resultsFor(tableDocuments))
+          .activate(
+            { tableName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'structure':
-      return client
-        .getStructure(resultsFor(structureDocuments))
-        .activate({ structureName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'structure.activate', (headers) =>
+        client
+          .getStructure(resultsFor(structureDocuments))
+          .activate(
+            { structureName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'ddl':
-      return client
-        .getDdl(resultsFor(ddlDocuments))
-        .activate({ ddlName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'ddl.activate', (headers) =>
+        client
+          .getDdl(resultsFor(ddlDocuments))
+          .activate({ ddlName: name }, { headers, analyse: analyseActivation }),
+      );
     case 'domain':
-      return client
-        .getDomain(resultsFor(domainDocuments))
-        .activate({ domainName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'domain.activate', (headers) =>
+        client
+          .getDomain(resultsFor(domainDocuments))
+          .activate(
+            { domainName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'data_element':
-      return client
-        .getDataElement(resultsFor(dataElementDocuments))
-        .activate({ dataElementName: name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'dataElement.activate', (headers) =>
+        client
+          .getDataElement(resultsFor(dataElementDocuments))
+          .activate(
+            { dataElementName: name },
+            { headers, analyse: analyseActivation },
+          ),
+      );
     case 'behavior_definition':
-      return client
-        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-        .activate({ name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
+        client
+          .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+          .activate({ name }, { headers, analyse: analyseActivation }),
+      );
     case 'metadata_extension':
-      return client
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .activate({ name }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
+        client
+          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+          .activate({ name }, { headers, analyse: analyseActivation }),
+      );
   }
 }
 
@@ -316,7 +365,7 @@ export async function handleActivateObject(
     const objectName = activationObjects[0].name;
     return answer(
       { tool: 'ActivateObjectLow', detail },
-      () => activateFamily(client, family, objectName),
+      () => activateFamily(context, client, family, objectName),
       project(detail, terseActivation),
     );
   }
@@ -336,10 +385,14 @@ export async function handleActivateObject(
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
     async () => {
-      const started = await utils.activateObjectsGroup(
-        activationObjects,
-        preaudit,
-        { analyse: analyseException },
+      const started = await withAdtHeaders(
+        context,
+        'utils.activateObjectsGroup',
+        (headers) =>
+          utils.activateObjectsGroup(activationObjects, preaudit, {
+            headers,
+            analyse: analyseException,
+          }),
       );
       if (!started.ok) return started as never;
       const runId = started.getResult().value;
@@ -348,6 +401,9 @@ export async function handleActivateObject(
         runId,
         analyseException,
       );
+      // Reading the run failed: the method's error as it is, with its step.
+      if (outcome.failure !== undefined)
+        return failedWith<ActivationRunOutcome>(outcome.failure);
       return succeededWith(outcome);
     },
     (outcome: ActivationRunOutcome) => {
@@ -396,5 +452,90 @@ export async function handleActivateObject(
                   .join('; '),
       };
     },
+  );
+}
+
+/** The step a run start's failure arose at. */
+const START_ACTIVATION_RUN = 'start activation run';
+
+/** A run start SAP answered with no run id: the fixed words. */
+export const RUN_START_WITHOUT_ID =
+  'SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.';
+
+/**
+ * The activation in one request (compact `HandlerActivate`; spec §4.6, one
+ * ADT request per tool call).
+ *
+ * One object of a type the per-object activation maps is that activation —
+ * the same request and answer as `handleActivateObject`. Every other call is
+ * the one `POST /activation/runs`, answered `{ run_id }`: the run was
+ * accepted and has no verdict yet. Its status and its messages are separate
+ * reads by that id (`handleGetActivationStatus`,
+ * `handleGetActivationResults`); waiting between them is the caller's.
+ */
+export async function handleActivateObjectOnce(
+  context: HandlerContext,
+  params: ActivateObjectArgs,
+) {
+  const { connection, logger } = context;
+  const args = params;
+  if (
+    !args.objects ||
+    !Array.isArray(args.objects) ||
+    args.objects.length === 0
+  ) {
+    return return_error(
+      new Error(
+        'Missing required parameter: objects (must be non-empty array)',
+      ),
+    );
+  }
+  const activationObjects = args.objects.map((obj) => ({
+    type: obj.type,
+    name: obj.name.toUpperCase(),
+    ...(obj.uri ? { uri: obj.uri } : {}),
+    ...(obj.parentName ? { parentName: obj.parentName } : {}),
+  }));
+  const family =
+    activationObjects.length === 1
+      ? familyFor(activationObjects[0].type)
+      : undefined;
+  if (family !== undefined) {
+    return handleActivateObject(context, params);
+  }
+
+  const preaudit = args.preaudit !== false; // default true
+  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+  return answer(
+    { tool: 'HandlerActivate', detail: 'terse' },
+    async () => {
+      const started = await withAdtHeaders(
+        context,
+        'utils.activateObjectsGroup',
+        (headers) =>
+          utils.activateObjectsGroup(activationObjects, preaudit, {
+            headers,
+            analyse: analyseException,
+          }),
+      );
+      if (!started.ok) {
+        return failedWith<string>(
+          withStep(started.getError(), START_ACTIVATION_RUN),
+        );
+      }
+      // A run is read by its id alone, and the id travels only in `Location`:
+      // an answer without one started nothing the caller can read.
+      const runId = started.getResult().value;
+      if (runId === '') {
+        return failedWith<string>(
+          withStep(
+            { message: RUN_START_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            START_ACTIVATION_RUN,
+          ),
+        );
+      }
+      return succeededWith(runId);
+    },
+    (runId: string) => ({ run_id: runId }),
   );
 }

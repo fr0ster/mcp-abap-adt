@@ -15,6 +15,7 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -58,7 +59,7 @@ export const TOOL_DEFINITION = {
   name: 'MoveTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Move object entries from one transport task to another. Each entry is named by its position in the source task's object list.",
+    "Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -148,19 +149,21 @@ export async function handleMoveTransportObjects(
   return answer(
     { tool: 'MoveTransportObjects', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .moveObjects(
-          args.transport_number,
-          args.target_number,
-          args.objects.map((entry) => ({
-            name: entry.object_name,
-            type: entry.object_type,
-            position: entry.position,
-            ...(entry.pgmid ? { pgmid: entry.pgmid } : {}),
-          })),
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'request.moveObjects', (headers) =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .moveObjects(
+            args.transport_number,
+            args.target_number,
+            args.objects.map((entry) => ({
+              name: entry.object_name,
+              type: entry.object_type,
+              position: entry.position,
+              ...(entry.pgmid ? { pgmid: entry.pgmid } : {}),
+            })),
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseMove),
   );
 }

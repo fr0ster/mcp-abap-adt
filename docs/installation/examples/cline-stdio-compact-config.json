@@ -2,7 +2,7 @@
   "mcpServers": {
     "mcp-abap-adt-compact": {
       "command": "mcp-abap-adt-compact",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     }
   }

@@ -1,17 +1,19 @@
 /**
- * The compact tools that change the system, or run code on it — nine of the
- * twenty-two.
+ * The compact tools that change the system, or run code on it — twelve of the
+ * twenty-nine.
  *
  * The other half of the capability split described in
  * `CompactReadOnlyHandlersGroup`. Everything here either writes to the repository
  * (`HandlerCreate`, `HandlerUpdate`, `HandlerDelete`, `HandlerActivate`,
- * `HandlerTransportCreate`), takes an enqueue (`HandlerLock`, `HandlerUnlock` — a
- * lock changes state and blocks other users), or executes ABAP and leaves traces
- * (`HandlerUnitTestRun`, `HandlerProfileRun`).
+ * `HandlerTransportCreate`, `HandlerTransportSortAndCompress`,
+ * `HandlerTransportMoveObjects`), takes an enqueue (`HandlerLock`, `HandlerUnlock` — a
+ * lock changes state and blocks other users), or schedules a trace or
+ * executes ABAP and leaves traces (`HandlerProfileSchedule`,
+ * `HandlerUnitTestRun`, `HandlerProfileRun`).
  *
  * A consumer that wants the whole compact surface takes this group beside the
- * read-only one, which is what `CompactHandlersGroup` does and what
- * `--exposition=compact` serves.
+ * read-only one, which is what `CompactHandlersGroup` does and what the compact
+ * binaries serve.
  */
 
 import type { HandlerContext, HandlerEntry } from '@mcp-abap-adt/lib/handlers';
@@ -37,9 +39,21 @@ import {
   handleHandlerProfileRun,
 } from './handlers/handleHandlerProfileRun';
 import {
+  TOOL_DEFINITION as HandlerProfileSchedule_Tool,
+  handleHandlerProfileSchedule,
+} from './handlers/handleHandlerProfileSchedule';
+import {
   TOOL_DEFINITION as HandlerTransportCreate_Tool,
   handleHandlerTransportCreate,
 } from './handlers/handleHandlerTransportCreate';
+import {
+  TOOL_DEFINITION as HandlerTransportMoveObjects_Tool,
+  handleHandlerTransportMoveObjects,
+} from './handlers/handleHandlerTransportMoveObjects';
+import {
+  TOOL_DEFINITION as HandlerTransportSortAndCompress_Tool,
+  handleHandlerTransportSortAndCompress,
+} from './handlers/handleHandlerTransportSortAndCompress';
 import {
   TOOL_DEFINITION as HandlerUnitTestRun_Tool,
   handleHandlerUnitTestRun,
@@ -91,6 +105,14 @@ export function compactModifyEntries(
       handler: withContext(handleHandlerTransportCreate),
     },
     {
+      toolDefinition: HandlerTransportSortAndCompress_Tool,
+      handler: withContext(handleHandlerTransportSortAndCompress),
+    },
+    {
+      toolDefinition: HandlerTransportMoveObjects_Tool,
+      handler: withContext(handleHandlerTransportMoveObjects),
+    },
+    {
       toolDefinition: HandlerLock_Tool,
       handler: withContext(handleHandlerLock),
     },
@@ -101,6 +123,10 @@ export function compactModifyEntries(
     {
       toolDefinition: HandlerUnitTestRun_Tool,
       handler: withContext(handleHandlerUnitTestRun),
+    },
+    {
+      toolDefinition: HandlerProfileSchedule_Tool,
+      handler: withContext(handleHandlerProfileSchedule),
     },
     {
       toolDefinition: HandlerProfileRun_Tool,

@@ -49,10 +49,12 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IMessageClassMessageConfig,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -63,7 +65,7 @@ import { return_error } from '../../../lib/utils';
 interface MessageClassMessageWrites {
   delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E>>;
 }
 
@@ -117,18 +119,20 @@ export async function handleDeleteMessageClassMessage(
   return answer(
     { tool: 'DeleteMessageClassMessage', detail: 'terse' },
     () =>
-      (
-        createAdtClient(
-          connection,
-          logger,
-        ).getMessageClassMessage() as unknown as MessageClassMessageWrites
-      ).delete(
-        {
-          className,
-          msgno: args.msgno,
-          transportRequest: args.transport_request,
-        },
-        { analyse: analyseException },
+      withAdtHeaders(context, 'messageClassMessage.delete', (headers) =>
+        (
+          createAdtClient(
+            connection,
+            logger,
+          ).getMessageClassMessage() as unknown as MessageClassMessageWrites
+        ).delete(
+          {
+            className,
+            msgno: args.msgno,
+            transportRequest: args.transport_request,
+          },
+          { headers, analyse: analyseException },
+        ),
       ),
     // A constant success, reading nothing from the answer — safe here, and
     // only here, because `answer()` never reaches this projection unless the

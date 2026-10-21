@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugCreateWatchpoint',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.',
+    '[read-only] [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.',
   inputSchema: {
     type: 'object',
     properties: {

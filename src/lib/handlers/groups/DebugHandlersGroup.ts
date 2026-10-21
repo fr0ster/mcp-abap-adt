@@ -122,8 +122,9 @@ import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import { defineTool, type HandlerEntry } from '../interfaces.js';
 
 /**
- * The debugger tools — opt-in (`--exposition=…,debug`): a breakpoint catches
- * every request of the request user. Their state lives in the server
+ * The debugger tools — served by the full write binaries (`fullToolSet`),
+ * never by a `-ro` one: a breakpoint catches every request of the request
+ * user. Their state lives in the server
  * instance (`HandlerContext.debugger`).
  */
 export class DebugHandlersGroup extends BaseHandlerGroup {

@@ -15,8 +15,8 @@
  */
 
 import { handleCreateDomain } from '../../../../handlers/domain/high/handleCreateDomain';
+import { handleDeleteDomain } from '../../../../handlers/domain/high/handleDeleteDomain';
 import { handleUpdateDomain } from '../../../../handlers/domain/high/handleUpdateDomain';
-import { handleDeleteDomain } from '../../../../handlers/domain/low/handleDeleteDomain';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
 

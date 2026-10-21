@@ -29,6 +29,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -37,6 +38,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -123,19 +125,23 @@ export async function handleUpdateFunctionInclude(
             { functionGroupName, includeName },
             { analyse: analyseLock },
           ),
-        (lockHandle) =>
-          obj.update(
-            {
-              functionGroupName,
-              includeName,
-              transportRequest: args.transport_request,
-            },
-            {
-              source: args.source_code,
-              lockHandle,
-              analyse: analyseException,
-            },
+        atStep('update', (lockHandle) =>
+          withAdtHeaders(context, 'functionInclude.update', (headers) =>
+            obj.update(
+              {
+                functionGroupName,
+                includeName,
+                transportRequest: args.transport_request,
+              },
+              {
+                headers,
+                source: args.source_code,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ functionGroupName, includeName }, lockHandle, {
             analyse: analyseException,
@@ -146,10 +152,15 @@ export async function handleUpdateFunctionInclude(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate(
-          { functionGroupName, includeName },
-          { analyse: analyseActivation },
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'functionInclude.activate', (headers) =>
+            obj.activate(
+              { functionGroupName, includeName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
         ),
       );
     },

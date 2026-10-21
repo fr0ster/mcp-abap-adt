@@ -22,61 +22,186 @@
  *   its lock handle; the update with that handle runs on it; the unlock
  *   releases it and closes it. The handle belongs to the session that took
  *   it, so the whole lock → update → unlock chain has to share that session.
+ *
+ * Where a fresh connection comes from is `openFreshConnection`: the factory's record of a connection the server built, or the host's
+ * `freshConnection` for one it injected — never the connection's own
+ * configuration. Without either the operation is refused.
+ *
+ * Every fresh connection is the server's from the moment it exists: recorded in the connection-ends registry (`ownedConnections.ts`) as
+ * the calling instance's, and ended with its one `disconnect()` — the logoff —
+ * when its operation ends, on every path, or by the instance's terminal close.
  */
-import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { isLatched } from './activeTools';
+import { ClosedInstanceRefusal } from './auth/failures';
+import { ServerRefusal } from './auth/serverRefusal';
 import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
-import { credentialFromSapConfig } from './credentialSources';
 import type { HandlerContext } from './handlers/interfaces';
+import {
+  endConnection,
+  isEnded,
+  own,
+  refuseIfClosed,
+  refuseWhenClosed,
+  whenEnded,
+} from './ownedConnections';
 
 type Logger = HandlerContext['logger'];
 
 /**
- * A connection of its own, connected: from the record the factory kept when it
- * built `connection` — the same settings and the same credential object — or,
- * for a connection it did not build, from the connection's own configuration.
+ * The host's factory of fresh connections: a connection of
+ * its own, built by the host with its credential. It receives no signal
+ *: a fresh connection is made inside a started tool, which runs to its
+ * end. Once returned it is the server's: held for the operation or
+ * under a package lock's handle, then closed with `disconnect()`.
+ */
+export type FreshConnectionFactory = () => Promise<IAbapConnection>;
+
+/** Injected connections whose host gave a fresh-connection factory. */
+const hostFactories = new WeakMap<object, FreshConnectionFactory>();
+
+/**
+ * Records what the host gave beside the connection it injected
+ * (`EmbeddableMcpServer`'s `freshConnection`): its factory, or none. The
+ * latest injection of a connection object decides — one injected again
+ * without a factory forgets the earlier one, and a fresh connection on it is
+ * refused. Keyed weakly: a connection the host drops is not kept.
+ */
+export function registerFreshConnectionFactory(
+  connection: object,
+  factory: FreshConnectionFactory | undefined,
+): void {
+  if (factory) hostFactories.set(connection, factory);
+  else hostFactories.delete(connection);
+}
+
+/**
+ * A connection of its own, ready for requests, decided from a registry keyed
+ * by the connection object — never from the connection's configuration
+ *:
+ *
+ * - built by the server (`createAbapConnection`) → the factory's record: the
+ *   same settings and the same credential object, connected here (closed if
+ *   that fails);
+ * - injected with the host's `freshConnection` → that factory, called with
+ *   no argument; what it returns is the server's, connected here
+ *   like the server's own;
+ * - anything else → refused `fresh_connection_unavailable`, nothing sent.
+ *
+ * Once the calling instance is latched closed (its close, the process's
+ * shutdown), nothing is built and the host's factory is not called:
+ * `ClosedInstanceRefusal`, nothing sent. A latch that closes while the
+ * factory or the connect runs ends the connection and refuses the same way.
+ *
+ * `born`, when given, is handed the connection as soon as it exists — once
+ * owned, before its `connect()`: a background run hands it to the instance
+ * that started it, whose close then reaches it while it still connects. A
+ * `born` that throws (that instance closed while the host's factory ran)
+ * refuses the open: the connection is ended unconnected, nothing sent.
  */
 export async function openFreshConnection(
   connection: IAbapConnection,
   logger: Logger,
+  born?: (connection: IAbapConnection) => void,
 ): Promise<IAbapConnection> {
+  refuseIfClosed();
   const record = siblingRecordOf(connection);
-  const settings = (record?.settings ??
-    (connection as { getConfig?: () => unknown }).getConfig?.() ??
-    (connection as { config?: unknown }).config) as SapConfig | undefined;
-  if (!settings) {
-    throw new Error(
-      'A fresh connection was needed, but the connection carries no configuration to open one from',
+  if (record) {
+    // Built for the kind recorded for the connection it is a sibling of,
+    // never for what SAP_SYSTEM_TYPE says now.
+    const built = createAbapConnection(
+      record.settings,
+      record.credential,
+      logger ?? null,
+      undefined,
+      undefined,
+      record.kind,
     );
+    own(built, { role: 'fresh' });
+    await bornOrEnded(built, born, logger);
+    return connectedOrClosed(built, logger);
   }
-  const fresh = createAbapConnection(
-    settings,
-    record?.credential ?? credentialFromSapConfig(settings),
-    logger ?? null,
-  ) as IAbapConnection & { connect?: () => Promise<void> };
-  // RFC connections need an explicit connect(); createAbapConnection does not.
-  if (typeof fresh.connect === 'function') await fresh.connect();
+  const factory = hostFactories.get(connection);
+  if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
+  // Once handed over it is the server's, treated exactly like a
+  // connection the server built.
+  const given = await factory();
+  own(given, { role: 'fresh' });
+  await bornOrEnded(given, born, logger);
+  return connectedOrClosed(given, logger);
+}
+
+/**
+ * Hands a fresh connection, not yet connected, to `born`; if that throws,
+ * ends it (nothing was sent on it) and throws what `born` threw.
+ */
+async function bornOrEnded(
+  fresh: IAbapConnection,
+  born: ((connection: IAbapConnection) => void) | undefined,
+  logger: Logger,
+): Promise<void> {
+  if (born === undefined) return;
+  try {
+    born(fresh);
+  } catch (error) {
+    await closeQuietly(fresh, logger, 'A fresh connection');
+    throw error;
+  }
+}
+
+/**
+ * Whether `openFreshConnection` has a fresh connection to open for
+ * `connection` — the factory's record or the host's `freshConnection` — so a
+ * caller can refuse before it sends anything else. Nothing is opened.
+ */
+export function freshConnectionAvailable(connection: IAbapConnection): boolean {
+  return (
+    siblingRecordOf(connection) !== undefined || hostFactories.has(connection)
+  );
+}
+
+/**
+ * A fresh connection the server now holds, connected (RFC needs an explicit
+ * `connect()`; `createAbapConnection` does not connect). If the connect
+ * fails, the connection is closed and the failure is the answer: nothing
+ * half-opened is left behind, on either path.
+ */
+async function connectedOrClosed(
+  fresh: IAbapConnection,
+  logger: Logger,
+): Promise<IAbapConnection> {
+  const connectable = fresh as { connect?: () => Promise<void> };
+  // Right before the connect, with no await between: a close that ended this
+  // connection after it was recorded (its instance's sweep, or the cut of the
+  // background runs that instance started) leaves nothing to connect.
+  if (isEnded(fresh)) throw new ClosedInstanceRefusal(isLatched());
+  refuseWhenClosed(fresh);
+  try {
+    if (typeof connectable.connect === 'function') await connectable.connect();
+  } catch (error) {
+    await closeQuietly(fresh, logger, 'A fresh connection');
+    // A connect its instance's close cut short: the close's refusal.
+    refuseWhenClosed(fresh);
+    throw error;
+  }
+  refuseWhenClosed(fresh);
   return fresh;
 }
 
-/** Closes a connection this process opened; a failure to close is only logged. */
+/**
+ * Closes a connection this process holds as its own — its one
+ * `disconnect()`, joined if another end already asked for it; a failure
+ * to close is only logged, in fixed words.
+ */
 export async function closeQuietly(
   opened: IAbapConnection,
   logger: Logger,
   what: string,
 ): Promise<void> {
-  const closable = opened as { disconnect?: () => Promise<void> };
-  if (typeof closable.disconnect !== 'function') return;
-  try {
-    await closable.disconnect();
-  } catch (error) {
-    logger?.warn(
-      `${what}: could not close its own connection: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
+  await endConnection(opened, () => {
+    logger?.warn(`${what}: could not close its own connection`);
+  });
 }
 
 /**
@@ -129,6 +254,14 @@ export async function connectionForPackageLock(
     connection: fresh,
     keep: (lockHandle) => {
       lockSessions.set(lockHandle, fresh);
+      // Held under its handle until the unlock — or the instance's terminal
+      // close, which logs it off and forgets it here.
+      own(fresh, { role: 'lock' });
+      whenEnded(fresh, () => {
+        if (lockSessions.get(lockHandle) === fresh) {
+          lockSessions.delete(lockHandle);
+        }
+      });
     },
     drop: () => closeQuietly(fresh, logger, 'LockPackage'),
   };

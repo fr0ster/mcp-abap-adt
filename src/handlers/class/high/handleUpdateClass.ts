@@ -29,6 +29,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -38,6 +39,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -106,15 +108,19 @@ export async function handleUpdateClass(
       const written = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const update = () =>
-            obj.update(
-              { className, transportRequest: args.transport_request },
-              {
-                source: args.source_code,
-                lockHandle,
-                analyse: analyseException,
-              },
-            );
+          const update = atStep('update', () =>
+            withAdtHeaders(context, 'class.update', (headers) =>
+              obj.update(
+                { className, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.source_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            ),
+          );
           // **A finding does not stop the write; a check that could not run
           // does.** Which is where the line sat before the migration, and the
           // only thing wrong with this step was the reading on it.
@@ -136,12 +142,15 @@ export async function handleUpdateClass(
           // always a reason not to write.
           return shouldActivate
             ? sequence(
-                () =>
-                  obj.check(
-                    { className, source: args.source_code },
-                    'inactive',
-                    { analyse: analyseException },
+                atStep('check', () =>
+                  withAdtHeaders(context, 'class.check', (headers) =>
+                    obj.check(
+                      { className, source: args.source_code },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
                   ),
+                ),
                 update,
               )
             : update();
@@ -153,8 +162,16 @@ export async function handleUpdateClass(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'class.activate', (headers) =>
+            obj.activate(
+              { className },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

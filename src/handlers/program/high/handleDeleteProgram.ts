@@ -64,6 +64,8 @@ export async function handleDeleteProgram(
     { tool: 'DeleteProgram', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'program',
         createAdtClient(connection, logger).getProgram(
           resultsFor(programDocuments),
         ),

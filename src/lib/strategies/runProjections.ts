@@ -44,17 +44,3 @@ export const terseClassRun: RuntimeProjection = (value) => ({
     ? { profile: { profiler_id: value.profilerId, trace_id: value.traceId } }
     : {}),
 });
-
-/**
- * The deprecated `RuntimeRunClassWithProfiling`: the profiler fields flat, and
- * **no `output`** — this tool did not answer one before the migration either,
- * and this work does not add fields to a deprecated tool.
- *
- * `run_status`/`trace_requests_status` are gone for the same reason as above.
- */
-export const terseProfilingRun: RuntimeProjection = (value) => ({
-  success: true,
-  class_name: value.className,
-  profiler_id: value.profilerId,
-  trace_id: value.traceId,
-});

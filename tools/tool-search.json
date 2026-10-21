@@ -1,0 +1,4164 @@
+{
+  "ActivateBehaviorDefinition": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Activate a RAP behavior definition after it was created or changed, so the change is in force."
+  },
+  "ActivateClass": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Activate an ABAP class after it was created or changed, so the change is in force."
+  },
+  "ActivateDataElement": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "data element",
+      "DTEL",
+      "field label",
+      "data type",
+      "domain",
+      "type of a field"
+    ],
+    "semantic": "Activate an ABAP data element after it was created or changed, so the change is in force."
+  },
+  "ActivateDdl": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Activate a CDS view after it was created or changed, so the change is in force."
+  },
+  "ActivateDomain": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "domain",
+      "DOMA",
+      "fixed values",
+      "value range",
+      "data type",
+      "length",
+      "decimals"
+    ],
+    "semantic": "Activate an ABAP domain after it was created or changed, so the change is in force."
+  },
+  "ActivateFunctionGroup": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "function group",
+      "FUGR",
+      "function pool"
+    ],
+    "semantic": "Activate an ABAP function group after it was created or changed, so the change is in force."
+  },
+  "ActivateFunctionModule": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Activate an ABAP function module (BAPI or RFC function) after it was created or changed, so the change is in force."
+  },
+  "ActivateInterface": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Activate an ABAP interface after it was created or changed, so the change is in force."
+  },
+  "ActivateMetadataExtension": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Activate a CDS metadata extension after it was created or changed, so the change is in force."
+  },
+  "ActivateObjects": {
+    "keywords": [
+      "activate",
+      "mass activation",
+      "activate all",
+      "several objects",
+      "inactive objects",
+      "activation",
+      "activate many"
+    ],
+    "semantic": "Activate several objects together in one activation, for example all inactive objects."
+  },
+  "ActivateProgram": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Activate an ABAP program (report) after it was created or changed, so the change is in force."
+  },
+  "ActivateServiceBinding": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "service binding",
+      "SRVB",
+      "OData V2",
+      "OData V4",
+      "OData service",
+      "Fiori",
+      "publish"
+    ],
+    "semantic": "Activate an OData service binding after it was created or changed, so the change is in force."
+  },
+  "ActivateServiceDefinition": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "service definition",
+      "SRVD",
+      "OData service",
+      "exposed entities",
+      "RAP service"
+    ],
+    "semantic": "Activate a service definition after it was created or changed, so the change is in force."
+  },
+  "ActivateStructure": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Activate an ABAP DDIC structure after it was created or changed, so the change is in force."
+  },
+  "ActivateTable": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Activate an ABAP database table after it was created or changed, so the change is in force."
+  },
+  "AddTransportObject": {
+    "keywords": [
+      "add to transport",
+      "record on transport",
+      "assign to transport",
+      "include in request",
+      "transport request",
+      "task",
+      "object list",
+      "class",
+      "program"
+    ],
+    "semantic": "Add a class, program or other object to a transport request or task, so it is transported with it."
+  },
+  "AmdpDebugCancel": {
+    "keywords": [
+      "AMDP",
+      "cancel",
+      "abort",
+      "SQLScript"
+    ],
+    "semantic": "Cancel the execution of the AMDP method being debugged."
+  },
+  "AmdpDebugGetTable": {
+    "keywords": [
+      "AMDP table variable",
+      "rows",
+      "SQLScript",
+      "AMDP",
+      "debug"
+    ],
+    "semantic": "Show the rows of a table variable where the AMDP method stopped."
+  },
+  "AmdpDebugSetBreakpoints": {
+    "keywords": [
+      "AMDP breakpoints",
+      "SQLScript",
+      "AMDP",
+      "breakpoint"
+    ],
+    "semantic": "Set the breakpoints of an AMDP debug session."
+  },
+  "AmdpDebugStart": {
+    "keywords": [
+      "AMDP debugging",
+      "SQLScript",
+      "AMDP",
+      "HANA procedure",
+      "debug",
+      "breakpoint"
+    ],
+    "semantic": "Start debugging an AMDP method (SQLScript) with breakpoints on its lines."
+  },
+  "AmdpDebugStep": {
+    "keywords": [
+      "AMDP",
+      "step",
+      "SQLScript",
+      "continue",
+      "debug"
+    ],
+    "semantic": "Step the stopped AMDP method over a statement or to the next stop."
+  },
+  "AmdpDebugStop": {
+    "keywords": [
+      "AMDP",
+      "stop debugging",
+      "end session",
+      "SQLScript"
+    ],
+    "semantic": "Stop debugging the AMDP method and end the AMDP debug session."
+  },
+  "AmdpDebugWait": {
+    "keywords": [
+      "AMDP",
+      "wait",
+      "AMDP events",
+      "SQLScript",
+      "debug"
+    ],
+    "semantic": "Wait until the AMDP method being debugged stops at an SQLScript breakpoint."
+  },
+  "BatchAnswers": {
+    "keywords": [
+      "batch answers",
+      "batch results",
+      "answer by number",
+      "batch"
+    ],
+    "semantic": "Read the answers of the calls of the last batch by their number."
+  },
+  "BatchBegin": {
+    "keywords": [
+      "batch mode",
+      "start batch",
+      "record calls",
+      "several calls together",
+      "batch"
+    ],
+    "semantic": "Start batch mode: record several independent calls to send them together."
+  },
+  "BatchEnd": {
+    "keywords": [
+      "end batch",
+      "send batch",
+      "execute batch",
+      "batch mode",
+      "batch"
+    ],
+    "semantic": "Send the recorded calls together in one request and end batch mode."
+  },
+  "CheckBehaviorDefinition": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Run a syntax check on a RAP behavior definition and see its errors and warnings."
+  },
+  "CheckClass": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Run a syntax check on an ABAP class and see its errors and warnings."
+  },
+  "CheckDataElement": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "data element",
+      "DTEL",
+      "field label",
+      "data type",
+      "domain",
+      "type of a field"
+    ],
+    "semantic": "Run a syntax check on an ABAP data element and see its errors and warnings."
+  },
+  "CheckDdl": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Run a syntax check on a CDS view and see its errors and warnings."
+  },
+  "CheckDomain": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "domain",
+      "DOMA",
+      "fixed values",
+      "value range",
+      "data type",
+      "length",
+      "decimals"
+    ],
+    "semantic": "Run a syntax check on an ABAP domain and see its errors and warnings."
+  },
+  "CheckFunctionGroup": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "function group",
+      "FUGR",
+      "function pool"
+    ],
+    "semantic": "Run a syntax check on an ABAP function group and see its errors and warnings."
+  },
+  "CheckFunctionModule": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Run a syntax check on an ABAP function module (BAPI or RFC function) and see its errors and warnings."
+  },
+  "CheckInterface": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Run a syntax check on an ABAP interface and see its errors and warnings."
+  },
+  "CheckMetadataExtension": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Run a syntax check on a CDS metadata extension and see its errors and warnings."
+  },
+  "CheckPackage": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "package",
+      "development package",
+      "DEVC",
+      "super-package",
+      "sub-packages"
+    ],
+    "semantic": "Run a syntax check on an ABAP package and see its errors and warnings."
+  },
+  "CheckProgram": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Run a syntax check on an ABAP program (report) and see its errors and warnings."
+  },
+  "CheckStructure": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Run a syntax check on an ABAP DDIC structure and see its errors and warnings."
+  },
+  "CheckTable": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "does it compile",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Run a syntax check on an ABAP database table and see its errors and warnings."
+  },
+  "CreateBehaviorDefinition": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Create a new RAP behavior definition for a CDS root entity of a RAP business object, in a package and recorded on a transport request."
+  },
+  "CreateBehaviorImplementation": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "behavior implementation",
+      "behavior pool",
+      "BP class",
+      "RAP handler class",
+      "RAP",
+      "behaviour implementation"
+    ],
+    "semantic": "Create a new RAP behavior implementation class for a behavior definition, in a package and recorded on a transport request."
+  },
+  "CreateCdsUnitTest": {
+    "keywords": [
+      "CDS test",
+      "CDS view unit test",
+      "test double",
+      "CDS test double framework",
+      "ABAP Unit",
+      "CDS view"
+    ],
+    "semantic": "Write ABAP Unit tests for a CDS view with CDS test doubles."
+  },
+  "CreateClass": {
+    "keywords": [
+      "create class",
+      "new class",
+      "create",
+      "new",
+      "generate",
+      "make",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO",
+      "helper class",
+      "test helper class"
+    ],
+    "semantic": "Create a new global ABAP class with any name, a test helper class included, in a package and recorded on a transport request."
+  },
+  "CreateDataElement": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "data element",
+      "DTEL",
+      "field label",
+      "data type",
+      "domain",
+      "type of a field"
+    ],
+    "semantic": "Create a new ABAP data element with its type and field labels, in a package and recorded on a transport request."
+  },
+  "CreateDdl": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Create a new CDS view that selects from a table or another CDS view, in a package and recorded on a transport request."
+  },
+  "CreateDomain": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "domain",
+      "DOMA",
+      "fixed values",
+      "value range",
+      "data type",
+      "length",
+      "decimals"
+    ],
+    "semantic": "Create a new ABAP domain with its data type and fixed values, in a package and recorded on a transport request."
+  },
+  "CreateFunctionGroup": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "function group",
+      "FUGR",
+      "function pool"
+    ],
+    "semantic": "Create a new ABAP function group, in a package and recorded on a transport request."
+  },
+  "CreateFunctionGroupUnitTest": {
+    "keywords": [
+      "function group unit test",
+      "ABAP Unit",
+      "test include",
+      "function group",
+      "FUGR"
+    ],
+    "semantic": "Write ABAP Unit tests for a function group in a test include."
+  },
+  "CreateFunctionInclude": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "function group include",
+      "include",
+      "TOP include",
+      "FUGR include"
+    ],
+    "semantic": "Create a new include of an ABAP function group inside a function group, for shared declarations or form routines, in a package and recorded on a transport request."
+  },
+  "CreateFunctionModule": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Create a new function module in a function group: an FM, BAPI or RFC-enabled function with its parameters."
+  },
+  "CreateInterface": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Create a new ABAP interface, in a package and recorded on a transport request."
+  },
+  "CreateMessageClass": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "message class",
+      "MSAG",
+      "T100",
+      "messages",
+      "message texts"
+    ],
+    "semantic": "Create a new ABAP message class, in a package and recorded on a transport request."
+  },
+  "CreateMessageClassMessage": {
+    "keywords": [
+      "add message",
+      "create",
+      "new",
+      "generate",
+      "make",
+      "message",
+      "message class",
+      "MSAG",
+      "T100",
+      "message number",
+      "message text"
+    ],
+    "semantic": "Add a new message with a number and a text to an ABAP message class."
+  },
+  "CreateMetadataExtension": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Create a new CDS metadata extension with UI annotations for a CDS view, in a package and recorded on a transport request."
+  },
+  "CreatePackage": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "package",
+      "development package",
+      "DEVC",
+      "super-package",
+      "sub-packages"
+    ],
+    "semantic": "Create a new ABAP package under a super-package, in a package and recorded on a transport request."
+  },
+  "CreateProgram": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Create a new ABAP program (report), in a package and recorded on a transport request."
+  },
+  "CreateProgramUnitTest": {
+    "keywords": [
+      "report unit test",
+      "program unit test",
+      "ABAP Unit",
+      "test include",
+      "report",
+      "program"
+    ],
+    "semantic": "Write ABAP Unit tests for a report (program) in a test include."
+  },
+  "CreateServiceBinding": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "service binding",
+      "SRVB",
+      "OData V2",
+      "OData V4",
+      "OData service",
+      "Fiori",
+      "publish"
+    ],
+    "semantic": "Create a new OData service binding (OData V2 or V4) for a service definition, in a package and recorded on a transport request."
+  },
+  "CreateServiceDefinition": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "service definition",
+      "SRVD",
+      "OData service",
+      "exposed entities",
+      "RAP service"
+    ],
+    "semantic": "Create a new service definition that exposes CDS views as an OData service, in a package and recorded on a transport request."
+  },
+  "CreateStructure": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Create a new ABAP DDIC structure with its fields (components), in a package and recorded on a transport request."
+  },
+  "CreateTable": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Create a new ABAP database table with its fields (columns) and key, in a package and recorded on a transport request."
+  },
+  "CreateTransport": {
+    "keywords": [
+      "new transport request",
+      "create transport",
+      "transport request",
+      "workbench request",
+      "customizing request",
+      "TR",
+      "SE09"
+    ],
+    "semantic": "Create a new transport request (workbench or customizing) to record changes."
+  },
+  "CreateTransportTask": {
+    "keywords": [
+      "transport task",
+      "new task",
+      "task for a user",
+      "add task",
+      "transport request"
+    ],
+    "semantic": "Create a new task under a transport request for a user."
+  },
+  "CreateUnitTest": {
+    "keywords": [
+      "write unit tests",
+      "ABAP Unit",
+      "local test classes",
+      "class"
+    ],
+    "semantic": "Write ABAP Unit tests for a class: its local test classes."
+  },
+  "DebugBatchBegin": {
+    "keywords": [
+      "debugger batch",
+      "record debugger calls",
+      "batch",
+      "debugger"
+    ],
+    "semantic": "Start recording debugger calls at the stopped program to send them together."
+  },
+  "DebugBatchEnd": {
+    "keywords": [
+      "debugger batch",
+      "send debugger calls",
+      "batch",
+      "debugger"
+    ],
+    "semantic": "Send the recorded debugger calls together and end the debugger batch."
+  },
+  "DebugCreateMemorySnapshot": {
+    "keywords": [
+      "memory snapshot",
+      "memory dump",
+      "debugger",
+      "memory"
+    ],
+    "semantic": "Write a memory snapshot of the program stopped in the debugger."
+  },
+  "DebugCreateWatchpoint": {
+    "keywords": [
+      "watchpoint",
+      "watch variable",
+      "stop when changed",
+      "debugger"
+    ],
+    "semantic": "Watch a variable and stop when its value changes."
+  },
+  "DebugDeleteBreakpoint": {
+    "keywords": [
+      "delete breakpoint",
+      "remove breakpoint",
+      "breakpoint",
+      "debug"
+    ],
+    "semantic": "Remove one breakpoint from a debug session."
+  },
+  "DebugDeleteWatchpoint": {
+    "keywords": [
+      "delete watchpoint",
+      "remove watchpoint",
+      "debugger"
+    ],
+    "semantic": "Remove a watchpoint."
+  },
+  "DebugGetMemorySizes": {
+    "keywords": [
+      "memory usage",
+      "memory sizes",
+      "debugger",
+      "memory"
+    ],
+    "semantic": "Show how much memory the program stopped in the debugger uses."
+  },
+  "DebugGetStack": {
+    "keywords": [
+      "call stack",
+      "stack",
+      "stack trace",
+      "debugger",
+      "frames"
+    ],
+    "semantic": "Show the call stack of the program stopped in the debugger."
+  },
+  "DebugGetVariables": {
+    "keywords": [
+      "variables",
+      "variable values",
+      "inspect variable",
+      "internal table",
+      "debugger",
+      "watch"
+    ],
+    "semantic": "Show the values of variables of the program stopped in the debugger."
+  },
+  "DebugListBreakpoints": {
+    "keywords": [
+      "list breakpoints",
+      "breakpoints",
+      "debug"
+    ],
+    "semantic": "List the breakpoints of a debug session."
+  },
+  "DebugListWatchpoints": {
+    "keywords": [
+      "list watchpoints",
+      "watchpoints",
+      "debugger"
+    ],
+    "semantic": "List the watchpoints of the program stopped in the debugger."
+  },
+  "DebugSetBreakpoints": {
+    "keywords": [
+      "set breakpoint",
+      "breakpoint",
+      "line breakpoint",
+      "exception breakpoint",
+      "statement breakpoint",
+      "conditional breakpoint",
+      "debug",
+      "method",
+      "class"
+    ],
+    "semantic": "Set breakpoints in a debug session: on a line of a class or program, an exception, a statement or a message."
+  },
+  "DebugSetSettings": {
+    "keywords": [
+      "debugger settings",
+      "system debugging",
+      "update debugging",
+      "debugger"
+    ],
+    "semantic": "Switch debugger settings at the current stop: system debugging, update debugging, exception objects, background RFC."
+  },
+  "DebugSetStackPosition": {
+    "keywords": [
+      "stack frame",
+      "select frame",
+      "call stack",
+      "debugger"
+    ],
+    "semantic": "Select a frame of the call stack to read its variables."
+  },
+  "DebugSetVariable": {
+    "keywords": [
+      "change variable",
+      "set variable value",
+      "debugger",
+      "variable"
+    ],
+    "semantic": "Change the value of a variable of the program stopped in the debugger."
+  },
+  "DebugStartListener": {
+    "keywords": [
+      "debug",
+      "debugger",
+      "start debugging",
+      "breakpoint",
+      "listen",
+      "attach",
+      "debug session"
+    ],
+    "semantic": "Start debugging: set breakpoints and wait for a program or class to stop at one."
+  },
+  "DebugStep": {
+    "keywords": [
+      "step",
+      "step into",
+      "step over",
+      "step out",
+      "continue",
+      "debugger",
+      "resume"
+    ],
+    "semantic": "Step through the program stopped in the debugger: into, over, out of a call, or continue."
+  },
+  "DebugStepToLine": {
+    "keywords": [
+      "run to line",
+      "jump to line",
+      "goto line",
+      "debugger"
+    ],
+    "semantic": "Run or jump the program stopped in the debugger to a line."
+  },
+  "DebugStop": {
+    "keywords": [
+      "stop debugging",
+      "end debug session",
+      "debugger",
+      "release"
+    ],
+    "semantic": "Stop debugging: release the program, remove the breakpoints and end the debug session."
+  },
+  "DebugTakeOverListener": {
+    "keywords": [
+      "take over debugger",
+      "debug",
+      "debugger",
+      "another debugger",
+      "breakpoint",
+      "listen"
+    ],
+    "semantic": "Start debugging and take over from another debugger that listens for the same user."
+  },
+  "DebugTerminate": {
+    "keywords": [
+      "terminate",
+      "abort program",
+      "end debuggee",
+      "debugger"
+    ],
+    "semantic": "Terminate the program stopped in the debugger."
+  },
+  "DebugWait": {
+    "keywords": [
+      "wait for debuggee",
+      "debugger state",
+      "stopped",
+      "breakpoint hit",
+      "debug"
+    ],
+    "semantic": "Wait until the debugged program stops at a breakpoint and see the debugger state."
+  },
+  "DeleteBehaviorDefinition": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Delete an existing RAP behavior definition from the system."
+  },
+  "DeleteBehaviorImplementation": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "behavior implementation",
+      "behavior pool",
+      "BP class",
+      "RAP handler class",
+      "RAP",
+      "behaviour implementation"
+    ],
+    "semantic": "Delete an existing RAP behavior implementation class from the system."
+  },
+  "DeleteCdsUnitTest": {
+    "keywords": [
+      "delete CDS test",
+      "CDS view unit test",
+      "ABAP Unit",
+      "CDS view"
+    ],
+    "semantic": "Delete the ABAP Unit test class of a CDS view."
+  },
+  "DeleteClass": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Delete an existing ABAP class from the system."
+  },
+  "DeleteDataElement": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "data element",
+      "DTEL",
+      "field label",
+      "data type",
+      "domain",
+      "type of a field"
+    ],
+    "semantic": "Delete an existing ABAP data element from the system."
+  },
+  "DeleteDdl": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Delete an existing CDS view from the system."
+  },
+  "DeleteDomain": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "domain",
+      "DOMA",
+      "fixed values",
+      "value range",
+      "data type",
+      "length",
+      "decimals"
+    ],
+    "semantic": "Delete an existing ABAP domain from the system."
+  },
+  "DeleteFunctionGroup": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "function group",
+      "FUGR",
+      "function pool"
+    ],
+    "semantic": "Delete an existing ABAP function group from the system."
+  },
+  "DeleteFunctionInclude": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "function group include",
+      "include",
+      "TOP include",
+      "FUGR include"
+    ],
+    "semantic": "Delete an existing include of an ABAP function group from the system."
+  },
+  "DeleteFunctionModule": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Delete an existing ABAP function module (BAPI or RFC function) from the system."
+  },
+  "DeleteInterface": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Delete an existing ABAP interface from the system."
+  },
+  "DeleteLocalDefinitions": {
+    "keywords": [
+      "local definitions",
+      "clear definitions include",
+      "class"
+    ],
+    "semantic": "Clear the definitions include of a global class, so it holds no class-local definitions."
+  },
+  "DeleteLocalMacros": {
+    "keywords": [
+      "local macros",
+      "clear macros include",
+      "class"
+    ],
+    "semantic": "Clear the macros include of a global class, so it holds no DEFINE macros."
+  },
+  "DeleteLocalTestClass": {
+    "keywords": [
+      "local test classes",
+      "clear test include",
+      "ABAP Unit",
+      "class"
+    ],
+    "semantic": "Clear the test classes include of a global class, so it holds no ABAP Unit test classes."
+  },
+  "DeleteLocalTypes": {
+    "keywords": [
+      "local types",
+      "local classes",
+      "clear implementations include",
+      "class"
+    ],
+    "semantic": "Clear the implementations include of a global class, so it holds no local helper classes or types."
+  },
+  "DeleteMessageClass": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "message class",
+      "MSAG",
+      "T100",
+      "messages",
+      "message texts"
+    ],
+    "semantic": "Delete an existing ABAP message class from the system."
+  },
+  "DeleteMessageClassMessage": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "message",
+      "message class",
+      "MSAG",
+      "T100",
+      "message number",
+      "message text"
+    ],
+    "semantic": "Delete one message of an ABAP message class by its number."
+  },
+  "DeleteMetadataExtension": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Delete an existing CDS metadata extension from the system."
+  },
+  "DeletePackage": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "package",
+      "development package",
+      "DEVC",
+      "super-package",
+      "sub-packages"
+    ],
+    "semantic": "Delete an existing ABAP package from the system."
+  },
+  "DeleteProgram": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Delete an existing ABAP program (report) from the system."
+  },
+  "DeleteServiceBinding": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "service binding",
+      "SRVB",
+      "OData V2",
+      "OData V4",
+      "OData service",
+      "Fiori",
+      "publish"
+    ],
+    "semantic": "Delete an existing OData service binding from the system."
+  },
+  "DeleteServiceDefinition": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "service definition",
+      "SRVD",
+      "OData service",
+      "exposed entities",
+      "RAP service"
+    ],
+    "semantic": "Delete an existing service definition from the system."
+  },
+  "DeleteStructure": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Delete an existing ABAP DDIC structure from the system."
+  },
+  "DeleteTable": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Delete an existing ABAP database table from the system."
+  },
+  "DeleteUnitTest": {
+    "keywords": [
+      "delete unit tests",
+      "ABAP Unit",
+      "local test classes",
+      "class"
+    ],
+    "semantic": "Delete the ABAP Unit test classes of a class, keeping the class."
+  },
+  "DescribeByList": {
+    "keywords": [
+      "describe objects",
+      "batch description",
+      "several objects",
+      "object descriptions",
+      "what are these objects"
+    ],
+    "semantic": "Describe several repository objects at once: their type, description and package."
+  },
+  "DiscardBackgroundRun": {
+    "keywords": [
+      "discard run",
+      "forget run",
+      "background run",
+      "clean up",
+      "remove result"
+    ],
+    "semantic": "Discard the kept result of a finished background run."
+  },
+  "GetATCFindings": {
+    "keywords": [
+      "ATC findings",
+      "ATC results",
+      "findings",
+      "check results",
+      "priority",
+      "messages",
+      "test cockpit",
+      "worklist"
+    ],
+    "semantic": "Show the findings of an ATC check run: the errors and warnings that ABAP Test Cockpit found."
+  },
+  "GetATCRunStatus": {
+    "keywords": [
+      "ATC run status",
+      "ATC",
+      "run finished",
+      "progress",
+      "test cockpit"
+    ],
+    "semantic": "Check whether an ABAP Test Cockpit (ATC) run has finished."
+  },
+  "GetAbapAST": {
+    "keywords": [
+      "AST",
+      "abstract syntax tree",
+      "parse ABAP",
+      "parser",
+      "syntax tree"
+    ],
+    "semantic": "Parse a piece of ABAP code into its abstract syntax tree."
+  },
+  "GetAbapSemanticAnalysis": {
+    "keywords": [
+      "semantic analysis",
+      "symbols",
+      "scopes",
+      "dependencies",
+      "code analysis",
+      "static analysis"
+    ],
+    "semantic": "Analyze a piece of ABAP code: its symbols, types, scopes and dependencies."
+  },
+  "GetAbapSystemSymbols": {
+    "keywords": [
+      "resolve symbols",
+      "system symbols",
+      "symbol lookup",
+      "types",
+      "packages of symbols",
+      "code analysis"
+    ],
+    "semantic": "Resolve the symbols of a piece of ABAP code against the system: their types, descriptions and packages."
+  },
+  "GetAdtTypes": {
+    "keywords": [
+      "object types",
+      "ADT types",
+      "type codes",
+      "CLAS",
+      "PROG",
+      "TABL",
+      "DDLS",
+      "valid types"
+    ],
+    "semantic": "List the ADT object types (CLAS, PROG, TABL, DDLS...) or check that a type code is valid."
+  },
+  "GetBackgroundRun": {
+    "keywords": [
+      "background run",
+      "run result",
+      "run status",
+      "run handle",
+      "finished run",
+      "output"
+    ],
+    "semantic": "Check one of my background runs and read its result when it has finished."
+  },
+  "GetBehaviorDefinition": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Show the source of a RAP behavior definition: its operations, actions, validations and determinations."
+  },
+  "GetBehaviorDefinitionVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Compare two versions of a RAP behavior definition and see what changed between them."
+  },
+  "GetBehaviorDefinitionVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Read the source code of an earlier version of a RAP behavior definition."
+  },
+  "GetBehaviorDefinitionVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "List the version history of a RAP behavior definition: who changed it, when, and in which transport request."
+  },
+  "GetBehaviorImplementation": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "behavior implementation",
+      "behavior pool",
+      "BP class",
+      "RAP handler class",
+      "RAP",
+      "behaviour implementation"
+    ],
+    "semantic": "Show the source code of a RAP behavior implementation class: its handler methods for actions, validations and determinations."
+  },
+  "GetClass": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Show the source code of an ABAP class: its methods and attributes."
+  },
+  "GetClassVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Compare two versions of an ABAP class and see what changed between them."
+  },
+  "GetClassVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Read the source code of an earlier version of an ABAP class."
+  },
+  "GetClassVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "List the version history of an ABAP class: who changed it, when, and in which transport request."
+  },
+  "GetDataElement": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "data element",
+      "DTEL",
+      "field label",
+      "data type",
+      "domain",
+      "type of a field"
+    ],
+    "semantic": "Show the definition of an ABAP data element: its domain, data type and field labels."
+  },
+  "GetDdl": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Show the DDL source of a CDS view: its fields, associations, joins and annotations."
+  },
+  "GetDdlVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Compare two versions of a CDS view and see what changed between them."
+  },
+  "GetDdlVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Read the source code of an earlier version of a CDS view."
+  },
+  "GetDdlVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "List the version history of a CDS view: who changed it, when, and in which transport request."
+  },
+  "GetDomain": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "domain",
+      "DOMA",
+      "fixed values",
+      "value range",
+      "data type",
+      "length",
+      "decimals"
+    ],
+    "semantic": "Show the definition of an ABAP domain: its data type, length and fixed values."
+  },
+  "GetEnhancementImpl": {
+    "keywords": [
+      "enhancement implementation",
+      "ENHO",
+      "BAdI implementation",
+      "enhancement source",
+      "enhancement code"
+    ],
+    "semantic": "Read the source code of an enhancement implementation of an enhancement spot."
+  },
+  "GetEnhancementSpot": {
+    "keywords": [
+      "enhancement spot",
+      "ENHS",
+      "BAdI definition",
+      "enhancement implementations",
+      "BAdI implementations"
+    ],
+    "semantic": "Show an enhancement spot and the implementations that exist for it."
+  },
+  "GetEnhancements": {
+    "keywords": [
+      "enhancements",
+      "enhancement implementations",
+      "BAdI",
+      "user exits",
+      "enhancement points",
+      "modifications",
+      "implicit enhancements"
+    ],
+    "semantic": "Find the enhancements (enhancement implementations, BAdIs) that exist in a program, include or class."
+  },
+  "GetFunctionGroup": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "function group",
+      "FUGR",
+      "function pool"
+    ],
+    "semantic": "Show the definition of an ABAP function group: its package, description and contents."
+  },
+  "GetFunctionInclude": {
+    "keywords": [
+      "function group include",
+      "include",
+      "include source",
+      "TOP include",
+      "FUGR include"
+    ],
+    "semantic": "Read the source code of an include that belongs to a function group."
+  },
+  "GetFunctionModule": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Show the source code of an ABAP function module (BAPI or RFC function): its parameters (importing, exporting, tables, exceptions) and logic."
+  },
+  "GetFunctionModuleVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Compare two versions of an ABAP function module (BAPI or RFC function) and see what changed between them."
+  },
+  "GetFunctionModuleVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Read the source code of an earlier version of an ABAP function module (BAPI or RFC function)."
+  },
+  "GetFunctionModuleVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "List the version history of an ABAP function module (BAPI or RFC function): who changed it, when, and in which transport request."
+  },
+  "GetInactiveObjects": {
+    "keywords": [
+      "inactive objects",
+      "not activated",
+      "pending activation",
+      "worklist",
+      "my inactive objects",
+      "unactivated changes"
+    ],
+    "semantic": "List the objects that are still inactive: changed but not yet activated."
+  },
+  "GetInclude": {
+    "keywords": [
+      "include",
+      "include program",
+      "PROG/I",
+      "include source",
+      "TOP include",
+      "read include"
+    ],
+    "semantic": "Read the source code of an ABAP include program by its name."
+  },
+  "GetIncludesList": {
+    "keywords": [
+      "includes",
+      "include list",
+      "includes of a program",
+      "program structure",
+      "include tree"
+    ],
+    "semantic": "List all includes that a program, include, function group or class is made of."
+  },
+  "GetInterface": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Show the source code of an ABAP interface: its methods and types."
+  },
+  "GetInterfaceVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Compare two versions of an ABAP interface and see what changed between them."
+  },
+  "GetInterfaceVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Read the source code of an earlier version of an ABAP interface."
+  },
+  "GetInterfaceVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "List the version history of an ABAP interface: who changed it, when, and in which transport request."
+  },
+  "GetLocalDefinitions": {
+    "keywords": [
+      "local definitions",
+      "definitions include",
+      "class-local types",
+      "constants",
+      "class"
+    ],
+    "semantic": "Read the class-local type and constant definitions of a global class, from its definitions include."
+  },
+  "GetLocalMacros": {
+    "keywords": [
+      "local macros",
+      "macros include",
+      "DEFINE",
+      "class"
+    ],
+    "semantic": "Read the DEFINE macros that a global class declares in its macros include."
+  },
+  "GetLocalTestClass": {
+    "keywords": [
+      "local test classes",
+      "test include",
+      "ABAP Unit",
+      "testclasses include",
+      "class",
+      "read tests"
+    ],
+    "semantic": "Read the ABAP Unit test classes that a global class declares locally, in its test classes include."
+  },
+  "GetLocalTypes": {
+    "keywords": [
+      "local types",
+      "local classes",
+      "implementations include",
+      "class-local",
+      "class"
+    ],
+    "semantic": "Read the local helper classes and types that a global class declares in its implementations include."
+  },
+  "GetMessageClass": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "message class",
+      "MSAG",
+      "T100",
+      "messages",
+      "message texts"
+    ],
+    "semantic": "Show the definition of an ABAP message class: its messages."
+  },
+  "GetMessageClassMessage": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "message",
+      "message class",
+      "MSAG",
+      "T100",
+      "message number",
+      "message text"
+    ],
+    "semantic": "Read one message of an ABAP message class by its number: its text."
+  },
+  "GetMetadataExtension": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Show the source of a CDS metadata extension: its UI annotations for Fiori elements."
+  },
+  "GetMetadataExtensionVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Compare two versions of a CDS metadata extension and see what changed between them."
+  },
+  "GetMetadataExtensionVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Read the source code of an earlier version of a CDS metadata extension."
+  },
+  "GetMetadataExtensionVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "List the version history of a CDS metadata extension: who changed it, when, and in which transport request."
+  },
+  "GetObjectInfo": {
+    "keywords": [
+      "object tree",
+      "object structure",
+      "components",
+      "package tree",
+      "class components",
+      "program structure"
+    ],
+    "semantic": "Show the tree of a package, class, program or function group with its components."
+  },
+  "GetObjectNodeFromCache": {
+    "keywords": [
+      "cache",
+      "cached node",
+      "object node",
+      "object list cache",
+      "URI"
+    ],
+    "semantic": "Read one node from the cached object list of an earlier walk."
+  },
+  "GetObjectStructure": {
+    "keywords": [
+      "object structure",
+      "ADT structure",
+      "tree",
+      "components",
+      "outline"
+    ],
+    "semantic": "Show the structure of a repository object as a tree of its parts."
+  },
+  "GetObjectVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "what changed",
+      "previous version",
+      "current version",
+      "any object"
+    ],
+    "semantic": "Compare two versions of a repository object (program, class, include, CDS view...) and see what changed."
+  },
+  "GetObjectVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "version source",
+      "earlier version",
+      "any object"
+    ],
+    "semantic": "Read the source code of an earlier version of a repository object of any type."
+  },
+  "GetObjectVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "change history",
+      "any object"
+    ],
+    "semantic": "List the version history of a repository object of any type: who changed it, when, in which transport."
+  },
+  "GetObjectsByType": {
+    "keywords": [
+      "objects of one type",
+      "all classes",
+      "all tables",
+      "filter by type",
+      "list by type",
+      "package"
+    ],
+    "semantic": "List the objects of one type (all classes, all tables...) under a package or object."
+  },
+  "GetObjectsList": {
+    "keywords": [
+      "child objects",
+      "objects of",
+      "sub-objects",
+      "contents",
+      "nested",
+      "list objects",
+      "package",
+      "program",
+      "function group"
+    ],
+    "semantic": "List all objects below a package, program, function group or class, including nested ones."
+  },
+  "GetPackage": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "development package",
+      "DEVC",
+      "super-package",
+      "sub-packages"
+    ],
+    "semantic": "Show the definition of an ABAP package: its description, super-package and sub-packages."
+  },
+  "GetPackageContents": {
+    "keywords": [
+      "package contents",
+      "objects in a package",
+      "list objects",
+      "package",
+      "DEVC",
+      "subpackages",
+      "what is in a package"
+    ],
+    "semantic": "List the objects that a package contains, optionally with its subpackages."
+  },
+  "GetPackageTree": {
+    "keywords": [
+      "package tree",
+      "package hierarchy",
+      "subpackages",
+      "objects in a package",
+      "package structure",
+      "DEVC"
+    ],
+    "semantic": "Show the tree of a package: its subpackages and the objects in each."
+  },
+  "GetProgram": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Show the source code of an ABAP program (report): its logic."
+  },
+  "GetProgramVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Compare two versions of an ABAP program (report) and see what changed between them."
+  },
+  "GetProgramVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Read the source code of an earlier version of an ABAP program (report)."
+  },
+  "GetProgramVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "List the version history of an ABAP program (report): who changed it, when, and in which transport request."
+  },
+  "GetServiceBinding": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "service binding",
+      "SRVB",
+      "OData V2",
+      "OData V4",
+      "OData service",
+      "Fiori",
+      "publish"
+    ],
+    "semantic": "Show the definition of an OData service binding: its OData version, service definition and publication state."
+  },
+  "GetServiceBindingPreviewUrl": {
+    "keywords": [
+      "preview URL",
+      "Fiori preview",
+      "service URL",
+      "$metadata",
+      "OData URL",
+      "browser link",
+      "service binding",
+      "test the app"
+    ],
+    "semantic": "Get the browser URL that previews an OData service binding in Fiori elements, and its service and $metadata URLs."
+  },
+  "GetServiceDefinition": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "service definition",
+      "SRVD",
+      "OData service",
+      "exposed entities",
+      "RAP service"
+    ],
+    "semantic": "Show the source of a service definition: the CDS entities it exposes."
+  },
+  "GetSqlQuery": {
+    "keywords": [
+      "SQL",
+      "SELECT",
+      "query",
+      "ABAP SQL",
+      "open SQL",
+      "where clause",
+      "filter rows",
+      "select data",
+      "join",
+      "count"
+    ],
+    "semantic": "Run an ABAP SQL SELECT over tables or CDS views, with a WHERE condition, and see the rows found."
+  },
+  "GetStructure": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Show the definition of an ABAP DDIC structure: its fields (components) and types."
+  },
+  "GetStructureVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Compare two versions of an ABAP DDIC structure and see what changed between them."
+  },
+  "GetStructureVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Read the source code of an earlier version of an ABAP DDIC structure."
+  },
+  "GetStructureVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "List the version history of an ABAP DDIC structure: who changed it, when, and in which transport request."
+  },
+  "GetStructuresList": {
+    "keywords": [
+      "embedded structures",
+      "includes of a structure",
+      "append structures",
+      ".INCLUDE",
+      "structure tree",
+      "appends"
+    ],
+    "semantic": "List the structures included or appended in a DDIC structure, as a tree."
+  },
+  "GetTable": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "source code",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Show the definition of an ABAP database table: its fields (columns), key fields and types."
+  },
+  "GetTableContents": {
+    "keywords": [
+      "table contents",
+      "rows",
+      "data",
+      "data preview",
+      "records",
+      "entries",
+      "SE16",
+      "SE16N",
+      "content of a table",
+      "CDS view data",
+      "first rows"
+    ],
+    "semantic": "Show the rows (data) stored in a database table or returned by a CDS view, like SE16."
+  },
+  "GetTableVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Compare two versions of an ABAP database table and see what changed between them."
+  },
+  "GetTableVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "restore",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Read the source code of an earlier version of an ABAP database table."
+  },
+  "GetTableVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "List the version history of an ABAP database table: who changed it, when, and in which transport request."
+  },
+  "GetTransaction": {
+    "keywords": [
+      "transaction",
+      "t-code",
+      "tcode",
+      "transaction code",
+      "program of a transaction",
+      "SE93",
+      "screen",
+      "authorization object"
+    ],
+    "semantic": "Show what a transaction code (t-code) starts: its program, screen, authorization object and type."
+  },
+  "GetTransport": {
+    "keywords": [
+      "transport request",
+      "transport",
+      "TR",
+      "request status",
+      "tasks",
+      "transport objects",
+      "SE09",
+      "SE10"
+    ],
+    "semantic": "Show a transport request: its description, owner, status, tasks and the objects it contains."
+  },
+  "GetTypeInfo": {
+    "keywords": [
+      "type information",
+      "data type",
+      "domain",
+      "data element",
+      "table type",
+      "structure",
+      "type of a field",
+      "DDIC type"
+    ],
+    "semantic": "Show what a DDIC type is: a domain, data element, table type or structure with its technical type."
+  },
+  "GetUnitTestResult": {
+    "keywords": [
+      "unit test result",
+      "test run result",
+      "run id",
+      "ABAP Unit"
+    ],
+    "semantic": "Read the result of an ABAP Unit test run that was still running when it started."
+  },
+  "GetWhereUsed": {
+    "keywords": [
+      "where used",
+      "where-used list",
+      "used by",
+      "usages",
+      "references",
+      "callers",
+      "who calls",
+      "who uses",
+      "dependencies",
+      "impact analysis",
+      "class",
+      "method",
+      "function module",
+      "BAPI",
+      "table",
+      "data element",
+      "CDS view",
+      "program",
+      "interface"
+    ],
+    "semantic": "Who calls this method or function module (BAPI), and who uses this class, table, data element or CDS view: the where-used list of an object."
+  },
+  "HandlerActivate": {
+    "keywords": [
+      "activate",
+      "activation",
+      "mass activation",
+      "inactive objects",
+      "several objects",
+      "class",
+      "interface",
+      "program",
+      "report",
+      "table",
+      "structure",
+      "CDS view",
+      "DDL",
+      "domain",
+      "data element",
+      "function module",
+      "function group",
+      "BAPI",
+      "behavior definition",
+      "metadata extension",
+      "service definition",
+      "service binding",
+      "package",
+      "transport"
+    ],
+    "semantic": "Activate one object or several objects together after a change."
+  },
+  "HandlerBackgroundRunDiscard": {
+    "keywords": [
+      "discard run",
+      "background run",
+      "clean up"
+    ],
+    "semantic": "Discard the kept result of a finished background run."
+  },
+  "HandlerBackgroundRunGet": {
+    "keywords": [
+      "background run",
+      "run result",
+      "run status",
+      "run handle"
+    ],
+    "semantic": "Check one of my background runs and read its result when it has finished."
+  },
+  "HandlerBackgroundRunList": {
+    "keywords": [
+      "background runs",
+      "my runs",
+      "running",
+      "list runs"
+    ],
+    "semantic": "List my background runs and whether each is still running."
+  },
+  "HandlerBatch": {
+    "keywords": [
+      "batch mode",
+      "start batch",
+      "send batch",
+      "batch answers",
+      "record calls",
+      "batch"
+    ],
+    "semantic": "Record several independent calls and send them together in batch mode, then read their answers."
+  },
+  "HandlerCdsUnitTestResult": {
+    "keywords": [
+      "CDS test result",
+      "CDS view unit test",
+      "ABAP Unit",
+      "passed",
+      "failed"
+    ],
+    "semantic": "Read the result of a CDS view unit test run."
+  },
+  "HandlerCdsUnitTestStatus": {
+    "keywords": [
+      "CDS test status",
+      "CDS view unit test",
+      "ABAP Unit",
+      "finished"
+    ],
+    "semantic": "Check whether a CDS view unit test run has finished."
+  },
+  "HandlerCheckRun": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "syntax errors",
+      "warnings",
+      "compile",
+      "class",
+      "interface",
+      "program",
+      "report",
+      "table",
+      "structure",
+      "CDS view",
+      "DDL",
+      "domain",
+      "data element",
+      "function module",
+      "function group",
+      "BAPI",
+      "behavior definition",
+      "metadata extension",
+      "service definition",
+      "service binding",
+      "package",
+      "transport"
+    ],
+    "semantic": "Run a syntax check on a class, program, CDS view or other object and see its errors and warnings."
+  },
+  "HandlerCreate": {
+    "keywords": [
+      "create",
+      "new",
+      "add",
+      "generate",
+      "object_type",
+      "class",
+      "interface",
+      "program",
+      "report",
+      "table",
+      "structure",
+      "CDS view",
+      "DDL",
+      "domain",
+      "data element",
+      "function module",
+      "function group",
+      "BAPI",
+      "behavior definition",
+      "metadata extension",
+      "service definition",
+      "service binding",
+      "package",
+      "transport"
+    ],
+    "semantic": "Create a new ABAP object: a class, program, CDS view, table, function module, package or another type."
+  },
+  "HandlerDebugBatch": {
+    "keywords": [
+      "debugger batch",
+      "record debugger calls",
+      "batch",
+      "debugger"
+    ],
+    "semantic": "Record debugger calls at the stopped program and send them together."
+  },
+  "HandlerDebugBreakpoints": {
+    "keywords": [
+      "breakpoint",
+      "set breakpoint",
+      "watchpoint",
+      "debugger",
+      "debug"
+    ],
+    "semantic": "Set, list or remove debugger breakpoints and watchpoints."
+  },
+  "HandlerDebugMaintain": {
+    "keywords": [
+      "call stack",
+      "variables",
+      "change variable",
+      "debugger",
+      "inspect"
+    ],
+    "semantic": "Show the call stack and variables of the program stopped in the debugger, or change a variable."
+  },
+  "HandlerDebugSession": {
+    "keywords": [
+      "debug session",
+      "start debugging",
+      "listen",
+      "attach",
+      "debugger",
+      "stop debugging"
+    ],
+    "semantic": "Start, wait for, or end a debug session of an ABAP program or AMDP method."
+  },
+  "HandlerDebugStep": {
+    "keywords": [
+      "step",
+      "step into",
+      "step over",
+      "continue",
+      "run to line",
+      "debugger"
+    ],
+    "semantic": "Step through the program stopped in the debugger."
+  },
+  "HandlerDelete": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "object_type",
+      "class",
+      "interface",
+      "program",
+      "report",
+      "table",
+      "structure",
+      "CDS view",
+      "DDL",
+      "domain",
+      "data element",
+      "function module",
+      "function group",
+      "BAPI",
+      "behavior definition",
+      "metadata extension",
+      "service definition",
+      "service binding",
+      "package",
+      "transport"
+    ],
+    "semantic": "Delete an ABAP object: a class, program, CDS view, table or another type."
+  },
+  "HandlerDeletionCheck": {
+    "keywords": [
+      "deletion check",
+      "can it be deleted",
+      "before delete",
+      "deletable",
+      "dependencies"
+    ],
+    "semantic": "Ask the system whether an object can be deleted before deleting it."
+  },
+  "HandlerDumpList": {
+    "keywords": [
+      "short dumps",
+      "dumps",
+      "crash",
+      "crashed",
+      "runtime errors",
+      "ST22",
+      "exception",
+      "yesterday",
+      "today",
+      "system messages",
+      "gateway errors"
+    ],
+    "semantic": "Find the ABAP short dumps (runtime errors, crashes) of a program, a user or a time range; also system messages and SAP Gateway errors."
+  },
+  "HandlerDumpView": {
+    "keywords": [
+      "dump",
+      "short dump",
+      "runtime error",
+      "ST22",
+      "dump details",
+      "dump id"
+    ],
+    "semantic": "Open one ABAP short dump by its id and see its details."
+  },
+  "HandlerGet": {
+    "keywords": [
+      "read",
+      "show",
+      "get",
+      "source code",
+      "metadata",
+      "definition",
+      "object_type",
+      "class",
+      "interface",
+      "program",
+      "report",
+      "table",
+      "structure",
+      "CDS view",
+      "DDL",
+      "domain",
+      "data element",
+      "function module",
+      "function group",
+      "BAPI",
+      "behavior definition",
+      "metadata extension",
+      "service definition",
+      "service binding",
+      "package",
+      "transport"
+    ],
+    "semantic": "Read the source code or metadata of any ABAP object: class, program, CDS view, table, function module, package and more."
+  },
+  "HandlerGetData": {
+    "keywords": [
+      "table contents",
+      "rows",
+      "data",
+      "data preview",
+      "SQL",
+      "SELECT",
+      "query",
+      "SE16",
+      "CDS view data"
+    ],
+    "semantic": "Show the rows of a table or CDS view, or run an ABAP SQL SELECT."
+  },
+  "HandlerLeftoverSessionList": {
+    "keywords": [
+      "leftover sessions",
+      "open SAP sessions",
+      "orphaned sessions",
+      "locks",
+      "session"
+    ],
+    "semantic": "List SAP sessions that an ended server process left open."
+  },
+  "HandlerLeftoverSessionLogoff": {
+    "keywords": [
+      "log off session",
+      "logoff",
+      "release locks",
+      "leftover session",
+      "session"
+    ],
+    "semantic": "Log off a leftover SAP session so that its locks are released."
+  },
+  "HandlerLock": {
+    "keywords": [
+      "lock",
+      "lock object",
+      "lock handle",
+      "enqueue",
+      "edit lock"
+    ],
+    "semantic": "Lock an object before changing it and get its lock handle."
+  },
+  "HandlerProfileList": {
+    "keywords": [
+      "profiler traces",
+      "trace files",
+      "SAT",
+      "performance traces",
+      "list traces"
+    ],
+    "semantic": "List the ABAP profiler (SAT) traces that exist."
+  },
+  "HandlerProfileRun": {
+    "keywords": [
+      "run class",
+      "run program",
+      "execute report",
+      "console output",
+      "profile run",
+      "background run",
+      "output"
+    ],
+    "semantic": "Run an ABAP class or program and see its output, optionally under the profiler or in the background."
+  },
+  "HandlerProfileSchedule": {
+    "keywords": [
+      "schedule trace",
+      "profiler",
+      "SAT",
+      "performance trace",
+      "profiling"
+    ],
+    "semantic": "Prepare an ABAP profiler (SAT) trace so the next run is measured."
+  },
+  "HandlerProfileView": {
+    "keywords": [
+      "profiler trace",
+      "hitlist",
+      "statements",
+      "database accesses",
+      "slowest",
+      "performance analysis",
+      "SAT"
+    ],
+    "semantic": "Read or analyze an ABAP profiler trace: the hit list, the statements, the database accesses."
+  },
+  "HandlerSearch": {
+    "keywords": [
+      "search",
+      "find object",
+      "search by name",
+      "wildcard",
+      "pattern",
+      "name starts with",
+      "lookup"
+    ],
+    "semantic": "Find repository objects by their name or a name pattern with wildcards."
+  },
+  "HandlerServiceBindingListTypes": {
+    "keywords": [
+      "service binding types",
+      "binding types",
+      "OData V2",
+      "OData V4"
+    ],
+    "semantic": "List the service binding types available, such as OData V2 or V4."
+  },
+  "HandlerServiceBindingValidate": {
+    "keywords": [
+      "validate service binding",
+      "service binding",
+      "check before create"
+    ],
+    "semantic": "Check that a new service binding can be created with the given name and service definition."
+  },
+  "HandlerTransportCreate": {
+    "keywords": [
+      "new transport request",
+      "create transport",
+      "transport request",
+      "workbench request",
+      "customizing request"
+    ],
+    "semantic": "Create a new transport request to record changes."
+  },
+  "HandlerTransportMoveObjects": {
+    "keywords": [
+      "move objects",
+      "move to another task",
+      "reassign",
+      "transport task"
+    ],
+    "semantic": "Move objects from one transport task to another."
+  },
+  "HandlerTransportSortAndCompress": {
+    "keywords": [
+      "sort and compress",
+      "duplicate entries",
+      "clean up transport",
+      "transport task"
+    ],
+    "semantic": "Sort the object list of a transport task and merge its duplicate entries."
+  },
+  "HandlerUnitTestResult": {
+    "keywords": [
+      "unit test result",
+      "test results",
+      "ABAP Unit",
+      "passed",
+      "failed"
+    ],
+    "semantic": "Read the result of an ABAP Unit test run."
+  },
+  "HandlerUnitTestRun": {
+    "keywords": [
+      "run unit tests",
+      "ABAP Unit",
+      "execute tests",
+      "test class",
+      "test results"
+    ],
+    "semantic": "Run ABAP Unit tests of classes or programs."
+  },
+  "HandlerUnitTestStatus": {
+    "keywords": [
+      "unit test status",
+      "test run status",
+      "ABAP Unit",
+      "finished",
+      "progress"
+    ],
+    "semantic": "Check whether an ABAP Unit test run has finished."
+  },
+  "HandlerUnlock": {
+    "keywords": [
+      "unlock",
+      "release lock",
+      "lock handle",
+      "dequeue"
+    ],
+    "semantic": "Release the lock on an object after changing it."
+  },
+  "HandlerUpdate": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "source code",
+      "object_type",
+      "class",
+      "interface",
+      "program",
+      "report",
+      "table",
+      "structure",
+      "CDS view",
+      "DDL",
+      "domain",
+      "data element",
+      "function module",
+      "function group",
+      "BAPI",
+      "behavior definition",
+      "metadata extension",
+      "service definition",
+      "service binding",
+      "package",
+      "transport"
+    ],
+    "semantic": "Change an existing ABAP object: write the new source code of a class, program, CDS view or another type."
+  },
+  "HandlerValidate": {
+    "keywords": [
+      "validate",
+      "check name",
+      "before create",
+      "name check",
+      "object_type"
+    ],
+    "semantic": "Check that a new object can be created with the given name and package."
+  },
+  "HandlerWhereUsed": {
+    "keywords": [
+      "where used",
+      "where-used list",
+      "used by",
+      "usages",
+      "references",
+      "callers",
+      "who calls",
+      "who uses",
+      "impact analysis",
+      "class",
+      "function module",
+      "BAPI",
+      "table",
+      "CDS view"
+    ],
+    "semantic": "Who calls this method or function module (BAPI), and who uses this class, table or CDS view: the where-used list of an object."
+  },
+  "ListBackgroundRuns": {
+    "keywords": [
+      "background runs",
+      "my runs",
+      "running",
+      "finished runs",
+      "list runs"
+    ],
+    "semantic": "List my background runs and whether each is still running or finished."
+  },
+  "ListFunctionGroupIncludes": {
+    "keywords": [
+      "function group includes",
+      "includes",
+      "TOP include",
+      "FUGR",
+      "function group"
+    ],
+    "semantic": "List the includes (TOP and custom includes) of a function group."
+  },
+  "ListFunctionModules": {
+    "keywords": [
+      "function modules of a group",
+      "function modules",
+      "list function modules",
+      "function group",
+      "FUGR",
+      "FM"
+    ],
+    "semantic": "List the function modules that belong to a function group."
+  },
+  "ListLeftoverSessions": {
+    "keywords": [
+      "leftover sessions",
+      "open SAP sessions",
+      "orphaned sessions",
+      "locks",
+      "stale sessions",
+      "session"
+    ],
+    "semantic": "List SAP sessions that an ended server process left open, and the locks they may hold."
+  },
+  "ListServiceBindingTypes": {
+    "keywords": [
+      "service binding types",
+      "binding types",
+      "OData V2",
+      "OData V4",
+      "UI",
+      "Web API"
+    ],
+    "semantic": "List the service binding types available, such as OData V2 or V4, UI or Web API."
+  },
+  "ListTransports": {
+    "keywords": [
+      "transport requests",
+      "my transports",
+      "list transports",
+      "open transports",
+      "modifiable requests",
+      "SE09",
+      "SE10",
+      "user"
+    ],
+    "semantic": "List the transport requests of a user, for example my open (modifiable) requests."
+  },
+  "LogoffLeftoverSession": {
+    "keywords": [
+      "log off session",
+      "logoff",
+      "release locks",
+      "leftover session",
+      "stale session",
+      "session"
+    ],
+    "semantic": "Log off a leftover SAP session so that its locks are released."
+  },
+  "MemorySnapshotDelta": {
+    "keywords": [
+      "compare memory snapshots",
+      "memory leak",
+      "memory growth",
+      "memory delta",
+      "memory"
+    ],
+    "semantic": "Compare two memory snapshots to find what grew, for example a memory leak."
+  },
+  "MemorySnapshotGet": {
+    "keywords": [
+      "memory snapshot",
+      "largest objects",
+      "memory analysis",
+      "memory consumption",
+      "memory"
+    ],
+    "semantic": "Analyze a memory snapshot: memory by kind, the largest objects and their references."
+  },
+  "MemorySnapshotList": {
+    "keywords": [
+      "memory snapshots",
+      "list snapshots",
+      "memory analysis",
+      "memory"
+    ],
+    "semantic": "List the memory snapshots that exist."
+  },
+  "MoveTransportObjects": {
+    "keywords": [
+      "move objects",
+      "move to another task",
+      "reassign",
+      "transport task",
+      "transport request",
+      "object entries"
+    ],
+    "semantic": "Move objects from one transport task to another task or request."
+  },
+  "ReadTransportActionLog": {
+    "keywords": [
+      "transport log",
+      "action log",
+      "history of a transport",
+      "who added objects",
+      "owner changed",
+      "events"
+    ],
+    "semantic": "Read the action log of a transport request: when it was created, which objects were added or deleted, owner changes."
+  },
+  "ReadTransportObjects": {
+    "keywords": [
+      "transport objects",
+      "objects in a transport",
+      "contents of a request",
+      "object list",
+      "entries",
+      "task",
+      "position"
+    ],
+    "semantic": "List the objects that a transport request or task contains, each with its position in the object list."
+  },
+  "RemoveTransportObject": {
+    "keywords": [
+      "remove from transport",
+      "transport entry",
+      "take out of the transport",
+      "unassign",
+      "object list",
+      "transport request",
+      "task",
+      "entry",
+      "class",
+      "program",
+      "object"
+    ],
+    "semantic": "Remove an object, such as a class, from a transport request."
+  },
+  "RunATC": {
+    "keywords": [
+      "ATC",
+      "ABAP Test Cockpit",
+      "code inspector",
+      "static checks",
+      "quality checks",
+      "check variant",
+      "run checks",
+      "findings",
+      "package"
+    ],
+    "semantic": "Run ABAP Test Cockpit (ATC) quality checks over objects or a package."
+  },
+  "RunCdsUnitTest": {
+    "keywords": [
+      "run CDS tests",
+      "CDS view unit test",
+      "ABAP Unit",
+      "CDS view",
+      "test results"
+    ],
+    "semantic": "Run the ABAP Unit tests of a CDS view and see which pass or fail."
+  },
+  "RunFunctionGroupUnitTest": {
+    "keywords": [
+      "run function group tests",
+      "ABAP Unit",
+      "function group",
+      "FUGR",
+      "test results"
+    ],
+    "semantic": "Run all ABAP Unit tests of a function group and see which pass or fail."
+  },
+  "RunFunctionModuleUnitTest": {
+    "keywords": [
+      "run function module tests",
+      "ABAP Unit",
+      "function module",
+      "FM",
+      "test results"
+    ],
+    "semantic": "Run the ABAP Unit tests of a function module and see which pass or fail."
+  },
+  "RunProgramUnitTest": {
+    "keywords": [
+      "run report tests",
+      "program unit test",
+      "ABAP Unit",
+      "report",
+      "program",
+      "test results"
+    ],
+    "semantic": "Run the ABAP Unit tests of a report (program) and see which pass or fail."
+  },
+  "RunUnitTest": {
+    "keywords": [
+      "run unit tests",
+      "ABAP Unit",
+      "execute tests",
+      "test results",
+      "class"
+    ],
+    "semantic": "Run the unit tests (ABAP Unit) of a class and show which tests pass or fail."
+  },
+  "RuntimeAnalyzeProfilerTrace": {
+    "keywords": [
+      "analyze trace",
+      "profiler",
+      "performance analysis",
+      "slowest",
+      "top statements",
+      "hotspots",
+      "SAT",
+      "runtime"
+    ],
+    "semantic": "Analyze an ABAP profiler trace: totals and the slowest statements or calls."
+  },
+  "RuntimeCreateProfilerTraceParameters": {
+    "keywords": [
+      "profiler",
+      "trace",
+      "performance trace",
+      "schedule trace",
+      "SAT",
+      "profiling parameters",
+      "measure performance"
+    ],
+    "semantic": "Prepare an ABAP profiler (SAT) trace so the next run is measured for performance."
+  },
+  "RuntimeGetDumpById": {
+    "keywords": [
+      "dump",
+      "short dump",
+      "runtime error",
+      "ST22",
+      "dump details",
+      "dump id",
+      "exception",
+      "crash"
+    ],
+    "semantic": "Open one ABAP short dump (runtime error) by its id and see its details."
+  },
+  "RuntimeGetGatewayErrorLog": {
+    "keywords": [
+      "gateway error log",
+      "SAP Gateway",
+      "/IWFND/ERROR_LOG",
+      "OData errors",
+      "error log",
+      "service errors"
+    ],
+    "semantic": "Show the SAP Gateway error log (/IWFND/ERROR_LOG) of OData services, or one error in detail."
+  },
+  "RuntimeGetProfilerTraceData": {
+    "keywords": [
+      "profiler trace data",
+      "hitlist",
+      "statements",
+      "database accesses",
+      "SQL statements",
+      "SAT",
+      "slowest",
+      "runtime"
+    ],
+    "semantic": "Read the data of an ABAP profiler trace: the hit list, the statements, the database accesses."
+  },
+  "RuntimeListFeeds": {
+    "keywords": [
+      "short dumps",
+      "dumps",
+      "crash",
+      "crashed",
+      "runtime errors",
+      "ST22",
+      "exception",
+      "yesterday",
+      "today",
+      "time range",
+      "system messages",
+      "gateway errors",
+      "what went wrong",
+      "failed"
+    ],
+    "semantic": "Find the ABAP short dumps (runtime errors, crashes) of a program, a user or a time range such as today or yesterday, and why it crashed; also system messages and SAP Gateway errors."
+  },
+  "RuntimeListProfilerTraceFiles": {
+    "keywords": [
+      "profiler traces",
+      "trace files",
+      "SAT",
+      "performance traces",
+      "list traces"
+    ],
+    "semantic": "List the ABAP profiler (SAT) trace files that exist."
+  },
+  "RuntimeListSystemMessages": {
+    "keywords": [
+      "system messages",
+      "SM02",
+      "broadcast",
+      "announcements",
+      "messages to users"
+    ],
+    "semantic": "List the SM02 system messages announced to users."
+  },
+  "RuntimeRunClass": {
+    "keywords": [
+      "run class",
+      "execute class",
+      "console output",
+      "if_oo_adt_classrun",
+      "main method",
+      "output",
+      "run"
+    ],
+    "semantic": "Run an ABAP class that implements if_oo_adt_classrun and see its console output."
+  },
+  "RuntimeRunProgram": {
+    "keywords": [
+      "run program",
+      "execute report",
+      "run report",
+      "execute program",
+      "output",
+      "list output",
+      "SE38",
+      "run"
+    ],
+    "semantic": "Execute an ABAP program (report) and see its output."
+  },
+  "SearchObject": {
+    "keywords": [
+      "search",
+      "find object",
+      "search by name",
+      "wildcard",
+      "pattern",
+      "name starts with",
+      "does it exist",
+      "lookup",
+      "object name"
+    ],
+    "semantic": "Find repository objects (classes, programs, tables...) by their name or a name pattern with wildcards."
+  },
+  "SearchSource": {
+    "keywords": [
+      "search source code",
+      "grep",
+      "find text in code",
+      "full-text search",
+      "code search",
+      "occurrences",
+      "statement",
+      "packages",
+      "cursor",
+      "continue",
+      "next_start_at"
+    ],
+    "semantic": "Search the source code of the programs, classes and function groups in a package for a text or statement; a scan that stops early answers a cursor to continue from."
+  },
+  "SortAndCompressTransportTask": {
+    "keywords": [
+      "sort and compress",
+      "duplicate entries",
+      "clean up transport",
+      "object list",
+      "transport task"
+    ],
+    "semantic": "Sort the object list of a transport task and merge its duplicate entries."
+  },
+  "UpdateBehaviorDefinition": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "behavior definition",
+      "behaviour definition",
+      "BDEF",
+      "RAP",
+      "business object",
+      "RAP BO"
+    ],
+    "semantic": "Add an action, a validation or a determination to a RAP behavior definition: write its new source."
+  },
+  "UpdateBehaviorImplementation": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "behavior implementation",
+      "behavior pool",
+      "BP class",
+      "RAP handler class",
+      "RAP",
+      "behaviour implementation"
+    ],
+    "semantic": "Implement an action, a validation or a determination in a RAP behavior implementation class: write its new source code."
+  },
+  "UpdateCdsUnitTest": {
+    "keywords": [
+      "change CDS test",
+      "CDS view unit test",
+      "test double",
+      "ABAP Unit",
+      "CDS view"
+    ],
+    "semantic": "Replace the ABAP Unit test classes that test a CDS view."
+  },
+  "UpdateClass": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "class",
+      "ABAP class",
+      "CLAS",
+      "global class",
+      "methods",
+      "OO"
+    ],
+    "semantic": "Edit an ABAP class and add a method to it, or change its source code."
+  },
+  "UpdateDataElement": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "data element",
+      "DTEL",
+      "field label",
+      "data type",
+      "domain",
+      "type of a field"
+    ],
+    "semantic": "Change an ABAP data element: its field labels, domain or type."
+  },
+  "UpdateDdl": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "CDS view",
+      "CDS entity",
+      "CDS",
+      "DDL source",
+      "DDLS",
+      "classic DDL view",
+      "data definition",
+      "view entity",
+      "core data services"
+    ],
+    "semantic": "Change the source of a CDS view: add a field, an association or a join, and write its new DDL source."
+  },
+  "UpdateDomain": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "domain",
+      "DOMA",
+      "fixed values",
+      "value range",
+      "data type",
+      "length",
+      "decimals"
+    ],
+    "semantic": "Change an ABAP domain: its fixed values, data type or length."
+  },
+  "UpdateFunctionGroup": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "function group",
+      "FUGR",
+      "function pool"
+    ],
+    "semantic": "Change the description of an ABAP function group."
+  },
+  "UpdateFunctionGroupUnitTest": {
+    "keywords": [
+      "change function group unit test",
+      "ABAP Unit",
+      "test include",
+      "function group",
+      "FUGR"
+    ],
+    "semantic": "Replace the ABAP Unit test classes of a function group."
+  },
+  "UpdateFunctionInclude": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "function group include",
+      "include",
+      "TOP include",
+      "FUGR include"
+    ],
+    "semantic": "Change the code of an include of an ABAP function group."
+  },
+  "UpdateFunctionModule": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "function module",
+      "FM",
+      "BAPI",
+      "RFC",
+      "remote-enabled function",
+      "FUNC"
+    ],
+    "semantic": "Change an ABAP function module (BAPI or RFC function): write its new source code with its parameters."
+  },
+  "UpdateInterface": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "interface",
+      "ABAP interface",
+      "INTF",
+      "methods"
+    ],
+    "semantic": "Add or change a method of an ABAP interface: write its new source code."
+  },
+  "UpdateLocalDefinitions": {
+    "keywords": [
+      "local definitions",
+      "definitions include",
+      "class-local types",
+      "constants",
+      "class"
+    ],
+    "semantic": "Write the class-local type and constant definitions of a global class, in its definitions include."
+  },
+  "UpdateLocalMacros": {
+    "keywords": [
+      "local macros",
+      "macros include",
+      "DEFINE",
+      "class"
+    ],
+    "semantic": "Write the DEFINE macros that a global class declares in its macros include."
+  },
+  "UpdateLocalTestClass": {
+    "keywords": [
+      "local test classes",
+      "test include",
+      "write tests",
+      "ABAP Unit",
+      "class"
+    ],
+    "semantic": "Write the ABAP Unit test classes that a global class declares locally, in its test classes include."
+  },
+  "UpdateLocalTypes": {
+    "keywords": [
+      "local types",
+      "local classes",
+      "implementations include",
+      "class-local",
+      "class"
+    ],
+    "semantic": "Write the local helper classes and types that a global class declares in its implementations include."
+  },
+  "UpdateMessageClass": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "message class",
+      "MSAG",
+      "T100",
+      "messages",
+      "message texts"
+    ],
+    "semantic": "Change the description of an ABAP message class."
+  },
+  "UpdateMessageClassMessage": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "message",
+      "message class",
+      "MSAG",
+      "T100",
+      "message number",
+      "message text"
+    ],
+    "semantic": "Change the text of an existing message of an ABAP message class."
+  },
+  "UpdateMetadataExtension": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "metadata extension",
+      "DDLX",
+      "UI annotations",
+      "CDS annotations",
+      "Fiori elements",
+      "annotations"
+    ],
+    "semantic": "Change the UI annotations of a CDS metadata extension: write its new source."
+  },
+  "UpdatePackage": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "package",
+      "development package",
+      "DEVC",
+      "super-package",
+      "sub-packages"
+    ],
+    "semantic": "Change the description of an ABAP package."
+  },
+  "UpdateProgram": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "program",
+      "report",
+      "ABAP report",
+      "PROG",
+      "executable program"
+    ],
+    "semantic": "Fix a bug in an ABAP report (program) and save its new source code."
+  },
+  "UpdateProgramUnitTest": {
+    "keywords": [
+      "change report unit test",
+      "program unit test",
+      "ABAP Unit",
+      "test include",
+      "report",
+      "program"
+    ],
+    "semantic": "Replace the ABAP Unit test classes of a report (program)."
+  },
+  "UpdateServiceBinding": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "service binding",
+      "SRVB",
+      "OData V2",
+      "OData V4",
+      "OData service",
+      "Fiori",
+      "publish"
+    ],
+    "semantic": "Publish or unpublish an OData service binding."
+  },
+  "UpdateServiceDefinition": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "service definition",
+      "SRVD",
+      "OData service",
+      "exposed entities",
+      "RAP service"
+    ],
+    "semantic": "Expose another CDS entity in a service definition: write its new source."
+  },
+  "UpdateStructure": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "structure",
+      "DDIC structure",
+      "TABL/DS",
+      "fields",
+      "components"
+    ],
+    "semantic": "Add or change a component of a DDIC structure: write its new definition."
+  },
+  "UpdateTable": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "database table",
+      "transparent table",
+      "table",
+      "TABL",
+      "fields",
+      "columns",
+      "key fields",
+      "table definition"
+    ],
+    "semantic": "Add or change a field of an ABAP database table: write its new definition."
+  },
+  "UpdateUnitTest": {
+    "keywords": [
+      "change unit tests",
+      "ABAP Unit",
+      "local test classes",
+      "class"
+    ],
+    "semantic": "Replace the ABAP Unit test classes of a class with new ones."
+  },
+  "ValidateServiceBinding": {
+    "keywords": [
+      "validate service binding",
+      "service binding",
+      "check before create",
+      "name check"
+    ],
+    "semantic": "Check that a new service binding can be created with the given name, service definition and package."
+  }
+}

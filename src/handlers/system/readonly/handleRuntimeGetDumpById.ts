@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeGetDumpById',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.',
+    '[read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -64,6 +64,8 @@ export async function handleDeleteTable(
     { tool: 'DeleteTable', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'table',
         createAdtClient(connection, logger).getTable(
           resultsFor(tableDocuments),
         ),

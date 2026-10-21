@@ -1,17 +1,15 @@
-import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readDataElementMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP data element definition. Supports reading active or inactive version.',
+    '[read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -46,26 +44,24 @@ export async function handleGetDataElement(
     return return_error(new Error('data_element_name is required'));
 
   const dataElementName = data_element_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getDataElement(
-    resultsFor(dataElementDocuments),
-  );
+  const client = createAdtClient(connection, logger);
 
   // A data element has no source of its own — `IDataElementContract`
   // composes `IAdtMetadataReadable` and nothing else, so unlike its
-  // siblings there is no `.read()` to call at all (same defect/fix as
-  // `ReadDataElement`). `version` is not forwarded — the library ignores
-  // it at every level for this family, matching `ReadDataElement`'s own
-  // deliberately unfixed echo (task 11 fix round 1, deferred to the
+  // siblings there is no `.read()` to call at all. `version` is not
+  // forwarded — the library ignores it at every level for this family — and
+  // is echoed, deliberately unfixed (task 11 fix round 1, deferred to the
   // documentation task). One call, used for the one field this tool has
   // always answered.
   return answer(
     { tool: 'GetDataElement', detail: 'terse' },
-    () => obj.readMetadata({ dataElementName }, { analyse: analyseException }),
+    () => readDataElementMetadata(client, { dataElementName }),
     (metadata: AdtReading<string>) => ({
       success: true,
       data_element_name: dataElementName,
       version,
-      data_element_data: metadata.raw,
+      part: 'metadata',
+      metadata: metadata.raw,
     }),
   );
 }

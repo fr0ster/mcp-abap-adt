@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact-modify
 
-Compact modifying tools — 9 tools that write, lock, activate or execute.
+Compact modifying tools — 11 tools that write, lock, activate or execute.
 
 > **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 
@@ -9,7 +9,7 @@ Compact modifying tools — 9 tools that write, lock, activate or execute.
 A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
-`HandlerCreate` with `object_type`. Twenty-five tool schemas instead of hundreds.
+`HandlerCreate` with `object_type`. Twenty-seven tool schemas instead of hundreds.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP
@@ -19,7 +19,7 @@ one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 ## Why two library packages
 
 Capability is decided by what you import, not by a flag a caller can pass. A tool
-list assembled from `@mcp-abap-adt/compact-readonly` has **no route to a write
+list assembled from `@mcp-abap-adt/compact-readonly-entries` has **no route to a write
 handler in its module graph** — asserted against the graph, not against a list of
 names, in `compact/src/__tests__/compactCapabilitySplit.test.ts`. The read-only
 half depends on `@mcp-abap-adt/lib/handlers/read`; the modifying half on

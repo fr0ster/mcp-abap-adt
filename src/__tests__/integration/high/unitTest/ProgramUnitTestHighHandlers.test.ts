@@ -13,6 +13,7 @@ import { handleCreateProgramUnitTest } from '../../../../handlers/unit_test/high
 import { handleRunProgramUnitTest } from '../../../../handlers/unit_test/high/handleRunProgramUnitTest';
 import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
+import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
@@ -56,10 +57,13 @@ describe('Unit Test High-Level Handlers (report)', () => {
               : (await createTestConnectionAndSession()).connection;
           const deleted = await createAdtClient(connection as any)
             .getInclude()
-            .delete({
-              includeName: programTestInclude(programName),
-              transportRequest: context.transportRequest,
-            });
+            .delete(
+              {
+                includeName: programTestInclude(programName),
+                transportRequest: context.transportRequest,
+              },
+              { headers: DEFAULT_ADT_HEADERS['include.delete'] },
+            );
           if (!deleted.ok) {
             context.logger?.warn?.(
               `cleanup include (ignored): ${deleted.getError().message}`,

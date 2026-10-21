@@ -6,7 +6,6 @@
  * getVersionSource(content_uri). Closes #30.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -24,19 +23,20 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectVersionSource',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.',
+    "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
   inputSchema: {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
-        description: 'Object type (same value used in GetObjectVersions).',
+        description:
+          'Object type (the same value the version history was read with).',
         enum: [...VERSIONED_OBJECT_TYPES],
       },
       content_uri: {
         type: 'string',
         description:
-          'Opaque content_uri taken from a GetObjectVersions version entry.',
+          "Opaque content_uri of a version, from the object's version history.",
       },
     },
     required: ['object_type', 'content_uri'],
@@ -86,13 +86,6 @@ export async function handleGetObjectVersionSource(
         data: JSON.stringify({ success: true, content_uri, source }, null, 2),
       } as AxiosResponse);
     } catch (error: any) {
-      if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-        return return_error(
-          new Error(
-            `Version source is not supported for object_type '${object_type}'.`,
-          ),
-        );
-      }
       return return_error(
         error instanceof Error ? error : new Error(String(error)),
       );

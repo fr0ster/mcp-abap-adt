@@ -9,13 +9,14 @@ import {
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.',
+    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -93,4 +94,16 @@ export async function handleGetUnitTestResult(
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
           },
   );
+}
+
+/**
+ * Compact: the run's result read once — `getResult` alone, answered as SAP
+ * gave it (`readResultOnce`). The run's status is the caller's to read.
+ */
+export async function handleGetUnitTestResultOnce(
+  context: HandlerContext,
+  args: ResultOnceArgs,
+  tool = 'HandlerUnitTestResult',
+) {
+  return readResultOnce(context, tool, 'read unit test result', args);
 }

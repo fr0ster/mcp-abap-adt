@@ -9,13 +9,14 @@ import {
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. ',
+    '[read-only] Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. ',
   inputSchema: {
     type: 'object',
     properties: {
@@ -94,4 +95,16 @@ export async function handleGetCdsUnitTestResult(
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
           },
   );
+}
+
+/**
+ * Compact: the run's result read once — `getResult` alone, answered as SAP
+ * gave it (`readResultOnce`). The run's status is the caller's to read.
+ */
+export async function handleGetCdsUnitTestResultOnce(
+  context: HandlerContext,
+  args: ResultOnceArgs,
+  tool = 'HandlerCdsUnitTestResult',
+) {
+  return readResultOnce(context, tool, 'read CDS unit test result', args);
 }

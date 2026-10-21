@@ -26,20 +26,20 @@ const OUTPUT_PATHS = {
     '../docs/user-guide/AVAILABLE_TOOLS_READONLY.md',
   ),
   high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
-  low: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LOW.md'),
   legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
 };
-const LEVELS = ['readonly', 'high', 'low', 'debug'];
+// `low` left in 19.0.0: the low set is not served by the full binaries,
+// and the low handler files that remain serve compact and high only.
+const LEVELS = ['readonly', 'high', 'debug', 'session', 'batch'];
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
 Usage: node tools/generate-tools-docs.js
 
-Scans src/handlers/**/(readonly|high|low|debug)/*.ts and generates:
+Scans src/handlers/**/(readonly|high|debug|session|batch)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS.md
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
-  docs/user-guide/AVAILABLE_TOOLS_LOW.md
   docs/user-guide/AVAILABLE_TOOLS_LEGACY.md   (only when a tool declares legacy)
 
 Output hierarchy:
@@ -499,7 +499,7 @@ function loadObjectVersionTools() {
 
     tools.push({
       name: `Get${display}Versions`,
-      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${display}VersionSource.`,
+      description: `[read-only] Lists the version history of the ${label} named by ${nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.`,
       inputSchema: { properties: versionsProps, required: versionsRequired },
       inputSchemaRef: null,
       availableIn,
@@ -510,12 +510,12 @@ function loadObjectVersionTools() {
     });
     tools.push({
       name: `Get${display}VersionSource`,
-      description: `[read-only] Fetch the source of a specific ${label} version by its content_uri (taken from a Get${display}Versions entry).`,
+      description: `[read-only] Reads the source of the ${label} version named by content_uri, an entry of the ${label}'s version history.`,
       inputSchema: {
         properties: {
           content_uri: {
             type: 'string',
-            description: `Opaque content_uri taken from a Get${display}Versions entry.`,
+            description: `Opaque content_uri of a version, from the ${label}'s version history.`,
           },
         },
         required: ['content_uri'],
@@ -529,16 +529,16 @@ function loadObjectVersionTools() {
     });
     tools.push({
       name: `Get${display}VersionDiff`,
-      description: `[read-only] Compute a unified diff between two ${label} versions, by their content_uris (taken from Get${display}Versions entries).`,
+      description: `[read-only] Compares the two ${label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.`,
       inputSchema: {
         properties: {
           content_uri_from: {
             type: 'string',
-            description: `Opaque content_uri of the OLD/base version (from a Get${display}Versions entry).`,
+            description: `Opaque content_uri of the OLD/base version, from the ${label}'s version history.`,
           },
           content_uri_to: {
             type: 'string',
-            description: `Opaque content_uri of the NEW/compare version (from a Get${display}Versions entry).`,
+            description: `Opaque content_uri of the NEW/compare version, from the ${label}'s version history.`,
           },
         },
         required: ['content_uri_from', 'content_uri_to'],
@@ -633,7 +633,6 @@ function builtDefinitions() {
   const entries = new HandlerExporter({
     includeReadOnly: true,
     includeHighLevel: true,
-    includeLowLevel: true,
     includeSystem: true,
     includeSearch: true,
     includeDebug: true,
@@ -755,11 +754,66 @@ function readOnlyCopies(tools) {
   return copies;
 }
 
+/**
+ * The tools a read-only binary serves (`mcp-abap-adt-ro`, `-http-ro`,
+ * `-sse-ro`), taken from the set the binary uses — `fullReadOnlyToolSet` of
+ * the build — never from a group or a folder: the readonly folders also hold
+ * the background-run tools, which core-ro does not serve, and the run tools
+ * are served there without `background`. Each tool keeps its source
+ * file and object; its parameters are the set's: a parameter the set's
+ * definition does not declare is dropped. Throws when the set serves a tool
+ * the file walk did not find, so the page cannot silently miss one.
+ */
+function readOnlySetTools(tools) {
+  const distEntry = path.join(__dirname, '..', 'dist', 'lib', 'toolSet.js');
+  requireFreshBuild(distEntry);
+  const { fullReadOnlyToolSet } = require(distEntry);
+  // The stdio binary's set: the http and sse ones are the same without the
+  // leftover-session list and logoff, which are stdio's only.
+  const entries = fullReadOnlyToolSet
+    .groups({ connection: null }, 'stdio')
+    .flatMap((group) => group.getHandlers());
+  return entries.map((entry) => {
+    const definition = entry.toolDefinition;
+    const source = tools.find((t) => t.name === definition.name);
+    if (!source) {
+      throw new Error(
+        `${definition.name} is served by mcp-abap-adt-ro but was found in no handler file`,
+      );
+    }
+    const declared = builtPropertiesOf(definition);
+    const parsed = source.inputSchema?.properties;
+    const inputSchema =
+      parsed && declared
+        ? {
+            ...source.inputSchema,
+            properties: Object.fromEntries(
+              Object.entries(parsed).filter(([key]) => declared.has(key)),
+            ),
+            required: (source.inputSchema.required || []).filter((key) =>
+              declared.has(key),
+            ),
+          }
+        : source.inputSchema;
+    return { ...source, inputSchema, level: 'readonly' };
+  });
+}
+
+/** The parameter names a built definition declares, in either schema shape. */
+function builtPropertiesOf(definition) {
+  const schema = definition.inputSchema;
+  if (!schema || typeof schema !== 'object') return undefined;
+  const properties = schema.properties ? schema.properties : schema;
+  return new Set(Object.keys(properties));
+}
+
 function levelTitle(level) {
   if (level === 'readonly') return 'Read-Only';
   if (level === 'high') return 'High-Level';
   if (level === 'low') return 'Low-Level';
   if (level === 'debug') return 'Debug';
+  if (level === 'session') return 'Session';
+  if (level === 'batch') return 'Batch';
   return level;
 }
 
@@ -807,8 +861,9 @@ function generateMarkdown(tools) {
     total: tools.length,
     readonly: tools.filter((t) => t.level === 'readonly').length,
     high: tools.filter((t) => t.level === 'high').length,
-    low: tools.filter((t) => t.level === 'low').length,
     debug: tools.filter((t) => t.level === 'debug').length,
+    session: tools.filter((t) => t.level === 'session').length,
+    batch: tools.filter((t) => t.level === 'batch').length,
   };
 
   let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
@@ -817,18 +872,20 @@ function generateMarkdown(tools) {
   md += `- Total tools: ${summary.total}\n`;
   md += `- Read-only tools: ${summary.readonly}\n`;
   md += `- High-level tools: ${summary.high}\n`;
-  md += `- Low-level tools: ${summary.low}\n`;
-  md += `- Debug tools: ${summary.debug}\n\n`;
+  md += `- Debug tools: ${summary.debug}\n`;
+  md += `- Session tools: ${summary.session}\n`;
+  md += `- Batch tools: ${summary.batch}\n\n`;
 
   md += `## Handler Sets\n\n`;
-  md += `- \`readonly\` -> [Read-Only Group](#read-only-group)\n`;
-  md += `- \`high\` -> [High-Level Group](#high-level-group)\n`;
-  md += `- \`low\` -> [Low-Level Group](#low-level-group)\n`;
-  md += `- \`debug\` (opt-in) -> [Debug Group](#debug-group)\n`;
-  md += `- \`compact\` -> [High-Level / Compact](#high-level-compact)\n\n`;
+  md += `The binary fixes its tool set (19.0.0); there is no \`--exposition\`.\n\n`;
+  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, on stdio the leftover-session list and logoff, and the run tools without \`background\`\n`;
+  md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
+  md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
+  md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
+  md += `- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, \`HandlerBatch\`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it\n`;
+  md += `- compact -> [the compact package](../../compact/README.md): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;
-  md += `- [Compact Set](#high-level-compact)\n`;
   for (const level of LEVELS) {
     const objects = Object.values(grouped[level]).sort((a, b) =>
       a.objectTitle.localeCompare(b.objectTitle),
@@ -887,7 +944,7 @@ function generateMarkdown(tools) {
   return md;
 }
 
-function generateLevelMarkdown(tools, level) {
+function generateLevelMarkdown(tools, level, intro) {
   const levelTools = tools.filter((t) => t.level === level);
   const grouped = groupByLevelAndObject(levelTools);
   const objects = Object.values(grouped[level]).sort((a, b) =>
@@ -896,6 +953,7 @@ function generateLevelMarkdown(tools, level) {
 
   let md = `# ${levelTitle(level)} Tools - MCP ABAP ADT Server\n\n`;
   md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  if (intro) md += `${intro}\n\n`;
   md += `- Level: ${levelTitle(level)}\n`;
   md += `- Total tools: ${levelTools.length}\n\n`;
 
@@ -1006,6 +1064,14 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
   return md;
 }
 
+/** What the read-only page lists, said on the page. */
+const READ_ONLY_PAGE_INTRO =
+  "Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
+
+/** What the high-level page says beside its tools. */
+const HIGH_PAGE_INTRO =
+  "The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).";
+
 function main() {
   console.log('🔍 Scanning handler code in src/handlers...');
   const tools = loadToolsFromHandlers();
@@ -1020,17 +1086,16 @@ function main() {
   fs.writeFileSync(OUTPUT_PATHS.all, markdownAll, 'utf8');
   fs.writeFileSync(
     OUTPUT_PATHS.readonly,
-    generateLevelMarkdown(tools, 'readonly'),
+    generateLevelMarkdown(
+      readOnlySetTools(tools),
+      'readonly',
+      READ_ONLY_PAGE_INTRO,
+    ),
     'utf8',
   );
   fs.writeFileSync(
     OUTPUT_PATHS.high,
-    generateLevelMarkdown(tools, 'high'),
-    'utf8',
-  );
-  fs.writeFileSync(
-    OUTPUT_PATHS.low,
-    generateLevelMarkdown(tools, 'low'),
+    generateLevelMarkdown(tools, 'high', HIGH_PAGE_INTRO),
     'utf8',
   );
   // The legacy page writes itself back when there is something to put on it.
@@ -1061,7 +1126,6 @@ function main() {
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
-  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
   console.log(
     declaresLegacy
       ? `✅ Documentation generated: ${OUTPUT_PATHS.legacy}`
@@ -1079,6 +1143,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  readOnlySetTools,
   extractToolDefinition,
   loadToolsFromHandlers,
   parseTopLevelProperties,

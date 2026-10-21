@@ -1,6 +1,13 @@
 // src/handlers/debugger/debug/handleDebugStep.ts
-import { requireDebugger } from '../../../lib/debugger/access';
-import { debugStateAnswer } from '../../../lib/debugger/answer';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
+import {
+  debugAnswer,
+  debugStateAnswer,
+  terseOnceStep,
+} from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
@@ -10,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugStep',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.',
+    '[read-only] [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -45,6 +52,21 @@ export async function handleDebugStep(
   context: HandlerContext,
   args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  const recorder = debugBatchRecorder(context);
+  if (
+    recorder !== undefined &&
+    args.action !== 'detach' &&
+    args.action !== 'release_debugger'
+  ) {
+    // Recorded in the debugger batch: the step's own request alone.
+    const step = STEPS[args.action];
+    return debugAnswer(
+      args,
+      async () =>
+        requireDebugger(context, args, 'use').abap.recordStep(recorder, step),
+      terseOnceStep,
+    );
+  }
   return debugStateAnswer(args, async () => {
     const d = requireDebugger(context, args, 'use');
     if (args.action === 'detach' || args.action === 'release_debugger') {

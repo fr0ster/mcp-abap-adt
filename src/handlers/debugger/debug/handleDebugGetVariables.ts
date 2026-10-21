@@ -1,5 +1,8 @@
 // src/handlers/debugger/debug/handleDebugGetVariables.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseVariables } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
@@ -11,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugGetVariables',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.',
+    '[read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -45,6 +48,11 @@ export async function handleDebugGetVariables(
     args,
     async () => {
       const a = requireDebugger(context, args, 'use').abap;
+      const recorder = debugBatchRecorder(context);
+      if (recorder !== undefined)
+        return names
+          ? a.recordVariables(recorder, names)
+          : a.recordChildVariables(recorder, parents);
       return names ? a.getVariables(names) : a.getChildVariables(parents);
     },
     (v) => {

@@ -15,7 +15,7 @@
  */
 
 import { handleCreatePackage } from '../../../../handlers/package/high/handleCreatePackage';
-import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
+import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -49,7 +49,7 @@ describe('Package High-Level Handlers Integration', () => {
         try {
           const deleteLogger = createTestLogger('package-high-delete');
           const deleteResponse = await tester.invokeToolOrHandler(
-            'DeletePackageLow',
+            'DeletePackage',
             {
               package_name: objectName,
               force_new_connection: true,

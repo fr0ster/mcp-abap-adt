@@ -1,0 +1,50 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": {
+      "@mcp-abap-adt/lib": [
+        "../dist/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers": [
+        "../dist/lib/handlers/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/compact-shared": [
+        "../dist/lib/compact/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/config": [
+        "../dist/lib/config/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/debugger": [
+        "../dist/lib/debugger/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/state": [
+        "../dist/lib/state/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/tool-set": [
+        "../dist/lib/toolSet.d.ts"
+      ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../dist/lib/httpTransport/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/embeddable": [
+        "../dist/embeddable/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/logger": [
+        "../dist/lib/handlerLogger.d.ts"
+      ],
+      "@mcp-abap-adt/http/launcher": [
+        "../http/dist/launcher.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__"
+  ]
+}

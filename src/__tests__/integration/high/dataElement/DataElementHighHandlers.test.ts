@@ -15,8 +15,8 @@
  */
 
 import { handleCreateDataElement } from '../../../../handlers/data_element/high/handleCreateDataElement';
+import { handleDeleteDataElement } from '../../../../handlers/data_element/high/handleDeleteDataElement';
 import { handleUpdateDataElement } from '../../../../handlers/data_element/high/handleUpdateDataElement';
-import { handleDeleteDataElement } from '../../../../handlers/data_element/low/handleDeleteDataElement';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
 

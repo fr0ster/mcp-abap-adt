@@ -1,0 +1,1504 @@
+[
+  {
+    "tool": "GetPackage",
+    "set": "full",
+    "handler": "src/handlers/package/high/handleGetPackage.ts#handleGetPackage",
+    "sends": "GET /sap/bc/adt/packages/{name}?version=active"
+  },
+  {
+    "tool": "GetDomain",
+    "set": "full",
+    "handler": "src/handlers/domain/high/handleGetDomain.ts#handleGetDomain",
+    "sends": "GET /sap/bc/adt/ddic/domains/{name}"
+  },
+  {
+    "tool": "GetDataElement",
+    "set": "full",
+    "handler": "src/handlers/data_element/high/handleGetDataElement.ts#handleGetDataElement",
+    "sends": "GET /sap/bc/adt/ddic/dataelements/{name}"
+  },
+  {
+    "tool": "GetTable",
+    "set": "full",
+    "handler": "src/handlers/table/high/handleGetTable.ts#handleGetTable",
+    "sends": "one request: GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/tables/{name} (part metadata)"
+  },
+  {
+    "tool": "GetStructure",
+    "set": "full",
+    "handler": "src/handlers/structure/high/handleGetStructure.ts#handleGetStructure",
+    "sends": "one request: GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/structures/{name} (part metadata)"
+  },
+  {
+    "tool": "GetDdl",
+    "set": "full",
+    "handler": "src/handlers/ddl/high/handleGetDdl.ts#handleGetDdl",
+    "sends": "one request: GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/ddl/sources/{name} (part metadata)"
+  },
+  {
+    "tool": "GetServiceDefinition",
+    "set": "full",
+    "handler": "src/handlers/service_definition/high/handleGetServiceDefinition.ts#handleGetServiceDefinition",
+    "sends": "one request: GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/srvd/sources/{name} (part metadata)"
+  },
+  {
+    "tool": "GetServiceBinding",
+    "set": "full",
+    "handler": "src/handlers/service_binding/high/handleGetServiceBinding.ts#handleGetServiceBinding",
+    "sends": "one request: GET /sap/bc/adt/businessservices/bindings/{name}, the binding document (part source, the default) or its metadata document (part metadata)"
+  },
+  {
+    "tool": "ListServiceBindingTypes",
+    "set": "full",
+    "handler": "src/handlers/service_binding/high/handleListServiceBindingTypes.ts#handleListServiceBindingTypes",
+    "sends": "GET /sap/bc/adt/businessservices/bindings/bindingtypes"
+  },
+  {
+    "tool": "GetClass",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetClass.ts#handleGetClass",
+    "sends": "one request: GET /sap/bc/adt/oo/classes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/classes/{name} (part metadata)"
+  },
+  {
+    "tool": "GetLocalTestClass",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalTestClass.ts#handleGetLocalTestClass",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/testclasses?version=active"
+  },
+  {
+    "tool": "GetLocalTypes",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalTypes.ts#handleGetLocalTypes",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/implementations?version=active"
+  },
+  {
+    "tool": "GetLocalDefinitions",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalDefinitions.ts#handleGetLocalDefinitions",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/definitions?version=active"
+  },
+  {
+    "tool": "GetLocalMacros",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalMacros.ts#handleGetLocalMacros",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/macros?version=active"
+  },
+  {
+    "tool": "GetProgram",
+    "set": "full",
+    "handler": "src/handlers/program/high/handleGetProgram.ts#handleGetProgram",
+    "sends": "one request: GET /sap/bc/adt/programs/programs/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/programs/programs/{name} (part metadata)"
+  },
+  {
+    "tool": "GetInterface",
+    "set": "full",
+    "handler": "src/handlers/interface/high/handleGetInterface.ts#handleGetInterface",
+    "sends": "one request: GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/interfaces/{name} (part metadata)"
+  },
+  {
+    "tool": "GetFunctionGroup",
+    "set": "full",
+    "handler": "src/handlers/function_group/high/handleGetFunctionGroup.ts#handleGetFunctionGroup",
+    "sends": "GET /sap/bc/adt/functions/groups/{name}"
+  },
+  {
+    "tool": "GetFunctionModule",
+    "set": "full",
+    "handler": "src/handlers/function_module/high/handleGetFunctionModule.ts#handleGetFunctionModule",
+    "sends": "one request at the group given: GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/fmodules/{name} (part metadata)"
+  },
+  {
+    "tool": "GetFunctionInclude",
+    "set": "full",
+    "handler": "src/handlers/function_include/readonly/handleGetFunctionInclude.ts#handleGetFunctionInclude",
+    "sends": "one request: GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/includes/{name} (part metadata)"
+  },
+  {
+    "tool": "GetBehaviorDefinition",
+    "set": "full",
+    "handler": "src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts#handleGetBehaviorDefinition",
+    "sends": "one request: GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/bo/behaviordefinitions/{name} (part metadata)"
+  },
+  {
+    "tool": "GetBehaviorImplementation",
+    "set": "full",
+    "handler": "src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts#handleGetBehaviorImplementation",
+    "sends": "one request: GET /sap/bc/adt/oo/classes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/classes/{name} (part metadata)"
+  },
+  {
+    "tool": "GetMetadataExtension",
+    "set": "full",
+    "handler": "src/handlers/metadata_extension/high/handleGetMetadataExtension.ts#handleGetMetadataExtension",
+    "sends": "one request: GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main (part source, the default), or GET /sap/bc/adt/ddic/ddlx/sources/{name} (part metadata)"
+  },
+  {
+    "tool": "GetMessageClass",
+    "set": "full",
+    "handler": "src/handlers/message_class/high/handleGetMessageClass.ts#handleGetMessageClass",
+    "sends": "GET /sap/bc/adt/messageclass/{name}"
+  },
+  {
+    "tool": "GetMessageClassMessage",
+    "set": "full",
+    "handler": "src/handlers/message_class/high/handleGetMessageClassMessage.ts#handleGetMessageClassMessage",
+    "sends": "GET /sap/bc/adt/messageclass/{name}, the message picked from it locally"
+  },
+  {
+    "tool": "GetInclude",
+    "set": "full",
+    "handler": "src/handlers/include/readonly/handleGetInclude.ts#handleGetInclude",
+    "sends": "GET /sap/bc/adt/programs/includes/{name}/source/main"
+  },
+  {
+    "tool": "GetTransport",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleGetTransport.ts#handleGetTransport",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/{number}?includeObjects=…&includeTasks=…"
+  },
+  {
+    "tool": "ReadTransportObjects",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleReadTransportObjects.ts#handleReadTransportObjects",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/{number}"
+  },
+  {
+    "tool": "ReadTransportActionLog",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleReadTransportActionLog.ts#handleReadTransportActionLog",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs"
+  },
+  {
+    "tool": "GetObjectVersions",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersions.ts#handleGetObjectVersions",
+    "sends": "GET the versions feed of the object (…/versions)"
+  },
+  {
+    "tool": "GetObjectVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersionSource.ts#handleGetObjectVersionSource",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetClassVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/main/versions"
+  },
+  {
+    "tool": "GetProgramVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/programs/programs/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetInterfaceVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/oo/interfaces/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetFunctionModuleVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetTableVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/tables/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetStructureVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/structures/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetDdlVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/ddl/sources/{name}/versions"
+  },
+  {
+    "tool": "GetBehaviorDefinitionVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetMetadataExtensionVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetClassVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetProgramVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetInterfaceVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetFunctionModuleVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetTableVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetStructureVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetDdlVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetBehaviorDefinitionVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetMetadataExtensionVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "SearchObject",
+    "set": "full",
+    "handler": "src/handlers/search/readonly/handleSearchObject.ts#handleSearchObject",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
+  },
+  {
+    "tool": "GetObjectsByType",
+    "set": "full",
+    "handler": "src/handlers/search/readonly/handleGetObjectsByType.ts#handleGetObjectsByType",
+    "sends": "POST /sap/bc/adt/repository/nodestructure for the one node asked"
+  },
+  {
+    "tool": "GetObjectStructure",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetObjectStructure.ts#handleGetObjectStructure",
+    "sends": "GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=…"
+  },
+  {
+    "tool": "GetInactiveObjects",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetInactiveObjects.ts#handleGetInactiveObjects",
+    "sends": "GET /sap/bc/adt/activation/inactiveobjects"
+  },
+  {
+    "tool": "GetAdtTypes",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetAllTypes.ts#handleGetAdtTypes",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider"
+  },
+  {
+    "tool": "GetSqlQuery",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetSqlQuery.ts#handleGetSqlQuery",
+    "sends": "POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with the SQL as the body"
+  },
+  {
+    "tool": "GetTableContents",
+    "set": "full",
+    "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
+    "sends": "POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=…"
+  },
+  {
+    "tool": "GetATCRunStatus",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleGetATCRunStatus.ts#handleGetATCRunStatus",
+    "sends": "GET /sap/bc/adt/atc/runs/{id}"
+  },
+  {
+    "tool": "GetATCFindings",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",
+    "sends": "GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false"
+  },
+  {
+    "tool": "RuntimeListProfilerTraceFiles",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts#handleRuntimeListProfilerTraceFiles",
+    "sends": "GET /sap/bc/adt/runtime/traces/abaptraces"
+  },
+  {
+    "tool": "RuntimeGetProfilerTraceData",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts#handleRuntimeGetProfilerTraceData",
+    "sends": "GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses"
+  },
+  {
+    "tool": "RuntimeAnalyzeProfilerTrace",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts#handleRuntimeAnalyzeProfilerTrace",
+    "sends": "GET …/abaptraces/{id}/hitlist or /statements, summarised locally"
+  },
+  {
+    "tool": "RuntimeGetDumpById",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetDumpById.ts#handleRuntimeGetDumpById",
+    "sends": "GET /sap/bc/adt/runtime/dump/{id} (the view asked)"
+  },
+  {
+    "tool": "RuntimeListSystemMessages",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeListSystemMessages.ts#handleRuntimeListSystemMessages",
+    "sends": "GET /sap/bc/adt/runtime/systemmessages"
+  },
+  {
+    "tool": "RuntimeGetGatewayErrorLog",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts#handleRuntimeGetGatewayErrorLog",
+    "sends": "GET /sap/bc/adt/gw/errorlog, or the error_url given"
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "one request: GET the type's source (as the full set's Get<Type>, part source); FUNCTION_MODULE at the group its arguments name",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "source"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "TRANSPORT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "LOCAL_TEST_CLASS",
+          "LOCAL_TYPES",
+          "LOCAL_DEFINITIONS",
+          "LOCAL_MACROS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "one request: GET the type's metadata document (as the full set's Get<Type>, part metadata); FUNCTION_MODULE at the group its arguments name",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "metadata"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "FUNCTION_GROUP",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=…",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "object_structure"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "POST /sap/bc/adt/repository/nodestructure for the one node asked",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "node_structure"
+        ]
+      },
+      {
+        "argument": "object_adt_type",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "virtual_folders"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/activation/runs/{run_id}",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "activation_status"
+        ]
+      },
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/activation/results/{run_id}",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "activation_results"
+        ]
+      },
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "source"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "UNIT_TEST",
+          "CDS_UNIT_TEST"
+        ]
+      },
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerSearch",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
+  },
+  {
+    "tool": "HandlerGetData",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
+    "sends": "POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name)"
+  },
+  {
+    "tool": "HandlerProfileList",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerProfileList.ts#handleHandlerProfileList",
+    "sends": "GET /sap/bc/adt/runtime/traces/abaptraces"
+  },
+  {
+    "tool": "HandlerProfileView",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerProfileView.ts#handleHandlerProfileView",
+    "sends": "GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses (mode analyze: summarised locally)"
+  },
+  {
+    "tool": "HandlerDumpView",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpView.ts#handleHandlerDumpView",
+    "sends": "GET /sap/bc/adt/runtime/dump/{id} (the view asked)"
+  },
+  {
+    "tool": "HandlerServiceBindingListTypes",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerServiceBindingListTypes.ts#handleHandlerServiceBindingListTypes",
+    "sends": "GET /sap/bc/adt/businessservices/bindings/bindingtypes"
+  },
+  {
+    "tool": "HandlerUnitTestStatus",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerUnitTestStatus.ts#handleHandlerUnitTestStatus",
+    "sends": "GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true"
+  },
+  {
+    "tool": "HandlerCdsUnitTestStatus",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerCdsUnitTestStatus.ts#handleHandlerCdsUnitTestStatus",
+    "sends": "GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true"
+  },
+  {
+    "tool": "HandlerUnitTestResult",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerUnitTestResult.ts#handleHandlerUnitTestResult",
+    "sends": "GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false]",
+    "when": [
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerDumpList",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",
+    "sends": "GET /sap/bc/adt/runtime/dumps (feed_type system_messages: /sap/bc/adt/runtime/systemmessages; gateway_errors: /sap/bc/adt/gw/errorlog) with $top (1 to 100), to, from and the dump filters: one page, SAP's next link answered as next_to"
+  },
+  {
+    "tool": "HandlerCdsUnitTestResult",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerCdsUnitTestResult.ts#handleHandlerCdsUnitTestResult",
+    "sends": "GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false]",
+    "when": [
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerCreate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerCreate.ts#handleHandlerCreate",
+    "sends": "POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "TRANSPORT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerCreate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerCreate.ts#handleHandlerCreate",
+    "sends": "POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
+    "tool": "HandlerLock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",
+    "sends": "POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerLock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",
+    "sends": "POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
+    "tool": "HandlerUnlock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUnlock.ts#handleHandlerUnlock",
+    "sends": "POST {object uri}?_action=UNLOCK&lockHandle=…, stateful",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerUnlock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUnlock.ts#handleHandlerUnlock",
+    "sends": "POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
+    "tool": "HandlerUpdate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUpdate.ts#handleHandlerUpdate",
+    "sends": "one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request",
+    "when": [
+      {
+        "argument": "lock_handle",
+        "present": true
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "FUNCTION_GROUP",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "LOCAL_TEST_CLASS",
+          "LOCAL_TYPES",
+          "LOCAL_DEFINITIONS",
+          "LOCAL_MACROS",
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerUpdate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUpdate.ts#handleHandlerUpdate",
+    "sends": "PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "lock_handle",
+        "present": true
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
+    "tool": "HandlerDelete",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerDelete.ts#handleHandlerDelete",
+    "sends": "the deletion request alone: POST /sap/bc/adt/deletion/delete (a metadata extension: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}[?corrNr=…])",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "CDS_UNIT_TEST",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerDelete",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerDelete.ts#handleHandlerDelete",
+    "sends": "PUT of empty content to the class include under the lock_handle given ({class uri}/includes/{include}?lockHandle=…[&corrNr=…])",
+    "when": [
+      {
+        "argument": "lock_handle",
+        "present": true
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "LOCAL_TEST_CLASS",
+          "LOCAL_TYPES",
+          "LOCAL_DEFINITIONS",
+          "LOCAL_MACROS",
+          "UNIT_TEST"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "ActivateDomain",
+    "set": "full",
+    "handler": "src/handlers/domain/low/handleActivateDomain.ts#handleActivateDomain",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateDataElement",
+    "set": "full",
+    "handler": "src/handlers/data_element/low/handleActivateDataElement.ts#handleActivateDataElement",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateTable",
+    "set": "full",
+    "handler": "src/handlers/table/low/handleActivateTable.ts#handleActivateTable",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateStructure",
+    "set": "full",
+    "handler": "src/handlers/structure/low/handleActivateStructure.ts#handleActivateStructure",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateDdl",
+    "set": "full",
+    "handler": "src/handlers/ddl/low/handleActivateDdl.ts#handleActivateDdl",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateClass",
+    "set": "full",
+    "handler": "src/handlers/class/low/handleActivateClass.ts#handleActivateClass",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateInterface",
+    "set": "full",
+    "handler": "src/handlers/interface/low/handleActivateInterface.ts#handleActivateInterface",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateProgram",
+    "set": "full",
+    "handler": "src/handlers/program/low/handleActivateProgram.ts#handleActivateProgram",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateFunctionModule",
+    "set": "full",
+    "handler": "src/handlers/function/low/handleActivateFunctionModule.ts#handleActivateFunctionModule",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateFunctionGroup",
+    "set": "full",
+    "handler": "src/handlers/function/low/handleActivateFunctionGroup.ts#handleActivateFunctionGroup",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateBehaviorDefinition",
+    "set": "full",
+    "handler": "src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts#handleActivateBehaviorDefinition",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateMetadataExtension",
+    "set": "full",
+    "handler": "src/handlers/ddlx/low/handleActivateMetadataExtension.ts#handleActivateMetadataExtension",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateServiceDefinition",
+    "set": "full",
+    "handler": "src/handlers/service_definition/low/handleActivateServiceDefinition.ts#handleActivateServiceDefinition",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateServiceBinding",
+    "set": "full",
+    "handler": "src/handlers/service_binding/low/handleActivateServiceBinding.ts#handleActivateServiceBinding",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps)",
+    "when": [
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "object_adt_type",
+        "present": false
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "BEHAVIOR_DEFINITION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate)",
+    "when": [
+      {
+        "argument": "objects",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate)",
+    "when": [
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "object_adt_type",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id }",
+    "when": [
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "object_adt_type",
+        "present": false
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "CheckClass",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleCheckClass.ts#handleCheckClass",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckInterface",
+    "set": "full",
+    "handler": "src/handlers/interface/high/handleCheckInterface.ts#handleCheckInterface",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckProgram",
+    "set": "full",
+    "handler": "src/handlers/program/high/handleCheckProgram.ts#handleCheckProgram",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckFunctionGroup",
+    "set": "full",
+    "handler": "src/handlers/function/high/handleCheckFunctionGroup.ts#handleCheckFunctionGroup",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckFunctionModule",
+    "set": "full",
+    "handler": "src/handlers/function/high/handleCheckFunctionModule.ts#handleCheckFunctionModule",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckTable",
+    "set": "full",
+    "handler": "src/handlers/table/high/handleCheckTable.ts#handleCheckTable",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckStructure",
+    "set": "full",
+    "handler": "src/handlers/structure/high/handleCheckStructure.ts#handleCheckStructure",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckDdl",
+    "set": "full",
+    "handler": "src/handlers/ddl/high/handleCheckDdl.ts#handleCheckDdl",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckDomain",
+    "set": "full",
+    "handler": "src/handlers/domain/high/handleCheckDomain.ts#handleCheckDomain",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckDataElement",
+    "set": "full",
+    "handler": "src/handlers/data_element/high/handleCheckDataElement.ts#handleCheckDataElement",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckBehaviorDefinition",
+    "set": "full",
+    "handler": "src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts#handleCheckBehaviorDefinition",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckMetadataExtension",
+    "set": "full",
+    "handler": "src/handlers/ddlx/high/handleCheckMetadataExtension.ts#handleCheckMetadataExtension",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckPackage",
+    "set": "full",
+    "handler": "src/handlers/package/high/handleCheckPackage.ts#handleCheckPackage",
+    "sends": "POST /sap/bc/adt/checkruns for the package"
+  },
+  {
+    "tool": "HandlerCheckRun",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerCheckRun.ts#handleHandlerCheckRun",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package)"
+  },
+  {
+    "tool": "HandlerDeletionCheck",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts#handleHandlerDeletionCheck",
+    "sends": "POST /sap/bc/adt/deletion/check for the one object"
+  },
+  {
+    "tool": "HandlerValidate",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerValidate.ts#handleHandlerValidate",
+    "sends": "POST the type's validation endpoint (…/validation?objname=…, /cts/transportchecks for a service binding)"
+  },
+  {
+    "tool": "ValidateServiceBinding",
+    "set": "full",
+    "handler": "src/handlers/service_binding/high/handleValidateServiceBinding.ts#handleValidateServiceBinding",
+    "sends": "POST /sap/bc/adt/cts/transportchecks"
+  },
+  {
+    "tool": "HandlerServiceBindingValidate",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerServiceBindingValidate.ts#handleHandlerServiceBindingValidate",
+    "sends": "POST /sap/bc/adt/cts/transportchecks"
+  },
+  {
+    "tool": "CreateClass",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleCreateClass.ts#handleCreateClass",
+    "sends": "POST /sap/bc/adt/oo/classes: the create alone"
+  },
+  {
+    "tool": "CreateTable",
+    "set": "full",
+    "handler": "src/handlers/table/high/handleCreateTable.ts#handleCreateTable",
+    "sends": "POST /sap/bc/adt/ddic/tables: the create alone"
+  },
+  {
+    "tool": "CreateMessageClass",
+    "set": "full",
+    "handler": "src/handlers/message_class/high/handleCreateMessageClass.ts#handleCreateMessageClass",
+    "sends": "POST /sap/bc/adt/messageclass: the create alone"
+  },
+  {
+    "tool": "CreateFunctionModule",
+    "set": "full",
+    "handler": "src/handlers/function/high/handleCreateFunctionModule.ts#handleCreateFunctionModule",
+    "sends": "POST /sap/bc/adt/functions/groups/{group}/fmodules: the create alone"
+  },
+  {
+    "tool": "CreateFunctionInclude",
+    "set": "full",
+    "handler": "src/handlers/function_include/high/handleCreateFunctionInclude.ts#handleCreateFunctionInclude",
+    "sends": "POST /sap/bc/adt/functions/groups/{group}/includes: the create alone"
+  },
+  {
+    "tool": "CreateBehaviorImplementation",
+    "set": "full",
+    "handler": "src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts#handleCreateBehaviorImplementation",
+    "sends": "POST /sap/bc/adt/oo/classes: the create alone"
+  },
+  {
+    "tool": "CreateProgram",
+    "set": "full",
+    "handler": "src/handlers/program/high/handleCreateProgram.ts#handleCreateProgram",
+    "sends": "POST /sap/bc/adt/programs/programs: the create alone"
+  },
+  {
+    "tool": "CreateInterface",
+    "set": "full",
+    "handler": "src/handlers/interface/high/handleCreateInterface.ts#handleCreateInterface",
+    "sends": "POST /sap/bc/adt/oo/interfaces: the create alone"
+  },
+  {
+    "tool": "CreateDdl",
+    "set": "full",
+    "handler": "src/handlers/ddl/high/handleCreateDdl.ts#handleCreateDdl",
+    "sends": "POST /sap/bc/adt/ddic/ddl/sources: the create alone"
+  },
+  {
+    "tool": "CreatePackage",
+    "set": "full",
+    "handler": "src/handlers/package/high/handleCreatePackage.ts#handleCreatePackage",
+    "sends": "POST /sap/bc/adt/packages; over RFC the create runs in an ABAP session of its own, outside the batch",
+    "connection": "http"
+  },
+  {
+    "tool": "CreateServiceDefinition",
+    "set": "full",
+    "handler": "src/handlers/service_definition/high/handleCreateServiceDefinition.ts#handleCreateServiceDefinition",
+    "sends": "POST /sap/bc/adt/ddic/srvd/sources: the create alone (no source written, nothing activated)",
+    "when": [
+      {
+        "argument": "activate",
+        "equals": [
+          "false"
+        ]
+      },
+      {
+        "argument": "source_code",
+        "present": false
+      }
+    ]
+  },
+  {
+    "tool": "CreateServiceBinding",
+    "set": "full",
+    "handler": "src/handlers/service_binding/high/handleCreateServiceBinding.ts#handleCreateServiceBinding",
+    "sends": "POST /sap/bc/adt/businessservices/bindings: the create alone (nothing activated)",
+    "when": [
+      {
+        "argument": "activate",
+        "equals": [
+          "false"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "CreateFunctionGroup",
+    "set": "full",
+    "handler": "src/handlers/function/high/handleCreateFunctionGroup.ts#handleCreateFunctionGroup",
+    "sends": "POST /sap/bc/adt/functions/groups: the create alone (nothing activated)",
+    "when": [
+      {
+        "argument": "activate",
+        "equals": [
+          "false"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "CreateTransport",
+    "set": "full",
+    "handler": "src/handlers/transport/high/handleCreateTransport.ts#handleCreateTransport",
+    "sends": "POST /sap/bc/adt/cts/transportrequests"
+  },
+  {
+    "tool": "HandlerTransportCreate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerTransportCreate.ts#handleHandlerTransportCreate",
+    "sends": "POST /sap/bc/adt/cts/transportrequests"
+  },
+  {
+    "tool": "CreateTransportTask",
+    "set": "full",
+    "handler": "src/handlers/transport/high/handleCreateTransportTask.ts#handleCreateTransportTask",
+    "sends": "POST /sap/bc/adt/cts/transportrequests/{number}/tasks"
+  },
+  {
+    "tool": "RemoveTransportObject",
+    "set": "full",
+    "handler": "src/handlers/transport/high/handleRemoveTransportObject.ts#handleRemoveTransportObject",
+    "sends": "PUT /sap/bc/adt/cts/transportrequests/{number} without the object"
+  },
+  {
+    "tool": "AddTransportObject",
+    "set": "full",
+    "handler": "src/handlers/transport/high/handleAddTransportObject.ts#handleAddTransportObject",
+    "sends": "PUT /sap/bc/adt/cts/transportrequests/{number} with the object"
+  },
+  {
+    "tool": "SortAndCompressTransportTask",
+    "set": "full",
+    "handler": "src/handlers/transport/high/handleSortAndCompressTransportTask.ts#handleSortAndCompressTransportTask",
+    "sends": "POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress"
+  },
+  {
+    "tool": "HandlerTransportSortAndCompress",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerTransportSortAndCompress.ts#handleHandlerTransportSortAndCompress",
+    "sends": "POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress"
+  },
+  {
+    "tool": "MoveTransportObjects",
+    "set": "full",
+    "handler": "src/handlers/transport/high/handleMoveTransportObjects.ts#handleMoveTransportObjects",
+    "sends": "POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given"
+  },
+  {
+    "tool": "HandlerTransportMoveObjects",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerTransportMoveObjects.ts#handleHandlerTransportMoveObjects",
+    "sends": "POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given"
+  },
+  {
+    "tool": "RuntimeCreateProfilerTraceParameters",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts#handleRuntimeCreateProfilerTraceParameters",
+    "sends": "POST /sap/bc/adt/runtime/traces/abaptraces/parameters"
+  },
+  {
+    "tool": "RuntimeRunClass",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeRunClass.ts#handleRuntimeRunClass",
+    "sends": "POST /sap/bc/adt/oo/classrun/{name} (without profile: with it the trace is also scheduled and listed)",
+    "when": [
+      {
+        "argument": "profile",
+        "notEquals": [
+          "true"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RuntimeRunProgram",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeRunProgram.ts#handleRuntimeRunProgram",
+    "sends": "POST /sap/bc/adt/programs/programrun/{name} (without profile: with it the trace is scheduled first)",
+    "when": [
+      {
+        "argument": "profile",
+        "notEquals": [
+          "true"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerProfileSchedule",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerProfileSchedule.ts#handleHandlerProfileSchedule",
+    "sends": "POST /sap/bc/adt/runtime/traces/abaptraces/parameters: schedules a trace and answers its profiler_id"
+  },
+  {
+    "tool": "HandlerProfileRun",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerProfileRun.ts#handleHandlerProfileRun",
+    "sends": "POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name}; with profiler_id, ?profilerId={profiler_id}"
+  },
+  {
+    "tool": "HandlerUnitTestRun",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUnitTestRun.ts#handleHandlerUnitTestRun",
+    "sends": "POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult"
+  },
+  {
+    "tool": "RuntimeListFeeds",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeListFeeds.ts#handleRuntimeListFeeds",
+    "sends": "GET /sap/bc/adt/feeds (descriptors, or the variants read from the same list; the dumps, system messages and gateway errors feeds are read page by page, so they are not listed)",
+    "when": [
+      {
+        "argument": "feed_type",
+        "equals": [
+          "descriptors",
+          "variants"
+        ]
+      },
+      {
+        "argument": "feed_types",
+        "present": false
+      }
+    ]
+  },
+  {
+    "tool": "GetWhereUsed",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetWhereUsed.ts#handleGetWhereUsed",
+    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given)",
+    "when": [
+      {
+        "argument": "enable_all_types",
+        "notEquals": [
+          "true"
+        ]
+      },
+      {
+        "argument": "enable_only_types",
+        "present": false
+      },
+      {
+        "argument": "disable_types",
+        "present": false
+      },
+      {
+        "argument": "objects",
+        "present": false
+      }
+    ]
+  },
+  {
+    "tool": "HandlerWhereUsed",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
+    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope"
+  },
+  {
+    "tool": "GetObjectVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersionDiff.ts#handleGetObjectVersionDiff",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetClassVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetProgramVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetInterfaceVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetFunctionModuleVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetTableVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetStructureVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetDdlVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetBehaviorDefinitionVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetMetadataExtensionVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetEnhancements",
+    "set": "full",
+    "handler": "src/handlers/enhancement/readonly/handleGetEnhancements.ts#handleGetEnhancements",
+    "sends": "GET {object uri}/source/main/enhancements/elements for a class, program or function group named by its type (any other type is resolved by probing metadata first, so it is not listed)",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "CLASS",
+          "CLAS",
+          "CLAS/OC",
+          "FUNCTION_GROUP",
+          "FUNCTIONGROUP",
+          "FUGR",
+          "FUGR/F",
+          "PROGRAM",
+          "PROG",
+          "PROG/P"
+        ]
+      },
+      {
+        "argument": "include_nested",
+        "notEquals": [
+          "true"
+        ]
+      }
+    ]
+  }
+]

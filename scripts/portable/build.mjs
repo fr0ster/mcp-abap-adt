@@ -187,12 +187,10 @@ function buildTools() {
 
 async function bundle(work, stageDir, server, esbuild) {
   const entry = path.join(work, `${server.name}-entry.cjs`);
-  const launcher = path.join(stageDir, 'node_modules', server.pkg, 'dist/launcher.js');
-  fs.writeFileSync(
-    entry,
-    `const { main } = require(${JSON.stringify(launcher)});\n` +
-      'void main().catch((err) => { console.error("[MCP] launcher failed:", err instanceof Error ? err.message : String(err)); process.exit(1); });\n',
-  );
+  // The package's own bin: it calls `main` with the tool set, name and
+  // version that command serves (19.0.0: `main({ toolSet, program, version })`).
+  const bin = path.join(stageDir, 'node_modules', server.pkg, 'bin', `${server.name}.js`);
+  fs.writeFileSync(entry, `require(${JSON.stringify(bin)});\n`);
   const outfile = path.join(work, `${server.name}.bundle.cjs`);
   const loader = path.join(here, 'sea-rfc-loader.cjs');
   const coreVersion = JSON.parse(

@@ -1,12 +1,13 @@
 /**
  * A tool can be a COPY in two groups: same name, schema and handler in
- * readonly and in high (GetUnitTestResult — purely a read). The rule: a caller
+ * readonly and in high (GetUnitTestResult, the object reads Get<Type> —
+ * purely reads). The rule: a caller
  * granted readonly alone gets it from readonly; a caller granted both gets it
  * ONCE, from high.
  *
  * `ReadOnlyHandlersGroup.getHandlers()` enforces it, whatever dedup strategy is
- * injected: a strategy decides about differently named pairs (Read<X> vs
- * Get<X>), and two tools under one name cannot both be registered anyway.
+ * injected: a strategy decides about differently named tools, and two tools
+ * under one name cannot both be registered anyway.
  *
  * Run: npm test -- --testPathPatterns=unit/readonlyHighSameNameDedup
  */
@@ -14,10 +15,7 @@
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../lib/handlers/groups/ReadOnlyHandlersGroup';
-import {
-  NoDedupStrategy,
-  ReadVsGetDedupStrategy,
-} from '../../lib/handlers/groups/strategies/index';
+import { NoDedupStrategy } from '../../lib/handlers/groups/strategies/index';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 
@@ -85,7 +83,7 @@ describe('the same tool in readonly and high', () => {
     });
 
     it.each([
-      ['ReadVsGetDedupStrategy', new ReadVsGetDedupStrategy()],
+      ['no strategy', undefined],
       ['NoDedupStrategy', new NoDedupStrategy()],
     ])('with high exposed (%s): withholds it, so high supplies it', (_n, s) => {
       const group = new ReadOnlyHandlersGroup(ctx, highNames(), s);
@@ -137,25 +135,24 @@ describe('the same tool in readonly and high', () => {
   describe('HandlerExporter', () => {
     it('readonly only: one entry', () => {
       const exporter = new HandlerExporter({
+        systemType: 'onprem',
         includeHighLevel: false,
-        includeLowLevel: false,
       });
       expect(exporter.getToolNames().filter((n) => n === TOOL)).toHaveLength(1);
     });
 
-    it('readonly+high: one entry, from high; Read<X> beside Get<X> unchanged', () => {
+    it('readonly+high: one entry, from high; one GetClass, no ReadClass', () => {
       const spy = spyOnContributors();
       try {
         const exporter = new HandlerExporter({
-          includeLowLevel: false,
+          systemType: 'onprem',
           systemContextResolver: null,
         });
         const all = exporter.getToolNames();
         expect(all.filter((n) => n === TOOL)).toHaveLength(1);
         expect(new Set(all).size).toBe(all.length);
-        // The exporter never hid Read<X> for Get<X>, and still does not.
-        expect(all).toContain('ReadClass');
-        expect(all).toContain('GetClass');
+        expect(all.filter((n) => n === 'GetClass')).toHaveLength(1);
+        expect(all).not.toContain('ReadClass');
         spy.contributors.length = 0;
         exporter.getHandlerEntries();
         expect([...new Set(spy.contributors)]).toEqual(['high']);

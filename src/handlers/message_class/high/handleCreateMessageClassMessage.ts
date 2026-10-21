@@ -28,6 +28,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -37,7 +38,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).',
+    'Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -104,19 +105,21 @@ export async function handleCreateMessageClassMessage(
   return answer(
     { tool: 'CreateMessageClassMessage', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getMessageClassMessage()
-        .create(
-          {
-            className,
-            msgno: args.msgno,
-            msgtext: args.msgtext,
-            selfExplanatory: args.self_explanatory ?? false,
-            description: args.description,
-            transportRequest: args.transport_request,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'messageClassMessage.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getMessageClassMessage()
+          .create(
+            {
+              className,
+              msgno: args.msgno,
+              msgtext: args.msgtext,
+              selfExplanatory: args.self_explanatory ?? false,
+              description: args.description,
+              transportRequest: args.transport_request,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     () => ({
       success: true,
       message_class_name: className,

@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { makeAdtRequestWithTimeout } from '../../../lib/utils';
+import { isCredentialFailure } from '../../../lib/answer';
+import { makeAdtRequest } from '../../../lib/utils';
 
 /**
  * Enhancement types ADT does not expose. Eclipse ADT opens each in SAP GUI, and
@@ -35,11 +36,12 @@ export async function enhancementTypeOf(
   objectType: 'ENHO' | 'ENHS',
 ): Promise<string | undefined> {
   try {
-    const response = await makeAdtRequestWithTimeout(
+    const response = await makeAdtRequest(
       connection,
       `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeURIComponent(name)}&maxResults=20&objectType=${objectType}`,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
       undefined,
       undefined,
       { Accept: 'application/xml' },
@@ -53,9 +55,11 @@ export async function enhancementTypeOf(
         continue;
       return /adtcore:type="([^"]+)"/.exec(attrs)?.[1];
     }
-  } catch {
-    // A search that fails says nothing about the type; the caller keeps the
-    // failure it already has.
+  } catch (error) {
+    // A credential failure ends the call as it came. Any other search that
+    // fails says nothing about the type; the caller keeps the failure it
+    // already has.
+    if (isCredentialFailure(error)) throw error;
   }
   return undefined;
 }

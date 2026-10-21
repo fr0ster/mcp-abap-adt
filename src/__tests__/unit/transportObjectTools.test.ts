@@ -1,4 +1,5 @@
 import { handleAddTransportObject } from '../../handlers/transport/high/handleAddTransportObject';
+import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
 import { handleRemoveTransportObject } from '../../handlers/transport/high/handleRemoveTransportObject';
 import { handleReadTransportActionLog } from '../../handlers/transport/readonly/handleReadTransportActionLog';
@@ -91,6 +92,104 @@ describe('ReadTransportObjects', () => {
       name: 'ZMCP_BLD_FGR_H1',
       position: '000025',
     });
+  });
+
+  const object = (type: string, name: string, position: string) => ({
+    '@': {
+      'tm:pgmid': 'R3TR',
+      'tm:type': type,
+      'tm:name': name,
+      'tm:position': position,
+    },
+  });
+
+  /**
+   * A request document as measured: each task's entries under
+   * `tm:request/tm:task`, and beside them `tm:all_objects`, the request's
+   * aggregate list — every object once more. Read whole, every object came
+   * twice (684 rows for 342 entries).
+   */
+  it("answers a request's task entries once each, with their task numbers", async () => {
+    fakeClient = fakeClientOf({
+      readObjects: () =>
+        okResponse(
+          reading({
+            'tm:root': {
+              'tm:request': {
+                '@': { 'tm:number': 'SIDK900100' },
+                'tm:all_objects': {
+                  'tm:abap_object': [
+                    object('PROG', 'ZP_ONE', '000001'),
+                    object('CLAS', 'ZCL_TWO', '000002'),
+                    object('PROG', 'ZP_THREE', '000003'),
+                  ],
+                },
+                'tm:task': [
+                  {
+                    '@': { 'tm:number': 'SIDK900101' },
+                    'tm:abap_object': [
+                      object('PROG', 'ZP_ONE', '000001'),
+                      object('CLAS', 'ZCL_TWO', '000002'),
+                    ],
+                  },
+                  {
+                    '@': { 'tm:number': 'SIDK900102' },
+                    'tm:abap_object': object('PROG', 'ZP_THREE', '000001'),
+                  },
+                ],
+              },
+            },
+          } as never),
+        ),
+    });
+
+    const answered = body(
+      await handleReadTransportObjects(context as any, {
+        transport_number: 'SIDK900100',
+      }),
+    );
+
+    expect(answered.count).toBe(3);
+    expect(
+      answered.objects.map((o: any) => [o.task, o.type, o.name, o.position]),
+    ).toEqual([
+      ['SIDK900101', 'PROG', 'ZP_ONE', '000001'],
+      ['SIDK900101', 'CLAS', 'ZCL_TWO', '000002'],
+      ['SIDK900102', 'PROG', 'ZP_THREE', '000001'],
+    ]);
+  });
+
+  /** A task document as measured: its entries under `tm:root/tm:task`. */
+  it('answers a task document as before: its own entries, once each', async () => {
+    fakeClient = fakeClientOf({
+      readObjects: () =>
+        okResponse(
+          reading({
+            'tm:root': {
+              'tm:request': { '@': { 'tm:number': 'SIDK900100' } },
+              'tm:task': {
+                '@': { 'tm:number': 'SIDK900101' },
+                'tm:abap_object': [
+                  object('PROG', 'ZP_ONE', '000001'),
+                  object('CLAS', 'ZCL_TWO', '000002'),
+                ],
+              },
+            },
+          } as never),
+        ),
+    });
+
+    const answered = body(
+      await handleReadTransportObjects(context as any, {
+        transport_number: 'SIDK900101',
+      }),
+    );
+
+    expect(answered.count).toBe(2);
+    expect(answered.objects).toEqual([
+      { pgmid: 'R3TR', type: 'PROG', name: 'ZP_ONE', position: '000001' },
+      { pgmid: 'R3TR', type: 'CLAS', name: 'ZCL_TWO', position: '000002' },
+    ]);
   });
 
   /**
@@ -267,6 +366,33 @@ describe('CreateTransportTask', () => {
   });
 
   /**
+   * SAP stores user ids in upper case and refuses a lower-case one as an
+   * unknown user (400, measured): the handler sends the id upper-cased.
+   */
+  it('sends target_user upper-cased and trimmed', async () => {
+    let options: any;
+    fakeClient = fakeClientOf({
+      createTask: (_number: unknown, given: unknown) => {
+        options = given;
+        return okResponse(
+          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
+        );
+      },
+    });
+
+    const answered = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'SIDK905941',
+        target_user: ' developer ',
+        task_type: 'X',
+      }),
+    );
+
+    expect(options.targetUser).toBe('DEVELOPER');
+    expect(answered.owner).toBe('DEVELOPER');
+  });
+
+  /**
    * A task number of `''` passed `ok` and was useless to everything after it
    * — the defect adt-clients fixed in `parseCreatedTransport`. If it ever
    * comes back, the answer says so rather than handing back a blank.
@@ -343,8 +469,13 @@ describe('CreateTransportTask', () => {
       }),
     );
     expect(terse.task_type).toBe('X');
-    expect(terse.task_type_error).toContain('workbench requests');
+    expect(terse.task_type_error).toEqual({
+      message: 'You can only change the type of tasks in workbench requests',
+      origin: 'refusal',
+      step: 'change task type',
+    });
     expect(terse.cleanup.message).toContain('TK127');
+    expect(terse.cleanup.failures).toEqual([terse.task_type_error]);
 
     fakeClient = refused();
     const full = body(
@@ -355,7 +486,16 @@ describe('CreateTransportTask', () => {
       }),
     );
     expect(full.cleanup.message).toContain('still Unclassified');
-    expect(full.cleanup.message).toContain('workbench requests');
+    // SAP's refusal rides as the method's error, with its step — not folded
+    // into the note's words.
+    expect(full.cleanup.message).not.toContain('workbench requests');
+    expect(full.cleanup.failures).toEqual([
+      {
+        message: 'You can only change the type of tasks in workbench requests',
+        origin: 'refusal',
+        step: 'change task type',
+      },
+    ]);
 
     fakeClient = refused();
     const raw = body(
@@ -423,7 +563,8 @@ describe('CreateTransportTask', () => {
     expect(result.isError).toBe(false);
     expect(answered.task_number).toBe('SIDK907073');
     expect(answered.task_type).toBe('X');
-    expect(answered.task_type_error).toMatch(/unknown/);
+    expect(answered.task_type_error.message).toMatch(/unknown/);
+    expect(answered.task_type_error.step).toBe('change task type');
     expect(answered.note).toMatch(/AddTransportObject/);
   });
 
@@ -549,5 +690,43 @@ describe('ReadTransportActionLog', () => {
       '25.09.2026 10:52:18 task type changed to S',
     );
     expect(answered.entries[2]).toMatch(/deleted following object R3TR PROG/);
+  });
+});
+
+describe('CreateTransport', () => {
+  /**
+   * SAP stores user ids in upper case: a create with a lower-case owner is
+   * refused as an unknown user (400, measured), so the owner is sent
+   * upper-cased.
+   */
+  it('sends owner upper-cased and trimmed', async () => {
+    let given: any;
+    fakeClient = fakeClientOf({
+      create: (options: unknown) => {
+        given = options;
+        return okResponse(reading('', '', 200));
+      },
+    });
+
+    await handleCreateTransport(context as any, {
+      description: 'x',
+      owner: ' developer ',
+    });
+
+    expect(given.owner).toBe('DEVELOPER');
+  });
+
+  it('sends no owner when none is given', async () => {
+    let given: any;
+    fakeClient = fakeClientOf({
+      create: (options: unknown) => {
+        given = options;
+        return okResponse(reading('', '', 200));
+      },
+    });
+
+    await handleCreateTransport(context as any, { description: 'x' });
+
+    expect(given.owner).toBeUndefined();
   });
 });

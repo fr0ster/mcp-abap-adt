@@ -15,6 +15,10 @@ import {
 } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import {
+  ServerRefusal,
+  SYSTEM_TYPE_REQUIRED_WORDS,
+} from '../../lib/auth/serverRefusal';
+import {
   createAbapConnection,
   resolveSystemKind,
 } from '../../lib/connectionFactory';
@@ -99,13 +103,51 @@ describe('resolveSystemKind', () => {
     ).toBe('cloud');
   });
 
-  it('takes jwt as cloud and anything else as on-premise when nothing is declared', () => {
-    expect(resolveSystemKind(settings({ authType: 'jwt' }), {})).toBe('cloud');
-    expect(resolveSystemKind(settings({ authType: 'basic' }), {})).toBe(
-      'onprem',
-    );
-    expect(resolveSystemKind(settings({ authType: 'saml' }), {})).toBe(
-      'onprem',
-    );
+  it.each([
+    ['nothing declared, a jwt', 'jwt', undefined],
+    ['nothing declared, basic', 'basic', undefined],
+    ['a blank value', 'jwt', '  '],
+    ['a value of no kind', 'basic', 'abap-cloud'],
+  ] as const)(
+    'is required, never guessed: %s is system_type_required',
+    (_what, authType, declared) => {
+      const thrown = (() => {
+        try {
+          resolveSystemKind(
+            settings({ authType }),
+            declared === undefined ? {} : { SAP_SYSTEM_TYPE: declared },
+          );
+        } catch (error) {
+          return error;
+        }
+        return undefined;
+      })();
+      expect(thrown).toBeInstanceOf(ServerRefusal);
+      expect((thrown as ServerRefusal).serverRefusal).toBe(
+        'system_type_required',
+      );
+      expect((thrown as Error).message).toBe(SYSTEM_TYPE_REQUIRED_WORDS);
+    },
+  );
+});
+
+describe('createAbapConnection without a stated kind', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
   });
+
+  it.each(['jwt', 'basic'] as const)(
+    'a %s destination is refused system_type_required, before any connector is built',
+    (authType) => {
+      delete process.env.SAP_SYSTEM_TYPE;
+      expect(() =>
+        createAbapConnection(
+          settings({ authType }),
+          new BasicAuthProvider('user', 'secret') as IAuthProvider,
+        ),
+      ).toThrow(SYSTEM_TYPE_REQUIRED_WORDS);
+    },
+  );
 });

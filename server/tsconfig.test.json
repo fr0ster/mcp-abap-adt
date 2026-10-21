@@ -22,11 +22,20 @@
     "outDir": "./dist",
     "noImplicitAny": false,
     "paths": {
+      "@mcp-abap-adt/background-runs-memory": [
+        "../background-runs-memory/src/index.ts"
+      ],
+      "@mcp-abap-adt/responsible-rules": [
+        "../responsible-rules/src/index.ts"
+      ],
       "@mcp-abap-adt/lib": [
         "../src/index.ts"
       ],
       "@mcp-abap-adt/lib/handlers": [
         "../src/lib/handlers/index.ts"
+      ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../src/lib/httpTransport/index.ts"
       ],
       "@mcp-abap-adt/lib/utils": [
         "../src/lib/utils.ts"
@@ -48,6 +57,9 @@
       ],
       "@mcp-abap-adt/lib/state": [
         "../src/lib/state/index.ts"
+      ],
+      "@mcp-abap-adt/lib/tool-set": [
+        "../src/lib/toolSet.ts"
       ]
     },
     "noEmit": true

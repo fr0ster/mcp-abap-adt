@@ -21,11 +21,20 @@
     "outDir": "./dist",
     "noImplicitAny": false,
     "paths": {
+      "@mcp-abap-adt/background-runs-memory": [
+        "../background-runs-memory/dist/index.d.ts"
+      ],
+      "@mcp-abap-adt/responsible-rules": [
+        "../responsible-rules/dist/index.d.ts"
+      ],
       "@mcp-abap-adt/lib": [
         "../dist/index.d.ts"
       ],
       "@mcp-abap-adt/lib/handlers": [
         "../dist/lib/handlers/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../dist/lib/httpTransport/index.d.ts"
       ],
       "@mcp-abap-adt/lib/utils": [
         "../dist/lib/utils.d.ts"
@@ -50,6 +59,9 @@
       ],
       "@mcp-abap-adt/lib/state": [
         "../dist/lib/state/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/tool-set": [
+        "../dist/lib/toolSet.d.ts"
       ]
     }
   },

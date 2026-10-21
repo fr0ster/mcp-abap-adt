@@ -89,6 +89,8 @@ export async function handleDeleteMetadataExtension(
     { tool: 'DeleteMetadataExtension', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'metadataExtension',
         createAdtClient(connection, logger).getMetadataExtension(
           resultsFor(metadataExtensionDocuments),
         ),

@@ -31,6 +31,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -40,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.',
+    'Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -105,16 +106,18 @@ export async function handleUpdateMessageClassMessage(
   return answer(
     { tool: 'UpdateMessageClassMessage', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger).getMessageClassMessage().update(
-        {
-          className,
-          msgno: args.msgno,
-          msgtext: args.msgtext,
-          selfExplanatory: args.self_explanatory,
-          description: args.description,
-          transportRequest: args.transport_request,
-        },
-        { analyse: analyseException },
+      withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
+        createAdtClient(connection, logger).getMessageClassMessage().update(
+          {
+            className,
+            msgno: args.msgno,
+            msgtext: args.msgtext,
+            selfExplanatory: args.self_explanatory,
+            description: args.description,
+            transportRequest: args.transport_request,
+          },
+          { headers, analyse: analyseException },
+        ),
       ),
     () => ({
       success: true,

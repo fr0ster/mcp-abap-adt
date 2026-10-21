@@ -8,19 +8,20 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckClassLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -39,21 +40,6 @@ export const TOOL_DEFINITION = {
         description:
           'Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['class_name'],
@@ -64,12 +50,6 @@ interface CheckClassArgs {
   class_name: string;
   version?: string;
   source_code?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -78,13 +58,7 @@ export async function handleCheckClass(
   args: CheckClassArgs,
 ) {
   const { connection, logger } = context;
-  const {
-    class_name,
-    version = 'active',
-    source_code,
-    session_id,
-    session_state,
-  } = args;
+  const { class_name, version = 'active', source_code } = args;
 
   if (!class_name) {
     return return_error(new Error('class_name is required'));
@@ -95,21 +69,20 @@ export async function handleCheckClass(
       ? (version.toLowerCase() as 'active' | 'inactive')
       : 'active';
 
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
-  }
-
   const className = class_name.toUpperCase();
   const detail = detailOf(args);
 
   return answer(
     { tool: 'CheckClassLow', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getClass(resultsFor(classDocuments))
-        .check({ className, source: source_code }, checkVersion, {
-          analyse: analyseException,
-        }),
+      withAdtHeaders(context, 'class.check', (headers) =>
+        createAdtClient(connection, logger)
+          .getClass(resultsFor(classDocuments))
+          .check({ className, source: source_code }, checkVersion, {
+            headers,
+            analyse: analyseException,
+          }),
+      ),
     project(detail, terseCheck),
   );
 }

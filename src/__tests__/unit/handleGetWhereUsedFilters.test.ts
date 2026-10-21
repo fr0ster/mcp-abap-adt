@@ -42,6 +42,7 @@ import {
   handleGetWhereUsed,
   TOOL_DEFINITION,
 } from '../../handlers/system/readonly/handleGetWhereUsed';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -82,6 +83,7 @@ describe('GetWhereUsed type-filter params', () => {
         object_type: 'table',
         scopeXml: '<scope-modified/>',
       }),
+      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },
     );
   });
 

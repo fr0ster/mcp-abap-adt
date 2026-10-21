@@ -3,7 +3,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieves all ABAP objects of a specific type (classes, tables, programs, interfaces, etc.) under a given parent node. Useful for listing all objects of one type within a package or composite object.',
+    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -34,6 +34,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -180,13 +181,16 @@ export async function handleGetObjectsByType(
   return answer(
     { tool: 'GetObjectsByType', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getUtils(ourUtils)
-        .fetchNodeStructure(parent_type, parentName, {
-          analyse: analyseException,
-          nodeId: node_id,
-          withShortDescriptions: withDescriptions,
-        }),
+      withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+        createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .fetchNodeStructure(parent_type, parentName, {
+            headers,
+            analyse: analyseException,
+            nodeId: node_id,
+            withShortDescriptions: withDescriptions,
+          }),
+      ),
     (level: NodeLevel) => {
       const { text, cached } = formatObjects(
         level,

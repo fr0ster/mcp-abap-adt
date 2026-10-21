@@ -34,6 +34,8 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { answerFailure, answerThrown } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -41,10 +43,10 @@ import {
   patchDataElementXml,
 } from '../../../lib/strategies/dataElementPatch';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -71,21 +73,6 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['data_element_name', 'properties', 'lock_handle'],
   },
@@ -95,12 +82,6 @@ interface UpdateDataElementArgs {
   data_element_name: string;
   properties: Record<string, any>;
   lock_handle: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /** `properties` always took both spellings; the patch function only knows snake_case. */
@@ -142,13 +123,8 @@ export async function handleUpdateDataElement(
 ) {
   const { connection, logger } = context;
   try {
-    const {
-      data_element_name,
-      properties,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UpdateDataElementArgs;
+    const { data_element_name, properties, lock_handle } =
+      args as UpdateDataElementArgs;
 
     if (!data_element_name || !properties || !lock_handle) {
       return return_error(
@@ -164,10 +140,6 @@ export async function handleUpdateDataElement(
 
     logger?.info(`Starting data element update: ${dataElementName}`);
 
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
     const transportRequest =
       properties.transport_request || properties.transportRequest;
     const changes = changesOf(properties);
@@ -178,31 +150,40 @@ export async function handleUpdateDataElement(
       // different failures, and whichever comes back is the one the caller
       // sees, built by the strategy rather than summarised here.
       const written = await sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getDataElement()
             .readMetadata({ dataElementName }, { analyse: analyseException }),
-        (current) =>
-          client.getDataElement().updateMetadata(
-            {
-              dataElementName,
-              transportRequest,
-            },
-            {
-              source: patchDataElementXml(
-                extractXmlString(current, `data element ${dataElementName}`),
-                changes,
-              ),
-              lockHandle: lock_handle,
-              analyse: analyseException,
-            },
+        ),
+        atStep('update metadata', (current) =>
+          withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
+            client.getDataElement().updateMetadata(
+              {
+                dataElementName,
+                transportRequest,
+              },
+              {
+                headers,
+                source: patchDataElementXml(
+                  extractXmlString(current, `data element ${dataElementName}`),
+                  changes,
+                ),
+                lockHandle: lock_handle,
+                analyse: analyseException,
+              },
+            ),
           ),
+        ),
       );
 
       if (!written.ok) {
         const failure = written.getError();
         logger?.error(`UpdateDataElement refused: ${failure.message}`);
-        return return_error(new Error(failure.message));
+        // The method's error as it is, with the step it arose at.
+        return answerFailure(failure, {
+          tool: 'UpdateDataElementLow',
+          detail: 'terse',
+        });
       }
 
       logger?.info(`✅ UpdateDataElement completed: ${dataElementName}`);
@@ -212,8 +193,6 @@ export async function handleUpdateDataElement(
           {
             success: true,
             data_element_name: dataElementName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `DataElement ${dataElementName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,
@@ -233,9 +212,10 @@ export async function handleUpdateDataElement(
       logger?.error(
         `Error updating data element ${dataElementName}: ${message}`,
       );
-      return return_error(
-        new Error(`Failed to update data element: ${message}`),
-      );
+      return answerThrown(error, {
+        tool: 'UpdateDataElementLow',
+        detail: 'terse',
+      });
     }
   } catch (error: any) {
     return return_error(error);

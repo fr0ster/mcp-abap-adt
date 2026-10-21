@@ -373,6 +373,11 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Syntax error');
+    // SAP reported it: SAP's refusal, with the step.
+    expect(payload(result)).toMatchObject({
+      origin: 'refusal',
+      step: 'activate',
+    });
   });
 
   it('a run that ended in error is a failure, even with no error message', async () => {
@@ -430,6 +435,16 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
       );
 
       expect(result.isError).toBe(true);
+      // Not SAP's refusal: our wait bound ran out, said as a failure on our
+      // side — no `origin`, no status SAP never gave.
+      const answered = payload(result);
+      expect(answered.error).toBe('client_threw');
+      expect(answered.origin).toBeUndefined();
+      expect(answered.status).toBeUndefined();
+      expect(answered.step).toBe('activate');
+      expect(answered.message).toMatch(
+        /had not finished after 6 polls — the wait bound ran out/,
+      );
       const polls = connection.requests.filter((r) =>
         r.url.includes('/activation/runs/RUN-4?'),
       );

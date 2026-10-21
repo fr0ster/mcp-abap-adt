@@ -11,12 +11,10 @@
  * through its own client call.
  *
  * Leaving `detail` off this wrapper's own surface is deliberate, not an
- * oversight — the same simplification this wrapper already makes for
- * `session_id`/`session_state`: neither is in this tool's own schema
- * either, even though the low-tier sibling accepts both. The high tier is
+ * oversight. The high tier is
  * the opinionated, reduced surface; the low tier is where the full set of
  * knobs — `detail` included — lives for a caller who needs them. A caller
- * who wants `full`/`raw` or session control calls the low-tier sibling
+ * who wants `full`/`raw` calls the low-tier sibling
  * directly.
  */
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -27,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Perform syntax check on an ABAP table. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
+    '[read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -38,7 +36,7 @@ export const TOOL_DEFINITION = {
       version: {
         type: 'string',
         description:
-          "Version to check: 'active', 'inactive', or 'new'. Default: new.",
+          "Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.",
         enum: ['active', 'inactive', 'new'],
       },
       ddl_code: {

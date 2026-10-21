@@ -41,6 +41,59 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src --diagnostic-level=error
 
+      # The root step covers `src` only; every other package lints its own
+      # sources.
+      - name: Run Biome lint (server)
+        run: npm --prefix server run lint:check
+
+      - name: Run Biome lint (http)
+        run: npm --prefix http run lint:check
+
+      - name: Run Biome lint (sse)
+        run: npm --prefix sse run lint:check
+
+      - name: Run Biome lint (compact)
+        run: npm --prefix compact run lint:check
+
+      - name: Run Biome lint (compact-readonly-entries)
+        run: npm --prefix compact-readonly-entries run lint:check
+
+      - name: Run Biome lint (compact-modify)
+        run: npm --prefix compact-modify run lint:check
+
+      - name: Run Biome lint (background-runs-memory)
+        run: npm --prefix background-runs-memory run lint:check
+
+      - name: Run Biome lint (responsible-rules)
+        run: npm --prefix responsible-rules run lint:check
+
+      # Their suites run in the root `npm test` (its Jest roots name them).
+      - name: Run Biome lint (compact-http)
+        run: npm --prefix compact-http run lint:check
+
+      - name: Run Biome lint (compact-sse)
+        run: npm --prefix compact-sse run lint:check
+
+      # The six read-only packages; their suites run in the root
+      # `npm test` (its Jest roots name them).
+      - name: Run Biome lint (core-ro)
+        run: npm --prefix core-ro run lint:check
+
+      - name: Run Biome lint (http-ro)
+        run: npm --prefix http-ro run lint:check
+
+      - name: Run Biome lint (sse-ro)
+        run: npm --prefix sse-ro run lint:check
+
+      - name: Run Biome lint (compact-ro)
+        run: npm --prefix compact-ro run lint:check
+
+      - name: Run Biome lint (compact-http-ro)
+        run: npm --prefix compact-http-ro run lint:check
+
+      - name: Run Biome lint (compact-sse-ro)
+        run: npm --prefix compact-sse-ro run lint:check
+
       - name: Build project
         run: npm run build
 
@@ -93,31 +146,45 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # The server package's own tests: the root Jest's roots are `src` and
-      # `compact*`, so `server/src/__tests__` never ran in CI before.
+      # These five packages' tests run in the root `npm test` above (one shared
+      # Jest configuration, its roots name every package); only their types are
+      # checked here, each against its own tsconfig.test.json.
       - name: Type-check server tests
         run: npm --prefix server run test:check
 
-      - name: Run server tests
-        run: npm --prefix server test
+      - name: Type-check http tests
+        run: npm --prefix http run test:check
+
+      - name: Type-check sse tests
+        run: npm --prefix sse run test:check
+
+      - name: Type-check background-runs-memory tests
+        run: npm --prefix background-runs-memory run test:check
+
+      - name: Type-check responsible-rules tests
+        run: npm --prefix responsible-rules run test:check
 
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All five packages. 10.0.0 split them: the repository root is
+      # All seventeen packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
       # this job had never created and failed on every run since the split.
-      # 14.0.0 added `compact`, `compact-readonly` and `compact-modify`, which
+      # 14.0.0 added `compact`, `compact-readonly` (since 19.0.0
+      # `compact-readonly-entries`) and `compact-modify`, which
       # this step did not pack — a compact package that could not be created
-      # or installed reached the release unseen.
+      # or installed reached the release unseen. `http` and `sse` are packages
+      # of their own, not `core`'s dependencies; they are packed so that every
+      # package of the release is created and installed here, and so that the
+      # install asks the registry for none of the release's own packages.
       - name: Verify the packages can be created
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./compact-readonly ./compact-modify ./server ./compact
+          npm pack ./background-runs-memory ./responsible-rules ./compact-readonly-entries ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse ./core-ro ./http-ro ./sse-ro ./compact-ro ./compact-http-ro ./compact-sse-ro
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -160,7 +227,7 @@ jobs:
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','core','compact','compact-readonly','compact-modify'];
+            const ours=['lib','background-runs-memory','responsible-rules','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify','core-ro','http-ro','sse-ro','compact-ro','compact-http-ro','compact-sse-ro'];
             let bad=0;
             for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
               const n=d.replace('@mcp-abap-adt/','');
@@ -172,16 +239,41 @@ jobs:
             }
             if (bad) process.exit(1);
             console.log(ours.map(p=>p+' '+pkg(p).version).join(', ')+': every sibling is the one built here');"
-          ./node_modules/.bin/mcp-abap-adt --help
-          ./node_modules/.bin/mcp-abap-adt-compact --version
+          # The twelve bins: each answers its version and its help.
+          for bin in mcp-abap-adt mcp-abap-adt-http mcp-abap-adt-sse \
+            mcp-abap-adt-compact mcp-abap-adt-compact-http mcp-abap-adt-compact-sse \
+            mcp-abap-adt-ro mcp-abap-adt-http-ro mcp-abap-adt-sse-ro \
+            mcp-abap-adt-compact-ro mcp-abap-adt-compact-http-ro mcp-abap-adt-compact-sse-ro; do
+            ./node_modules/.bin/$bin --version
+            ./node_modules/.bin/$bin --help
+          done
 
-      # The image installs the published packages from npm (nothing of this
-      # checkout goes into it); this keeps the Dockerfile itself working — it
-      # stopped starting once and nothing noticed, because nothing built it.
-      - name: Build the Docker image
+      # **Every image, from this run's tarballs.** One Dockerfile builds the
+      # twelve variants (`VARIANT`); with `PACKAGE_SOURCE=tarballs` it installs
+      # the checkout's packages, so the images are this run's code and not
+      # whatever npm holds — a release raising the major could not be built
+      # from the registry before it is published. Each image is checked:
+      # `--version`, a `tools/list`; HTTP and SSE also the health endpoint,
+      # the image's HEALTHCHECK and a `tools/call` whose x-sap-* credential
+      # reaches an ADT stand-in; a `-ro` image lists no write tool.
+      - name: Build and check the Docker images
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
-          docker build -f docker/Dockerfile -t mcp-abap-adt:ci .
-          docker run --rm mcp-abap-adt:ci mcp-abap-adt --version
-          docker run --rm mcp-abap-adt:ci mcp-abap-adt-compact --version
+          mkdir -p "$RUNNER_TEMP/tarballs"
+          cp mcp-abap-adt-*.tgz "$RUNNER_TEMP/tarballs/"
+          node scripts/ci/check-images.mjs --tarballs "$RUNNER_TEMP/tarballs" --tag ci
 
+      # The Glama reference image installs `core` from npm at its pinned
+      # version, which is on npm only once the release is published: it is
+      # built when it can be, and the run says so when it cannot.
+      - name: Build the Glama reference image
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        run: |
+          version=$(sed -n 's/^ARG CORE_VERSION=//p' docker/Dockerfile.inspect)
+          if [ -z "$(npm view "@mcp-abap-adt/core@$version" version 2>/dev/null)" ]; then
+            echo "@mcp-abap-adt/core@$version is not on npm yet: Dockerfile.inspect not built"
+            exit 0
+          fi
+          docker build -f docker/Dockerfile.inspect -t mcp-abap-adt-test/inspect:ci docker
+          docker run --rm mcp-abap-adt-test/inspect:ci mcp-abap-adt --version
+          docker image rm mcp-abap-adt-test/inspect:ci

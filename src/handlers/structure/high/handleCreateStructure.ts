@@ -42,6 +42,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -50,6 +51,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -227,7 +229,7 @@ export async function handleCreateStructure(
       );
 
       const checked = await sequence(
-        () =>
+        atStep('validate', () =>
           obj.validate(
             {
               structureName,
@@ -236,28 +238,41 @@ export async function handleCreateStructure(
             },
             { analyse: analyseException },
           ),
-        () =>
-          obj.create(
-            {
-              structureName,
-              description: args.description || structureName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { analyse: analyseException },
+        ),
+        atStep('create', () =>
+          withAdtHeaders(context, 'structure.create', (headers) =>
+            obj.create(
+              {
+                structureName,
+                description: args.description || structureName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
-        () =>
-          obj.check({ structureName }, 'inactive', {
-            analyse: analyseException,
-          }),
+        ),
+        atStep('check', () =>
+          withAdtHeaders(context, 'structure.check', (headers) =>
+            obj.check({ structureName }, 'inactive', {
+              headers,
+              analyse: analyseException,
+            }),
+          ),
+        ),
       );
 
       if (!checked.ok || !shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ structureName }, { analyse: analyseActivation });
+      return withAdtHeaders(context, 'structure.activate', (headers) =>
+        obj.activate(
+          { structureName },
+          { headers, analyse: analyseActivation },
+        ),
+      );
     },
     project(detail, terseWrite),
   );

@@ -3,6 +3,12 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_PART_PROPERTY,
+  type ReadPart,
+  readPartOf,
+} from '../../../lib/handlers/readPart';
+import { readBehaviorDefinitionMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -11,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP behavior definition definition. Supports reading active or inactive version.',
+    '[read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -19,11 +25,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'BehaviorDefinition name.',
       },
+      part: READ_PART_PROPERTY,
       version: {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
+          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -33,6 +40,7 @@ export const TOOL_DEFINITION = {
 
 interface GetBehaviorDefinitionArgs {
   behavior_definition_name: string;
+  part?: ReadPart;
   version?: 'active' | 'inactive';
 }
 
@@ -44,17 +52,34 @@ export async function handleGetBehaviorDefinition(
   const { behavior_definition_name, version = 'active' } = args;
   if (!behavior_definition_name)
     return return_error(new Error('behavior_definition_name is required'));
+  const part = readPartOf(args.part);
+  if (part instanceof Error) return return_error(part);
 
   // The config field is `name`, not `behaviorDefinitionName` — confirmed
   // against `IBehaviorDefinitionConfig`, and the pre-migration handler
   // already called it that way.
   const behaviorDefinitionName = behavior_definition_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getBehaviorDefinition(
+  const client = createAdtClient(connection, logger);
+  const obj = client.getBehaviorDefinition(
     resultsFor(behaviorDefinitionDocuments),
   );
 
-  // GetBehaviorDefinition has only ever answered the source, not the
-  // metadata — one call, unlike ReadBehaviorDefinition's pair.
+  // One request per call: the part asked for, and only it.
+  if (part === 'metadata') {
+    return answer(
+      { tool: 'GetBehaviorDefinition', detail: 'terse' },
+      () =>
+        readBehaviorDefinitionMetadata(client, {
+          name: behaviorDefinitionName,
+        }),
+      (metadata: AdtReading<string>) => ({
+        success: true,
+        behavior_definition_name: behaviorDefinitionName,
+        part,
+        metadata: metadata.raw,
+      }),
+    );
+  }
   return answer(
     { tool: 'GetBehaviorDefinition', detail: 'terse' },
     () =>
@@ -65,7 +90,8 @@ export async function handleGetBehaviorDefinition(
       success: true,
       behavior_definition_name: behaviorDefinitionName,
       version,
-      behavior_definition_data: source.raw,
+      part,
+      source: source.raw,
     }),
   );
 }

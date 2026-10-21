@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListProfilerTraceFiles',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.',
+    '[read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.',
   inputSchema: {
     type: 'object',
     properties: {},

@@ -1,9 +1,23 @@
 import { load } from 'js-yaml';
 import {
-  generateYamlConfigTemplate,
-  validateYamlConfig,
+  type ParameterTable,
+  STATE_IDLE_ROW,
+  tlsRows,
+} from '../../../lib/config/authParameters';
+import {
+  generateYamlConfigTemplate as templateOf,
+  validateYamlConfig as validateTable,
   type YamlConfig,
 } from '../../../lib/config/yamlConfig';
+
+/** A table of lib's shared rows: the secret check holds for every binary's. */
+const TABLE: ParameterTable = {
+  program: 'any-binary',
+  rows: [...tlsRows('http'), STATE_IDLE_ROW],
+  removed: [],
+};
+const validateYamlConfig = (config: YamlConfig) => validateTable(TABLE, config);
+const generateYamlConfigTemplate = () => templateOf(TABLE);
 
 const VALUE = 'placeholder-value-not-for-messages';
 
@@ -45,7 +59,6 @@ describe('YAML holds configuration, never a secret or the session', () => {
     expect(
       errorsFor({
         http: { tls: { cert: '/c.crt', key: '/k.key', ca: '/ca.crt' } },
-        sse: { tls: { cert: '/c.crt', key: '/k.key' } },
       }),
     ).toBe('');
   });

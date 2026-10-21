@@ -74,6 +74,8 @@ export async function handleDeleteFunctionModule(
     { tool: 'DeleteFunctionModule', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'functionModule',
         createAdtClient(connection, logger).getFunctionModule(
           resultsFor(functionModuleDocuments),
         ),

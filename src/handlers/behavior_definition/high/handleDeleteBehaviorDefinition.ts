@@ -66,6 +66,8 @@ export async function handleDeleteBehaviorDefinition(
     { tool: 'DeleteBehaviorDefinition', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'behaviorDefinition',
         createAdtClient(connection, logger).getBehaviorDefinition(
           resultsFor(behaviorDefinitionDocuments),
         ),

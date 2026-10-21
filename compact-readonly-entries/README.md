@@ -1,0 +1,36 @@
+# @mcp-abap-adt/compact-readonly-entries
+
+Compact read-only tools — 16 tools that change nothing.
+
+> **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); to run a server of these 16 tools alone, [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) (`mcp-abap-adt-compact-ro`, and `-compact-http-ro`, `-compact-sse-ro`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
+>
+> **Renamed in 19.0.0** from `@mcp-abap-adt/compact-readonly`, so it is not confused with `@mcp-abap-adt/compact-ro`, the server. The exports are unchanged.
+
+## What compact is
+
+A different decomposition of the same ABAP ADT surface: the **operation** is the
+tool and the object moves into the arguments. Where the object-oriented surface has
+`CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
+`HandlerCreate` with `object_type`. Twenty-seven tool schemas instead of hundreds.
+
+It exists for a host that **cannot build a retrieval pipeline of its own** — a small
+context, no tool-RAG, no way to select tools per request — and must still drive ABAP
+through MCP reliably. A consumer that does select per request (cloud-llm-hub, for
+one) has no use for it and should take `@mcp-abap-adt/lib` instead.
+
+## Why two library packages
+
+Capability is decided by what you import, not by a flag a caller can pass. A tool
+list assembled from `@mcp-abap-adt/compact-readonly-entries` has **no route to a write
+handler in its module graph** — asserted against the graph, not against a list of
+names, in `compact/src/__tests__/compactCapabilitySplit.test.ts`. The read-only
+half depends on `@mcp-abap-adt/lib/handlers/read`; the modifying half on
+`@mcp-abap-adt/lib/handlers/write`.
+
+Note what this is not: both halves depend on `@mcp-abap-adt/lib`, so this is not a
+smaller install, and it is not a sandbox — code that deliberately reaches into
+`lib` can still call anything. It is a facade that offers no way to write.
+
+## Licence
+
+Apache-2.0. See LICENSE.

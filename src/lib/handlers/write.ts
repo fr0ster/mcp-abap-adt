@@ -27,10 +27,14 @@ export { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpda
 export { handleUpdateLocalTypes } from '../../handlers/class/high/handleUpdateLocalTypes.js';
 export {
   handleActivateObject,
+  handleActivateObjectOnce,
   TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject.js';
+export { handleCreateOnly } from '../../handlers/common/low/handleCreateOnly.js';
+export { handleDeleteOnly } from '../../handlers/common/low/handleDeleteOnly.js';
 export { handleLockObject } from '../../handlers/common/low/handleLockObject.js';
 export { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject.js';
+export { handleUpdateUnderLock } from '../../handlers/common/low/handleUpdateUnderLock.js';
 export { handleCreateDataElement } from '../../handlers/data_element/high/handleCreateDataElement.js';
 export { handleDeleteDataElement } from '../../handlers/data_element/high/handleDeleteDataElement.js';
 export { handleUpdateDataElement } from '../../handlers/data_element/high/handleUpdateDataElement.js';
@@ -53,6 +57,8 @@ export { handleDeleteInterface } from '../../handlers/interface/high/handleDelet
 export { handleUpdateInterface } from '../../handlers/interface/high/handleUpdateInterface.js';
 export { handleDeleteMetadataExtension } from '../../handlers/metadata_extension/high/handleDeleteMetadataExtension.js';
 export { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage.js';
+export { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage.js';
+export { handleUpdatePackage } from '../../handlers/package/high/handleUpdatePackage.js';
 export { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram.js';
 export { handleDeleteProgram } from '../../handlers/program/high/handleDeleteProgram.js';
 export { handleUpdateProgram } from '../../handlers/program/high/handleUpdateProgram.js';
@@ -65,14 +71,24 @@ export { handleUpdateServiceDefinition } from '../../handlers/service_definition
 export { handleCreateStructure } from '../../handlers/structure/high/handleCreateStructure.js';
 export { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure.js';
 export { handleUpdateStructure } from '../../handlers/structure/high/handleUpdateStructure.js';
-export { handleRuntimeRunClass } from '../../handlers/system/readonly/handleRuntimeRunClass.js';
-export { handleRuntimeRunClassWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunClassWithProfiling.js';
-export { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
-export { handleRuntimeRunProgramWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling.js';
+export {
+  handleScheduleProfilerTraceOnce,
+  type ScheduleProfilerTraceArgs,
+} from '../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.js';
+export {
+  handleRuntimeRunClass,
+  handleRuntimeRunClassUnderProfiler,
+} from '../../handlers/system/readonly/handleRuntimeRunClass.js';
+export {
+  handleRuntimeRunProgram,
+  handleRuntimeRunProgramUnderProfiler,
+} from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
 export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.js';
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';
 export { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport.js';
+export { handleMoveTransportObjects } from '../../handlers/transport/high/handleMoveTransportObjects.js';
+export { handleSortAndCompressTransportTask } from '../../handlers/transport/high/handleSortAndCompressTransportTask.js';
 export { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest.js';
 export { handleCreateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest.js';
 export { handleCreateProgramUnitTest } from '../../handlers/unit_test/high/handleCreateProgramUnitTest.js';

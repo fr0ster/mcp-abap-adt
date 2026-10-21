@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create ABAP Unit tests for a class: write its local test classes and activate the class.',
+    "Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.",
   inputSchema: {
     type: 'object',
     properties: {

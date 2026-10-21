@@ -269,10 +269,13 @@ export function fakeWorld() {
       },
     }) as unknown as Debugger;
   };
+  /** The session kind each opened connection was asked for, index for index with `opened`. */
+  const sessionKinds: string[] = [];
   const ports: DebugSessionPorts<string> = {
-    openConnection: async () => {
+    openConnection: async (_origin, session = 'stateful') => {
       const c = { id: opened.length } as unknown as IAbapConnection;
       opened.push(c);
+      sessionKinds.push(session);
       return c;
     },
     closeConnection: async (c) => {
@@ -295,6 +298,7 @@ export function fakeWorld() {
     ports,
     polls,
     opened,
+    sessionKinds,
     closed,
     dropped,
     calls,

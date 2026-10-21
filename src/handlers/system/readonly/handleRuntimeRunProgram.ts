@@ -3,7 +3,7 @@
  *
  * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
  * @mcp-abap-adt/adt-clients 19 — not `createAdtClient`, per
- * `AdtExecutor`'s own shape (see `handleRuntimeRunProgramWithProfiling.ts`
+ * `AdtExecutor`'s own shape (see `handleRuntimeRunClass.ts`
  * and Task 24's class-profiling pair for the same door).
  *
  * **`runWithProfiling` was split, not deleted.** `ProgramExecutor`'s own
@@ -27,18 +27,21 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
+import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgram',
   available_in: ['onprem'] as const,
   description:
-    '[runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).',
+    '[read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -46,6 +49,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'ABAP program name to execute.',
       },
+      background: BACKGROUND_PROPERTY,
       profile: {
         type: 'boolean',
         description:
@@ -123,31 +127,36 @@ export async function handleRuntimeRunProgram(
     { tool: 'RuntimeRunProgram', detail: 'terse' },
     () =>
       pair(
-        () =>
-          programExecutor.scheduleTrace({
-            ...definedOnly({
-              description: args.description,
-              allProceduralUnits: args.all_procedural_units,
-              allMiscAbapStatements: args.all_misc_abap_statements,
-              allInternalTableEvents: args.all_internal_table_events,
-              allDynproEvents: args.all_dynpro_events,
-              aggregate: args.aggregate,
-              explicitOnOff: args.explicit_on_off,
-              withRfcTracing: args.with_rfc_tracing,
-              allSystemKernelEvents: args.all_system_kernel_events,
-              sqlTrace: args.sql_trace,
-              allDbEvents: args.all_db_events,
-              maxSizeForTraceFile: args.max_size_for_trace_file,
-              amdpTrace: args.amdp_trace,
-              maxTimeForTracing: args.max_time_for_tracing,
+        atStep('schedule trace', () =>
+          withAdtHeaders(context, 'programExecutor.scheduleTrace', (headers) =>
+            programExecutor.scheduleTrace({
+              ...definedOnly({
+                description: args.description,
+                allProceduralUnits: args.all_procedural_units,
+                allMiscAbapStatements: args.all_misc_abap_statements,
+                allInternalTableEvents: args.all_internal_table_events,
+                allDynproEvents: args.all_dynpro_events,
+                aggregate: args.aggregate,
+                explicitOnOff: args.explicit_on_off,
+                withRfcTracing: args.with_rfc_tracing,
+                allSystemKernelEvents: args.all_system_kernel_events,
+                sqlTrace: args.sql_trace,
+                allDbEvents: args.all_db_events,
+                maxSizeForTraceFile: args.max_size_for_trace_file,
+                amdpTrace: args.amdp_trace,
+                maxTimeForTracing: args.max_time_for_tracing,
+              }),
+              analyse: analyseException,
+              headers,
             }),
-            analyse: analyseException,
-          }),
-        (profilerId: string) =>
+          ),
+        ),
+        atStep('run with profiler', (profilerId: string) =>
           programExecutor.runWithProfiler(
             { programName },
             { analyse: analyseException, profilerId },
           ),
+        ),
       ),
     ([profilerId, output]: [string, string]) => ({
       success: true,
@@ -157,6 +166,68 @@ export async function handleRuntimeRunProgram(
         profiler_id: profilerId,
         // traceId is not returned for programs — use RuntimeListProfilerTraceFiles to find it.
       },
+    }),
+  );
+}
+
+/**
+ * A program run in one request (compact `HandlerProfileRun`; spec §4.6, one
+ * ADT request per tool call).
+ *
+ * With `profiler_id`: the one `POST /programs/programrun/{name}?profilerId=…`
+ * under the trace the caller scheduled. Without it: the one plain program
+ * run. An empty `profiler_id` is refused before any request; a failure is
+ * the method's error plus `step`.
+ */
+export async function handleRuntimeRunProgramUnderProfiler(
+  context: HandlerContext,
+  args: { program_name?: string; profiler_id?: string },
+  tool: string,
+) {
+  const { connection, logger } = context;
+  if (!args?.program_name) {
+    return return_error(new Error('Parameter "program_name" is required'));
+  }
+  const profilerId = args.profiler_id;
+  if (
+    profilerId !== undefined &&
+    (typeof profilerId !== 'string' || profilerId === '')
+  ) {
+    return return_error(
+      new Error('Parameter "profiler_id", when given, must not be empty'),
+    );
+  }
+  const programName = args.program_name.trim().toUpperCase();
+  const programExecutor = new AdtExecutor(
+    connection,
+    logger,
+  ).getProgramExecutor(ourProgramExecutor);
+  if (profilerId === undefined) {
+    return answer(
+      { tool, detail: 'terse' },
+      atStep('run program', () =>
+        programExecutor.run({ programName }, { analyse: analyseException }),
+      ),
+      (output: string) => ({
+        success: true,
+        program_name: programName,
+        output: output ?? '',
+      }),
+    );
+  }
+  return answer(
+    { tool, detail: 'terse' },
+    atStep('run with profiler', () =>
+      programExecutor.runWithProfiler(
+        { programName },
+        { analyse: analyseException, profilerId },
+      ),
+    ),
+    (output: string) => ({
+      success: true,
+      program_name: programName,
+      output: output ?? '',
+      profile: { profiler_id: profilerId },
     }),
   );
 }

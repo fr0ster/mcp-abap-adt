@@ -14,6 +14,12 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import { AdtOnPremConnector } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../lib/credentialSources';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 const BASE_URL = 'https://system.example.invalid:44300';
 

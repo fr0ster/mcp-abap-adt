@@ -51,7 +51,6 @@ import { handleDeleteLocalTestClass } from '../../handlers/class/high/handleDele
 import { handleDeleteLocalTypes } from '../../handlers/class/high/handleDeleteLocalTypes';
 import { handleDeleteDataElement } from '../../handlers/data_element/high/handleDeleteDataElement';
 import { handleDeleteDdl } from '../../handlers/ddl/high/handleDeleteDdl';
-import { handleDeleteMetadataExtension as handleDeleteMetadataExtensionLow } from '../../handlers/ddlx/low/handleDeleteMetadataExtension';
 import { handleDeleteDomain } from '../../handlers/domain/high/handleDeleteDomain';
 import { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleDeleteFunctionInclude } from '../../handlers/function_include/high/handleDeleteFunctionInclude';
@@ -446,18 +445,12 @@ describe.each([
     handleDeleteMetadataExtension,
     { metadata_extension_name: 'ZI_DDLX_DEL_X' },
   ],
-  [
-    'DeleteMetadataExtensionLow',
-    handleDeleteMetadataExtensionLow,
-    { name: 'ZI_DDLX_DEL_LOW_X' },
-  ],
 ] as const)(
   '%s: a plain DELETE on its own URL, not the deletion service',
   (_toolName, handler, args) => {
     it("DELETEs /ddic/ddlx/sources/{name} for the caller's name, and takes no lock", async () => {
       const conn = recordingConnection();
-      const objectName =
-        'name' in args ? args.name : args.metadata_extension_name;
+      const objectName = args.metadata_extension_name;
 
       const result: any = await (handler as any)(ctx(conn) as any, args);
 
@@ -472,52 +465,6 @@ describe.each([
     });
   },
 );
-
-describe('DeleteMetadataExtension: the deletion check first', () => {
-  it("answers the check's refusal and never sends the DELETE", async () => {
-    const conn = recordingConnection([
-      {
-        data: deletionCheckXml(
-          'ZI_DDLX_DEL_X',
-          '2 strong and 0 weak external references',
-        ),
-      },
-    ]);
-
-    const result: any = await handleDeleteMetadataExtension(ctx(conn) as any, {
-      metadata_extension_name: 'ZI_DDLX_DEL_X',
-    });
-
-    expect(result?.isError).toBe(true);
-    expect(requestsTo(conn.requests, 'POST', '/deletion/check')).toHaveLength(
-      1,
-    );
-    expect(
-      requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources'),
-    ).toHaveLength(0);
-  });
-});
-
-describe('DeleteMetadataExtension: nothing to delete', () => {
-  it('sends no DELETE when the check says the object does not exist', async () => {
-    const conn = recordingConnection([
-      { data: absentCheckXml('ZI_DDLX_DEL_X') },
-    ]);
-
-    const result: any = await handleDeleteMetadataExtension(ctx(conn) as any, {
-      metadata_extension_name: 'ZI_DDLX_DEL_X',
-    });
-
-    expect(result?.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toMatchObject({
-      deleted: false,
-      object: 'ZI_DDLX_DEL_X',
-    });
-    expect(
-      requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources'),
-    ).toHaveLength(0);
-  });
-});
 
 describe('DeleteMessageClassMessage: a PUT of the parent class, the message moved to deletedmessages', () => {
   it("PUTs the class for the caller's class name, moving the caller's msgno into <mc:deletedmessages>", async () => {

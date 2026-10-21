@@ -4,6 +4,7 @@ import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
 
 export const SNAPSHOT_VIEW_PROPERTIES = {
@@ -30,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'MemorySnapshotGet',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
+    "[read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -86,7 +87,13 @@ export async function handleMemorySnapshotGet(
             });
         }
       })();
-      if (!answer.ok) throw new Error(answer.getError().message);
+      if (!answer.ok) {
+        throw carryingFailure(
+          new Error(answer.getError().message),
+          answer.getError(),
+          'read memory snapshot',
+        );
+      }
       const raw = String(answer.getResult().value ?? '');
       return { value: raw, raw };
     },

@@ -1,4 +1,6 @@
+import { answerThrown } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { StepThrew } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetAbapAST',
@@ -178,14 +180,11 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
     return result;
   } catch (error) {
     logger?.error('Failed to generate ABAP AST', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: error instanceof Error ? error.message : String(error),
-        },
-      ],
-    };
+    // A local parser over the caller's source, no request: its throw is
+    // not SAP's answer but the method's own failure, `client_threw`.
+    return answerThrown(new StepThrew('parse', error), {
+      tool: 'GetAbapAST',
+      detail: 'terse',
+    });
   }
 }

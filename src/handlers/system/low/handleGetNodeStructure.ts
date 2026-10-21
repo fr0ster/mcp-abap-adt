@@ -40,6 +40,12 @@
  * two package fixtures capture is real and is still handled above; it is not
  * a property of the blank body in general.
  *
+ * **Compact reads it once.** Compact is one ADT request per tool call (the
+ * owner's rule), so compact `HandlerGet` part `node_structure` calls
+ * `handleGetNodeStructureOnce`: a package's blank body is the empty listing
+ * with `blank` stating both readings, and the package's metadata is the
+ * consumer's next call when it needs to know which one holds.
+ *
  * **Where the throw lives, and why it agrees with `GetObjectStructureLow`'s.**
  * Both guards now run inside the `call()` passed to `answer()`, not inside a
  * projection — a document this handler cannot honestly read is a client-side
@@ -53,19 +59,22 @@ import {
   isIndeterminateWalkAnswer,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { atStep } from '../../../lib/strategies/step';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -88,21 +97,6 @@ export const TOOL_DEFINITION = {
         description: 'Include short descriptions in response',
         default: true,
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['parent_type', 'parent_name'],
   },
@@ -113,12 +107,6 @@ interface GetNodeStructureArgs {
   parent_name: string;
   node_id?: string;
   with_short_descriptions?: boolean;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**
@@ -130,8 +118,13 @@ function rawNodeStructureXml(wire: unknown): string {
   return String((wire as { data?: unknown } | undefined)?.data ?? '');
 }
 
-/** A success carrying a `NodeLevel` — the shape `sequence()`'s steps answer with. */
-function succeededLevel(level: NodeLevel): IAdtResponse<NodeLevel, IAdtError> {
+/**
+ * A success carrying a `NodeLevel` — the shape `sequence()`'s steps answer
+ * with — and, for a package's blank body read once, `blank`.
+ */
+function succeededLevel(
+  level: NodeLevel & { blank?: string },
+): IAdtResponse<NodeLevel, IAdtError> {
   return {
     ok: true,
     getResult: () => ({ value: level }),
@@ -141,29 +134,52 @@ function succeededLevel(level: NodeLevel): IAdtResponse<NodeLevel, IAdtError> {
   } as unknown as IAdtResponse<NodeLevel, IAdtError>;
 }
 
+/**
+ * What a blank body for a package parent means: the package holds no objects,
+ * or no package of that name exists — SAP answers both alike.
+ */
+export const BLANK_PACKAGE_LISTING =
+  'SAP answered a blank body: the package holds no objects, or no package of this name exists.';
+
+/**
+ * How a blank body for a `DEVC/K` parent is answered: `read-package` pays one
+ * more request (the package's metadata) to tell the two readings apart;
+ * `state` answers the empty listing with both readings stated — one request
+ * per call, the compact rule.
+ */
+type BlankPackage = 'read-package' | 'state';
+
 export async function handleGetNodeStructure(
   context: HandlerContext,
   args: GetNodeStructureArgs,
 ) {
+  return nodeStructure(context, args, 'read-package');
+}
+
+/**
+ * The node structure in one request: a blank body for a package parent is an
+ * empty listing carrying `blank`, both of its readings.
+ */
+export async function handleGetNodeStructureOnce(
+  context: HandlerContext,
+  args: GetNodeStructureArgs,
+) {
+  return nodeStructure(context, args, 'state');
+}
+
+async function nodeStructure(
+  context: HandlerContext,
+  args: GetNodeStructureArgs,
+  blankPackage: BlankPackage,
+) {
   const { connection, logger } = context;
-  const {
-    parent_type,
-    parent_name,
-    node_id,
-    with_short_descriptions,
-    session_id,
-    session_state,
-  } = args;
+  const { parent_type, parent_name, node_id, with_short_descriptions } = args;
 
   if (!parent_type) {
     return return_error(new Error('parent_type is required'));
   }
   if (!parent_name) {
     return return_error(new Error('parent_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
@@ -179,14 +195,18 @@ export async function handleGetNodeStructure(
     () => {
       const client = createAdtClient(connection, logger);
       return sequence(
-        () =>
-          client
-            .getUtils({ ...ourUtils, node: rawNodeStructureXml })
-            .fetchNodeStructure(parent_type, parent_name, {
-              analyse: analyseException,
-              nodeId: node_id || '000000',
-              withShortDescriptions: with_short_descriptions !== false,
-            }),
+        atStep('read node structure', () =>
+          withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+            client
+              .getUtils({ ...ourUtils, node: rawNodeStructureXml })
+              .fetchNodeStructure(parent_type, parent_name, {
+                headers,
+                analyse: analyseException,
+                nodeId: node_id || '000000',
+                withShortDescriptions: with_short_descriptions !== false,
+              }),
+          ),
+        ),
         async (rawXml) => {
           if (!isIndeterminateWalkAnswer(rawXml)) {
             return succeededLevel(nodeLevel({ data: rawXml }));
@@ -198,15 +218,24 @@ export async function handleGetNodeStructure(
             return succeededLevel({ objects: [], childNodes: [] });
           }
 
+          if (blankPackage === 'state') {
+            return succeededLevel({
+              objects: [],
+              childNodes: [],
+              blank: BLANK_PACKAGE_LISTING,
+            });
+          }
+
           // The one existence check this tool can pay: the same one
           // GetPackageTree pays, over the same object, through the
           // already-migrated getPackage().readMetadata().
-          const packageRead = await client
-            .getPackage()
-            .readMetadata(
+          const packageRead = await atStep('read package metadata', () =>
+            readPackageMetadata(
+              client,
               { packageName: parent_name.toUpperCase() },
-              { analyse: analyseException },
-            );
+              'active',
+            ),
+          )();
 
           if (!packageRead.ok) {
             // The package's own refusal, named — not a sentence this

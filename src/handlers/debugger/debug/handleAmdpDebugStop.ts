@@ -1,4 +1,7 @@
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  endDebugBatchAnswers,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
@@ -9,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'AmdpDebugStop',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; a part that could not be undone is reported and kept.',
+    '[read-only] [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },
@@ -27,6 +30,8 @@ export async function handleAmdpDebugStop(
       const d = requireDebugger(context, args, 'use');
       context.state!.endWhenEmpty();
       await d.amdp.stop();
+      // The whole debug state ended: a debugger batch's kept answers with it.
+      endDebugBatchAnswers(context);
       return { value: { state: 'stopped' }, raw: '' };
     },
     (v) => v,

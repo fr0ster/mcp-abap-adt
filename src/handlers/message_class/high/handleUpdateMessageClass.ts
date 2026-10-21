@@ -27,6 +27,7 @@
 
 import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -34,6 +35,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { patchXmlAttribute } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -42,7 +44,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
+    'Updates the header of the ABAP message class named by message_class_name: its description.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -95,10 +97,9 @@ export async function handleUpdateMessageClass(
         resultsFor(messageClassDocuments),
       );
 
-      const current = await obj.readMetadata(
-        { name },
-        { analyse: analyseException },
-      );
+      const current = await atStep('read metadata', () =>
+        obj.readMetadata({ name }, { analyse: analyseException }),
+      )();
       if (!current.ok) return current as never;
       const edited = patchXmlAttribute(
         String(current.getResult().value.raw),
@@ -108,11 +109,19 @@ export async function handleUpdateMessageClass(
 
       return withLock(
         () => obj.lock({ name }, { analyse: analyseLock }),
-        (lockHandle) =>
-          obj.updateMetadata(
-            { name, transportRequest: args.transport_request },
-            { source: edited, lockHandle, analyse: analyseException },
+        atStep('update metadata', (lockHandle) =>
+          withAdtHeaders(context, 'messageClass.updateMetadata', (headers) =>
+            obj.updateMetadata(
+              { name, transportRequest: args.transport_request },
+              {
+                headers,
+                source: edited,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
       );

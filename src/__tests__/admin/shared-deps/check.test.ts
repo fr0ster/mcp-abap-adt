@@ -1,7 +1,9 @@
 /**
  * Config consistency checker for shared dependencies.
  *
- * Pure offline validation — no SAP connection required.
+ * The consistency checks are pure offline validation — no SAP connection.
+ * The last block reads every shared object from the system (reads only,
+ * nothing is written) and runs only when the test config is present.
  * All checks are driven by shared_dependencies config — no hardcoded prefixes.
  *
  * Verifies:
@@ -9,14 +11,35 @@
  *   2. Param values matching shared_dependencies names are defined there
  *   3. Shared view/bdef DDL cross-references to tables are defined
  *   4. Orphan shared deps (defined but never referenced) produce warnings
+ *   5. Live: every shared object is present on the system, listed by name
+ *      when absent
  *
  * Run:  npm run shared:check
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import {
   getSharedDependenciesConfig,
+  getTimeout,
+  isTestAvailableForSystem,
   loadTestConfig,
+  testConfigPathFromEnv,
 } from '../../integration/helpers/configHelpers';
+import { createTestLogger } from '../../integration/helpers/loggerHelpers';
+import { primeSystemContext } from '../../integration/helpers/primeSystemContext';
+import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
+import { connectionFailureWords, presenceReport, readShared } from './presence';
+
+const testsLogger = createTestLogger('shared-check');
+
+/** The test config itself — the template does not count as a system */
+const TEST_CONFIG_PRESENT = fs.existsSync(
+  testConfigPathFromEnv() ??
+    path.resolve(__dirname, '../../../../tests/test-config.yaml'),
+);
 
 /** Map dep_* param names to shared_dependencies section names */
 const DEP_PARAM_MAP: Record<string, string> = {
@@ -297,4 +320,58 @@ describe('Config: shared_dependencies consistency', () => {
       );
     }
   });
+});
+
+// The live half: one read per shared name on the system the test config names.
+// Where it runs: only as `npm run shared:check` (the admin directory is out of
+// `npm test`), and only where tests/test-config.yaml (or MCP_TEST_CONFIG) is
+// present; elsewhere it is skipped and the offline checks above still run.
+const liveIt = TEST_CONFIG_PRESENT ? it : it.skip;
+
+describe('Live: shared_dependencies exist on the system', () => {
+  let client: AdtClient | undefined;
+  let connectionError: unknown;
+
+  beforeAll(async () => {
+    if (!TEST_CONFIG_PRESENT) return;
+    try {
+      const { connection } = await createTestConnectionAndSession();
+      await primeSystemContext(connection);
+      client = createAdtClient(connection);
+    } catch (error: any) {
+      connectionError = error;
+    }
+  });
+
+  liveIt(
+    TEST_CONFIG_PRESENT
+      ? 'every shared object is present (reads only)'
+      : 'skipped: runs only as `npm run shared:check` where tests/test-config.yaml (or MCP_TEST_CONFIG) is present',
+    async () => {
+      // An admin script runs only when asked for: a system it cannot reach
+      // is a failure, not a skip.
+      if (connectionError || !client) {
+        throw new Error(connectionFailureWords(connectionError));
+      }
+      const sharedConfig = getSharedDependenciesConfig();
+      if (!sharedConfig) {
+        throw new Error(
+          'No shared_dependencies in the test config, nothing to read',
+        );
+      }
+
+      const results = await readShared(
+        client,
+        sharedConfig,
+        isTestAvailableForSystem,
+      );
+      const report = presenceReport(results);
+      testsLogger?.info?.(
+        `Shared objects present: ${report.present.length}, absent: ${report.absent.length}, unreadable: ${report.unreadable.length}`,
+      );
+      expect(results.length).toBeGreaterThan(0);
+      if (report.message) throw new Error(report.message);
+    },
+    getTimeout('long') * 20,
+  );
 });

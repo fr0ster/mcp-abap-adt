@@ -53,7 +53,7 @@ Some tests depend on shared SAP objects (tables, CDS views, classes). Create the
 npm run shared:setup
 ```
 
-Verify with `npm run shared:check`. These objects persist across test runs — no need to re-create unless deleted via `npm run shared:teardown`.
+Verify with `npm run shared:check` (it reads every shared object from the system and lists the absent ones by name). These objects persist across test runs — no need to re-create unless deleted via `npm run shared:teardown`.
 
 ### 4. Run tests
 
@@ -71,6 +71,21 @@ npm test -- --testPathPatterns=class
 npm test -- --testPathPatterns="class|unitTest|cds"
 ```
 
+### One Jest configuration for every package
+
+The root `package.json` holds the repository's only Jest configuration: its `roots` name the root `src` and every
+package's `src` (`server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, the compact packages and
+the six `-ro` packages), and its `moduleNameMapper` resolves every sibling package to its sources. The root
+`npm test` runs every package's suites once. A package's own `npm test` runs that same configuration for its folder
+only (`npm --prefix .. test -- --roots <package>/src`), so it works from inside the package:
+
+```bash
+cd server && npm test        # the server package's suites alone
+npm --prefix http test       # the same for http, from the repository root
+```
+
+A package's `test:check` still type-checks its tests against its own `tsconfig.test.json`.
+
 ## Test Modes
 
 - **Soft mode** (default, `integration_hard_mode.enabled: false`): calls handlers directly, no MCP subprocess. Use for mass regression testing.
@@ -87,10 +102,9 @@ MCP_LIVE_ENV_PATHS=/path/to/a.env:/path/to/b.env npm test -- src/__tests__/live
 
 ## Test Levels
 
-Each object type has up to three test levels:
+Each object type has up to two test levels (the low level and `LowTester` left with the low set in 19.0.0; compact's single-step operations are tested against an ADT stand-in in `src/__tests__/unit/lowToCompact.test.ts`):
 
 - **HIGH** (`HighTester`): Tests full handler workflow (create -> update -> activate -> delete)
-- **LOW** (`LowTester`): Tests low-level ADT client operations
 - **Lambda** (`LambdaTester`): Tests individual handler functions in isolation
 
 ## Cleanup Behavior
@@ -104,7 +118,7 @@ Persistent SAP objects used across multiple tests (tables, CDS views, classes). 
 ```bash
 npm run shared:setup     # Create all shared objects
 npm run shared:teardown  # Delete all shared objects
-npm run shared:check     # Verify shared objects exist
+npm run shared:check     # Config consistency; with a test config, also reads every shared object from the system
 ```
 
 ## Debugging
@@ -123,4 +137,4 @@ DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=view
 2. **Connection errors** — check `.env` credentials and SAP system availability.
 3. **Timeout errors** — increase `test_settings.timeout` in `test-config.yaml`.
 4. **"Resource is not locked"** — session management issue, retry or check stateful session support.
-5. **`PAK/058` "Package … is already locked"** on a package update or delete — the package was already saved in the same ABAP session: over RFC every call shares one, over HTTP every stateful lock → update → unlock does. A package can be saved only once per session; it is `CL_PACKAGE`'s instance buffer, not an enqueue lock. The package tools open a session of their own for this; see [RFC_SETUP.md](../../installation/RFC_SETUP.md#known-limitation-a-package-cannot-be-changed-by-the-session-that-created-or-changed-it).
+5. **`PAK/058` "Package … is already locked"** on a package update or delete — the package was already saved in the same ABAP session: over RFC every call shares one, over HTTP lock → update → unlock run in one ABAP session (only LOCK and UNLOCK are sent stateful; the update and everything else are stateless). A package can be saved only once per session; it is `CL_PACKAGE`'s instance buffer, not an enqueue lock. The package tools open a session of their own for this; see [RFC_SETUP.md](../../installation/RFC_SETUP.md#known-limitation-a-package-cannot-be-changed-by-the-session-that-created-or-changed-it).

@@ -4,16 +4,57 @@
  * (a real runtime dependency) after `yaml` was dropped — the `yaml`
  * package used to be a devDependency, so `npx` installs crashed with
  * "Cannot find module 'yaml'". These tests prove the config loads and
- * validates without the `yaml` package present.
+ * validates without the `yaml` package present, against a binary's table.
  */
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  ParameterRefusal,
+  type ParameterTable,
+  tlsRows,
+  transportRemoved,
+} from '../../lib/config/authParameters';
+import { readStartupConfig } from '../../lib/config/startup';
+import {
+  generateConfigTemplateIfNeeded,
   loadYamlConfig,
   validateYamlConfig,
 } from '../../lib/config/yamlConfig';
+
+/** A table with a nested row, a list row and the removed --transport. */
+const TABLE: ParameterTable = {
+  program: 'test-binary',
+  rows: [
+    {
+      key: 'items',
+      cli: '--items',
+      yaml: 'items',
+      kind: 'list',
+      section: 'TEST',
+      help: 'A list',
+    },
+    {
+      key: 'port',
+      cli: '--http-port',
+      yaml: 'http.port',
+      kind: 'port',
+      section: 'TEST',
+      help: 'A port',
+    },
+    {
+      key: 'host',
+      cli: '--http-host',
+      yaml: 'http.host',
+      kind: 'string',
+      section: 'TEST',
+      help: 'A host',
+    },
+    ...tlsRows('http'),
+  ],
+  removed: [transportRemoved('http')],
+};
 
 function writeTempYaml(name: string, content: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-yaml-'));
@@ -26,43 +67,107 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
   it('parses a YAML config file into typed values', () => {
     const file = writeTempYaml(
       'config.yaml',
-      ['transport: http', 'http:', '  port: 8080', '  host: 127.0.0.1'].join(
-        '\n',
-      ),
+      ['http:', '  port: 8080', '  host: 127.0.0.1'].join('\n'),
     );
 
-    const config = loadYamlConfig(file);
+    const config = loadYamlConfig(TABLE, file) as {
+      http?: { port?: number; host?: string };
+    };
 
     expect(config).not.toBeNull();
-    expect(config?.transport).toBe('http');
     expect(config?.http?.port).toBe(8080);
     expect(config?.http?.host).toBe('127.0.0.1');
   });
 
-  it('parses a YAML array (exposition) into a string[]', () => {
+  it('parses a YAML array into a string[]', () => {
     const file = writeTempYaml(
       'array.yaml',
-      ['exposition:', '  - readonly', '  - high', '  - low'].join('\n'),
+      ['items:', '  - readonly', '  - high', '  - low'].join('\n'),
     );
 
-    const config = loadYamlConfig(file);
+    const config = loadYamlConfig(TABLE, file);
 
-    expect(config?.exposition).toEqual(['readonly', 'high', 'low']);
+    expect(config?.items).toEqual(['readonly', 'high', 'low']);
   });
 
   it('returns null when the config file does not exist', () => {
     const missing = path.join(os.tmpdir(), 'definitely-not-here-143.yaml');
-    expect(loadYamlConfig(missing)).toBeNull();
+    expect(loadYamlConfig(TABLE, missing)).toBeNull();
   });
 
-  it('throws when the parsed config fails validation', () => {
+  it('throws when the parsed config fails validation: --transport is gone', () => {
     const file = writeTempYaml('bad.yaml', 'transport: telepathy\n');
-    expect(() => loadYamlConfig(file)).toThrow(/Invalid transport/);
+    expect(() => loadYamlConfig(TABLE, file)).toThrow(
+      '`--transport` is gone: `mcp-abap-adt-http` serves Streamable HTTP',
+    );
   });
 
-  it('validateYamlConfig rejects an out-of-range HTTP port', () => {
-    const result = validateYamlConfig({ http: { port: 70000 } });
+  it('a file that is not YAML is refused by its position, never its text', () => {
+    const file = writeTempYaml('broken.yaml', 'a: [unclosed\nsecret-ish\n');
+    let words = '';
+    try {
+      loadYamlConfig(TABLE, file);
+    } catch (error) {
+      words = (error as Error).message;
+    }
+    expect(words).toMatch(
+      /^The config file .* is not valid YAML \(line \d+, column \d+\)$/,
+    );
+    expect(words).not.toContain('secret-ish');
+  });
+
+  it('validateYamlConfig rejects an out-of-range port, naming its key', () => {
+    const result = validateYamlConfig(TABLE, { http: { port: 70000 } });
     expect(result.valid).toBe(false);
-    expect(result.errors.join(' ')).toMatch(/Invalid HTTP port/);
+    expect(result.errors).toEqual([
+      'Invalid http.port (config file): "70000". Must be a port between 1 and 65535',
+    ]);
+  });
+
+  describe('file I/O faults are refused in fixed words naming the path', () => {
+    let dir: string;
+    beforeEach(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-yaml-io-'));
+    });
+    afterEach(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('a --conf that names a directory cannot be read (not "not valid YAML")', () => {
+      expect(() => loadYamlConfig(TABLE, dir)).toThrow(
+        new ParameterRefusal(`The config file ${dir} cannot be read`),
+      );
+    });
+
+    it('a template in a directory that does not exist cannot be written', () => {
+      const file = path.join(dir, 'missing', 'conf.yaml');
+      expect(() => generateConfigTemplateIfNeeded(TABLE, file)).toThrow(
+        new ParameterRefusal(`The config file ${file} cannot be written`),
+      );
+    });
+
+    it('the start reports either as one [MCP] line and exit 1', () => {
+      const missing = path.join(dir, 'missing', 'conf.yaml');
+      for (const [conf, words] of [
+        [dir, `The config file ${dir} cannot be read`],
+        [missing, `The config file ${missing} cannot be written`],
+      ]) {
+        const lines: string[] = [];
+        const exits: number[] = [];
+        const read = readStartupConfig(
+          TABLE,
+          [`--conf=${conf}`],
+          {},
+          {
+            stderr: (line) => lines.push(line),
+            exit: (code) => exits.push(code),
+          },
+          () => 'read',
+        );
+        expect(read).toBeUndefined();
+        expect(lines).toEqual([`[MCP] ${words}`]);
+        expect(exits).toEqual([1]);
+      }
+    });
   });
 });

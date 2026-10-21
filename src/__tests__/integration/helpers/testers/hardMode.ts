@@ -20,20 +20,11 @@ export interface HardModeConfig {
   mcp_destination?: string; // --mcp=<dest> (auth-broker / service key)
   env_destination?: string; // --env=<dest> (session .env from default folder)
   env_path?: string; // --env-path=<path> (explicit .env file)
-  /**
-   * stdio only: the exposition the spawned server serves.
-   *
-   * `high` and `low` are mutually exclusive — `validateExposition` refuses the
-   * pair and the launcher exits — so there is no value that serves both tiers,
-   * and asking for both was never a test of anything. A run covers one tier;
-   * set this to `readonly,low` for the low one.
-   */
-  exposition?: string;
   // http/sse only: auth headers sent to a running server
   headers?: Record<string, string>;
   /**
    * http only: launch the server binary with `--transport=http` on a free
-   * port of this host, with the destination and exposition stdio would use,
+   * port of this host, with the destination stdio would use,
    * instead of connecting to a server already running at `http_url`.
    */
   launch_http?: boolean;
@@ -73,18 +64,15 @@ export function getHardModeConfig(): HardModeConfig {
     mcp_destination: hard.mcp_destination,
     env_destination: hard.env_destination,
     env_path: hard.env_path,
-    exposition:
-      typeof hard.exposition === 'string' && hard.exposition.trim() !== ''
-        ? hard.exposition.trim()
-        : 'readonly,high',
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     launch_http: hard.launch_http === true,
   };
 }
 
 /**
- * The launcher's arguments every launched server shares: the exposition, the
- * stores soft mode reads, and the destination — the same file soft mode reads.
+ * The launcher's arguments every launched server shares: the stores soft
+ * mode reads, and the destination — the same file soft mode reads. The tools
+ * are core's (readonly, high, debug): the binary fixes them.
  */
 function launcherArgs(hard: HardModeConfig): string[] {
   const cfg = loadTestConfig();
@@ -94,7 +82,6 @@ function launcherArgs(hard: HardModeConfig): string[] {
     cfg?.auth_broker?.unsafe_session_store === true;
   const args = [
     path.resolve(process.cwd(), 'server/dist/launcher.js'),
-    `--exposition=${hard.exposition}`,
     ...(useUnsafe ? ['--unsafe'] : []),
   ];
   const brokerPath = testAuthBrokerPath(cfg);
@@ -292,21 +279,18 @@ export function toolCandidates(
     | 'activate'
     | 'delete',
   entity: string,
-  mode: 'high' | 'low',
+  _mode: 'high',
   handlerName: string,
 ): string[] {
+  // The full binaries serve no low set since 19.0.0: the candidates are
+  // the high tools only.
   const cap = step[0].toUpperCase() + step.slice(1);
-  const low = `${cap}${entity}Low`;
   const high = `${cap}${entity}`;
 
   if (step === 'delete' && handlerName.includes('behavior_implementation')) {
-    return ['DeleteClass', 'DeleteClassLow', high, low];
+    return ['DeleteClass', high];
   }
-
-  if (mode === 'high') {
-    return [high, low];
-  }
-  return [low, high];
+  return [high];
 }
 
 export async function callTool(

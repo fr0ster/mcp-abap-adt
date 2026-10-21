@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'AmdpDebugWait',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] AMDP events of a debug session after waiting up to hold_seconds.',
+    '[read-only] [debug] AMDP events of a debug session after waiting up to hold_seconds.',
   inputSchema: {
     type: 'object',
     properties: {

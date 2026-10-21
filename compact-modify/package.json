@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/compact-modify",
-  "version": "18.1.0",
+  "version": "19.0.0",
   "description": "The compact ABAP ADT tools that write, lock, activate or execute: one tool per operation, the object in the arguments.",
   "license": "Apache-2.0",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -46,13 +46,13 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx tsc -p tsconfig.json",
-    "test": "jest --passWithNoTests",
+    "test": "npm --prefix .. test -- --roots compact-modify/src",
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^15.3.0",
-    "@mcp-abap-adt/lib": "^18.1.0"
+    "@mcp-abap-adt/interfaces-adt": "^20.0.0",
+    "@mcp-abap-adt/lib": "^19.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

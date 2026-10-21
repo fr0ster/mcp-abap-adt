@@ -10,17 +10,17 @@ import {
 import { lineUriOf } from './objectUri';
 
 export const USER_MODE_SENTENCE =
-  'In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server.';
+  'In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else.';
 /** The AMDP session has no mode and no request user: it is the connected user's. */
 export const AMDP_CATCH_SENTENCE =
-  'Catches every request of the connected SAP user, not only programs run by this server.';
+  'Catches every request of the connected SAP user, from this server and from anywhere else.';
 /** The same, as a fragment the compact start scopes with `amdp:`. */
 export const AMDP_CATCH_FACT =
   'catches every request of the connected SAP user, not only programs run by this server.';
 export const TAKE_OVER_SENTENCE =
   'Displaces another debugger listening for the same user.';
 const SHARED_SET_PREDICATE =
-  'are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.';
+  'are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.';
 /** The shared set as a fragment, lower case, for a text that scopes it (compact: `abap: …`). */
 export const SHARED_SET_FACT = `the breakpoints ${SHARED_SET_PREDICATE}`;
 export const SHARED_SET_SENTENCE = `Its breakpoints ${SHARED_SET_PREDICATE}`;

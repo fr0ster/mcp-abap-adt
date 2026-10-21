@@ -6,7 +6,7 @@
  * packages' graphs are not visible and their needs are not lib's business.)
  *
  * **What they are for.** The compact facade is moving into packages of its own, and
- * `@mcp-abap-adt/compact-readonly` must not be able to reach a write handler —
+ * `@mcp-abap-adt/compact-readonly-entries` must not be able to reach a write handler —
  * capability is what a package imports, not what its tool list enumerates. It
  * therefore imports `@mcp-abap-adt/lib/handlers/read` and nothing wider. One barrel
  * of all 104 handlers the facade needs would relink every write route into that
@@ -64,12 +64,37 @@ describe("lib's read and write handler barrels", () => {
     // and the preview-URL tool joined them when `HandlerGet` gained `part`, which
     // is why this number moves deliberately and in a commit that says so.
     // 15.1: search, where-used, table/SQL data and package contents joined, for
-    // the compact facade's read half.
-    expect(read).toHaveLength(59);
+    // the compact facade's read half. 19.0.0: ReadTransportObjects joined, for
+    // `HandlerGet` with object_type TRANSPORT. 19.0.0: the node-structure,
+    // virtual-folder and object-structure reads joined, for `HandlerGet`'s
+    // address parts, when the low set left the full binaries. 19.0.0: the 18
+    // Read<Type> handlers left, folded into Get<Type> with `part`. 19.0.0: the
+    // deletion check alone, for compact's `HandlerDeletionCheck` (46); the node
+    // structure read once, for `HandlerGet` part `node_structure` (47); an
+    // activation run's status and results, for `HandlerGet` parts
+    // `activation_status` / `activation_results` (49); a unit-test run's
+    // result read once, ABAP and CDS, for compact `HandlerUnitTestResult`,
+    // `HandlerCdsUnitTestResult` and `HandlerGet` UNIT_TEST /
+    // CDS_UNIT_TEST (51); one page of a runtime feed, for compact
+    // `HandlerDumpList` (52).
+    expect(read).toHaveLength(52);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
-    // module, CDS run) and the compact facade's run start.
-    expect(write).toHaveLength(79);
+    // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
+    // two deprecated `…WithProfiling` runs (76 handlers). 19.0.0 added the
+    // transport organizer's sort-and-compress and move-objects, for compact's
+    // `HandlerTransportSortAndCompress` / `HandlerTransportMoveObjects` (78).
+    // 19.0.0: the write under the caller's lock and the package delete,
+    // for compact's `HandlerUpdate` with lock_handle and `HandlerDelete` PACKAGE.
+    // 19.0.0: the high UpdatePackage, for `HandlerUpdate`
+    // PACKAGE without lock_handle (82).
+    // 19.0.0: the create request alone, compact's `HandlerCreate` (83).
+    // 19.0.0: the deletion request alone, compact's `HandlerDelete` (84).
+    // 19.0.0: the activation in one request, compact's `HandlerActivate` (85).
+    // 19.0.0: the trace schedule and the class and program runs under a
+    // profiler id, one request each, compact's `HandlerProfileSchedule` and
+    // `HandlerProfileRun` (88).
+    expect(write).toHaveLength(88);
   });
 
   it('share not one symbol', () => {

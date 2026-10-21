@@ -1,0 +1,218 @@
+[
+  {
+    "query": "Show me the code of interface ZIF_DEMO",
+    "roles": ["reader", "developer"],
+    "required": [["GetInterface"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Display the CDS entity ZC_TRAVEL",
+    "roles": ["reader", "developer"],
+    "required": [["GetDdl"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Get the definition of structure ZST_ADDR",
+    "roles": ["reader", "developer"],
+    "required": [["GetStructure", "GetTypeInfo"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Count the rows in table MARA where MTART is FERT",
+    "roles": ["reader", "developer"],
+    "required": [["GetSqlQuery"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Find programs whose name contains SALES",
+    "roles": ["reader", "developer"],
+    "required": [["SearchObject"]],
+    "source": "heldout"
+  },
+  {
+    "query": "What is inside function group ZFG_DEMO?",
+    "roles": ["reader", "developer"],
+    "required": [["ListFunctionModules", "GetFunctionGroup"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the source of function module Z_DEMO_FM",
+    "roles": ["reader", "developer"],
+    "required": [["GetFunctionModule"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the package hierarchy below ZDEMO",
+    "roles": ["reader", "developer"],
+    "required": [["GetPackageTree", "GetPackageContents"]],
+    "source": "heldout"
+  },
+  {
+    "query": "What changed in class ZCL_DEMO since the last version?",
+    "roles": ["reader", "developer"],
+    "required": [["GetClassVersionDiff", "GetObjectVersionDiff"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the service binding ZUI_TRAVEL_O4",
+    "roles": ["reader", "developer"],
+    "required": [["GetServiceBinding"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Who uses table ZTAB_ORDERS?",
+    "roles": ["reader", "developer"],
+    "required": [["GetWhereUsed"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the local types of class ZCL_DEMO",
+    "roles": ["developer"],
+    "required": [["GetLocalTypes"]],
+    "source": "heldout"
+  },
+  {
+    "query": "List the transport requests of user JDOE",
+    "roles": ["reader", "developer"],
+    "required": [["ListTransports"]],
+    "source": "heldout"
+  },
+  {
+    "query": "ST22 dumps of this morning for user JDOE",
+    "roles": ["reader", "developer"],
+    "required": [["RuntimeListFeeds"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the unit test class inside class ZCL_DEMO",
+    "roles": ["developer"],
+    "required": [["GetLocalTestClass"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the implementation class of behavior definition ZI_TRAVEL",
+    "roles": ["reader", "developer"],
+    "required": [["GetBehaviorImplementation"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Print the abstract syntax tree of this ABAP code",
+    "roles": ["reader", "developer"],
+    "required": [["GetAbapAST"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the system messages",
+    "roles": ["reader", "developer"],
+    "required": [["RuntimeListSystemMessages", "RuntimeListFeeds"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Change the fixed values of domain ZDO_STATUS",
+    "roles": ["developer"],
+    "required": [["UpdateDomain"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Create a data element ZDE_NAME based on domain ZDO_NAME",
+    "roles": ["developer"],
+    "required": [["CreateDataElement"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Delete class ZCL_OLD",
+    "roles": ["developer"],
+    "required": [["DeleteClass"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Activate program ZREP_DEMO",
+    "roles": ["developer"],
+    "required": [["ActivateProgram", "ActivateObjects"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Create package ZDEMO_NEW under ZDEMO",
+    "roles": ["developer"],
+    "required": [["CreatePackage"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Run the ABAP unit tests of program ZREP_DEMO",
+    "roles": ["developer"],
+    "required": [["RunProgramUnitTest", "RunUnitTest"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Update the behavior definition ZI_TRAVEL with a new action",
+    "roles": ["developer"],
+    "required": [["UpdateBehaviorDefinition"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Create a metadata extension ZC_TRAVEL with UI annotations",
+    "roles": ["developer"],
+    "required": [["CreateMetadataExtension"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Create interface ZIF_NEW",
+    "roles": ["developer"],
+    "required": [["CreateInterface"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Add a method to interface ZIF_DEMO",
+    "roles": ["developer"],
+    "required": [["UpdateInterface"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Does program ZREP_DEMO compile?",
+    "roles": ["developer"],
+    "required": [["CheckProgram"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Create a service definition exposing ZI_TRAVEL",
+    "roles": ["developer"],
+    "required": [["CreateServiceDefinition"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Change the text of message 001 in message class ZMSG_DEMO",
+    "roles": ["developer"],
+    "required": [["UpdateMessageClassMessage"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Add field AMOUNT to table ZTAB_ORDERS",
+    "roles": ["developer"],
+    "required": [["UpdateTable"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Step over the next statement in the debugger",
+    "roles": ["developer"],
+    "required": [["DebugStep"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Show the variables in the debugger",
+    "roles": ["developer"],
+    "required": [["DebugGetVariables"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Create a task in transport DEVK900001 for user JDOE",
+    "roles": ["developer"],
+    "required": [["CreateTransportTask"]],
+    "source": "heldout"
+  },
+  {
+    "query": "Change the macros of program ZREP_DEMO",
+    "roles": ["developer"],
+    "required": [["UpdateLocalMacros"]],
+    "source": "heldout"
+  }
+]

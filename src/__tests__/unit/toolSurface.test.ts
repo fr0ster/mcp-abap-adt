@@ -4,6 +4,24 @@ import { join } from 'node:path';
 import { spawnOptionsForNpx } from '../helpers/platform';
 
 /**
+ * **The long tools on the approved list gain `timeout` (19.0.0).** The
+ * user approved them tool by tool (`tools/long-handlers.json`); each may
+ * gain `timeout` and nothing else for it. `GetIncludesList` and
+ * `GetStructuresList` already declared one (per request, in ms) — the name
+ * stays, its meaning is now the call's (seconds, on the wait only).
+ */
+const LONG_TOOLS = new Set(
+  (
+    JSON.parse(
+      readFileSync(
+        join(__dirname, '../../../tools/long-handlers.json'),
+        'utf8',
+      ),
+    ) as Array<{ tool: string }>
+  ).map((entry) => entry.tool),
+);
+
+/**
  * The tool surface is a contract with callers who never read this repository.
  *
  * `detail` is the one addition the adt-clients 19 migration may make; anything
@@ -50,16 +68,22 @@ describe('the MCP tool surface', () => {
   );
 
   const current: Row[] = JSON.parse(
-    execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], {
-      ...spawnOptionsForNpx,
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    }),
+    execFileSync(
+      'npx',
+      ['tsx', '--tsconfig', 'tsconfig.test.json', 'scripts/list-tools.ts'],
+      {
+        ...spawnOptionsForNpx,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    ),
   );
 
   it('enumerates the whole surface, so the assertions below are not vacuous', () => {
     // A run that listed nothing would satisfy every comparison that follows.
-    expect(frozen.length).toBeGreaterThan(300);
+    // 19.0.0: the 112 low tools left the surface, and their rows the
+    // fixture — 264 remain.
+    expect(frozen.length).toBeGreaterThan(250);
     expect(current.length).toBe(frozen.length);
   });
 
@@ -90,13 +114,8 @@ describe('the MCP tool surface', () => {
       // captured in `check-ddlx-active-version` /
       // `check-ddlx-inactive-version`.
       //
-      // **Third exception: three compact runtime tools closed real coverage
-      // gaps against the readonly surface.** `HandlerProfileRun` could only
-      // ever run WITH profiling (`handleRuntimeRunClassWithProfiling`/
-      // `handleRuntimeRunProgramWithProfiling`) — a plain run
-      // (`handleRuntimeRunClass`/`handleRuntimeRunProgram`) was unreachable
-      // from compact mode, so `profiling` (default true) was added.
-      // `HandlerProfileView` only ever returned the raw trace payload
+      // **Third exception: two compact runtime tools closed real coverage
+      // gaps against the readonly surface.** `HandlerProfileView` only ever returned the raw trace payload
       // (`handleRuntimeGetProfilerTraceData`) — the dedicated analysis
       // endpoint (`handleRuntimeAnalyzeProfilerTrace`, totals + top-ranked
       // entries) had no compact tool at all, so `mode` (raw|analyze, default
@@ -141,6 +160,51 @@ describe('the MCP tool surface', () => {
         'low/CheckPackageLow': 'super_package',
       };
       const relaxed = MAY_RELAX_REQUIRED[tool];
+      // **19.0.0, several objects per call (spec §11, owner-approved).** A
+      // tool that took one root object takes several, read in the same
+      // envelopes: the list argument arrives beside the single one, exactly
+      // one of them given (the handler checks it), so the single one stops
+      // being required. Each pair below is that move and nothing else.
+      const LIST_ARGUMENTS: Record<
+        string,
+        { relaxed: string[]; added: string[] }
+      > = {
+        'readonly/GetPackageContents': {
+          relaxed: ['package_name'],
+          added: ['package_names'],
+        },
+        'system/GetPackageTree': {
+          relaxed: ['package_name'],
+          added: ['package_names'],
+        },
+        'search/GetObjectsList': {
+          relaxed: ['parent_name', 'parent_tech_name', 'parent_type'],
+          added: ['objects'],
+        },
+        'system/GetObjectInfo': {
+          relaxed: ['parent_type', 'parent_name'],
+          added: ['objects'],
+        },
+        'readonly/GetIncludesList': {
+          relaxed: ['object_name', 'object_type'],
+          added: ['objects'],
+        },
+        'readonly/GetStructuresList': {
+          relaxed: ['structure_name'],
+          added: ['structure_names'],
+        },
+        'readonly/GetEnhancements': {
+          relaxed: ['object_name', 'object_type'],
+          added: ['objects'],
+        },
+        'system/GetWhereUsed': {
+          relaxed: ['object_name', 'object_type'],
+          added: ['objects'],
+        },
+      };
+      const listed = LIST_ARGUMENTS[tool];
+      const listRelaxed = (p: string) =>
+        listed?.relaxed.some((name) => p === `${name}*` || p === name) === true;
       // **One tightening, decided by the user (2026-10-11).** The two ABAP
       // debugger starts require at least one breakpoint (`minItems: 1`), as the
       // compact start already did: a model may start a run and forget the
@@ -152,13 +216,22 @@ describe('the MCP tool surface', () => {
         'debug/DebugTakeOverListener': 'breakpoints',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
+      // **19.0.0, internal batches (spec §11).** A parallelism knob the
+      // batched version makes meaningless is removed: `SearchSource`'s
+      // `concurrency`, and nothing else.
+      const REMOVED: Record<string, string[]> = {
+        'search/SearchSource': ['concurrency'],
+      };
+      const removed = REMOVED[tool] ?? [];
       expect({
         tool,
         lost: had.filter(
           (p) =>
             !has.includes(p) &&
+            !removed.includes(p) &&
             p !== `${relaxed ?? '\u0000'}*` &&
-            p !== tightened,
+            p !== tightened &&
+            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))),
         ),
       }).toEqual({
         tool,
@@ -169,19 +242,41 @@ describe('the MCP tool surface', () => {
         'low/CheckMetadataExtensionLow',
       ]);
       const EXTRA_ALLOWED_ADDITIONS: Record<string, string[]> = {
-        'compact/HandlerProfileRun': ['profiling'],
+        // Background runs (19.0.0): the run tools take `background`, optional,
+        // no default — without it a run waits as before.
+        'system/RuntimeRunClass': ['background'],
+        'system/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
         // declares; the user filter was the only one reachable before.
+        // 19.0.0, several feeds per call (spec §11): `feed_types` beside
+        // `feed_type`, which was never required.
         'system/RuntimeListFeeds': [
           'runtime_error',
           'exception',
           'object_name',
           'package',
           'component',
+          'feed_types',
         ],
         'high/CreateTransportTask': ['task_type'],
+        // 19.0.0: SearchSource's cursor, `start_at` (from `next_start_at`), optional.
+        'search/SearchSource': ['start_at'],
+        // 19.0.0: one Get<Type> per type; a type with a source reads one
+        // part per call, `part` (source | metadata, default source), optional.
+        'high/GetClass': ['part'],
+        'high/GetInterface': ['part'],
+        'high/GetProgram': ['part'],
+        'high/GetTable': ['part'],
+        'high/GetStructure': ['part'],
+        'high/GetDdl': ['part'],
+        'high/GetServiceDefinition': ['part'],
+        'high/GetServiceBinding': ['part'],
+        'high/GetBehaviorDefinition': ['part'],
+        'high/GetBehaviorImplementation': ['part'],
+        'high/GetMetadataExtension': ['part'],
+        'high/GetFunctionModule': ['part'],
         'low/UpdateClassLow': ['transport_request'],
         'low/UpdateClassTestClassesLow': ['transport_request'],
         'low/UpdateDdlLow': ['transport_request'],
@@ -221,18 +316,30 @@ describe('the MCP tool surface', () => {
           'settings',
         ],
       };
-      expect({
+      const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
+      const gainsTimeout = isLong && !had.includes('timeout');
+      const added = has.filter(
+        (p) =>
+          !had.includes(p) &&
+          p !== relaxed &&
+          p !== `${tightened}*` &&
+          !(listRelaxed(p) && had.includes(`${p}*`)) &&
+          !(gainsTimeout && p === 'timeout'),
+      );
+      // A long tool whose only change is its `timeout` (gained, or moved
+      // first in the list) gained nothing else.
+      if (isLong && added.length === 0) continue;
+      expect({ tool, added: [...added].sort() }).toEqual({
         tool,
-        added: has.filter(
-          (p) => !had.includes(p) && p !== relaxed && p !== `${tightened}*`,
-        ),
-      }).toEqual({
-        tool,
-        added: MAY_GAIN_VERSION.has(tool)
-          ? ['version']
-          : relaxed !== undefined
-            ? []
-            : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail']),
+        added: [
+          ...(listed !== undefined
+            ? listed.added
+            : MAY_GAIN_VERSION.has(tool)
+              ? ['version']
+              : relaxed !== undefined
+                ? []
+                : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail'])),
+        ].sort(),
       });
     }
   });
@@ -266,6 +373,21 @@ describe('the MCP tool surface', () => {
    * **The third deliberate move: `DebugSetSettings` arrived** with the debugger
    * on adt-clients 29 — the settings at the current stop. Every other row was
    * checked unchanged.
+   */
+  /**
+   * **The fourth deliberate move: two tools left (19.0.0).** The deprecated
+   * `RuntimeRunClassWithProfiling` and `RuntimeRunProgramWithProfiling` are
+   * deleted, as the user decided with the long-tool list (2026-10-13):
+   * `RuntimeRunClass` / `RuntimeRunProgram` with `profile=true` and the
+   * profiler tools do what they did. Their rows left the snapshot; every
+   * other row was checked unchanged.
+   */
+  /**
+   * **The fifth deliberate move: `SearchSource` is available on cloud too
+   * (19.0.0).** It scans what the package walk and the source reads answer,
+   * and both answered on an SAP BTP ABAP trial (2026-10-21); its row's
+   * `available_in` moved from `onprem` to `cloud, onprem`, every other row
+   * was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

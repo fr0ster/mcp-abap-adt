@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Read the local test classes include of a class. Active or inactive version.',
+    "[read-only] Reads the local test classes include of the ABAP class named by class_name, active or inactive version. Returns { class_name, version, part: 'source', source }.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
+          'Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -58,7 +58,8 @@ export async function handleGetLocalTestClass(
       success: true,
       class_name: className,
       version,
-      test_class_code: source.raw,
+      part: 'source',
+      source: source.raw,
     }),
   );
 }

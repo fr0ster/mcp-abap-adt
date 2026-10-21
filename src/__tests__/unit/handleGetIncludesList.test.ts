@@ -156,7 +156,11 @@ describe('GetIncludesList', () => {
     expect(answered.unreadable).toEqual([
       {
         name: 'ZSECRET',
+        // The read's error as it is, with the step.
         message: 'You are not authorized to display ZSECRET',
+        origin: 'refusal',
+        adt_type: 'ExceptionResourceNoAccess',
+        step: 'read source',
       },
     ]);
   });

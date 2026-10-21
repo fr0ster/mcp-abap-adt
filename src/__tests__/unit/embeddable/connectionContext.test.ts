@@ -1,20 +1,24 @@
 /**
- * A server's connection context holds settings and a credential, each from
- * its one source: a destination's settings and `getProvider` (H0), or the
- * request headers through `credentialFromHeaders`. No token is read, no
- * refresher is looked up, and the settings carry no secret.
+ * A server's connection context is its source: a destination's
+ * settings and `getProvider` (core), or the request headers through
+ * `headerSource` (http, sse). No token is read, no refresher is looked up,
+ * and the settings carry no secret. A connection is built once and kept:
+ * it presents the credential the source answers (`CurrentCredential`), a
+ * new credential object put in force on it.
  */
 
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
+  // The connect's system lookup reads the kind for a 404: on-premise, the
+  // configuration applies.
+  systemKindOf: jest.fn(() => 'onprem'),
 }));
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  getSystemInformation: jest.fn(),
+jest.mock('../../../lib/systemInformation', () => ({
+  ...jest.requireActual('../../../lib/systemInformation'),
+  readSystemInformation: jest.fn(),
 }));
 jest.mock('../../../lib/credentialSources', () => {
   const actual = jest.requireActual('../../../lib/credentialSources');
@@ -25,23 +29,31 @@ jest.mock('../../../lib/credentialSources', () => {
 });
 
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
-import type { ConnectionContext } from '../../../embeddable/ConnectionContext';
-import type { IDestinations } from '../../../lib/auth';
+import type {
+  ConnectionContext,
+  ConnectionSource,
+  ResolvedConnection,
+} from '../../../embeddable/ConnectionContext';
+import type { DestinationSystemContext } from '../../../lib/auth';
+import { serverRefusalOf } from '../../../lib/auth/serverRefusal';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromHeaders } from '../../../lib/credentialSources';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { headerContext } from '../../../lib/httpTransport/headerSource';
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   getSystemContext,
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
+import { readSystemInformation } from '../../../lib/systemInformation';
+import { presented } from '../../helpers/presented';
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
 >;
-const lookup = getSystemInformation as jest.Mock;
+const lookup = readSystemInformation as jest.Mock;
 const fromHeaders = credentialFromHeaders as jest.MockedFunction<
   typeof credentialFromHeaders
 >;
@@ -68,7 +80,7 @@ const reportingRegistry = new CompositeHandlersRegistry([
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
         handler: (async () => {
-          const seen = getEffectiveSystemContext();
+          const seen = getStatedSystemContext();
           return {
             content: [
               {
@@ -106,14 +118,14 @@ class TestServer extends BaseMcpServer {
   context(): ConnectionContext | null {
     return this.getConnectionContext();
   }
-  fromDestination(destination: string, destinations: IDestinations) {
-    return this.setConnectionContext(destination, destinations);
+  fromSource(source: ConnectionSource) {
+    this.setConnectionContext({ kind: 'built', source, sessionId: 'dest-a' });
   }
   fromHeaders(headers: Record<string, string | string[] | undefined>) {
-    this.setConnectionContextFromHeaders(headers);
+    this.setConnectionContext(headerContext(headers));
   }
   connection() {
-    return this.getConnection();
+    return this.getConnection(new AbortController().signal);
   }
 }
 
@@ -136,53 +148,51 @@ const SETTINGS: SapConfig = {
   authType: 'jwt',
 };
 
-/** An IDestinations with nothing but its two methods. */
-function stubDestinations(provider: IAuthProvider) {
-  const destinations = {
-    settingsFor: jest.fn(async () => ({ ...SETTINGS })),
-    getProvider: jest.fn(async () => provider),
+/** A destination-like source: the settings, the provider, what its .env states. */
+function sourceOf(
+  provider: IAuthProvider,
+  systemContext?: DestinationSystemContext,
+) {
+  const resolve = jest.fn(
+    async (_signal: AbortSignal): Promise<ResolvedConnection> => ({
+      settings: { ...SETTINGS },
+      credential: provider,
+      ...(systemContext ? { systemContext } : {}),
+    }),
+  );
+  return { resolve } satisfies ConnectionSource;
+}
+
+/** A source answering each provider in turn, then the last one. */
+function sourceAnswering(...providers: IAuthProvider[]): ConnectionSource {
+  let call = 0;
+  return {
+    resolve: async () => ({
+      settings: { ...SETTINGS },
+      credential: providers[Math.min(call++, providers.length - 1)],
+    }),
   };
-  return destinations;
 }
 
 beforeEach(() => {
   build.mockReset();
   build.mockImplementation(() => fakeConnection());
   lookup.mockReset();
+  // An on-premise system without the function: the configuration applies.
+  lookup.mockRejectedValue(
+    Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+  );
   fromHeaders.mockClear();
 });
 
-describe('setConnectionContext(destination, destinations)', () => {
-  it('holds the provider getProvider gave, and settings with no secret', async () => {
+describe('setConnectionContext({ kind: built, source })', () => {
+  it('builds no connection, resolves nothing and looks nothing up', async () => {
     const provider = fakeProvider();
-    const destinations = stubDestinations(provider);
-    // Nothing else on the stub: no getToken, no createTokenRefresher.
-    expect(Object.keys(destinations).sort()).toEqual([
-      'getProvider',
-      'settingsFor',
-    ]);
-
+    const source = sourceOf(provider);
     const server = new TestServer();
-    await server.fromDestination('dest-a', destinations);
+    server.fromSource(source);
 
-    const context = server.context();
-    expect(context?.credential).toBe(provider);
-    expect(destinations.settingsFor).toHaveBeenCalledWith('dest-a');
-    expect(destinations.getProvider).toHaveBeenCalledWith('dest-a');
-    expect(context?.connectionParams.url).toBe(SETTINGS.url);
-    expect(context?.connectionParams.authType).toBe('jwt');
-    for (const field of SECRET_FIELDS) {
-      expect(context?.connectionParams).not.toHaveProperty(field);
-    }
-    expect(context?.sessionId).toBe('dest-a');
-    expect(context?.metadata).toEqual({ destination: 'dest-a' });
-  });
-
-  it('builds no connection and looks nothing up: no setup-time master-system lookup', async () => {
-    const provider = fakeProvider();
-    const server = new TestServer();
-    await server.fromDestination('dest-a', stubDestinations(provider));
-
+    expect(source.resolve).not.toHaveBeenCalled();
     expect(build).not.toHaveBeenCalled();
     expect(lookup).not.toHaveBeenCalled();
     expect(provider.prepare).not.toHaveBeenCalled();
@@ -195,7 +205,7 @@ describe('setConnectionContext(destination, destinations)', () => {
       process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_CONFIG';
       process.env.SAP_RESPONSIBLE = 'USER_FROM_CONFIG';
       const server = new TestServer();
-      await server.fromDestination('dest-a', stubDestinations(fakeProvider()));
+      server.fromSource(sourceOf(fakeProvider()));
       expect(getSystemContext()).toMatchObject({
         masterSystem: 'SYSTEM_FROM_CONFIG',
         responsible: 'USER_FROM_CONFIG',
@@ -207,19 +217,21 @@ describe('setConnectionContext(destination, destinations)', () => {
     }
   });
 
-  it("stdio (no request scope): the destination's own .env wins over the process configuration, key by key", async () => {
+  it("stdio (no request scope): the source's own statement wins over the process configuration, key by key", async () => {
     const saved = { ...process.env };
     try {
       resetSystemContextCache();
       process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_PROCESS';
       process.env.SAP_RESPONSIBLE = 'USER_FROM_PROCESS';
       const server = new TestServer();
-      await server.fromDestination('dest-a', {
-        ...stubDestinations(fakeProvider()),
-        systemContextFor: jest.fn(async () => ({
+      server.fromSource(
+        // The login states the user an on-premise system without the
+        // function needs; the stated responsible wins over it.
+        sourceOf(fakeProvider(), {
           responsible: 'USER_OF_DESTINATION',
-        })),
-      });
+          login: 'LOGIN_OF_DESTINATION',
+        }),
+      );
       await expect(server.report()).resolves.toEqual({
         responsible: 'USER_OF_DESTINATION',
         masterSystem: 'SYSTEM_FROM_PROCESS',
@@ -229,73 +241,78 @@ describe('setConnectionContext(destination, destinations)', () => {
       resetSystemContextCache();
     }
   });
-
-  it('a client the settings do not state stays unstated (the system default applies)', async () => {
-    const server = new TestServer();
-    await server.fromDestination('dest-a', stubDestinations(fakeProvider()));
-    expect(server.context()?.connectionParams.client).toBeUndefined();
-  });
-
-  it('a destination that fails reaches the caller as the error it is', async () => {
-    const failure = new Error('destination refused');
-    const destinations = {
-      settingsFor: jest.fn(async () => {
-        throw failure;
-      }),
-      getProvider: jest.fn(async () => fakeProvider()),
-    };
-    const server = new TestServer();
-    await expect(server.fromDestination('dest-a', destinations)).rejects.toBe(
-      failure,
-    );
-    expect(server.context()).toBeNull();
-  });
 });
 
-describe('getConnection()', () => {
-  it('builds the connector with the context credential and connects it', async () => {
+describe('getConnection(signal)', () => {
+  it('builds the connector with the resolved settings and credential and connects it', async () => {
     const provider = fakeProvider();
     const server = new TestServer();
-    await server.fromDestination('dest-a', stubDestinations(provider));
-    build.mockClear();
+    server.fromSource(sourceOf(provider));
 
     const connection = await server.connection();
 
     expect(build).toHaveBeenCalledTimes(1);
     const [settings, credential] = build.mock.calls[0];
-    expect(credential).toBe(provider);
-    expect(settings).toBe(server.context()?.connectionParams);
+    expect(presented(credential)).toBe(provider);
+    expect(settings).toEqual(SETTINGS);
+    for (const field of SECRET_FIELDS) {
+      expect(settings).not.toHaveProperty(field);
+    }
     expect((connection as any).connect).toHaveBeenCalledTimes(1);
   });
 
-  it('stdio: one context reuses one connection', async () => {
+  it('the same credential object: one connection, resolved per call', async () => {
+    const source = sourceOf(fakeProvider());
     const server = new TestServer();
-    await server.fromDestination('dest-a', stubDestinations(fakeProvider()));
-    build.mockClear();
+    server.fromSource(source);
 
     const first = await server.connection();
     const second = await server.connection();
 
     expect(second).toBe(first);
     expect(build).toHaveBeenCalledTimes(1);
+    expect(source.resolve).toHaveBeenCalledTimes(2);
   });
 
-  it('HTTP: a second context builds a new connection with the same credential object', async () => {
-    const provider = fakeProvider();
-    const destinations = stubDestinations(provider);
-    const one = new TestServer();
-    const two = new TestServer();
-    await one.fromDestination('dest-a', destinations);
-    await two.fromDestination('dest-a', destinations);
-    build.mockClear();
+  it('a new credential object: the same connection, presenting it', async () => {
+    const one = fakeProvider();
+    const two = fakeProvider();
+    const server = new TestServer();
+    server.fromSource(sourceAnswering(one, two));
 
-    const a = await one.connection();
-    const b = await two.connection();
+    const a = await server.connection();
+    expect(presented(build.mock.calls[0][1])).toBe(one);
+    const b = await server.connection();
 
-    expect(b).not.toBe(a);
+    expect(b).toBe(a);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(presented(build.mock.calls[0][1])).toBe(two);
+  });
+
+  it('a failed connect is not kept: the next call connects again', async () => {
+    const failing = {
+      connect: jest.fn(async () => Promise.reject(new Error('down'))),
+    };
+    build.mockImplementationOnce(() => failing as any);
+    const server = new TestServer();
+    server.fromSource(sourceOf(fakeProvider()));
+
+    await expect(server.connection()).rejects.toThrow('down');
+    const connection = await server.connection();
+    expect(connection).not.toBe(failing);
     expect(build).toHaveBeenCalledTimes(2);
-    expect(build.mock.calls[0][1]).toBe(provider);
-    expect(build.mock.calls[1][1]).toBe(provider);
+  });
+
+  it('a source that fails reaches the caller as the error it is', async () => {
+    const failure = new Error('destination refused');
+    const server = new TestServer();
+    server.fromSource({
+      resolve: async () => {
+        throw failure;
+      },
+    });
+    await expect(server.connection()).rejects.toBe(failure);
+    expect(build).not.toHaveBeenCalled();
   });
 
   it('without a context it refuses', async () => {
@@ -317,10 +334,7 @@ describe("an embedder's setSystemContext survives a request", () => {
         process.env.SAP_RESPONSIBLE = 'USER_FROM_PROCESS';
         const server = new TestServer();
         if (from === 'destination') {
-          await server.fromDestination(
-            'dest-a',
-            stubDestinations(fakeProvider()),
-          );
+          server.fromSource(sourceOf(fakeProvider()));
         } else {
           server.fromHeaders({
             'x-sap-url': 'https://system.example.invalid',
@@ -339,7 +353,7 @@ describe("an embedder's setSystemContext survives a request", () => {
   );
 });
 
-describe('setConnectionContextFromHeaders(headers)', () => {
+describe('headerContext(headers): the x-sap-* headers as the source', () => {
   it('reads the process configuration: no destination, so it is the fallback', async () => {
     const saved = { ...process.env };
     try {
@@ -361,7 +375,7 @@ describe('setConnectionContextFromHeaders(headers)', () => {
     }
   });
 
-  it('a token header: the context is what credentialFromHeaders answered', async () => {
+  it('a token header: the connection is built from what credentialFromHeaders answered', async () => {
     const headers = {
       'x-sap-url': 'https://system.example.invalid',
       'x-sap-jwt-token': 'token-placeholder',
@@ -374,44 +388,49 @@ describe('setConnectionContextFromHeaders(headers)', () => {
     expect(fromHeaders).toHaveBeenCalledWith(headers);
     const answered = fromHeaders.mock.results[0].value;
     const context = server.context();
-    expect(context?.credential).toBe(answered.credential);
-    expect(context?.connectionParams).toEqual(answered.settings);
-    expect(context?.connectionParams.authType).toBe('jwt');
+    expect(context?.kind).toBe('built');
     expect(context?.sessionId).toBe('direct-jwt');
     expect(context?.metadata).toMatchObject({
       masterSystem: 'master-placeholder',
     });
-    for (const field of SECRET_FIELDS) {
-      expect(context?.connectionParams).not.toHaveProperty(field);
-    }
 
     await server.connection();
-    expect(build.mock.calls[0][1]).toBe(answered.credential);
+    const [settings, credential] = build.mock.calls[0];
+    expect(presented(credential)).toBe(answered.credential);
+    expect(settings).toEqual(answered.settings);
+    expect(settings.authType).toBe('jwt');
+    for (const field of SECRET_FIELDS) {
+      expect(settings).not.toHaveProperty(field);
+    }
   });
 
-  it('a user and password: basic, the secret in the credential only', () => {
+  it('a user and password: basic, the secret in the credential only', async () => {
     const server = new TestServer();
     server.fromHeaders({
       'x-sap-url': 'https://system.example.invalid',
       'x-sap-login': 'user-placeholder',
       'x-sap-password': 'password-placeholder',
     });
-    const context = server.context();
-    expect(context?.connectionParams.authType).toBe('basic');
-    expect(context?.sessionId).toBe('direct-basic');
-    expect(JSON.stringify(context?.connectionParams)).not.toContain(
-      'password-placeholder',
-    );
-    expect(context?.credential).toBe(
+    expect(server.context()?.sessionId).toBe('direct-basic');
+    await server.connection();
+    const [settings, credential] = build.mock.calls[0];
+    expect(settings.authType).toBe('basic');
+    expect(JSON.stringify(settings)).not.toContain('password-placeholder');
+    expect(presented(credential)).toBe(
       fromHeaders.mock.results[0].value.credential,
     );
   });
 
-  it('neither: refused as before', () => {
-    expect(() =>
+  it('neither: refused credentials_required, before any credential is built', () => {
+    let thrown: unknown;
+    try {
       new TestServer().fromHeaders({
         'x-sap-url': 'https://system.example.invalid',
-      }),
-    ).toThrow(/x-sap-jwt-token or x-sap-login\+x-sap-password/);
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(serverRefusalOf(thrown)?.code).toBe('credentials_required');
+    expect(fromHeaders).not.toHaveBeenCalled();
   });
 });

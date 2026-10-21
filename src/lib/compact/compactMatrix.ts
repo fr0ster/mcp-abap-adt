@@ -6,10 +6,10 @@ export const COMPACT_CRUD_MATRIX: Record<
   CompactObjectType,
   readonly CompactCrudOperation[]
 > = {
-  PACKAGE: ['create', 'get'],
+  PACKAGE: ['create', 'get', 'update', 'delete'],
   DOMAIN: ['create', 'get', 'update', 'delete'],
   DATA_ELEMENT: ['create', 'get', 'update', 'delete'],
-  TRANSPORT: ['create'],
+  TRANSPORT: ['create', 'get'],
   TABLE: ['create', 'get', 'update', 'delete'],
   STRUCTURE: ['create', 'get', 'update', 'delete'],
   DDL: ['create', 'get', 'update', 'delete'],

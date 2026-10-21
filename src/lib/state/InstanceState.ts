@@ -27,9 +27,12 @@ export interface StatePart {
 }
 
 /** An unknown handle and a handle whose state is gone get this one answer. */
+/** The answer to a handle that names no state: unknown, or ended, alike. */
+export const STATE_UNAVAILABLE_WORDS = 'state is not available';
+
 export class StateUnavailableError extends Error {
   constructor() {
-    super('state is not available');
+    super(STATE_UNAVAILABLE_WORDS);
     this.name = 'StateUnavailableError';
   }
 }
@@ -87,6 +90,12 @@ export interface InstanceStateOptions {
    * call. A whole number, at least 30 (the default); anything else is refused.
    */
   idleMinutes?: number;
+  /**
+   * Run after the idle bound's stop, whatever its undo answered: the host's
+   * terminal close of what the state owns. A failure is reported
+   * on the state logger, never thrown.
+   */
+  onIdleStop?: () => Promise<void>;
 }
 
 export class InstanceState {
@@ -94,8 +103,11 @@ export class InstanceState {
   /** The idle bound, in minutes. */
   readonly idleMinutes: number;
 
+  private readonly onIdleStop: (() => Promise<void>) | undefined;
+
   constructor(options: InstanceStateOptions = {}) {
     this.log = options.logger ?? processLogger;
+    this.onIdleStop = options.onIdleStop;
     this.idleMinutes =
       options.idleMinutes === undefined
         ? DEFAULT_STATE_IDLE_MINUTES
@@ -234,6 +246,17 @@ export class InstanceState {
     } catch (error) {
       failed = messageOf(error);
     }
+    // The terminal close of what the state owns, whatever the undo answered:
+    // a failed undo never keeps a session, or a lock, open.
+    if (this.onIdleStop) {
+      try {
+        await this.onIdleStop();
+      } catch {
+        this.log.error(
+          'instance state: the connections of the held state could not be closed after the idle bound',
+        );
+      }
+    }
     if (!this.idleEnding) return; // emptied: "ended" was said
     if (this.holdsState() && this.pending() && failed === undefined) {
       this.log.info?.(
@@ -296,6 +319,17 @@ export class InstanceState {
       r.status === 'rejected' ? [messageOf(r.reason)] : [],
     );
     if (failures.length) throw new StateCleanupError(failures);
+  }
+
+  /**
+   * The host let the instance go after its connections were logged off (the
+   * client closed its stream, the process ends): the bound is never armed
+   * again, and nothing is undone — the logoff ended in SAP what the state
+   * held there.
+   */
+  letGo(): void {
+    this.closed = true;
+    this.disarm();
   }
 
   /** Resolves when nothing is held, or nothing is finishing on its own. */

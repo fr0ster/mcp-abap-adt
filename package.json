@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "18.1.0",
+  "version": "19.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -59,6 +59,11 @@
       "import": "./dist/lib/compact/index.js",
       "require": "./dist/lib/compact/index.js"
     },
+    "./http-transport": {
+      "types": "./dist/lib/httpTransport/index.d.ts",
+      "import": "./dist/lib/httpTransport/index.js",
+      "require": "./dist/lib/httpTransport/index.js"
+    },
     "./debugger": {
       "types": "./dist/lib/debugger/index.d.ts",
       "import": "./dist/lib/debugger/index.js",
@@ -68,6 +73,21 @@
       "types": "./dist/lib/state/index.d.ts",
       "import": "./dist/lib/state/index.js",
       "require": "./dist/lib/state/index.js"
+    },
+    "./tool-set": {
+      "types": "./dist/lib/toolSet.d.ts",
+      "import": "./dist/lib/toolSet.js",
+      "require": "./dist/lib/toolSet.js"
+    },
+    "./adt-headers": {
+      "types": "./dist/lib/adtHeaders/index.d.ts",
+      "import": "./dist/lib/adtHeaders/index.js",
+      "require": "./dist/lib/adtHeaders/index.js"
+    },
+    "./tool-search": {
+      "types": "./dist/lib/toolSearch/index.d.ts",
+      "import": "./dist/lib/toolSearch/index.js",
+      "require": "./dist/lib/toolSearch/index.js"
     }
   },
   "typesVersions": {
@@ -102,11 +122,23 @@
       "compact-shared": [
         "dist/lib/compact/index.d.ts"
       ],
+      "http-transport": [
+        "dist/lib/httpTransport/index.d.ts"
+      ],
       "debugger": [
         "dist/lib/debugger/index.d.ts"
       ],
       "state": [
         "dist/lib/state/index.d.ts"
+      ],
+      "tool-set": [
+        "dist/lib/toolSet.d.ts"
+      ],
+      "adt-headers": [
+        "dist/lib/adtHeaders/index.d.ts"
+      ],
+      "tool-search": [
+        "dist/lib/toolSearch/index.d.ts"
       ]
     }
   },
@@ -116,7 +148,6 @@
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
-    "test:low": "jest --testPathPatterns='integration.*Low' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
@@ -125,11 +156,10 @@
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",
     "format": "npx biome format --write src",
-    "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','server/dist','compact-readonly/dist','compact-modify/dist','compact/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
-    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p compact-readonly/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p compact/tsconfig.json",
+    "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','background-runs-memory/dist','responsible-rules/dist','http/dist','sse/dist','server/dist','compact-readonly-entries/dist','compact-modify/dist','compact/dist','compact-http/dist','compact-sse/dist','core-ro/dist','http-ro/dist','sse-ro/dist','compact-ro/dist','compact-http-ro/dist','compact-sse-ro/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
+    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p background-runs-memory/tsconfig.json && npx tsc -p responsible-rules/tsconfig.json && npx tsc -p http/tsconfig.json && npx tsc -p sse/tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p compact-readonly-entries/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p compact/tsconfig.json && npx tsc -p compact-http/tsconfig.json && npx tsc -p compact-sse/tsconfig.json && npx tsc -p core-ro/tsconfig.json && npx tsc -p http-ro/tsconfig.json && npx tsc -p sse-ro/tsconfig.json && npx tsc -p compact-ro/tsconfig.json && npx tsc -p compact-http-ro/tsconfig.json && npx tsc -p compact-sse-ro/tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
-    "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "chrono": "./tools/version-stats.sh",
     "docs:tools": "npm run build && node ./tools/generate-tools-docs.js",
@@ -148,10 +178,7 @@
     "docker:build": "docker compose -f docker/docker-compose.yml build",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
-    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
-    "docker:build:headerless": "docker compose -f docker/docker-compose.headerless.yml build",
-    "docker:up:headerless": "docker compose -f docker/docker-compose.headerless.yml up -d",
-    "docker:down:headerless": "docker compose -f docker/docker-compose.headerless.yml down"
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
   },
   "keywords": [
     "abap",
@@ -179,6 +206,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
+    "@mcp-abap-adt/auth-broker": "^5.0.6",
+    "@mcp-abap-adt/auth-stores": "^5.0.1",
+    "@mcp-abap-adt/interfaces-auth-broker": "^1.3.0",
     "@modelcontextprotocol/inspector": "^2.9.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
@@ -195,24 +225,20 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^30.0.0",
-    "@mcp-abap-adt/adt-strategies": "^0.10.2",
-    "@mcp-abap-adt/auth-broker": "^4.1.0",
-    "@mcp-abap-adt/auth-providers": "^5.4.0",
-    "@mcp-abap-adt/auth-stores": "^3.3.0",
-    "@mcp-abap-adt/connection": "^11.0.0",
-    "@mcp-abap-adt/interfaces-adt": "^15.3.0",
-    "@mcp-abap-adt/interfaces-adt-connection": "^2.0.0",
-    "@mcp-abap-adt/interfaces-auth": "^3.2.0",
-    "@mcp-abap-adt/interfaces-auth-broker": "^1.2.0",
-    "@mcp-abap-adt/interfaces-auth-sap": "^2.0.0",
-    "@mcp-abap-adt/interfaces-network": "^2.0.1",
+    "@mcp-abap-adt/adt-clients": "^36.0.2",
+    "@mcp-abap-adt/adt-strategies": "^0.13.0",
+    "@mcp-abap-adt/auth-errors": "^2.2.1",
+    "@mcp-abap-adt/auth-providers": "^6.0.2",
+    "@mcp-abap-adt/connection": "^18.0.1",
+    "@mcp-abap-adt/interfaces-adt": "^20.0.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
+    "@mcp-abap-adt/interfaces-auth": "^7.5.0",
+    "@mcp-abap-adt/interfaces-auth-sap": "^3.4.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "axios": "^1.20.0",
     "diff": "^9.0.0",
-    "dotenv": "^18.0.5",
     "express": "^5.2.1",
     "fast-xml-parser": "^5.11.2",
     "js-yaml": "^5.4.2",
@@ -221,7 +247,7 @@
     "zod": "^4.6.5"
   },
   "optionalDependencies": {
-    "@mcp-abap-adt/sap-rfc-lite": "^0.2.1"
+    "@mcp-abap-adt/sap-rfc-lite": "^0.2.3"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -229,6 +255,8 @@
   },
   "files": [
     "dist/",
+    "tools/batch-handlers.json",
+    "tools/tool-search.json",
     "docs/",
     "!docs/superpowers/",
     "README.md",
@@ -242,9 +270,22 @@
     "testEnvironment": "node",
     "roots": [
       "<rootDir>/src",
-      "<rootDir>/compact-readonly/src",
+      "<rootDir>/background-runs-memory/src",
+      "<rootDir>/responsible-rules/src",
+      "<rootDir>/server/src",
+      "<rootDir>/http/src",
+      "<rootDir>/sse/src",
+      "<rootDir>/compact-readonly-entries/src",
       "<rootDir>/compact-modify/src",
-      "<rootDir>/compact/src"
+      "<rootDir>/compact/src",
+      "<rootDir>/compact-http/src",
+      "<rootDir>/compact-sse/src",
+      "<rootDir>/core-ro/src",
+      "<rootDir>/http-ro/src",
+      "<rootDir>/sse-ro/src",
+      "<rootDir>/compact-ro/src",
+      "<rootDir>/compact-http-ro/src",
+      "<rootDir>/compact-sse-ro/src"
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
@@ -272,11 +313,35 @@
       "^@mcp-abap-adt/lib/state$": "<rootDir>/src/lib/state/index.ts",
       "^@mcp-abap-adt/lib/utils$": "<rootDir>/src/lib/utils.ts",
       "^@mcp-abap-adt/lib/config$": "<rootDir>/src/lib/config/index.ts",
-      "^@mcp-abap-adt/compact-readonly$": "<rootDir>/compact-readonly/src/index.ts",
+      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/src/embeddable/index.ts",
+      "^@mcp-abap-adt/lib/logger$": "<rootDir>/src/lib/handlerLogger.ts",
+      "^@mcp-abap-adt/lib/request-context$": "<rootDir>/src/lib/requestContext.ts",
+      "^@mcp-abap-adt/lib/auth$": "<rootDir>/src/lib/auth/index.ts",
+      "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/src/lib/httpTransport/index.ts",
+      "^@mcp-abap-adt/lib/tool-set$": "<rootDir>/src/lib/toolSet.ts",
+      "^@mcp-abap-adt/lib/adt-headers$": "<rootDir>/src/lib/adtHeaders/index.ts",
+      "^@mcp-abap-adt/lib/tool-search$": "<rootDir>/src/lib/toolSearch/index.ts",
+      "^@mcp-abap-adt/background-runs-memory$": "<rootDir>/background-runs-memory/src/index.ts",
+      "^@mcp-abap-adt/responsible-rules$": "<rootDir>/responsible-rules/src/index.ts",
+      "^@mcp-abap-adt/compact-readonly-entries$": "<rootDir>/compact-readonly-entries/src/index.ts",
       "^@mcp-abap-adt/compact-modify$": "<rootDir>/compact-modify/src/index.ts",
       "^@mcp-abap-adt/core/launcher$": "<rootDir>/server/src/launcher.ts",
-      "^@mcp-abap-adt/compact-readonly/routes$": "<rootDir>/compact-readonly/src/handlers/compactReadRoutes.ts",
+      "^@mcp-abap-adt/core/auth$": "<rootDir>/server/src/auth/index.ts",
+      "^@mcp-abap-adt/http$": "<rootDir>/http/src/index.ts",
+      "^@mcp-abap-adt/sse$": "<rootDir>/sse/src/index.ts",
+      "^@mcp-abap-adt/compact-readonly-entries/routes$": "<rootDir>/compact-readonly-entries/src/handlers/compactReadRoutes.ts",
       "^@mcp-abap-adt/compact-modify/routes$": "<rootDir>/compact-modify/src/handlers/compactWriteRoutes.ts",
+      "^@mcp-abap-adt/http/launcher$": "<rootDir>/http/src/launcher.ts",
+      "^@mcp-abap-adt/sse/launcher$": "<rootDir>/sse/src/launcher.ts",
+      "^@mcp-abap-adt/compact/launcher$": "<rootDir>/compact/src/launcher.ts",
+      "^@mcp-abap-adt/compact-http/launcher$": "<rootDir>/compact-http/src/launcher.ts",
+      "^@mcp-abap-adt/compact-sse/launcher$": "<rootDir>/compact-sse/src/launcher.ts",
+      "^@mcp-abap-adt/core-ro/launcher$": "<rootDir>/core-ro/src/launcher.ts",
+      "^@mcp-abap-adt/http-ro/launcher$": "<rootDir>/http-ro/src/launcher.ts",
+      "^@mcp-abap-adt/sse-ro/launcher$": "<rootDir>/sse-ro/src/launcher.ts",
+      "^@mcp-abap-adt/compact-ro/launcher$": "<rootDir>/compact-ro/src/launcher.ts",
+      "^@mcp-abap-adt/compact-http-ro/launcher$": "<rootDir>/compact-http-ro/src/launcher.ts",
+      "^@mcp-abap-adt/compact-sse-ro/launcher$": "<rootDir>/compact-sse-ro/src/launcher.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "collectCoverageFrom": [

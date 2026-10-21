@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugTerminate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Ends the stopped debuggee where it stands; the program does not run on.',
+    '[read-only] [debug] Ends the stopped debuggee and its program where it stands.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

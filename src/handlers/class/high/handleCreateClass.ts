@@ -15,6 +15,7 @@
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -27,7 +28,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.',
+    'Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -103,22 +104,24 @@ export async function handleCreateClass(
   return answer(
     { tool: 'CreateClass', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getClass(resultsFor(classDocuments))
-        .create(
-          {
-            className,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            description: args.description || className,
-            superclass: args.superclass,
-            final: args.final || false,
-            abstract: args.abstract || false,
-            createProtected: args.create_protected || false,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'class.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getClass(resultsFor(classDocuments))
+          .create(
+            {
+              className,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              description: args.description || className,
+              superclass: args.superclass,
+              final: args.final || false,
+              abstract: args.abstract || false,
+              createProtected: args.create_protected || false,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

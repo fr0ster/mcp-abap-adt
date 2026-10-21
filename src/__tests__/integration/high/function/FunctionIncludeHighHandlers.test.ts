@@ -5,7 +5,7 @@
  *   CreateFunctionGroup   (the test's own group)
  *   -> CreateFunctionInclude (custom letter-suffix include)
  *   -> UpdateFunctionInclude (set source)
- *   -> ReadFunctionInclude   (verify source round-trips)
+ *   -> GetFunctionInclude   (verify source round-trips)
  *   -> DeleteFunctionInclude, DeleteFunctionGroup (cleanup)
  *
  * **Its own function group, never the shared one.** Creating an include adds
@@ -31,7 +31,7 @@ import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/h
 import { handleCreateFunctionInclude } from '../../../../handlers/function_include/high/handleCreateFunctionInclude';
 import { handleDeleteFunctionInclude } from '../../../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleUpdateFunctionInclude } from '../../../../handlers/function_include/high/handleUpdateFunctionInclude';
-import { handleReadFunctionInclude } from '../../../../handlers/function_include/readonly/handleReadFunctionInclude';
+import { handleGetFunctionInclude } from '../../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import {
   assertNotSharedDependency,
   getCleanupAfter,
@@ -283,17 +283,17 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
 
         await delay(getOperationDelay('update', testCase));
 
-        // Step 3: ReadFunctionInclude — verify source round-trips
+        // Step 3: GetFunctionInclude — verify source round-trips
         testLogger?.info(`📖 Read-back: Reading include ${includeName}...`);
         const readResponse = await invoke(
-          'ReadFunctionInclude',
+          'GetFunctionInclude',
           {
             function_group_name: functionGroupName,
             include_name: includeName,
             version: 'active',
           },
           () =>
-            handleReadFunctionInclude(
+            handleGetFunctionInclude(
               { connection: connection!, logger: testLogger },
               {
                 function_group_name: functionGroupName,
@@ -305,15 +305,15 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
 
         if (readResponse.isError) {
           throw new Error(
-            `ReadFunctionInclude failed: ${readResponse.content[0]?.text || 'Unknown error'}`,
+            `GetFunctionInclude failed: ${readResponse.content[0]?.text || 'Unknown error'}`,
           );
         }
         const readData = parseHandlerResponse(readResponse);
         expect(readData.success).toBe(true);
         expect(readData.include_name).toBe(includeName.toUpperCase());
         // Source should round-trip: assert a stable token from the snippet survives.
-        if (readData.source_code) {
-          expect(String(readData.source_code)).toContain(
+        if (readData.source) {
+          expect(String(readData.source)).toContain(
             'function-include-roundtrip',
           );
         }

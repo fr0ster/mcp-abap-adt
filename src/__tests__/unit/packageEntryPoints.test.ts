@@ -40,6 +40,8 @@ function manifest(dir: string): Manifest {
 const packages: Array<[label: string, dir: string]> = [
   ['@mcp-abap-adt/lib', root],
   ['@mcp-abap-adt/core', path.join(root, 'server')],
+  ['@mcp-abap-adt/http', path.join(root, 'http')],
+  ['@mcp-abap-adt/sse', path.join(root, 'sse')],
 ];
 
 describe.each(packages)('%s entry points', (_label, dir) => {

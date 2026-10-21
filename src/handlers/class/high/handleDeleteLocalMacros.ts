@@ -16,6 +16,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -24,6 +25,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -31,7 +33,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteLocalMacros',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.',
+    'Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -84,11 +86,14 @@ export async function handleDeleteLocalMacros(
 
       const deleted = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
-        (lockHandle) =>
-          obj.update(
-            { className, transportRequest: args.transport_request },
-            { source: '', lockHandle, analyse: analyseException },
+        atStep('update', (lockHandle) =>
+          withAdtHeaders(context, 'localMacros.update', (headers) =>
+            obj.update(
+              { className, transportRequest: args.transport_request },
+              { headers, source: '', lockHandle, analyse: analyseException },
+            ),
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
@@ -97,8 +102,16 @@ export async function handleDeleteLocalMacros(
         return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(deleted, () =>
-        obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(
+        deleted,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'localMacros.activate', (headers) =>
+            obj.activate(
+              { className },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

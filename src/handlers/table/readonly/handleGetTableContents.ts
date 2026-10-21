@@ -1,8 +1,10 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import { detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -14,9 +16,11 @@ import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Retrieve contents (data preview) of an ABAP database table or CDS view. Returns rows of data like SE16/SE16N.',
+  ),
   inputSchema: {
+    timeout: timeoutField(),
     table_name: z.string().describe('Name of the ABAP table'),
     max_rows: z
       .number()
@@ -67,13 +71,15 @@ export async function handleGetTableContents(
   return answer(
     { tool: 'GetTableContents', detail },
     () =>
-      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
-        {
-          table_name: tableName,
-          max_rows: maxRows,
-          sql_query: sqlQuery,
-        },
-        { analyse: analyseException },
+      withAdtHeaders(context, 'utils.getTableContents', (headers) =>
+        createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
+          {
+            table_name: tableName,
+            max_rows: maxRows,
+            sql_query: sqlQuery,
+          },
+          { headers, analyse: analyseException },
+        ),
       ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;

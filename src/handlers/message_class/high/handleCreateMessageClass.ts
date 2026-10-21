@@ -9,6 +9,7 @@
 
 import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -22,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.',
+    'Creates the ABAP message class (T100) named by message_class_name, with its description, in the package named by package_name: a shell whose messages are added afterwards. A message class is in effect once saved.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -85,18 +86,20 @@ export async function handleCreateMessageClass(
   return answer(
     { tool: 'CreateMessageClass', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMessageClass(resultsFor(messageClassDocuments))
-        .create(
-          {
-            name,
-            description: args.description || name,
-            packageName: args.package_name,
-            transportRequest: args.transport_request,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'messageClass.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getMessageClass(resultsFor(messageClassDocuments))
+          .create(
+            {
+              name,
+              description: args.description || name,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

@@ -15,7 +15,7 @@ We welcome contributions! Please see the project documentation for details on ho
 |---|---:|---:|---|
 | **Oleksii Kyslytsia** ([@fr0ster](https://github.com/fr0ster)) — maintainer | 962 | 176,236 | 2025-05 – present |
 | **mario-andreschak** ([@mario-andreschak](https://github.com/mario-andreschak)) — original project | 33 | 136 | 2025-01 – 2025-03 |
-| **Henry Mao** ([@calclavia](https://github.com/calclavia)) | 3 | 7 | 2025-02 |
+| **Henry Mao** ([@calclavia](https://github.com/calclavia)) | 3 | 0 (7 until 2026-10-05) | 2025-02 |
 | **Aleksandr Razinkin** ([@raaleksandr-epam](https://github.com/raaleksandr-epam)) | 2 | 0 | 2026-01 |
 | **Frank Fiegel** ([@punkpeye](https://github.com/punkpeye)) | 1 | 0 | 2025-03 |
 
@@ -30,8 +30,10 @@ git ls-files | grep -vE 'package-lock.json|\.(png|jpg|gif|ico|pdf)$' \
 The project began in January 2025 from mario-andreschak's work and was rebuilt on
 its own architecture from May 2025 onward. What remains of the original is 136
 lines of 176,379 — mostly `.gitignore`, `tsconfig.json` and CHANGELOG history,
-with 25 lines across `src/lib/utils.ts` and six read-only handlers. Henry Mao's 7
-surviving lines are in `docker/Dockerfile`. The acknowledgment in the README
+with 25 lines across `src/lib/utils.ts` and six read-only handlers. Henry Mao contributed
+the first `Dockerfile`, the Smithery configuration and a README section (February 2025); the
+7 of his lines that `docker/Dockerfile` still held when this was measured were rewritten on
+2026-10-05 (#274), so none survive in the tree today. The acknowledgment in the README
 records where the project started.
 
 ## Licensing

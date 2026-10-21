@@ -28,13 +28,14 @@ export const TOOL_DEFINITION = {
   name: 'GetATCRunStatus',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Ask whether an ATC run has ended. Takes the run_id from RunATC (only a run started with wait=false has one). Answers the status the server reports and whether it is finished — finished means ended, not that the checks passed. Read what it found with GetATCFindings, by worklist_id.',
+    "[read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.",
   inputSchema: {
     type: 'object',
     properties: {
       run_id: {
         type: 'string',
-        description: 'Run identifier answered by RunATC when wait was false.',
+        description:
+          'Run identifier an ATC run started with wait=false answered.',
       },
     },
     required: ['run_id'],

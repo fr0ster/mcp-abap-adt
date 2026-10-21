@@ -36,6 +36,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -44,6 +45,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -51,7 +53,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Write the local test classes include of a class under the class lock, and optionally activate the class.',
+    'Writes test_class_code as the local test classes include of the ABAP class named by class_name. The include is written under the class lock; with activate_on_update the class is activated.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -114,15 +116,19 @@ export async function handleUpdateLocalTestClass(
 
       const written = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
-        (lockHandle) =>
-          obj.update(
-            { className, transportRequest: args.transport_request },
-            {
-              source: args.test_class_code,
-              lockHandle,
-              analyse: analyseException,
-            },
+        atStep('update', (lockHandle) =>
+          withAdtHeaders(context, 'localTestClass.update', (headers) =>
+            obj.update(
+              { className, transportRequest: args.transport_request },
+              {
+                headers,
+                source: args.test_class_code,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
@@ -131,8 +137,16 @@ export async function handleUpdateLocalTestClass(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'localTestClass.activate', (headers) =>
+            obj.activate(
+              { className },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

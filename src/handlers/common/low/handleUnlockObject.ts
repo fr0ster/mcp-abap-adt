@@ -23,6 +23,8 @@ import {
   metadataExtensionDocuments,
   packageDocuments,
   programDocuments,
+  serviceDefinitionDocuments,
+  serviceDocuments,
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -30,15 +32,19 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  connectionHoldingPackageLock,
+  releasePackageLockSession,
+} from '../../../lib/packageSessions';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.',
+    '[low-level] Unlock an ABAP object after modification, with the lock_handle the LockObject operation answered (the lock stays in the instance’s own session until then).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -63,30 +69,18 @@ export const TOOL_DEFINITION = {
           'data_element',
           'package',
           'behavior_definition',
+          'behavior_implementation',
           'metadata_extension',
+          'service_definition',
+          'service_binding',
         ],
       },
       lock_handle: {
         type: 'string',
         description: 'Lock handle from LockObject operation',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from LockObject operation. Must be the same session.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
-    required: ['object_name', 'object_type', 'lock_handle', 'session_id'],
+    required: ['object_name', 'object_type', 'lock_handle'],
   },
 } as const;
 
@@ -94,12 +88,6 @@ interface UnlockObjectArgs {
   object_name: string;
   object_type: string;
   lock_handle: string;
-  session_id: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 const VALID_TYPES = [
@@ -115,7 +103,10 @@ const VALID_TYPES = [
   'data_element',
   'package',
   'behavior_definition',
+  'behavior_implementation',
   'metadata_extension',
+  'service_definition',
+  'service_binding',
 ];
 
 export async function handleUnlockObject(
@@ -123,14 +114,11 @@ export async function handleUnlockObject(
   args: UnlockObjectArgs,
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, lock_handle, session_id, session_state } =
-    args as UnlockObjectArgs;
+  const { object_name, object_type, lock_handle } = args as UnlockObjectArgs;
 
-  if (!object_name || !object_type || !lock_handle || !session_id) {
+  if (!object_name || !object_type || !lock_handle) {
     return return_error(
-      new Error(
-        'object_name, object_type, lock_handle, and session_id are required',
-      ),
+      new Error('object_name, object_type and lock_handle are required'),
     );
   }
 
@@ -157,10 +145,6 @@ export async function handleUnlockObject(
     [functionGroupName, functionModuleName] = object_name
       .toUpperCase()
       .split('|');
-  }
-
-  if (session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const objectName = object_name.toUpperCase();
@@ -236,11 +220,17 @@ export async function handleUnlockObject(
               analyse: analyseException,
             });
         case 'package':
-          return client
+          // Sent on the session holding the lock, which is then released
+          // whatever the unlock answered.
+          return createAdtClient(
+            connectionHoldingPackageLock(connection, lock_handle),
+            logger,
+          )
             .getPackage(resultsFor(packageDocuments))
             .unlock({ packageName: objectName }, lock_handle, {
               analyse: analyseException,
-            });
+            })
+            .finally(() => releasePackageLockSession(lock_handle, logger));
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
@@ -251,6 +241,25 @@ export async function handleUnlockObject(
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .unlock({ name: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'behavior_implementation':
+          // The implementation class's own unlock, pairing the lock.
+          return client
+            .getBehaviorImplementation()
+            .unlock({ className: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'service_definition':
+          return client
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .unlock({ serviceDefinitionName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'service_binding':
+          return client
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .unlock({ bindingName: objectName }, lock_handle, {
               analyse: analyseException,
             });
         default:

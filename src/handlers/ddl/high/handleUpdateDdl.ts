@@ -21,6 +21,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -30,6 +31,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -37,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
+    'Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -95,23 +97,32 @@ export async function handleUpdateDdl(
       const written = await withLock(
         () => obj.lock({ ddlName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const update = () =>
-            obj.update(
-              { ddlName, transportRequest: args.transport_request },
-              {
-                source: args.ddl_source,
-                lockHandle,
-                analyse: analyseException,
-              },
-            );
+          const update = atStep('update', () =>
+            withAdtHeaders(context, 'ddl.update', (headers) =>
+              obj.update(
+                { ddlName, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.ddl_source,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            ),
+          );
           // A conditional phase of the sequence, not a hand-rolled
           // short-circuit: see UpdateClass for the reasoning.
           return shouldActivate
             ? sequence(
-                () =>
-                  obj.check({ ddlName, source: args.ddl_source }, 'inactive', {
-                    analyse: analyseException,
-                  }),
+                atStep('check', () =>
+                  withAdtHeaders(context, 'ddl.check', (headers) =>
+                    obj.check(
+                      { ddlName, source: args.ddl_source },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
+                  ),
+                ),
                 update,
               )
             : update();
@@ -123,8 +134,13 @@ export async function handleUpdateDdl(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ ddlName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'ddl.activate', (headers) =>
+            obj.activate({ ddlName }, { headers, analyse: analyseActivation }),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

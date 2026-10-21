@@ -10,6 +10,7 @@
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import { getSystemContext } from '../../../lib/systemContext';
 import {
@@ -89,7 +90,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 functionGroupName: item.group,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['functionModule.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -111,7 +115,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 functionGroupName: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['functionGroup.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -133,7 +140,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 className: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['class.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -151,7 +161,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 serviceDefinitionName: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['serviceDefinition.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -173,7 +186,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 name: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['behaviorDefinition.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -195,7 +211,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 ddlName: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['ddl.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -216,7 +235,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 structureName: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['structure.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -234,7 +256,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 tableName: item.name,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['table.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );
@@ -251,7 +276,10 @@ describe('Admin: Teardown shared dependencies', () => {
                 packageName: sharedConfig.package,
                 transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: DEFAULT_ADT_HEADERS['package.delete'],
+                analyse: analyseDeletion,
+              },
             ),
           testsLogger,
         );

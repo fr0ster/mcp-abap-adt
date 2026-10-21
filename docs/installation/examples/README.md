@@ -27,9 +27,8 @@ Nothing is read from the working directory.
 | `cline-stdio-compact-config.json` | Compact server (`mcp-abap-adt-compact`), same arguments |
 | `cline-stdio-snc-config.json` | RFC / SNC on Windows: the SDK's `lib` directory on `PATH` |
 | `cline-stdio-ca-config.json` | A system whose certificate a company CA issued: `NODE_EXTRA_CA_CERTS` |
-| `cline-http-config.json` | Client of a server started with `--transport=http` |
-| `cline-http-service-key-config.json` | The same, choosing the destination per request (`x-mcp-destination`) |
-| `cline-sse-config.json` | Client of a server started with `--transport=sse` |
+| `cline-http-config.json` | Client of `mcp-abap-adt-http`, its credentials in `x-sap-*` headers |
+| `cline-sse-config.json` | Client of `mcp-abap-adt-sse`, its credentials in the opening request's `x-sap-*` headers |
 
 ## 1. Full server over HTTP (stdio)
 
@@ -40,7 +39,7 @@ With one `.env` file:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     }
   }
@@ -48,7 +47,9 @@ With one `.env` file:
 ```
 
 With a named destination (`service-keys/<destination>.json` and `sessions/<destination>.env`, see
-[SERVICE_KEY_SETUP.md](SERVICE_KEY_SETUP.md)): replace the `--env-path` argument with `--mcp=<destination>`.
+[SERVICE_KEY_SETUP.md](SERVICE_KEY_SETUP.md)): replace the `--env-path` argument with `--mcp=<destination>`
+and state the system type beside it, `--system-type=<onprem|cloud>` — required since 19.0.0, and a
+named destination's session `.env` is not read for it (`cline-stdio-destination-config.json`).
 Without a global install, use `"command": "npx"` and put `"-y", "@mcp-abap-adt/core"` before the
 other arguments.
 
@@ -63,7 +64,7 @@ SAP_PASSWORD=<your password>
 SAP_SYSTEM_TYPE=onprem
 ```
 
-For a JWT you hold: `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN=<token>`. All
+A token you hold is not served over stdio: send it in the `x-sap-jwt-token` header to `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. All
 authentications: [Authentication & Destinations](../../user-guide/AUTHENTICATION.md).
 
 ## 2. Compact server
@@ -75,14 +76,14 @@ The same arguments and `.env`, the command `mcp-abap-adt-compact`:
   "mcpServers": {
     "mcp-abap-adt-compact": {
       "command": "mcp-abap-adt-compact",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     }
   }
 }
 ```
 
-Through npx: `"command": "npx"`, `"args": ["-y", "-p", "@mcp-abap-adt/compact", "mcp-abap-adt-compact", "--env-path=…"]`.
+Through npx: `"command": "npx"`, `"args": ["-y", "-p", "@mcp-abap-adt/compact", "mcp-abap-adt-compact", "--env-path=…", "--system-type=<onprem|cloud>"]`.
 
 ## 3. RFC and SNC
 
@@ -94,7 +95,7 @@ them from the `.env`. On Windows the SDK's `lib` directory must be on `PATH` whe
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=C:/path/to/<destination>.env"],
+      "args": ["--env-path=C:/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "env": {
         "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
       },
@@ -117,10 +118,14 @@ SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
 SAP_RESPONSIBLE=<your ABAP user>
+SAP_SYSTEM_TYPE=onprem
 ```
 
 For RFC with a user and password, use `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`
-instead of the SNC keys. The SDK, the install order and the SNC options: [RFC Setup](../RFC_SETUP.md).
+instead of the SNC keys. Through a message server and a logon group, add `SAP_MSHOST` with
+`SAP_MSSERV` or `SAP_SYSID`, and optionally `SAP_GROUP` and `SAP_SAPROUTER`: then the system number
+comes from neither the port nor `SAP_SYSNR`. The SDK, the install order, the SNC options and the
+message server: [RFC Setup](../RFC_SETUP.md).
 
 ## 4. A company CA
 
@@ -132,7 +137,7 @@ trusts that CA. Name the PEM file in the client's `env` block:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "env": {
         "NODE_EXTRA_CA_CERTS": "/path/to/company-ca.pem"
       },
@@ -150,25 +155,23 @@ The server runs on its own; the client only connects. Start it in a terminal (pr
 such as `NODE_EXTRA_CA_CERTS` belong in that terminal's environment):
 
 ```bash
-# Streamable HTTP: http://localhost:3000/mcp/stream/http
-mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+# Streamable HTTP (@mcp-abap-adt/http): http://localhost:3000/mcp/stream/http
+mcp-abap-adt-http --port=3000 --system-type=onprem
 
-# A named destination instead of a .env
-mcp-abap-adt --transport=http --port=3000 --mcp=<destination>
-
-# SSE: http://localhost:3001/sse
-mcp-abap-adt --transport=sse --port=3001 --env-path=/path/to/<destination>.env
+# SSE (@mcp-abap-adt/sse): http://localhost:3001/sse
+mcp-abap-adt-sse --sse-port=3001 --system-type=onprem
 ```
 
-`mcp-abap-adt-compact` and `npx -y @mcp-abap-adt/core` take the same arguments. Then use
-`cline-http-config.json` or `cline-sse-config.json`.
+The system type (`onprem`, `cloud` or `legacy`) is the process's parameter — `--system-type`,
+`SAP_SYSTEM_TYPE` or YAML `system-type`; no header states it, and without it neither binary starts.
 
-To choose the destination per request, start the server with `--allow-destination-header` and send
-`x-mcp-destination` (`cline-http-service-key-config.json`). Without `--mcp`, `--env` or `--env-path` there
-is no default destination, and a request must name one or carry `x-sap-url` with a credential.
+Neither takes a destination: each request (Streamable HTTP), or the `GET` that opens each SSE
+connection, carries its credential in `x-sap-*` headers. Then use `cline-http-config.json` or
+`cline-sse-config.json`. A request carrying `x-mcp-destination` is answered `400`: destinations, service
+keys and the browser login are served only by `mcp-abap-adt` (stdio).
 
-**First-time authentication** of a service-key destination: the browser opens for the login (callback
-port `61001`). The token is kept in memory, or saved to `sessions/<destination>.env` with `--unsafe`.
+**First-time authentication** of a service-key destination (`mcp-abap-adt --mcp=<destination> --system-type=cloud`, stdio): the browser opens for the login at the
+server's start, before the client sees its tools (callback port `61001`). The token is kept in memory, or saved to `sessions/<destination>.env` with `--unsafe`.
 
 ## More Info
 

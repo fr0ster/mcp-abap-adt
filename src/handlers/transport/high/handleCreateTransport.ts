@@ -22,6 +22,7 @@ import {
   transportCreated,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -83,6 +84,9 @@ export async function handleCreateTransport(
   }
 
   const detail = detailOf(args);
+  // SAP stores user ids in upper case: a lower-case owner is refused as an
+  // unknown user (400, measured), so the id is sent upper-cased.
+  const owner = args.owner?.trim().toUpperCase() || undefined;
 
   const terseCreatedTransport: Terse<string> = (value) => {
     const created = // adt-clients 23 moved the reading to adt-strategies as a strategy over
@@ -94,7 +98,7 @@ export async function handleCreateTransport(
       description: created.description ?? args.description,
       transport_type: args.transport_type || 'workbench',
       target_system: created.targetSystem ?? args.target_system ?? null,
-      owner: created.owner ?? args.owner ?? null,
+      owner: created.owner ?? owner ?? null,
       message: `Transport request ${created.transportNumber} created successfully.`,
     };
   };
@@ -102,17 +106,19 @@ export async function handleCreateTransport(
   return answer(
     { tool: 'CreateTransport', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .create(
-          {
-            description: args.description,
-            transportType: args.transport_type || 'workbench',
-            targetSystem: args.target_system,
-            owner: args.owner,
-          },
-          { analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'request.create', (headers) =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .create(
+            {
+              description: args.description,
+              transportType: args.transport_type || 'workbench',
+              targetSystem: args.target_system,
+              owner,
+            },
+            { headers, analyse: analyseException },
+          ),
+      ),
     project(detail, terseCreatedTransport),
   );
 }

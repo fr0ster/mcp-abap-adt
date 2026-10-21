@@ -1,6 +1,12 @@
-import { RfcTransport } from '@mcp-abap-adt/connection';
+import { createConnection } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../lib/credentialSources';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 /**
  * Whether the RFC wire logs what it carries, and who decides.
@@ -17,10 +23,15 @@ import { credentialFromSapConfig } from '../../lib/credentialSources';
  * by whoever is sitting in front of a misbehaving system, not by code, and an
  * argument would have to be threaded through every call site for something
  * nobody sets in production.
+ *
+ * The server builds the connection with connection's `createConnection`
+ * (connection 16), which constructs the `RfcTransport` from the spec's
+ * `wireLogger` and `rfc` options: those are what is read here.
  */
 jest.mock('@mcp-abap-adt/connection', () => ({
   ...jest.requireActual('@mcp-abap-adt/connection'),
-  RfcTransport: jest.fn(),
+  // A connection object is all the factory keeps of what this returns.
+  createConnection: jest.fn(() => ({})),
 }));
 
 const rfcConfig = {
@@ -37,13 +48,15 @@ const rfcConfig = {
 /** The destination's credential: the connector's second argument. */
 const credential = credentialFromSapConfig(rfcConfig as never);
 
-/** The third argument `RfcTransport` was constructed with. */
-const optionsFromLastCall = () =>
-  (RfcTransport as unknown as jest.Mock).mock.calls.at(-1)?.[2];
+/** The last spec `createConnection` was given. */
+const lastSpec = () =>
+  (createConnection as unknown as jest.Mock).mock.calls.at(-1)?.[0];
 
-/** The second — the logger, without which the option writes nothing. */
-const loggerFromLastCall = () =>
-  (RfcTransport as unknown as jest.Mock).mock.calls.at(-1)?.[1];
+/** The RFC wire's options (`RfcTransport`'s third argument). */
+const optionsFromLastCall = () => lastSpec()?.rfc;
+
+/** The wire's logger, without which the option writes nothing. */
+const loggerFromLastCall = () => lastSpec()?.wireLogger;
 
 describe('the RFC wire logs only when asked', () => {
   const saved = {
@@ -59,7 +72,7 @@ describe('the RFC wire logs only when asked', () => {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
-    (RfcTransport as unknown as jest.Mock).mockClear();
+    (createConnection as unknown as jest.Mock).mockClear();
   });
 
   const connect = () =>

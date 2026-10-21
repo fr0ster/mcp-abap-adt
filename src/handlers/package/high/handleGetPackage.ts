@@ -1,22 +1,20 @@
-import { packageDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   packageDetails,
   packageSummary,
 } from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.',
+    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -53,30 +51,28 @@ export async function handleGetPackage(
 
   const packageName = package_name.toUpperCase();
   const detail = detailOf(args);
-  const obj = createAdtClient(connection, logger).getPackage(
-    resultsFor(packageDocuments),
-  );
+  const client = createAdtClient(connection, logger);
 
   // A package is a container: it has no source of its own —
   // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
-  // unlike its siblings there is no `.read()` to call at all (same
-  // defect/fix as `ReadPackage`). Unlike Domain, DataElement and
+  // unlike its siblings there is no `.read()` to call at all. Unlike Domain, DataElement and
   // FunctionGroup, `AdtPackage` actually honours `version` — it forwards
-  // `options.version` into the query string — so it is passed through here,
-  // the same fix `ReadPackage` carries (task 11 fix round 1).
+  // `options.version` into the query string — so it is passed through here
+  // (task 11 fix round 1).
   return answer(
     { tool: 'GetPackage', detail },
-    () =>
-      obj.readMetadata({ packageName }, { version, analyse: analyseException }),
+    () => readPackageMetadata(client, { packageName }, version),
     (metadata: AdtReading<string>) => ({
       success: true,
       package_name: packageName,
       version,
-      ...(detail === 'raw'
-        ? { package_data: metadata.raw }
-        : detail === 'full'
-          ? { package: packageDetails(metadata.raw) }
-          : { package: packageSummary(metadata.raw) }),
+      part: 'metadata',
+      metadata:
+        detail === 'raw'
+          ? metadata.raw
+          : detail === 'full'
+            ? packageDetails(metadata.raw)
+            : packageSummary(metadata.raw),
     }),
   );
 }

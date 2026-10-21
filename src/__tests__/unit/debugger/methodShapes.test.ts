@@ -12,6 +12,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
+import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { readDebuggeeEnd } from '../../../lib/debugger/readings';
 
 /** Replays one recorded exchange; a status of 400 or more is thrown the way the transport throws it. */
@@ -69,12 +70,18 @@ const DOCUMENT_MEMBERS: Array<
   [
     'getVariables',
     'debugger-run-to-line--07-variables-at-write',
-    (d) => d.getVariables(['LV_COUNTER']),
+    (d) =>
+      d.getVariables(['LV_COUNTER'], {
+        headers: DEFAULT_ADT_HEADERS['debugger.getVariables'],
+      }),
   ],
   [
     'getChildVariables',
     'debugger-conversation--07-children-root',
-    (d) => d.getChildVariables(['@ROOT']),
+    (d) =>
+      d.getChildVariables(['@ROOT'], {
+        headers: DEFAULT_ADT_HEADERS['debugger.getChildVariables'],
+      }),
   ],
   [
     'stepToLine',
@@ -84,7 +91,10 @@ const DOCUMENT_MEMBERS: Array<
   [
     'setBreakpoints',
     'debugger-conversation--01-breakpoints-set',
-    (d) => d.setBreakpoints(IDENTITY, []),
+    (d) =>
+      d.setBreakpoints(IDENTITY, [], {
+        headers: DEFAULT_ADT_HEADERS['debugger.setBreakpoints'],
+      }),
   ],
 ];
 

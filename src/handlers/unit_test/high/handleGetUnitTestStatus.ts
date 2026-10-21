@@ -10,7 +10,7 @@ import { testRunner } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Retrieve ABAP Unit test run status for a run_id.',
+  description: '[read-only] Retrieve ABAP Unit test run status for a run_id.',
   inputSchema: {
     type: 'object',
     properties: {

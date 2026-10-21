@@ -83,6 +83,8 @@ export async function handleDeleteServiceBinding(
     { tool: 'DeleteServiceBinding', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'serviceBinding',
         createAdtClient(connection, logger).getServiceBinding(
           resultsFor(serviceDocuments),
         ),

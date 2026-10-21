@@ -28,6 +28,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -36,6 +37,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -124,16 +126,20 @@ export async function handleCreateServiceDefinition(
         resultsFor(serviceDefinitionDocuments),
       );
 
-      const created = await obj.create(
-        {
-          serviceDefinitionName,
-          description: args.description || serviceDefinitionName,
-          packageName: args.package_name.toUpperCase(),
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      const created = await atStep('create', () =>
+        withAdtHeaders(context, 'serviceDefinition.create', (headers) =>
+          obj.create(
+            {
+              serviceDefinitionName,
+              description: args.description || serviceDefinitionName,
+              packageName: args.package_name.toUpperCase(),
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+        ),
+      )();
 
       if (!created.ok) {
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
@@ -146,18 +152,22 @@ export async function handleCreateServiceDefinition(
       if (args.source_code) {
         written = await withLock(
           () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
-          (lockHandle) =>
-            obj.update(
-              {
-                serviceDefinitionName,
-                transportRequest: args.transport_request,
-              },
-              {
-                source: args.source_code,
-                lockHandle,
-                analyse: analyseException,
-              },
+          atStep('update', (lockHandle) =>
+            withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
+              obj.update(
+                {
+                  serviceDefinitionName,
+                  transportRequest: args.transport_request,
+                },
+                {
+                  headers,
+                  source: args.source_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
             ),
+          ),
           (lockHandle) =>
             obj.unlock({ serviceDefinitionName }, lockHandle, {
               analyse: analyseException,
@@ -169,8 +179,16 @@ export async function handleCreateServiceDefinition(
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ serviceDefinitionName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'serviceDefinition.activate', (headers) =>
+            obj.activate(
+              { serviceDefinitionName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

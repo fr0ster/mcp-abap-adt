@@ -4,33 +4,32 @@
  * SAP stores that attribute on them as the creator, not the responsible
  * (adt-clients 26.0.1), so the vehicle here is a message class.
  *
- * Responsible: its own variable (the tool argument, `x-sap-responsible`,
- * `SAP_RESPONSIBLE` of the destination then of the process), else the login
- * (the destination's `SAP_USERNAME`, `x-sap-login`, the process
- * `SAP_USERNAME`; on a cloud system `systeminformation`'s `userName`). A
- * create that finds none is refused naming `SAP_RESPONSIBLE`, and nothing is
- * sent — so no empty `adtcore:responsible=""` ever leaves the server.
+ * A handler run outside the server, with no rules (lib applies none): the
+ * responsible is what is stated — the tool argument, `x-sap-responsible`,
+ * `SAP_RESPONSIBLE` — and no login stands in for it (that is a host's rule:
+ * `@mcp-abap-adt/responsible-rules`, whose suite covers it). A create that
+ * finds none is refused naming `SAP_RESPONSIBLE`, and nothing is sent — so
+ * no empty `adtcore:responsible=""` ever leaves the server.
  *
- * Master system: its own variable, else the cloud system's `systemID`;
- * otherwise it is left out of the request — never refused.
+ * Master system: its own variable; otherwise it is left out of the request
+ * — never refused.
  */
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  getSystemInformation: jest.fn(),
+jest.mock('../../lib/systemInformation', () => ({
+  ...jest.requireActual('../../lib/systemInformation'),
+  readSystemInformation: jest.fn(),
 }));
 
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
-import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
-import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationLow } from '../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
-import { handleCreateClass as handleCreateClassLow } from '../../handlers/class/low/handleCreateClass';
-import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
+import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
+import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import {
   TOOL_DEFINITION as CreateMessageClassTool,
   handleCreateMessageClass,
 } from '../../handlers/message_class/high/handleCreateMessageClass';
 import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
+import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { SYSTEM_LOOKUP_FAILED_WORDS } from '../../lib/auth/serverRefusal';
 import { createAdtClient } from '../../lib/clients';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -40,13 +39,11 @@ import {
   setSystemContext,
   systemContextFromConfiguration,
 } from '../../lib/systemContext';
-import {
-  MISSING_RESPONSIBLE,
-  RESPONSIBLE_LOOKUP_FAILED,
-} from '../../lib/systemContextGuard';
+import { MISSING_RESPONSIBLE } from '../../lib/systemContextGuard';
+import { readSystemInformation } from '../../lib/systemInformation';
 import { recordingConnection } from '../helpers/recordingConnection';
 
-const lookup = getSystemInformation as jest.Mock;
+const lookup = readSystemInformation as jest.Mock;
 
 const KEYS = [
   'SAP_MASTER_SYSTEM',
@@ -103,7 +100,7 @@ const createMessageClass = async () => {
 /** A class create, which carries neither. */
 const createClass = async () => {
   const connection = recordingConnection();
-  const result = await handleCreateClassLow(
+  const result = await handleCreateClass(
     { connection, logger: undefined } as never,
     CLASS_ARGS,
   );
@@ -111,18 +108,48 @@ const createClass = async () => {
 };
 
 describe('on-premise', () => {
-  it('basic: the login is the responsible, no master system is sent, nothing is refused', async () => {
-    process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+  it('basic: the stated responsible, no master system is sent, nothing is refused', async () => {
+    process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();
     const { connection, result } = await createMessageClass();
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(createBody(connection)).toContain(
-      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
     );
     expect(createBody(connection)).not.toContain('adtcore:masterSystem');
   });
 
-  it('SAP_RESPONSIBLE beats the login', async () => {
+  it('no rules: the process SAP_USERNAME is no responsible — refused, nothing sent', async () => {
+    process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+    systemContextFromConfiguration();
+    const { connection, result } = await createMessageClass();
+    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
+    expect(connection.requests).toEqual([]);
+  });
+
+  it('no rules: the stated login alone is the responsible', async () => {
+    process.env.SAP_USERNAME = 'PROCESS_PLACEHOLDER';
+    const { connection, result } = await runWithRequestContext(
+      { login: 'LOGIN_PLACEHOLDER' },
+      createMessageClass,
+    );
+    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+    );
+  });
+
+  it('no rules: the stated responsible beside a stated login', async () => {
+    const { connection } = await runWithRequestContext(
+      { login: 'LOGIN_PLACEHOLDER', responsible: 'RESPONSIBLE_PLACEHOLDER' },
+      createMessageClass,
+    );
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+    );
+  });
+
+  it('SAP_RESPONSIBLE is taken, the login beside it ignored', async () => {
     process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
     process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();
@@ -156,10 +183,6 @@ describe('on-premise', () => {
 
   it('SNC / a handed-over token with nothing stated: refused naming SAP_RESPONSIBLE, nothing sent', async () => {
     const { connection, result } = await createMessageClass();
-    // On-premise the login is SAP_USERNAME, or x-sap-login with x-sap-url;
-    // on ABAP Cloud only the system's user.
-    expect(textOf(result)).toContain('x-sap-login with x-sap-url');
-    expect(textOf(result)).not.toContain(RESPONSIBLE_LOOKUP_FAILED);
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
     expect(textOf(result)).toContain('SAP_RESPONSIBLE');
@@ -193,35 +216,44 @@ describe('on-premise', () => {
     [
       'service definition',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getServiceDefinition().create({
-          serviceDefinitionName: 'ZSD_PLACEHOLDER',
-          packageName: 'ZPACKAGE_PLACEHOLDER',
-          description: 'placeholder',
-        }),
+        c.getServiceDefinition().create(
+          {
+            serviceDefinitionName: 'ZSD_PLACEHOLDER',
+            packageName: 'ZPACKAGE_PLACEHOLDER',
+            description: 'placeholder',
+          },
+          { headers: DEFAULT_ADT_HEADERS['serviceDefinition.create'] },
+        ),
     ],
     [
       'transformation',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getTransformation().create({
-          transformationName: 'ZXSLT_PLACEHOLDER',
-          transformationType: 'SimpleTransformation',
-          packageName: 'ZPACKAGE_PLACEHOLDER',
-          description: 'placeholder',
-        }),
+        c.getTransformation().create(
+          {
+            transformationName: 'ZXSLT_PLACEHOLDER',
+            transformationType: 'SimpleTransformation',
+            packageName: 'ZPACKAGE_PLACEHOLDER',
+            description: 'placeholder',
+          },
+          { headers: DEFAULT_ADT_HEADERS['transformation.create'] },
+        ),
     ],
     [
       'access control',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getAccessControl().create({
-          accessControlName: 'ZDCL_PLACEHOLDER',
-          packageName: 'ZPACKAGE_PLACEHOLDER',
-          description: 'placeholder',
-        }),
+        c.getAccessControl().create(
+          {
+            accessControlName: 'ZDCL_PLACEHOLDER',
+            packageName: 'ZPACKAGE_PLACEHOLDER',
+            description: 'placeholder',
+          },
+          { headers: DEFAULT_ADT_HEADERS['accessControl.create'] },
+        ),
     ],
   ] as const;
 
   it.each(emptyAttributeBuilders)(
-    'a %s create with nothing stated is refused, no responsible="" sent; with a login it carries the login',
+    'a %s create with nothing stated is refused, no responsible="" sent; with a responsible stated it carries it',
     async (_kind, create) => {
       const refusedConnection = recordingConnection();
       const refused = await create(createAdtClient(refusedConnection));
@@ -231,12 +263,12 @@ describe('on-premise', () => {
       ).toBe(MISSING_RESPONSIBLE);
       expect(refusedConnection.requests).toEqual([]);
 
-      process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+      process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
       systemContextFromConfiguration();
       const sentConnection = recordingConnection();
       await create(createAdtClient(sentConnection));
       expect(createBody(sentConnection)).toContain(
-        'adtcore:responsible="LOGIN_PLACEHOLDER"',
+        'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
       );
     },
   );
@@ -247,15 +279,12 @@ describe('on-premise', () => {
     description: 'placeholder',
     package_name: 'ZPACKAGE_PLACEHOLDER',
   };
-  const bimpTools = [
-    ['low', handleCreateBehaviorImplementationLow],
-    ['high', handleCreateBehaviorImplementationHigh],
-  ] as const;
+  const bimpTools = [['high', handleCreateBehaviorImplementationHigh]] as const;
 
   it.each(bimpTools)(
     'CreateBehaviorImplementation (%s), basic: no responsible attribute, no master system, not refused',
     async (_tier, handler) => {
-      process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+      process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
       systemContextFromConfiguration();
       const connection = recordingConnection();
       const result = await handler(
@@ -359,171 +388,11 @@ describe('on-premise', () => {
 
   it('a read-only tool is not refused', async () => {
     const connection = recordingConnection();
-    const result = await handleReadClass(
+    const result = await handleGetClass(
       { connection, logger: undefined } as never,
       { class_name: 'ZCL_PLACEHOLDER' },
     );
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(connection.requests.length).toBeGreaterThan(0);
-  });
-});
-
-describe('cloud', () => {
-  const registry = new CompositeHandlersRegistry([
-    {
-      getName: () => 'create',
-      registerHandlers: () => {},
-      getHandlers: (): HandlerEntry[] => [
-        {
-          toolDefinition: CreateMessageClassTool as never,
-          handler: handleCreateMessageClass as never,
-        },
-      ],
-    },
-  ]);
-  const toolsOf = (server: EmbeddableMcpServer) =>
-    (
-      server as unknown as {
-        _registeredTools: Record<
-          string,
-          { handler: (a: unknown) => Promise<unknown> }
-        >;
-      }
-    )._registeredTools;
-
-  it('nothing stated: both from systeminformation, and the create carries them', async () => {
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(lookup).toHaveBeenCalledTimes(1);
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
-    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
-  });
-
-  it('the process SAP_USERNAME is not a cloud login: systeminformation is the responsible', async () => {
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    systemContextFromConfiguration();
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(lookup).toHaveBeenCalledTimes(1);
-    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
-  });
-
-  it('a scope login is not a cloud login either; a stated SAP_RESPONSIBLE still wins on cloud', async () => {
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    await runWithRequestContext({ login: 'SCOPE_LOGIN' }, () =>
-      toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
-    );
-    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
-
-    process.env.SAP_RESPONSIBLE = 'STATED_USER';
-    systemContextFromConfiguration();
-    const stated = recordingConnection();
-    const statedServer = new EmbeddableMcpServer({
-      connection: stated as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    await toolsOf(statedServer).CreateMessageClass.handler(MSAG_ARGS);
-    expect(createBody(stated)).toContain('adtcore:responsible="STATED_USER"');
-  });
-
-  it('a cloud system that answers no user: the process login does not stand in, the create is refused', async () => {
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    systemContextFromConfiguration();
-    lookup.mockResolvedValue(null);
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-    expect(connection.requests).toEqual([]);
-  });
-
-  it.each([
-    ['cloud', true],
-    ['onprem', false],
-  ] as const)(
-    'a host scope carrying both keys as undefined (%s): cloud asks the system, on-premise is refused',
-    async (systemType, filled) => {
-      lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
-      const connection = recordingConnection();
-      const server = new EmbeddableMcpServer({
-        connection: connection as never,
-        handlersRegistry: registry,
-        systemType,
-      });
-      const result = await runWithRequestContext(
-        { responsible: undefined, masterSystem: undefined },
-        () => toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
-      );
-      if (filled) {
-        expect(lookup).toHaveBeenCalledTimes(1);
-        expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
-        expect(createBody(connection)).toContain(
-          'adtcore:responsible="CB_USER"',
-        );
-      } else {
-        expect(lookup).not.toHaveBeenCalled();
-        expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-        expect(connection.requests).toEqual([]);
-      }
-    },
-  );
-
-  it('a lookup that fails: the create is refused as an unreachable system, not as SAP_RESPONSIBLE missing; nothing sent', async () => {
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    systemContextFromConfiguration();
-    lookup.mockRejectedValue(new Error('placeholder failure'));
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain(RESPONSIBLE_LOOKUP_FAILED);
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(textOf(result)).not.toContain('placeholder failure');
-    expect(textOf(result)).not.toContain('SAP_RESPONSIBLE');
-    expect(textOf(result)).not.toContain('x-sap-responsible');
-    expect(JSON.parse(textOf(result))).toMatchObject({
-      error: 'system_context_missing',
-    });
-    expect(connection.requests).toEqual([]);
-  });
-
-  it('a system that answers nothing leaves the create refused, nothing sent', async () => {
-    lookup.mockResolvedValue(null);
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-    expect(connection.requests).toEqual([]);
   });
 });

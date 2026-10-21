@@ -38,6 +38,7 @@ import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -45,6 +46,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
 
@@ -179,43 +181,53 @@ export async function handleCreateServiceBinding(
         resultsFor(serviceDocuments),
       );
 
-      const created = await obj.create(
-        {
-          bindingName: serviceBindingName,
-          packageName,
-          description: (args.description || serviceBindingName).trim(),
-          serviceDefinitionName,
-          serviceName,
-          serviceVersion,
-          bindingVariant,
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      const created = await atStep('create', () =>
+        withAdtHeaders(context, 'serviceBinding.create', (headers) =>
+          obj.create(
+            {
+              bindingName: serviceBindingName,
+              packageName,
+              description: (args.description || serviceBindingName).trim(),
+              serviceDefinitionName,
+              serviceName,
+              serviceVersion,
+              bindingVariant,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { headers, analyse: analyseException },
+          ),
+        ),
+      )();
 
       if (!created.ok || !shouldActivate) {
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      const activated = await obj.activate(
-        { bindingName: serviceBindingName },
-        { analyse: analyseActivation },
-      );
+      const activated = await atStep('activate', () =>
+        withAdtHeaders(context, 'serviceBinding.activate', (headers) =>
+          obj.activate(
+            { bindingName: serviceBindingName },
+            { headers, analyse: analyseActivation },
+          ),
+        ),
+      )();
       if (!activated.ok) {
         return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      const group = await obj.getServiceGroup(
-        {
-          objectname: serviceBindingName,
-          serviceType,
-          servicename: serviceName,
-          serviceversion: serviceVersion,
-          srvdname: serviceDefinitionName,
-        },
-        { analyse: analyseException },
-      );
+      const group = await atStep('read service group', () =>
+        obj.getServiceGroup(
+          {
+            objectname: serviceBindingName,
+            serviceType,
+            servicename: serviceName,
+            serviceversion: serviceVersion,
+            srvdname: serviceDefinitionName,
+          },
+          { analyse: analyseException },
+        ),
+      )();
       if (!group.ok) {
         return group as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }

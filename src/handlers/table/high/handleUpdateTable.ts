@@ -26,6 +26,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -35,6 +36,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -102,23 +104,32 @@ export async function handleUpdateTable(
       const written = await withLock(
         () => obj.lock({ tableName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const update = () =>
-            obj.update(
-              { tableName, transportRequest: args.transport_request },
-              {
-                source: args.ddl_code,
-                lockHandle,
-                analyse: analyseException,
-              },
-            );
+          const update = atStep('update', () =>
+            withAdtHeaders(context, 'table.update', (headers) =>
+              obj.update(
+                { tableName, transportRequest: args.transport_request },
+                {
+                  headers,
+                  source: args.ddl_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            ),
+          );
           // A conditional phase of the sequence, not a hand-rolled
           // short-circuit: see UpdateClass for the reasoning.
           return shouldActivate
             ? sequence(
-                () =>
-                  obj.check({ tableName, source: args.ddl_code }, 'inactive', {
-                    analyse: analyseException,
-                  }),
+                atStep('check', () =>
+                  withAdtHeaders(context, 'table.check', (headers) =>
+                    obj.check(
+                      { tableName, source: args.ddl_code },
+                      'inactive',
+                      { headers, analyse: analyseException },
+                    ),
+                  ),
+                ),
                 update,
               )
             : update();
@@ -131,8 +142,16 @@ export async function handleUpdateTable(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ tableName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          withAdtHeaders(context, 'table.activate', (headers) =>
+            obj.activate(
+              { tableName },
+              { headers, analyse: analyseActivation },
+            ),
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

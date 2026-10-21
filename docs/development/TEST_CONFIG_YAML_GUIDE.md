@@ -122,17 +122,6 @@ Before running tests, verify:
 
 ## Common Parameter Patterns
 
-### Low-Level Handler Tests
-```yaml
-params:
-  name: "OBJECT_NAME"
-  description: "Description"
-  package_name: "PACKAGE_NAME"
-  transport_request: "TRANSPORT"  # Optional for local packages
-  source_code: |
-    # ... source code ...
-```
-
 ### High-Level Handler Tests
 ```yaml
 params:

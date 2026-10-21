@@ -3,13 +3,16 @@ import {
   DebugSession,
   DebugStateError,
 } from '../../../lib/debugger/DebugSession';
+import { return_error } from '../../../lib/utils';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,
   CONFLICT_409,
+  deferred,
   fakeWorld,
   IDS,
   INVALID_USER,
+  LISTEN_CATCH,
   LISTEN_NOTHING,
   rowsXml,
   START,
@@ -29,6 +32,8 @@ const ROWS = () =>
       { kind: 'exception', id: 'E1', clientId: 'bp2', exceptionClass: 'CX_A' },
     ]),
   );
+const DEBUGGEE_KEPT =
+  "not sent: the listener's stop failed and a breakpoint may still be set, where the debuggee would stop again. It stays held for the next stop.";
 const NOT_COMPLETE =
   'the cleanup of this debug session is not complete: DebugStop it, then start again';
 
@@ -60,7 +65,7 @@ describe('the cleanup', () => {
     world.override.deleteBreakpoint = async () =>
       refusedResponse('Breakpoint is locked');
     await expect(session.stop()).rejects.toThrow(
-      /listener: listener busy; breakpoint L10: Breakpoint is locked; breakpoint E1: Breakpoint is locked/,
+      /stop listener: listener busy; delete breakpoint L10: Breakpoint is locked; delete breakpoint E1: Breakpoint is locked/,
     );
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
@@ -87,11 +92,163 @@ describe('the cleanup', () => {
     await expect(session.stop()).rejects.toThrow(DebugCleanupError);
     expect(session.listBreakpoints().map((r) => r.id)).toEqual(['E1']);
     expect(session.requestedBreakpoints()).toEqual([EXC]);
+    // Each in the shape of every other failure: the method's error as it
+    // is, with its step — not one text.
     expect(session.failures()).toEqual([
-      'listener: listener busy',
-      'breakpoint E1: Breakpoint is locked',
+      { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
+      {
+        message: 'Breakpoint is locked',
+        origin: 'refusal',
+        step: 'delete breakpoint E1',
+      },
     ]);
     expect(session.holdsState()).toBe(true);
+  });
+
+  // A debuggee let go while a breakpoint may still be set can stop there
+  // again — inside a loop, at once. So when the listener's stop failed and a
+  // breakpoint's delete by id failed too, the held debuggee is not released:
+  // it stays held for the next stop, which releases it once the breakpoints
+  // are gone.
+  it('a failed stopListener and a failed delete by id: the held debuggee is not released, it stays for the next stop', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async (_i: unknown, id: string) =>
+      id === 'E1'
+        ? refusedResponse('Breakpoint is locked')
+        : okResponse(undefined);
+    world.calls.length = 0;
+    await expect(session.stop()).rejects.toThrow(
+      /release the debuggee: not sent: the listener's stop failed and a breakpoint may still be set/,
+    );
+    expect(world.calls.filter((c) => c.startsWith('step:'))).toEqual([]);
+    expect(session.failures()).toEqual([
+      { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
+      {
+        message: 'Breakpoint is locked',
+        origin: 'refusal',
+        step: 'delete breakpoint E1',
+      },
+      {
+        message: DEBUGGEE_KEPT,
+        step: 'release the debuggee',
+      },
+    ]);
+    expect(session.holdsState()).toBe(true);
+    // The next stop: the listener's stop succeeds first, then the release.
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+    world.calls.length = 0;
+    await expect(session.stop()).resolves.toEqual([]);
+    const release = world.calls.indexOf('step:stepContinue:analysed');
+    expect(release).toBeGreaterThan(world.calls.indexOf('stopListener'));
+    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  // The run's request is the one held at the breakpoint: its connection's
+  // logoff would end the session of the debuggee kept for the next stop. So
+  // the run and its connection stay with the held debuggee, and the stop that
+  // releases it closes the run's connection after the release.
+  it('a debuggee kept held keeps its run and the run connection: the stop that releases it closes it, after the release', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world, {
+      run: { kind: 'class', name: 'CLASS_X' },
+    });
+    await until(() => world.runs.length === 1);
+    const runConnection = world.opened[world.sessionKinds.indexOf('stateless')];
+    expect(runConnection).toBeDefined();
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async (_i: unknown, id: string) =>
+      id === 'E1'
+        ? refusedResponse('Breakpoint is locked')
+        : okResponse(undefined);
+    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+    expect(world.closed).not.toContain(runConnection);
+    expect(session.holdsState()).toBe(true);
+    // The next stop releases the debuggee, then closes the run's connection.
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+    const close = world.ports.closeConnection;
+    world.ports.closeConnection = async (c) => {
+      if (c === runConnection) world.calls.push('close:run');
+      return close(c);
+    };
+    world.calls.length = 0;
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.indexOf('close:run')).toBeGreaterThan(
+      world.calls.indexOf('step:stepContinue:analysed'),
+    );
+    expect(world.calls.indexOf('step:stepContinue:analysed')).toBeGreaterThan(
+      world.calls.indexOf('stopListener'),
+    );
+    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
+    expect(world.closed).toContain(runConnection);
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a release an earlier stop owed is not sent either while a breakpoint may still be set', async () => {
+    const world = fakeWorld();
+    const attach = deferred<any>();
+    world.attachAnswers.push(() => attach.promise);
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.some((c) => c.startsWith('attach:')));
+    (session as any).generation++; // the listener moved on while the attach ran
+    world.override.step = async () => refusedResponse('work process busy');
+    attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(0);
+    delete world.override.step;
+    // Owed now; the stop that follows fails its listener stop and a delete.
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async (_i: unknown, id: string) =>
+      id === 'E1'
+        ? refusedResponse('Breakpoint is locked')
+        : okResponse(undefined);
+    world.calls.length = 0;
+    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+    expect(world.calls.filter((c) => c.startsWith('step:'))).toEqual([]);
+    expect(session.failures()).toContainEqual({
+      message: DEBUGGEE_KEPT,
+      step: 'release the debuggee',
+    });
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+    world.calls.length = 0;
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.indexOf('step:stepContinue:analysed')).toBeGreaterThan(
+      world.calls.indexOf('stopListener'),
+    );
+    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
+    expect(session.holdsState()).toBe(false);
+  });
+
+  it('a failed stopListener whose deletes by id all succeeded: the held debuggee is released, after the deletes', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.calls.length = 0;
+    await expect(session.stop()).rejects.toThrow(
+      /stop listener: listener busy/,
+    );
+    const release = world.calls.indexOf('step:stepContinue:analysed');
+    expect(release).toBeGreaterThan(
+      world.calls.lastIndexOf('deleteBreakpoint:E1'),
+    );
+    expect(session.listBreakpoints()).toEqual([]);
+    expect(session.failures()).toEqual([
+      { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
+    ]);
   });
 
   it('a start that failed after a change runs the same cleanup: stopListener, no deletion by id', async () => {
@@ -312,6 +469,50 @@ describe('the cleanup', () => {
     expect(session.holdsState()).toBe(false);
   });
 
+  it('a start that failed with no SAP answer behind it answers its own words, with what it could not undo as entries', async () => {
+    const world = fakeWorld();
+    world.breakpointAnswers.push(ROWS);
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async () =>
+      refusedResponse('Breakpoint is locked');
+    const session = new DebugSession(world.ports, IDS).bind('origin');
+    const started = session
+      .start('refuse', { breakpoints: [A] })
+      .catch((e: unknown) => e);
+    await until(() => world.polls.length === 1);
+    world.polls[0].reject(new Error('socket hang up'));
+    const error = await started;
+    const answered = JSON.parse(
+      (return_error(error) as { content: Array<{ text: string }> }).content[0]
+        .text,
+    );
+    expect(answered).toEqual({
+      message: 'socket hang up',
+      cleanup: {
+        message: 'not undone',
+        failures: [
+          {
+            message: 'listener busy',
+            origin: 'refusal',
+            step: 'stop listener',
+          },
+          {
+            message: 'Breakpoint is locked',
+            origin: 'refusal',
+            step: 'delete breakpoint L10',
+          },
+          {
+            message: 'Breakpoint is locked',
+            origin: 'refusal',
+            step: 'delete breakpoint E1',
+          },
+        ],
+      },
+    });
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+  });
+
   it("another user without authorisation: SAP's 403 reaches the caller as it said it, and the state stays held for DebugStop", async () => {
     const world = fakeWorld();
     const NO_AUTH = 'No authorization to debug the requests of SAPUSER02';
@@ -322,8 +523,21 @@ describe('the cleanup', () => {
       .start('refuse', { ...START, requestUser: 'SAPUSER02', breakpoints: [A] })
       .catch((e: unknown) => e);
     expect((error as Error).message).toBe(
-      `${NO_AUTH}; not undone: listener: ${NO_AUTH}`,
+      `${NO_AUTH}; not undone: stop listener: ${NO_AUTH}`,
     );
+    // The consumer's answer: the arming's refusal as it is, with what could
+    // not be undone beside it — each an entry with its step.
+    const answered = JSON.parse(
+      (return_error(error) as { content: Array<{ text: string }> }).content[0]
+        .text,
+    );
+    expect(answered.message).toBe(NO_AUTH);
+    expect(answered.cleanup).toEqual({
+      message: 'not undone',
+      failures: [
+        { message: NO_AUTH, origin: 'refusal', step: 'stop listener' },
+      ],
+    });
     expect(session.holdsState()).toBe(true);
     expect(session.currentIdentity()).toMatchObject({
       requestUser: 'SAPUSER02',

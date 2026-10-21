@@ -76,6 +76,8 @@ export async function handleDeleteFunctionInclude(
     { tool: 'DeleteFunctionInclude', detail },
     () =>
       deleteIfDeletable(
+        context,
+        'functionInclude',
         createAdtClient(connection, logger).getFunctionInclude(
           resultsFor(functionIncludeDocuments),
         ),

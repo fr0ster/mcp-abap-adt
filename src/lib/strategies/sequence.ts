@@ -160,3 +160,50 @@ export async function pair<A, B>(
   // unless it is carried over — the same held lock `sequence` carries.
   return attachCleanup(a, attachCleanup(b, succeededWith(both)));
 }
+
+/**
+ * Two independent calls whose BOTH answers are the result, sent together.
+ *
+ * `pair` waits for the first answer before it sends the second request, even
+ * when the second needs nothing of it — a read of a source and its metadata.
+ * In batch mode no answer exists before `BatchEnd`, so such a read could not
+ * be recorded whole. `both` sends the two requests at once and then reads the
+ * answers in order, with `pair`'s answer exactly: the first failing answer,
+ * untouched (the first's before the second's), else both values with any
+ * held lock carried. It settles only once both requests have: when the first
+ * fails or rejects, it waits for the second to settle (its outcome ignored)
+ * and then answers the first's failure, or rethrows its rejection, as it
+ * came. A rejection of the second is never left unhandled.
+ *
+ * Only for calls the second of which takes nothing of the first's answer;
+ * a step built from an earlier answer stays a `pair` or a `sequence`.
+ */
+export async function both<A, B>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: () => Promise<IAdtResponse<B, IAdtError>>,
+): Promise<IAdtResponse<[A, B], IAdtError>> {
+  const answeringA = first();
+  const answeringB = second();
+  // Settled, whatever it answers: `both` never ends while its second request
+  // is still in flight — a tool call that ended with a request running would
+  // leave it outside the call's flow, where the next call could start beside it.
+  const settledB = answeringB.then(
+    () => undefined,
+    () => undefined,
+  );
+  let a: IAdtResponse<A, IAdtError>;
+  try {
+    a = await answeringA;
+  } catch (thrown) {
+    await settledB;
+    throw thrown;
+  }
+  if (!a.ok) {
+    await settledB;
+    return a as unknown as IAdtResponse<[A, B], IAdtError>;
+  }
+  const b = await answeringB;
+  if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
+  const both: [A, B] = [a.getResult().value, b.getResult().value];
+  return attachCleanup(a, attachCleanup(b, succeededWith(both)));
+}

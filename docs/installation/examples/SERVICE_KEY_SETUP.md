@@ -36,18 +36,25 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ### Step 2: Start the Server with the Destination
 
-The server serves one default destination, named with `--mcp`. Over stdio the client starts the server: go to Step 3.
+`mcp-abap-adt` (stdio) serves one destination, named with `--mcp`; the client starts the server (Step 3).
+Service keys, sessions and the browser login are served only over stdio: `mcp-abap-adt-http` and
+`mcp-abap-adt-sse` take each request's `x-sap-*` headers instead.
 
 ```bash
 # Installed (npm install -g @mcp-abap-adt/core; the compact server: mcp-abap-adt-compact)
-mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Or without installing
-npx -y @mcp-abap-adt/core --transport=http --port=3000 --mcp=TRIAL
+npx -y @mcp-abap-adt/core --mcp=TRIAL --system-type=cloud
 
 # With custom path for service keys and sessions
-mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL --auth-broker-path=/path/to/dir/
+mcp-abap-adt --mcp=TRIAL --system-type=cloud --auth-broker-path=/path/to/dir/
 ```
+
+**The system type is required** (19.0.0): `--system-type=cloud` for an ABAP Cloud system,
+`onprem` for an on-premise one (an XSUAA key may point at either), or `SAP_SYSTEM_TYPE` in the
+environment, or YAML `system-type`. A named destination's files are not read for it; without it
+the server does not start.
 
 **What `--mcp=TRIAL` does:**
 - The destination is read field by field from `sessions/TRIAL.env` (wins) and `service-keys/TRIAL.json`
@@ -68,38 +75,7 @@ A stdio client starts the server itself — no separate server, no URL:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--mcp=TRIAL"],
-      "disabled": false
-    }
-  }
-}
-```
-
-Over HTTP, with `--mcp=TRIAL` the client needs no headers:
-
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-service-key": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "disabled": false
-    }
-  }
-}
-```
-
-To choose the destination per request, start the server with `--allow-destination-header` and send `x-mcp-destination`:
-
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-service-key": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "headers": {
-        "x-mcp-destination": "TRIAL"
-      },
+      "args": ["--mcp=TRIAL", "--system-type=cloud"],
       "disabled": false
     }
   }
@@ -109,32 +85,35 @@ To choose the destination per request, start the server with `--allow-destinatio
 The destination name must **exactly** match the service key filename without `.json` (**case-sensitive**) and may use only letters, digits, `_`, `.` and `-`.
 
 **Examples:**
-- File: `sk.json` → Header: `"sk"` (lowercase)
-- File: `SK.json` → Header: `"SK"` (uppercase)
-- File: `TRIAL.json` → Header: `"TRIAL"`
+- File: `sk.json` → `--mcp=sk` (lowercase)
+- File: `SK.json` → `--mcp=SK` (uppercase)
+- File: `TRIAL.json` → `--mcp=TRIAL`
 
 ### Step 4: First-Time Authentication
 
-When you make the first request:
+The server connects at its start, before the client sees its tools:
 1. The server reads the destination
 2. The browser opens for the login; the server waits for the redirect on port `61001` (`--browser-auth-port` changes it)
 3. The token is stored: in memory, or in `~/.config/mcp-abap-adt/sessions/TRIAL.env` with `--unsafe`
-4. Subsequent requests use the stored token, and the server renews it
+4. Tool calls use the stored token, and the server renews it
+
+A failure at the start — the login refused, the system unreachable — ends the process (exit `1`,
+the words on stderr): start it again.
 
 ## Troubleshooting
 
-### Error: `Destination "TRIAL" lacks: <fields>`
+### Error: `Destination "TRIAL" cannot be used: <fields>`
 
 **Cause**: The destination states less than its authentication needs. The message names the fields and, where the server knows the remedy, one hint.
 
 **Solution**:
-- `grantType`: the `.env` is a `jwt` one without `SAP_GRANT_TYPE`. Add it, or regenerate with `mcp-auth generate-env --grant <grant>` (`@mcp-abap-adt/auth-broker-cli`)
+- `grantType`: the `.env` is a `jwt` one without `SAP_GRANT_TYPE`. Add it, or write the `.env` again with `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (`@mcp-abap-adt/auth-broker-cli`)
 - `XSUAA_MCP_URL`: an XSUAA key needs the system's URL in `sessions/TRIAL.env`
 - `SAP_URL`: state the system's URL
 
 ### Error: `Destination "TRIAL" uses <type> / <grant>, which this server does not support`
 
-**Cause**: The destination states an authentication outside the four the server supports (basic, SNC, `jwt` / `authorization_code`, `jwt` / `none`).
+**Cause**: The destination states an authentication outside the three `mcp-abap-adt` (stdio) supports (basic, SNC, `jwt` / `authorization_code`). A token you hold (`jwt` / `none`) is refused with the hint to send it in the `x-sap-jwt-token` header to `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or to create the session with `mcp-auth`.
 
 ### Error: the key is not found
 
@@ -161,21 +140,19 @@ Create multiple service key files:
 ~/.config/mcp-abap-adt/service-keys/TRIAL.json
 ```
 
-Either run one server per destination (`--mcp=DEV`, `--mcp=PROD`, each on its own `--port`), or run one server with `--allow-destination-header` and send the destination per request. A destination is built the first time a request asks for it and kept for the life of the process:
+Run one server per destination, each started by the client:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-dev": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "headers": { "x-mcp-destination": "DEV" },
+      "command": "mcp-abap-adt",
+      "args": ["--mcp=DEV", "--system-type=cloud"],
       "disabled": false
     },
     "mcp-abap-prod": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "headers": { "x-mcp-destination": "PROD" },
+      "command": "mcp-abap-adt",
+      "args": ["--mcp=PROD", "--system-type=cloud"],
       "disabled": false
     }
   }

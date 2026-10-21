@@ -1,8 +1,7 @@
 # Raw ADT wire corpus
 
 Real responses from a real SAP system, recorded byte for byte, so the result and
-error strategies (`docs/superpowers/specs/2026-09-08-result-error-strategies-design.md`)
-can be written against documents someone has actually seen. Writing a parser first
+error strategies can be written against documents someone has actually seen. Writing a parser first
 and meeting the document later is how the transport-tree parser broke in #168.
 
 **What this is: a catalogue of response variants.** One endpoint answers

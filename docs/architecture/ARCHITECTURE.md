@@ -105,20 +105,19 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 
 | Attribute | Value |
 |:---|:---|
-| **Responsibility** | Turns the connection headers of a request into settings and a credential, or names the destination the request asks for |
-| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `server/src/destinationRequest.ts` (`destinationFromHeader`) |
-| **Runtime role** | Used by the HTTP and SSE transport servers; stdio has no request headers |
+| **Responsibility** | Turns the connection headers of a request into a `ConnectionSource`: settings and a credential |
+| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `src/lib/httpTransport/headerSource.ts` (`headerSource`, `headerContext`, the two `400` sentences) — `@mcp-abap-adt/lib/http-transport` |
+| **Runtime role** | The only credential `@mcp-abap-adt/http` (per request) and `@mcp-abap-adt/sse` (per SSE connection, from its opening `GET`) take; stdio has no request headers |
 
-Per request, in this order:
+| Method | Headers |
+|:---|:---|
+| A token you hold | `x-sap-url` + `x-sap-jwt-token` |
+| Basic | `x-sap-url` + `x-sap-login` + `x-sap-password` |
 
-| Priority | Method | Headers |
-|:---|:---|:---|
-| 3 (highest) | A named destination, only with `--allow-destination-header` | `x-mcp-destination` (a plain name; anything else is refused with `400`, naming the header) |
-| 2 | A token you hold | `x-sap-url` + `x-sap-jwt-token` |
-| 1 | Basic | `x-sap-url` + `x-sap-login` + `x-sap-password` |
-| 0 | The default destination (`--mcp`, `--env`, `--env-path`) | none; with no default, `400` |
-
-A header connection gets a fixed credential (`TokenAuthProvider.fixed`, `BasicAuthProvider`); nothing renews it.
+A request without them is answered `400` (`ping` excepted); a request carrying `x-mcp-destination`
+is answered `400` too — destinations are core's, over stdio. A header connection gets a fixed
+credential (`TokenAuthProvider.fixed`, `BasicAuthProvider`); nothing renews it, and nothing is
+stored, shared or cached across requests.
 
 ---
 
@@ -162,14 +161,13 @@ The server calls `getProvider(destination)` and hands the provider to the connec
 | **Runtime role** | Built by the broker for a destination; the connector calls its four methods |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
-The server supports four authentications, each served by one handler (`src/lib/auth/handlers/`):
+core (stdio) supports three authentications, each served by one handler (`server/src/auth/handlers/`); `jwt` / `none` is refused — a token you hold is http's and sse's `x-sap-jwt-token` header (`TokenAuthProvider.fixed`):
 
 | Authentication | `SAP_AUTH_TYPE` / `SAP_GRANT_TYPE` | Provider |
 |:---|:---|:---|
 | Basic (HTTP or RFC) | `basic` | `BasicAuthProvider` |
 | SNC (RFC only, passwordless) | `snc` | `SncLogonProvider` |
 | JWT, browser login | `jwt` / `authorization_code` | `AuthorizationCodeProvider` |
-| JWT you hold | `jwt` / `none` | `TokenAuthProvider` |
 
 Adding an authentication means a handler there, a row in this table and a test; nothing else. The package ships other providers (client credentials, passcode, the OIDC and SAML ones); this server does not serve them, and a destination that states one is refused at startup.
 
@@ -186,11 +184,11 @@ Adding an authentication means a handler there, a row in this table and a test; 
 | **Runtime role** | Executes ADT requests over HTTP or RFC against a SAP system, presenting the `IAuthProvider` it is handed |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios` |
 
-**Construction** -- the server has one place that builds a connector (`src/lib/connectionFactory.ts`): the system kind and the wire follow from the settings (`SAP_SYSTEM_TYPE`, `connectionType`), and the credential is the one the caller hands in. Where a credential comes from is `src/lib/credentialSources.ts` (headers, an embedder's `SapConfig`) or the broker's `getProvider(destination)`; the factory never builds one from `settings.authType`.
+**Construction** -- the server has one place that builds a connector (`src/lib/connectionFactory.ts`): the system kind and the wire follow from the settings (`SAP_SYSTEM_TYPE` — required, never guessed: none, or a value other than `onprem` / `cloud` / `legacy`, is `system_type_required` before anything is sent —, `connectionType`), and the credential is the one the caller hands in. Where a credential comes from is `src/lib/credentialSources.ts` (headers, an embedder's `SapConfig`) or the broker's `getProvider(destination)`; the factory never builds one from `settings.authType`.
 
 **Key capabilities:**
 - CSRF token management (automatic fetch, cache, refresh on error)
-- Stateful/stateless session switching via `sap-contextid` headers
+- Stateful or stateless per request: while the connection's session type is stateful (adt-clients sets it around one `LOCK` or one `UNLOCK`), a request goes with `x-sap-adt-sessiontype: stateful` and the `sap-contextid` context cookie over HTTP, or in the stateful conversation over RFC; every other request goes stateless, without the context cookie
 - Cookie management for session persistence
 - A `401` the wire's own recovery cannot clear is put to the credential (`rejected`); if it answers Ok (a renewed token), the request gets one more attempt
 - The HTTPS server certificate verified by default (connection 11); `TLS_REJECT_UNAUTHORIZED=0` or `NODE_TLS_REJECT_UNAUTHORIZED=0` in the process environment opts out, `NODE_EXTRA_CA_CERTS` adds a CA
@@ -240,21 +238,164 @@ Each step accumulates results in `TState`, providing full audit trail of the ope
 | Attribute | Value |
 |:---|:---|
 | **Responsibility** | MCP protocol adapter -- translates MCP tool calls into ADT client operations |
-| **Runtime role** | Primary application entry point; composition root |
-| **Transport modes** | `stdio`, `streamable-http`, `sse` |
-| **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod` |
+| **Runtime role** | Primary application entry point; one composition root per binary |
+| **Packages** | `@mcp-abap-adt/core` (`server/`, `mcp-abap-adt`: stdio), `@mcp-abap-adt/http` (`http/`, `mcp-abap-adt-http`: Streamable HTTP), `@mcp-abap-adt/sse` (`sse/`, `mcp-abap-adt-sse`: HTTP+SSE), each on `@mcp-abap-adt/lib`, `@mcp-abap-adt/background-runs-memory` and `@mcp-abap-adt/responsible-rules`; the compact and `-ro` packages are one call each of their transport's `main` with another tool set (Composition Roots below) — twelve binaries in all |
+| **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod`; only core depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores` |
 
-#### Composition Root
+#### The three packages and their connection sources
 
-`src/server/launcher.ts` is the composition root where all dependencies are wired:
+`BaseMcpServer` (lib) holds one **connection source** per instance — the contract each package
+fills (`src/embeddable/ConnectionContext.ts`):
+
+```ts
+interface ConnectionSource {
+  resolve(signal: AbortSignal): Promise<{ settings: SapConfig; credential: IAuthProvider; systemContext? }>;
+}
+type Source =
+  | { kind: 'built'; source: ConnectionSource }        // core: a destination; http, sse: the headers
+  | { kind: 'injected'; connection: AbapConnection };  // embedded: the consumer's, used as given
+```
+
+| Package | Source | Connection |
+|:---|:---|:---|
+| core (stdio) | `destinationSource(destination, factory)`: `settingsFor`, `getProvider(destination, { signal })`, `systemContextFor` | kept for the instance's life: `getProvider` answers the same provider for the process (the user is fixed; the session is renewed and written back by that provider); replaced only when SAP already lost the session, built with that same provider |
+| http | `headerSource(req.headers)` per request, on a new instance or the pooled one its `state_handle` names | one per request |
+| sse | `headerSource` of the `GET` that opened the connection | one per SSE connection |
+| embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
+
+The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.ts`): the published
+lib, http and sse declare and reach no broker, stores or `interfaces-auth-broker`; http and sse
+never reach each other.
+
+#### The stateful window and the main flow
+
+**Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
+stateless.** Both requests are marked by adt-clients (since 31.1), not by the server: the
+`LOCK` alone and the `UNLOCK` alone, each inside `inStatefulSession` or a
+`try`/`finally` that sets the connection back to stateless whatever the request
+answered. The write under the lock goes outside the lock's context, as Eclipse sends
+it (the lock handle carries it). The server itself turns no tool's session stateful:
+its one stateful site is the debugger's own session (`src/lib/debugger/ports.ts`),
+and the listed long tools and background runs set their own fresh connections
+stateless. Batch mode only forwards: a recorded call's `LOCK` / `UNLOCK` asks the
+batch connection (adt-clients' `AdtBatchConnection`, through the per-call recorder,
+`src/lib/batch/recorder.ts`) to mark that request stateful, and at `BatchEnd`
+`execute()` sends the LOCK / UNLOCK runs as stateful envelopes on the instance's
+connection in force, reached through the late-bound target
+(`src/lib/batch/lateBound.ts`), restoring its session type afterwards. Every site is
+a row of `tools/stateful-sites.json` with the window it
+opens and where it returns to stateless — the recorder's and the late-bound
+target's forwards included; `src/__tests__/unit/sources/statefulSites.test.ts`
+holds the scan of the server's sources and adt-clients' installed `dist` equal to it.
+
+**One MCP session = one connector = one main flow.** The session type is the
+connection's (since connection 17.1): adt-clients switches it with `setSessionType` around
+the request, and the connection reads it when the request is built, after an
+`await`. Two calls at once on one connection would cross — a read sent while another
+call's `LOCK` is in flight goes stateful, an `UNLOCK` whose credential is still
+being asked goes stateless once another call's window closed (both seen against the
+stand-in). So the server does not trust the client: the calls of an instance that
+work on its connection run strictly one after another (`BaseMcpServer.enterMainFlow`,
+in the registered tool wrapper). The next waits until the previous settled, with no
+timeout. **A tool call cannot be cancelled**: it ends with its result or with the
+session — a client's cancel aborts nothing, a queued call keeps its place. When the
+client closes its connection (stdio's stdin, an SSE stream) and at the process
+shutdown, the running calls are interrupted, the queued ones never start, and every
+connection the instance owns is logged off at once (`closeInstance`, `logOffAtOnce`):
+nothing waits for a running tool or a request in flight — the logoff releases the locks,
+and a tool's later requests fail against the ended session. Over Streamable HTTP a
+dropped request closes nothing and ends no call: an admitted call — waiting for its
+connection, its system lookup or its turn, or running — runs to its end, and the pool ends its
+instance as before. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
+main-flow queue.
+Every send on the instance's connection is inside the order: the identity lookups
+(`systeminformation`, asked on every kind of system through the shipped resolver — its user
+wins over any configured login; no information on-premise: the responsible if stated, else the configured login, with neither
+`system_user_unknown`; on ABAP Cloud a `404` `cloud_without_systeminformation`, anything else
+`system_lookup_failed`; a `401` the credential failure as it came)
+of the background-run tools and the debugger's request user go through `onMainConnection` — directly from a call that
+already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
+else in turn, on the connection taken inside the flow (so a session the call ahead lost
+is already replaced); the send is handed its connection and captures none. A caller
+already known — the user SAP named for the credential — is answered at once, without
+entering the flow, so a background run never waits for a lookup it does not send; the
+leftover-session tools send none at all (their caller is the destination the instance
+serves). A cached user is valid only for the
+connection it was asked on: whenever the instance's connection is replaced,
+the whole cache is forgotten, every credential's entry, and asked again on the
+replacement. Outside the order,
+because they work on a connection of their own: a background run, a listed long read
+(its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
+is entered after the connection is ready, so concurrent callers still share one
+`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). Over Streamable HTTP the held connection takes each request's credential (`CurrentCredential`: a renewed token, a new basic pair — the same user) in the same SAP session; only a session SAP ended replaces it. On stdio the instance's connection is born at the process's start, before the transport opens (`StdioServer.connectAtStart` → `bornAtStart` → `buildConnection`): the destination's one leftover session taken up (`resumedSession`; with none or several, a logon), so no call is in the flow then; there is no resume tool. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
+SSE connection's; Streamable HTTP builds one per request. A connection's **parameters** — the
+responsible and master system a create fills, which also name the debugger's request user and a
+background run's caller — are made once, together with the connection, per destination (the
+resolved credential and its target system — URL, client, wire —, not the session): on stdio at the
+start (`bornAtStart`, or the leftover session's file), a failure ending the process before the
+transport opens; on SSE once per stream, on Streamable HTTP when the pooled instance's connection is
+created (`buildConnection` → `requireSystem`), a failure that call's answer — the connection ends
+and nothing is kept, so the next call that creates one asks again. Never after a tool: **no tool
+runs twice**. The lookup (`systeminformation`, through the resolver the host passes; none by
+default) answers only the information, no information, or a credential failure (a chain failure, a
+`401`: the call's as it came); what the parameters are is the rules' the host passes
+(`SystemContextRules`): core, http and sse pass `@mcp-abap-adt/responsible-rules` — the information
+wins; no information is, on ABAP Cloud, one step to the error (a `404`
+`cloud_without_systeminformation`: the configuration or headers are inconsistent; anything else
+`system_lookup_failed`), on-premise the stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`,
+the destination's), else the login (the destination's `SAP_USERNAME`, else its `x-sap-login`),
+else `system_user_unknown`; no kind `system_type_required`. lib applies none: an embedder gets a
+lookup only with a resolver, and the rules only when it passes them. A new session of the same
+destination — a replacement after a lost session, a new logon after a gone leftover (the file's) —
+keeps its parameters (`destinationSystems`), known per credential object and target system. The tool wrapper applies them (`withKnownSystemContext`) and sends nothing; a host's
+injected connection has them made by its first call (`systemBeforeTool`), inside the main flow.
+
+- **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
+  the consumer's choice — where the connection lives across calls (stdio, SSE): the
+  lock's ABAP context stays in the session (its `sap-contextid` cookie is kept), the
+  calls between run stateless and outside it, and the `UNLOCK` reaches it. At the
+  latest the instance's logoff ends it: a logoff releases the session's locks. Over
+  Streamable HTTP the lock is the pooled instance's state: a request on its
+  `state_handle` reaches the held connection — with that request's credential, in the
+  same SAP session — until the `UNLOCK` or until SAP ends the session.
+- **A tool call cannot be cancelled.** A client's cancel aborts nothing: the call
+  runs to its end; nothing is logged off and no session is reopened. The client's
+  close (stdio, SSE) and the process shutdown are what end a running tool: its
+  sessions logged off at once.
+- **A reopen only when SAP already lost the session.** stdio keeps its connection
+  for the instance's life; http builds one per request (a pooled instance too, from
+  that request's headers), sse one per SSE connection.
+- **On stdio the caller is the kept session's user.** The user is fixed for the
+  process: the session is renewed (refresh token, or a new login when the refresh
+  fails) and written back — the same user — so the caller of the background-run tools
+  is always the user of the session the instance keeps — every tool runs in SAP as that
+  user — and the caller of the leftover-session tools is the destination the process
+  serves. HTTP and SSE never keep a connection across
+  credentials, and keep no runtime session file: the leftover-session tools are stdio's
+  (one http or sse server holds the sessions of many users).
+
+#### Composition Roots
+
+`server/src/launcher.ts` (core), `http/src/launcher.ts` and `sse/src/launcher.ts` wire each
+binary. Each `main({ toolSet, program, version })` takes the tools as a `ToolSet`
+(`@mcp-abap-adt/lib/tool-set`) and nothing else of them, and the binary fixes it: the full
+bins pass `fullToolSet`, the read-only packages (`core-ro/`, `http-ro/`, `sse-ro/`)
+`fullReadOnlyToolSet`, the compact packages (`compact/`, `compact-http/`, `compact-sse/`)
+`compactToolSetOf` with the two halves' entry builders, and the read-only compact ones
+(`compact-ro/`, `compact-http-ro/`, `compact-sse-ro/`) `compactReadOnlyToolSetOf` with the read-only
+half — so the four sets share every transport's behaviour:
 
 ```
-launcher.ts main()
-  ├── ServerConfigManager.getConfig()         // CLI args, YAML, env vars
-  ├── Create handler groups (by exposition)   // ReadOnly, HighLevel, LowLevel, Search, System
-  ├── CompositeHandlersRegistry(groups)       // Aggregate registry
-  ├── AuthBrokerFactory                       // Per-destination auth broker management
-  └── Transport server (Stdio|Http|Sse)       // Start appropriate transport
+main({ toolSet, program, version })
+  ├── readStartupConfig(<binary>Parameters(toolSet))  // its own table; the set's removed --exposition
+  │                                                   //   stops the start, naming the binary to use
+  ├── registryOf(toolSet)                             // full: ReadOnly, System, BackgroundRun, HighLevel,
+  │                                                   //   Debug, Search, LeftoverSession; ro: ReadOnly,
+  │                                                   //   System, Search, the list and logoff; compact:
+  │                                                   //   both halves, debug tools, background runs, ...
+  ├── a background-run store only if toolSet.backgroundRuns
+  ├── core only: AuthBrokerFactory                    // the destination, the startup check
+  └── StdioServer | StreamableHttpServer | SseServer
 ```
 
 #### Handler Architecture
@@ -265,13 +406,14 @@ Handlers are organized into groups by access level:
 |:---|:---|:---|
 | `ReadOnlyHandlersGroup` | Get operations (read source, metadata) | ~29 |
 | `HighLevelHandlersGroup` | Full CRUD (Create, Update, Delete, Get) | ~121 |
-| `LowLevelHandlersGroup` | Fine-grained (lock, unlock, activate, validate) | ~120 |
 | `SearchHandlersGroup` | Repository search, where-used | ~4 |
 | `SystemHandlersGroup` | System info, discovery | ~30 |
+| `BatchHandlersGroup` | Batch mode: `BatchBegin`, `BatchEnd`, `BatchAnswers` (every full set, `-ro` included; the compact sets serve `HandlerBatch`) | 3 |
 
 Counts drift as tools are added; see [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) for the authoritative, up-to-date list.
 
-The `exposition` configuration controls which groups are active, enabling read-only deployments or full-access modes.
+The binary installed decides which groups are active: a `-ro` binary for read-only
+deployments, a write binary for full access.
 
 **Handler registration flow:**
 
@@ -303,15 +445,25 @@ export async function handleGetProgram(context: HandlerContext, args: GetProgram
 }
 ```
 
-`HandlerContext` contains the `IAbapConnection` and optional `ILogger` -- injected per-request by `BaseMcpServer`.
+`HandlerContext` contains the `IAbapConnection` and optional `ILogger` -- injected per-request by `BaseMcpServer` -- and,
+where the host gave one, the instance's batch owner (`batch`, an `InstanceBatch`), which the batch tools reach.
+
+**Batch mode.** While a batch is open, `BaseMcpServer`'s dispatch records each call the eligibility table
+(`tools/batch-handlers.json`) admits — its handler runs on a per-call recorder over adt-clients'
+`AdtBatchConnection`, numbered in the order made — and refuses every other call. `BatchEnd` takes the
+instance's connection in its turn, holds it for the whole `execute()`, and every recorded handler then
+builds its answer from what SAP answered; batch mode ends whatever fails. Where the instance has a
+batch owner, every tool's description, as registered, ends with one sentence (`src/lib/batch/sentence.ts`)
+saying how a call of it behaves in batch mode: "Recordable: …", "When <arguments>, recordable: …"
+(the arguments in words, from the table's `when` and `connection`) or "Runs outside batch mode.". See [Batch Mode](../user-guide/BATCH_MODE.md).
 
 #### Transport Servers
 
-| Transport | Class | Connection Model | Session Management |
-|:---|:---|:---|:---|
-| stdio | `StdioServer` | Cached (one per server lifetime) | Single persistent session |
-| HTTP | `StreamableHttpServer` | Per-request (new server instance) | Stateless |
-| SSE | `SseServer` | Per-connection | Map by session ID |
+| Transport | Package | Class | Connection Model | Session Management |
+|:---|:---|:---|:---|:---|
+| stdio | core | `StdioServer` | Kept while the destination's provider is the same | Single persistent session |
+| HTTP | http | `StreamableHttpServer` | Per request, from its headers | Stateless; held state in pooled instances by `state_handle` |
+| SSE | sse | `SseServer` | Per connection, from its opening `GET` | Map by session ID |
 
 All transports extend `BaseMcpServer` which handles handler registration, connection context management, and per-request context injection.
 
@@ -421,10 +573,10 @@ graph TD
 2. Per-request server creation
    └── new BaseMcpServer() instance per request
 
-3. Connection context resolution
-   ├── From x-mcp-destination header (--allow-destination-header) → IDestinations: settingsFor + getProvider(destination)
-   ├── From x-sap-url + auth headers → settings and a fixed credential from the headers
-   └── From default destination (startup config) → the same IDestinations path
+3. Connection source
+   ├── x-mcp-destination → 400 (destinations are core's, over stdio)
+   ├── no x-sap-url with a token or a user and password → 400 (ping excepted)
+   └── headerSource(req.headers) → the instance's source: settings and a fixed credential
 
 4. Handler invocation
    ├── BaseMcpServer resolves tool name → handler function
@@ -447,21 +599,25 @@ The system has three distinct IoC boundaries:
 
 | Boundary | What is Inverted | Composition Point |
 |:---|:---|:---|
-| **Auth** | The credential a connector presents | `ConnectionContext.credential` (an `IAuthProvider`) is built by `AuthBrokerFactory.getProvider` or from headers; the connector never builds one |
+| **Auth** | The credential a connector presents | the instance's `ConnectionSource` answers it (an `IAuthProvider`): `AuthBrokerFactory.getProvider` (core) or the headers (http, sse); the connector never builds one |
 | **Transport** | HTTP communication with SAP | `AdtClient` constructor receives `IAbapConnection` |
 | **Handlers** | Tool behavior per transport/mode | `CompositeHandlersRegistry` receives `IHandlerGroup[]` |
 
 ### 4.4 Composition Root Location
 
-`mcp-abap-adt/src/server/launcher.ts` is the single composition root for the main server. It:
+`server/src/launcher.ts` is core's composition root (stdio). It:
 
 1. Reads configuration (CLI, YAML, env)
-2. Chooses the stores of a destination (`src/lib/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
+2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
-4. Assembles one `AuthBroker` per destination via `AuthBrokerFactory`, on first use
-5. Creates handler groups with `HandlerContext`
-6. Assembles `CompositeHandlersRegistry`
-7. Starts the appropriate transport server
+4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`
+5. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
+6. Starts `StdioServer` with `destinationSource`
+
+`http/src/launcher.ts` and `sse/src/launcher.ts` read their configuration, assemble the
+registry of the tool set they are given and start their server; neither has a broker, a store
+or a login. `compact/`, `compact-http/` and `compact-sse/` are each one call of their transport's
+`main` with the compact tool set; the six `-ro` packages one call each with a read-only set.
 
 No other file in the system creates concrete cross-package dependencies.
 
@@ -493,21 +649,26 @@ const broker = new AuthBroker({
 To add an authentication the server serves:
 
 1. **Implement or reuse an `IAuthProvider`** (`prepare`, `establish`, `authorize`, `rejected`; none may throw -- each answers `{ ok: true }` or a refusal)
-2. **Add an `AuthenticationHandler`** in `src/lib/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
+2. **Add an `AuthenticationHandler`** in `server/src/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
 3. Add its row to the table in section 2.6 and a test; the rest of the system remains unchanged -- the connector presents whatever `IAuthProvider` it is given
 
-An embedder that has its own credential passes it as `ConnectionContext.credential` and the server builds nothing from settings.
+An embedder that has its own connection passes it as an injected source (`EmbeddableMcpServer`'s `connection`); one that has its own credential gives a `ConnectionSource` whose `resolve` answers it, and the server builds nothing from settings.
 
 ---
 
 ### 5.3 Custom Configuration Handling
 
-`ServerConfigManager` supports:
-- CLI arguments (`--transport`, `--host`, `--port`, `--conf`, `--mcp`, `--env`, and the authentication parameters of `src/lib/config/authParameters.ts`)
-- YAML configuration files (via `--conf <path>`) -- configuration only; a secret-looking key is refused
-- Environment variables (`MCP_TRANSPORT`, `MCP_HTTP_HOST`, `MCP_HTTP_PORT`, `MCP_BROWSER_AUTH_PORT`, ...); secrets and the session live in `.env` files
+Each binary reads its own parameter table through lib's machinery (`src/lib/config/authParameters.ts`):
+`CORE_PARAMETERS` (`server/src/config/coreParameters.ts`: the destination, browser and login rows),
+`HTTP_PARAMETERS` (`http/src/config/httpParameters.ts`) and `SSE_PARAMETERS`
+(`sse/src/config/sseParameters.ts`), each beside lib's shared rows (`--conf`,
+`--system-type`, `--state-idle-minutes`; the TLS rows in http and sse), and the tool set's removed
+`--exposition`. A table gives:
+- CLI arguments, environment variables and YAML keys (`--conf <path>`; configuration only, a secret-looking key is refused); CLI beats env beats YAML
+- the help text, the `--conf` template and the YAML validation
+- the refusal of every other binary's options, and of `--transport` (gone), naming the binary that serves it
 
-For deeper customization, consumers can bypass `ServerConfigManager` and construct `IServerConfig` directly.
+For deeper customization, consumers can build the config directly (`CoreConfig`, `HttpConfig`, `SseConfig`, each extending lib's `IServerConfig`), or a table of their own with `readParameters`.
 
 ### 5.4 Extending MCP Tool Behavior
 
@@ -563,7 +724,7 @@ registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 |:---|:---|:---|
 | Local development with Claude Code | Main server | stdio |
 | Team deployment on BTP | Main server + proxy | HTTP |
-| Read-only monitoring | Main server (exposition=readonly) | HTTP/SSE |
+| Read-only monitoring | Read-only server (`mcp-abap-adt-http-ro` / `-sse-ro`) | HTTP/SSE |
 | Custom IDE integration | Main server (as npm dependency) | Embedded via `EmbeddableMcpServer` |
 | Multi-system landscape | Main server + proxy (multi-destination) | HTTP |
 
@@ -574,7 +735,7 @@ Consultants working with customer systems typically:
 1. Use `@mcp-abap-adt/configurator` to set up their MCP client
 2. Configure service keys for BTP systems or basic auth for on-premise
 3. Deploy the proxy for team-shared access with centralized auth
-4. Control tool exposure via `exposition` config (readonly for auditing, full for development)
+4. Control tool exposure by the binary they install (a `-ro` one for auditing, a write one for development)
 
 ### 6.4 Support Usage Patterns
 
@@ -627,9 +788,9 @@ For troubleshooting:
 ### 7.4 Strengths
 
 - **Strict interface isolation** prevents accidental coupling between packages
-- **Four authentications** -- basic, SNC, JWT with browser login, JWT you hold -- covering on-premise through BTP cloud
+- **Three authentications over stdio** -- basic, SNC, JWT with browser login -- and a JWT you hold in the HTTP and SSE headers, covering on-premise through BTP cloud
 - **Operation chain model** provides atomic, auditable CRUD sequences with automatic lock/unlock
-- **Exposition control** enables deployment profiles (read-only, full CRUD, low-level)
+- **Exposition control** enables deployment profiles (read-only, full CRUD; the single-step lock / write / unlock flow is the compact binaries' since 19.0.0)
 - **Transport flexibility** (stdio, HTTP, SSE) adapts to different client architectures
 - **22+ ABAP object types** with uniform interface -- broad coverage with consistent API
 
@@ -637,15 +798,15 @@ For troubleshooting:
 
 | Risk | Mitigation |
 |:---|:---|
-| Two destinations logging in at once would race for the callback port | One login at a time per process; the first connect of a destination runs inside its lock |
-| Large handler count (~150 tools) may overwhelm AI model context | `exposition` config limits visible tools per deployment |
+| A login racing another for the callback port | stdio serves one destination per process, whose provider serializes its own logins; http and sse log nobody in |
+| Large handler count (~150 tools) may overwhelm AI model context | the `-ro` and compact binaries serve shorter lists |
 | XML parsing of ADT responses is fragile across SAP versions | `fast-xml-parser` with per-object-type parsers; integration tests validate against real systems |
 | Service key files stored on filesystem | Configurable directory; `unsafe` flag controls file vs. in-memory storage |
 
 ### 7.6 Recommendations
 
 1. **For new contributors:** Follow the existing handler pattern exactly -- tool definition + handler function + handler group registration. Do not introduce new cross-package dependencies.
-2. **For custom deployments:** Start with the `exposition` config and `EmbeddableMcpServer` before building custom infrastructure.
+2. **For custom deployments:** Start with the binary that serves the tools you need, and `EmbeddableMcpServer`, before building custom infrastructure.
 3. **For enterprise adoption:** Use the proxy for centralized BTP authentication and the configurator for standardized client setup across teams.
 4. **For extending object type support:** Add a new module under `@mcp-abap-adt/adt-clients/src/core/{type}/` following the established pattern (types, CRUD functions, `IAdtObject` implementation).
 
@@ -682,12 +843,18 @@ For troubleshooting:
 
 ### Parallel Tool Calls
 
-MCP tool calls that modify SAP objects (Create, Update, Delete) must be executed **sequentially**, not in parallel. Each MCP server instance uses a single ABAP connection with one CSRF token and one HTTP session. Parallel write operations cause:
+**An instance runs its calls one at a time; the server enforces it.** Each MCP server
+instance uses a single ABAP connection, with one CSRF token, one HTTP session and one
+session type. Calls on it at once would cross — CSRF tokens, a read sent stateful
+inside another call's lock, an `UNLOCK` sent stateless — so the calls that work on the
+instance's connection run strictly one after another, whatever the client sends in
+parallel ("The stateful window and the main flow"); a background run, a listed long
+read and the debugger tools that work on the debugger's own connections are outside
+that order. A client may send calls in parallel; they are answered in turn.
 
-- **CSRF token conflicts** -- SAP ties CSRF tokens to HTTP sessions; concurrent requests invalidate each other's tokens.
-- **Session type race conditions** -- lock/unlock operations toggle the connection between stateful and stateless modes; concurrent toggles corrupt session state.
-- **Lock conflicts** -- SAP DDIC objects support only one lock per object; parallel locks on the same object will fail.
-
-Read-only operations (Read*, Search*, Get*) are safe to call in any order since they don't require CSRF tokens or session state changes.
-
-**For LLM clients**: configure the MCP client to send write tool calls one at a time. If the client batches multiple Create/Update calls in a single message, they must be serialized before reaching the server.
+- **A long call on the main connection holds the flow; `background: true` or a tool on
+  its own connection does not.** A unit-test or ATC run, a class or program run or a
+  profiling run in the foreground, an activation and the creates and updates that
+  activate: every other call of that MCP session waits until it ends, by design.
+- **Lock conflicts** -- SAP DDIC objects support only one lock per object; two sessions
+  locking the same object conflict, and SAP's answer reaches the model as it is.

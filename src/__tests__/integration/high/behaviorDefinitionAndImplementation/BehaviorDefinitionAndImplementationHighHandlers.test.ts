@@ -16,14 +16,14 @@
  */
 
 import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
+import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
-import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
-import { handleValidateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { handleCreateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
+import { handleValidateObject } from '../../../../handlers/common/low/handleValidateObject';
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -122,7 +122,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
               logger: testLogger,
             });
             const answer = await handleDeleteBehaviorDefinition(deleteCtx, {
-              name: objectName,
+              behavior_definition_name: objectName,
               ...(transportRequest && {
                 transport_request: transportRequest,
               }),
@@ -254,8 +254,9 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         // server's reason, and a run that skips this finds out from a create
         // that is refused for something that reads like another problem.
         await assertNameAvailable(`BDEF ${objectName}`, () =>
-          handleValidateBehaviorDefinition(handlerCtx, {
-            name: objectName,
+          handleValidateObject(handlerCtx, {
+            object_type: 'behavior_definition',
+            object_name: objectName,
             package_name: packageName,
             description: params.description || objectName,
             root_entity: params.root_entity,

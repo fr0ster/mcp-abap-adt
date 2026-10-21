@@ -13,6 +13,7 @@ import {
   analyseCdsTestDoubles,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -20,6 +21,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { writeClassTests } from '../shared/writeTests';
 
@@ -27,7 +29,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create ABAP Unit tests for a CDS view: check the view supports CDS test doubles, create a test class holding the local test classes, activate it.',
+    'Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -92,23 +94,27 @@ export async function handleCreateCdsUnitTest(
     { tool: 'CreateCdsUnitTest', detail },
     () =>
       sequence(
-        () =>
+        atStep('check test doubles', () =>
           client
             .getDdl(resultsFor(ddlDocuments))
             .checkCdsTestDoubles(args.cds_view_name.toUpperCase(), {
               analyse: analyseCdsTestDoubles,
             }),
-        () =>
-          client.getClass(resultsFor(classDocuments)).create(
-            {
-              className,
-              packageName: args.package_name,
-              description: `ABAP Unit tests of ${args.cds_view_name.toUpperCase()}`,
-              final: true,
-              transportRequest: args.transport_request,
-            },
-            { analyse: analyseException },
+        ),
+        atStep('create', () =>
+          withAdtHeaders(context, 'class.create', (headers) =>
+            client.getClass(resultsFor(classDocuments)).create(
+              {
+                className,
+                packageName: args.package_name,
+                description: `ABAP Unit tests of ${args.cds_view_name.toUpperCase()}`,
+                final: true,
+                transportRequest: args.transport_request,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
+        ),
         () =>
           writeClassTests(
             context,

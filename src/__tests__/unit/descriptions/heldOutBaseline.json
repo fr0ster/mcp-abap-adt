@@ -1,0 +1,33 @@
+{
+  "bm25": [
+    "[developer] Show the unit test class inside class ZCL_DEMO",
+    "[developer] Add a method to interface ZIF_DEMO",
+    "[developer] Add field AMOUNT to table ZTAB_ORDERS"
+  ],
+  "cosine nomic-embed-text": [
+    "[developer] Show the unit test class inside class ZCL_DEMO",
+    "[developer] Create a data element ZDE_NAME based on domain ZDO_NAME",
+    "[developer] Does program ZREP_DEMO compile?"
+  ],
+  "hybrid nomic-embed-text": [
+    "[developer] Show the unit test class inside class ZCL_DEMO"
+  ],
+  "cosine bge-m3": [
+    "[developer] Show the unit test class inside class ZCL_DEMO",
+    "[developer] Create a data element ZDE_NAME based on domain ZDO_NAME",
+    "[developer] Does program ZREP_DEMO compile?",
+    "[developer] Change the macros of program ZREP_DEMO"
+  ],
+  "hybrid bge-m3": [
+    "[developer] Show the unit test class inside class ZCL_DEMO"
+  ],
+  "cosine mxbai-embed-large": [],
+  "hybrid mxbai-embed-large": [],
+  "cosine bge-large": [],
+  "hybrid bge-large": [],
+  "cosine snowflake-arctic-embed:335m": [
+    "[developer] Create interface ZIF_NEW",
+    "[developer] Change the macros of program ZREP_DEMO"
+  ],
+  "hybrid snowflake-arctic-embed:335m": []
+}

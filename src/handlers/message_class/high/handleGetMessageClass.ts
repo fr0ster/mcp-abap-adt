@@ -1,17 +1,15 @@
-import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readMessageClassMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.',
+    '[read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -41,20 +39,19 @@ export async function handleGetMessageClass(
   const name = message_class_name.toUpperCase();
 
   // `IMessageClassContract` composes `IAdtMetadataReadable` and nothing
-  // else — there is no `.read()` in v19, same as `ReadMessageClass` found.
+  // else — there is no `.read()` in v19.
   // The pre-migration handler answered `state.messageClass`, a v18 parsed
   // convenience object adt-clients 19 no longer builds; the document itself
-  // is what is available now, same as `ReadMessageClass`'s own `metadata`.
+  // is what is available now.
   return answer(
     { tool: 'GetMessageClass', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getMessageClass(resultsFor(messageClassDocuments))
-        .readMetadata({ name }, { analyse: analyseException }),
+      readMessageClassMetadata(createAdtClient(connection, logger), { name }),
     (metadata: AdtReading<string>) => ({
       success: true,
       message_class_name: name,
-      message_class: metadata.raw,
+      part: 'metadata',
+      metadata: metadata.raw,
     }),
   );
 }

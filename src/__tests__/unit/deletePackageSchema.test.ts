@@ -10,7 +10,14 @@ jest.mock('../../lib/packageSessions', () => ({
 }));
 jest.mock('../../lib/clients', () => ({
   createAdtClient: () => ({
-    getPackage: () => ({ delete: async () => ({}) }),
+    getPackage: () => ({
+      // The deletion check permits (19.0.0: DeletePackage asks it first).
+      checkDeletion: async () => ({
+        ok: true,
+        getResult: () => ({ value: { raw: '' } }),
+      }),
+      delete: async () => ({}),
+    }),
   }),
 }));
 jest.mock('../../lib/answer', () => ({
@@ -20,9 +27,9 @@ jest.mock('../../lib/answer', () => ({
 import {
   handleDeletePackage,
   TOOL_DEFINITION,
-} from '../../handlers/package/low/handleDeletePackage';
+} from '../../handlers/package/high/handleDeletePackage';
 
-describe('DeletePackageLow input', () => {
+describe('DeletePackage input', () => {
   it('has no connection_config, and still has force_new_connection', () => {
     const properties = TOOL_DEFINITION.inputSchema.properties as Record<
       string,

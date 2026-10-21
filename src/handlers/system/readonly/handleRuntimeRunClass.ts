@@ -39,7 +39,9 @@
 
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
+import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
@@ -49,13 +51,14 @@ import {
 } from '../../../lib/strategies/resultSets';
 import { terseClassRun } from '../../../lib/strategies/runProjections';
 import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.',
+    '[read-only] [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -63,6 +66,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'ABAP class name to execute.',
       },
+      background: BACKGROUND_PROPERTY,
       profile: {
         type: 'boolean',
         description:
@@ -195,7 +199,9 @@ export async function handleRuntimeRunClass(
     async () => {
       // 1. The snapshot. A refused feed read is a refusal, not an empty feed —
       // reported as-is, before scheduling or running anything.
-      const snapshot = await profiler.list({ analyse: analyseException });
+      const snapshot = await atStep('list traces', () =>
+        profiler.list({ analyse: analyseException }),
+      )();
       if (!snapshot.ok) return snapshot;
       const before = new Set(
         snapshot.getResult().value.map((entry) => entry.id),
@@ -206,27 +212,33 @@ export async function handleRuntimeRunClass(
       // cannot reach back into a finished sequence.
       let profilerId = '';
       const ran = await sequence(
-        () =>
-          classExecutor.scheduleTrace({
-            ...profilerParameters,
-            analyse: analyseException,
-          }),
-        (id: string) => {
+        atStep('schedule trace', () =>
+          withAdtHeaders(context, 'classExecutor.scheduleTrace', (headers) =>
+            classExecutor.scheduleTrace({
+              ...profilerParameters,
+              analyse: analyseException,
+              headers,
+            }),
+          ),
+        ),
+        atStep('run with profiler', (id: string) => {
           profilerId = id;
           return classExecutor.runWithProfiler(
             { className },
             { analyse: analyseException, profilerId: id },
           );
-        },
+        }),
       );
       if (!ran.ok) return ran;
 
       // 3. The search. A run that succeeded with no trace written yet is
       // still a successful run: the id is absent, not an error.
-      const found = await newTraceAfter(profiler, before, {
-        attempts: maxTraceAttempts,
-        delayMs: traceRetryDelayMs,
-      });
+      const found = await atStep('find trace', () =>
+        newTraceAfter(profiler, before, {
+          attempts: maxTraceAttempts,
+          delayMs: traceRetryDelayMs,
+        }),
+      )();
       if (!found.ok) return found;
 
       return succeededWith({
@@ -237,5 +249,58 @@ export async function handleRuntimeRunClass(
       });
     },
     terseClassRun,
+  );
+}
+
+/**
+ * A class run in one request (compact `HandlerProfileRun`; spec §4.6, one
+ * ADT request per tool call).
+ *
+ * With `profiler_id`: the one `POST /oo/classrun/{name}?profilerId=…` under
+ * the trace the caller scheduled — no feed snapshot, no schedule, no trace
+ * search. Without it: the one plain `POST /oo/classrun/{name}`. An empty
+ * `profiler_id` is refused before any request; a failure is the method's
+ * error plus `step`.
+ */
+export async function handleRuntimeRunClassUnderProfiler(
+  context: HandlerContext,
+  args: { class_name?: string; profiler_id?: string },
+  tool: string,
+) {
+  const { connection, logger } = context;
+  if (!args?.class_name) {
+    return return_error(new Error('Parameter "class_name" is required'));
+  }
+  const profilerId = args.profiler_id;
+  if (
+    profilerId !== undefined &&
+    (typeof profilerId !== 'string' || profilerId === '')
+  ) {
+    return return_error(
+      new Error('Parameter "profiler_id", when given, must not be empty'),
+    );
+  }
+  const className = args.class_name.trim().toUpperCase();
+  const classExecutor = new AdtExecutor(connection, logger).getClassExecutor(
+    ourClassExecutor,
+  );
+  if (profilerId === undefined) {
+    return answer(
+      { tool, detail: 'terse' },
+      atStep('run class', () =>
+        classExecutor.run({ className }, { analyse: analyseException }),
+      ),
+      (output: string) => terseClassRun({ className, output }),
+    );
+  }
+  return answer(
+    { tool, detail: 'terse' },
+    atStep('run with profiler', () =>
+      classExecutor.runWithProfiler(
+        { className },
+        { analyse: analyseException, profilerId },
+      ),
+    ),
+    (output: string) => terseClassRun({ className, output, profilerId }),
   );
 }

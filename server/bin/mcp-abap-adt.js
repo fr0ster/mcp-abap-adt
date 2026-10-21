@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * MCP ABAP ADT Server Launcher
- *
- * Main entry point that runs the v2 server from dist/server/v2/launcher.js
+ * mcp-abap-adt — the MCP ABAP ADT server over stdio, with the full tool set.
  *
  * NOTE: Using direct require() instead of spawn() to ensure proper stdio handling.
  * spawn() with stdio: 'inherit' can cause issues with MCP protocol
  * because the parent process becomes an unnecessary intermediate layer.
+ *
+ * The launcher is required and started in THIS process, so stdin/stdout stay
+ * wired to the MCP protocol with no intermediate layer. It starts nothing on
+ * import: `main` is called here with the tool set this command serves, and a
+ * sibling command (@mcp-abap-adt/compact) calls the same `main` with its own.
  */
+const { main, launcherFailedLine } = require('../dist/launcher.js');
+const { CORE_VERSION } = require('../dist/coreVersion.js');
+const { fullToolSet } = require('@mcp-abap-adt/lib/tool-set');
 
-// Require the launcher and start it in THIS process, so stdin/stdout stay wired to
-// the MCP protocol with no intermediate layer. `main()` is called explicitly
-// because the launcher only self-starts when it is the program itself — a sibling
-// command (@mcp-abap-adt/compact) imports the same `main` to serve a different tool
-// list, and an import must not start a server.
-const { main } = require('../dist/launcher.js');
-
-void main().catch((err) => {
-  console.error(
-    '[MCP] launcher failed:',
-    err instanceof Error ? err.message : String(err),
-  );
+void main({
+  toolSet: fullToolSet,
+  program: 'mcp-abap-adt',
+  version: CORE_VERSION,
+}).catch((err) => {
+  console.error(launcherFailedLine(err));
   process.exit(1);
 });

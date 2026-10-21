@@ -1,479 +1,174 @@
 /**
- * YAML configuration file support for mcp-abap-adt
- * Allows loading startup parameters from YAML file instead of command-line arguments
+ * The YAML config file (`--conf`), read against a binary's own table: the
+ * file is loaded and validated by the table, and its template is written from
+ * the table — so a binary's file holds only that binary's parameters, and a
+ * key of another binary is refused naming the binary that serves it.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
-import { authParametersTemplate, validateAuthYaml } from './authParameters.js';
-import { validateStateIdleYaml } from './stateIdleMinutes.js';
+import {
+  CONF_ROW,
+  ParameterRefusal,
+  type ParameterTable,
+  parametersTemplate,
+  validateYamlParameters,
+} from './authParameters.js';
 
-export interface YamlConfig {
-  transport?: string;
-  mcp?: string;
-  env?: string;
-  'env-path'?: string;
-  unsafe?: boolean;
-  'auth-broker-path'?: string;
-  browser?: string;
-  'browser-auth-port'?: number | string;
-  'allow-destination-header'?: boolean;
-  'connection-type'?: string;
-  'system-type'?: string;
-  /** The idle bound on held state, in minutes (at least 30, default 30). */
-  'state-idle-minutes'?: number | string;
-  // Handler sets: readonly, high, low, debug. `compact` is recognised and refused —
-  // that facade is the @mcp-abap-adt/compact command.
-  exposition?: string | string[];
-  http?: {
-    port?: number;
-    host?: string;
-    'json-response'?: boolean;
-    'allowed-origins'?: string[];
-    'allowed-hosts'?: string[];
-    'enable-dns-protection'?: boolean;
-    tls?: {
-      cert?: string;
-      key?: string;
-      ca?: string;
-    };
-  };
-  sse?: {
-    port?: number;
-    host?: string;
-    'allowed-origins'?: string[];
-    'allowed-hosts'?: string[];
-    'enable-dns-protection'?: boolean;
-    tls?: {
-      cert?: string;
-      key?: string;
-      ca?: string;
-    };
-  };
-}
+/** A loaded config file: its top-level mapping. */
+export type YamlConfig = Record<string, unknown>;
 
 /**
- * Parse --conf / --config argument from command line
+ * `--conf` / `--config` as given on the command line, or undefined. Plain
+ * code over the arguments.
  */
-export function parseConfigArg(): string | undefined {
-  const args = process.argv;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--conf=')) {
-      return arg.slice('--conf='.length);
-    } else if (arg === '--conf' && i + 1 < args.length) {
-      return args[i + 1];
-    } else if (arg.startsWith('--config=')) {
-      return arg.slice('--config='.length);
-    } else if (arg === '--config' && i + 1 < args.length) {
-      return args[i + 1];
+export function parseConfigArg(
+  argv: readonly string[] = process.argv,
+): string | undefined {
+  for (const name of [CONF_ROW.cli, ...(CONF_ROW.cliAliases ?? [])]) {
+    for (let i = 0; i < argv.length; i++) {
+      const arg = argv[i];
+      if (arg.startsWith(`${name}=`)) return arg.slice(name.length + 1);
+      if (arg === name) {
+        const next = argv[i + 1];
+        if (next === undefined || next.startsWith('-')) {
+          throw new ParameterRefusal(`${name} needs a value: ${name}=<path>`);
+        }
+        return next;
+      }
     }
   }
   return undefined;
 }
 
-/**
- * Validate YAML configuration
- * @returns Object with valid flag and array of error messages
- */
-export function validateYamlConfig(config: YamlConfig): {
-  valid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [
-    ...validateAuthYaml(config as Record<string, unknown>),
-    ...validateStateIdleYaml(config as Record<string, unknown>),
-  ];
-
-  // Validate transport
-  if (config.transport) {
-    const validTransports = ['stdio', 'http', 'streamable-http', 'sse'];
-    if (!validTransports.includes(config.transport)) {
-      errors.push(
-        `Invalid transport: "${config.transport}". Must be one of: ${validTransports.join(', ')}`,
-      );
-    }
-  }
-
-  // Validate HTTP port
-  if (config.http?.port !== undefined) {
-    const port = config.http.port;
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      errors.push(`Invalid HTTP port: ${port}. Must be between 1 and 65535`);
-    }
-  }
-
-  // Validate HTTP host
-  if (config.http?.host) {
-    const host = config.http.host;
-    if (
-      host !== '127.0.0.1' &&
-      host !== '0.0.0.0' &&
-      host !== 'localhost' &&
-      host !== '::'
-    ) {
-      // Allow other hosts but warn (validation passes, just log)
-      // This allows custom hostnames/IPs
-    }
-  }
-
-  // Validate SSE port
-  if (config.sse?.port !== undefined) {
-    const port = config.sse.port;
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      errors.push(`Invalid SSE port: ${port}. Must be between 1 and 65535`);
-    }
-  }
-
-  // Validate SSE host
-  if (config.sse?.host) {
-    const host = config.sse.host;
-    if (
-      host !== '127.0.0.1' &&
-      host !== '0.0.0.0' &&
-      host !== 'localhost' &&
-      host !== '::'
-    ) {
-      // Allow other hosts but warn (validation passes, just log)
-      // This allows custom hostnames/IPs
-    }
-  }
-
-  // Validate that HTTP and SSE ports are different if both are set
-  if (config.http?.port && config.sse?.port) {
-    if (config.http.port === config.sse.port) {
-      errors.push(
-        `HTTP port and SSE port cannot be the same: ${config.http.port}`,
-      );
-    }
-  }
-
-  // Validate allowed-origins format (should be array or string)
-  if (config.http?.['allowed-origins']) {
-    const origins = config.http['allowed-origins'];
-    if (!Array.isArray(origins) && typeof origins !== 'string') {
-      errors.push(
-        `HTTP allowed-origins must be an array or comma-separated string`,
-      );
-    }
-  }
-
-  if (config.sse?.['allowed-origins']) {
-    const origins = config.sse['allowed-origins'];
-    if (!Array.isArray(origins) && typeof origins !== 'string') {
-      errors.push(
-        `SSE allowed-origins must be an array or comma-separated string`,
-      );
-    }
-  }
-
-  // Validate TLS configuration (http)
-  if (config.http?.tls) {
-    const tls = config.http.tls;
-    if (tls.cert && !tls.key) {
-      errors.push('HTTP TLS: cert requires key to be specified');
-    }
-    if (tls.key && !tls.cert) {
-      errors.push('HTTP TLS: key requires cert to be specified');
-    }
-  }
-
-  // Validate TLS configuration (sse)
-  if (config.sse?.tls) {
-    const tls = config.sse.tls;
-    if (tls.cert && !tls.key) {
-      errors.push('SSE TLS: cert requires key to be specified');
-    }
-    if (tls.key && !tls.cert) {
-      errors.push('SSE TLS: key requires cert to be specified');
-    }
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+/** Every refusal of a config file against the table; empty when it is valid. */
+export function validateYamlConfig(
+  table: ParameterTable,
+  config: YamlConfig,
+): { valid: boolean; errors: string[] } {
+  const errors = validateYamlParameters(table, config);
+  return { valid: errors.length === 0, errors };
 }
 
-/**
- * Load YAML configuration from file
- */
-export function loadYamlConfig(configPath: string): YamlConfig | null {
-  try {
-    const resolvedPath = path.isAbsolute(configPath)
-      ? configPath
-      : path.resolve(process.cwd(), configPath);
-
-    if (!fs.existsSync(resolvedPath)) {
-      return null;
-    }
-
-    const fileContent = fs.readFileSync(resolvedPath, 'utf-8');
-    const config = parseYaml(fileContent) as YamlConfig;
-
-    // Validate configuration
-    const validation = validateYamlConfig(config);
-    if (!validation.valid) {
-      throw new Error(
-        `YAML config validation failed:\n${validation.errors.map((e) => `  - ${e}`).join('\n')}`,
-      );
-    }
-
-    return config;
-  } catch (error) {
-    throw new Error(
-      `Failed to load YAML config from ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-/**
- * Generate YAML configuration template
- */
-export function generateYamlConfigTemplate(): string {
-  return `# MCP ABAP ADT Server Configuration
-# This file contains startup parameters for the MCP ABAP ADT server
-# Command-line arguments override values from this file
-
-# Transport type: stdio | http | streamable-http | sse
-# Default: stdio (for MCP clients)
-transport: stdio
-
-# Auth and connection parameters. Each one also has a CLI and an environment form;
-# the CLI wins over the environment, which wins over this file.
-# This file is configuration only: secrets and the session belong in .env files or the
-# environment, and a key that looks like a secret is refused.
-${authParametersTemplate()}
-# Held state (a debug session) ends after this many minutes without a tool call.
-# A whole number, at least 30. A call in flight pauses it; a listener's own
-# background re-poll does not count as a call.
-# Also: --state-idle-minutes, MCP_STATE_IDLE_MINUTES
-state-idle-minutes: 30
-
-# Handler sets to expose: readonly, high, low, debug (the debugger, opt-in)
-# (compact moved to the @mcp-abap-adt/compact command and is refused here)
-# Default: readonly,high
-# Use comma-separated list or YAML array
-exposition: readonly,high
-# Alternative YAML array format:
-# exposition:
-#   - readonly
-#   - high
-#   - low
-
-# HTTP/StreamableHTTP transport options
-http:
-  # Server port
-  port: 3000
-
-  # Server host
-  # 127.0.0.1 (default) - localhost only
-  # 0.0.0.0 - all interfaces
-  host: 127.0.0.1
-
-  # Enable JSON response format
-  json-response: false
-
-  # Allowed CORS origins (comma-separated or array)
-  # Allowed hosts (comma-separated or array)
-  allowed-hosts: []
-
-  # Enable DNS rebinding protection
-  enable-dns-protection: false
-
-  # TLS configuration for HTTPS (both cert and key required)
-  # When configured, server starts in HTTPS mode automatically
-  # Note: only the active transport's TLS config is used
-  # tls:
-  #   cert: /path/to/server.crt
-  #   key: /path/to/server.key
-  #   ca: /path/to/ca.crt  # optional, for custom CA
-
-# SSE (Server-Sent Events) transport options
-sse:
-  # Server port
-  port: 3001
-
-  # Server host
-  # 127.0.0.1 (default) - localhost only
-  # 0.0.0.0 - all interfaces
-  host: 127.0.0.1
-
-  # Allowed CORS origins (comma-separated or array)
-  allowed-origins: []
-
-  # Allowed hosts (comma-separated or array)
-  allowed-hosts: []
-
-  # Enable DNS rebinding protection
-  enable-dns-protection: false
-
-  # TLS configuration for HTTPS (both cert and key required)
-  # When configured, server starts in HTTPS mode automatically
-  # Note: only the active transport's TLS config is used
-  # tls:
-  #   cert: /path/to/server.crt
-  #   key: /path/to/server.key
-  #   ca: /path/to/ca.crt  # optional, for custom CA
-
-# Examples:
-#
-# stdio mode with MCP destination:
-# transport: stdio
-# mcp: TRIAL
-#
-# HTTP mode with custom port:
-# transport: http
-# http:
-#   port: 8080
-#
-# SSE mode with CORS:
-# transport: sse
-# sse:
-#   port: 3001
-#   allowed-origins:
-#     - http://localhost:3000
-#     - http://localhost:5173
-`;
-}
-
-/**
- * Generate YAML config template file if it doesn't exist
- * @returns true if template was generated (file didn't exist), false if file already existed
- */
-export function generateConfigTemplateIfNeeded(configPath: string): boolean {
-  const resolvedPath = path.isAbsolute(configPath)
+function resolved(configPath: string): string {
+  return path.isAbsolute(configPath)
     ? configPath
     : path.resolve(process.cwd(), configPath);
-
-  if (!fs.existsSync(resolvedPath)) {
-    const template = generateYamlConfigTemplate();
-    fs.writeFileSync(resolvedPath, template, 'utf-8');
-    process.stderr.write(
-      `[MCP-CONFIG] Generated YAML config template: ${resolvedPath}\n`,
-    );
-    process.stderr.write(
-      `[MCP-CONFIG] Please edit the file and fill in your configuration.\n`,
-    );
-    return true;
-  }
-  return false;
 }
 
 /**
- * Apply YAML config values to process.argv (for compatibility with existing parsers)
- * Only applies values that are not already set in command-line arguments
+ * The config file, validated by the table; null when it does not exist. A
+ * file that cannot be read, one that is not YAML, or one the table refuses
+ * stops the start: the words name the file and the kind of failure, the line
+ * of a parse failure (never its text), or each refused key — never an error's
+ * message.
  */
-export function applyYamlConfigToArgs(config: YamlConfig): void {
-  // Helper to check if argument exists
-  const hasArg = (name: string): boolean => {
-    return process.argv.some(
-      (arg) => arg === name || arg.startsWith(`${name}=`),
+export function loadYamlConfig(
+  table: ParameterTable,
+  configPath: string,
+): YamlConfig | null {
+  const file = resolved(configPath);
+  if (!fs.existsSync(file)) return null;
+
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf-8');
+  } catch {
+    // A directory, a file without read permission: fixed words, no message.
+    throw new ParameterRefusal(`The config file ${configPath} cannot be read`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(text);
+  } catch (error) {
+    // js-yaml's message quotes the file; only the position is passed on.
+    const mark = (error as { mark?: { line?: unknown; column?: unknown } })
+      ?.mark;
+    const at =
+      typeof mark?.line === 'number' && typeof mark?.column === 'number'
+        ? ` (line ${mark.line + 1}, column ${mark.column + 1})`
+        : '';
+    throw new ParameterRefusal(
+      `The config file ${configPath} is not valid YAML${at}`,
     );
+  }
+  if (parsed === undefined || parsed === null) return {};
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new ParameterRefusal(
+      `The config file ${configPath} must be a mapping of parameter keys`,
+    );
+  }
+  const config = parsed as YamlConfig;
+  const { errors } = validateYamlConfig(table, config);
+  if (errors.length > 0) {
+    throw new ParameterRefusal(
+      `The config file ${configPath} is refused:\n${errors.map((e) => `  - ${e}`).join('\n')}`,
+    );
+  }
+  return config;
+}
+
+/** The template of the table's config file. */
+export function generateYamlConfigTemplate(table: ParameterTable): string {
+  return parametersTemplate(table);
+}
+
+/**
+ * Writes the table's template where `--conf` points when nothing is there.
+ * @returns true if the template was written (the start then ends), false if a file is there
+ */
+export function generateConfigTemplateIfNeeded(
+  table: ParameterTable,
+  configPath: string,
+): boolean {
+  const file = resolved(configPath);
+  if (fs.existsSync(file)) return false;
+  try {
+    fs.writeFileSync(file, generateYamlConfigTemplate(table), 'utf-8');
+  } catch {
+    // A missing directory, no write permission: fixed words, no message.
+    throw new ParameterRefusal(
+      `The config file ${configPath} cannot be written`,
+    );
+  }
+  process.stderr.write(
+    `[MCP-CONFIG] Generated YAML config template: ${file}\n`,
+  );
+  process.stderr.write(
+    '[MCP-CONFIG] Please edit the file and fill in your configuration.\n',
+  );
+  return true;
+}
+
+/**
+ * What a binary's launcher reads first: the config file named by `--conf`
+ * (its template written when it is missing — `template: true`, the start
+ * ends), then the table's values.
+ */
+export type ConfigurationRead =
+  | { readonly template: true }
+  | {
+      readonly template: false;
+      readonly configFile: string | undefined;
+      readonly yaml: YamlConfig | null;
+    };
+
+/** `--conf`: the template written, or the file loaded (null without one). */
+export function readConfigFile(
+  table: ParameterTable,
+  argv: readonly string[],
+): ConfigurationRead {
+  const configFile = parseConfigArg(argv);
+  if (configFile === undefined) {
+    return { template: false, configFile, yaml: null };
+  }
+  if (generateConfigTemplateIfNeeded(table, configFile)) {
+    return { template: true };
+  }
+  return {
+    template: false,
+    configFile,
+    yaml: loadYamlConfig(table, configFile),
   };
-
-  // Helper to add argument if not present
-  const addArg = (name: string, value: string | number | boolean): void => {
-    if (!hasArg(name)) {
-      if (typeof value === 'boolean' && value) {
-        process.argv.push(name);
-      } else if (typeof value !== 'boolean') {
-        process.argv.push(`${name}=${value}`);
-      }
-    }
-  };
-
-  // Apply transport
-  if (config.transport && !hasArg('--transport')) {
-    addArg('--transport', config.transport);
-  }
-
-  // The auth and connection parameters (authParameters.ts) are not written to
-  // argv: ArgumentsParser reads them from the YAML directly, so env beats YAML.
-
-  // Apply exposition
-  if (config.exposition && !hasArg('--exposition')) {
-    const exposition = Array.isArray(config.exposition)
-      ? config.exposition.join(',')
-      : config.exposition;
-    addArg('--exposition', exposition);
-  }
-
-  // Apply HTTP options
-  if (config.http) {
-    if (config.http.port && !hasArg('--http-port')) {
-      addArg('--http-port', config.http.port);
-    }
-    if (config.http.host && !hasArg('--http-host')) {
-      addArg('--http-host', config.http.host);
-    }
-    if (config.http['json-response'] && !hasArg('--http-json-response')) {
-      addArg('--http-json-response', true);
-    }
-    if (config.http['allowed-origins'] && !hasArg('--http-allowed-origins')) {
-      const origins = Array.isArray(config.http['allowed-origins'])
-        ? config.http['allowed-origins'].join(',')
-        : config.http['allowed-origins'];
-      addArg('--http-allowed-origins', origins);
-    }
-    if (config.http['allowed-hosts'] && !hasArg('--http-allowed-hosts')) {
-      const hosts = Array.isArray(config.http['allowed-hosts'])
-        ? config.http['allowed-hosts'].join(',')
-        : config.http['allowed-hosts'];
-      addArg('--http-allowed-hosts', hosts);
-    }
-    if (
-      config.http['enable-dns-protection'] &&
-      !hasArg('--http-enable-dns-protection')
-    ) {
-      addArg('--http-enable-dns-protection', true);
-    }
-    if (config.http.tls?.cert && !hasArg('--tls-cert')) {
-      addArg('--tls-cert', config.http.tls.cert);
-    }
-    if (config.http.tls?.key && !hasArg('--tls-key')) {
-      addArg('--tls-key', config.http.tls.key);
-    }
-    if (config.http.tls?.ca && !hasArg('--tls-ca')) {
-      addArg('--tls-ca', config.http.tls.ca);
-    }
-  }
-
-  // Apply SSE options
-  if (config.sse) {
-    if (config.sse.port && !hasArg('--sse-port')) {
-      addArg('--sse-port', config.sse.port);
-    }
-    if (config.sse.host && !hasArg('--sse-host')) {
-      addArg('--sse-host', config.sse.host);
-    }
-    if (config.sse['allowed-origins'] && !hasArg('--sse-allowed-origins')) {
-      const origins = Array.isArray(config.sse['allowed-origins'])
-        ? config.sse['allowed-origins'].join(',')
-        : config.sse['allowed-origins'];
-      addArg('--sse-allowed-origins', origins);
-    }
-    if (config.sse['allowed-hosts'] && !hasArg('--sse-allowed-hosts')) {
-      const hosts = Array.isArray(config.sse['allowed-hosts'])
-        ? config.sse['allowed-hosts'].join(',')
-        : config.sse['allowed-hosts'];
-      addArg('--sse-allowed-hosts', hosts);
-    }
-    if (
-      config.sse['enable-dns-protection'] &&
-      !hasArg('--sse-enable-dns-protection')
-    ) {
-      addArg('--sse-enable-dns-protection', true);
-    }
-    if (config.sse.tls?.cert && !hasArg('--tls-cert')) {
-      addArg('--tls-cert', config.sse.tls.cert);
-    }
-    if (config.sse.tls?.key && !hasArg('--tls-key')) {
-      addArg('--tls-key', config.sse.tls.key);
-    }
-    if (config.sse.tls?.ca && !hasArg('--tls-ca')) {
-      addArg('--tls-ca', config.sse.tls.ca);
-    }
-  }
 }

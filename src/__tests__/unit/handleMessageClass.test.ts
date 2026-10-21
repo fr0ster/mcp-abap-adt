@@ -317,6 +317,37 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
   });
 
+  it.each([
+    ['an empty body', ''],
+    ['a body that is not XML', 'not a document'],
+    ['another document', '<other:root xmlns:other="urn:x"/>'],
+  ])(
+    'GetMessageClassMessage: the strategy refuses %s, the handler decides nothing',
+    async (_what, body) => {
+      const { analyseMessageClassMessage } = jest.requireActual(
+        '@mcp-abap-adt/adt-strategies',
+      );
+      const { ADT_NO_FAILURE } = jest.requireActual(
+        '@mcp-abap-adt/interfaces-adt',
+      );
+      const verdict = analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
+        status: 200,
+        data: body,
+      });
+      expect(verdict).not.toBe(ADT_NO_FAILURE);
+      expect(verdict.code).toBe('ADT_OBJECT_NOT_FOUND');
+      // A strategy that clears it is the consumer's choice: the handler
+      // answers what it read, without a failure of its own.
+      mockMsg.read.mockResolvedValue(okResponse(body));
+      const result = await handleGetMessageClassMessage(ctx, {
+        message_class_name: 'zmy_msgs',
+        msgno: '001',
+      });
+      expect(result.isError).toBe(false);
+      expect(payload(result).message).toBeUndefined();
+    },
+  );
+
   it('GetMessageClassMessage refuses a number the class does not hold', async () => {
     // The real strategy over the real document: `analyseMessageClassMessage`
     // is what refuses, before any projection.

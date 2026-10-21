@@ -76,25 +76,21 @@ export async function handleGetMessageClassMessage(
         }),
     (document: string) => {
       if (detail === 'raw') return document;
+      // Whether the answer holds the message is the strategy's verdict
+      // (`analyseMessageClassMessage`, above): it refuses a class without the
+      // message and an answer that is no class document (adt-strategies
+      // 0.14.0), on the same local names this reading compares.
       const message = classMessageOf(document, msgno);
-      // The refusal above reads the same document with the same comparison,
-      // so a class without the message never reaches this; a document it
-      // passed that still holds no such element is a defect of the reading.
-      if (message === undefined) {
-        throw new Error(
-          `Message ${msgno} was not found in the class document of ${className}`,
-        );
-      }
       const answered = {
         success: true,
         message_class_name: className,
         msgno,
-        message: message.fields,
+        message: message?.fields,
       };
       // `full` adds the element as parsed — attributes verbatim, its links
       // included — so nothing of the one message is dropped.
       return detail === 'full'
-        ? { ...answered, element: message.element }
+        ? { ...answered, element: message?.element }
         : answered;
     },
   );

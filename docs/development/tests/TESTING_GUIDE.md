@@ -97,13 +97,21 @@ eighteen packages once and serves the tarballs from a loopback registry
 registry.npmjs.org — so it **needs the network**, as `binSmoke.test.ts` does, and never fetches a
 package of the release from the registry.
 
-It is the slowest suite of the root `npm test`: **about 100 s** on a developer machine, about
-**20 npm installs** (four at a time). It is part of the full gate list and of CI; to leave it out
-of a local run, set `SKIP_INSTALL_MATRIX=true`, and the suite prints that it was skipped:
+It is the slowest suite of the root `npm test`: **about 100 s** on Linux (measured), about
+**20 npm installs** (four at a time). It is part of the full gate list. To leave it out of a local
+run, set `SKIP_INSTALL_MATRIX=true`, and the suite prints that it was skipped:
 
 ```bash
 SKIP_INSTALL_MATRIX=true npm test
 ```
+
+**Where it runs in CI.** In one cell only: **ubuntu-latest with Node 22**, in `ci.yml` and in
+`release.yml`. Every other cell (`ci.yml`: Node 24 on Linux, both macOS cells, both Windows cells;
+`release.yml`: Node 24) sets `SKIP_INSTALL_MATRIX: 'true'` on its `npm test` step
+(`workflowInventory.test.ts` holds both workflows to that). **Windows is not covered by CI:** with
+the suite on, both windows-latest cells hung in `npm test` for over 40 minutes, where the Linux and
+macOS cells finished the whole step in 9–11 minutes; the cause is not established. A Windows run
+of the install matrix is a local run on a Windows machine.
 
 ## Test Modes
 

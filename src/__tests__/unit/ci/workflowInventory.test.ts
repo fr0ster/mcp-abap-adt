@@ -111,3 +111,63 @@ describe.each(WORKFLOWS)('%s names every package of the release', (file) => {
     expect(sorted(prefixed(lines, 'test:check'))).toEqual(sorted(withTests));
   });
 });
+
+/**
+ * The install matrix runs in one CI cell: ubuntu-latest + Node 22. Every
+ * other cell's `npm test` step sets `SKIP_INSTALL_MATRIX` to `'true'` (on
+ * windows-latest both cells hung in that step with it).
+ */
+const INSTALL_MATRIX_GATE = {
+  'ci.yml':
+    "SKIP_INSTALL_MATRIX: ${{ (matrix.os == 'ubuntu-latest' && matrix.node-version == 22) && 'false' || 'true' }}",
+  'release.yml':
+    "SKIP_INSTALL_MATRIX: ${{ matrix.node-version == 22 && 'false' || 'true' }}",
+} as const;
+
+/** The lines of the step named `name`, up to the next step. */
+function step(lines: string[], name: string): string[] {
+  const start = lines.findIndex((line) => line.trim() === `- name: ${name}`);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => line.trim().startsWith('- name: '));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+describe.each(WORKFLOWS)('%s runs the install matrix in one cell', (file) => {
+  const lines = read(file);
+
+  it("the npm test step's SKIP_INSTALL_MATRIX: 'false' only on ubuntu-latest + Node 22", () => {
+    const run = step(lines, 'Run tests').map((line) => line.trim());
+    expect(run).toContain('run: npm test');
+    expect(run).toContain('env:');
+    expect(
+      run.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
+    ).toEqual([INSTALL_MATRIX_GATE[file]]);
+  });
+
+  it('the job runs where the gate assumes', () => {
+    const text = lines.join('\n');
+    if (file === 'ci.yml') {
+      expect(text).toContain('runs-on: ${{ matrix.os }}');
+      expect(text).toContain(
+        'os: [ubuntu-latest, macos-latest, windows-latest]',
+      );
+    } else {
+      // The test job, the first of the file.
+      expect(
+        lines.find((line) => line.trim().startsWith('runs-on:'))?.trim(),
+      ).toBe('runs-on: ubuntu-latest');
+    }
+    expect(text).toContain('node-version: [22, 24]');
+  });
+});
+
+it('the install matrix suite skips only on SKIP_INSTALL_MATRIX=true', () => {
+  const source = readFileSync(
+    join(ROOT, 'src', '__tests__', 'unit', 'installMatrix.test.ts'),
+    'utf8',
+  );
+  expect(source).toContain(
+    "const SKIPPED = process.env.SKIP_INSTALL_MATRIX === 'true';",
+  );
+});

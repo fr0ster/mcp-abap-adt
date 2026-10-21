@@ -100,6 +100,11 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          # The install matrix (installMatrix.test.ts: ~100 s and ~20 npm
+          # installs on Linux) runs on one cell only, Node 22 (this job is
+          # ubuntu-latest); the Node 24 cell skips it, and the suite says so.
+          SKIP_INSTALL_MATRIX: ${{ matrix.node-version == 22 && 'false' || 'true' }}
 
       # These six packages' tests run in the root `npm test` above (one shared
       # Jest configuration, its roots name every package); only their types are

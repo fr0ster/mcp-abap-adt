@@ -28,6 +28,15 @@ import { gunzipSync } from 'node:zlib';
  * Point the scope at it with `npmArgs` (the scope's registry, and no rewriting
  * of the public registry's tarball URLs to it); unscoped packages go to the
  * public registry as npm is configured.
+ *
+ * **What it forwards ignores npm's configuration.** A `@mcp-abap-adt/*`
+ * request that is not one of this checkout's tarballs is fetched from
+ * `https://registry.npmjs.org` with plain `fetch`: npm's configured
+ * `registry`, its proxy settings (`proxy`, `https-proxy`, `noproxy`) and its
+ * CA are not read. On a CI runner, which reaches the public registry
+ * directly, that is fine; behind a corporate mirror or proxy that blocks it,
+ * the non-release `@mcp-abap-adt/*` dependencies (the ADT clients, the auth
+ * packages) fail to resolve and the install tests fail with them.
  */
 export interface TarballRegistry {
   /** `http://127.0.0.1:<port>` */

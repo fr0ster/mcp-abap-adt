@@ -13,6 +13,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { RELEASE_DIRS } from '../../helpers/installedRelease';
 
 const ROOT = path.join(__dirname, '..', '..', '..', '..');
 
@@ -148,6 +149,32 @@ function accepts(range: string, version: string): boolean {
 }
 
 describe('the package set', () => {
+  it('the install tests (RELEASE_DIRS), publish-all.sh and this list name the same eighteen packages', () => {
+    const script = fs
+      .readFileSync(path.join(ROOT, 'scripts', 'publish-all.sh'), 'utf8')
+      .split(/\r?\n/);
+    const start = script.findIndex((line) => line.trim() === 'PACKAGES=(');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = script.findIndex(
+      (line, index) => index > start && line.trim() === ')',
+    );
+    expect(end).toBeGreaterThan(start);
+    const published = script
+      .slice(start + 1, end)
+      .map((line) => line.trim().replace(/^"|"$/g, ''))
+      .filter((line) => line !== '')
+      .map((dir) => (dir === '.' ? '.' : dir.replace(/^\.\//, '')));
+    const listed = PACKAGES.map(([dir]) => dir);
+    const sorted = (dirs: readonly string[]) => [...dirs].sort();
+    for (const dirs of [published, RELEASE_DIRS, listed]) {
+      expect(dirs).toHaveLength(18);
+      expect(new Set(dirs).size).toBe(18);
+    }
+    // The order is publish-all's own concern (dependency order).
+    expect(sorted(published)).toEqual(sorted(listed));
+    expect(sorted(RELEASE_DIRS)).toEqual(sorted(listed));
+  });
+
   it('is eighteen packages, every manifest kept by .gitignore’s exceptions', () => {
     const ignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
     expect(PACKAGES).toHaveLength(18);
@@ -328,8 +355,9 @@ describe('the package set', () => {
         }).toEqual({
           dir,
           name,
-          peer: '^19.2.0',
-          dev: '^19.2.0',
+          // The ranges themselves are releaseMetadata's: each against the release.
+          peer: expect.any(String),
+          dev: expect.any(String),
           dependency: undefined,
         });
       }

@@ -12,27 +12,32 @@ the MCP Registry, and neither needs a secret beyond the built-in `GITHUB_TOKEN`.
 **Steps, on every combination:**
 1. `npm ci`
 2. Biome lint: `npx biome check src --diagnostic-level=error`, then each package's `lint:check`
-   (`server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, `compact-http`, `compact-sse` and the six
-   `-ro` packages)
+   (`server`, `http`, `sse`, `compact`, `compact-readonly-entries`, `compact-modify`, `background-runs-memory`,
+   `responsible-rules`, `server-runtime`, `compact-http`, `compact-sse` and the six `-ro` packages)
 3. `npm run build`
 4. Test type-check: `npm run test:check`
 5. `npm test` — every package's suites, once: the root `package.json` holds the one Jest configuration, and its roots
    name the root `src` and every package's `src`
-6. The server, http, sse, background-runs-memory and responsible-rules test type-check: `npm --prefix <dir> run test:check`
+6. The server-runtime, server, http, sse, background-runs-memory and responsible-rules test type-check:
+   `npm --prefix <dir> run test:check` (since 19.2.0 the transports' launch code and its suites live in `server-runtime`;
+   `server`, `http` and `sse` keep the test of their own entry points)
 
 Every step gates the run; none is `continue-on-error`.
 
 **On Ubuntu / Node 22 only:**
 - `npm audit --omit=dev --audit-level=high`
-- `npm pack` of all seventeen packages (`lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`,
-  `compact-modify`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`, `core-ro`,
+- `npm pack` of all eighteen packages (`lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`,
+  `compact-modify`, `server-runtime`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`, `core-ro`,
   `http-ro`, `sse-ro`, `compact-ro`, `compact-http-ro`, `compact-sse-ro`)
-- an install of the seventeen tarballs into an empty directory, a check that no package resolved a
-  sibling other than the one built in that run (a nested copy is one the registry supplied), and
+- an install of the eighteen tarballs into an empty directory, a check that no package resolved a
+  sibling — a dependency or a peer — other than the one built in that run (a nested copy is one the
+  registry supplied), and
   `--version` and `--help` of each of the twelve bins
 - the twelve Docker images, built from those tarballs and checked
   (`node scripts/ci/check-images.mjs --tarballs <dir>`): `docker/Dockerfile` with `VARIANT=<variant>`
-  and `PACKAGE_SOURCE=tarballs`, so each image is this run's code. Each binary answers `--version`
+  and `PACKAGE_SOURCE=tarballs`, so each image is this run's code: every package of the release in the
+  image (`server-runtime` always among them) was installed from its tarball, none from the registry. Each
+  binary answers `--version`
   with its package's version and a `tools/list`; a Streamable HTTP or SSE image also answers
   `/mcp/health` with `200`, passes its own `HEALTHCHECK`, and a `tools/call` with `x-sap-*` basic
   credentials reaches an ADT stand-in (`scripts/ci/adt-stand-in.mjs`, a container on the check's own
@@ -51,8 +56,8 @@ Every step gates the run; none is `continue-on-error`.
 **Jobs:**
 1. `test` — Ubuntu × Node 22 and 24: `npm ci`, Biome lint (root and each package's
    `lint:check`), build, test type-check, tests (every package's, in the one root `npm test`), the
-   server, http, sse, background-runs-memory and responsible-rules test type-check; on Node 22 also what CI runs on Ubuntu / Node 22 alone: `npm pack` of the
-   seventeen packages, the install of the tarballs and the twelve bins, the twelve Docker images
+   server-runtime, server, http, sse, background-runs-memory and responsible-rules test type-check; on Node 22 also what CI runs on Ubuntu / Node 22 alone: `npm pack` of the
+   eighteen packages, the install of the tarballs and the twelve bins, the twelve Docker images
    built from the tarballs and checked, and the Glama reference image when its version is on npm.
 2. `release` — after `test` passes: creates a GitHub Release for the tag with
    `softprops/action-gh-release` and generated release notes. No package or other file is

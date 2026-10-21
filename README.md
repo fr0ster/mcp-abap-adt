@@ -115,22 +115,31 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone stdio server, `mcp-abap-adt`: one destination through the auth broker. Depends on the library. |
 | [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http) | AGPL-3.0-only | The Streamable HTTP server, `mcp-abap-adt-http`: credentials from each request's `x-sap-*` headers. |
 | [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse) | AGPL-3.0-only | The HTTP+SSE server, `mcp-abap-adt-sse`: credentials from the `x-sap-*` headers of each SSE connection's `GET`. |
-| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact server over stdio, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. `core`'s launcher and configuration with the compact tool set. |
-| [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http) | AGPL-3.0-only | The compact server over Streamable HTTP, `mcp-abap-adt-compact-http`: `http`'s launcher and configuration with the compact tool set. |
-| [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse) | AGPL-3.0-only | The compact server over HTTP+SSE, `mcp-abap-adt-compact-sse`: `sse`'s launcher and configuration with the compact tool set. |
-| [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. `core`, `http` and `sse` depend on it. |
-| [`@mcp-abap-adt/responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Apache-2.0 | The rules that name a call's responsible, user and system from `systeminformation` (`SystemContextRules` of the library), and the system type the binaries require. `core`, `http` and `sse` pass them; the library applies none, so an embedder opts in. |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact server over stdio, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. `core`'s launcher and configuration (from `server-runtime`) with the compact tool set. |
+| [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http) | AGPL-3.0-only | The compact server over Streamable HTTP, `mcp-abap-adt-compact-http`: `http`'s launcher and configuration (from `server-runtime`) with the compact tool set. |
+| [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse) | AGPL-3.0-only | The compact server over HTTP+SSE, `mcp-abap-adt-compact-sse`: `sse`'s launcher and configuration (from `server-runtime`) with the compact tool set. |
+| [`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) | AGPL-3.0-only | The launch code of every server: the stdio, Streamable HTTP and SSE launchers and servers, and the destination layer. **No command of its own**: every server package depends on it, so it is installed with each server; you never install it yourself. |
+| [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. Every server package depends on it. |
+| [`@mcp-abap-adt/responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Apache-2.0 | The rules that name a call's responsible, user and system from `systeminformation` (`SystemContextRules` of the library), and the system type the binaries require. Every server package passes them; the library applies none, so an embedder opts in. |
 | [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search), batch mode and, on stdio, the leftover-session list and logoff — no high, debugger, background-run or resume tool. |
 | [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 17 compact tools that change nothing, `HandlerBatch` and, on stdio, the leftover-session list and logoff. |
 | [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
-Seventeen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
+Eighteen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
 each transport. **The binary fixes the tool set** (19.0.0; there is no `--exposition`): install the
 one for your transport and the tools you want to run a server — `@mcp-abap-adt/core`, `http` or
 `sse` (readonly, high, the debugger), their `-ro` packages (the readonly tools alone), `compact`,
 `compact-http`, `compact-sse`, or their `-ro` packages (the compact tools that change nothing).
 Install `@mcp-abap-adt/lib` to embed the tools in your own application. Every binary and its
 tools: [Handler sets](docs/user-guide/HANDLERS_MANAGEMENT.md).
+
+**Each server is installed on its own** (`npm install -g @mcp-abap-adt/compact`): a server
+package brings everything it runs on — `server-runtime`, `lib` and the rest — and depends on
+no other server package, so installing two servers, in one command or in two, is fine and
+neither needs the other. Since 19.2.0 a process that loads two copies of `@mcp-abap-adt/lib`
+anyway does not start: it prints `Two copies of @mcp-abap-adt/lib are loaded in this process
+(…): reinstall <package> (npm install -g <package>).` and exits `1` — see
+[One `lib` per server process](docs/architecture/README.md#one-lib-per-server-process-1920).
 
 ### 1. Standalone MCP Server (Default)
 Run as a standalone MCP server; a binary is its transport (there is no `--transport` option):
@@ -544,9 +553,9 @@ package you install.
 | Packages | Licence | |
 |---|---|---|
 | `@mcp-abap-adt/lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`, `compact-modify` | Apache-2.0 | [`LICENSE`](LICENSE), [`NOTICE`](NOTICE); each package's own `LICENSE` |
-| `@mcp-abap-adt/core`, `http`, `sse`, `compact`, `compact-http`, `compact-sse` and the six `-ro` packages | AGPL-3.0-only | [`server/LICENSE`](server/LICENSE); each package's own `LICENSE` |
+| `@mcp-abap-adt/server-runtime`, `core`, `http`, `sse`, `compact`, `compact-http`, `compact-sse` and the six `-ro` packages | AGPL-3.0-only | [`server/LICENSE`](server/LICENSE); each package's own `LICENSE` |
 
-All seventeen are published from this repository with one command, in dependency
+All eighteen are published from this repository with one command, in dependency
 order ([Release](docs/deployment/RELEASE.md)):
 
 ```bash

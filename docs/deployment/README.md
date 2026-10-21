@@ -7,7 +7,7 @@ How the server is run in a container and how a release is made.
 - **[DOCKER.md](./DOCKER.md)** — running the server in Docker: one image per binary from
   `docker/Dockerfile` (`VARIANT`), what works in them (HTTP, TLS) and what does not (RFC, SNC,
   browser login).
-- **[RELEASE.md](./RELEASE.md)** — the seventeen npm packages, `npm run release:publish`, the tag and
+- **[RELEASE.md](./RELEASE.md)** — the eighteen npm packages (`server-runtime` among them, with no command), `npm run release:publish`, the tag and
   the GitHub Release.
 - **[GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md)** — what `ci.yml` and `release.yml` run.
 - **[MCP_REGISTRY.md](./MCP_REGISTRY.md)** — the twelve registry entries, one per server package

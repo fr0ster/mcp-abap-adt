@@ -161,7 +161,7 @@ The server calls `getProvider(destination)` and hands the provider to the connec
 | **Runtime role** | Built by the broker for a destination; the connector calls its four methods |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
-core (stdio) supports three authentications, each served by one handler (`server/src/auth/handlers/`); `jwt` / `none` is refused — a token you hold is http's and sse's `x-sap-jwt-token` header (`TokenAuthProvider.fixed`):
+core (stdio) supports three authentications, each served by one handler (`server-runtime/src/stdio/auth/handlers/`); `jwt` / `none` is refused — a token you hold is http's and sse's `x-sap-jwt-token` header (`TokenAuthProvider.fixed`):
 
 | Authentication | `SAP_AUTH_TYPE` / `SAP_GRANT_TYPE` | Provider |
 |:---|:---|:---|
@@ -239,8 +239,8 @@ Each step accumulates results in `TState`, providing full audit trail of the ope
 |:---|:---|
 | **Responsibility** | MCP protocol adapter -- translates MCP tool calls into ADT client operations |
 | **Runtime role** | Primary application entry point; one composition root per binary |
-| **Packages** | `@mcp-abap-adt/core` (`server/`, `mcp-abap-adt`: stdio), `@mcp-abap-adt/http` (`http/`, `mcp-abap-adt-http`: Streamable HTTP), `@mcp-abap-adt/sse` (`sse/`, `mcp-abap-adt-sse`: HTTP+SSE), each on `@mcp-abap-adt/lib`, `@mcp-abap-adt/background-runs-memory` and `@mcp-abap-adt/responsible-rules`; the compact and `-ro` packages are one call each of their transport's `main` with another tool set (Composition Roots below) — twelve binaries in all |
-| **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod`; only core depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores` |
+| **Packages** | `@mcp-abap-adt/server-runtime` (`server-runtime/`, no command): the launch code of the three transports; `@mcp-abap-adt/core` (`server/`, `mcp-abap-adt`: stdio), `@mcp-abap-adt/http` (`http/`, `mcp-abap-adt-http`: Streamable HTTP), `@mcp-abap-adt/sse` (`sse/`, `mcp-abap-adt-sse`: HTTP+SSE), each its bin and version over the runtime, on `@mcp-abap-adt/lib`, `@mcp-abap-adt/background-runs-memory` and `@mcp-abap-adt/responsible-rules`; the compact and `-ro` packages are one call each of the runtime's `main` of their transport with another tool set (Composition Roots below) — twelve binaries in all, none depending on another |
+| **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod`; `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores` are `server-runtime`'s dependencies, so every server installs them, and only its stdio paths (`/stdio`, `/stdio/server`, `/auth`) load them |
 
 #### The three packages and their connection sources
 
@@ -264,8 +264,10 @@ type Source =
 | embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
 
 The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.ts`): the published
-lib, http and sse declare and reach no broker, stores or `interfaces-auth-broker`; http and sse
-never reach each other.
+lib and the http and sse packages declare and reach no broker, stores or `interfaces-auth-broker`;
+`server-runtime` declares them and only its stdio paths reach them; http and sse never reach each
+other; no binary package depends on another (`packageSet.test.ts`), and `lib` is a peer of every
+package below the binaries — see [One `lib` per server process](README.md#one-lib-per-server-process-1920).
 
 #### The stateful window and the main flow
 
@@ -339,7 +341,7 @@ and nothing is kept, so the next call that creates one asks again. Never after a
 runs twice**. The lookup (`systeminformation`, through the resolver the host passes; none by
 default) answers only the information, no information, or a credential failure (a chain failure, a
 `401`: the call's as it came); what the parameters are is the rules' the host passes
-(`SystemContextRules`): core, http and sse pass `@mcp-abap-adt/responsible-rules` — the information
+(`SystemContextRules`): every server (server-runtime's launchers) passes `@mcp-abap-adt/responsible-rules` — the information
 wins; no information is, on ABAP Cloud, one step to the error (a `404`
 `cloud_without_systeminformation`: the configuration or headers are inconsistent; anything else
 `system_lookup_failed`), on-premise the stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`,
@@ -376,8 +378,8 @@ injected connection has them made by its first call (`systemBeforeTool`), inside
 
 #### Composition Roots
 
-`server/src/launcher.ts` (core), `http/src/launcher.ts` and `sse/src/launcher.ts` wire each
-binary. Each `main({ toolSet, program, version })` takes the tools as a `ToolSet`
+`server-runtime/src/stdio/launcher.ts` (core), `server-runtime/src/http/launcher.ts` and `server-runtime/src/sse/launcher.ts` wire each
+binary. Each `main({ toolSet, program, version, packageName })` takes the tools as a `ToolSet`
 (`@mcp-abap-adt/lib/tool-set`) and nothing else of them, and the binary fixes it: the full
 bins pass `fullToolSet`, the read-only packages (`core-ro/`, `http-ro/`, `sse-ro/`)
 `fullReadOnlyToolSet`, the compact packages (`compact/`, `compact-http/`, `compact-sse/`)
@@ -386,7 +388,8 @@ bins pass `fullToolSet`, the read-only packages (`core-ro/`, `http-ro/`, `sse-ro
 half — so the four sets share every transport's behaviour:
 
 ```
-main({ toolSet, program, version })
+main({ toolSet, program, version, packageName })
+  ├── libInstances()                                 // more than one copy of lib: the guard line, exit 1
   ├── readStartupConfig(<binary>Parameters(toolSet))  // its own table; the set's removed --exposition
   │                                                   //   stops the start, naming the binary to use
   ├── registryOf(toolSet)                             // full: ReadOnly, System, BackgroundRun, HighLevel,
@@ -605,19 +608,20 @@ The system has three distinct IoC boundaries:
 
 ### 4.4 Composition Root Location
 
-`server/src/launcher.ts` is core's composition root (stdio). It:
+`server-runtime/src/stdio/launcher.ts` is core's composition root (stdio). It:
 
-1. Reads configuration (CLI, YAML, env)
-2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
-3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
-4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`
-5. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
-6. Starts `StdioServer` with `destinationSource`
+1. Refuses a second copy of `@mcp-abap-adt/lib` in the process (`libInstances()`; one line on stderr, exit `1`), before anything else
+2. Reads configuration (CLI, YAML, env)
+3. Chooses the stores of a destination (`server-runtime/src/stdio/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
+4. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
+5. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`
+6. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
+7. Starts `StdioServer` with `destinationSource`
 
-`http/src/launcher.ts` and `sse/src/launcher.ts` read their configuration, assemble the
+`server-runtime/src/http/launcher.ts` and `server-runtime/src/sse/launcher.ts` refuse a second copy of `lib` the same way, read their configuration, assemble the
 registry of the tool set they are given and start their server; neither has a broker, a store
-or a login. `compact/`, `compact-http/` and `compact-sse/` are each one call of their transport's
-`main` with the compact tool set; the six `-ro` packages one call each with a read-only set.
+or a login. `compact/`, `compact-http/` and `compact-sse/` are each one call of the runtime's
+`main` of their transport with the compact tool set; the six `-ro` packages one call each with a read-only set.
 
 No other file in the system creates concrete cross-package dependencies.
 
@@ -649,7 +653,7 @@ const broker = new AuthBroker({
 To add an authentication the server serves:
 
 1. **Implement or reuse an `IAuthProvider`** (`prepare`, `establish`, `authorize`, `rejected`; none may throw -- each answers `{ ok: true }` or a refusal)
-2. **Add an `AuthenticationHandler`** in `server/src/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
+2. **Add an `AuthenticationHandler`** in `server-runtime/src/stdio/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
 3. Add its row to the table in section 2.6 and a test; the rest of the system remains unchanged -- the connector presents whatever `IAuthProvider` it is given
 
 An embedder that has its own connection passes it as an injected source (`EmbeddableMcpServer`'s `connection`); one that has its own credential gives a `ConnectionSource` whose `resolve` answers it, and the server builds nothing from settings.
@@ -659,9 +663,9 @@ An embedder that has its own connection passes it as an injected source (`Embedd
 ### 5.3 Custom Configuration Handling
 
 Each binary reads its own parameter table through lib's machinery (`src/lib/config/authParameters.ts`):
-`CORE_PARAMETERS` (`server/src/config/coreParameters.ts`: the destination, browser and login rows),
-`HTTP_PARAMETERS` (`http/src/config/httpParameters.ts`) and `SSE_PARAMETERS`
-(`sse/src/config/sseParameters.ts`), each beside lib's shared rows (`--conf`,
+`CORE_PARAMETERS` (`server-runtime/src/stdio/config/coreParameters.ts`: the destination, browser and login rows),
+`HTTP_PARAMETERS` (`server-runtime/src/http/config/httpParameters.ts`) and `SSE_PARAMETERS`
+(`server-runtime/src/sse/config/sseParameters.ts`), each beside lib's shared rows (`--conf`,
 `--system-type`, `--state-idle-minutes`; the TLS rows in http and sse), and the tool set's removed
 `--exposition`. A table gives:
 - CLI arguments, environment variables and YAML keys (`--conf <path>`; configuration only, a secret-looking key is refused); CLI beats env beats YAML
@@ -830,7 +834,8 @@ For troubleshooting:
 │
 └── mcp-abap-adt (main server -- composition root, consumes all)
     ├── Depends on all packages above
-    └── @modelcontextprotocol/sdk
+    ├── @modelcontextprotocol/sdk
+    └── @mcp-abap-adt/server-runtime (the launch code; every binary package depends on it, none on another)
 
 @mcp-abap-adt/proxy (independent auxiliary -- uses auth-broker, auth-stores, auth-providers)
 

@@ -10,7 +10,7 @@
  * disposal, an SSE close, shutdown — run against the ADT stand-in in
  * `unit/shutdown/lockHeldLogoff.test.ts`, `undoFailsLogoff.test.ts` and the
  * http, sse and server shutdown suites; the stdio connection kept after its
- * caller cancelled in `server/src/__tests__/cancel/lateConnect.test.ts`.
+ * caller cancelled in `server-runtime/src/stdio/__tests__/cancel/lateConnect.test.ts`.
  */
 
 import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';

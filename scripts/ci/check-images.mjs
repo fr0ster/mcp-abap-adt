@@ -5,8 +5,10 @@
 //   npm pack --pack-destination <dir> . ./background-runs-memory ./responsible-rules … (every package)
 //   node scripts/ci/check-images.mjs --tarballs <dir> [--tag <tag>] [--keep-images] [variant …]
 //
-// Every image: its binary answers --version with its package's version (this
-// checkout's). stdio images: a tools/list over stdin (`docker run -i`) answers.
+// Every image: each package of the release in it was installed from its
+// tarball, none from the registry, and @mcp-abap-adt/server-runtime (which
+// every binary package depends on) is among them; its binary answers
+// --version with its package's version (this checkout's). stdio images: a tools/list over stdin (`docker run -i`) answers.
 // Streamable HTTP and SSE images: /mcp/health answers 200 and the image's own
 // HEALTHCHECK passes; a tools/list and a tools/call with x-sap-* basic
 // credentials answer, and the call reaches an ADT stand-in
@@ -64,6 +66,23 @@ if (tarballs === undefined || !fs.existsSync(tarballs)) {
 tarballs = path.resolve(tarballs);
 const variants = chosen.length > 0 ? chosen : Object.keys(VARIANTS);
 
+/** The package name of each tarball supplied: the release's packages. */
+const RUNTIME = '@mcp-abap-adt/server-runtime';
+const released = new Set(
+  fs
+    .readdirSync(tarballs)
+    .filter((file) => file.endsWith('.tgz'))
+    .map(
+      (file) =>
+        JSON.parse(execFileSync('tar', ['-xzOf', path.join(tarballs, file), 'package/package.json'], { encoding: 'utf8' }))
+          .name,
+    ),
+);
+if (!released.has(RUNTIME)) {
+  console.error(`no tarball of ${RUNTIME} in ${tarballs}: every image needs it, and it would come from the registry`);
+  process.exit(2);
+}
+
 // ---- docker ----
 const docker = (args, options = {}) =>
   execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
@@ -109,6 +128,38 @@ function isWriteTool(name) {
   let rest = name.startsWith('Handler') ? name.slice('Handler'.length) : name;
   if (rest.startsWith('Transport')) rest = rest.slice('Transport'.length);
   return WRITE_VERBS.some((verb) => rest.startsWith(verb)) || rest === 'DebugSetVariable';
+}
+
+/**
+ * Where each package of the release in the image came from: the image's
+ * lockfile records every installed package with what it was resolved from — a
+ * tarball is `file:…/tarballs/<file>.tgz`, the registry an https URL. Every
+ * copy of a released package must be a tarball, and the runtime must be there.
+ */
+function checkProvenance(variant, image) {
+  const lock = JSON.parse(docker(['run', '--rm', '--entrypoint', 'cat', image, '/opt/mcp-abap-adt/package-lock.json']));
+  const copies = Object.entries(lock.packages ?? {})
+    .map(([at, entry]) => ({ at, name: at.slice(at.lastIndexOf('node_modules/') + 'node_modules/'.length), entry }))
+    .filter(({ at, name }) => at !== '' && released.has(name));
+  const foreign = copies.filter(({ entry }) => {
+    const resolved = String(entry.resolved ?? '');
+    return !(resolved.startsWith('file:') && resolved.includes('/tarballs/') && resolved.endsWith('.tgz'));
+  });
+  check(
+    variant,
+    'every package of the release came from its tarball',
+    copies.length > 0 && foreign.length === 0,
+    foreign.length > 0
+      ? foreign.map(({ at, entry }) => `${at} ← ${entry.resolved ?? '(no resolved)'}`).join(', ')
+      : `${copies.length} packages`,
+  );
+  const runtime = copies.filter(({ name }) => name === RUNTIME);
+  check(
+    variant,
+    `${RUNTIME} is installed, from its tarball`,
+    runtime.length > 0 && runtime.every((copy) => !foreign.includes(copy)),
+    runtime.map(({ at, entry }) => `${at} ← ${entry.resolved ?? '(no resolved)'}`).join(', ') || 'absent',
+  );
 }
 
 function checkToolList(variant, names) {
@@ -368,6 +419,7 @@ try {
       continue;
     }
     try {
+      checkProvenance(variant, image);
       const answered = docker(['run', '--rm', image, '--version']);
       check(variant, `--version answers ${version}`, answered === version, answered);
       if (transport === 'stdio') {

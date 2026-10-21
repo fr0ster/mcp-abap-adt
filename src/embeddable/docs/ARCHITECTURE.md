@@ -223,7 +223,7 @@ lookup whose parameters were not kept, is asked by the first call on it (`system
 alone. With no resolver (`systemContextResolver`, default none) nothing is looked up. The lookup
 (`parametersOnce`: one in flight per connection) answers the information, no information, or a
 credential failure — passed through as it came; what the parameters are is the host's rules'
-(`SystemContextRules.parametersFor`, `src/lib/requestSystemResolution.ts`): core, http and sse pass
+(`SystemContextRules.parametersFor`, `src/lib/requestSystemResolution.ts`): every server (server-runtime's launchers) passes
 `@mcp-abap-adt/responsible-rules` (the information wins; ABAP Cloud one step to its error,
 on-premise the stated responsible, else the login, else `system_user_unknown`; no kind
 `system_type_required`), lib applies none — without rules the information is applied, no

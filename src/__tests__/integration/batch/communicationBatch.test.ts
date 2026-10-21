@@ -180,7 +180,7 @@ async function serve(kind: Kind): Promise<Served> {
     entry,
     [
       `import { main } from ${JSON.stringify(path.join(REPO, 'compact/src/launcher'))};`,
-      `import { launcherFailedLine } from ${JSON.stringify(path.join(REPO, 'server/src/launcher'))};`,
+      `import { launcherFailedLine } from ${JSON.stringify(path.join(REPO, 'server-runtime/src/stdio/launcher'))};`,
       'void main().catch((err) => {',
       '  console.error(launcherFailedLine(err));',
       '  process.exit(1);',

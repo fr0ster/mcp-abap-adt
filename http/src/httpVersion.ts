@@ -10,6 +10,11 @@ import { join } from 'node:path';
  * `dist/` when built) and the package root when installed — in every layout it
  * is this package's `package.json`.
  */
-export const HTTP_VERSION: string = JSON.parse(
+const manifest: { name: string; version: string } = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
-).version;
+);
+
+export const HTTP_VERSION: string = manifest.version;
+
+/** `@mcp-abap-adt/http`'s own package name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const HTTP_PACKAGE: string = manifest.name;

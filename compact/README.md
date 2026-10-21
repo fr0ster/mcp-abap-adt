@@ -105,7 +105,9 @@ alive on each transport and what ends it: [Debugger](https://github.com/fr0ster/
 Configuration — the destination, authentication, the login — is the same as
 `mcp-abap-adt`'s, because the launcher is the same one: this command passes the
 compact tool set (`compactToolSetOf` of `@mcp-abap-adt/lib/tool-set`, with the two
-halves' entry builders) to `@mcp-abap-adt/core`'s `main`, and nothing else.
+halves' entry builders) to the stdio `main` of `@mcp-abap-adt/server-runtime` — the one
+`mcp-abap-adt` runs —, and nothing else. It depends on no other server package (not on
+`@mcp-abap-adt/core`).
 
 **RFC and SNC** work here exactly as in the full server, and need the same preparation **before** `npm install -g @mcp-abap-adt/compact`: the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` set in the shell — the RFC module is compiled during the install and silently left out when it cannot be. Check with `npm ls -g @mcp-abap-adt/sap-rfc-lite`. Steps: [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/RFC_SETUP.md); every variant: [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 

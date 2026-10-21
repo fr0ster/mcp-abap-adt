@@ -21,7 +21,8 @@ Streamable HTTP and HTTP+SSE are packages of their own, serving credentials from
 `x-sap-*` headers: [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)
 (`mcp-abap-adt-http`) and [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)
 (`mcp-abap-adt-sse`). There is no `--transport` option: it, and any option of those binaries, stops
-this one naming the binary to run. Only this package depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores`.
+this one naming the binary to run. Only the stdio servers (this one, `compact`, `core-ro`,
+`compact-ro`) load `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores`.
 
 It connects to the ABAP system over **HTTP** (basic or JWT), **RFC** (basic) or **SNC**
 (passwordless, over RFC). HTTP needs nothing more. **RFC and SNC need the SAP NW RFC SDK, a C++
@@ -45,6 +46,17 @@ the binary to install instead.
 The tools themselves are not here. They live in
 [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), which
 this package depends on.
+
+**Where the code lives (19.2.0).** The launcher, `StdioServer` and the destination layer live in
+[`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime),
+which is installed with this package; this package holds the `mcp-abap-adt` binary and its
+version. Its exports are unchanged, as re-exports: `@mcp-abap-adt/core` of
+`server-runtime/stdio/server` (its `StdioServer` answers core's version when constructed without
+one), `@mcp-abap-adt/core/launcher` of `server-runtime/stdio` (its `main` and `launch` take
+19.1.0's options, `{ toolSet, program, version }`: `packageName` — required on
+`server-runtime/stdio` — is optional here and defaults to `@mcp-abap-adt/core`),
+`@mcp-abap-adt/core/auth` of `server-runtime/auth`. No other server package depends on this one: `compact`, `core-ro` and
+`compact-ro` run the same launcher from `server-runtime`, so each server is installed on its own.
 
 ## Licence
 

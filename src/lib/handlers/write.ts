@@ -8,6 +8,9 @@
  * `TYPE_TO_FAMILY` lives here rather than beside the types because it is the
  * activation family map, and activation writes.
  */
+
+import '../instance.js';
+
 export { handleCreateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCreateBehaviorDefinition.js';
 export { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition.js';
 export { handleUpdateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition.js';

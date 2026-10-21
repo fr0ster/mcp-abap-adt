@@ -60,6 +60,15 @@
       ],
       "@mcp-abap-adt/lib/tool-set": [
         "../src/lib/toolSet.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/stdio": [
+        "../server-runtime/src/stdio/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/stdio/server": [
+        "../server-runtime/src/stdio/server.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/auth": [
+        "../server-runtime/src/stdio/auth/index.ts"
       ]
     },
     "noEmit": true

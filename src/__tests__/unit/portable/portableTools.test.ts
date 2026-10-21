@@ -3,6 +3,7 @@
  * scripts/portable/elf.cjs (the RUNPATH rewrite) and tools.cjs (how npm and
  * tar are started, and the search path the smoke check runs with).
  */
+import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 const elf = require('../../../../scripts/portable/elf.cjs');
@@ -51,6 +52,86 @@ describe('RUNPATH rewrite', () => {
     expect(() => elf.patchRunpath(image('/l'), '/l', '$ORIGIN')).toThrow(
       /longer/,
     );
+  });
+});
+
+// A minimal ELF64 little-endian image: a header, a dynamic section and its
+// string table, with the given dynamic entries ([tag, string]).
+const elfImage = (entries: Array<[number, string]>) => {
+  const strings = Buffer.concat([
+    Buffer.from([0]),
+    ...entries.map(([, s]) => Buffer.from(`${s}\0`)),
+  ]);
+  const dynamic = Buffer.alloc(16 * (entries.length + 1));
+  let offset = 1;
+  entries.forEach(([tag, s], i) => {
+    dynamic.writeBigInt64LE(BigInt(tag), i * 16);
+    dynamic.writeBigUInt64LE(BigInt(offset), i * 16 + 8);
+    offset += Buffer.byteLength(s) + 1;
+  });
+  const header = Buffer.alloc(64);
+  header.writeUInt32BE(0x7f454c46, 0);
+  header[4] = 2;
+  header[5] = 1;
+  const dynOff = 64;
+  const strOff = dynOff + dynamic.length;
+  const shoff = strOff + strings.length;
+  header.writeBigUInt64LE(BigInt(shoff), 0x28);
+  header.writeUInt16LE(64, 0x3a);
+  header.writeUInt16LE(3, 0x3c);
+  const section = (type: number, off: number, size: number, link: number) => {
+    const s = Buffer.alloc(64);
+    s.writeUInt32LE(type, 4);
+    s.writeBigUInt64LE(BigInt(off), 0x18);
+    s.writeBigUInt64LE(BigInt(size), 0x20);
+    s.writeUInt32LE(link, 0x28);
+    return s;
+  };
+  return Buffer.concat([
+    header,
+    dynamic,
+    strings,
+    section(0, 0, 0, 0),
+    section(6, dynOff, dynamic.length, 2),
+    section(3, strOff, strings.length, 0),
+  ]);
+};
+
+describe('RUNPATH read', () => {
+  it('reads the RUNPATH the image carries, whoever built it', () => {
+    const image = elfImage([
+      [1, 'libsapnwrfc.so'],
+      [29, '/publisher/sdk/lib'],
+    ]);
+    expect(elf.readRunpath(image)).toBe('/publisher/sdk/lib');
+    expect(
+      elf.patchRunpath(image, elf.readRunpath(image), '$ORIGIN'),
+    ).toHaveLength(image.length);
+  });
+
+  it('reads an RPATH when there is no RUNPATH', () => {
+    expect(elf.readRunpath(elfImage([[15, '/old/lib']]))).toBe('/old/lib');
+  });
+
+  it('refuses an image with none: the SDK beside it would not be found', () => {
+    expect(() => elf.readRunpath(elfImage([[1, 'libc.so.6']]))).toThrow(
+      /no RUNPATH/,
+    );
+  });
+
+  it('refuses an image with two', () => {
+    expect(() =>
+      elf.readRunpath(
+        elfImage([
+          [29, '/a'],
+          [15, '/b'],
+        ]),
+      ),
+    ).toThrow(/more than one/);
+  });
+
+  it('refuses what is not a 64-bit little-endian ELF', () => {
+    expect(() => elf.readRunpath(Buffer.alloc(64))).toThrow(/not a 64-bit/);
   });
 });
 
@@ -128,6 +209,64 @@ describe('the search path the smoke check runs with', () => {
     expect(tools.withoutSdk(undefined, 'libsapnwrfc.so', () => true)).toBe(
       undefined,
     );
+  });
+});
+
+describe('the environment the smoke check runs every executable with', () => {
+  // A shell that states a system: every one of these would route, or type,
+  // the smoke's RFC logon if it reached the child.
+  const parent = {
+    PATH: ['/usr/bin', '/opt/sdk/lib'].join(path.delimiter),
+    LD_LIBRARY_PATH: '/opt/sdk/lib',
+    HOME: '/home/someone',
+    SAPNWRFC_HOME: '/opt/sdk',
+    SAP_MSHOST: 'msg.unreachable.invalid',
+    SAP_MSSERV: '3600',
+    SAP_SYSID: 'SID',
+    SAP_GROUP: 'PUBLIC',
+    SAP_SAPROUTER: '/H/192.0.2.1/S/3299',
+    SAP_SYSNR: '00',
+    SAP_CONNECTION_TYPE: 'http',
+    SAP_SYSTEM_TYPE: 'cloud',
+    SAP_URL: 'http://unreachable.invalid:8000',
+    sap_username: 'someone',
+    MCP_ENV_PATH: '/home/someone/.env',
+    MCP_BROWSER: 'chrome',
+    AUTH_BROKER_PATH: '/home/someone/.config/mcp-abap-adt',
+  };
+  const sdkHere = (p: string) =>
+    p === path.join('/opt/sdk/lib', 'libsapnwrfc.so');
+
+  it('carries no SAP_*, MCP_*, AUTH_BROKER_PATH or SAPNWRFC_HOME of the caller', () => {
+    const env = tools.smokeEnv(parent, 'libsapnwrfc.so', sdkHere);
+    expect(
+      Object.keys(env).filter((key) =>
+        /^(SAP|MCP)_|^AUTH_BROKER_PATH$|^SAPNWRFC_HOME$/i.test(key),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps the rest, the search paths without an SDK folder', () => {
+    const env = tools.smokeEnv(parent, 'libsapnwrfc.so', sdkHere);
+    expect(env.HOME).toBe('/home/someone');
+    expect(env.PATH).toBe('/usr/bin');
+    expect(env.LD_LIBRARY_PATH).toBe('');
+  });
+
+  it('is the one environment smoke.mjs gives every child', () => {
+    const source = readFileSync(
+      path.join(__dirname, '../../../../scripts/portable/smoke.mjs'),
+      'utf8',
+    );
+    expect(source).toContain('const env = smokeEnv(process.env, sdkLib);');
+    // process.env is read once more, for SystemRoot only; no child gets it.
+    const reads = source.split('process.env').length - 1;
+    expect(reads).toBe(2);
+    expect(source).toContain('process.env.SystemRoot');
+    // Every child: spawnSync, spawn and the MCP transport take `env` alone.
+    expect(source.match(/\benv: (?!process)[^,}\n]+/g) ?? []).toEqual([]);
+    expect((source.match(/\{ env, encoding/g) ?? []).length).toBe(1);
+    expect((source.match(/^\s+env,$/gm) ?? []).length).toBe(2);
   });
 });
 

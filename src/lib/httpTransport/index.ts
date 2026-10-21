@@ -4,6 +4,9 @@
  * rebinding protection, the TLS listener, and the header connection source
  * with its two `400` sentences.
  */
+
+import '../instance.js';
+
 export {
   CREDENTIALS_REQUIRED_WORDS,
   DESTINATIONS_ONLY_STDIO_WORDS,

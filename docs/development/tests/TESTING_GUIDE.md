@@ -74,17 +74,44 @@ npm test -- --testPathPatterns="class|unitTest|cds"
 ### One Jest configuration for every package
 
 The root `package.json` holds the repository's only Jest configuration: its `roots` name the root `src` and every
-package's `src` (`server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, the compact packages and
+package's `src` (`server-runtime`, `server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, the compact packages and
 the six `-ro` packages), and its `moduleNameMapper` resolves every sibling package to its sources. The root
 `npm test` runs every package's suites once. A package's own `npm test` runs that same configuration for its folder
 only (`npm --prefix .. test -- --roots <package>/src`), so it works from inside the package:
 
 ```bash
-cd server && npm test        # the server package's suites alone
-npm --prefix http test       # the same for http, from the repository root
+cd server-runtime && npm test   # the runtime's suites alone (the three transports' launchers and servers)
+npm --prefix http test          # http's own suites (its exports), from the repository root
 ```
 
 A package's `test:check` still type-checks its tests against its own `tsconfig.test.json`.
+
+### The install matrix (`SKIP_INSTALL_MATRIX`)
+
+`src/__tests__/unit/installMatrix.test.ts` proves that every server process loads one copy of
+`@mcp-abap-adt/lib` in every install layout: global (a wrapper with its former base, in one command
+or in two, either order), local (hoisted, and `--install-strategy=nested`), a runtime at a later
+patch than the binary, and an embedder's `compact-readonly-entries` with `lib`. It packs the
+eighteen packages once and serves the tarballs from a loopback registry
+(`src/__tests__/helpers/tarballRegistry.ts`), which passes every other package request on to
+registry.npmjs.org — so it **needs the network**, as `binSmoke.test.ts` does, and never fetches a
+package of the release from the registry.
+
+It is the slowest suite of the root `npm test`: **about 100 s** on Linux (measured), about
+**20 npm installs** (four at a time). It is part of the full gate list. To leave it out of a local
+run, set `SKIP_INSTALL_MATRIX=true`, and the suite prints that it was skipped:
+
+```bash
+SKIP_INSTALL_MATRIX=true npm test
+```
+
+**Where it runs in CI.** In one cell only: **ubuntu-latest with Node 22**, in `ci.yml` and in
+`release.yml`. Every other cell (`ci.yml`: Node 24 on Linux, both macOS cells, both Windows cells;
+`release.yml`: Node 24) sets `SKIP_INSTALL_MATRIX: 'true'` on its `npm test` step
+(`workflowInventory.test.ts` holds both workflows to that). **Windows is not covered by CI:** with
+the suite on, both windows-latest cells hung in `npm test` for over 40 minutes, where the Linux and
+macOS cells finished the whole step in 9–11 minutes; the cause is not established. A Windows run
+of the install matrix is a local run on a Windows machine.
 
 ## Test Modes
 

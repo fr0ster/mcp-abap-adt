@@ -9,5 +9,9 @@
  * the package's own root entry. The subpath exports are the documented way in,
  * and they keep working.
  */
+
+import './lib/instance.js';
+
 export * from './embeddable/index.js';
 export * from './lib/handlers/index.js';
+export { type LibInstance, libInstances } from './lib/instance.js';

@@ -59,6 +59,12 @@
       ],
       "@mcp-abap-adt/lib/tool-set": [
         "../dist/lib/toolSet.d.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse": [
+        "../server-runtime/dist/sse/launcher.d.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse/server": [
+        "../server-runtime/dist/sse/server.d.ts"
       ]
     }
   },

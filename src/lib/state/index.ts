@@ -4,6 +4,9 @@
  * shutdown sequence and its logoffs at once. Not on the embeddable entry: an embedder closes its own
  * instance with `closeInstance` and owns its process's signals.
  */
+
+import '../instance.js';
+
 export {
   isLatched,
   SHUTDOWN_SENTENCE,

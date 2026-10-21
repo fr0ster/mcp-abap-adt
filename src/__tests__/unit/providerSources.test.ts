@@ -26,6 +26,7 @@ const REPO = path.resolve(__dirname, '../../..');
 const ROOTS = [
   'src',
   'server/src',
+  'server-runtime/src',
   'http/src',
   'sse/src',
   'compact/src',
@@ -40,7 +41,7 @@ const FACTORY_FILE = path.join(REPO, 'src/lib/connectionFactory.ts');
 const CREDENTIAL_HOMES = [
   path.join(REPO, 'src/lib/credentialSources.ts'),
   path.join(REPO, 'src/lib/auth') + path.sep,
-  path.join(REPO, 'server/src/auth') + path.sep,
+  path.join(REPO, 'server-runtime/src/stdio/auth') + path.sep,
 ];
 
 /** A path relative to the repository, with POSIX separators on every platform. */

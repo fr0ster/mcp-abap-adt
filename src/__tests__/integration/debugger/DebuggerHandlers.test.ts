@@ -35,7 +35,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
-import { resolveEnvFilePath } from '../../../../server/src/config/envResolver';
+import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
 import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';

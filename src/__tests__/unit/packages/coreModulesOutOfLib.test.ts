@@ -1,7 +1,7 @@
 /**
  * The destination's env file and the stores' platform paths are core's
  *: `envFileContext`, `envResolver` and `platformPaths` live
- * in `server/src/config/`. Nothing of them comes back to lib — no module at
+ * in `server-runtime/src/stdio/config/`. Nothing of them comes back to lib — no module at
  * its old path, and no name in any entry of lib's `exports`, in `src` and, when
  * built, in `dist`.
  */

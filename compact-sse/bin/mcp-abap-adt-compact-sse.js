@@ -3,7 +3,7 @@
 /**
  * mcp-abap-adt-compact-sse — the compact MCP ABAP ADT server over HTTP+SSE.
  *
- * `@mcp-abap-adt/sse`'s launcher with the compact tool set, started in this
+ * `@mcp-abap-adt/server-runtime/sse`'s launcher with the compact tool set, started in this
  * process.
  */
 const { main } = require('../dist/launcher.js');

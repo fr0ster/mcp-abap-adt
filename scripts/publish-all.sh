@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the seventeen packages of this repository to npm, in dependency order.
+# Publish the eighteen packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
@@ -23,21 +23,23 @@ for arg in "$@"; do
   [ "$arg" = "--dry-run" ] && DRY="--dry-run"
 done
 
-# Order matters and is not cosmetic: dependency order. core (./server), http
-# and sse each resolve @mcp-abap-adt/lib through paths into ../dist, so none
-# can build until the library has; background-runs-memory and
-# responsible-rules depend on lib, and core, http and sse depend on both;
-# compact depends on core, compact-http on
-# http and compact-sse on sse. core, http and sse do not depend on one another.
-# The six read-only packages come last: core-ro and compact-ro depend on
-# core, http-ro and compact-http-ro on http, sse-ro and compact-sse-ro on sse,
-# and the compact ones on compact-readonly-entries.
+# Order matters and is not cosmetic: dependency order. The library goes
+# first: background-runs-memory, responsible-rules, compact-readonly-entries
+# and compact-modify take lib as a peer (the binary package owns it).
+# server-runtime takes lib, background-runs-memory and responsible-rules as
+# peers and holds the stdio, Streamable HTTP and SSE launch code; every one of
+# the twelve binary packages depends on it (and on lib, background-runs-memory
+# and responsible-rules), so it goes before ./server. The compact binaries
+# depend on compact-readonly-entries, the three writing ones (compact,
+# compact-http, compact-sse) on compact-modify too. No binary package depends
+# on another, so their order among themselves does not matter.
 PACKAGES=(
   "."
   "./background-runs-memory"
   "./responsible-rules"
   "./compact-readonly-entries"
   "./compact-modify"
+  "./server-runtime"
   "./server"
   "./http"
   "./sse"

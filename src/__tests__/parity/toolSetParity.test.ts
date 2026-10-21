@@ -50,13 +50,13 @@ import * as compactRo from '../../../compact-ro/src/launcher';
 import * as compactSse from '../../../compact-sse/src/launcher';
 import * as compactSseRo from '../../../compact-sse-ro/src/launcher';
 import * as coreRo from '../../../core-ro/src/launcher';
-import { HTTP_VERSION } from '../../../http/src/httpVersion';
-import { main as httpMain } from '../../../http/src/launcher';
+import { HTTP_PACKAGE, HTTP_VERSION } from '../../../http/src/httpVersion';
 import * as httpRo from '../../../http-ro/src/launcher';
-import { CORE_VERSION } from '../../../server/src/coreVersion';
-import { main as coreMain } from '../../../server/src/launcher';
-import { main as sseMain } from '../../../sse/src/launcher';
-import { SSE_VERSION } from '../../../sse/src/sseVersion';
+import { CORE_PACKAGE, CORE_VERSION } from '../../../server/src/coreVersion';
+import { main as httpMain } from '../../../server-runtime/src/http/launcher';
+import { main as sseMain } from '../../../server-runtime/src/sse/launcher';
+import { main as coreMain } from '../../../server-runtime/src/stdio/launcher';
+import { SSE_PACKAGE, SSE_VERSION } from '../../../sse/src/sseVersion';
 import * as sseRo from '../../../sse-ro/src/launcher';
 import { activeTools, resetProcessLatchForTests } from '../../lib/activeTools';
 import {
@@ -108,6 +108,7 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
             toolSet: fullToolSet,
             program: 'mcp-abap-adt',
             version: CORE_VERSION,
+            packageName: CORE_PACKAGE,
           },
           edges,
         ),
@@ -138,6 +139,7 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
             toolSet: fullToolSet,
             program: 'mcp-abap-adt-http',
             version: HTTP_VERSION,
+            packageName: HTTP_PACKAGE,
           },
           edges,
         ),
@@ -168,6 +170,7 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
             toolSet: fullToolSet,
             program: 'mcp-abap-adt-sse',
             version: SSE_VERSION,
+            packageName: SSE_PACKAGE,
           },
           edges,
         ),

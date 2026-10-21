@@ -13,7 +13,9 @@
       "@mcp-abap-adt/lib/tool-set": ["../dist/lib/toolSet.d.ts"],
       "@mcp-abap-adt/compact-readonly-entries": ["../compact-readonly-entries/dist/index.d.ts"],
       "@mcp-abap-adt/compact-modify": ["../compact-modify/dist/index.d.ts"],
-      "@mcp-abap-adt/core/launcher": ["../server/dist/launcher.d.ts"]
+      "@mcp-abap-adt/server-runtime/stdio": ["../server-runtime/dist/stdio/launcher.d.ts"],
+      "@mcp-abap-adt/background-runs-memory": ["../background-runs-memory/dist/index.d.ts"],
+      "@mcp-abap-adt/responsible-rules": ["../responsible-rules/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],

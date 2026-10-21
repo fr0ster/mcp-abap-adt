@@ -12,21 +12,32 @@
  * carries them — following a sibling package of this repository through its
  * own `exports`:
  *
- * - lib, http, sse, compact-http and compact-sse declare and reach no
- *   auth-broker, auth-stores or interfaces-auth-broker; core declares them
- *   and reaches them; compact reaches them only through core, declaring none;
+ * - lib, the http packages (http, compact-http, http-ro, compact-http-ro)
+ *   and the sse packages (sse, compact-sse, sse-ro, compact-sse-ro) declare
+ *   and reach no auth-broker, auth-stores or interfaces-auth-broker;
+ *   server-runtime declares them and reaches them;
+ *   core, compact, core-ro and compact-ro reach them only through
+ *   server-runtime, declaring none;
+ * - server-runtime reaches no binary package and neither half; it takes lib,
+ *   background-runs-memory and responsible-rules as peers;
+ * - background-runs-memory and responsible-rules take lib as a peer (the
+ *   binary package owns it: spec §2a); a peer counts as declared;
  * - http reaches no sse and sse no http; neither reaches core;
- * - compact-http and compact-sse reach no core (nor compact), and each
- *   reaches exactly its own transport package;
+ * - the stdio packages (core, compact, core-ro, compact-ro), the http
+ *   packages and the sse packages reach server-runtime's path of their
+ *   transport, no other
+ *   transport's path of it and no file of another transport's directory of
+ *   it, and no other binary package;
  * - the six read-only packages reach lib, their own transport's
- *   package and — a compact one — the half that changes nothing, and never
- *   the modifying half or another transport;
+ *   package (or runtime path) and — a compact one — the half that changes
+ *   nothing, and never the modifying half or another transport;
  * - every package a file of a package imports is declared in that package's
  *   own published dependencies, so a packed install resolves it — and, for
  *   core, http and sse, present in the root manifest, so the root install
  *   that development and CI use resolves it too;
- * - no source of core, http or sse (tests included) reaches into another
- *   transport's directory by a relative path.
+ * - no source of a transport (tests included) reaches into another
+ *   transport's directory by a relative path — server-runtime's stdio, http
+ *   and sse directories counted as stdio's, http's and sse's.
  *
  * The packages come from one table.
  */
@@ -54,7 +65,44 @@ interface Row {
   undeclared?: string[];
   /** Declared in its published `dependencies` and reached by its graph. */
   required?: string[];
+  /** Declared in its `peerDependencies` (and `devDependencies`) and reached by its graph. */
+  peers?: string[];
+  /** Reached by its graph (through a sibling), whether declared or not. */
+  reaches?: string[];
+  /** The runtime path of its transport (`@mcp-abap-adt/server-runtime/stdio`): reached; no other transport's. */
+  runtimePath?: string;
 }
+
+const RUNTIME = '@mcp-abap-adt/server-runtime';
+/** server-runtime's import paths, per transport; `/auth` is the destination layer, stdio's. */
+const RUNTIME_PATHS: Record<string, readonly string[]> = {
+  stdio: [`${RUNTIME}/stdio`, `${RUNTIME}/stdio/server`, `${RUNTIME}/auth`],
+  http: [`${RUNTIME}/http`, `${RUNTIME}/http/server`],
+  sse: [`${RUNTIME}/sse`, `${RUNTIME}/sse/server`],
+};
+/** The runtime's directory of each transport, under its `src` and its `dist`. */
+const RUNTIME_DIRS: Record<string, string> = {
+  stdio: 'stdio',
+  http: 'http',
+  sse: 'sse',
+};
+/** The files of server-runtime in another transport's directory than `runtimePath`'s. */
+const inOtherRuntimeDir = (runtimePath: string, file: string): boolean =>
+  Object.entries(RUNTIME_PATHS)
+    .filter(([, paths]) => !paths.includes(runtimePath))
+    .some(([transport]) =>
+      ['src', 'dist'].some((tree) =>
+        file.startsWith(
+          path.join(ROOT, 'server-runtime', tree, RUNTIME_DIRS[transport]) +
+            path.sep,
+        ),
+      ),
+    );
+/** The runtime paths of every transport but the one `runtimePath` names. */
+const otherRuntimePaths = (runtimePath: string): string[] =>
+  Object.values(RUNTIME_PATHS)
+    .filter((paths) => !paths.includes(runtimePath))
+    .flat();
 
 const TRANSPORTS = [
   '@mcp-abap-adt/core',
@@ -75,12 +123,17 @@ const HALVES = [
   '@mcp-abap-adt/compact-modify',
 ];
 
-/** A compact package: lib, the two halves and `transport`, and no other transport. */
+/**
+ * A compact package: lib, the two halves and `transport`, and no other
+ * transport. A stdio one's transport is server-runtime, through its
+ * `runtimePath`.
+ */
 const compactOver = (
   name: string,
   dir: string,
   transport: string,
-  chainState: 'forbidden' | 'through core',
+  chainState: 'forbidden' | 'through the runtime',
+  runtimePath?: string,
 ): Row => ({
   name,
   dir,
@@ -88,8 +141,9 @@ const compactOver = (
     ...(chainState === 'forbidden' ? CHAIN_STATE : []),
     ...TRANSPORTS.filter((t) => t !== transport && t !== name),
   ],
-  ...(chainState === 'through core' && { undeclared: CHAIN_STATE }),
+  ...(chainState === 'through the runtime' && { undeclared: CHAIN_STATE }),
   required: ['@mcp-abap-adt/lib', transport, ...HALVES],
+  ...(runtimePath !== undefined && { runtimePath }),
 });
 
 /**
@@ -101,8 +155,9 @@ const readOnlyOver = (
   name: string,
   dir: string,
   transport: string,
-  chainState: 'forbidden' | 'through core',
+  chainState: 'forbidden' | 'through the runtime',
   compact: boolean,
+  runtimePath?: string,
 ): Row => ({
   name,
   dir,
@@ -112,12 +167,13 @@ const readOnlyOver = (
     '@mcp-abap-adt/compact-modify',
     ...(compact ? [] : ['@mcp-abap-adt/compact-readonly-entries']),
   ],
-  ...(chainState === 'through core' && { undeclared: CHAIN_STATE }),
+  ...(chainState === 'through the runtime' && { undeclared: CHAIN_STATE }),
   required: [
     '@mcp-abap-adt/lib',
     transport,
     ...(compact ? ['@mcp-abap-adt/compact-readonly-entries'] : []),
   ],
+  ...(runtimePath !== undefined && { runtimePath }),
 });
 
 /** The packages the rule covers. */
@@ -125,99 +181,133 @@ const PACKAGES: Row[] = [
   {
     name: '@mcp-abap-adt/lib',
     dir: '.',
-    forbidden: [...CHAIN_STATE, '@mcp-abap-adt/core'],
+    forbidden: [...CHAIN_STATE, '@mcp-abap-adt/core', RUNTIME],
   },
   // The in-memory background-run store: lib's contract, nothing else of ours.
   {
     name: '@mcp-abap-adt/background-runs-memory',
     dir: 'background-runs-memory',
-    forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES],
-    required: ['@mcp-abap-adt/lib'],
+    forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES, RUNTIME],
+    peers: ['@mcp-abap-adt/lib'],
   },
   // The responsible rules: lib's hook, nothing else of ours.
   {
     name: '@mcp-abap-adt/responsible-rules',
     dir: 'responsible-rules',
-    forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES],
-    required: ['@mcp-abap-adt/lib'],
+    forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES, RUNTIME],
+    peers: ['@mcp-abap-adt/lib'],
   },
+  // http: the runtime's http paths, and no broker or store through them.
   {
     name: '@mcp-abap-adt/http',
     dir: 'http',
     forbidden: [...CHAIN_STATE, '@mcp-abap-adt/sse', '@mcp-abap-adt/core'],
+    required: [RUNTIME, '@mcp-abap-adt/lib'],
+    runtimePath: `${RUNTIME}/http`,
   },
+  // sse: the runtime's sse paths, and no broker or store through them.
   {
     name: '@mcp-abap-adt/sse',
     dir: 'sse',
     forbidden: [...CHAIN_STATE, '@mcp-abap-adt/http', '@mcp-abap-adt/core'],
+    required: [RUNTIME, '@mcp-abap-adt/lib'],
+    runtimePath: `${RUNTIME}/sse`,
   },
+  // The servers' launch code: the broker and the stores, lib and its two
+  // state packages as peers (the binary package owns them), no binary package.
+  {
+    name: RUNTIME,
+    dir: 'server-runtime',
+    forbidden: [...TRANSPORTS, ...HALVES],
+    required: ['@mcp-abap-adt/auth-broker', '@mcp-abap-adt/auth-stores'],
+    peers: [
+      '@mcp-abap-adt/lib',
+      '@mcp-abap-adt/background-runs-memory',
+      '@mcp-abap-adt/responsible-rules',
+    ],
+  },
+  // core: the runtime's stdio paths, and the broker and the stores through them.
   {
     name: '@mcp-abap-adt/core',
     dir: 'server',
     forbidden: ['@mcp-abap-adt/http', '@mcp-abap-adt/sse'],
-    required: ['@mcp-abap-adt/auth-broker', '@mcp-abap-adt/auth-stores'],
+    undeclared: CHAIN_STATE,
+    required: [RUNTIME, '@mcp-abap-adt/lib'],
+    reaches: ['@mcp-abap-adt/auth-broker', '@mcp-abap-adt/auth-stores'],
+    runtimePath: `${RUNTIME}/stdio`,
   },
-  // stdio: the broker and the stores only through core.
+  // stdio: the broker and the stores only through the runtime.
   compactOver(
     '@mcp-abap-adt/compact',
     'compact',
-    '@mcp-abap-adt/core',
-    'through core',
+    RUNTIME,
+    'through the runtime',
+    `${RUNTIME}/stdio`,
   ),
+  // http: no broker or store, through the runtime or otherwise.
   compactOver(
     '@mcp-abap-adt/compact-http',
     'compact-http',
-    '@mcp-abap-adt/http',
+    RUNTIME,
     'forbidden',
+    `${RUNTIME}/http`,
   ),
+  // sse: no broker or store, through the runtime or otherwise.
   compactOver(
     '@mcp-abap-adt/compact-sse',
     'compact-sse',
-    '@mcp-abap-adt/sse',
+    RUNTIME,
     'forbidden',
+    `${RUNTIME}/sse`,
   ),
   // The six read-only packages: each over its transport's launcher.
   readOnlyOver(
     '@mcp-abap-adt/core-ro',
     'core-ro',
-    '@mcp-abap-adt/core',
-    'through core',
+    RUNTIME,
+    'through the runtime',
     false,
+    `${RUNTIME}/stdio`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/http-ro',
     'http-ro',
-    '@mcp-abap-adt/http',
+    RUNTIME,
     'forbidden',
     false,
+    `${RUNTIME}/http`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/sse-ro',
     'sse-ro',
-    '@mcp-abap-adt/sse',
+    RUNTIME,
     'forbidden',
     false,
+    `${RUNTIME}/sse`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/compact-ro',
     'compact-ro',
-    '@mcp-abap-adt/core',
-    'through core',
+    RUNTIME,
+    'through the runtime',
     true,
+    `${RUNTIME}/stdio`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/compact-http-ro',
     'compact-http-ro',
-    '@mcp-abap-adt/http',
+    RUNTIME,
     'forbidden',
     true,
+    `${RUNTIME}/http`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/compact-sse-ro',
     'compact-sse-ro',
-    '@mcp-abap-adt/sse',
+    RUNTIME,
     'forbidden',
     true,
+    `${RUNTIME}/sse`,
   ),
 ];
 
@@ -226,6 +316,7 @@ const SIBLING_DIRS = [
   '.',
   'background-runs-memory',
   'responsible-rules',
+  'server-runtime',
   'server',
   'http',
   'sse',
@@ -353,6 +444,8 @@ interface Graph {
   files: Set<string>;
   /** Every package name the graph imports, siblings included. */
   reached: Set<string>;
+  /** Every specifier of a sibling package the graph imports (`@mcp-abap-adt/server-runtime/stdio`). */
+  reachedPaths: Set<string>;
   /** Package name → the files of the package's own directory importing it. */
   ownImports: Map<string, Set<string>>;
 }
@@ -362,6 +455,7 @@ function walk(row: Row, mode: Mode): Graph {
   const graph: Graph = {
     files: new Set(),
     reached: new Set(),
+    reachedPaths: new Set(),
     ownImports: new Map(),
   };
   const queue: string[] = [];
@@ -406,6 +500,7 @@ function walk(row: Row, mode: Mode): Graph {
       }
       const sibling = SIBLINGS.get(name);
       if (sibling !== undefined) {
+        graph.reachedPaths.add(specifier);
         const sub = specifier.slice(name.length);
         queue.push(...entriesOf(sibling, sub ? `.${sub}` : '.', mode));
       }
@@ -430,9 +525,13 @@ function distDecision(
     : { modes: ['src'], skip: `[dependencyRule] dist graph skipped: ${words}` };
 }
 
-const unbuilt = PACKAGES.filter(
-  (row) => !fs.existsSync(path.join(ROOT, row.dir, 'dist', 'index.js')),
-).map((row) => row.name);
+// Built: every `exports` target there in `dist` — a package with subpath
+// exports only (server-runtime) has no `dist/index.js`.
+const unbuilt = PACKAGES.filter((row) => {
+  const keys = Object.keys(manifestOf(row.dir).exports ?? {});
+  const targets = keys.flatMap((key) => entriesOf(row.dir, key, 'dist'));
+  return targets.length === 0 || !targets.every((t) => fs.existsSync(t));
+}).map((row) => row.name);
 const ON_CI = (process.env.CI ?? '') !== '' && process.env.CI !== 'false';
 const decision = distDecision(unbuilt, ON_CI);
 if (decision.skip !== undefined) console.log(decision.skip);
@@ -480,6 +579,19 @@ describe.each(PACKAGES)('$name: published manifest', (row) => {
       }
     });
   }
+
+  if (row.peers) {
+    it('takes its peers as peerDependencies (and devDependencies), not dependencies', () => {
+      for (const name of row.peers ?? []) {
+        expect({
+          name,
+          peer: manifest.peerDependencies?.[name] !== undefined,
+          dev: manifest.devDependencies?.[name] !== undefined,
+          dependency: manifest.dependencies?.[name] !== undefined,
+        }).toEqual({ name, peer: true, dev: true, dependency: false });
+      }
+    });
+  }
 });
 
 describe.each(
@@ -498,11 +610,32 @@ describe.each(
     );
   });
 
-  if (row.required) {
+  if (row.required || row.peers || row.reaches) {
     it('reaches what it must', () => {
-      for (const name of row.required ?? []) {
+      for (const name of [
+        ...(row.required ?? []),
+        ...(row.peers ?? []),
+        ...(row.reaches ?? []),
+      ]) {
         expect(graph.reached).toContain(name);
       }
+    });
+  }
+
+  if (row.runtimePath !== undefined) {
+    const runtimePath = row.runtimePath;
+    it(`reaches ${runtimePath}, and no other transport's runtime path or directory`, () => {
+      expect(graph.reachedPaths).toContain(runtimePath);
+      expect(
+        [...graph.reachedPaths].filter((p) =>
+          otherRuntimePaths(runtimePath).includes(p),
+        ),
+      ).toEqual([]);
+      expect(
+        [...graph.files]
+          .filter((file) => inOtherRuntimeDir(runtimePath, file))
+          .map((file) => path.relative(ROOT, file)),
+      ).toEqual([]);
     });
   }
 
@@ -540,12 +673,12 @@ describe.each(
 
 describe('the root manifest: development install, not lib’s runtime', () => {
   const root = manifestOf('.');
-  const core = manifestOf('server');
+  const runtime = manifestOf('server-runtime');
 
-  it('holds the broker and the stores only as devDependencies, at exactly core’s ranges', () => {
+  it('holds the broker and the stores only as devDependencies, at exactly server-runtime’s ranges', () => {
     for (const name of CHAIN_STATE) {
       expect(published(root)[name]).toBeUndefined();
-      expect(root.devDependencies?.[name]).toBe(core.dependencies?.[name]);
+      expect(root.devDependencies?.[name]).toBe(runtime.dependencies?.[name]);
     }
   });
 });
@@ -558,32 +691,134 @@ describe('no transport reaches another by a relative path, tests included', () =
       .map((rel) => path.join(ROOT, dir, rel));
 
   it.each([
-    ['server/src', ['http', 'sse']],
-    ['http/src', ['server', 'sse']],
-    ['sse/src', ['server', 'http']],
-    ['compact/src', ['http', 'sse', 'compact-http', 'compact-sse']],
-    ['compact-http/src', ['server', 'sse', 'compact', 'compact-sse']],
-    ['compact-sse/src', ['server', 'http', 'compact', 'compact-http']],
-    ['core-ro/src', ['http', 'sse', 'compact', 'compact-http', 'compact-sse']],
+    [
+      'server/src',
+      ['http', 'server-runtime/src/http', 'sse', 'server-runtime/src/sse'],
+    ],
+    [
+      'server-runtime/src/stdio',
+      ['http', 'server-runtime/src/http', 'sse', 'server-runtime/src/sse'],
+    ],
+    [
+      'http/src',
+      ['server', 'server-runtime/src/stdio', 'sse', 'server-runtime/src/sse'],
+    ],
+    [
+      'server-runtime/src/http',
+      ['server', 'server-runtime/src/stdio', 'sse', 'server-runtime/src/sse'],
+    ],
+    [
+      'sse/src',
+      ['server', 'server-runtime/src/stdio', 'http', 'server-runtime/src/http'],
+    ],
+    [
+      'server-runtime/src/sse',
+      ['server', 'server-runtime/src/stdio', 'http', 'server-runtime/src/http'],
+    ],
+    [
+      'compact/src',
+      [
+        'http',
+        'server-runtime/src/http',
+        'sse',
+        'server-runtime/src/sse',
+        'compact-http',
+        'compact-sse',
+      ],
+    ],
+    [
+      'compact-http/src',
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'sse',
+        'server-runtime/src/sse',
+        'compact',
+        'compact-sse',
+      ],
+    ],
+    [
+      'compact-sse/src',
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'http',
+        'server-runtime/src/http',
+        'compact',
+        'compact-http',
+      ],
+    ],
+    [
+      'core-ro/src',
+      [
+        'http',
+        'server-runtime/src/http',
+        'sse',
+        'server-runtime/src/sse',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
+    ],
     [
       'http-ro/src',
-      ['server', 'sse', 'compact', 'compact-http', 'compact-sse'],
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'sse',
+        'server-runtime/src/sse',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
     ],
     [
       'sse-ro/src',
-      ['server', 'http', 'compact', 'compact-http', 'compact-sse'],
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'http',
+        'server-runtime/src/http',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
     ],
     [
       'compact-ro/src',
-      ['http', 'sse', 'compact', 'compact-http', 'compact-sse'],
+      [
+        'http',
+        'server-runtime/src/http',
+        'sse',
+        'server-runtime/src/sse',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
     ],
     [
       'compact-http-ro/src',
-      ['server', 'sse', 'compact', 'compact-http', 'compact-sse'],
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'sse',
+        'server-runtime/src/sse',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
     ],
     [
       'compact-sse-ro/src',
-      ['server', 'http', 'compact', 'compact-http', 'compact-sse'],
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'http',
+        'server-runtime/src/http',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
     ],
   ])('%s', (dir, others) => {
     const crossings: string[] = [];

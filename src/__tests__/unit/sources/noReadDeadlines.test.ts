@@ -28,6 +28,7 @@ const PACKAGES = [
   'compact-readonly-entries/src',
   'compact-modify/src',
   'server/src',
+  'server-runtime/src',
   'http/src',
   'sse/src',
   'core-ro/src',

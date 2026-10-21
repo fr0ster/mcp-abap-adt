@@ -3,7 +3,7 @@
 /**
  * mcp-abap-adt-compact-http — the compact MCP ABAP ADT server over Streamable HTTP.
  *
- * `@mcp-abap-adt/http`'s launcher with the compact tool set, started in this
+ * `@mcp-abap-adt/server-runtime/http`'s launcher with the compact tool set, started in this
  * process.
  */
 const { main } = require('../dist/launcher.js');

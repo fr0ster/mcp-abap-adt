@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/background-runs-memory",
-  "version": "19.1.0",
+  "version": "19.2.0",
   "description": "The in-memory store of the MCP ABAP ADT server's background runs: an IBackgroundRuns of @mcp-abap-adt/lib keeping each caller's runs and their answers in the process's memory, 16 per caller, until discarded or the process ends.",
   "license": "Apache-2.0",
   "publishConfig": {
@@ -46,10 +46,11 @@
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {
-    "@mcp-abap-adt/lib": "^19.1.0"
+  "peerDependencies": {
+    "@mcp-abap-adt/lib": "^19.2.0"
   },
   "devDependencies": {
+    "@mcp-abap-adt/lib": "^19.2.0",
     "@types/jest": "*",
     "@types/node": "*",
     "typescript": "*"

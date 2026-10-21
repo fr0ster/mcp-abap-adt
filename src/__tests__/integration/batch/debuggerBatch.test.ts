@@ -12,7 +12,7 @@
  *    e.g. through `MCP_TEST_CONFIG`) and ABAP Cloud. The case of the
  *    configured kind runs; the other two skip, saying why. Hard mode: the
  *    test starts the full server over stdio — the full command's `main`
- *    (`server/src/launcher.ts`) with `fullToolSet`, run from source through
+ *    (`server-runtime/src/stdio/launcher.ts`) with `fullToolSet`, run from source through
  *    tsx with `tsconfig.test.json`'s package paths — and calls its tools by
  *    name through an MCP client, as a model does. The debug target is the
  *    shared class `ZMCP_SHR_PROF_CLS` (`shared_dependencies`; running it
@@ -208,7 +208,7 @@ async function serve(kind: Kind): Promise<Served> {
     entry,
     [
       ...(TRACE_SESSIONS ? SESSION_TRACE_PREAMBLE : []),
-      `import { main, launcherFailedLine } from ${JSON.stringify(path.join(REPO, 'server/src/launcher'))};`,
+      `import { main, launcherFailedLine } from ${JSON.stringify(path.join(REPO, 'server-runtime/src/stdio/launcher'))};`,
       `import { CORE_VERSION } from ${JSON.stringify(path.join(REPO, 'server/src/coreVersion'))};`,
       `import { fullToolSet } from ${JSON.stringify(path.join(REPO, 'src/lib/toolSet'))};`,
       "void main({ toolSet: fullToolSet, program: 'mcp-abap-adt', version: CORE_VERSION }).catch((err) => {",

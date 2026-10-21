@@ -1,7 +1,8 @@
 /**
- * The package set: seventeen packages, twelve of them a binary each.
+ * The package set: eighteen packages, twelve of them a binary each.
  *
- * Every package of this repository builds (its `dist` entry is there after
+ * Every package of this repository builds (every file its `exports` map —
+ * or, without one, its `main` — names in `dist` is there after
  * `npm run build`), each binary package declares exactly its bin and ships
  * the file, and every dependency range is a registry range — a sibling of
  * this repository by its version range, never a `file:`, `link:`,
@@ -12,6 +13,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { RELEASE_DIRS } from '../../helpers/installedRelease';
 
 const ROOT = path.join(__dirname, '..', '..', '..', '..');
 
@@ -22,6 +24,7 @@ const PACKAGES: ReadonlyArray<readonly [string, string, string | null]> = [
   ['responsible-rules', '@mcp-abap-adt/responsible-rules', null],
   ['compact-readonly-entries', '@mcp-abap-adt/compact-readonly-entries', null],
   ['compact-modify', '@mcp-abap-adt/compact-modify', null],
+  ['server-runtime', '@mcp-abap-adt/server-runtime', null],
   ['server', '@mcp-abap-adt/core', 'mcp-abap-adt'],
   ['http', '@mcp-abap-adt/http', 'mcp-abap-adt-http'],
   ['sse', '@mcp-abap-adt/sse', 'mcp-abap-adt-sse'],
@@ -48,6 +51,7 @@ interface Manifest {
   name: string;
   version: string;
   main?: string;
+  exports?: Record<string, string | Record<string, string>>;
   bin?: Record<string, string>;
   files?: string[];
   dependencies?: Record<string, string>;
@@ -59,6 +63,22 @@ interface Manifest {
 
 const manifestOf = (dir: string): Manifest =>
   JSON.parse(fs.readFileSync(path.join(ROOT, dir, 'package.json'), 'utf8'));
+
+/**
+ * Every file a package's manifest points an importer at: each condition's
+ * target of its `exports` map, or its `main` when it has none.
+ */
+function declaredTargets(manifest: Manifest): string[] {
+  if (manifest.exports === undefined) {
+    return manifest.main === undefined ? [] : [manifest.main];
+  }
+  const targets = new Set<string>();
+  for (const entry of Object.values(manifest.exports)) {
+    const values = typeof entry === 'string' ? [entry] : Object.values(entry);
+    for (const target of values) targets.add(target);
+  }
+  return [...targets];
+}
 
 /** A range npm resolves on the registry: `*`, or `^` / `~` / nothing before a version. Plain code. */
 function isRegistryRange(range: string): boolean {
@@ -129,9 +149,35 @@ function accepts(range: string, version: string): boolean {
 }
 
 describe('the package set', () => {
-  it('is seventeen packages, every manifest kept by .gitignore’s exceptions', () => {
+  it('the install tests (RELEASE_DIRS), publish-all.sh and this list name the same eighteen packages', () => {
+    const script = fs
+      .readFileSync(path.join(ROOT, 'scripts', 'publish-all.sh'), 'utf8')
+      .split(/\r?\n/);
+    const start = script.findIndex((line) => line.trim() === 'PACKAGES=(');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = script.findIndex(
+      (line, index) => index > start && line.trim() === ')',
+    );
+    expect(end).toBeGreaterThan(start);
+    const published = script
+      .slice(start + 1, end)
+      .map((line) => line.trim().replace(/^"|"$/g, ''))
+      .filter((line) => line !== '')
+      .map((dir) => (dir === '.' ? '.' : dir.replace(/^\.\//, '')));
+    const listed = PACKAGES.map(([dir]) => dir);
+    const sorted = (dirs: readonly string[]) => [...dirs].sort();
+    for (const dirs of [published, RELEASE_DIRS, listed]) {
+      expect(dirs).toHaveLength(18);
+      expect(new Set(dirs).size).toBe(18);
+    }
+    // The order is publish-all's own concern (dependency order).
+    expect(sorted(published)).toEqual(sorted(listed));
+    expect(sorted(RELEASE_DIRS)).toEqual(sorted(listed));
+  });
+
+  it('is eighteen packages, every manifest kept by .gitignore’s exceptions', () => {
     const ignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
-    expect(PACKAGES).toHaveLength(17);
+    expect(PACKAGES).toHaveLength(18);
     for (const [dir, name] of PACKAGES) {
       expect(manifestOf(dir).name).toBe(name);
       expect(manifestOf(dir).workspaces).toBeUndefined();
@@ -249,6 +295,79 @@ describe('the package set', () => {
     }
   });
 
+  // Spec §2a: one `dependencies` entry for lib per install tree — the
+  // binary package's. Everything below the binaries takes lib (and the
+  // runtime its two state packages) as a peer, so npm resolves it to the
+  // binary's one copy in every layout.
+  const BINARIES = PACKAGES.filter(([, , bin]) => bin !== null);
+  const BINARY_NAMES = BINARIES.map(([, name]) => name);
+  const STATE = [
+    '@mcp-abap-adt/background-runs-memory',
+    '@mcp-abap-adt/responsible-rules',
+  ];
+  const BELOW: ReadonlyArray<readonly [string, readonly string[]]> = [
+    ['server-runtime', ['@mcp-abap-adt/lib', ...STATE]],
+    ['compact-readonly-entries', ['@mcp-abap-adt/lib']],
+    ['compact-modify', ['@mcp-abap-adt/lib']],
+    ['background-runs-memory', ['@mcp-abap-adt/lib']],
+    ['responsible-rules', ['@mcp-abap-adt/lib']],
+  ];
+
+  it('twelve binary packages, none depending on another', () => {
+    expect(BINARIES).toHaveLength(12);
+    for (const [dir, name] of BINARIES) {
+      const manifest = manifestOf(dir);
+      const edges = (
+        ['dependencies', 'optionalDependencies', 'peerDependencies'] as const
+      ).flatMap((field) =>
+        Object.keys(manifest[field] ?? {})
+          .filter((dep) => dep !== name && BINARY_NAMES.includes(dep))
+          .map((dep) => `${field} ${dep}`),
+      );
+      expect({ dir, edges }).toEqual({ dir, edges: [] });
+    }
+  });
+
+  it.each(BINARIES)(
+    '%s: lists the runtime, lib and the two state packages in dependencies',
+    (dir) => {
+      const dependencies = manifestOf(dir).dependencies ?? {};
+      const missing = [
+        '@mcp-abap-adt/server-runtime',
+        '@mcp-abap-adt/lib',
+        ...STATE,
+      ].filter((dep) => dependencies[dep] === undefined);
+      expect(missing).toEqual([]);
+    },
+  );
+
+  it.each(BELOW)(
+    '%s: takes %j as peerDependencies (and devDependencies), not dependencies',
+    (dir, peers) => {
+      const manifest = manifestOf(dir);
+      for (const name of peers) {
+        expect({
+          dir,
+          name,
+          peer: manifest.peerDependencies?.[name],
+          dev: manifest.devDependencies?.[name],
+          dependency: manifest.dependencies?.[name],
+        }).toEqual({
+          dir,
+          name,
+          // The ranges themselves are releaseMetadata's: each against the release.
+          peer: expect.any(String),
+          dev: expect.any(String),
+          dependency: undefined,
+        });
+      }
+    },
+  );
+
+  it('server-runtime has no bin', () => {
+    expect(manifestOf('server-runtime').bin).toBeUndefined();
+  });
+
   it('the lockfile installs nothing by link', () => {
     const lock = JSON.parse(
       fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8'),
@@ -260,10 +379,15 @@ describe('the package set', () => {
   });
 
   // Built by `npm run build`, as the dependency rule's dist graph is: under
-  // CI an unbuilt package is refused; locally it is skipped, saying so.
-  const unbuilt = PACKAGES.filter(
-    ([dir]) => !fs.existsSync(path.join(ROOT, dir, 'dist', 'index.js')),
-  ).map(([dir]) => dir);
+  // CI an unbuilt package is refused; locally it is skipped, saying so. What
+  // is checked is what an importer reaches: every target of the package's
+  // `exports` map (or its `main` without one) — a package with subpath
+  // exports only (server-runtime) has no `dist/index.js` to look for.
+  const unbuilt = PACKAGES.flatMap(([dir]) =>
+    declaredTargets(manifestOf(dir))
+      .filter((target) => !fs.existsSync(path.join(ROOT, dir, target)))
+      .map((target) => `${dir}: ${target}`),
+  );
   const onCi = (process.env.CI ?? '') !== '' && process.env.CI !== 'false';
   if (unbuilt.length > 0 && !onCi) {
     console.log(
@@ -271,7 +395,16 @@ describe('the package set', () => {
     );
   }
 
-  it('every package builds: its dist entry is there after npm run build', () => {
+  it('every package declares what it exports', () => {
+    for (const [dir] of PACKAGES) {
+      expect({
+        dir,
+        targets: declaredTargets(manifestOf(dir)).length > 0,
+      }).toEqual({ dir, targets: true });
+    }
+  });
+
+  it('every package builds: each exported file is there after npm run build', () => {
     if (unbuilt.length > 0 && !onCi) return;
     expect(unbuilt).toEqual([]);
   });

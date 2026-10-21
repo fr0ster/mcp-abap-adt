@@ -13,6 +13,11 @@ import { join } from 'node:path';
  * `node bin/…`, `mcp-proxy` — the variable was unset and every transport answered
  * `serverInfo.version: "1.0.0"`, whatever was installed.
  */
-export const CORE_VERSION: string = JSON.parse(
+const manifest: { name: string; version: string } = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
-).version;
+);
+
+export const CORE_VERSION: string = manifest.version;
+
+/** `@mcp-abap-adt/core`'s own package name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const CORE_PACKAGE: string = manifest.name;

@@ -13,6 +13,9 @@
  * barrels disjoint and their union equal to what the facade needs. Nothing here
  * changes an object, takes an enqueue, or executes ABAP.
  */
+
+import '../instance.js';
+
 export { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition.js';
 export { handleGetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation.js';
 export { handleGetClass } from '../../handlers/class/high/handleGetClass.js';

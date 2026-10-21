@@ -4,6 +4,10 @@
  * Streamable HTTP rows, sse's SSE rows.
  */
 
+import '../instance.js';
+
+export { type LibInstance, libInstances } from '../instance.js';
+
 export {
   BATCH_KEEP_RAW_PARTS_CLI,
   BATCH_KEEP_RAW_PARTS_ENV,

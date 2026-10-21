@@ -60,6 +60,12 @@
       ],
       "@mcp-abap-adt/lib/tool-set": [
         "../src/lib/toolSet.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse": [
+        "../server-runtime/src/sse/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse/server": [
+        "../server-runtime/src/sse/server.ts"
       ]
     },
     "noEmit": true

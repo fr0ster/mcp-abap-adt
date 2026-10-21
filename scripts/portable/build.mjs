@@ -17,8 +17,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, parseArgs } = require_('./args.cjs');
-const { sdkHome, addonRpath, builtAddon, isStaged, markStaged } = require_('./staging.cjs');
-const { patchRunpath } = require_('./elf.cjs');
+const { sdkHome, stagedAddon, isStaged, markStaged } = require_('./staging.cjs');
+const { patchRunpath, readRunpath } = require_('./elf.cjs');
 const { npmCommand, tarCommand, buildToolSpecs, toolsInstalled, markToolsInstalled } = require_('./tools.cjs');
 // Taken before cleanEnv drops the npm_* variables.
 const npm = npmCommand();
@@ -39,11 +39,16 @@ const run = (cmd, args, opts = {}) =>
 // its N-API version through `node -p`, which then prints ANSI colour codes.
 // Under `npm run` the inherited npm_* settings make the nested npm colour its
 // scripts again, so those go too and colour is switched off explicitly.
+// `--build-from-source` (npm_config_build_from_source) is the one kept: with it
+// sap-rfc-lite compiles its binding instead of installing the prebuilt one.
+const FROM_SOURCE = /^(1|true)$/i.test(process.env.npm_config_build_from_source ?? '');
+
 function cleanEnv(extra = {}) {
   const env = { ...process.env, ...extra };
   for (const key of Object.keys(env)) if (/^npm_/i.test(key)) delete env[key];
   env.FORCE_COLOR = '0';
   env.npm_config_color = 'false';
+  if (FROM_SOURCE) env.npm_config_build_from_source = 'true';
   return env;
 }
 
@@ -55,8 +60,8 @@ function stage(work, version) {
   } catch (error) {
     fail(error.message);
   }
-  // Cached per version AND SDK, and only once the addon was really built.
-  if (isStaged(dir, { version, sdk })) return { dir, sdk };
+  // Cached per version, SDK and source build, and only once the binding is there.
+  if (isStaged(dir, { version, sdk, fromSource: FROM_SOURCE })) return { dir, sdk };
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
@@ -68,22 +73,28 @@ function stage(work, version) {
     { cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'] },
   );
   try {
-    markStaged({ dir, version, sdk });
+    markStaged({ dir, version, sdk, fromSource: FROM_SOURCE });
   } catch (error) {
     fail(error.message);
   }
   return { dir, sdk };
 }
 
-function addon(stageDir, sdk, work, platform) {
-  const built = builtAddon(stageDir);
+// The binding as sap-rfc-lite installed it: prebuilt (0.2.3 and later, on the
+// platforms it ships one for) or compiled against SAPNWRFC_HOME — whichever its
+// own loader picks (staging.cjs). Its library search path names some SDK
+// folder (this machine's, or the publisher's for a prebuild); it becomes the
+// addon's own folder, so the addon finds the SDK beside it.
+function addon(stageDir, work, platform) {
+  const built = stagedAddon(stageDir);
+  if (built === undefined) fail('the staged @mcp-abap-adt/sap-rfc-lite has no RFC binding');
+  console.log(`portable: RFC binding ${path.relative(stageDir, built)}`);
   const out = path.join(work, 'sapnwrfc.node');
   let bytes = fs.readFileSync(built);
   if (platform === 'linux-x64') {
-    // The addon's RUNPATH names the SDK on this machine; it becomes $ORIGIN, so
-    // the addon finds the SDK in its own folder (elf.cjs).
+    // The RUNPATH it carries becomes $ORIGIN (elf.cjs).
     try {
-      bytes = patchRunpath(bytes, addonRpath(sdk), '$ORIGIN');
+      bytes = patchRunpath(bytes, readRunpath(bytes), '$ORIGIN');
     } catch (error) {
       fail(error.message);
     }
@@ -91,10 +102,24 @@ function addon(stageDir, sdk, work, platform) {
   fs.writeFileSync(out, bytes);
   if (platform === 'linux-x64') checkElf(built, out);
   if (platform === 'macos-arm64') {
-    run('install_name_tool', ['-delete_rpath', addonRpath(sdk), '-add_rpath', '@loader_path', out]);
+    const rpaths = machoRpaths(out);
+    const deletes = rpaths.flatMap((rpath) => ['-delete_rpath', rpath]);
+    run('install_name_tool', [...deletes, '-add_rpath', '@loader_path', out]);
     run('codesign', ['--force', '--sign', '-', out]);
   }
   return out;
+}
+
+// Every LC_RPATH of a Mach-O image, as `otool -l` lists them (`path <p> (offset N)`).
+function machoRpaths(file) {
+  const lines = run('otool', ['-l', file]).split('\n').map((line) => line.trim());
+  const rpaths = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] !== 'cmd LC_RPATH') continue;
+    const entry = lines.slice(i + 1, i + 4).find((line) => line.startsWith('path '));
+    if (entry !== undefined) rpaths.push(entry.slice(5).replace(/ \(offset \d+\)$/, ''));
+  }
+  return rpaths;
 }
 
 // The patched addon must differ from the built one in its RUNPATH only: a linker
@@ -188,14 +213,30 @@ function buildTools() {
 async function bundle(work, stageDir, server, esbuild) {
   const entry = path.join(work, `${server.name}-entry.cjs`);
   // The package's own bin: it calls `main` with the tool set, name and
-  // version that command serves (19.0.0: `main({ toolSet, program, version })`).
+  // version that command serves (19.2.0: `main({ toolSet, program, version, packageName })`).
   const bin = path.join(stageDir, 'node_modules', server.pkg, 'bin', `${server.name}.js`);
   fs.writeFileSync(entry, `require(${JSON.stringify(bin)});\n`);
   const outfile = path.join(work, `${server.name}.bundle.cjs`);
   const loader = path.join(here, 'sea-rfc-loader.cjs');
-  const coreVersion = JSON.parse(
+  const coreManifest = JSON.parse(
     fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/core/package.json'), 'utf8'),
-  ).version;
+  );
+  // server-runtime came with 19.2.0; an earlier version (--version) has none.
+  const runtimeManifestFile = path.join(stageDir, 'node_modules/@mcp-abap-adt/server-runtime/package.json');
+  const runtimeManifest = fs.existsSync(runtimeManifestFile)
+    ? JSON.parse(fs.readFileSync(runtimeManifestFile, 'utf8'))
+    : undefined;
+  // sap-rfc-lite (0.2.3 and later) reads its version from its own package.json
+  // at run time, with a require esbuild cannot follow; a single executable has
+  // no such file and its require loads built-ins only. Fixed at build from the
+  // staged manifest, like core's and server-runtime's versions.
+  const rfcLiteManifest = JSON.parse(
+    fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/sap-rfc-lite/package.json'), 'utf8'),
+  );
+  const rfcLitePackageRead = "require(node_path_1.default.resolve(__dirname, '..', 'package.json'))";
+  // Set when the hook below saw sap-rfc-lite's lib/binding.js: a later release
+  // that moved the read elsewhere must fail here, not in the executable.
+  let rfcLiteBindingSeen = false;
   const result = await esbuild.build({
     entryPoints: [entry],
     outfile,
@@ -209,17 +250,41 @@ async function bundle(work, stageDir, server, esbuild) {
         name: 'sea-rfc-addon',
         setup(b) {
           b.onResolve({ filter: /^node-gyp-build$/ }, () => ({ path: loader }));
-          // core reads its version from ../package.json beside dist/ at run time;
-          // a single executable has no such file, so the version is fixed at build.
+          b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]sap-rfc-lite[\\/]lib[\\/]binding\.js$/ }, (args) => {
+            rfcLiteBindingSeen = true;
+            const source = fs.readFileSync(args.path, 'utf8');
+            const contents = source.split(rfcLitePackageRead).join(
+              `({ version: ${JSON.stringify(rfcLiteManifest.version)} })`,
+            );
+            // Any other read of a file beside the package would fail the same way
+            // inside the executable: refused here rather than at its first RFC call.
+            if (contents.includes('package.json')) {
+              fail(`${args.path} reads package.json in a way this build does not replace`);
+            }
+            return { contents, loader: 'js' };
+          });
+          // core reads its version and name from ../package.json beside dist/ at
+          // run time; a single executable has no such file, so both are fixed at build.
           b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]core[\\/]dist[\\/]coreVersion\.js$/ }, () => ({
-            contents: `exports.CORE_VERSION = ${JSON.stringify(coreVersion)};`,
+            contents: `exports.CORE_VERSION = ${JSON.stringify(coreManifest.version)};\nexports.CORE_PACKAGE = ${JSON.stringify(coreManifest.name)};`,
             loader: 'js',
           }));
+          // server-runtime (19.2.0) reads its version from its own ../package.json the
+          // same way; fixed at build from the staged runtime's manifest.
+          if (runtimeManifest !== undefined) {
+            b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]server-runtime[\\/]dist[\\/]runtimeVersion\.js$/ }, () => ({
+              contents: `exports.RUNTIME_VERSION = ${JSON.stringify(runtimeManifest.version)};`,
+              loader: 'js',
+            }));
+          }
         },
       },
     ],
   });
   if (result.errors.length) fail('bundling failed');
+  if (!rfcLiteBindingSeen) {
+    fail('the bundle did not take @mcp-abap-adt/sap-rfc-lite/lib/binding.js: its run-time package.json read is not replaced, so RFC would not load in the executable');
+  }
   return outfile;
 }
 
@@ -349,7 +414,7 @@ opts.version ??= JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'ut
 const work = path.join(os.tmpdir(), 'mcp-abap-adt-portable', opts.version, opts.platform);
 fs.mkdirSync(work, { recursive: true });
 const { dir: stageDir, sdk } = stage(work, opts.version);
-const addonFile = addon(stageDir, sdk, work, opts.platform);
+const addonFile = addon(stageDir, work, opts.platform);
 const { bin: nodeBin } = await nodeBinary(work, opts.platform);
 const tools = buildTools();
 const servers = opts.which === 'all' ? ['full', 'compact'] : [opts.which];

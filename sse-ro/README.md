@@ -4,7 +4,7 @@ The read-only MCP server for SAP ABAP ADT over **HTTP+SSE**:
 the `mcp-abap-adt-sse-ro` command. **The binary fixes the tool set** (19.0.0): there is no `--exposition`;
 installing this package is how you choose the tools that change nothing.
 
-It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s launcher with the read-only tool set (`fullReadOnlyToolSet` of `@mcp-abap-adt/lib/tool-set`) and nothing else: the same options, credentials, failures and shutdown as `mcp-abap-adt-sse`; only the tools differ. It does not depend on `@mcp-abap-adt/core`.
+It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s launcher — the one in [`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) — with the read-only tool set (`fullReadOnlyToolSet` of `@mcp-abap-adt/lib/tool-set`) and nothing else: the same options, credentials, failures and shutdown as `mcp-abap-adt-sse`; only the tools differ. It depends on no other server package (not on `@mcp-abap-adt/sse`, not on `@mcp-abap-adt/core`).
 
 ## The tools
 
@@ -43,7 +43,7 @@ There is no `--transport` (a binary is its transport) and no `--exposition`: pas
 config file's `exposition`, stops the start with a sentence naming the binary that serves what you
 asked for — for example `--exposition=high` names `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`).
 
-**Credentials** come only from the `x-sap-*` headers of the `GET` that opens each SSE connection — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; that connection's `POST`s are served with them. No auth broker, no stores.
+**Credentials** come only from the `x-sap-*` headers of the `GET` that opens each SSE connection — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; that connection's `POST`s are served with them. No auth broker, no stores: `@mcp-abap-adt/auth-broker` and `auth-stores` are installed with `server-runtime` and never loaded.
 
 Every binary and its tools:
 [Handler sets](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/HANDLERS_MANAGEMENT.md);

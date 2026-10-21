@@ -9,6 +9,8 @@
  * - HandlerExporter for easy integration with external servers
  */
 
+import '../instance.js';
+
 // Handler arguments derived from a tool's JSON schema
 export type { ArgsOf } from './argsOf.js';
 // Base classes

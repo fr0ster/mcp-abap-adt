@@ -80,7 +80,10 @@ For each executable it checks the version, MCP `initialize` and `tools/list` ove
 to an unreachable host, which must answer an RFC error — proof that the module and the SDK load from
 `nwrfcsdk/lib`. It runs them without `SAPNWRFC_HOME` and without the `PATH` / `LD_LIBRARY_PATH` /
 `DYLD_LIBRARY_PATH` folders that hold an SDK library, so the archive's own SDK is what is checked. On
-Windows it warns when `System32` holds `sapnwrfc.dll`, which Windows could load first.
+Windows it warns when `System32` holds `sapnwrfc.dll`, which Windows could load first. It also checks
+that each executable carries one copy of `@mcp-abap-adt/lib`: the build's bundle holds one, and the
+executables run with the build's staging `node_modules` moved aside (put back afterwards), so nothing
+outside the executable can be loaded, and start without the line a second copy stops them with.
 
 ## Running it
 

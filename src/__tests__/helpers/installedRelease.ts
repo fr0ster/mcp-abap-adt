@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { spawnOptionsForNpx } from './platform';
 
 /** The repository root, where the library's own manifest lives. */
@@ -41,6 +41,36 @@ const run = (command: string, args: string[], cwd: string): string =>
   });
 
 /**
+ * Packs the given packages of this repository into `workdir` and answers each
+ * tarball's path, in the order of `dirs`. `dirs` are relative to the
+ * repository root (`.` is the library), or absolute (a prepared copy of a
+ * package). Packing reads each package's `dist/` as it stands: build first.
+ */
+export function packRelease(
+  workdir: string,
+  dirs: readonly string[],
+): string[] {
+  return dirs.map((dir) =>
+    join(
+      workdir,
+      run(
+        'npm',
+        [
+          'pack',
+          isAbsolute(dir) ? dir : join(ROOT, dir),
+          '--pack-destination',
+          workdir,
+        ],
+        workdir,
+      )
+        .trim()
+        .split('\n')
+        .at(-1) as string,
+    ),
+  );
+}
+
+/**
  * Packs the given packages of this repository and installs the tarballs together
  * into `workdir`, the way a user's tree looks after `npm install` — without
  * publishing first. Each package depends on the others by version, and the
@@ -51,19 +81,7 @@ const run = (command: string, args: string[], cwd: string): string =>
  * each package's `dist/` as it stands: build first.
  */
 export function installPackedRelease(workdir: string, dirs: string[]): void {
-  const tarballs = dirs.map((dir) =>
-    join(
-      workdir,
-      run(
-        'npm',
-        ['pack', join(ROOT, dir), '--pack-destination', workdir],
-        workdir,
-      )
-        .trim()
-        .split('\n')
-        .at(-1) as string,
-    ),
-  );
+  const tarballs = packRelease(workdir, dirs);
   run('npm', ['init', '-y'], workdir);
   run(
     'npm',

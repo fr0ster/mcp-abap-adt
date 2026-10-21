@@ -4,7 +4,7 @@ The read-only MCP server for SAP ABAP ADT over **stdio**:
 the `mcp-abap-adt-ro` command. **The binary fixes the tool set** (19.0.0): there is no `--exposition`;
 installing this package is how you choose the tools that change nothing.
 
-It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s launcher with the read-only tool set (`fullReadOnlyToolSet` of `@mcp-abap-adt/lib/tool-set`) and nothing else: the same options, credentials, failures and shutdown as `mcp-abap-adt`; only the tools differ.
+It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s launcher — the one in [`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) — with the read-only tool set (`fullReadOnlyToolSet` of `@mcp-abap-adt/lib/tool-set`) and nothing else: the same options, credentials, failures and shutdown as `mcp-abap-adt`; only the tools differ. It depends on no other server package (not on `@mcp-abap-adt/core`).
 
 ## The tools
 

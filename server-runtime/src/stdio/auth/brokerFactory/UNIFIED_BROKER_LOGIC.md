@@ -1,6 +1,6 @@
 # Unified AuthBroker Creation Logic
 
-How `AuthBrokerFactory` (`server/src/auth/brokerFactory.ts`) builds a destination's broker and
+How `AuthBrokerFactory` (`server-runtime/src/stdio/auth/brokerFactory.ts`) builds a destination's broker and
 credential, and which destination a request is served from. The server's connections come from
 `IDestinations`: `settingsFor(destination)` and `getProvider(destination, { signal })`. Nothing
 reads a token before connecting: the provider is the credential, and it renews itself, the way the
@@ -40,7 +40,7 @@ broker's `renewal` says.
 An env file is chosen by `--env-path` / `MCP_ENV_PATH` / `--env` (or their YAML keys) only: nothing
 is looked up in the working directory. The factory is built once, in the launcher.
 
-## Where a destination lives (`server/src/auth/destinationStores.ts`)
+## Where a destination lives (`server-runtime/src/stdio/auth/destinationStores.ts`)
 
 | Mode | Means (service key store) | Secret (session store) |
 |------|---------------------------|------------------------|
@@ -73,7 +73,7 @@ the source (`--mcp`, `destination`) and never quotes the name.
   request's `x-sap-*` headers (lib's `headerSource`) and use no broker, no store and no
   destination; a request carrying `x-mcp-destination` is answered `400`.
 
-## Handlers (`server/src/auth/handlers/`)
+## Handlers (`server-runtime/src/stdio/auth/handlers/`)
 
 | Handler | `authType` / `grantType` | Needs | Adds |
 |---------|-------------------------|-------|------|
@@ -87,8 +87,8 @@ the table, with the hint that a token you hold goes in the `x-sap-jwt-token` hea
 
 The browser strategy is passed in by the launcher (`browserCallbackStrategy` from
 `@mcp-abap-adt/auth-providers`); the factory defaults to none. The browser is an `IBrowser`, mapped
-from `--browser` / `--browser-program` by `browserFor` (`server/src/auth/browser.ts`); none means
-the URL is shown on stderr. `serverLogin` (`server/src/auth/serverLogin.ts`) passes each login
+from `--browser` / `--browser-program` by `browserFor` (`server-runtime/src/stdio/auth/browser.ts`); none means
+the URL is shown on stderr. `serverLogin` (`server-runtime/src/stdio/auth/serverLogin.ts`) passes each login
 request on with its own `signal` and the prompt logger (`info` on stderr), forwards `dispose()`,
 and is recorded so `settle` disposes it. One destination per process: the provider serializes its
 own logins, so there is no login lock; the composed strategy settles only after its listener is
@@ -115,7 +115,7 @@ then exits `1` with one stderr line, never the secret.
 
 ### `mcp-abap-adt` with `--transport`, or an HTTP / SSE option
 - Refused at start, naming `mcp-abap-adt-http` (`mcp-abap-adt-sse`): core serves stdio only, and
-  reads only its own parameter table (`server/src/config/coreParameters.ts`).
+  reads only its own parameter table (`server-runtime/src/stdio/config/coreParameters.ts`).
 
 ### stdio without parameters and without `.env`
 - Inspection-only mode: a tool call answers `inspection_only`.

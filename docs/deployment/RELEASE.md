@@ -7,29 +7,39 @@ How a release of this repository is made. Two things happen, and only one of the
 - **The GitHub Release is automated**: pushing a `v*.*.*` tag runs `.github/workflows/release.yml`,
   which tests the tag and creates a GitHub Release with generated notes. It attaches no files.
 
-## The seventeen packages
+## The eighteen packages
 
-In publish order (`scripts/publish-all.sh`), which is dependency order:
+In publish order (`scripts/publish-all.sh`), which is dependency order. "Peers" are
+`peerDependencies` (each also in `devDependencies`, for its own build and tests):
 
-| Directory | Package | Depends on (siblings) |
-|---|---|---|
-| `.` | `@mcp-abap-adt/lib` | — |
-| `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | `lib` |
-| `responsible-rules/` | `@mcp-abap-adt/responsible-rules` | `lib` |
-| `compact-readonly-entries/` | `@mcp-abap-adt/compact-readonly-entries` | `lib` |
-| `compact-modify/` | `@mcp-abap-adt/compact-modify` | `lib` |
-| `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `lib`, `background-runs-memory`, `responsible-rules` |
-| `http/` | `@mcp-abap-adt/http` (bin `mcp-abap-adt-http`) | `lib`, `background-runs-memory`, `responsible-rules` |
-| `sse/` | `@mcp-abap-adt/sse` (bin `mcp-abap-adt-sse`) | `lib`, `background-runs-memory`, `responsible-rules` |
-| `compact/` | `@mcp-abap-adt/compact` (bin `mcp-abap-adt-compact`) | `lib`, `core`, `compact-readonly-entries`, `compact-modify` |
-| `compact-http/` | `@mcp-abap-adt/compact-http` (bin `mcp-abap-adt-compact-http`) | `lib`, `http`, `compact-readonly-entries`, `compact-modify` |
-| `compact-sse/` | `@mcp-abap-adt/compact-sse` (bin `mcp-abap-adt-compact-sse`) | `lib`, `sse`, `compact-readonly-entries`, `compact-modify` |
-| `core-ro/` | `@mcp-abap-adt/core-ro` (bin `mcp-abap-adt-ro`) | `lib`, `core` |
-| `http-ro/` | `@mcp-abap-adt/http-ro` (bin `mcp-abap-adt-http-ro`) | `lib`, `http` |
-| `sse-ro/` | `@mcp-abap-adt/sse-ro` (bin `mcp-abap-adt-sse-ro`) | `lib`, `sse` |
-| `compact-ro/` | `@mcp-abap-adt/compact-ro` (bin `mcp-abap-adt-compact-ro`) | `lib`, `core`, `compact-readonly-entries` |
-| `compact-http-ro/` | `@mcp-abap-adt/compact-http-ro` (bin `mcp-abap-adt-compact-http-ro`) | `lib`, `http`, `compact-readonly-entries` |
-| `compact-sse-ro/` | `@mcp-abap-adt/compact-sse-ro` (bin `mcp-abap-adt-compact-sse-ro`) | `lib`, `sse`, `compact-readonly-entries` |
+| Directory | Package | Depends on (siblings) | Peers |
+|---|---|---|---|
+| `.` | `@mcp-abap-adt/lib` | — | — |
+| `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | — | `lib` |
+| `responsible-rules/` | `@mcp-abap-adt/responsible-rules` | — | `lib` |
+| `compact-readonly-entries/` | `@mcp-abap-adt/compact-readonly-entries` | — | `lib` |
+| `compact-modify/` | `@mcp-abap-adt/compact-modify` | — | `lib` |
+| `server-runtime/` | `@mcp-abap-adt/server-runtime` (no bin) | — (the auth chain, `connection`, `logger`, `@modelcontextprotocol/sdk`, `express`, `dotenv`) | `lib`, `background-runs-memory`, `responsible-rules` |
+| `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` | — |
+| `http/` | `@mcp-abap-adt/http` (bin `mcp-abap-adt-http`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` | — |
+| `sse/` | `@mcp-abap-adt/sse` (bin `mcp-abap-adt-sse`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` | — |
+| `compact/` | `@mcp-abap-adt/compact` (bin `mcp-abap-adt-compact`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`, `compact-modify` | — |
+| `compact-http/` | `@mcp-abap-adt/compact-http` (bin `mcp-abap-adt-compact-http`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`, `compact-modify` | — |
+| `compact-sse/` | `@mcp-abap-adt/compact-sse` (bin `mcp-abap-adt-compact-sse`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`, `compact-modify` | — |
+| `core-ro/` | `@mcp-abap-adt/core-ro` (bin `mcp-abap-adt-ro`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` | — |
+| `http-ro/` | `@mcp-abap-adt/http-ro` (bin `mcp-abap-adt-http-ro`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` | — |
+| `sse-ro/` | `@mcp-abap-adt/sse-ro` (bin `mcp-abap-adt-sse-ro`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` | — |
+| `compact-ro/` | `@mcp-abap-adt/compact-ro` (bin `mcp-abap-adt-compact-ro`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries` | — |
+| `compact-http-ro/` | `@mcp-abap-adt/compact-http-ro` (bin `mcp-abap-adt-compact-http-ro`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries` | — |
+| `compact-sse-ro/` | `@mcp-abap-adt/compact-sse-ro` (bin `mcp-abap-adt-compact-sse-ro`) | `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries` | — |
+
+**No binary package depends on another binary package**, and `lib` is in `dependencies` of the
+twelve binary packages only: every package below them takes it as a peer, so one install tree
+holds the binary's one copy (see
+[One `lib` per server process](../architecture/README.md#one-lib-per-server-process-1920)).
+`src/__tests__/unit/packages/packageSet.test.ts` and `dependencyRule.test.ts` hold the rule. The
+twelve binary packages depend on no other one, so their order among themselves does not matter;
+`server-runtime` and the packages below it must be on npm first.
 
 They are **not** npm workspaces: each is published by path. `scripts/publish-all.sh` publishes
 them in the order above, skips any `name@version` already on npm, and aborts on the first failure
@@ -39,9 +49,10 @@ so that no package goes out on top of a dependency that is missing.
 
 ## Steps
 
-1. **Bump every manifest** — the seventeen above — and in each, the ranges on sibling packages
-   (`@mcp-abap-adt/lib`, `background-runs-memory`, `responsible-rules`, `core`, `http`, `sse`,
-   `compact-readonly-entries`, `compact-modify`) so they accept the new versions. A manifest left at an old version is silently skipped by the
+1. **Bump every manifest** — the eighteen above — and in each, the ranges on sibling packages
+   (`@mcp-abap-adt/lib`, `background-runs-memory`, `responsible-rules`, `server-runtime`,
+   `compact-readonly-entries`, `compact-modify`), in `dependencies`, `peerDependencies` and
+   `devDependencies` alike, so they accept the new versions. A manifest left at an old version is silently skipped by the
    publish script ("already on npm"). Then refresh the lockfile:
    ```bash
    npm install --package-lock-only
@@ -69,9 +80,11 @@ so that no package goes out on top of a dependency that is missing.
 4. **Build and test**:
    ```bash
    npm ci
-   npm run build          # all seventeen packages
+   npm run build          # all eighteen packages
    npm run test:check
-   npm test               # every package's suites, once; includes binSmoke: packs all seventeen, installs them, runs the twelve bins
+   npm test               # every package's suites, once; includes binSmoke (packs all eighteen, installs them, runs the twelve bins)
+                          # and the install matrix (one lib per process in every layout)
+   npm --prefix server-runtime run test:check
    npm --prefix server run test:check
    npm --prefix http run test:check
    npm --prefix sse run test:check
@@ -84,7 +97,7 @@ so that no package goes out on top of a dependency that is missing.
    ```
 5. **Rehearse the publish**:
    ```bash
-   npm run release:dry    # must end with "Published: 17  Skipped: 0"
+   npm run release:dry    # must end with "Published: 18  Skipped: 0"
    ```
 6. **Merge**, then tag the merge commit and push the tag:
    ```bash
@@ -110,18 +123,30 @@ so that no package goes out on top of a dependency that is missing.
    ```
    See [MCP_REGISTRY.md](./MCP_REGISTRY.md). npm may answer the new version only a few minutes after
    the publish; install with `--prefer-online` if it still says `ETARGET`.
-9. **Check an installed copy**, outside the repository:
+9. **Check an installed copy**, outside the repository, from the registry: each wrapper
+   installed globally **in one command with its former base** — the layout that loaded two
+   copies of `lib` in 19.1.0 — starts and answers `--version` with its own version, with no
+   `Two copies of @mcp-abap-adt/lib` line. A fresh prefix per pair keeps the global tree clean:
    ```bash
-   npm install -g @mcp-abap-adt/core@<version>
-   mcp-abap-adt --version
+   for pair in "core compact" "core core-ro" "core compact-ro" \
+     "http compact-http" "http http-ro" "http compact-http-ro" \
+     "sse compact-sse" "sse sse-ro" "sse compact-sse-ro"; do
+     set -- $pair
+     prefix="$(mktemp -d)"
+     npm install -g --prefix "$prefix" --prefer-online \
+       "@mcp-abap-adt/$1@<version>" "@mcp-abap-adt/$2@<version>"
+     for bin in "$prefix"/bin/mcp-abap-adt*; do "$bin" --version || echo "FAILED: $bin"; done
+     rm -rf "$prefix"
+   done
    ```
+   On Windows the binaries are in `$prefix` itself, not `$prefix/bin`.
 
 ## What the workflows check
 
 - `ci.yml` (push and pull request to `main` / `develop`): Ubuntu, macOS and Windows × Node 22 and
   24 — Biome lint (root and each package's `lint:check`), build, test type-check, tests, the
-  server, http, sse, background-runs-memory and responsible-rules tests; on Ubuntu / Node 22 also
-  `npm audit --omit=dev --audit-level=high`, `npm pack` of all seventeen packages, an install of
+  server-runtime, server, http, sse, background-runs-memory and responsible-rules tests; on Ubuntu / Node 22 also
+  `npm audit --omit=dev --audit-level=high`, `npm pack` of all eighteen packages, an install of
   the tarballs that runs each of the twelve bins' `--version` and `--help`, and the twelve Docker
   images built from those tarballs and checked (`scripts/ci/check-images.mjs`).
 - `release.yml` (tag `v*.*.*`): the same lint, build and tests on Ubuntu × Node 22 and 24 — on

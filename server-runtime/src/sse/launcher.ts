@@ -33,8 +33,8 @@ import {
 import { SseServer } from './SseServer.js';
 
 /**
- * What a command passes sse's launcher: the tools it
- * serves, and its own name and version — nothing else. Everything the
+ * What a command passes the HTTP+SSE launcher: the tools it serves, its own
+ * name, its own version and its own npm package — nothing else. Everything the
  * launcher does is sse's, the same for any tool set:
  * `mcp-abap-adt-sse` passes `fullToolSet`, `mcp-abap-adt-sse-ro`
  * `fullReadOnlyToolSet`, `mcp-abap-adt-compact-sse` and

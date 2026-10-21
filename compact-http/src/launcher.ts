@@ -1,7 +1,7 @@
 /**
  * `mcp-abap-adt-compact-http` — the compact tool set over Streamable HTTP.
  *
- * `@mcp-abap-adt/http`'s `main` with `compactToolSet` — the two halves' entry
+ * The runtime's Streamable HTTP `main` with `compactToolSet` — the two halves' entry
  * builders composed by lib's `compactToolSetOf` — and this command's name and
  * version. Nothing else: http's table, and
  * http's credentials, cancellation, failures and shutdown. The launcher is

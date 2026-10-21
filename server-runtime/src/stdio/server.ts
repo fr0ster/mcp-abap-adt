@@ -1,8 +1,10 @@
 /**
- * `@mcp-abap-adt/core` — the standalone MCP server over stdio, AGPL-3.0-only.
+ * `@mcp-abap-adt/server-runtime/stdio/server` — the standalone MCP server over
+ * stdio, AGPL-3.0-only: `StdioServer`, core's parameter table, the env-file
+ * resolution and the destination source. `@mcp-abap-adt/core` re-exports it.
  *
- * Streamable HTTP is `@mcp-abap-adt/http` and HTTP+SSE `@mcp-abap-adt/sse`:
- * packages of their own, serving credentials from each request's headers.
+ * Streamable HTTP is this package's `http/server` path and HTTP+SSE its
+ * `sse/server`, serving credentials from each request's headers.
  *
  * Importing from here links AGPL code. If you are embedding ADT tools in your
  * own application, you want `@mcp-abap-adt/lib` instead: it carries the

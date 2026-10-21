@@ -2,10 +2,13 @@
  * `mcp-abap-adt-compact` — the compact tool set over stdio.
  *
  * The same server as `mcp-abap-adt`, a different decomposition of its tool
- * list: core's `main` with `compactToolSet` — the two halves' entry builders
+ * list: the runtime's stdio `main` (`@mcp-abap-adt/server-runtime/stdio`, the one
+ * `mcp-abap-adt` runs) with `compactToolSet` — the two halves' entry builders
  * composed by lib's `compactToolSetOf` — and this command's name and version.
  * Nothing else: core's table, core's
- * destination, credentials, cancellation, failures and shutdown.
+ * destination, credentials, cancellation, failures and shutdown. The package
+ * depends on lib, the runtime and the two halves, never on another binary
+ * package.
  *
  * **Why a command at all**, rather than a flag on the first one: the host this is
  * for cannot build a retrieval pipeline and must be handed a tool list short by

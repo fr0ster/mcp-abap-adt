@@ -4,14 +4,16 @@ The compact MCP server for SAP ABAP ADT over **Streamable HTTP**: one tool per o
 `object_type` — 29 tools instead of hundreds, for a host that cannot build a retrieval pipeline
 of its own.
 
-It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s launcher with the
+It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s launcher — the one in
+[`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) — with the
 compact tool set and nothing else: the same options, the same credentials, the same failures and
 shutdown as `mcp-abap-adt-http`; only the tools differ. The 17 that change nothing alone are
 [`@mcp-abap-adt/compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro)
 (`mcp-abap-adt-compact-http-ro`): the binary fixes the tool set (19.0.0). stdio is
 [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact), the other HTTP
-transport `@mcp-abap-adt/compact-sse`. It does not depend on
-`@mcp-abap-adt/core`: no auth broker, no stores, no destination, no login.
+transport `@mcp-abap-adt/compact-sse`. It depends on no other server package
+(not on `@mcp-abap-adt/http`, not on `@mcp-abap-adt/core`) and serves no destination and no login;
+`@mcp-abap-adt/auth-broker` and `auth-stores` come with `server-runtime` but are never loaded.
 
 ## Running it
 

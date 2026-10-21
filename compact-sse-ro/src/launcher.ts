@@ -1,7 +1,7 @@
 /**
  * `mcp-abap-adt-compact-sse-ro` — the read-only compact tool set over HTTP+SSE.
  *
- * sse's `main` with `compactReadOnlyToolSetOf` over the half that changes
+ * The runtime's HTTP+SSE `main` with `compactReadOnlyToolSetOf` over the half that changes
  * nothing, and this command's name and version. Nothing else: sse's table,
  * credentials, cancellation, failures and shutdown. The launcher is
  * `@mcp-abap-adt/server-runtime/sse`'s; the package depends on lib, the

@@ -1,7 +1,7 @@
 /**
  * `mcp-abap-adt-compact-sse` — the compact tool set over HTTP+SSE.
  *
- * `@mcp-abap-adt/sse`'s `main` with `compactToolSet` — the two halves' entry
+ * The runtime's HTTP+SSE `main` with `compactToolSet` — the two halves' entry
  * builders composed by lib's `compactToolSetOf` — and this command's name and
  * version. Nothing else: sse's table, and
  * sse's credentials, cancellation, failures and shutdown. The launcher is

@@ -141,9 +141,19 @@ credentials.
 ## Embedding
 
 `new StreamableHttpServer(handlersRegistry, options)` — the same options, and `app` to register
-the routes on your own Express (or CAP) application instead of listening itself. `main({ program,
-version })` is the binary's launcher (`@mcp-abap-adt/http/launcher`). An embedder that stops the
+the routes on your own Express (or CAP) application instead of listening itself. `main({ toolSet,
+program, version, packageName })` is the binary's launcher (`@mcp-abap-adt/http/launcher`). An embedder that stops the
 server itself calls `stop()`: admission stops, the listener closes, the pool's instances are
 disposed (their state undone) and logged off. The binary's own shutdown does not wait: it logs
 every session off at once (lib's `installTransportShutdown`, with `releaseConnections()` after the
 logoffs).
+
+**Where the code lives (19.2.0).** The launcher and `StreamableHttpServer` live in
+[`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime),
+which is installed with this package; this package holds the `mcp-abap-adt-http` binary and its
+version. Its exports are unchanged, as re-exports: `@mcp-abap-adt/http` of
+`server-runtime/http/server` (its `StreamableHttpServer` answers http's version when constructed
+without one), `@mcp-abap-adt/http/launcher` of `server-runtime/http`. No other server package
+depends on this one: `compact-http`, `http-ro` and `compact-http-ro` run the same launcher from
+`server-runtime`. The runtime also carries the stdio destination layer, so `@mcp-abap-adt/auth-broker`
+and `@mcp-abap-adt/auth-stores` are installed with this server; it never loads them.

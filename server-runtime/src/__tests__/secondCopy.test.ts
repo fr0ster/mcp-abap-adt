@@ -7,6 +7,7 @@
  * with exit `1` and one line on stderr naming the first two files and the
  * package to reinstall. One entry starts as today.
  */
+import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import net from 'node:net';
 import { join } from 'node:path';
@@ -56,7 +57,7 @@ function recordingEdges(argv: string[] = []) {
     stdout: (line) => record.stdout.push(line),
     stderr: (line) => record.stderr.push(line),
     exit: (code) => record.exits.push(code),
-    processLike: new (require('node:events').EventEmitter)(),
+    processLike: new EventEmitter(),
   };
   return { edges, record };
 }

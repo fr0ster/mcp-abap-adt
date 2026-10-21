@@ -1,5 +1,6 @@
 /**
- * `@mcp-abap-adt/core/auth` — the destination layer: one auth broker per
+ * `@mcp-abap-adt/server-runtime/auth` (re-exported by `@mcp-abap-adt/core/auth`)
+ * — the destination layer: one auth broker per
  * destination, built from its service key and session stores; the browser
  * of a login and the server's login wrapper.
  */

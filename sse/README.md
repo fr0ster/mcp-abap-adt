@@ -116,10 +116,20 @@ This server keeps no runtime session files, so nothing lists such a session
 ## Embedding
 
 `new SseServer(handlersRegistry, options)` — the same options, and `app` to register the routes on
-your own Express (or CAP) application. `main({ program, version })` is the binary's launcher
+your own Express (or CAP) application. `main({ toolSet, program, version, packageName })` is the binary's launcher
 (`@mcp-abap-adt/sse/launcher`). An embedder that stops the server itself calls `stop()`: the listener
 closes and every open connection gets the close above — its ADT sessions logged off at once, its
 running tools interrupted, no state undo sent —, joined where one is already closing; it never
 rejects. The binary's own shutdown calls `stopListening()`, logs every session of the process off
 at once (lib's `installTransportShutdown`), then `releaseConnections()`, which closes the client
 connections left.
+
+**Where the code lives (19.2.0).** The launcher and `SseServer` live in
+[`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime),
+which is installed with this package; this package holds the `mcp-abap-adt-sse` binary and its
+version. Its exports are unchanged, as re-exports: `@mcp-abap-adt/sse` of
+`server-runtime/sse/server` (its `SseServer` answers sse's version when constructed without one),
+`@mcp-abap-adt/sse/launcher` of `server-runtime/sse`. No other server package depends on this one:
+`compact-sse`, `sse-ro` and `compact-sse-ro` run the same launcher from `server-runtime`. The
+runtime also carries the stdio destination layer, so `@mcp-abap-adt/auth-broker` and
+`@mcp-abap-adt/auth-stores` are installed with this server; it never loads them.

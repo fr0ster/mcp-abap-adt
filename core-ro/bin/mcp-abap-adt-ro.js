@@ -4,8 +4,8 @@
  * mcp-abap-adt-ro — the read-only MCP ABAP ADT server over stdio.
  *
  * Starts the server in THIS process so stdin/stdout stay wired to the MCP protocol
- * with no intermediate layer, exactly as `mcp-abap-adt` does: core's `main` with
- * the read-only tool set — the readonly tools (with system and search) and the leftover-session list and logoff.
+ * with no intermediate layer, exactly as `mcp-abap-adt` does: the runtime's stdio `main`
+ * (@mcp-abap-adt/server-runtime/stdio) with the read-only tool set — the readonly tools (with system and search) and the leftover-session list and logoff.
  */
 const { main } = require('../dist/launcher.js');
 const { launcherFailedLine } = require('@mcp-abap-adt/server-runtime/stdio');

@@ -1,7 +1,7 @@
 /**
  * `mcp-abap-adt-sse-ro` — the read-only tool set over HTTP+SSE.
  *
- * sse's `main` with `fullReadOnlyToolSet`, and this command's name and version.
+ * The runtime's HTTP+SSE `main` with `fullReadOnlyToolSet`, and this command's name and version.
  * Nothing else: sse's table, credentials, cancellation, failures and shutdown.
  * The launcher is `@mcp-abap-adt/server-runtime/sse`'s; the package depends on
  * lib and the runtime, never on another binary package.

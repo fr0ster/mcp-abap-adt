@@ -1,6 +1,7 @@
 /**
- * `@mcp-abap-adt/http` — the Streamable HTTP transport of the MCP ABAP ADT
- * server, AGPL-3.0-only.
+ * `@mcp-abap-adt/server-runtime/http/server` — the Streamable HTTP transport of
+ * the MCP ABAP ADT server, AGPL-3.0-only: `StreamableHttpServer` and http's
+ * parameter table. `@mcp-abap-adt/http` re-exports it.
  *
  * Importing from here links AGPL code. If you are embedding ADT tools in your
  * own application, you want `@mcp-abap-adt/lib` instead: it carries the

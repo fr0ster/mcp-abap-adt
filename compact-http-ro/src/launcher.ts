@@ -2,7 +2,7 @@
  * `mcp-abap-adt-compact-http-ro` — the read-only compact tool set over
  * Streamable HTTP.
  *
- * http's `main` with `compactReadOnlyToolSetOf` over the half that changes
+ * The runtime's Streamable HTTP `main` with `compactReadOnlyToolSetOf` over the half that changes
  * nothing, and this command's name and version. Nothing else: http's table,
  * credentials, cancellation, failures and shutdown. The launcher is
  * `@mcp-abap-adt/server-runtime/http`'s; the package depends on lib, the

@@ -6,7 +6,9 @@
  * one. `lib` itself refuses nothing.
  *
  * `file` is this module's `__filename` when there is one, `bundled`
- * otherwise. It is only shown, never resolved, read or compared — nothing
+ * otherwise. Inside a Node SEA executable the injected script has a
+ * `__filename` — the executable's path (measured, Node 24) —, so a SEA
+ * registers that path. It is only shown, never resolved, read or compared — nothing
  * here touches the file system, so a bundle with no package directory holds
  * one copy and registers once.
  */

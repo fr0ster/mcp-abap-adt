@@ -267,8 +267,8 @@ export function coreHelp(
 }
 
 /**
- * What a command passes core's launcher: the tools it
- * serves, and its own name and version — nothing else. Everything the
+ * What a command passes the stdio launcher: the tools it serves, its own
+ * name, its own version and its own npm package — nothing else. Everything the
  * launcher does — options, the destination, credentials, cancellation,
  * failures, shutdown — is stdio's, the same for any tool set:
  * `mcp-abap-adt` passes `fullToolSet`, `mcp-abap-adt-ro` `fullReadOnlyToolSet`,
@@ -285,7 +285,7 @@ export interface LauncherOptions {
   packageName: string;
 }
 
-/** The process as core's `main` meets it: lib's edges, and the MCP transport. */
+/** The process as the stdio `main` meets it: lib's edges, and the MCP transport. */
 export interface StdioLauncherEdges extends LauncherEdges {
   /** The MCP transport; stdio unless a host passes its own (a test's). */
   transport?: Transport;

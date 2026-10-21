@@ -32,8 +32,8 @@ import {
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 
 /**
- * What a command passes http's launcher: the tools it
- * serves, and its own name and version — nothing else. Everything the
+ * What a command passes the Streamable HTTP launcher: the tools it serves,
+ * its own name, its own version and its own npm package — nothing else. Everything the
  * launcher does is http's, the same for any tool set:
  * `mcp-abap-adt-http` passes `fullToolSet`, `mcp-abap-adt-http-ro`
  * `fullReadOnlyToolSet`, `mcp-abap-adt-compact-http` and

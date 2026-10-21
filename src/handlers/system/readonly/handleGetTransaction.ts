@@ -1,4 +1,4 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -85,8 +85,13 @@ export async function handleGetTransaction(
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
+        // Whether the answer is the transaction's properties is the
+        // strategy's verdict: a 200 that is no `opr:objectProperties`
+        // document holding `opr:object` (empty, not XML, a sign-in page) is
+        // refused `ADT_OBJECT_NOT_FOUND`; SAP's own refusal (a `422` for a
+        // name it does not know) passes through as it came.
         .getObjectProperties(transactionUri(name), {
-          analyse: analyseException,
+          analyse: analyseObjectProperties,
         }),
     (reading: AdtReading<unknown>) => {
       if (detail === 'raw') return reading.raw;

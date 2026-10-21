@@ -11,7 +11,8 @@ jest.mock('../../lib/clients', () => ({
   }),
 }));
 
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import {
   handleGetTransaction,
   TOOL_DEFINITION,
@@ -41,12 +42,12 @@ describe('GetTransaction', () => {
     );
   });
 
-  it('reads the workbench uri of the transaction, once, with analyseException', async () => {
+  it('reads the workbench uri of the transaction, once, with analyseObjectProperties', async () => {
     await handleGetTransaction(ctx, { transaction_name: ' ztx_a ' });
     expect(getObjectProperties).toHaveBeenCalledTimes(1);
     expect(getObjectProperties).toHaveBeenCalledWith(
       '/sap/bc/adt/vit/wb/object_type/trant/object_name/ZTX_A',
-      { analyse: analyseException },
+      { analyse: analyseObjectProperties },
     );
   });
 
@@ -136,6 +137,69 @@ describe('GetTransaction', () => {
     });
     expect(result.isError).toBe(true);
     expect(payload(result).message).toBe('Request failed with status code 422');
+  });
+
+  // The verdict is the strategy's (adt-strategies 0.15.0), run here for real
+  // over each answer, and its verdict handed to the handler as the client
+  // would: the handler decides nothing about the answer itself.
+  const throughStrategy = (wire: { status: number; data: string }): unknown => {
+    const verdict = analyseObjectProperties(ADT_NO_FAILURE, wire as any);
+    return verdict === ADT_NO_FAILURE
+      ? okResponse(structured(wire as any))
+      : {
+          ok: false,
+          getResult: () => {
+            throw new Error('no result');
+          },
+          getError: () => verdict,
+        };
+  };
+
+  it.each([
+    ['an empty body', ''],
+    ['a sign-in page', '<html><body><form>Log on</form></body></html>'],
+    [
+      'a document without its object',
+      '<opr:objectProperties xmlns:opr="http://www.sap.com/adt/objectproperties"/>',
+    ],
+  ])('a 200 with %s is refused ADT_OBJECT_NOT_FOUND', async (_what, data) => {
+    getObjectProperties.mockResolvedValue(
+      throughStrategy({ status: 200, data }),
+    );
+    const result = await handleGetTransaction(ctx, {
+      transaction_name: 'ZTX_A',
+    });
+    expect(result.isError).toBe(true);
+    expect(payload(result).code).toBe('ADT_OBJECT_NOT_FOUND');
+  });
+
+  it('the transaction document passes the strategy and is answered', async () => {
+    getObjectProperties.mockResolvedValue(
+      throughStrategy({ status: 200, data: DOCUMENT }),
+    );
+    const result = await handleGetTransaction(ctx, {
+      transaction_name: 'ZTX_A',
+    });
+    expect(result.isError).toBe(false);
+    expect(payload(result).object.name).toBe('ZTX_A');
+  });
+
+  it("SAP's 422 for an unknown name stays SAP's refusal, as it came", () => {
+    const incoming = {
+      origin: 'connection',
+      message: 'Request failed with status code 422',
+    };
+    const body =
+      '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionUnprocessableEntity"/></exc:exception>';
+    const verdict: any = analyseObjectProperties(
+      incoming as any,
+      {
+        status: 422,
+        data: body,
+      } as any,
+    );
+    expect(verdict.message).toBe('Request failed with status code 422');
+    expect(verdict.code).not.toBe('ADT_OBJECT_NOT_FOUND');
   });
 
   it('refuses a call without a name, before any request', async () => {

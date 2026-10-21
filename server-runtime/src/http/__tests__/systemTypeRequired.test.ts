@@ -7,7 +7,7 @@
  * without one is refused `system_type_required`, before anything is sent.
  */
 
-import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../src/lib/auth/serverRefusal';
+import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../../src/lib/auth/serverRefusal';
 import { type HttpStand, httpStand, turns } from './shutdown/harness';
 
 jest.setTimeout(30_000);

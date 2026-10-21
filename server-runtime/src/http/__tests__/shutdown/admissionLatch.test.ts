@@ -13,7 +13,7 @@ import {
   isLockOf,
   isUnlockOf,
   isUpdateOf,
-} from '../../../../src/__tests__/helpers/shutdownTools';
+} from '../../../../../src/__tests__/helpers/shutdownTools';
 import { POOL_CLOSED_WORDS } from '../../InstancePool.js';
 import {
   basicHeaders,

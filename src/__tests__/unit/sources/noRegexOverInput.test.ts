@@ -23,7 +23,7 @@ const SCANNED: ReadonlyArray<[string, readonly string[] | undefined]> = [
   ['src/lib/config/binaries.ts', undefined],
   ['src/lib/config/startup.ts', undefined],
   ['server-runtime/src/stdio/config/coreParameters.ts', undefined],
-  ['http/src/config/httpParameters.ts', undefined],
+  ['server-runtime/src/http/config/httpParameters.ts', undefined],
   ['sse/src/config/sseParameters.ts', undefined],
   [
     'src/lib/utils.ts',

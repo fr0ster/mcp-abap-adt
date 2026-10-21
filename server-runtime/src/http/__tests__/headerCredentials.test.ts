@@ -25,7 +25,7 @@ import {
   basicOf,
   PROBE_PATH,
   probeGroup,
-} from '../../../src/__tests__/helpers/adtStandIn';
+} from '../../../../src/__tests__/helpers/adtStandIn';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 /** A part that holds the instance's state: the pool keeps the instance. */

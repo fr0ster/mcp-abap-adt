@@ -3,7 +3,7 @@
 /**
  * mcp-abap-adt-http-ro — the read-only MCP ABAP ADT server over Streamable HTTP.
  *
- * `@mcp-abap-adt/http`'s launcher with the read-only tool set, started in this
+ * `@mcp-abap-adt/server-runtime/http`'s launcher with the read-only tool set, started in this
  * process.
  */
 const { main } = require('../dist/launcher.js');

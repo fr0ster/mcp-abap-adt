@@ -17,7 +17,7 @@ import {
 import {
   envelopeResponse,
   innerRequests,
-} from '../../../src/__tests__/helpers/batchEnvelope';
+} from '../../../../src/__tests__/helpers/batchEnvelope';
 import {
   basicHeaders,
   type HttpStand,

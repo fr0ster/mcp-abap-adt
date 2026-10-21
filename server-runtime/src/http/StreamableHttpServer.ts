@@ -39,7 +39,7 @@ import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-import { HTTP_VERSION } from './httpVersion.js';
+import { RUNTIME_VERSION } from '../runtimeVersion.js';
 import {
   BATCH_WITH_HANDLE_WORDS,
   BatchWithHandleError,
@@ -193,7 +193,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   ) {
     super({
       name: 'mcp-abap-adt',
-      version: opts?.version ?? HTTP_VERSION,
+      version: opts?.version ?? RUNTIME_VERSION,
       logger: opts?.logger ?? noopLogger,
       // Validated by the base: a misconfiguration stops the start.
       stateIdleMinutes: opts?.stateIdleMinutes,
@@ -210,7 +210,7 @@ export class StreamableHttpServer extends BaseMcpServer {
       opts?.batch === undefined
         ? undefined
         : { keepRawParts: opts.batch.keepRawParts === true };
-    this.version = opts?.version ?? HTTP_VERSION;
+    this.version = opts?.version ?? RUNTIME_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
     this.enableJsonResponse = opts?.enableJsonResponse ?? true;

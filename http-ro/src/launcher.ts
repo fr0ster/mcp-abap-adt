@@ -3,16 +3,17 @@
  *
  * http's `main` with `fullReadOnlyToolSet`, and this command's name and
  * version. Nothing else: http's table, credentials, cancellation, failures and
- * shutdown. It depends on lib and @mcp-abap-adt/http only: never on core, so
- * neither the auth broker nor the stores are installed with it.
+ * shutdown. The launcher is `@mcp-abap-adt/server-runtime/http`'s; the
+ * package depends on lib and the runtime, never on another binary package.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
  * decision), and a user installs only what they need. The high,
  * debugger, background-run and resume tools are `mcp-abap-adt-http`'s.
  */
-import { main as httpMain } from '@mcp-abap-adt/http/launcher';
+
 import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { main as httpMain } from '@mcp-abap-adt/server-runtime/http';
 
 /**
  * The read-only tool set: readonly (with system and search). No high, no debugger, no background run,

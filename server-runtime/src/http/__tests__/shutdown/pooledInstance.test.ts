@@ -14,8 +14,8 @@ import {
   isUpdateOf,
   listenUrl,
   stopUrl,
-} from '../../../../src/__tests__/helpers/shutdownTools';
-import { ownedConnections } from '../../../../src/lib/ownedConnections';
+} from '../../../../../src/__tests__/helpers/shutdownTools';
+import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import {
   basicHeaders,
   type HttpStand,

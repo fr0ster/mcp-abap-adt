@@ -16,7 +16,7 @@ import type { InstanceState, StatePart } from '@mcp-abap-adt/lib/state';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { withSystemInformation } from '../../../src/__tests__/helpers/systemInformationStandIn';
+import { withSystemInformation } from '../../../../src/__tests__/helpers/systemInformationStandIn';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 /** Every request carries its own credentials: the server takes them from nowhere else. */

@@ -8,15 +8,15 @@
  * pool with its state.
  */
 
-import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
+import { isLogoff } from '../../../../../src/__tests__/helpers/adtStandIn';
 import {
   isLockOf,
   isUnlockOf,
   isUpdateOf,
   listenUrl,
-} from '../../../../src/__tests__/helpers/shutdownTools';
-import { activeTools } from '../../../../src/lib/activeTools';
-import type { IHandlerGroup } from '../../../../src/lib/handlers/interfaces';
+} from '../../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../../src/lib/activeTools';
+import type { IHandlerGroup } from '../../../../../src/lib/handlers/interfaces';
 import {
   basicHeaders,
   type HttpStand,

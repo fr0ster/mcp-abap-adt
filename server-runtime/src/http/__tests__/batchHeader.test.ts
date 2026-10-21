@@ -21,7 +21,7 @@ import type { InstanceState } from '@mcp-abap-adt/lib/state';
 import {
   envelopeResponse,
   innerRequests,
-} from '../../../src/__tests__/helpers/batchEnvelope';
+} from '../../../../src/__tests__/helpers/batchEnvelope';
 import { InstancePool } from '../InstancePool.js';
 import {
   basicHeaders,

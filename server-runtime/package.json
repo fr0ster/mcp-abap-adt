@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/server-runtime",
   "version": "19.2.0",
-  "description": "The launch code of the MCP ABAP ADT servers: the stdio launcher and server, and the destination layer (the auth broker per destination). No command of its own — each server package (@mcp-abap-adt/core and its siblings) carries its binary and depends on this one.",
+  "description": "The launch code of the MCP ABAP ADT servers: the stdio launcher and server with the destination layer (the auth broker per destination), and the Streamable HTTP launcher and server. No command of its own — each server package (@mcp-abap-adt/core and its siblings) carries its binary and depends on this one.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -39,6 +39,16 @@
       "types": "./dist/stdio/auth/index.d.ts",
       "import": "./dist/stdio/auth/index.js",
       "require": "./dist/stdio/auth/index.js"
+    },
+    "./http": {
+      "types": "./dist/http/launcher.d.ts",
+      "import": "./dist/http/launcher.js",
+      "require": "./dist/http/launcher.js"
+    },
+    "./http/server": {
+      "types": "./dist/http/server.d.ts",
+      "import": "./dist/http/server.js",
+      "require": "./dist/http/server.js"
     }
   },
   "typesVersions": {
@@ -51,6 +61,12 @@
       ],
       "auth": [
         "dist/stdio/auth/index.d.ts"
+      ],
+      "http": [
+        "dist/http/launcher.d.ts"
+      ],
+      "http/server": [
+        "dist/http/server.d.ts"
       ]
     }
   },
@@ -78,7 +94,8 @@
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "dotenv": "^18.0.5"
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1"
   },
   "peerDependencies": {
     "@mcp-abap-adt/background-runs-memory": "^19.2.0",
@@ -89,6 +106,7 @@
     "@mcp-abap-adt/background-runs-memory": "^19.2.0",
     "@mcp-abap-adt/lib": "^19.2.0",
     "@mcp-abap-adt/responsible-rules": "^19.2.0",
+    "@types/express": "*",
     "@types/jest": "*",
     "@types/node": "*",
     "typescript": "*"

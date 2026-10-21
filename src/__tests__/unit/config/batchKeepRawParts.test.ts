@@ -1,4 +1,4 @@
-import { HTTP_PARAMETERS } from '../../../../http/src/config/httpParameters';
+import { HTTP_PARAMETERS } from '../../../../server-runtime/src/http/config/httpParameters';
 import { CORE_PARAMETERS } from '../../../../server-runtime/src/stdio/config/coreParameters';
 import { SSE_PARAMETERS } from '../../../../sse/src/config/sseParameters';
 import {

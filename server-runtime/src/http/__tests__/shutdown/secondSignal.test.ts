@@ -10,11 +10,11 @@
 
 import { EventEmitter } from 'node:events';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
-import { isUnlockOf } from '../../../../src/__tests__/helpers/shutdownTools';
+import { isUnlockOf } from '../../../../../src/__tests__/helpers/shutdownTools';
 import {
   registerActiveTool,
   resetProcessLatchForTests,
-} from '../../../../src/lib/activeTools';
+} from '../../../../../src/lib/activeTools';
 import { type HttpStand, httpStand, turns, until } from './harness';
 
 jest.setTimeout(30_000);

@@ -7,7 +7,7 @@
  * launcher's process edge.
  */
 
-import { ownedConnections } from '../../../../src/lib/ownedConnections';
+import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import { type HttpStand, httpStand, until } from './harness';
 
 jest.setTimeout(30_000);

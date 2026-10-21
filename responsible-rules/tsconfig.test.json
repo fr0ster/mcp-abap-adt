@@ -91,6 +91,12 @@
       "@mcp-abap-adt/server-runtime/auth": [
         "../server-runtime/src/stdio/auth/index.ts"
       ],
+      "@mcp-abap-adt/server-runtime/http": [
+        "../server-runtime/src/http/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/http/server": [
+        "../server-runtime/src/http/server.ts"
+      ],
       "@mcp-abap-adt/core/launcher": [
         "../server/src/launcher.ts"
       ],

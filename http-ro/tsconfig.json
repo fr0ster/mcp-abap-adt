@@ -34,8 +34,14 @@
       "@mcp-abap-adt/lib/logger": [
         "../dist/lib/handlerLogger.d.ts"
       ],
-      "@mcp-abap-adt/http/launcher": [
-        "../http/dist/launcher.d.ts"
+      "@mcp-abap-adt/server-runtime/http": [
+        "../server-runtime/dist/http/launcher.d.ts"
+      ],
+      "@mcp-abap-adt/background-runs-memory": [
+        "../background-runs-memory/dist/index.d.ts"
+      ],
+      "@mcp-abap-adt/responsible-rules": [
+        "../responsible-rules/dist/index.d.ts"
       ]
     }
   },

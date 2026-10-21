@@ -12,9 +12,9 @@
 import {
   isUpdateOf,
   stopUrl,
-} from '../../../../src/__tests__/helpers/shutdownTools';
-import { activeTools } from '../../../../src/lib/activeTools';
-import { ownedConnections } from '../../../../src/lib/ownedConnections';
+} from '../../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../../src/lib/activeTools';
+import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import { type HttpStand, httpStand, until } from './harness';
 
 jest.setTimeout(30_000);

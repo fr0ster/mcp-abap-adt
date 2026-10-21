@@ -168,7 +168,7 @@ async function serveHttp(systemType: string) {
     entry,
     [
       ...SESSION_TRACE_PREAMBLE,
-      `import { main } from ${JSON.stringify(path.join(REPO, 'http/src/launcher'))};`,
+      `import { main } from ${JSON.stringify(path.join(REPO, 'server-runtime/src/http/launcher'))};`,
       `import { HTTP_VERSION } from ${JSON.stringify(path.join(REPO, 'http/src/httpVersion'))};`,
       `import { fullToolSet } from ${JSON.stringify(path.join(REPO, 'src/lib/toolSet'))};`,
       "void main({ toolSet: fullToolSet, program: 'mcp-abap-adt-http', version: HTTP_VERSION }).catch(() => {",

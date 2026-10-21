@@ -12,18 +12,20 @@
  * carries them — following a sibling package of this repository through its
  * own `exports`:
  *
- * - lib, http, sse, compact-http and compact-sse declare and reach no
- *   auth-broker, auth-stores or interfaces-auth-broker; server-runtime
- *   declares them and reaches them; core, compact, core-ro and compact-ro
- *   reach them only through server-runtime, declaring none;
+ * - lib, the http packages (http, compact-http, http-ro, compact-http-ro),
+ *   sse and compact-sse declare and reach no auth-broker, auth-stores or
+ *   interfaces-auth-broker; server-runtime declares them and reaches them;
+ *   core, compact, core-ro and compact-ro reach them only through
+ *   server-runtime, declaring none;
  * - server-runtime reaches no binary package and neither half; it takes lib,
  *   background-runs-memory and responsible-rules as peers;
  * - http reaches no sse and sse no http; neither reaches core;
- * - compact-http and compact-sse reach no core (nor compact), and each
- *   reaches exactly its own transport package;
- * - the stdio packages (core, compact, core-ro, compact-ro) reach
- *   server-runtime's stdio path and no other transport's path of it, and no
- *   other binary package;
+ * - compact-sse reaches no core (nor compact), and reaches exactly its own
+ *   transport package;
+ * - the stdio packages (core, compact, core-ro, compact-ro) and the http
+ *   packages reach server-runtime's path of their transport, no other
+ *   transport's path of it and no file of another transport's directory of
+ *   it, and no other binary package;
  * - the six read-only packages reach lib, their own transport's
  *   package (or runtime path) and — a compact one — the half that changes
  *   nothing, and never the modifying half or another transport;
@@ -32,8 +34,8 @@
  *   core, http and sse, present in the root manifest, so the root install
  *   that development and CI use resolves it too;
  * - no source of a transport (tests included) reaches into another
- *   transport's directory by a relative path — server-runtime's stdio
- *   directory counted as stdio's.
+ *   transport's directory by a relative path — server-runtime's stdio and
+ *   http directories counted as stdio's and http's.
  *
  * The packages come from one table.
  */
@@ -76,6 +78,24 @@ const RUNTIME_PATHS: Record<string, readonly string[]> = {
   http: [`${RUNTIME}/http`, `${RUNTIME}/http/server`],
   sse: [`${RUNTIME}/sse`, `${RUNTIME}/sse/server`],
 };
+/** The runtime's directory of each transport, under its `src` and its `dist`. */
+const RUNTIME_DIRS: Record<string, string> = {
+  stdio: 'stdio',
+  http: 'http',
+  sse: 'sse',
+};
+/** The files of server-runtime in another transport's directory than `runtimePath`'s. */
+const inOtherRuntimeDir = (runtimePath: string, file: string): boolean =>
+  Object.entries(RUNTIME_PATHS)
+    .filter(([, paths]) => !paths.includes(runtimePath))
+    .some(([transport]) =>
+      ['src', 'dist'].some((tree) =>
+        file.startsWith(
+          path.join(ROOT, 'server-runtime', tree, RUNTIME_DIRS[transport]) +
+            path.sep,
+        ),
+      ),
+    );
 /** The runtime paths of every transport but the one `runtimePath` names. */
 const otherRuntimePaths = (runtimePath: string): string[] =>
   Object.values(RUNTIME_PATHS)
@@ -175,10 +195,13 @@ const PACKAGES: Row[] = [
     forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES, RUNTIME],
     required: ['@mcp-abap-adt/lib'],
   },
+  // http: the runtime's http paths, and no broker or store through them.
   {
     name: '@mcp-abap-adt/http',
     dir: 'http',
     forbidden: [...CHAIN_STATE, '@mcp-abap-adt/sse', '@mcp-abap-adt/core'],
+    required: [RUNTIME, '@mcp-abap-adt/lib'],
+    runtimePath: `${RUNTIME}/http`,
   },
   {
     name: '@mcp-abap-adt/sse',
@@ -216,11 +239,13 @@ const PACKAGES: Row[] = [
     'through the runtime',
     `${RUNTIME}/stdio`,
   ),
+  // http: no broker or store, through the runtime or otherwise.
   compactOver(
     '@mcp-abap-adt/compact-http',
     'compact-http',
-    '@mcp-abap-adt/http',
+    RUNTIME,
     'forbidden',
+    `${RUNTIME}/http`,
   ),
   compactOver(
     '@mcp-abap-adt/compact-sse',
@@ -240,9 +265,10 @@ const PACKAGES: Row[] = [
   readOnlyOver(
     '@mcp-abap-adt/http-ro',
     'http-ro',
-    '@mcp-abap-adt/http',
+    RUNTIME,
     'forbidden',
     false,
+    `${RUNTIME}/http`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/sse-ro',
@@ -262,9 +288,10 @@ const PACKAGES: Row[] = [
   readOnlyOver(
     '@mcp-abap-adt/compact-http-ro',
     'compact-http-ro',
-    '@mcp-abap-adt/http',
+    RUNTIME,
     'forbidden',
     true,
+    `${RUNTIME}/http`,
   ),
   readOnlyOver(
     '@mcp-abap-adt/compact-sse-ro',
@@ -588,12 +615,17 @@ describe.each(
 
   if (row.runtimePath !== undefined) {
     const runtimePath = row.runtimePath;
-    it(`reaches ${runtimePath}, and no other transport's runtime path`, () => {
+    it(`reaches ${runtimePath}, and no other transport's runtime path or directory`, () => {
       expect(graph.reachedPaths).toContain(runtimePath);
       expect(
         [...graph.reachedPaths].filter((p) =>
           otherRuntimePaths(runtimePath).includes(p),
         ),
+      ).toEqual([]);
+      expect(
+        [...graph.files]
+          .filter((file) => inOtherRuntimeDir(runtimePath, file))
+          .map((file) => path.relative(ROOT, file)),
       ).toEqual([]);
     });
   }
@@ -650,20 +682,44 @@ describe('no transport reaches another by a relative path, tests included', () =
       .map((rel) => path.join(ROOT, dir, rel));
 
   it.each([
-    ['server/src', ['http', 'sse']],
-    ['server-runtime/src/stdio', ['http', 'sse']],
+    ['server/src', ['http', 'server-runtime/src/http', 'sse']],
+    ['server-runtime/src/stdio', ['http', 'server-runtime/src/http', 'sse']],
     ['http/src', ['server', 'server-runtime/src/stdio', 'sse']],
-    ['sse/src', ['server', 'server-runtime/src/stdio', 'http']],
-    ['compact/src', ['http', 'sse', 'compact-http', 'compact-sse']],
+    ['server-runtime/src/http', ['server', 'server-runtime/src/stdio', 'sse']],
+    [
+      'sse/src',
+      ['server', 'server-runtime/src/stdio', 'http', 'server-runtime/src/http'],
+    ],
+    [
+      'compact/src',
+      ['http', 'server-runtime/src/http', 'sse', 'compact-http', 'compact-sse'],
+    ],
     [
       'compact-http/src',
       ['server', 'server-runtime/src/stdio', 'sse', 'compact', 'compact-sse'],
     ],
     [
       'compact-sse/src',
-      ['server', 'server-runtime/src/stdio', 'http', 'compact', 'compact-http'],
+      [
+        'server',
+        'server-runtime/src/stdio',
+        'http',
+        'server-runtime/src/http',
+        'compact',
+        'compact-http',
+      ],
     ],
-    ['core-ro/src', ['http', 'sse', 'compact', 'compact-http', 'compact-sse']],
+    [
+      'core-ro/src',
+      [
+        'http',
+        'server-runtime/src/http',
+        'sse',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
+    ],
     [
       'http-ro/src',
       [
@@ -681,6 +737,7 @@ describe('no transport reaches another by a relative path, tests included', () =
         'server',
         'server-runtime/src/stdio',
         'http',
+        'server-runtime/src/http',
         'compact',
         'compact-http',
         'compact-sse',
@@ -688,7 +745,14 @@ describe('no transport reaches another by a relative path, tests included', () =
     ],
     [
       'compact-ro/src',
-      ['http', 'sse', 'compact', 'compact-http', 'compact-sse'],
+      [
+        'http',
+        'server-runtime/src/http',
+        'sse',
+        'compact',
+        'compact-http',
+        'compact-sse',
+      ],
     ],
     [
       'compact-http-ro/src',
@@ -707,6 +771,7 @@ describe('no transport reaches another by a relative path, tests included', () =
         'server',
         'server-runtime/src/stdio',
         'http',
+        'server-runtime/src/http',
         'compact',
         'compact-http',
         'compact-sse',

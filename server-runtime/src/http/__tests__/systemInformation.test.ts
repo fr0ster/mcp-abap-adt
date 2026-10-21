@@ -11,7 +11,7 @@
  * `system_user_unknown`. A refused call's tool never runs.
  */
 
-import type { StandInRequest } from '../../../src/__tests__/helpers/adtStandIn';
+import type { StandInRequest } from '../../../../src/__tests__/helpers/adtStandIn';
 import { type HttpStand, httpStand, turns } from './shutdown/harness';
 
 jest.setTimeout(30_000);

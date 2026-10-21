@@ -16,8 +16,8 @@ import type { AddressInfo } from 'node:net';
 // The connector, without a wire: an on-premise system without
 // systeminformation (its lookup answers 404), so the configured order below
 // applies — where the system names its user, its answer wins over all of it.
-jest.mock('../../../src/lib/connectionFactory', () => ({
-  ...jest.requireActual('../../../src/lib/connectionFactory'),
+jest.mock('../../../../src/lib/connectionFactory', () => ({
+  ...jest.requireActual('../../../../src/lib/connectionFactory'),
   createAbapConnection: () => ({
     connect: async () => {},
     makeAdtRequest: async () => {
@@ -38,7 +38,7 @@ import express from 'express';
 import {
   getStatedSystemContext,
   resetSystemContextCache,
-} from '../../../src/lib/systemContext';
+} from '../../../../src/lib/systemContext';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 /** One tool: waits `delayMs`, then answers the context its call sees. */

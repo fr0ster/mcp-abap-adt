@@ -7,13 +7,13 @@
  * the pool with its connections, until its stop tool or the idle bound.
  */
 
-import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
+import { isLogoff } from '../../../../../src/__tests__/helpers/adtStandIn';
 import {
   isUnlockOf,
   isUpdateOf,
   listenUrl,
-} from '../../../../src/__tests__/helpers/shutdownTools';
-import { activeTools } from '../../../../src/lib/activeTools';
+} from '../../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../../src/lib/activeTools';
 import {
   basicHeaders,
   type HttpStand,

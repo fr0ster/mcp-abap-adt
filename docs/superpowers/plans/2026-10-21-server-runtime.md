@@ -17,6 +17,8 @@
 - `@mcp-abap-adt/lib` is in `dependencies` of the twelve binary packages only; `server-runtime`, `compact-readonly-entries`, `compact-modify`, `background-runs-memory`, `responsible-rules` list it in `peerDependencies` and `devDependencies`. `server-runtime` lists `background-runs-memory` and `responsible-rules` the same way.
 - `server-runtime`: license `AGPL-3.0-only`, no `bin`, sibling ranges `^19.2.0`.
 - Registry-only ranges; no `file:`, `link:`, `workspace:`; lockfiles changed by npm only.
+- **Every commit leaves the repo green**: `npm run build`, `npm run lint:check`, `npm run test:check`, and the full `npm test` (after the build, so `binSmoke` has `dist`) pass at the end of every task, and a moved suite must report its tests as run (jest's `--passWithNoTests` hides a suite nobody finds: check the count, not the exit code).
+- **Resolution is wired in the task that needs it**, never later: root `package.json` `jest.roots` and exact `jest.moduleNameMapper` entries (one per export path — a wildcard cannot map `/stdio` to `stdio/launcher.ts`), `tsconfig.test.json` `paths` and `include`, and each package's own `tsconfig.json` `paths` (built declarations in `../server-runtime/dist/...`), for every import the task introduces or retargets.
 - What a user runs does not change: twelve binaries, names, options, tool sets, `--version` and `serverInfo.version` (each binary's own version).
 - `lib` refuses nothing; only the runtime's `main` acts on a second copy.
 - The guard's line, verbatim: `Two copies of @mcp-abap-adt/lib are loaded in this process (<file>, <file>): reinstall <package> (npm install -g <package>).`
@@ -26,149 +28,139 @@
 
 ## Review Focus
 
-1. A global install of a wrapper **together with its former base in one command** — the reported case — must load one `lib` (Task 8, layout 1).
-2. `npm install --install-strategy=nested` of a binary — the layout ordinary dependencies do not deduplicate — must load one `lib` (Task 8, layout 4).
-3. The portable SEA binaries (no `node_modules` on the target) must start and register one copy (Task 8, portable).
-4. A direct `new StdioServer(...)` from `@mcp-abap-adt/core` without `opts.version` must still answer core's version (Task 4).
-5. An embedder that installs `lib` plus `compact-readonly-entries` (no binary) must see no refusal and no missing peer (Task 4, packageSet + a local install case in Task 8).
+1. A global install of a wrapper **together with its former base in one command** — the reported case — must load one `lib` (Task 9, layout 1).
+2. `npm install --install-strategy=nested` of a binary — the layout ordinary dependencies do not deduplicate — must load one `lib` (Task 9, layout 4).
+3. The portable SEA binaries (no `node_modules` on the target) must start and register one copy (Task 9, portable).
+4. A direct `new StdioServer(...)` from `@mcp-abap-adt/core` without `opts.version` must still answer core's version (Task 3).
+5. An embedder that installs `lib` plus `compact-readonly-entries` (no binary) must see no refusal and no missing peer (Task 6 packageSet rules; Task 9 layout 3).
 
 ---
 
-### Task 1: `lib` registers each loaded copy
+### Task 1: the release's versions
+
+**Files:**
+- Modify: the 17 manifests (`package.json` of `.`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`, `compact-modify`, `server`, `http`, `sse`, `compact`, `compact-http`, `compact-sse`, `core-ro`, `http-ro`, `sse-ro`, `compact-ro`, `compact-http-ro`, `compact-sse-ro`), `package-lock.json` (by npm), the twelve `server*.json`, `docker/Dockerfile.inspect`
+
+- [ ] **Step 1:** every manifest at `19.2.0`, every sibling range `^19.2.0` (as `docs/deployment/RELEASE.md` step 1–2 says); `npm install --package-lock-only`; registry entries and `CORE_VERSION` at 19.2.0.
+- [ ] **Step 2:** `releaseMetadata.test.ts`, `packageSet.test.ts` and the full gate list pass; no foreign `"link": true`.
+- [ ] **Step 3:** commit `release: 19.2.0 versions (#303)`. (If #305 lands first with the same bump, this task shrinks to what is left.)
+
+### Task 2: `lib` registers each loaded copy
 
 **Files:**
 - Create: `src/lib/instance.ts`
-- Modify: every module named in the root `package.json` `exports` map (`src/index.ts`, `src/lib/handlers/index.ts`, `src/lib/utils.ts`, `src/embeddable/index.ts`, `src/lib/config/index.ts`, `src/lib/auth/index.ts`, `src/lib/handlerLogger.ts`, `src/lib/requestContext.ts`, `src/lib/handlers/read.ts`, `src/lib/handlers/write.ts`, `src/lib/compact/index.ts`, `src/lib/httpTransport/index.ts`, `src/lib/debugger/index.ts`, `src/lib/state/index.ts`, `src/lib/toolSet.ts`, `src/lib/adtHeaders/index.ts`, `src/lib/toolSearch/index.ts`)
+- Modify: every module named in the root `exports` map (`src/index.ts`, `src/lib/handlers/index.ts`, `src/lib/utils.ts`, `src/embeddable/index.ts`, `src/lib/config/index.ts`, `src/lib/auth/index.ts`, `src/lib/handlerLogger.ts`, `src/lib/requestContext.ts`, `src/lib/handlers/read.ts`, `src/lib/handlers/write.ts`, `src/lib/compact/index.ts`, `src/lib/httpTransport/index.ts`, `src/lib/debugger/index.ts`, `src/lib/state/index.ts`, `src/lib/toolSet.ts`, `src/lib/adtHeaders/index.ts`, `src/lib/toolSearch/index.ts`)
 - Test: `src/__tests__/unit/libInstance.test.ts`
 
 **Interfaces:**
-- Produces: `libInstances(): readonly { file: string }[]` exported from `@mcp-abap-adt/lib/config` (and the root); the registry key `Symbol.for('@mcp-abap-adt/lib/instances')`.
+- Produces: `libInstances(): readonly { file: string }[]` from `@mcp-abap-adt/lib/config` and the root; registry key `Symbol.for('@mcp-abap-adt/lib/instances')`.
 
-- [ ] **Step 1: Failing tests** — `libInstance.test.ts`: (a) loading `instance.ts` once registers one entry whose `file` is the module's `__filename`; (b) loading it again in an isolated module registry (`jest.isolateModules`) registers a second entry — two copies, two entries; (c) every path of the root `exports` map, loaded in a fresh isolated registry with the global array reset, registers exactly one entry (reads the map from `package.json`, maps `dist/…js` to the `src/…ts` module); (d) `file` is `bundled` when `__filename` is not a string (simulate by evaluating the module source in a context without it).
-- [ ] **Step 2:** run `npm test -- src/__tests__/unit/libInstance.test.ts` — fails (module missing).
-- [ ] **Step 3:** implement `instance.ts` per spec §3 (push `{ file }` on load; no file system access; no export of a mutator); add `import './instance'` (relative path from each entry) as a side-effect import at the top of every entry listed above; export `libInstances` from `config` and the root.
-- [ ] **Step 4:** the test passes; `npm run test:check`, `npm run lint:check`.
-- [ ] **Step 5:** break the side-effect import of one entry, see (c) red, revert; commit `feat(lib): each loaded copy registers itself (#303)`.
+- [ ] **Step 1: Failing tests** — (a) loading `instance.ts` once registers one entry, `file` = its `__filename`; (b) a second load in `jest.isolateModules` registers a second entry; (c) each path of the root `exports` map (read from `package.json`, `dist/…js` mapped to `src/…ts`), loaded in a fresh isolated registry with the array reset, registers exactly one entry; (d) `file` is `bundled` where `__filename` is not a string.
+- [ ] **Step 2:** they fail.
+- [ ] **Step 3:** `instance.ts` per spec §3 (push on load, no file system access, no exported mutator); a side-effect `import './instance'` (relative) at the top of every entry; `libInstances` exported from `config` and the root.
+- [ ] **Step 4:** green; drop one entry's import, see (c) red, revert.
+- [ ] **Step 5:** commit `feat(lib): each loaded copy registers itself (#303)`.
 
-### Task 2: the `server-runtime` package and the stdio move
+### Task 3: `server-runtime` and the stdio transport, end to end
 
 **Files:**
 - Create: `server-runtime/package.json`, `server-runtime/tsconfig.json`, `server-runtime/README.md`, `server-runtime/LICENSE` (copy of `server/LICENSE`), `server-runtime/src/runtimeVersion.ts`
-- Move (`git mv`): `server/src/{launcher.ts,StdioServer.ts,destinationSource.ts,shutdown.ts,config/,auth/,index.ts}` → `server-runtime/src/stdio/…` (`index.ts` becomes `stdio/server.ts`, the `stdio/server` export); `server/src/__tests__/` → `server-runtime/src/stdio/__tests__/`
-- Keep: `server/src/coreVersion.ts`, `server/bin/`
-- Modify: root `package.json` (`build`, `prebuild` clean list, `lint:check`/`test:check` if they list package dirs), `scripts/publish-all.sh`
-- Modify: `src/__tests__/integration/helpers/packageSources.ts` (jest mapping of package names to sources)
+- Move (`git mv`): `server/src/{launcher.ts,StdioServer.ts,destinationSource.ts,shutdown.ts,config/,auth/,index.ts}` → `server-runtime/src/stdio/…` (`index.ts` → `stdio/server.ts`); `server/src/__tests__/` → `server-runtime/src/stdio/__tests__/`
+- Keep in `server/`: `src/coreVersion.ts`, `bin/`; Create: `server/src/index.ts`, `server/src/launcher.ts`, `server/src/auth/index.ts` as re-export modules
+- Modify: `server/package.json`, `server/tsconfig.json`; `compact/`, `compact-ro/`, `core-ro/` — `src/launcher.ts`, `bin/*.js`, `package.json`, `tsconfig.json`
+- Modify: root `package.json` (`build` order: runtime after `compact-modify`, before `server`; `prebuild` clean list; `jest.roots` + `<rootDir>/server-runtime/src`; exact `moduleNameMapper` for `@mcp-abap-adt/server-runtime/stdio`, `/stdio/server`, `/auth`), `tsconfig.test.json` (`paths` for the same three, `include` of `server-runtime/src/**/*`), `scripts/publish-all.sh` (`./server-runtime` after `./compact-modify`, before `./server`; "eighteen")
+- Modify: `src/__tests__/unit/packages/dependencyRule.test.ts` (runtime among the sibling dirs; the `core` rows: core reaches the runtime's stdio paths and the auth chain through it; `compactOver` / `readOnlyOver` rows for compact, compact-ro, core-ro: they reach `server-runtime/stdio`, not `core`)
+- Test: `server/src/__tests__/exports.test.ts`
 
 **Interfaces:**
-- Produces: exports `@mcp-abap-adt/server-runtime/stdio` (`main`, `launcherFailedLine`, `StdioLauncherEdges`, `LauncherOptions`, `coreHelp`, …), `/stdio/server` (`StdioServer`, core's parameter table, env resolution, destination source), `/auth`; `RUNTIME_VERSION: string`.
+- Produces: `@mcp-abap-adt/server-runtime/stdio` (`main`, `launcherFailedLine`, `StdioLauncherEdges`, `LauncherOptions`, `coreHelp`, …), `/stdio/server` (`StdioServer`, core's parameter table, env resolution, destination source), `/auth`; `RUNTIME_VERSION`; unchanged `@mcp-abap-adt/core`, `/launcher`, `/auth`.
 
-- [ ] **Step 1:** create the package manifest: name, `AGPL-3.0-only`, no `bin`, `exports` for `./stdio`, `./stdio/server`, `./auth` (Task 3 adds the others), `files: ["dist/", "README.md", "LICENSE"]`, `dependencies` = what `server/package.json` declares minus `lib`, `background-runs-memory`, `responsible-rules`, which go to `peerDependencies` and `devDependencies` (`^19.2.0`). `tsconfig.json` mirrors `server/tsconfig.json` (`paths` into `../dist`, `../background-runs-memory/dist`, `../responsible-rules/dist`).
-- [ ] **Step 2:** `git mv` the files above; fix relative imports inside the moved tree only.
-- [ ] **Step 3:** `runtimeVersion.ts` reads `../package.json` (as `coreVersion.ts` does); `StdioServer` defaults `opts.version` to `RUNTIME_VERSION` instead of `CORE_VERSION`. The moved tests that assert the default version expect `RUNTIME_VERSION`.
-- [ ] **Step 4:** root build compiles `server-runtime` after `responsible-rules` and before `server`; the clean list includes `server-runtime/dist`; `publish-all.sh` lists `./server-runtime` after `./compact-modify`, before `./server`, and its comment says eighteen; `packageSources.ts` maps `@mcp-abap-adt/server-runtime/*` to `server-runtime/src/*`.
-- [ ] **Step 5:** `server/` temporarily re-exports from `../server-runtime` sources so it still builds (Task 4 makes it final) — or Task 4 is done in the same commit if simpler; either way `npm run build` and the moved tests pass: `npm test -- server-runtime/src/stdio`.
-- [ ] **Step 6:** commit `refactor: stdio launch code moves to @mcp-abap-adt/server-runtime (#303)`.
+- [ ] **Step 1:** the runtime manifest: `AGPL-3.0-only`, no `bin`, `exports` `./stdio`, `./stdio/server`, `./auth`, `files: ["dist/", "README.md", "LICENSE"]`, `dependencies` = `server/package.json`'s minus `lib`, `background-runs-memory`, `responsible-rules`, which are peers + devDependencies (`^19.2.0`); `tsconfig.json` mirrors `server/tsconfig.json` (`paths` into `../dist`, `../background-runs-memory/dist`, `../responsible-rules/dist`).
+- [ ] **Step 2:** `git mv`; relative imports fixed inside the moved tree; `StdioServer` defaults to `RUNTIME_VERSION` (`runtimeVersion.ts` reads `../package.json`, as `coreVersion.ts` does).
+- [ ] **Step 3: Failing test** `server/src/__tests__/exports.test.ts`: every name 19.1.0's `@mcp-abap-adt/core`, `/launcher` and `/auth` exported is still exported (the list written into the test from the 19.1.0 `dist`); `new StdioServer({...})` from `@mcp-abap-adt/core` without `version` answers `CORE_VERSION` with the runtime's version module mocked to another value.
+- [ ] **Step 4:** core's re-export modules; `StdioServer` exported as a subclass defaulting `opts.version` to `CORE_VERSION`; `server/tsconfig.json` `paths` for the three runtime exports into `../server-runtime/dist/…`; `server/package.json` depends on `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules`, nothing it no longer imports; core's bin calls the runtime's `main` with its tool set, program, own version and package name.
+- [ ] **Step 5:** the three stdio wrappers import `@mcp-abap-adt/server-runtime/stdio` (bin: `launcherFailedLine` from it); their `tsconfig.json` `paths` map it into `../server-runtime/dist/stdio/…`; manifests drop `core`, add `server-runtime`, `background-runs-memory`, `responsible-rules`.
+- [ ] **Step 6:** `dependencyRule.test.ts` rows for stdio migrated (Files above); the moved stdio suites report their tests run; full gate list green.
+- [ ] **Step 7:** commit `refactor: stdio launch code in @mcp-abap-adt/server-runtime; core and its wrappers on it (#303)`.
 
-### Task 3: the http and sse moves
-
-**Files:**
-- Move (`git mv`): `http/src/{launcher.ts,StreamableHttpServer.ts,InstancePool.ts,config/,index.ts}` → `server-runtime/src/http/…` (`index.ts` → `http/server.ts`); `sse/src/{launcher.ts,SseServer.ts,config/,index.ts}` → `server-runtime/src/sse/…`; their `__tests__/` alongside
-- Keep: `http/src/httpVersion.ts`, `sse/src/sseVersion.ts`, `http/bin/`, `sse/bin/`
-- Modify: `server-runtime/package.json` (exports `./http`, `./http/server`, `./sse`, `./sse/server`; `express` dependency)
-
-**Interfaces:**
-- Consumes: Task 2's package and `RUNTIME_VERSION`.
-- Produces: `@mcp-abap-adt/server-runtime/http` (`main`), `/http/server` (`StreamableHttpServer`, http's parameter table), `/sse` (`main`), `/sse/server` (`SseServer`, sse's parameter table).
-
-- [ ] **Step 1:** `git mv`; fix relative imports in the moved trees; `StreamableHttpServer` and `SseServer` default `opts.version` to `RUNTIME_VERSION`.
-- [ ] **Step 2:** no moved source reaches another transport's directory by a relative path (grep; the dependencyRule test in Task 7 enforces it).
-- [ ] **Step 3:** `npm run build`, `npm test -- server-runtime/src/http server-runtime/src/sse` pass.
-- [ ] **Step 4:** commit `refactor: http and sse launch code move to server-runtime (#303)`.
-
-### Task 4: `core`, `http`, `sse` become thin; peers per §2a
+### Task 4: the http transport, end to end
 
 **Files:**
-- Modify: `server/src/index.ts`, `server/src/launcher.ts`, `server/src/auth/index.ts` (re-export modules), `http/src/index.ts`, `http/src/launcher.ts`, `sse/src/index.ts`, `sse/src/launcher.ts`, their `bin/*.js`, `server/package.json`, `http/package.json`, `sse/package.json`
-- Modify: `background-runs-memory/package.json`, `responsible-rules/package.json`, `compact-readonly-entries/package.json`, `compact-modify/package.json` (lib → peer + dev)
-- Test: `server/src/__tests__/exports.test.ts`, `http/src/__tests__/exports.test.ts`, `sse/src/__tests__/exports.test.ts`
+- Move (`git mv`): `http/src/{launcher.ts,StreamableHttpServer.ts,InstancePool.ts,config/,index.ts}` → `server-runtime/src/http/…` (`index.ts` → `http/server.ts`), `http/src/__tests__/` → `server-runtime/src/http/__tests__/`
+- Keep in `http/`: `src/httpVersion.ts`, `bin/`; Create re-export `http/src/index.ts`, `http/src/launcher.ts`
+- Modify: `server-runtime/package.json` (`./http`, `./http/server`; `express`), `http/package.json`, `http/tsconfig.json`; `compact-http/`, `compact-http-ro/`, `http-ro/` (`src/launcher.ts`, `bin`, `package.json`, `tsconfig.json`); root `jest.moduleNameMapper` and `tsconfig.test.json` for the two new paths; `dependencyRule.test.ts` http rows (http reaches no stdio module and no auth-broker / auth-stores / interfaces-auth-broker; its wrappers reach `server-runtime/http`)
+- Test: `http/src/__tests__/exports.test.ts`
 
-**Interfaces:**
-- Consumes: Tasks 2–3 exports.
-- Produces: unchanged public paths `@mcp-abap-adt/core`, `/launcher`, `/auth`; `@mcp-abap-adt/http`, `/launcher`; `@mcp-abap-adt/sse`, `/launcher`.
+- [ ] **Step 1:** as Task 3 steps 2–6 for http: move, `RUNTIME_VERSION` default in `StreamableHttpServer`, failing exports test (19.1.0's names; `HTTP_VERSION` default via subclass), re-exports, `paths`, manifests, wrappers, rows.
+- [ ] **Step 2:** no moved http source reaches another transport's directory by a relative path; full gate list green; moved suites report their tests run.
+- [ ] **Step 3:** commit `refactor: http launch code in server-runtime; http and its wrappers on it (#303)`.
 
-- [ ] **Step 1: Failing tests** — each `exports.test.ts`: every name today's `index`/`launcher`/`auth` exported is still exported (compare against the list in `dist` of the 19.1.0 package, written into the test); `new StdioServer({...})` from `@mcp-abap-adt/core` without `version` reports `CORE_VERSION` (and `HTTP_VERSION` / `SSE_VERSION` likewise), with the runtime's version module mocked to another value to prove the subclass decides.
-- [ ] **Step 2:** re-export modules; each server class exported as a subclass defaulting `opts.version` to the package's own version (spec §2); bins call the runtime's `main` with the tool set, program and own version, `launcherFailedLine` from the runtime.
-- [ ] **Step 3:** manifests: each base depends on `server-runtime`, `lib`, `background-runs-memory`, `responsible-rules` (`^19.2.0`) and on nothing it no longer imports; the four packages above move `lib` to `peerDependencies` (+ `devDependencies`).
-- [ ] **Step 4:** tests pass; `npm run build`; `npm --prefix server run test:check` and the same for `http`, `sse` (or their replacement in Task 7's CI change).
-- [ ] **Step 5:** commit `refactor: core, http and sse re-export the runtime; lib is a peer below the binaries (#303)`.
+### Task 5: the sse transport, end to end
 
-### Task 5: the nine wrappers
+**Files:** as Task 4 with `sse/src/{launcher.ts,SseServer.ts,config/,index.ts}`, `sseVersion.ts`, `compact-sse/`, `compact-sse-ro/`, `sse-ro/`, `./sse`, `./sse/server`.
 
-**Files:**
-- Modify: `compact/`, `compact-ro/`, `core-ro/`, `compact-http/`, `compact-http-ro/`, `http-ro/`, `compact-sse/`, `compact-sse-ro/`, `sse-ro/` — each `src/launcher.ts`, `bin/*.js`, `package.json`
+- [ ] **Step 1:** as Task 4 step 1 for sse (`SSE_VERSION` via subclass).
+- [ ] **Step 2:** as Task 4 step 2.
+- [ ] **Step 3:** commit `refactor: sse launch code in server-runtime; sse and its wrappers on it (#303)`.
 
-**Interfaces:**
-- Consumes: `@mcp-abap-adt/server-runtime/stdio|http|sse` (`main`, `launcherFailedLine`, `StdioLauncherEdges`).
-
-- [ ] **Step 1:** imports `@mcp-abap-adt/core/launcher` → `@mcp-abap-adt/server-runtime/stdio` (http, sse likewise); `bin` takes `launcherFailedLine` from the runtime.
-- [ ] **Step 2:** manifests drop `core` / `http` / `sse`; add `server-runtime`, `background-runs-memory`, `responsible-rules` (`^19.2.0`); `lib` stays in `dependencies`.
-- [ ] **Step 3:** each wrapper's existing tests pass; `node <wrapper>/bin/<bin>.js --version` from the built tree answers the wrapper's version.
-- [ ] **Step 4:** commit `refactor: wrappers depend on the runtime, not on another binary (#303)`.
-
-### Task 6: the runtime refuses a second copy
+### Task 6: `lib` is a peer below the binaries
 
 **Files:**
-- Modify: `server-runtime/src/stdio/launcher.ts`, `server-runtime/src/http/launcher.ts`, `server-runtime/src/sse/launcher.ts`
+- Modify: `background-runs-memory/package.json`, `responsible-rules/package.json`, `compact-readonly-entries/package.json`, `compact-modify/package.json`, `package-lock.json` (npm)
+- Modify: `src/__tests__/unit/packages/packageSet.test.ts`, `src/__tests__/unit/packages/dependencyRule.test.ts` (the rows that required `lib` in those packages' `dependencies` require it in `peerDependencies`; "declared" accepts a peer where spec §2a makes it one)
+
+- [ ] **Step 1: Failing rules** in `packageSet.test.ts` (spec §4): no binary depends on a binary; the twelve list runtime, `lib`, the two state packages in `dependencies`; the five list `lib` (runtime also the two state packages) in `peerDependencies`, not `dependencies`; the runtime has no `bin`.
+- [ ] **Step 2:** move `lib` to `peerDependencies` + `devDependencies` in the four manifests; lockfile by npm.
+- [ ] **Step 3:** green; break each rule once (a binary-to-binary edge; `lib` back in `compact-modify`'s `dependencies`) and see red; revert.
+- [ ] **Step 4:** commit `build: lib is a peer of everything below the binaries (#303)`.
+
+### Task 7: the runtime refuses a second copy
+
+**Files:**
 - Create: `server-runtime/src/secondCopy.ts`
+- Modify: `server-runtime/src/{stdio,http,sse}/launcher.ts` (the package name in `LauncherOptions` beside `program`, if absent), the twelve bins pass it
 - Test: `server-runtime/src/__tests__/secondCopy.test.ts`
 
 **Interfaces:**
-- Consumes: `libInstances()` (Task 1).
-- Produces: `secondCopyLine(instances, packageName): string | undefined`.
+- Consumes: `libInstances()` (Task 2). Produces: `secondCopyLine(instances, packageName): string | undefined`.
 
-- [ ] **Step 1: Failing tests** — for each transport's `main` with injected edges: two registered entries → exit `1`, stderr exactly the Global Constraints line (files and package substituted), no parameter read (the edges' config reader is never called), nothing listens; one entry → starts as today. `secondCopyLine` with one entry → `undefined`.
-- [ ] **Step 2:** implement `secondCopy.ts`; call it first in each `main`, before parameters; the package name is the one the binary passes in (add it to `LauncherOptions` beside `program` if absent).
-- [ ] **Step 3:** tests pass; break the call in one `main`, see red, revert.
+- [ ] **Step 1: Failing tests** — each transport's `main` with injected edges: two registered entries → exit `1`, stderr exactly the Global Constraints line, the edges' parameter reader never called, nothing listens; one entry → starts as today; `secondCopyLine` with one entry → `undefined`.
+- [ ] **Step 2:** implement; call it first in each `main`.
+- [ ] **Step 3:** green; remove the call from one `main`, see red, revert.
 - [ ] **Step 4:** commit `feat: the runtime refuses a second copy of lib at start (#303)`.
 
-### Task 7: dependency gates
+### Task 8: pipelines
 
 **Files:**
-- Modify: `src/__tests__/unit/packages/packageSet.test.ts`, `src/__tests__/unit/packages/dependencyRule.test.ts`, `src/__tests__/unit/releaseMetadata.test.ts`
-- Modify: `.github/workflows/ci.yml`, `.github/workflows/release.yml`
+- Modify: `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `src/__tests__/unit/releaseMetadata.test.ts`, `src/__tests__/helpers/installedRelease.ts`, `src/__tests__/unit/binSmoke.test.ts`, `scripts/ci/check-images.mjs`, `scripts/portable/build.mjs`
 
-- [ ] **Step 1:** `packageSet.test.ts` per spec §4 (no binary depends on a binary; binaries list runtime, lib, the two state packages; the five list lib as peer, not dependency; runtime has no bin); `releaseMetadata.test.ts` knows `server-runtime` has no registry entry.
-- [ ] **Step 2:** `dependencyRule.test.ts` migrated per spec §4 (runtime among the sibling dirs; wrapper rows require reaching the runtime path of their transport; peers accepted as declared where §2a makes them peers; isolation checks over the moved sources and `dist`).
-- [ ] **Step 3:** prove each new rule load-bearing: add a binary-to-binary dependency in a scratch manifest edit → red; move `lib` back to `dependencies` of `compact-modify` → red; revert both.
-- [ ] **Step 4:** workflows: `server-runtime`'s `lint:check` and `test:check`; the transports' `test:check` steps point at the runtime; `./server-runtime` in both `npm pack` lists and in every hard-coded package inventory of the install and Docker steps.
-- [ ] **Step 5:** commit `test: dependency gates for server-runtime and lib peers (#303)`.
+- [ ] **Step 1:** workflows: the runtime's `lint:check` and `test:check`; the transports' `test:check` steps point at the runtime; `./server-runtime` in both `npm pack` lists and in every hard-coded package inventory of the install and Docker steps.
+- [ ] **Step 2:** `releaseMetadata.test.ts`: the runtime has no registry entry; `installedRelease.ts` / `binSmoke` pack it; `check-images.mjs` verifies the runtime in each image came from the tarball; `build.mjs` substitutes `runtimeVersion` as it substitutes `coreVersion`.
+- [ ] **Step 3:** full gate list green; commit `ci: server-runtime in the pipelines (#303)`.
 
-### Task 8: the install matrix and the portable check
+### Task 9: the install matrix and the portable check
 
 **Files:**
-- Modify: `src/__tests__/helpers/installedRelease.ts`, `src/__tests__/unit/binSmoke.test.ts`
 - Create: `src/__tests__/unit/installMatrix.test.ts`
-- Modify: `scripts/portable/smoke.mjs`, `scripts/ci/check-images.mjs`
+- Modify: `scripts/portable/smoke.mjs`
 
-- [ ] **Step 1: The matrix test** (packs every package once, installs from the tarballs only into temp prefixes): layouts 1–5 of spec §4; in each, a child `node` requires the binary's launcher and its tool set's packages, then asserts `libInstances().length === 1` and that `runWithRequestContext` entered through the runtime's resolved `lib` is seen by the handler packages' resolved `lib`; each binary's `--version` answers its own version; every `@mcp-abap-adt/*` package of the release resolves to a tarball (`npm ls --json`), none from the registry. Layout 5 builds a runtime tarball at a later patch by packing a copy with its version bumped in a temp dir.
-- [ ] **Step 2:** see it fail on 19.1.0's layout first: run layout 1 against the tarballs of `origin/main` before Task 4–5 (or against the published 19.1.0 from the registry, read-only) and record the two copies — the test must be red there.
-- [ ] **Step 3:** `binSmoke` / `installedRelease.ts` pack `server-runtime` too.
-- [ ] **Step 4:** portable: `smoke.mjs` starts both portable binaries with the staging `node_modules` removed and asserts one registered copy with `file: bundled`; `build.mjs` substitutes `runtimeVersion` as it substitutes `coreVersion`.
-- [ ] **Step 5:** `check-images.mjs` verifies the runtime in each image came from the tarball.
-- [ ] **Step 6:** commit `test: install matrix proves one lib per process (#303)`.
+- [ ] **Step 1: The matrix** (tarballs only, temp prefixes): layouts 1–5 of spec §4; in each a child `node` requires the binary's launcher and its tool set's packages and asserts `libInstances().length === 1` and that `runWithRequestContext` entered through the runtime's resolved `lib` is seen by the handler packages' resolved `lib`; each binary's `--version` is its own; `npm ls --json` shows every `@mcp-abap-adt/*` package of the release from its tarball. Layout 5 packs a copy of the runtime at a later patch in a temp dir.
+- [ ] **Step 2:** prove it red where the defect is: run layout 1 against the published 19.1.0 (registry, read-only) and record two copies — the assertion fails there.
+- [ ] **Step 3:** `smoke.mjs` starts both portable binaries with the staging `node_modules` removed and asserts one registered copy, `file: bundled`.
+- [ ] **Step 4:** commit `test: install matrix proves one lib per process (#303)`.
 
-### Task 9: documentation and release notes
+### Task 10: documentation and release notes
 
 **Files:**
 - Modify: `README.md`, `server/README.md`, `http/README.md`, `sse/README.md`, `server-runtime/README.md`, `docs/deployment/RELEASE.md`, `docs/architecture/*` (package diagram, dependency rule), `CHANGELOG.md`
 
-- [ ] **Step 1:** README package table gains `server-runtime` (no command, installed with each server); install section: each server is installed on its own command; the three base READMEs say where the code lives.
-- [ ] **Step 2:** `RELEASE.md`: eighteen packages, the table with `server-runtime` and its dependencies and peers, publish order, step 9 adds the post-publish proof (a clean global install of each wrapper together with its former base, from the registry, starts and answers `--version`).
+- [ ] **Step 1:** README package table gains `server-runtime` (no command, installed with each server); install section: each server on its own command; the three base READMEs say where the code lives.
+- [ ] **Step 2:** `RELEASE.md`: eighteen packages, the table with the runtime, its dependencies and peers, publish order, step 9 adds the post-publish proof (a clean global install of each wrapper with its former base, from the registry, starts and answers `--version`).
 - [ ] **Step 3:** architecture docs: the dependency rule and the guard.
-- [ ] **Step 4:** CHANGELOG `## [19.2.0]`: `### Changed` — the new package, the dependency rule, lib as a peer below the binaries; `### Fixed` — #303 with the remedy for an existing double install (reinstall each server on its own).
-- [ ] **Step 5:** full gate list (CI's), `npm run docs:tools` unchanged output, commit `docs: server-runtime (#303)`.
+- [ ] **Step 4:** CHANGELOG `## [19.2.0]`: `### Changed` — the runtime package, the rule, `lib` as a peer below the binaries; `### Fixed` — #303 with the remedy for an existing double install (reinstall each server on its own).
+- [ ] **Step 5:** full gate list; `npm run docs:tools` output unchanged; commit `docs: server-runtime (#303)`.
 
-### Task 10: delete the working documents
+### Task 11: delete the working documents
 
-- [ ] **Step 1:** after the final review approves, delete `docs/superpowers/2026-10-21-server-runtime-goal.md`, the spec and this plan; move anything they still owe into the PR description.
+- [ ] **Step 1:** after the final review approves, delete the goal, the spec and this plan; move what they still owe into the PR description.
 - [ ] **Step 2:** commit `docs: remove #303's goal, spec and plan`.

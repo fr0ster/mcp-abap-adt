@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [19.0.1] - 2026-10-21
+## [19.1.0] - 2026-10-21
+
+### Changed
+
+- **Package listings answer no descriptions unless asked: `include_descriptions` defaults to `false`** in `GetPackageContents`, `GetPackageTree` and compact `HandlerGet` part `contents`, which takes the parameter now ([#300](https://github.com/fr0ster/mcp-abap-adt/issues/300)). Whether to pay for the descriptions is the consumer's choice; by default the server answers the fastest listing. With `include_descriptions: true`, on a destination that serves ADT batch, each description is read from the object's metadata, one read per object, in one more envelope after the walk: measured on an on-premise system, about 23 s for a flat package of 2 033 objects whose walk alone takes about 1.5 s. Without a communication batch the node structures are asked with descriptions only when `true`. Migration: a consumer that relied on the descriptions passes `include_descriptions: true`.
 
 ### Fixed
 
-- **`GetPackageContents` and `GetPackageTree` with `include_descriptions: false` read no object metadata** ([#300](https://github.com/fr0ster/mcp-abap-adt/issues/300)). On the batched path they read every walked object's metadata in one more envelope for a description the answer then did not carry: on a flat package of about 2 000 objects that pass took most of the call. With descriptions asked for (the default), each description still comes from the object's metadata: measured again, inside one envelope SAP answers almost every node structure part after the first with other parts' `DESCRIPTION` texts (2 023 of 2 033 objects of one package), so the node structure parts' descriptions stay unused.
+- **`include_descriptions: false` no longer reads object metadata on the batched path** of `GetPackageContents` and `GetPackageTree`: the metadata pass ran for descriptions the answer did not carry. Inside one envelope SAP answers almost every node structure part after the first with other parts' `DESCRIPTION` texts (measured: 2 023 of 2 033 objects of one package), so those parts' descriptions stay unused and the descriptions come from the metadata.
 
 ## [19.0.0] - 2026-10-21
 

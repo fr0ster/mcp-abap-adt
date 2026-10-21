@@ -47,7 +47,9 @@ export const TOOL_DEFINITION = {
     include_descriptions: z
       .boolean()
       .optional()
-      .describe('Include object descriptions in response (default: true)'),
+      .describe(
+        "Include each object's description in the response. Where the system serves ADT batch, each description is read from the object's metadata: one more read per object, which on a large package takes most of the call (default: false)",
+      ),
   },
 } as const;
 
@@ -106,10 +108,10 @@ export async function handleGetPackageContents(
           packageNames,
           options,
         );
-        // Without descriptions the answer carries none: no metadata is read.
-        return options.includeDescriptions === false
-          ? levels
-          : describeFromMetadata(context, levels);
+        // Descriptions only when asked for: each is its object's metadata.
+        return options.includeDescriptions === true
+          ? describeFromMetadata(context, levels)
+          : levels;
       },
       () => {
         const utils = createAdtClient(connection, logger).getUtils(ourUtils);

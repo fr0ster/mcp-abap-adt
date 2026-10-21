@@ -26,6 +26,7 @@ const manifests = {
   'responsible-rules': json('responsible-rules/package.json'),
   'compact-readonly-entries': json('compact-readonly-entries/package.json'),
   'compact-modify': json('compact-modify/package.json'),
+  'server-runtime': json('server-runtime/package.json'),
   'core-ro': json('core-ro/package.json'),
   'http-ro': json('http-ro/package.json'),
   'sse-ro': json('sse-ro/package.json'),
@@ -37,7 +38,7 @@ const version: string = manifests.lib.version;
 const major = version.split('.')[0];
 
 describe('release metadata names the version npm will carry', () => {
-  it('the seventeen packages are released together', () => {
+  it('the eighteen packages are released together', () => {
     for (const [name, manifest] of Object.entries(manifests)) {
       expect(`${name} ${manifest.version}`).toBe(`${name} ${version}`);
     }
@@ -45,8 +46,11 @@ describe('release metadata names the version npm will carry', () => {
 
   // A sibling range is a caret on this major; its floor may be raised to the
   // release that ships what the dependant needs (17.2.0: `lib/debugger` and
-  // `lib/state`), never above the version released here.
-  it('every sibling range is a caret on this major, its floor at most this version', () => {
+  // `lib/state`), never above the version released here. A peer range too
+  // (19.2.0: the packages below the binaries take lib, and server-runtime
+  // also background-runs-memory and responsible-rules, as peers): a peer the
+  // release cannot satisfy is a conflict at every install.
+  it('every sibling range, dependency or peer, is a caret on this major, its floor at most this version', () => {
     const siblings = Object.values(manifests).map((m) => m.name);
     const parts = (v: string) => v.split('.').map(Number);
     const atMost = (floor: string, top: string) => {
@@ -54,9 +58,22 @@ describe('release metadata names the version npm will carry', () => {
       for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
       return true;
     };
+    const ranges = (manifest: {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    }) => [
+      ...Object.entries(manifest.dependencies ?? {}).map(
+        ([dep, range]) => ['dependency', dep, range] as const,
+      ),
+      ...Object.entries(manifest.peerDependencies ?? {}).map(
+        ([dep, range]) => ['peer', dep, range] as const,
+      ),
+    ];
+    let peers = 0;
     for (const manifest of Object.values(manifests)) {
-      for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
+      for (const [kind, dep, range] of ranges(manifest)) {
         if (!siblings.includes(dep)) continue;
+        if (kind === 'peer') peers++;
         const floor = /^\^(\d+\.\d+\.\d+)$/.exec(String(range))?.[1];
         expect(`${manifest.name} → ${dep} ${range}`).toMatch(
           new RegExp(`→ ${dep} \\^${major}\\.\\d+\\.\\d+$`),
@@ -66,6 +83,26 @@ describe('release metadata names the version npm will carry', () => {
         ).toBe(`${manifest.name} → ${dep} floor within ${version}: true`);
       }
     }
+    // The peers were read at all: lib in the five packages below the binaries,
+    // and the runtime's two state packages.
+    expect(peers).toBe(7);
+  });
+
+  // The runtime is a library of the twelve servers, not a server: it carries
+  // no binary and has no MCP Registry entry of its own.
+  it('server-runtime has no registry entry: no binary, no mcpName, no server*.json naming it', () => {
+    const runtime = manifests['server-runtime'];
+    expect(runtime.bin).toBeUndefined();
+    expect(runtime.mcpName).toBeUndefined();
+    const naming = fs
+      .readdirSync(root)
+      .filter((file) => file.startsWith('server') && file.endsWith('.json'))
+      .filter((file) =>
+        (json(file).packages ?? []).some(
+          (p: { identifier?: string }) => p.identifier === runtime.name,
+        ),
+      );
+    expect(naming).toEqual([]);
   });
 
   // The MCP Registry: one entry per server package, published separately

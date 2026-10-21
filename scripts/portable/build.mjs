@@ -196,6 +196,9 @@ async function bundle(work, stageDir, server, esbuild) {
   const coreManifest = JSON.parse(
     fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/core/package.json'), 'utf8'),
   );
+  const runtimeManifest = JSON.parse(
+    fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/server-runtime/package.json'), 'utf8'),
+  );
   const result = await esbuild.build({
     entryPoints: [entry],
     outfile,
@@ -213,6 +216,12 @@ async function bundle(work, stageDir, server, esbuild) {
           // run time; a single executable has no such file, so both are fixed at build.
           b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]core[\\/]dist[\\/]coreVersion\.js$/ }, () => ({
             contents: `exports.CORE_VERSION = ${JSON.stringify(coreManifest.version)};\nexports.CORE_PACKAGE = ${JSON.stringify(coreManifest.name)};`,
+            loader: 'js',
+          }));
+          // server-runtime (19.2.0) reads its version from its own ../package.json the
+          // same way; fixed at build from the staged runtime's manifest.
+          b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]server-runtime[\\/]dist[\\/]runtimeVersion\.js$/ }, () => ({
+            contents: `exports.RUNTIME_VERSION = ${JSON.stringify(runtimeManifest.version)};`,
             loader: 'js',
           }));
         },

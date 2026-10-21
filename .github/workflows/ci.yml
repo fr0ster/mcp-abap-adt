@@ -67,6 +67,10 @@ jobs:
       - name: Run Biome lint (responsible-rules)
         run: npm --prefix responsible-rules run lint:check
 
+      # The launch code of the three transports and its suites (19.2.0).
+      - name: Run Biome lint (server-runtime)
+        run: npm --prefix server-runtime run lint:check
+
       # Their suites run in the root `npm test` (its Jest roots name them).
       - name: Run Biome lint (compact-http)
         run: npm --prefix compact-http run lint:check
@@ -146,9 +150,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # These five packages' tests run in the root `npm test` above (one shared
+      # These six packages' tests run in the root `npm test` above (one shared
       # Jest configuration, its roots name every package); only their types are
-      # checked here, each against its own tsconfig.test.json.
+      # checked here, each against its own tsconfig.test.json. Since 19.2.0 the
+      # transports' launch code and its suites live in server-runtime; server,
+      # http and sse keep the test of their own entry points.
+      - name: Type-check server-runtime tests
+        run: npm --prefix server-runtime run test:check
+
       - name: Type-check server tests
         run: npm --prefix server run test:check
 
@@ -168,7 +177,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All seventeen packages. 10.0.0 split them: the repository root is
+      # All eighteen packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
@@ -180,11 +189,13 @@ jobs:
       # of their own, not `core`'s dependencies; they are packed so that every
       # package of the release is created and installed here, and so that the
       # install asks the registry for none of the release's own packages.
+      # 19.2.0 added `server-runtime`, which every binary package depends on:
+      # without its tarball here the install would take it from the registry.
       - name: Verify the packages can be created
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./background-runs-memory ./responsible-rules ./compact-readonly-entries ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse ./core-ro ./http-ro ./sse-ro ./compact-ro ./compact-http-ro ./compact-sse-ro
+          npm pack ./background-runs-memory ./responsible-rules ./compact-readonly-entries ./compact-modify ./server-runtime ./http ./sse ./server ./compact ./compact-http ./compact-sse ./core-ro ./http-ro ./sse-ro ./compact-ro ./compact-http-ro ./compact-sse-ro
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -223,17 +234,19 @@ jobs:
           # offer `./package.json`, so requiring that subpath is
           # ERR_PACKAGE_PATH_NOT_EXPORTED.
           # The same question for every sibling a package of this repository
-          # depends on: a nested copy is one the registry supplied instead.
+          # depends on, or takes as a peer (lib, background-runs-memory and
+          # responsible-rules are peers of the packages below the binaries): a
+          # nested copy is one the registry supplied instead.
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','background-runs-memory','responsible-rules','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify','core-ro','http-ro','sse-ro','compact-ro','compact-http-ro','compact-sse-ro'];
+            const ours=['lib','background-runs-memory','responsible-rules','server-runtime','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify','core-ro','http-ro','sse-ro','compact-ro','compact-http-ro','compact-sse-ro'];
             let bad=0;
-            for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
+            for (const p of ours) for (const [d,range] of Object.entries({...pkg(p).peerDependencies,...pkg(p).dependencies})) {
               const n=d.replace('@mcp-abap-adt/','');
               if (!ours.includes(n)) continue;
               if (existsSync(nm+p+'/node_modules/@mcp-abap-adt/'+n)) {
-                console.error(p+' did not accept the '+n+' built here ('+pkg(n).version+'): its range is '+pkg(p).dependencies[d]+', and npm nested another copy.');
+                console.error(p+' did not accept the '+n+' built here ('+pkg(n).version+'): its range is '+range+', and npm nested another copy.');
                 bad=1;
               }
             }
@@ -253,9 +266,11 @@ jobs:
       # the checkout's packages, so the images are this run's code and not
       # whatever npm holds — a release raising the major could not be built
       # from the registry before it is published. Each image is checked:
-      # `--version`, a `tools/list`; HTTP and SSE also the health endpoint,
-      # the image's HEALTHCHECK and a `tools/call` whose x-sap-* credential
-      # reaches an ADT stand-in; a `-ro` image lists no write tool.
+      # every package of the release in it came from its tarball (and
+      # server-runtime is among them), `--version`, a `tools/list`; HTTP and
+      # SSE also the health endpoint, the image's HEALTHCHECK and a
+      # `tools/call` whose x-sap-* credential reaches an ADT stand-in; a `-ro`
+      # image lists no write tool.
       - name: Build and check the Docker images
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |

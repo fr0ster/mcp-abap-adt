@@ -23,18 +23,16 @@ for arg in "$@"; do
   [ "$arg" = "--dry-run" ] && DRY="--dry-run"
 done
 
-# Order matters and is not cosmetic: dependency order. core (./server), http
-# and sse each resolve @mcp-abap-adt/lib through paths into ../dist, so none
-# can build until the library has; background-runs-memory,
-# responsible-rules, compact-readonly-entries and compact-modify take lib as
-# a peer (the binary package owns it), and core, http and sse depend on both;
+# Order matters and is not cosmetic: dependency order. The library goes
+# first: background-runs-memory, responsible-rules, compact-readonly-entries
+# and compact-modify take lib as a peer (the binary package owns it).
 # server-runtime takes lib, background-runs-memory and responsible-rules as
-# peers and holds the stdio launch code: core, compact, core-ro and compact-ro
-# depend on it, so it goes before ./server. compact-http depends on
-# http and compact-sse on sse. core, http and sse do not depend on one another.
-# The six read-only packages come last: http-ro and compact-http-ro depend on
-# http, sse-ro and compact-sse-ro on sse, and the compact ones on
-# compact-readonly-entries.
+# peers and holds the stdio, Streamable HTTP and SSE launch code; every one of
+# the twelve binary packages depends on it (and on lib, background-runs-memory
+# and responsible-rules), so it goes before ./server. The compact binaries
+# depend on compact-readonly-entries, the three writing ones (compact,
+# compact-http, compact-sse) on compact-modify too. No binary package depends
+# on another, so their order among themselves does not matter.
 PACKAGES=(
   "."
   "./background-runs-memory"

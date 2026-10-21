@@ -5,11 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [19.2.0] - 2026-10-21
 
 ### Changed
 
 - **Package listings with `include_descriptions: true` read the walk as single requests, several at a time, instead of ADT batch envelopes plus a metadata read per object** — `GetPackageContents`, `GetPackageTree` and compact `HandlerGet` part `contents`, on any system. Inside one envelope SAP answers the node structure parts after the first with other parts' `DESCRIPTION` texts, so the batched walk could not use them and read every object's metadata instead; a node structure sent alone carries its own. Each description is now the node structure's own short description, the one the sequential path always answered — in the logon language; the metadata read answered `adtcore:description` in the object's master language, so on a system whose objects are mastered in another language the text changes language (measured: 1 057 of the 1 251 objects both describe). Measured on an on-premise system: a flat package of 2 033 objects 24.3 s → 1.2 s, a three-level package of 2 282 objects 36.2 s → 6.3 s; every description equal to the sequential read's, and objects of types the metadata read did not cover (about a third of that flat package) now carry theirs. Without descriptions nothing changes: one envelope per phase of each level.
+
+### Fixed
+
+- **`GetTableContents` (and compact `HandlerGetData` with `object_name`) answers the rows asked for and the table's true row count** ([#302](https://github.com/fr0ster/mcp-abap-adt/issues/302)). It read `/sap/bc/adt/datapreview/ddic?rowNumber=N`, which, measured on an on-premise system (BASIS 816), answers N+1 rows and `totalRows` 0 — a table of four rows asked for two answered three and `total_rows: 0`. It now reads the freestyle preview (`/sap/bc/adt/datapreview/freestyle?rowNumber=N`, as `GetSqlQuery` does) with `SELECT * FROM <table>`, which answers at most N rows and the true `total_rows` (measured: the same table, two asked → two rows, `total_rows` 4). The answer's shape and `detail` levels are unchanged; `row_number` is the `max_rows` asked.
+- **`GetMessageClassMessage` answers the one message, not the whole class** ([#302](https://github.com/fr0ster/mcp-abap-adt/issues/302)). ADT answers a message read with the class document, every message in it (measured: 613,165 bytes for one message of a class of 900), and the tool handed that document on under `metadata`. It now reads the message numbered `msgno` out of that one answer and answers its fields under `message` — `msgno`, `msgtext`, `selfexplainatory`, `documented`, `lastchangedby`, `lastmodified`, `name` and any other the system gives the message (measured: 280 bytes). New `detail` parameter: `full` adds the message element as parsed, its links included; `raw` answers the class document as SAP sent it. A number absent from the class is still refused (`ADT_OBJECT_NOT_FOUND`). Migration: a consumer that read `metadata` (or `part`) reads `message`, or passes `detail: 'raw'` for the document.
 
 ## [19.1.0] - 2026-10-21
 

@@ -2,13 +2,16 @@ import { analyseMessageClassMessage } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { classMessageOf } from '../../../lib/strategies/messageClassMessage';
+import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class\'s ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.',
+    '[read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -20,6 +23,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Message number (e.g., "001").',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['message_class_name', 'msgno'],
   },
@@ -28,6 +32,7 @@ export const TOOL_DEFINITION = {
 interface GetMessageClassMessageArgs {
   message_class_name: string;
   msgno: string;
+  detail?: AnswerDetail;
 }
 
 export async function handleGetMessageClassMessage(
@@ -45,16 +50,15 @@ export async function handleGetMessageClassMessage(
 
   const className = message_class_name.toUpperCase();
 
-  // No `resultsFor(messageDocuments)` and `.read()`, not `.readMetadata()`
-  // — same two disagreements with a naive port that `ReadMessageClassMessage`
-  // found and documents in full: `IMessageClassMessageResults` fixes
-  // `read`/`written`/`deleted` to literal `string`, so `resultsFor(...)`
-  // does not type-check against it, and `.readMetadata` is not on this
-  // contract at all. A message has no resource of its own — `read` fetches
-  // the whole PARENT CLASS document — and adt-clients 19 dropped the
-  // per-message parse the v18 SDK built `message` from, same as
-  // `ReadMessageClassMessage` found. The caller gets the full document,
-  // as that sibling tool already does, under this tool's own field name.
+  const detail = detailOf(args);
+
+  // No `resultsFor(messageDocuments)` and `.read()`, not `.readMetadata()`:
+  // `IMessageClassMessageResults` fixes `read`/`written`/`deleted` to literal
+  // `string`, so a reading of ours cannot be injected there, and
+  // `.readMetadata` is not on this contract at all. A message has no resource
+  // of its own — `read` fetches the whole PARENT CLASS document, as SAP sent
+  // it — so the one message is picked from that document here
+  // (`classMessageOf`), and `detail: 'raw'` answers the document itself.
   //
   // **`analyseMessageClassMessage(msgno)` is passed.** ADT answers a
   // message read with the whole class document, 200, whether or not `msgno`
@@ -63,19 +67,35 @@ export async function handleGetMessageClassMessage(
   // (MIGRATION-23 §3) — without it a message that does not exist answers
   // `success: true` with the unrelated class document.
   return answer(
-    { tool: 'GetMessageClassMessage', detail: 'terse' },
+    { tool: 'GetMessageClassMessage', detail },
     () =>
       createAdtClient(connection, logger)
         .getMessageClassMessage()
         .read({ className, msgno }, undefined, {
           analyse: analyseMessageClassMessage(msgno),
         }),
-    (document: string) => ({
-      success: true,
-      message_class_name: className,
-      msgno,
-      part: 'metadata',
-      metadata: document,
-    }),
+    (document: string) => {
+      if (detail === 'raw') return document;
+      const message = classMessageOf(document, msgno);
+      // The refusal above reads the same document with the same comparison,
+      // so a class without the message never reaches this; a document it
+      // passed that still holds no such element is a defect of the reading.
+      if (message === undefined) {
+        throw new Error(
+          `Message ${msgno} was not found in the class document of ${className}`,
+        );
+      }
+      const answered = {
+        success: true,
+        message_class_name: className,
+        msgno,
+        message: message.fields,
+      };
+      // `full` adds the element as parsed — attributes verbatim, its links
+      // included — so nothing of the one message is dropped.
+      return detail === 'full'
+        ? { ...answered, element: message.element }
+        : answered;
+    },
   );
 }

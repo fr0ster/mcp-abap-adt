@@ -216,31 +216,33 @@ describe('Message Class (MSAG) CRUD tools', () => {
     );
   });
 
-  // adt-clients 19: `AdtMessageClassMessage`'s factory contract only composes
-  // `IAdtCreatable & IAdtReadable & IAdtUpdatable` — no `IAdtMetadataReadable`
-  // — and `read`/`written`/`deleted` are fixed to answer plain `string` (see
-  // `handleGetMessageClassMessage.ts`'s own comment), so this now calls
-  // `read()` and answers the parent class document verbatim rather than a
-  // parsed single message.
-  //
-  // Fix round 1 (task 18 review): no `analyse` is passed here, deliberately.
-  // `AdtMessageClassMessage.read` is one of only two read-shaped members in
-  // the whole distribution that ship their own default strategy — it checks
-  // whether `msgno` is actually in the parsed class document and refuses
-  // `OBJECT_NOT_FOUND` when it is not. Passing `{ analyse: analyseException }`
-  // (this test's own original shape) REPLACED that check rather than
-  // composing with it, since the member reads `options?.analyse ??
-  // defaultCheck` — see `handleGetMessageClassMessage.ts`'s own comment for
-  // the full finding.
-  it('GetMessageClassMessage answers the parent class document via read', async () => {
-    const classDocument =
-      '<msag:messageClass><mc:messages><mc:message mc:msgno="001">Hello &amp;1</mc:message></mc:messages></msag:messageClass>';
-    mockMsg.read.mockResolvedValue(okResponse(classDocument));
+  // A message has no resource of its own: `read` answers the PARENT CLASS
+  // document, every message in it, each an `mc:messages` element with its
+  // fields as attributes (the shape measured on premise, BASIS 816,
+  // 2026-10-21; values here are placeholders). The tool answers the one
+  // message asked for, and the document only at `detail: 'raw'`.
+  const classDocument =
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<mc:messageClass adtcore:name="ZMY_MSGS" adtcore:type="MSAG/N" xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<mc:messages mc:msgno="000" mc:msgtext="First &amp;1" mc:selfexplainatory="false" mc:documented="false" mc:lastchangedby="SAPUSER01" mc:lastmodified="2020-01-01T00:00:00Z" adtcore:name="ZMY_MSGS000">' +
+    '<atom:link href="messages/000" rel="self" xmlns:atom="http://www.w3.org/2005/Atom"/></mc:messages>' +
+    '<mc:messages mc:msgno="001" mc:msgtext="Hello &amp;1" mc:selfexplainatory="true" mc:documented="true" mc:lastchangedby="SAPUSER01" mc:lastmodified="2021-02-03T04:05:06Z" adtcore:name="ZMY_MSGS001">' +
+    '<atom:link href="messages/001" rel="self" xmlns:atom="http://www.w3.org/2005/Atom"/>' +
+    '<atom:link href="messages/001/longtext" rel="longtext" xmlns:atom="http://www.w3.org/2005/Atom"/></mc:messages>' +
+    '<mc:messages mc:msgno="002" mc:msgtext="Third" mc:selfexplainatory="false" mc:documented="false" mc:lastchangedby="SAPUSER01" mc:lastmodified="2022-01-01T00:00:00Z" adtcore:name="ZMY_MSGS002"/>' +
+    '</mc:messageClass>';
 
-    const result = await handleGetMessageClassMessage(ctx, {
-      message_class_name: 'ZMY_MSGS',
+  const readMessage = async (detail?: string) => {
+    mockMsg.read.mockResolvedValue(okResponse(classDocument));
+    return handleGetMessageClassMessage(ctx, {
+      message_class_name: 'zmy_msgs',
       msgno: '001',
-    });
+      ...(detail !== undefined ? { detail } : {}),
+    } as any);
+  };
+
+  it('GetMessageClassMessage answers the one message, read from the class document', async () => {
+    const result = await readMessage();
 
     expect(result.isError).toBe(false);
     expect(mockMsg.read).toHaveBeenCalledWith(
@@ -248,6 +250,60 @@ describe('Message Class (MSAG) CRUD tools', () => {
       undefined,
       expect.objectContaining({ analyse: expect.any(Function) }),
     );
-    expect(payload(result).metadata).toBe(classDocument);
+    expect(payload(result)).toEqual({
+      success: true,
+      message_class_name: 'ZMY_MSGS',
+      msgno: '001',
+      message: {
+        msgno: '001',
+        msgtext: 'Hello &1',
+        selfexplainatory: 'true',
+        documented: 'true',
+        lastchangedby: 'SAPUSER01',
+        lastmodified: '2021-02-03T04:05:06Z',
+        name: 'ZMY_MSGS001',
+      },
+    });
+    // Nothing of the other messages, and not the document.
+    const text = result.content[0].text;
+    expect(text).not.toContain('First');
+    expect(text).not.toContain('Third');
+    expect(text).not.toContain('mc:messageClass');
+  });
+
+  it('GetMessageClassMessage full adds the element as parsed, its links included', async () => {
+    const answered = payload(await readMessage('full'));
+    expect(answered.message.msgno).toBe('001');
+    expect(answered.element['@']['mc:msgno']).toBe('001');
+    expect(JSON.stringify(answered.element)).toContain('messages/001/longtext');
+    expect(JSON.stringify(answered)).not.toContain('Third');
+  });
+
+  it('GetMessageClassMessage raw answers the class document as SAP sent it', async () => {
+    const result = await readMessage('raw');
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe(classDocument);
+  });
+
+  it('GetMessageClassMessage refuses a number the class does not hold', async () => {
+    // The real strategy over the real document: `analyseMessageClassMessage`
+    // is what refuses, before any projection.
+    const { analyseMessageClassMessage } = jest.requireActual(
+      '@mcp-abap-adt/adt-strategies',
+    );
+    const { ADT_NO_FAILURE } = jest.requireActual(
+      '@mcp-abap-adt/interfaces-adt',
+    );
+    const verdict = analyseMessageClassMessage('999')(ADT_NO_FAILURE, {
+      status: 200,
+      data: classDocument,
+    });
+    expect(verdict).not.toBe(ADT_NO_FAILURE);
+    expect(
+      analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
+        status: 200,
+        data: classDocument,
+      }),
+    ).toBe(ADT_NO_FAILURE);
   });
 });

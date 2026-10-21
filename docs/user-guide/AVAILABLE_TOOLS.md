@@ -697,7 +697,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclassmessage-read-only-message-class"></a>
 #### GetMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.
+**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -1276,7 +1276,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Retrieve contents (data preview) of an ABAP database table or CDS view. Returns rows of data like SE16/SE16N. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -2700,7 +2700,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.
+**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 

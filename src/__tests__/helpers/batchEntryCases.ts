@@ -48,6 +48,10 @@ const NAME_FREE = corpusBody(
 const TRANSPORT_DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"/>';
 
+/** A message class document holding message `001`, the shape ADT answers. */
+const MESSAGE_CLASS_DOCUMENT =
+  '<?xml version="1.0" encoding="utf-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="MSAG_A"><mc:messages mc:msgno="001" mc:msgtext="Text" mc:selfexplainatory="false"/></mc:messageClass>';
+
 /** The `Get<Type>` reads with a `part`: each part one request. */
 const PART_READS: Array<[string, Record<string, unknown>]> = [
   ['GetClass', { class_name: 'CLAS_A' }],
@@ -106,6 +110,7 @@ const FULL: BatchEntryCase[] = [
   {
     tool: 'GetMessageClassMessage',
     args: { message_class_name: 'MSAG_A', msgno: '001' },
+    body: MESSAGE_CLASS_DOCUMENT,
   },
   ...PART_READS.flatMap(([tool, names]) =>
     ['source', 'metadata'].map((part) => ({ tool, args: { ...names, part } })),

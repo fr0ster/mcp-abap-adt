@@ -212,6 +212,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetATCFindings',
   'GetAdtTypes',
   'GetInactiveObjects',
+  'GetMessageClassMessage',
   'GetObjectStructure',
   'GetPackage',
   'GetSqlQuery',

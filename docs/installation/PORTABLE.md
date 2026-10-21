@@ -20,11 +20,14 @@ The installed variants — npm, RFC, SNC — are in [Installation variants](INST
 
 ## What the building machine needs
 
-The same as building the RFC module of the npm install ([RFC Setup](RFC_SETUP.md)):
-
-- the SAP NW RFC SDK of this platform, with `SAPNWRFC_HOME` pointing at it;
-- a C++ toolchain (Windows: Visual Studio Build Tools, "Desktop development with C++"; macOS: Xcode
-  Command Line Tools; Linux: `g++`, `make`, Python 3);
+- the SAP NW RFC SDK of this platform, with `SAPNWRFC_HOME` pointing at it: its runtime libraries go
+  into the archive;
+- the RFC module comes as `@mcp-abap-adt/sap-rfc-lite` installs it: the prebuilt binding it carries for
+  these three platforms (0.2.3 and later), so no compiler is needed. To compile it against your SDK
+  instead, run the build with `--build-from-source` (`npm run portable:build --build-from-source`); that
+  needs a C++ toolchain, as for the npm install ([RFC Setup](RFC_SETUP.md)) — Windows: Visual Studio
+  Build Tools, "Desktop development with C++"; macOS: Xcode Command Line Tools; Linux: `g++`, `make`,
+  Python 3;
 - Node.js 22 or 24 and a checkout of this repository with its production dependencies:
   `npm ci --omit=dev --ignore-scripts` is enough — the build installs the two tools it runs (esbuild and
   postject, at the versions the repository declares) into its cache, so the linter, the test runner and the
@@ -38,7 +41,13 @@ Only these machines can build: Linux x64, Windows x64, macOS arm64 (Apple silico
 Linux on ARM, an Intel Mac — is refused with that list.
 
 The Node.js 24 runtime that goes inside the executable is downloaded from nodejs.org and its SHA-256
-checksum verified. The servers themselves are installed from npm at the repository's version.
+checksum verified. The servers themselves are installed from npm at the repository's version, so a
+version not yet published cannot be built: name a published one with `--version`.
+
+The build takes the RFC module the way the package itself loads it (its own `node-gyp-build`): a
+compiled `build/Release` first, else the prebuilt one. Whatever library search path the module carries
+— your SDK's folder, or the folder of the SDK it was prebuilt with — is rewritten to the module's own
+folder (`$ORIGIN` on Linux, `@loader_path` on macOS), so it finds the SDK beside it.
 
 ## Building
 
@@ -62,12 +71,12 @@ dist-portable/
   mcp-abap-adt-<version>-<platform>.zip | .tar.gz
 ```
 
-**The build cache.** The servers installed from npm, the RFC module compiled against your SDK and the
-downloaded Node.js are kept in `<temp>/mcp-abap-adt-portable/<version>/<platform>/`, the build tools in
+**The build cache.** The servers installed from npm with their RFC module, and the downloaded Node.js,
+are kept in `<temp>/mcp-abap-adt-portable/<version>/<platform>/`, the build tools in
 `<temp>/mcp-abap-adt-portable/tools/` (`<temp>` is the
 system's temporary folder: `/tmp` on Linux, `%TEMP%` on Windows, `$TMPDIR` on macOS). A build reuses it
-only for the same version and the same `SAPNWRFC_HOME`, and only when the RFC module was really built
-there; a changed SDK, or a first run without a compiler, is rebuilt. The tools are reinstalled when the
+only for the same version, the same `SAPNWRFC_HOME` and the same choice of `--build-from-source`, and
+only when the RFC module is really there; anything else is installed again. The tools are reinstalled when the
 repository declares other versions of them. To start from nothing, delete `<temp>/mcp-abap-adt-portable/`.
 
 Then check what was built:
@@ -76,14 +85,27 @@ Then check what was built:
 npm run portable:smoke
 ```
 
-For each executable it checks the version, MCP `initialize` and `tools/list` over stdio, and an RFC call
-to an unreachable host, which must answer an RFC error — proof that the module and the SDK load from
-`nwrfcsdk/lib`. It runs them without `SAPNWRFC_HOME` and without the `PATH` / `LD_LIBRARY_PATH` /
-`DYLD_LIBRARY_PATH` folders that hold an SDK library, so the archive's own SDK is what is checked. On
-Windows it warns when `System32` holds `sapnwrfc.dll`, which Windows could load first. It also checks
-that each executable carries one copy of `@mcp-abap-adt/lib`: the build's bundle holds one, and the
-executables run with the build's staging `node_modules` moved aside (put back afterwards), so nothing
-outside the executable can be loaded, and start without the line a second copy stops them with.
+(`npm run portable:smoke -- <version>` for a build made with `--version`.) For each executable it checks:
+
+- `--version` answers the version built;
+- MCP over stdio: started with no destination, in inspection-only mode — the start connects nothing — it
+  answers `initialize` with that version and `tools/list` (the compact server only its `Handler…` tools,
+  the full one more than 250);
+- the RFC stack: started against an RFC destination whose host does not resolve (`unreachable.invalid`,
+  fake credentials — nothing is contacted), it must stop at the RFC logon with a start line naming the
+  RFC key, `the RFC logon failed (RFC_COMMUNICATION_FAILURE)`. Since 19.0.0 stdio logs on at its start,
+  so this is where the RFC stack runs; the line holds fixed words and the key only, and a module or SDK
+  that did not load reads `could not be connected at start: Error` instead — that is the failure the
+  check catches.
+
+It runs them without `SAPNWRFC_HOME` and without the `PATH` / `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH`
+folders that hold an SDK library, so the archive's own SDK is what is checked, and with an empty folder
+of its own as `--auth-broker-path`, so no session or service key of the machine takes part. On Windows
+it warns when `System32` holds `sapnwrfc.dll`, which Windows could load first. It also checks that each
+executable carries one copy of `@mcp-abap-adt/lib`: the build's bundle holds one (skipped for a lib
+older than 19.2.0, which has no instance registry to count), and the executables run with the build's
+staging `node_modules` moved aside (put back afterwards), so nothing outside the executable can be
+loaded, and start without the line a second copy stops them with.
 
 ## Running it
 
@@ -111,6 +133,9 @@ and SmartScreen asks once. Enough for a build that stays on your machine.
 
 - **Linux x64:** in a clean container with no Node.js, the archive mounted read-only — version, MCP
   `initialize`, `tools/list`, and the RFC stack loading from `nwrfcsdk/lib` (`npm run portable:smoke`).
+  Built again from npm at 19.1.0 with `@mcp-abap-adt/sap-rfc-lite` 0.2.4's prebuilt module (2026-10-21):
+  `npm run portable:smoke -- 19.1.0` passes for both servers. Not yet for the prebuilt module on
+  Windows and macOS.
 - **Windows 11 x64:** built with `npm run portable:build` and used with SNC; the RFC module and the SDK
   DLLs load from the archive's `nwrfcsdk/lib`. Rebuilt after the build switched to `System32\\tar.exe` and npm
   without a shell (2026-10-06): builds and works.

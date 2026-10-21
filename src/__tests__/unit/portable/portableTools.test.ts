@@ -54,6 +54,86 @@ describe('RUNPATH rewrite', () => {
   });
 });
 
+// A minimal ELF64 little-endian image: a header, a dynamic section and its
+// string table, with the given dynamic entries ([tag, string]).
+const elfImage = (entries: Array<[number, string]>) => {
+  const strings = Buffer.concat([
+    Buffer.from([0]),
+    ...entries.map(([, s]) => Buffer.from(`${s}\0`)),
+  ]);
+  const dynamic = Buffer.alloc(16 * (entries.length + 1));
+  let offset = 1;
+  entries.forEach(([tag, s], i) => {
+    dynamic.writeBigInt64LE(BigInt(tag), i * 16);
+    dynamic.writeBigUInt64LE(BigInt(offset), i * 16 + 8);
+    offset += Buffer.byteLength(s) + 1;
+  });
+  const header = Buffer.alloc(64);
+  header.writeUInt32BE(0x7f454c46, 0);
+  header[4] = 2;
+  header[5] = 1;
+  const dynOff = 64;
+  const strOff = dynOff + dynamic.length;
+  const shoff = strOff + strings.length;
+  header.writeBigUInt64LE(BigInt(shoff), 0x28);
+  header.writeUInt16LE(64, 0x3a);
+  header.writeUInt16LE(3, 0x3c);
+  const section = (type: number, off: number, size: number, link: number) => {
+    const s = Buffer.alloc(64);
+    s.writeUInt32LE(type, 4);
+    s.writeBigUInt64LE(BigInt(off), 0x18);
+    s.writeBigUInt64LE(BigInt(size), 0x20);
+    s.writeUInt32LE(link, 0x28);
+    return s;
+  };
+  return Buffer.concat([
+    header,
+    dynamic,
+    strings,
+    section(0, 0, 0, 0),
+    section(6, dynOff, dynamic.length, 2),
+    section(3, strOff, strings.length, 0),
+  ]);
+};
+
+describe('RUNPATH read', () => {
+  it('reads the RUNPATH the image carries, whoever built it', () => {
+    const image = elfImage([
+      [1, 'libsapnwrfc.so'],
+      [29, '/publisher/sdk/lib'],
+    ]);
+    expect(elf.readRunpath(image)).toBe('/publisher/sdk/lib');
+    expect(
+      elf.patchRunpath(image, elf.readRunpath(image), '$ORIGIN'),
+    ).toHaveLength(image.length);
+  });
+
+  it('reads an RPATH when there is no RUNPATH', () => {
+    expect(elf.readRunpath(elfImage([[15, '/old/lib']]))).toBe('/old/lib');
+  });
+
+  it('refuses an image with none: the SDK beside it would not be found', () => {
+    expect(() => elf.readRunpath(elfImage([[1, 'libc.so.6']]))).toThrow(
+      /no RUNPATH/,
+    );
+  });
+
+  it('refuses an image with two', () => {
+    expect(() =>
+      elf.readRunpath(
+        elfImage([
+          [29, '/a'],
+          [15, '/b'],
+        ]),
+      ),
+    ).toThrow(/more than one/);
+  });
+
+  it('refuses what is not a 64-bit little-endian ELF', () => {
+    expect(() => elf.readRunpath(Buffer.alloc(64))).toThrow(/not a 64-bit/);
+  });
+});
+
 describe('npm without a shell', () => {
   it('runs npm-cli.js through node when npm started us', () => {
     expect(

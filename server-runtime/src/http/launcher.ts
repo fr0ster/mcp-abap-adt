@@ -10,6 +10,7 @@ import {
   answerVersionOrHelp,
   generateHelp,
   type LauncherEdges,
+  libInstances,
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
@@ -22,6 +23,7 @@ import {
   type ToolSet,
 } from '@mcp-abap-adt/lib/tool-set';
 import { listenerSystemTypeRequiredWords } from '@mcp-abap-adt/responsible-rules';
+import { secondCopyLine } from '../secondCopy.js';
 import {
   type HttpConfig,
   httpParameters,
@@ -44,6 +46,8 @@ export interface HttpLauncherOptions {
   program: string;
   /** The version `--version` and `initialize` report: the command's own package's. */
   version: string;
+  /** The command's own npm package: the one a second copy of lib asks to reinstall. */
+  packageName: string;
 }
 
 /** What the launcher takes from the program: the process's edges. */
@@ -102,6 +106,13 @@ export async function main(
   options: HttpLauncherOptions,
   edges: LauncherEdges = processEdges(),
 ): Promise<StreamableHttpServer | undefined> {
+  // A second copy of lib stops the start before anything is read.
+  const secondCopy = secondCopyLine(libInstances(), options.packageName);
+  if (secondCopy !== undefined) {
+    edges.stderr(secondCopy);
+    edges.exit(1);
+    return undefined;
+  }
   const { argv, stderr, exit } = edges;
   if (
     answerVersionOrHelp(edges, {

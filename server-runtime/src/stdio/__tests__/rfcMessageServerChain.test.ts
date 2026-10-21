@@ -146,7 +146,12 @@ async function start(
   const exits: number[] = [];
   await launch(
     config,
-    { toolSet: fullToolSet, program: 'mcp-abap-adt', version: '0.0.0-test' },
+    {
+      toolSet: fullToolSet,
+      program: 'mcp-abap-adt',
+      version: '0.0.0-test',
+      packageName: '@mcp-abap-adt/core',
+    },
     {
       browserStrategy: noLogin,
       stderr: (line) => stderr.push(line),

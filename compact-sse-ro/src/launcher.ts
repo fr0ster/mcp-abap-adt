@@ -35,6 +35,11 @@ export const COMPACT_SSE_RO_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const COMPACT_SSE_RO_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: LauncherEdges = processEdges(),
 ): ReturnType<typeof sseMain> {
@@ -43,6 +48,7 @@ export function main(
       toolSet: readOnlyToolSet,
       program: 'mcp-abap-adt-compact-sse-ro',
       version: COMPACT_SSE_RO_VERSION,
+      packageName: COMPACT_SSE_RO_PACKAGE,
     },
     edges,
   );

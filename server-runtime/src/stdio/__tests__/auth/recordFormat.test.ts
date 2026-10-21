@@ -40,6 +40,7 @@ const TEST_OPTIONS = {
   toolSet: fullToolSet,
   program: 'mcp-abap-adt',
   version: '0.0.0-test',
+  packageName: '@mcp-abap-adt/core',
 };
 
 const TOKEN = 'record-token-PLACEHOLDER.payload.signature';

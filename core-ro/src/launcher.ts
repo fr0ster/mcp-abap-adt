@@ -31,6 +31,11 @@ export const CORE_RO_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const CORE_RO_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: StdioLauncherEdges = processEdges(),
 ): Promise<void> {
@@ -39,6 +44,7 @@ export function main(
       toolSet: readOnlyToolSet,
       program: 'mcp-abap-adt-ro',
       version: CORE_RO_VERSION,
+      packageName: CORE_RO_PACKAGE,
     },
     edges,
   );

@@ -11,6 +11,7 @@ import {
   answerVersionOrHelp,
   generateHelp,
   type LauncherEdges,
+  libInstances,
   MESSAGE_SERVER_ENV,
   MESSAGE_SERVER_FIELDS,
   type MessageServerField,
@@ -39,6 +40,7 @@ import {
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { secondCopyLine } from '../secondCopy.js';
 import {
   AuthBrokerFactory,
   BrowserChoiceError,
@@ -279,6 +281,8 @@ export interface LauncherOptions {
   program: string;
   /** The version `--version` and `initialize` report: the command's own package's. */
   version: string;
+  /** The command's own npm package: the one a second copy of lib asks to reinstall. */
+  packageName: string;
 }
 
 /** The process as core's `main` meets it: lib's edges, and the MCP transport. */
@@ -291,6 +295,13 @@ export async function main(
   options: LauncherOptions,
   edges: StdioLauncherEdges = processEdges(),
 ): Promise<void> {
+  // A second copy of lib stops the start before anything is read.
+  const secondCopy = secondCopyLine(libInstances(), options.packageName);
+  if (secondCopy !== undefined) {
+    edges.stderr(secondCopy);
+    edges.exit(1);
+    return;
+  }
   const { argv, stderr, exit } = edges;
   if (
     answerVersionOrHelp(edges, {

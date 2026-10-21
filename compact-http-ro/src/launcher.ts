@@ -36,6 +36,11 @@ export const COMPACT_HTTP_RO_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const COMPACT_HTTP_RO_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: LauncherEdges = processEdges(),
 ): ReturnType<typeof httpMain> {
@@ -44,6 +49,7 @@ export function main(
       toolSet: readOnlyToolSet,
       program: 'mcp-abap-adt-compact-http-ro',
       version: COMPACT_HTTP_RO_VERSION,
+      packageName: COMPACT_HTTP_RO_PACKAGE,
     },
     edges,
   );

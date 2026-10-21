@@ -73,6 +73,7 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
     toolSet: fullToolSet,
     program: 'mcp-abap-adt-sse',
     version: '0.0.0-test',
+    packageName: '@mcp-abap-adt/sse',
   });
   return {
     stderr: written.join(''),

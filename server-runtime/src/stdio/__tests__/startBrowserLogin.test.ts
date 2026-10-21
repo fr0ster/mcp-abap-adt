@@ -122,6 +122,7 @@ it.each<['end' | 'close']>([['end'], ['close']])(
         toolSet: fullToolSet,
         program: 'mcp-abap-adt',
         version: '0.0.0-test',
+        packageName: '@mcp-abap-adt/core',
       },
       {
         // The program's strategy, with the test's browser in place of the

@@ -28,6 +28,11 @@ export const COMPACT_SSE_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const COMPACT_SSE_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: LauncherEdges = processEdges(),
 ): ReturnType<typeof sseMain> {
@@ -36,6 +41,7 @@ export function main(
       toolSet: compactToolSet,
       program: 'mcp-abap-adt-compact-sse',
       version: COMPACT_SSE_VERSION,
+      packageName: COMPACT_SSE_PACKAGE,
     },
     edges,
   );

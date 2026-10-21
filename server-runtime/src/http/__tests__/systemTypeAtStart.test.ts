@@ -46,7 +46,12 @@ async function start(argv: string[], env: NodeJS.ProcessEnv) {
   const stderr: string[] = [];
   const exits: number[] = [];
   const server = await main(
-    { toolSet: fullToolSet, program: 'mcp-abap-adt-http', version: '0.0.0' },
+    {
+      toolSet: fullToolSet,
+      program: 'mcp-abap-adt-http',
+      version: '0.0.0',
+      packageName: '@mcp-abap-adt/http',
+    },
     {
       argv,
       stdout: () => {},

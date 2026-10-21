@@ -188,14 +188,14 @@ function buildTools() {
 async function bundle(work, stageDir, server, esbuild) {
   const entry = path.join(work, `${server.name}-entry.cjs`);
   // The package's own bin: it calls `main` with the tool set, name and
-  // version that command serves (19.0.0: `main({ toolSet, program, version })`).
+  // version that command serves (19.2.0: `main({ toolSet, program, version, packageName })`).
   const bin = path.join(stageDir, 'node_modules', server.pkg, 'bin', `${server.name}.js`);
   fs.writeFileSync(entry, `require(${JSON.stringify(bin)});\n`);
   const outfile = path.join(work, `${server.name}.bundle.cjs`);
   const loader = path.join(here, 'sea-rfc-loader.cjs');
-  const coreVersion = JSON.parse(
+  const coreManifest = JSON.parse(
     fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/core/package.json'), 'utf8'),
-  ).version;
+  );
   const result = await esbuild.build({
     entryPoints: [entry],
     outfile,
@@ -209,10 +209,10 @@ async function bundle(work, stageDir, server, esbuild) {
         name: 'sea-rfc-addon',
         setup(b) {
           b.onResolve({ filter: /^node-gyp-build$/ }, () => ({ path: loader }));
-          // core reads its version from ../package.json beside dist/ at run time;
-          // a single executable has no such file, so the version is fixed at build.
+          // core reads its version and name from ../package.json beside dist/ at
+          // run time; a single executable has no such file, so both are fixed at build.
           b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]core[\\/]dist[\\/]coreVersion\.js$/ }, () => ({
-            contents: `exports.CORE_VERSION = ${JSON.stringify(coreVersion)};`,
+            contents: `exports.CORE_VERSION = ${JSON.stringify(coreManifest.version)};\nexports.CORE_PACKAGE = ${JSON.stringify(coreManifest.name)};`,
             loader: 'js',
           }));
         },

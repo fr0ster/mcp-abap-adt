@@ -37,6 +37,11 @@ export const COMPACT_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const COMPACT_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: StdioLauncherEdges = processEdges(),
 ): Promise<void> {
@@ -45,6 +50,7 @@ export function main(
       toolSet: compactToolSet,
       program: 'mcp-abap-adt-compact',
       version: COMPACT_VERSION,
+      packageName: COMPACT_PACKAGE,
     },
     edges,
   );

@@ -37,6 +37,11 @@ export const COMPACT_RO_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const COMPACT_RO_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: StdioLauncherEdges = processEdges(),
 ): Promise<void> {
@@ -45,6 +50,7 @@ export function main(
       toolSet: readOnlyToolSet,
       program: 'mcp-abap-adt-compact-ro',
       version: COMPACT_RO_VERSION,
+      packageName: COMPACT_RO_PACKAGE,
     },
     edges,
   );

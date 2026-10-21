@@ -19,8 +19,11 @@ npm install -g @mcp-abap-adt/core   # installs server-runtime with it
 | `@mcp-abap-adt/server-runtime/stdio/server` | `StdioServer`, core's parameter table, the env-file resolution, the destination source |
 | `@mcp-abap-adt/server-runtime/auth` | the destination layer: one auth broker per destination, its stores, the browser of a login |
 
-A server package calls the launcher's `main` with its tool set, its program name and its own
-version, so `--version` and `serverInfo.version` are the server package's. `StdioServer`
+A server package calls the launcher's `main` with its tool set, its program name, its own
+version and its own package name, so `--version` and `serverInfo.version` are the server package's.
+Each transport's `main` first counts the copies of `@mcp-abap-adt/lib` loaded in the process
+(`libInstances()`); with more than one it reads nothing, starts nothing, and exits `1` with one
+line on stderr naming the first two copies' files and the package to reinstall. `StdioServer`
 constructed without a version answers this package's version; `@mcp-abap-adt/core`'s
 `StdioServer` answers core's.
 

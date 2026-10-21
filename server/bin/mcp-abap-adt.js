@@ -17,13 +17,14 @@ const {
   main,
   launcherFailedLine,
 } = require('@mcp-abap-adt/server-runtime/stdio');
-const { CORE_VERSION } = require('../dist/coreVersion.js');
+const { CORE_VERSION, CORE_PACKAGE } = require('../dist/coreVersion.js');
 const { fullToolSet } = require('@mcp-abap-adt/lib/tool-set');
 
 void main({
   toolSet: fullToolSet,
   program: 'mcp-abap-adt',
   version: CORE_VERSION,
+  packageName: CORE_PACKAGE,
 }).catch((err) => {
   console.error(launcherFailedLine(err));
   process.exit(1);

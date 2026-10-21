@@ -10,13 +10,14 @@
  * is http's own.
  */
 const { main } = require('@mcp-abap-adt/server-runtime/http');
-const { HTTP_VERSION } = require('../dist/httpVersion.js');
+const { HTTP_VERSION, HTTP_PACKAGE } = require('../dist/httpVersion.js');
 const { fullToolSet } = require('@mcp-abap-adt/lib/tool-set');
 
 void main({
   toolSet: fullToolSet,
   program: 'mcp-abap-adt-http',
   version: HTTP_VERSION,
+  packageName: HTTP_PACKAGE,
 }).catch(() => {
   // Fixed words: an error's message may quote a file or a header.
   console.error('[MCP] launcher failed');

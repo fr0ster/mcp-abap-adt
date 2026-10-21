@@ -177,6 +177,7 @@ async function start(
       toolSet: options.toolSet ?? fullToolSet,
       program: 'mcp-abap-adt',
       version: '0.0.0-test',
+      packageName: '@mcp-abap-adt/core',
     },
     {
       browserStrategy: (() => {

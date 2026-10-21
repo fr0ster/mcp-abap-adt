@@ -28,6 +28,11 @@ export const SSE_RO_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
+/** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
+export const SSE_RO_PACKAGE: string = (
+  require('../package.json') as { name: string }
+).name;
+
 export function main(
   edges: LauncherEdges = processEdges(),
 ): ReturnType<typeof sseMain> {
@@ -36,6 +41,7 @@ export function main(
       toolSet: readOnlyToolSet,
       program: 'mcp-abap-adt-sse-ro',
       version: SSE_RO_VERSION,
+      packageName: SSE_RO_PACKAGE,
     },
     edges,
   );

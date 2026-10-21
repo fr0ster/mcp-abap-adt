@@ -82,6 +82,12 @@ export const TOOL_DEFINITION = {
           '[read-only] Whether to add description and package via SearchObject (default true)',
         default: true,
       },
+      include_descriptions: {
+        type: 'boolean',
+        description:
+          "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
+        default: false,
+      },
     },
     required: [],
   },
@@ -311,6 +317,7 @@ async function buildTree(
   depth: number,
   maxDepth: number,
   enrich: boolean,
+  describe: boolean,
   ended: Ended,
 ): Promise<IAdtResponse<TreeNode, IAdtError>> {
   const enrichment = enrich
@@ -330,7 +337,7 @@ async function buildTree(
         utils.fetchNodeStructure(objectType, objectName, {
           headers,
           analyse: analyseException,
-          withShortDescriptions: true,
+          withShortDescriptions: describe,
         }),
     );
     if (!rootResponse.ok) {
@@ -355,7 +362,7 @@ async function buildTree(
             headers,
             analyse: analyseException,
             nodeId: child.nodeId,
-            withShortDescriptions: true,
+            withShortDescriptions: describe,
           }),
       );
       if (!childResponse.ok) {
@@ -372,6 +379,7 @@ async function buildTree(
             depth + 1,
             maxDepth,
             enrich,
+            describe,
             ended,
           );
           if (ended.answer !== undefined) return subtree;
@@ -418,6 +426,7 @@ async function buildTrees(
   context: HandlerContext,
   objects: ReadonlyArray<{ type: string; name: string; maxDepth: number }>,
   enrich: boolean,
+  describe: boolean,
   ended: Ended,
 ): Promise<Trees> {
   const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
@@ -499,7 +508,7 @@ async function buildTrees(
       tier.map((node) => ({
         parentType: node.type,
         parentName: node.name,
-        withShortDescriptions: true,
+        withShortDescriptions: describe,
         analysed: true,
       })),
     );
@@ -521,7 +530,7 @@ async function buildTrees(
               parentType: node.type,
               parentName: node.name,
               nodeId,
-              withShortDescriptions: true,
+              withShortDescriptions: describe,
               analysed: true,
             })),
           )
@@ -551,19 +560,21 @@ async function buildTrees(
     tier = next.filter((node) => !failures.has(node.root));
   }
 
-  // Every leaf's description from its metadata, in one phase.
-  const described = leaves.filter(({ root }) => !failures.has(root));
-  const { descriptions, refused } = await metadataDescriptions(
-    context,
-    described.map(({ target }) => target),
-  );
-  // A metadata read SAP refused with a credential failure ends the call as a
-  // refused node read does: the method's error, with its step.
-  if (refused !== undefined) return { roots, failures, ended: refused };
-  for (const { leaf, target } of described) {
-    const key = metadataKeyOf(target);
-    const description = key === undefined ? undefined : descriptions.get(key);
-    if (description) leaf.OBJECT_DESCRIPTION = description;
+  // Asked for: every leaf's description from its metadata, in one phase.
+  if (describe) {
+    const described = leaves.filter(({ root }) => !failures.has(root));
+    const { descriptions, refused } = await metadataDescriptions(
+      context,
+      described.map(({ target }) => target),
+    );
+    // A metadata read SAP refused with a credential failure ends the call as
+    // a refused node read does: the method's error, with its step.
+    if (refused !== undefined) return { roots, failures, ended: refused };
+    for (const { leaf, target } of described) {
+      const key = metadataKeyOf(target);
+      const description = key === undefined ? undefined : descriptions.get(key);
+      if (description) leaf.OBJECT_DESCRIPTION = description;
+    }
   }
 
   if (enrich) {
@@ -602,6 +613,7 @@ async function buildTreesSequential(
   context: HandlerContext,
   objects: ReadonlyArray<{ type: string; name: string; maxDepth: number }>,
   enrich: boolean,
+  describe: boolean,
   ended: Ended,
 ): Promise<{
   trees: Array<IAdtResponse<TreeNode, IAdtError> | Thrown>;
@@ -622,6 +634,7 @@ async function buildTreesSequential(
         0,
         o.maxDepth,
         enrich,
+        describe,
         ended,
       );
     } catch (thrown) {
@@ -645,6 +658,7 @@ export async function handleGetObjectInfo(
     objects?: Array<{ object_type?: string; object_name?: string }>;
     maxDepth?: number;
     enrich?: boolean;
+    include_descriptions?: boolean;
   },
 ) {
   const { logger } = context;
@@ -692,6 +706,7 @@ export async function handleGetObjectInfo(
       ? (args.maxDepth as number)
       : getDefaultDepth(type);
   const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
+  const describe = args.include_descriptions === true;
   const asked = objects.map((o) => ({ ...o, maxDepth: depthOf(o.type) }));
 
   // Task 28: why this tool carries no `detail`. The node-level family's
@@ -721,7 +736,13 @@ export async function handleGetObjectInfo(
         context,
         async () => {
           ended = {};
-          const trees = await buildTrees(context, asked, enrich, ended);
+          const trees = await buildTrees(
+            context,
+            asked,
+            enrich,
+            describe,
+            ended,
+          );
           if (trees.ended !== undefined) return trees.ended;
           const single = listed === undefined && trees.failures.get(0);
           if (single) {
@@ -749,6 +770,7 @@ export async function handleGetObjectInfo(
               0,
               only.maxDepth,
               enrich,
+              describe,
               ended,
             );
             return tree.ok ? ok([tree.getResult().value]) : tree;
@@ -757,6 +779,7 @@ export async function handleGetObjectInfo(
             context,
             asked,
             enrich,
+            describe,
             ended,
           );
           if (read.ended !== undefined) return read.ended;

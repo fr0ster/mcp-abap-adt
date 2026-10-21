@@ -278,7 +278,8 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       'ZPKG',
       {
         headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
-        withShortDescriptions: true,
+        // include_descriptions defaults to false.
+        withShortDescriptions: false,
       },
     ]);
   });

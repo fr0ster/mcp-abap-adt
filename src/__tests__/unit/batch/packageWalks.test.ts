@@ -952,10 +952,6 @@ describe('GetObjectInfo', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
-      [
-        'GET /sap/bc/adt/oo/classes/zcl_a',
-        'GET /sap/bc/adt/programs/programs/zprog_a',
-      ],
       ['SEARCH|ZROOT_A', 'SEARCH|ZSUB_A'],
     ]);
   });
@@ -988,7 +984,7 @@ describe('GetObjectInfo', () => {
         maxDepth: 2,
       }),
     );
-    expect(fake.envelopes).toHaveLength(6);
+    expect(fake.envelopes).toHaveLength(5);
     const [a, b] = payloadOf(result);
     expect(a.OBJECT_NAME).toBe('ZROOT_A');
     expect(b.CHILDREN[0].CHILDREN[0].OBJECT_NAME).toBe('ZPROG_B');
@@ -1162,7 +1158,7 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
     );
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(6);
+    expect(fake.envelopes).toHaveLength(5);
   });
 });
 
@@ -1329,6 +1325,7 @@ const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
           { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
         ],
         maxDepth: 2,
+        include_descriptions: true,
       }),
   },
 ];
@@ -1501,6 +1498,15 @@ describe.each([
   {
     tool: 'GetPackageTree',
     call: ((c) => handleGetPackageTree(c, { package_name: 'ZROOT_A' })) as Call,
+  },
+  {
+    tool: 'GetObjectInfo',
+    call: ((c) =>
+      handleGetObjectInfo(c, {
+        parent_type: 'DEVC/K',
+        parent_name: 'ZROOT_A',
+        maxDepth: 2,
+      })) as Call,
   },
 ])('$tool without include_descriptions', ({ call }) => {
   it('batched: no metadata read, no description', async () => {

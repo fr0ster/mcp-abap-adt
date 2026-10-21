@@ -261,6 +261,10 @@ describe('the MCP tool surface', () => {
           'feed_types',
         ],
         'high/CreateTransportTask': ['task_type'],
+        // 19.1.0 (#300): reading each leaf's metadata for its description is
+        // the caller's choice, `include_descriptions` (default false), as in
+        // GetPackageContents and GetPackageTree.
+        'system/GetObjectInfo': ['include_descriptions'],
         // 19.0.0: SearchSource's cursor, `start_at` (from `next_start_at`), optional.
         'search/SearchSource': ['start_at'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
@@ -333,7 +337,7 @@ describe('the MCP tool surface', () => {
         tool,
         added: [
           ...(listed !== undefined
-            ? listed.added
+            ? [...listed.added, ...(EXTRA_ALLOWED_ADDITIONS[tool] ?? [])]
             : MAY_GAIN_VERSION.has(tool)
               ? ['version']
               : relaxed !== undefined

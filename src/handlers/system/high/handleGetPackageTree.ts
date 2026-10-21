@@ -23,7 +23,7 @@ import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   assembleTree,
   batchReader,
-  describeFromMetadata,
+  concurrentReader,
   endsTheCall,
   type NodeRequest,
   nodeStructureOn,
@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk.',
+    '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
   ),
   inputSchema: {
     type: 'object',
@@ -71,7 +71,7 @@ export const TOOL_DEFINITION = {
       include_descriptions: {
         type: 'boolean',
         description:
-          "Include each object's description in the response. Where the system serves ADT batch, each description is read from the object's metadata: one more read per object, which on a large package takes most of the call. Default: false",
+          "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
         default: false,
       },
       debug: {
@@ -147,9 +147,10 @@ const metadataRead = (metadata: PhaseResult<Metadata>) =>
 /**
  * Every package's metadata and walk in ADT batch envelopes (spec §11): (1)
  * the metadata GET and the root node structure of every package, in one
- * phase; then the walk's levels for the packages whose metadata was read;
- * then every walked object's description from its metadata, in one phase.
- * A metadata read refused with a credential failure ends the reads.
+ * phase; then the walk's levels for the packages whose metadata was read.
+ * No description: an envelope part's can be another part's
+ * (`readTreesConcurrent` answers them). A metadata read refused with a
+ * credential failure ends the reads.
  */
 async function readTreesBatched(
   context: HandlerContext,
@@ -173,7 +174,7 @@ async function readTreesBatched(
       node: {
         parentType: 'DEVC/K',
         parentName: name,
-        withShortDescriptions: options.includeDescriptions,
+        withShortDescriptions: false,
       },
     })),
   ]);
@@ -189,12 +190,48 @@ async function readTreesBatched(
     options,
     kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
   );
-  // Descriptions only when asked for: each is its object's metadata.
-  const described = options.includeDescriptions
-    ? await describeFromMetadata(context, walked)
-    : walked;
   kept.forEach((i, k) => {
-    (reads[i] as TreeRead).walked = described[k];
+    (reads[i] as TreeRead).walked = walked[k];
+  });
+  return reads;
+}
+
+/**
+ * Every package's metadata and walk with descriptions, as requests sent
+ * alone, several at a time (`concurrentReader`), on any system: (1) every
+ * package's metadata; then the walk's levels for the packages whose metadata
+ * was read, each node structure with its own descriptions. A metadata read
+ * refused with a credential failure ends the reads: no metadata read not yet
+ * started is sent, as on the sequential path.
+ */
+async function readTreesConcurrent(
+  context: HandlerContext,
+  packageNames: readonly string[],
+  options: TreeOptions,
+): Promise<TreeRead[]> {
+  const metadata = await concurrentReader<string, Metadata>(
+    context,
+    (name, c) => readMetadata(context, c, name),
+    (answer) => credentialRefused({ ok: true, value: answer }),
+  )(packageNames);
+  const reads: TreeRead[] = metadata.map((m) => ({ metadata: m }));
+  if (reads.some((r) => credentialRefused(r.metadata))) return reads;
+  const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
+  const walked = await walkPackages(
+    concurrentReader<NodeRequest, unknown>(context, (request, c) =>
+      readNode(
+        nodeStructureOn(
+          context,
+          createAdtClient(c, context.logger).getUtils(ourUtils),
+        ),
+        request,
+      ),
+    ),
+    kept.map((i) => packageNames[i] as string),
+    options,
+  );
+  kept.forEach((i, k) => {
+    (reads[i] as TreeRead).walked = walked[k];
   });
   return reads;
 }
@@ -303,11 +340,15 @@ export async function handleGetPackageTree(
     // `fetchNodeStructure` is one request and takes our reading, so the walk is
     // composed of steps we can read and the assembly is ours.
     // See mcp-abap-adt-clients#141.
-    const reads = await withSequentialFallback(
-      context,
-      () => readTreesBatched(context, packageNames, options),
-      () => readTreesSequential(context, packageNames, options),
-    );
+    // Descriptions asked for, on any system: requests sent alone — inside an
+    // envelope a node structure part can carry another part's DESCRIPTION.
+    const reads = options.includeDescriptions
+      ? await readTreesConcurrent(context, packageNames, options)
+      : await withSequentialFallback(
+          context,
+          () => readTreesBatched(context, packageNames, options),
+          () => readTreesSequential(context, packageNames, options),
+        );
 
     // A metadata read refused with a credential failure ends the call as it
     // came; so does one package's own refusal when it was the only one asked.

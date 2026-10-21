@@ -88,10 +88,16 @@ export function nodeStructureOn<R>(
   };
 }
 
-/** Reads every item of one level; each item's settlement, in item order. */
-export type LevelReader<I, R> = (
+/**
+ * Reads every item of one level; each item's settlement, in item order.
+ * `ownAnswers`: every item's answer is its own request's, as a request sent
+ * alone answers it (`concurrentReader`); not so for the parts of an envelope
+ * (`batchReader`), whose node structures can carry another part's
+ * `DESCRIPTION`.
+ */
+export type LevelReader<I, R> = ((
   items: readonly I[],
-) => Promise<PhaseResult<R>[]>;
+) => Promise<PhaseResult<R>[]>) & { readonly ownAnswers?: boolean };
 
 /**
  * One level's reads in one ADT batch envelope (spec §11): `read(item,
@@ -102,6 +108,55 @@ export function batchReader<I, R>(
   read: (item: I, connection: IAbapConnection) => Promise<R>,
 ): LevelReader<I, R> {
   return (items) => runPhase(context, items, read);
+}
+
+/** How many node structure requests `concurrentReader` keeps open at once. */
+export const NODE_READ_CONCURRENCY = 8;
+
+/**
+ * One level's reads as requests sent alone, `NODE_READ_CONCURRENCY` at a
+ * time, on the call's connection: `read(item, connection)` for every item;
+ * each item's settlement, in item order. Every answer is its own request's
+ * (`ownAnswers`), so a node structure's `DESCRIPTION` is the object's own —
+ * which an envelope part's is not (measured on an on-premise system: inside
+ * one envelope, the node structure parts after the first answer other parts'
+ * texts; sent alone, each answers its own). A failure that ends the call
+ * (`endsTheCall`) stops the reads not yet started and is thrown as it came,
+ * once the started ones have settled. An answer `stopsAt` accepts — a refusal
+ * the read answered rather than threw, such as a `401` read with
+ * `analyseException` — stops the reads not yet started too, and is answered
+ * in its place: the result then holds the items read, in order, up to the
+ * last one started; the items after it have no entry.
+ */
+export function concurrentReader<I, R>(
+  context: HandlerContext,
+  read: (item: I, connection: IAbapConnection) => Promise<R>,
+  stopsAt?: (value: R) => boolean,
+): LevelReader<I, R> {
+  const reader = async (items: readonly I[]): Promise<PhaseResult<R>[]> => {
+    const out: PhaseResult<R>[] = new Array(items.length);
+    let next = 0;
+    let ended: { error: unknown } | undefined;
+    let stopped = false;
+    const pump = async (): Promise<void> => {
+      while (ended === undefined && !stopped && next < items.length) {
+        const at = next++;
+        try {
+          const value = await read(items[at] as I, context.connection);
+          out[at] = { ok: true, value };
+          if (stopsAt?.(value)) stopped = true;
+        } catch (error) {
+          if (endsTheCall(error)) ended ??= { error };
+          out[at] = { ok: false, error };
+        }
+      }
+    };
+    const pumps = Math.max(1, Math.min(NODE_READ_CONCURRENCY, items.length));
+    await Promise.all(Array.from({ length: pumps }, pump));
+    if (ended !== undefined) throw ended.error;
+    return stopped ? out.slice(0, next) : out;
+  };
+  return Object.assign(reader, { ownAnswers: true as const });
 }
 
 /**
@@ -486,8 +541,7 @@ interface PackageWalk {
  * An object of a batched level, found in `packageName`, without the
  * description its part carried: a node structure part after the first of an
  * envelope can carry another part's `DESCRIPTION` (measured, 2026-10-18), so
- * a batched walk takes the description from the object's metadata
- * (`describeFromMetadata`).
+ * a walk that answers descriptions reads its levels with `concurrentReader`.
  */
 function undescribed(
   object: NodeLevel['objects'][number],
@@ -506,11 +560,13 @@ function flatten(walk: PackageWalk): WalkedItem[] {
  * (spec §11): per level, (a) the root node structure of every package of the
  * level, read together; (b) every type node those roots list, read together;
  * the next level is the subpackages found — walked only when asked for, and
- * never past `maxDepth`. `read` reads one level's requests in one envelope
- * (`batchReader`): no request of a level needs another's answer. Where the
- * destination has no communication batch the handler runs `walkPackage`.
- * The objects carry no description: a caller that answers descriptions
- * reads them with `describeFromMetadata`.
+ * never past `maxDepth`. `read` reads one level's requests together — in one
+ * envelope (`batchReader`), or as requests sent alone (`concurrentReader`):
+ * no request of a level needs another's answer. Where the destination has
+ * no communication batch the handler runs `walkPackage`. The objects carry
+ * their node structure's description when descriptions are asked for and
+ * `read` answers each request's own (`ownAnswers`); otherwise none, and no
+ * description is asked for.
  *
  * One settlement per package asked, in the order asked: its objects — the
  * package's own, then those of each subpackage walked from it, depth first —
@@ -525,7 +581,12 @@ export async function walkPackages(
   options: WalkOptions = {},
   roots?: readonly PhaseResult<unknown>[],
 ): Promise<PhaseResult<WalkedItem[]>[]> {
-  const withShortDescriptions = options.includeDescriptions === true;
+  // An envelope part's description can be another part's: asked for only
+  // where each answer is its request's own.
+  const withShortDescriptions =
+    options.includeDescriptions === true && read.ownAnswers === true;
+  const objectOf = (o: NodeLevel['objects'][number], packageName: string) =>
+    withShortDescriptions ? { ...o, packageName } : undescribed(o, packageName);
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
   const failures = new Map<number, unknown>();
   const seen = packageNames.map((name) => new Set([name.toUpperCase()]));
@@ -572,7 +633,7 @@ export async function walkPackages(
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      walk.found.push(...root.objects.map((o) => undescribed(o, walk.name)));
+      walk.found.push(...root.objects.map((o) => objectOf(o, walk.name)));
       for (const child of root.childNodes) {
         typeNodes.push({ walk, nodeId: child.nodeId });
       }
@@ -590,7 +651,7 @@ export async function walkPackages(
       typeNodes.forEach(({ walk }, i) => {
         const typed = settle(walk, typeAnswers[i]);
         if (typed === undefined) return;
-        walk.found.push(...typed.objects.map((o) => undescribed(o, walk.name)));
+        walk.found.push(...typed.objects.map((o) => objectOf(o, walk.name)));
       });
     }
 
@@ -786,41 +847,6 @@ export async function metadataDescriptions(
     }
   });
   return refused === undefined ? { descriptions } : { descriptions, refused };
-}
-
-/**
- * Every walked object's description from its metadata (spec §11, the batched
- * walks): one phase over the objects of every walk that answered, each
- * object's description its metadata's `adtcore:description`. An object of a
- * type with no metadata read (`metadataKeyOf`), or whose read failed, has no
- * description. A metadata read SAP refused with a credential failure ends
- * the call: thrown, carrying the method's error with its step.
- */
-export async function describeFromMetadata(
-  context: HandlerContext,
-  walked: readonly PhaseResult<WalkedItem[]>[],
-): Promise<PhaseResult<WalkedItem[]>[]> {
-  const { descriptions, refused } = await metadataDescriptions(
-    context,
-    walked.flatMap((result) => (result.ok ? result.value : [])),
-  );
-  if (refused !== undefined) {
-    const error = refused.getError();
-    throw carryingFailure(new Error(error.message), error, METADATA_STEP);
-  }
-  return walked.map((result) =>
-    result.ok
-      ? {
-          ok: true,
-          value: result.value.map((item) => {
-            const key = metadataKeyOf(item);
-            const description =
-              key === undefined ? undefined : descriptions.get(key);
-            return description === undefined ? item : { ...item, description };
-          }),
-        }
-      : result,
-  );
 }
 
 /** The flat listing. */

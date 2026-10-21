@@ -7,7 +7,7 @@ import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import {
   assembleList,
   batchReader,
-  describeFromMetadata,
+  concurrentReader,
   type NodeRequest,
   nodeStructureOn,
   readNode,
@@ -22,7 +22,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes.',
+    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time.',
   ),
   inputSchema: {
     timeout: timeoutField(),
@@ -48,7 +48,7 @@ export const TOOL_DEFINITION = {
       .boolean()
       .optional()
       .describe(
-        "Include each object's description in the response. Where the system serves ADT batch, each description is read from the object's metadata: one more read per object, which on a large package takes most of the call (default: false)",
+        "Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)",
       ),
   },
 } as const;
@@ -89,37 +89,40 @@ export async function handleGetPackageContents(
     // many requests cannot take an IResultStrategy, and a flat list and a tree
     // are two conveniences over one walk. This is the same walk that handler
     // uses, assembled the other way — level by level, each level's requests in
-    // one envelope (spec §11), then, when descriptions are asked for, every
-    // object's description from its metadata in one more; one package after
-    // another where the system has no communication batch.
-    const walked = await withSequentialFallback(
-      context,
-      async () => {
-        const levels = await walkPackages(
-          batchReader<NodeRequest, unknown>(context, (request, c) =>
-            readNode(
-              nodeStructureOn(
-                context,
-                createAdtClient(c, logger).getUtils(ourUtils),
+    // one envelope (spec §11); one package after another where the system has
+    // no communication batch. Descriptions asked for, on any system: each
+    // level's requests sent alone, several at a time — inside an envelope a
+    // node structure part can carry another part's DESCRIPTION, sent alone it
+    // carries its own.
+    const readLevel = (request: NodeRequest, c: typeof connection) =>
+      readNode(
+        nodeStructureOn(context, createAdtClient(c, logger).getUtils(ourUtils)),
+        request,
+      );
+    const walked =
+      options.includeDescriptions === true
+        ? await walkPackages(
+            concurrentReader<NodeRequest, unknown>(context, readLevel),
+            packageNames,
+            options,
+          )
+        : await withSequentialFallback(
+            context,
+            () =>
+              walkPackages(
+                batchReader<NodeRequest, unknown>(context, readLevel),
+                packageNames,
+                options,
               ),
-              request,
-            ),
-          ),
-          packageNames,
-          options,
-        );
-        // Descriptions only when asked for: each is its object's metadata.
-        return options.includeDescriptions === true
-          ? describeFromMetadata(context, levels)
-          : levels;
-      },
-      () => {
-        const utils = createAdtClient(connection, logger).getUtils(ourUtils);
-        return rootByRoot(packageNames, (name) =>
-          walkPackage(nodeStructureOn(context, utils), name, options),
-        );
-      },
-    );
+            () => {
+              const utils = createAdtClient(connection, logger).getUtils(
+                ourUtils,
+              );
+              return rootByRoot(packageNames, (name) =>
+                walkPackage(nodeStructureOn(context, utils), name, options),
+              );
+            },
+          );
 
     let answered: unknown;
     if (single) {

@@ -1,9 +1,14 @@
+import { authError } from '@mcp-abap-adt/auth-errors';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../handlers/interfaces';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   assembleList,
   assembleTree,
   codeFormatOf,
+  concurrentReader,
   kindOf,
+  NODE_READ_CONCURRENCY,
   type NodeStructureSource,
   nodeLevel,
   walkPackage,
@@ -249,5 +254,102 @@ describe('a node-load message is not an object', () => {
       '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>The API state can be edited...</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
       '</TREE_CONTENT></DATA></asx:values></asx:abap>';
     expect(nodeLevel({ data }).objects.map((o) => o.name)).toEqual(['ZV_REAL']);
+  });
+});
+
+describe('concurrentReader', () => {
+  const context = { connection: {} } as unknown as HandlerContext;
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+  it('answers in item order, never more than NODE_READ_CONCURRENCY open at once', async () => {
+    let open = 0;
+    let most = 0;
+    const read = concurrentReader<number, number>(context, async (n) => {
+      open += 1;
+      most = Math.max(most, open);
+      // Later items finish first.
+      for (let i = 0; i < 30 - n; i++) await tick();
+      open -= 1;
+      return n * 10;
+    });
+    const items = Array.from({ length: 30 }, (_, i) => i);
+    const out = await read(items);
+    expect(out).toEqual(items.map((n) => ({ ok: true, value: n * 10 })));
+    expect(most).toBe(NODE_READ_CONCURRENCY);
+    expect(read.ownAnswers).toBe(true);
+  });
+
+  it("an item's failure is its own", async () => {
+    const boom = new Error('refused');
+    const read = concurrentReader<number, number>(context, async (n) => {
+      if (n === 1) throw boom;
+      return n;
+    });
+    expect(await read([0, 1, 2])).toEqual([
+      { ok: true, value: 0 },
+      { ok: false, error: boom },
+      { ok: true, value: 2 },
+    ]);
+  });
+
+  it('a credential refusal starts no further read, and is thrown once the started reads settle', async () => {
+    const refusal = new AuthRefusedError(
+      authError['credential-refused']({ credential: 'token' }),
+      'request',
+    );
+    const started: number[] = [];
+    const held = new Map<number, () => void>();
+    const read = concurrentReader<number, number>(context, (n) => {
+      started.push(n);
+      if (n === 0) return Promise.reject(refusal);
+      return new Promise<number>((resolve) => {
+        held.set(n, () => resolve(n));
+      });
+    });
+    let settled = false;
+    const answer = read(Array.from({ length: 40 }, (_, i) => i)).finally(() => {
+      settled = true;
+    });
+    answer.catch(() => undefined);
+    for (let i = 0; i < 5; i++) await tick();
+    // The refused read's pump stopped; the other pumps hold their reads.
+    expect(started).toEqual(
+      Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
+    );
+    expect(settled).toBe(false);
+    for (const release of held.values()) release();
+    await expect(answer).rejects.toBe(refusal);
+    expect(started).toHaveLength(NODE_READ_CONCURRENCY);
+  });
+
+  it('an answer stopsAt accepts starts no further read; the items read are answered', async () => {
+    const started: number[] = [];
+    const held = new Map<number, () => void>();
+    const read = concurrentReader<number, string>(
+      context,
+      (n) => {
+        started.push(n);
+        if (n === 0) return Promise.resolve('refused');
+        return new Promise<string>((resolve) => {
+          held.set(n, () => resolve(`read ${n}`));
+        });
+      },
+      (value) => value === 'refused',
+    );
+    const answer = read(Array.from({ length: 40 }, (_, i) => i));
+    for (let i = 0; i < 5; i++) await tick();
+    expect(started).toEqual(
+      Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
+    );
+    for (const release of held.values()) release();
+    const out = await answer;
+    expect(started).toHaveLength(NODE_READ_CONCURRENCY);
+    expect(out).toEqual([
+      { ok: true, value: 'refused' },
+      ...Array.from({ length: NODE_READ_CONCURRENCY - 1 }, (_, i) => ({
+        ok: true,
+        value: `read ${i + 1}`,
+      })),
+    ]);
   });
 });

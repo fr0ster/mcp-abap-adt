@@ -21,13 +21,13 @@
     "tool": "GetPackageContents",
     "set": "full",
     "handler": "src/handlers/package/readonly/handleGetPackageContents.ts#handleGetPackageContents",
-    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level up to max_depth: the nodestructure POST of every package of the level, then of every type node they list; the next level is the subpackages found; package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level up to max_depth: the nodestructure POST of every package of the level, then of every type node they list; the next level is the subpackages found; package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch; with include_descriptions the same nodestructure POSTs as single requests, several at a time, on any system"
   },
   {
     "tool": "GetPackageTree",
     "set": "full",
     "handler": "src/handlers/system/high/handleGetPackageTree.ts#handleGetPackageTree",
-    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the package metadata GET with the root nodestructure POST, then the nodestructure walk by levels (subpackages by default, max_depth 5); package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the package metadata GET with the root nodestructure POST, then the nodestructure walk by levels (subpackages by default, max_depth 5); package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch; with include_descriptions the metadata GETs and the walk's nodestructure POSTs as single requests, several at a time, on any system"
   },
   {
     "tool": "GetObjectsList",
@@ -141,6 +141,6 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes, as GetPackageContents; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
+    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes (with include_descriptions as single requests, several at a time), as GetPackageContents; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
   }
 ]

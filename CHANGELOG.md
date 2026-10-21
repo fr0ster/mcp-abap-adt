@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Package listings with `include_descriptions: true` read the walk as single requests, several at a time, instead of ADT batch envelopes plus a metadata read per object** — `GetPackageContents`, `GetPackageTree` and compact `HandlerGet` part `contents`, on any system. Inside one envelope SAP answers the node structure parts after the first with other parts' `DESCRIPTION` texts, so the batched walk could not use them and read every object's metadata instead; a node structure sent alone carries its own. Each description is now the node structure's own short description, the one the sequential path always answered — in the logon language; the metadata read answered `adtcore:description` in the object's master language, so on a system whose objects are mastered in another language the text changes language (measured: 1 057 of the 1 251 objects both describe). Measured on an on-premise system: a flat package of 2 033 objects 24.3 s → 1.2 s, a three-level package of 2 282 objects 36.2 s → 6.3 s; every description equal to the sequential read's, and objects of types the metadata read did not cover (about a third of that flat package) now carry theirs. Without descriptions nothing changes: one envelope per phase of each level.
+
 ## [19.1.0] - 2026-10-21
 
 ### Changed

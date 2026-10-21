@@ -37,7 +37,7 @@ per request.
 - `package_name` — Package name.
 - `package_names` — Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.
 - `max_results` — Maximum number of members listed per package (part contents).
-- `include_descriptions` — Include each member's description (part contents). Where the system serves ADT batch, each description is read from the member's metadata: one more read per member, which on a large package takes most of the call.
+- `include_descriptions` — Include each member's description (part contents). The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes.
 - `class_name` — Class name.
 - `interface_name` — Interface name.
 - `program_name` — Program name.

@@ -2,6 +2,8 @@
  * Authentication module exports
  */
 
+import '../instance.js';
+
 /** The browser strategy the program passes to the factory (Ruling 1). */
 export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 export {

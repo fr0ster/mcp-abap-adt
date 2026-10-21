@@ -1,3 +1,5 @@
+import './instance.js';
+
 import type { Logger } from '@mcp-abap-adt/logger';
 
 /**

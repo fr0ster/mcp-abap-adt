@@ -15,6 +15,9 @@
  * own reader (`correctedPair`) and the server's context reader
  * (`adtHeadersOf`) stay internal.
  */
+
+import '../instance.js';
+
 export { AdtHeaderPairs, type AdtHeaderPort } from './AdtHeaderPairs';
 export {
   type AdtObjectWith,

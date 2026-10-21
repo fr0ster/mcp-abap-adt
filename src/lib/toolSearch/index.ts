@@ -12,6 +12,8 @@
  * bundler carries it inside.
  */
 
+import '../instance.js';
+
 /** The search texts of one tool. */
 export interface ToolSearchText {
   /** For lexical search (BM25): the terms, synonyms and object kinds users ask with. */

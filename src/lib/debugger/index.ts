@@ -1,3 +1,5 @@
+import '../instance.js';
+
 export * from './AmdpSession';
 export * from './access';
 export * from './amdpReadings';

@@ -11,6 +11,8 @@
  * does not.
  */
 
+import '../lib/instance.js';
+
 export { type ActiveTool, activeTools } from '../lib/activeTools.js';
 /**
  * The corrected request header pairs of the systems the process talks to

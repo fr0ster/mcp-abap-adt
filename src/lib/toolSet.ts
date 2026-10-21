@@ -31,6 +31,8 @@
  * parameter, naming the binary its words asked for.
  */
 
+import './instance.js';
+
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactBatchHandlersGroup } from './compact/batch/group';
 import {

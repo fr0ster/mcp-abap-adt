@@ -5,6 +5,33 @@ import { spawnOptionsForNpx } from './platform';
 /** The repository root, where the library's own manifest lives. */
 export const ROOT = join(__dirname, '../../..');
 
+/**
+ * Every package of this repository's release, by directory, in publish order
+ * (`scripts/publish-all.sh`): the packed-package inventory. A package another
+ * one depends on is packed from this checkout with it, never fetched from the
+ * registry — the versions being released are not there yet.
+ */
+export const RELEASE_DIRS: readonly string[] = [
+  '.',
+  'background-runs-memory',
+  'responsible-rules',
+  'compact-readonly-entries',
+  'compact-modify',
+  'server-runtime',
+  'server',
+  'http',
+  'sse',
+  'compact',
+  'compact-http',
+  'compact-sse',
+  'core-ro',
+  'http-ro',
+  'sse-ro',
+  'compact-ro',
+  'compact-http-ro',
+  'compact-sse-ro',
+];
+
 const run = (command: string, args: string[], cwd: string): string =>
   execFileSync(command, args, {
     cwd,

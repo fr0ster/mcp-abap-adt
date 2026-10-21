@@ -24,7 +24,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import express from 'express';
 import { StreamableHttpServer } from '../../../../http/src/StreamableHttpServer';
-import { StdioServer } from '../../../../server/src/StdioServer';
+import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import { SseServer } from '../../../../sse/src/SseServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { IHttpApplication } from '../../../embeddable/IHttpApplication';

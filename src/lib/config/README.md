@@ -77,4 +77,4 @@ the validator refuses a secret- or session-looking key.
 
 The launcher of `@mcp-abap-adt/core` maps a `CoreConfig` to an `IAuthBrokerFactoryConfig`
 (`factoryConfigFrom`), passing the browser strategy explicitly. See
-`server/src/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md`.
+`server-runtime/src/stdio/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md`.

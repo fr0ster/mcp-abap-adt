@@ -38,12 +38,19 @@ import {
   tsFiles,
 } from './helpers/failureScan';
 
-const PACKAGES = ['src', 'server/src', 'http/src', 'sse/src'];
+const PACKAGES = [
+  'src',
+  'server/src',
+  'server-runtime/src',
+  'http/src',
+  'sse/src',
+];
 const THROWN_SCOPE = [
   'src/lib/auth',
   'src/lib/httpTransport',
   'src/embeddable',
   'server/src',
+  'server-runtime/src',
   'http/src',
   'sse/src',
 ];
@@ -80,7 +87,7 @@ describe('the sources', () => {
     for (const dir of PACKAGES) {
       expect(files.some((f) => rel(f).startsWith(`${dir}/`))).toBe(true);
     }
-    expect(files.map(rel)).toContain('server/src/launcher.ts');
+    expect(files.map(rel)).toContain('server-runtime/src/stdio/launcher.ts');
   });
 
   it('finds nothing but the listed exceptions', () => {

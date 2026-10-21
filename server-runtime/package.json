@@ -1,0 +1,96 @@
+{
+  "name": "@mcp-abap-adt/server-runtime",
+  "version": "19.2.0",
+  "description": "The launch code of the MCP ABAP ADT servers: the stdio launcher and server, and the destination layer (the auth broker per destination). No command of its own — each server package (@mcp-abap-adt/core and its siblings) carries its binary and depends on this one.",
+  "license": "AGPL-3.0-only",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "type": "commonjs",
+  "exports": {
+    "./stdio": {
+      "types": "./dist/stdio/launcher.d.ts",
+      "import": "./dist/stdio/launcher.js",
+      "require": "./dist/stdio/launcher.js"
+    },
+    "./stdio/server": {
+      "types": "./dist/stdio/server.d.ts",
+      "import": "./dist/stdio/server.js",
+      "require": "./dist/stdio/server.js"
+    },
+    "./auth": {
+      "types": "./dist/stdio/auth/index.d.ts",
+      "import": "./dist/stdio/auth/index.js",
+      "require": "./dist/stdio/auth/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "stdio": [
+        "dist/stdio/launcher.d.ts"
+      ],
+      "stdio/server": [
+        "dist/stdio/server.d.ts"
+      ],
+      "auth": [
+        "dist/stdio/auth/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "npm --prefix .. test -- --roots server-runtime/src",
+    "test:check": "npx tsc --noEmit -p tsconfig.test.json",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/auth-broker": "^5.0.6",
+    "@mcp-abap-adt/auth-errors": "^2.2.1",
+    "@mcp-abap-adt/auth-providers": "^6.0.2",
+    "@mcp-abap-adt/auth-stores": "^5.0.1",
+    "@mcp-abap-adt/connection": "^18.0.1",
+    "@mcp-abap-adt/interfaces-auth": "^7.5.0",
+    "@mcp-abap-adt/interfaces-auth-broker": "^1.3.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.1",
+    "@mcp-abap-adt/logger": "^0.4.1",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "dotenv": "^18.0.5"
+  },
+  "peerDependencies": {
+    "@mcp-abap-adt/background-runs-memory": "^19.2.0",
+    "@mcp-abap-adt/lib": "^19.2.0",
+    "@mcp-abap-adt/responsible-rules": "^19.2.0"
+  },
+  "devDependencies": {
+    "@mcp-abap-adt/background-runs-memory": "^19.2.0",
+    "@mcp-abap-adt/lib": "^19.2.0",
+    "@mcp-abap-adt/responsible-rules": "^19.2.0",
+    "@types/jest": "*",
+    "@types/node": "*",
+    "typescript": "*"
+  }
+}

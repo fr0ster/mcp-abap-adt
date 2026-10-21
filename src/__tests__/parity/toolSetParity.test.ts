@@ -54,7 +54,7 @@ import { HTTP_VERSION } from '../../../http/src/httpVersion';
 import { main as httpMain } from '../../../http/src/launcher';
 import * as httpRo from '../../../http-ro/src/launcher';
 import { CORE_VERSION } from '../../../server/src/coreVersion';
-import { main as coreMain } from '../../../server/src/launcher';
+import { main as coreMain } from '../../../server-runtime/src/stdio/launcher';
 import { main as sseMain } from '../../../sse/src/launcher';
 import { SSE_VERSION } from '../../../sse/src/sseVersion';
 import * as sseRo from '../../../sse-ro/src/launcher';

@@ -11,8 +11,12 @@
  * wired to the MCP protocol with no intermediate layer. It starts nothing on
  * import: `main` is called here with the tool set this command serves, and a
  * sibling command (@mcp-abap-adt/compact) calls the same `main` with its own.
+ * The launcher is @mcp-abap-adt/server-runtime's; the version is core's own.
  */
-const { main, launcherFailedLine } = require('../dist/launcher.js');
+const {
+  main,
+  launcherFailedLine,
+} = require('@mcp-abap-adt/server-runtime/stdio');
 const { CORE_VERSION } = require('../dist/coreVersion.js');
 const { fullToolSet } = require('@mcp-abap-adt/lib/tool-set');
 

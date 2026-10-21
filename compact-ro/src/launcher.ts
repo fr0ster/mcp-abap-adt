@@ -10,15 +10,15 @@
  * half, the debugger, background runs and the resume are `mcp-abap-adt-compact`'s.
  */
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import {
-  main as coreMain,
-  type StdioLauncherEdges,
-} from '@mcp-abap-adt/core/launcher';
 import { processEdges } from '@mcp-abap-adt/lib/config';
 import {
   compactReadOnlyToolSetOf,
   type ToolSet,
 } from '@mcp-abap-adt/lib/tool-set';
+import {
+  main as coreMain,
+  type StdioLauncherEdges,
+} from '@mcp-abap-adt/server-runtime/stdio';
 
 /**
  * The read-only compact tool set: the half that changes nothing, and the

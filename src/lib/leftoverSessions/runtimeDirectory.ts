@@ -1,7 +1,7 @@
 /**
  * Where a process keeps the files of the SAP sessions it holds:
  * `<config dir>/runtime` — the config dir the server resolves for its
- * `sessions/` and `service-keys/` (`server/src/config/platformPaths.ts`):
+ * `sessions/` and `service-keys/` (`server-runtime/src/stdio/config/platformPaths.ts`):
  * the given base (`--auth-broker-path`), else the first entry of
  * `AUTH_BROKER_PATH`, else `~/.config/mcp-abap-adt` on Unix and
  * `Documents\mcp-abap-adt` on Windows. Never the working directory.

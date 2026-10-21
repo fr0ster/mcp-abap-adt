@@ -2,7 +2,7 @@
  * Errors of the authentication layer that lib keeps. They name fields and
  * vetted vocabulary only — never a value read from a file. What a thrown
  * value is, as an answer, is `failureOf`'s (`./failures`); the destination
- * layer's own errors live in core (`server/src/auth/destinationFailure.ts`).
+ * layer's own errors live in core (`server-runtime/src/stdio/auth/destinationFailure.ts`).
  */
 
 /** Whether `text` is an identifier: a letter, `_` or `$`, then word characters. Plain code. */

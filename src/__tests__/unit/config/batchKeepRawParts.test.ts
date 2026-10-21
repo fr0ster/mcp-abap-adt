@@ -1,5 +1,5 @@
 import { HTTP_PARAMETERS } from '../../../../http/src/config/httpParameters';
-import { CORE_PARAMETERS } from '../../../../server/src/config/coreParameters';
+import { CORE_PARAMETERS } from '../../../../server-runtime/src/stdio/config/coreParameters';
 import { SSE_PARAMETERS } from '../../../../sse/src/config/sseParameters';
 import {
   BATCH_KEEP_RAW_PARTS_ROW,

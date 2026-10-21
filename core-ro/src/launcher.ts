@@ -9,12 +9,12 @@
  * decision), and a user installs only what they need. The high,
  * debugger, background-run and resume tools are `mcp-abap-adt`'s.
  */
+import { processEdges } from '@mcp-abap-adt/lib/config';
+import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
   main as coreMain,
   type StdioLauncherEdges,
-} from '@mcp-abap-adt/core/launcher';
-import { processEdges } from '@mcp-abap-adt/lib/config';
-import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
+} from '@mcp-abap-adt/server-runtime/stdio';
 
 /**
  * The read-only tool set: readonly (with system and search), and the

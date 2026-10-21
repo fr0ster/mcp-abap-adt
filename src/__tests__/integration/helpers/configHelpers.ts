@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
-import { resolveEnvFilePath } from '../../../../server/src/config/envResolver';
+import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
 import { applyCertKerberosFields } from '../../../lib/config/applyAuthFields';
 import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';

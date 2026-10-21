@@ -25,7 +25,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { StdioServer } from '../../../../server/src/StdioServer';
+import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { activeTools } from '../../../lib/activeTools';
 import { CompactHandlersGroup } from '../../../lib/compact/group';

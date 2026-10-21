@@ -8,7 +8,7 @@
  */
 
 import { httpStand } from '../../../../http/src/__tests__/shutdown/harness';
-import { stand as coreStand } from '../../../../server/src/__tests__/helpers/loginStand';
+import { stand as coreStand } from '../../../../server-runtime/src/stdio/__tests__/helpers/loginStand';
 import { sseStand } from '../../../../sse/src/__tests__/shutdown/harness';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { isLogoff } from '../../helpers/adtStandIn';

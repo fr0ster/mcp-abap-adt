@@ -7,7 +7,7 @@
  * answer is kept, so the next call asks again and, once the system names its
  * user, its tool runs once. (On-premise the same answer goes to the stated
  * values: `systemContextRequired.test.ts`; a stdio start ends with its own
- * words: `server/src/__tests__/startConnector.test.ts`.)
+ * words: `server-runtime/src/stdio/__tests__/startConnector.test.ts`.)
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';

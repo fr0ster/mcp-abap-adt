@@ -10,7 +10,7 @@
  * `mcp-abap-adt-compact-ro` (@mcp-abap-adt/compact-ro).
  */
 const { main } = require('../dist/launcher.js');
-const { launcherFailedLine } = require('@mcp-abap-adt/core/launcher');
+const { launcherFailedLine } = require('@mcp-abap-adt/server-runtime/stdio');
 
 void main().catch((err) => {
   console.error(launcherFailedLine(err));

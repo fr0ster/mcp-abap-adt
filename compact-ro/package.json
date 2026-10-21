@@ -58,9 +58,11 @@
     "start": "node ./bin/mcp-abap-adt-compact-ro.js"
   },
   "dependencies": {
+    "@mcp-abap-adt/background-runs-memory": "^19.2.0",
     "@mcp-abap-adt/compact-readonly-entries": "^19.2.0",
-    "@mcp-abap-adt/core": "^19.2.0",
-    "@mcp-abap-adt/lib": "^19.2.0"
+    "@mcp-abap-adt/lib": "^19.2.0",
+    "@mcp-abap-adt/responsible-rules": "^19.2.0",
+    "@mcp-abap-adt/server-runtime": "^19.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

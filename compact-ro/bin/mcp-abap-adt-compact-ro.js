@@ -8,7 +8,7 @@
  * the read-only tool set — the 16 compact tools that change nothing and the leftover-session list and logoff.
  */
 const { main } = require('../dist/launcher.js');
-const { launcherFailedLine } = require('@mcp-abap-adt/core/launcher');
+const { launcherFailedLine } = require('@mcp-abap-adt/server-runtime/stdio');
 
 void main().catch((err) => {
   console.error(launcherFailedLine(err));

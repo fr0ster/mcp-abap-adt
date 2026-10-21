@@ -62,6 +62,15 @@
       ],
       "@mcp-abap-adt/lib/tool-set": [
         "../dist/lib/toolSet.d.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/stdio": [
+        "../server-runtime/dist/stdio/launcher.d.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/stdio/server": [
+        "../server-runtime/dist/stdio/server.d.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/auth": [
+        "../server-runtime/dist/stdio/auth/index.d.ts"
       ]
     }
   },

@@ -308,17 +308,19 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     ]);
   });
 
-  it('GetTableContents calls getTableContents({table_name, max_rows, sql_query})', async () => {
+  it('GetTableContents calls getSqlQuery({sql_query: SELECT * FROM <table>, row_number: max_rows}), never getTableContents', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleGetTableContents(context as any, { table_name: 'ZT' });
-    const call = seen.calls
-      .filter((c) => c.member === 'getTableContents')
-      .at(-1);
+    await handleGetTableContents(context as any, {
+      table_name: 'ZT',
+      max_rows: 7,
+    });
+    const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
     expect(call?.args).toEqual([
-      { table_name: 'ZT', max_rows: 100, sql_query: 'SELECT * FROM ZT' },
-      { headers: DEFAULT_ADT_HEADERS['utils.getTableContents'] },
+      { sql_query: 'SELECT * FROM ZT', row_number: 7 },
+      { headers: DEFAULT_ADT_HEADERS['utils.getSqlQuery'] },
     ]);
+    expect(seen.calls.some((c) => c.member === 'getTableContents')).toBe(false);
   });
 
   it('ListTransports asks for the saved search, then lists with its uri', async () => {

@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTableContents',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Retrieve contents (data preview) of an ABAP database table or CDS view. Returns rows of data like SE16/SE16N.',
+    '[read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows.',
   ),
   inputSchema: {
     timeout: timeoutField(),
@@ -58,28 +58,26 @@ export async function handleGetTableContents(
 
   logger?.info(`Reading table contents: ${tableName} (max_rows=${maxRows})`);
 
-  // `IGetTableContentsParams.sql_query` is required since adt-clients 42.0.0 —
-  // the caller states the statement, it is not built server-side from the
-  // table's columns any more (see the type's own doc). The pre-migration call
-  // never sent one; sending `SELECT * FROM <table>` here is not a new
-  // capability, it is naming what this tool's own success label
-  // ("SELECT * FROM ${tableName}") already assumed was being run.
   const sqlQuery = `SELECT * FROM ${tableName}`;
 
-  // `getTableContents(params, options?)` takes `analyseException` since
-  // adt-clients 23.
+  // **Read through the freestyle preview, not `/datapreview/ddic`.** Measured
+  // on premise (BASIS 816, 2026-10-21): `/datapreview/ddic?rowNumber=N`
+  // answers N+1 rows and `totalRows` 0, so a table of four rows asked for two
+  // answered three and said it was empty. `/datapreview/freestyle?rowNumber=N`
+  // with the same `SELECT * FROM <table>` answers exactly N rows (fewer when
+  // the table holds fewer) and the true `totalRows` — the reading
+  // `GetSqlQuery` already uses, so both tools answer one document the same
+  // way.
   return answer(
     { tool: 'GetTableContents', detail },
     () =>
-      withAdtHeaders(context, 'utils.getTableContents', (headers) =>
-        createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
-          {
-            table_name: tableName,
-            max_rows: maxRows,
-            sql_query: sqlQuery,
-          },
-          { headers, analyse: analyseException },
-        ),
+      withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
+        createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .getSqlQuery(
+            { sql_query: sqlQuery, row_number: maxRows },
+            { headers, analyse: analyseException },
+          ),
       ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;

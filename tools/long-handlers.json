@@ -69,7 +69,7 @@
     "tool": "GetTableContents",
     "set": "full",
     "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
-    "sends": "POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=…"
+    "sends": "POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with SELECT * FROM the table as the body"
   },
   {
     "tool": "GetObjectInfo",

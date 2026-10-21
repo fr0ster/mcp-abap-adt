@@ -1234,8 +1234,10 @@ describe('GetPackageTree: a metadata read SAP answered 401', () => {
 
 // ---------------------------------------------------------------------------
 // Descriptions: a node structure part after the first of an envelope can
-// carry another part's DESCRIPTION (measured, 2026-10-18); the batched walks
-// take every description from the object's metadata.
+// carry another part's DESCRIPTION (measured, 2026-10-18). The package
+// listings read a walk with descriptions as requests sent alone, several at a
+// time, each carrying its own; GetObjectInfo's batched walk takes every
+// description from the object's metadata.
 // ---------------------------------------------------------------------------
 
 const DESCRIPTION_TAG = /<DESCRIPTION>[^<]*<\/DESCRIPTION>|<DESCRIPTION\/>/g;
@@ -1286,8 +1288,8 @@ function leakingSystem(model: Model = {}) {
   return { ...fake, leaks };
 }
 
-/** The four calls that answer descriptions, over two roots. */
-const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
+/** The package listings that answer descriptions, over two roots. */
+const LISTING_CALLS: Array<{ tool: string; call: Call }> = [
   {
     tool: 'GetPackageContents',
     call: (c) =>
@@ -1316,21 +1318,107 @@ const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
         include_descriptions: true,
       }),
   },
-  {
-    tool: 'GetObjectInfo',
-    call: (c) =>
-      handleGetObjectInfo(c, {
-        objects: [
-          { object_type: 'DEVC/K', object_name: 'ZROOT_A' },
-          { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
-        ],
-        maxDepth: 2,
-        include_descriptions: true,
-      }),
-  },
 ];
 
-describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
+/** The node structure requests a call sent alone. */
+const nodeReads = (fake: { directs: IAbapRequestOptions[] }) =>
+  fake.directs.filter((r) => r.url.includes('/repository/nodestructure'));
+
+describe.each(LISTING_CALLS)('$tool: descriptions', ({ call }) => {
+  it('each node structure sent alone: its own descriptions, the sequential answer', async () => {
+    const leaking = leakingSystem();
+    const concurrent = await withinTurns(call(contextOn(leaking as Fake)));
+    const sequential = await withinTurns(
+      call(contextOn(leakingSystem() as Fake, 'absent')),
+    );
+    expect(leaking.leaks.count).toBe(0);
+    expect((concurrent as { isError?: boolean }).isError).toBe(false);
+    expect(textOf(concurrent)).toBe(textOf(sequential));
+    expect(textOf(concurrent)).toContain('Class A');
+    expect(textOf(concurrent)).toContain('Interface B');
+  });
+
+  it('no node structure in an envelope, none asked without descriptions, no object metadata read', async () => {
+    const fake = system();
+    await withinTurns(call(contextOn(fake)));
+    expect(fake.envelopes.flatMap(partKeys).some((k) => k.includes('|'))).toBe(
+      false,
+    );
+    const asked = nodeReads(fake);
+    expect(asked.length).toBeGreaterThan(0);
+    expect(
+      asked.every(
+        (r) =>
+          (r.params as { withShortDescriptions?: unknown })
+            ?.withShortDescriptions === true,
+      ),
+    ).toBe(true);
+    expect(
+      [
+        ...fake.envelopes.flatMap(partKeys),
+        ...fake.directs.map((r) => r.url),
+      ].some((k) => k.includes('/sap/bc/adt/oo/')),
+    ).toBe(false);
+  });
+
+  it('no communication batch: the same requests, the same answer', async () => {
+    const served = system();
+    const absent = system();
+    const a = await withinTurns(call(contextOn(served)));
+    const b = await withinTurns(call(contextOn(absent, 'absent')));
+    expect(absent.envelopes).toHaveLength(0);
+    expect(textOf(b)).toBe(textOf(a));
+    expect(
+      nodeReads(absent)
+        .map((r) => keyOf(r.method, r.url, r.params))
+        .sort(),
+    ).toEqual(
+      nodeReads(served)
+        .map((r) => keyOf(r.method, r.url, r.params))
+        .sort(),
+    );
+  });
+
+  it("a node structure's failure is its root's; the other root answers", async () => {
+    const fake = system({
+      refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 500 },
+    });
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(textOf(result)).not.toContain('Class A');
+    expect(textOf(result)).toContain('Interface B');
+  });
+
+  it('a 401 SAP answered to a node structure ends the call as it came', async () => {
+    const fake = system({
+      refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 401 },
+    });
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(textOf(result)).toContain('401');
+  });
+
+  it("the connection's credential refusal ends the call as it came", async () => {
+    const fake = system({}, undefined, () => {
+      throw credential();
+    });
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result).error).toBe('authentication_failed');
+  });
+});
+
+describe('GetObjectInfo: descriptions', () => {
+  const call: Call = (c) =>
+    handleGetObjectInfo(c, {
+      objects: [
+        { object_type: 'DEVC/K', object_name: 'ZROOT_A' },
+        { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
+      ],
+      maxDepth: 2,
+      include_descriptions: true,
+    });
+
   it("a part carrying another part's DESCRIPTION: the answer is the sequential one", async () => {
     const leaking = leakingSystem();
     const batched = await withinTurns(call(contextOn(leaking as Fake)));

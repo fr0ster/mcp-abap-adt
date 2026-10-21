@@ -214,7 +214,7 @@ export const compactGetSchema = {
       type: 'boolean',
       default: false,
       description:
-        "Include each member's description (part contents). Where the system serves ADT batch, each description is read from the member's metadata: one more read per member, which on a large package takes most of the call.",
+        "Include each member's description (part contents). The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes.",
     },
     class_name: { type: 'string', description: 'Class name.' },
     interface_name: { type: 'string', description: 'Interface name.' },

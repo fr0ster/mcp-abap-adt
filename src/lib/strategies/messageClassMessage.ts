@@ -49,21 +49,30 @@ function localFields(
   return fields;
 }
 
+/** The value under the key whose local name (the part after any prefix) is `name`. */
+const byLocalName = (node: unknown, name: string): unknown => {
+  if (node === null || typeof node !== 'object') return undefined;
+  const key = Object.keys(node).find(
+    (k) => k.slice(k.indexOf(':') + 1) === name,
+  );
+  return key === undefined ? undefined : (node as Record<string, unknown>)[key];
+};
+
 /**
  * The message numbered `msgno` in `document`, compared as the string SAP
- * wrote (`001`, never `1`) — the same comparison the refusal of a missing
- * number makes. `undefined` when the document holds no such message.
+ * wrote (`001`, never `1`) — the same comparison, on the same local names
+ * whatever the prefix, as the refusal of a missing number makes
+ * (`analyseMessageClassMessage`). `undefined` when the document holds no such
+ * message.
  */
 export function classMessageOf(
   document: string,
   msgno: string,
 ): ClassMessage | undefined {
-  const parsed = parseStructure(document) as Record<string, unknown> | null;
-  const root = parsed?.['mc:messageClass'];
-  if (root === null || typeof root !== 'object') return undefined;
-  const element = asArray(
-    (root as Record<string, unknown>)['mc:messages'],
-  ).find((m) => String(attributesOf(m)['mc:msgno'] ?? '') === msgno);
+  const root = byLocalName(parseStructure(document), 'messageClass');
+  const element = asArray(byLocalName(root, 'messages')).find(
+    (m) => String(byLocalName(attributesOf(m), 'msgno') ?? '') === msgno,
+  );
   if (element === undefined) return undefined;
   return { fields: localFields(attributesOf(element)), element };
 }

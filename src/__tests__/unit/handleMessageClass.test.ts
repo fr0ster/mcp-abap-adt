@@ -285,6 +285,38 @@ describe('Message Class (MSAG) CRUD tools', () => {
     expect(result.content[0].text).toBe(classDocument);
   });
 
+  it('GetMessageClassMessage reads the message whatever the prefix, one message or many', async () => {
+    // Another prefix for the same namespace, and a class of one message: the
+    // real refusal reads local names, so the extraction must too.
+    const single =
+      '<m:messageClass xmlns:m="http://www.sap.com/adt/MessageClass" xmlns:a="http://www.sap.com/adt/core" a:name="ZMY_MSGS">' +
+      '<m:messages m:msgno="001" m:msgtext="Only" m:selfexplainatory="false" a:name="ZMY_MSGS001"/></m:messageClass>';
+    const { analyseMessageClassMessage } = jest.requireActual(
+      '@mcp-abap-adt/adt-strategies',
+    );
+    const { ADT_NO_FAILURE } = jest.requireActual(
+      '@mcp-abap-adt/interfaces-adt',
+    );
+    expect(
+      analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
+        status: 200,
+        data: single,
+      }),
+    ).toBe(ADT_NO_FAILURE);
+    mockMsg.read.mockResolvedValue(okResponse(single));
+    const result = await handleGetMessageClassMessage(ctx, {
+      message_class_name: 'zmy_msgs',
+      msgno: '001',
+    });
+    expect(result.isError).toBe(false);
+    expect(payload(result).message).toEqual({
+      msgno: '001',
+      msgtext: 'Only',
+      selfexplainatory: 'false',
+      name: 'ZMY_MSGS001',
+    });
+  });
+
   it('GetMessageClassMessage refuses a number the class does not hold', async () => {
     // The real strategy over the real document: `analyseMessageClassMessage`
     // is what refuses, before any projection.

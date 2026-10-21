@@ -97,6 +97,12 @@
       "@mcp-abap-adt/server-runtime/http/server": [
         "../server-runtime/src/http/server.ts"
       ],
+      "@mcp-abap-adt/server-runtime/sse": [
+        "../server-runtime/src/sse/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse/server": [
+        "../server-runtime/src/sse/server.ts"
+      ],
       "@mcp-abap-adt/core/launcher": [
         "../server/src/launcher.ts"
       ],

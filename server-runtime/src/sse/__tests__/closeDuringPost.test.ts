@@ -11,8 +11,8 @@ import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import {
   isLockOf,
   isUpdateOf,
-} from '../../../src/__tests__/helpers/shutdownTools';
-import { activeTools } from '../../../src/lib/activeTools';
+} from '../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../src/lib/activeTools';
 import {
   halfPost,
   type SseStand,

@@ -3,7 +3,7 @@
 /**
  * mcp-abap-adt-sse-ro — the read-only MCP ABAP ADT server over HTTP+SSE.
  *
- * `@mcp-abap-adt/sse`'s launcher with the read-only tool set, started in this
+ * `@mcp-abap-adt/server-runtime/sse`'s launcher with the read-only tool set, started in this
  * process.
  */
 const { main } = require('../dist/launcher.js');

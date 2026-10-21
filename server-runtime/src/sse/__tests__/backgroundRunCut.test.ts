@@ -13,10 +13,10 @@ import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import {
   isLogoff,
   type StandInRequest,
-} from '../../../src/__tests__/helpers/adtStandIn';
-import { BackgroundRunHandlersGroup } from '../../../src/lib/handlers/groups/BackgroundRunHandlersGroup';
-import { SystemHandlersGroup } from '../../../src/lib/handlers/groups/SystemHandlersGroup';
-import type { HandlerContext } from '../../../src/lib/handlers/interfaces';
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import { BackgroundRunHandlersGroup } from '../../../../src/lib/handlers/groups/BackgroundRunHandlersGroup';
+import { SystemHandlersGroup } from '../../../../src/lib/handlers/groups/SystemHandlersGroup';
+import type { HandlerContext } from '../../../../src/lib/handlers/interfaces';
 import { type SseStand, sseStand, until } from './shutdown/harness';
 
 jest.setTimeout(30_000);

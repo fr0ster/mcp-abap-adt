@@ -12,8 +12,8 @@
  */
 
 import { httpStand } from '../../../../server-runtime/src/http/__tests__/shutdown/harness';
+import { sseStand } from '../../../../server-runtime/src/sse/__tests__/shutdown/harness';
 import { stand as coreStand } from '../../../../server-runtime/src/stdio/__tests__/helpers/loginStand';
-import { sseStand } from '../../../../sse/src/__tests__/shutdown/harness';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { stopUrl } from '../../helpers/shutdownTools';
 import { stateSystemKind } from '../../helpers/systemKind';

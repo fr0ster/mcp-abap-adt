@@ -40,7 +40,7 @@ import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
-import { SSE_VERSION } from './sseVersion.js';
+import { RUNTIME_VERSION } from '../runtimeVersion.js';
 
 export interface SseServerOptions {
   /**
@@ -173,7 +173,7 @@ export class SseServer {
     this.ssePath = opts?.ssePath ?? '/sse';
     this.postPath = opts?.postPath ?? '/messages';
     this.logger = opts?.logger ?? noopLogger;
-    this.version = opts?.version ?? SSE_VERSION;
+    this.version = opts?.version ?? RUNTIME_VERSION;
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
     this.allowedHosts = opts?.allowedHosts;

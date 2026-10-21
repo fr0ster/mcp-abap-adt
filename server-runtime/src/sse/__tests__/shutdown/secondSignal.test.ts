@@ -7,7 +7,7 @@
  * transport-shutdown suite.)
  */
 
-import { isUnlockOf } from '../../../../src/__tests__/helpers/shutdownTools';
+import { isUnlockOf } from '../../../../../src/__tests__/helpers/shutdownTools';
 import { type SseStand, sseStand, turns, until } from './harness';
 
 jest.setTimeout(30_000);

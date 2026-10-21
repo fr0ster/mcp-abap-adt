@@ -10,7 +10,7 @@ import type {
   HandlerEntry,
   IHandlerGroup,
 } from '@mcp-abap-adt/lib/handlers';
-import { HighLevelHandlersGroup } from '../../../src/lib/handlers/groups/HighLevelHandlersGroup';
+import { HighLevelHandlersGroup } from '../../../../src/lib/handlers/groups/HighLevelHandlersGroup';
 import { sseStand, until } from './shutdown/harness';
 
 jest.setTimeout(30_000);

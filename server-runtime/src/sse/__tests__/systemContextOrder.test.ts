@@ -19,8 +19,8 @@ import type { AddressInfo } from 'node:net';
 // applies — where the system names its user, its answer wins over all of it.
 // Each lookup is counted.
 const mockLookups = { count: 0 };
-jest.mock('../../../src/lib/connectionFactory', () => ({
-  ...jest.requireActual('../../../src/lib/connectionFactory'),
+jest.mock('../../../../src/lib/connectionFactory', () => ({
+  ...jest.requireActual('../../../../src/lib/connectionFactory'),
   createAbapConnection: () => ({
     connect: async () => {},
     makeAdtRequest: async (options: { url?: string }) => {
@@ -44,7 +44,7 @@ import express from 'express';
 import {
   getStatedSystemContext,
   resetSystemContextCache,
-} from '../../../src/lib/systemContext';
+} from '../../../../src/lib/systemContext';
 import { SseServer } from '../SseServer.js';
 
 /** One tool: waits `delayMs`, then answers the context its call sees. */

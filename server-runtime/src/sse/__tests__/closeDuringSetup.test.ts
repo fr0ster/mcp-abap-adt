@@ -9,7 +9,7 @@
 import { EventEmitter } from 'node:events';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
-import { resetProcessLatchForTests } from '../../../src/lib/activeTools';
+import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
 import { SseServer } from '../SseServer.js';
 
 const CREDENTIALS = {

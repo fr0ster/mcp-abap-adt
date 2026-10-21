@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/server-runtime",
   "version": "19.2.0",
-  "description": "The launch code of the MCP ABAP ADT servers: the stdio launcher and server with the destination layer (the auth broker per destination), and the Streamable HTTP launcher and server. No command of its own — each server package (@mcp-abap-adt/core and its siblings) carries its binary and depends on this one.",
+  "description": "The launch code of the MCP ABAP ADT servers: the stdio launcher and server with the destination layer (the auth broker per destination), the Streamable HTTP launcher and server, and the HTTP+SSE launcher and server. No command of its own — each server package (@mcp-abap-adt/core and its siblings) carries its binary and depends on this one.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -49,6 +49,16 @@
       "types": "./dist/http/server.d.ts",
       "import": "./dist/http/server.js",
       "require": "./dist/http/server.js"
+    },
+    "./sse": {
+      "types": "./dist/sse/launcher.d.ts",
+      "import": "./dist/sse/launcher.js",
+      "require": "./dist/sse/launcher.js"
+    },
+    "./sse/server": {
+      "types": "./dist/sse/server.d.ts",
+      "import": "./dist/sse/server.js",
+      "require": "./dist/sse/server.js"
     }
   },
   "typesVersions": {
@@ -67,6 +77,12 @@
       ],
       "http/server": [
         "dist/http/server.d.ts"
+      ],
+      "sse": [
+        "dist/sse/launcher.d.ts"
+      ],
+      "sse/server": [
+        "dist/sse/server.d.ts"
       ]
     }
   },

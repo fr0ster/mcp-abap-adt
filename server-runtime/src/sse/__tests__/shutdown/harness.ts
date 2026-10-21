@@ -19,9 +19,9 @@ import {
   type AdtStandIn,
   adtStandIn,
   probeGroup,
-} from '../../../../src/__tests__/helpers/adtStandIn';
-import { shutdownTools } from '../../../../src/__tests__/helpers/shutdownTools';
-import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
+} from '../../../../../src/__tests__/helpers/adtStandIn';
+import { shutdownTools } from '../../../../../src/__tests__/helpers/shutdownTools';
+import { resetProcessLatchForTests } from '../../../../../src/lib/activeTools';
 import { SseServer, type SseServerOptions } from '../../SseServer.js';
 
 export const turns = async (n = 10) => {

@@ -1,6 +1,6 @@
 import { HTTP_PARAMETERS } from '../../../../server-runtime/src/http/config/httpParameters';
+import { SSE_PARAMETERS } from '../../../../server-runtime/src/sse/config/sseParameters';
 import { CORE_PARAMETERS } from '../../../../server-runtime/src/stdio/config/coreParameters';
-import { SSE_PARAMETERS } from '../../../../sse/src/config/sseParameters';
 import {
   BATCH_KEEP_RAW_PARTS_ROW,
   type ParameterTable,

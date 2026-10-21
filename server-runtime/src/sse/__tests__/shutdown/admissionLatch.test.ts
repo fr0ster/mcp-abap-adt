@@ -12,8 +12,8 @@ import {
   isLockOf,
   isUnlockOf,
   isUpdateOf,
-} from '../../../../src/__tests__/helpers/shutdownTools';
-import { activeTools } from '../../../../src/lib/activeTools';
+} from '../../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../../src/lib/activeTools';
 import { halfPost, type SseStand, sseStand, turns, until } from './harness';
 
 jest.setTimeout(30_000);

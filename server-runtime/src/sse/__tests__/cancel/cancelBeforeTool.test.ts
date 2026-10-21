@@ -13,8 +13,8 @@
  */
 
 import type { AuthOutcome, IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import { PROBE_PATH } from '../../../../src/__tests__/helpers/adtStandIn';
-import { activeTools } from '../../../../src/lib/activeTools';
+import { PROBE_PATH } from '../../../../../src/__tests__/helpers/adtStandIn';
+import { activeTools } from '../../../../../src/lib/activeTools';
 import {
   type SseConnection,
   type SseStand,
@@ -41,8 +41,8 @@ function mockReset(): void {
   });
 }
 
-jest.mock('../../../../src/lib/credentialSources', () => {
-  const actual = jest.requireActual('../../../../src/lib/credentialSources');
+jest.mock('../../../../../src/lib/credentialSources', () => {
+  const actual = jest.requireActual('../../../../../src/lib/credentialSources');
   /** The headers' provider, its renewal and (when set) its authorize held at the gate. */
   const gated = (basic: IAuthProvider): IAuthProvider => ({
     kind: basic.kind,

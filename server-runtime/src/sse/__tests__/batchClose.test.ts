@@ -10,8 +10,8 @@ import {
   type HandlerContext,
   HighLevelHandlersGroup,
 } from '@mcp-abap-adt/lib/handlers';
-import { isLogoff } from '../../../src/__tests__/helpers/adtStandIn';
-import { InstanceBatch } from '../../../src/lib/batch/InstanceBatch';
+import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
+import { InstanceBatch } from '../../../../src/lib/batch/InstanceBatch';
 import { type SseStand, sseStand, turns, until } from './shutdown/harness';
 
 jest.setTimeout(30_000);

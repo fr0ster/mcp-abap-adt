@@ -21,8 +21,8 @@ import {
   adtStandIn,
   basicOf,
   probeGroup,
-} from '../../../src/__tests__/helpers/adtStandIn';
-import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../src/lib/auth/serverRefusal';
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../../src/lib/auth/serverRefusal';
 import { SseServer } from '../SseServer.js';
 
 const registry = new CompositeHandlersRegistry([probeGroup()]);

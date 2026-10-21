@@ -13,12 +13,12 @@
  */
 
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
-import { isLogoff } from '../../../src/__tests__/helpers/adtStandIn';
+import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
 import {
   isUnlockOf,
   isUpdateOf,
-} from '../../../src/__tests__/helpers/shutdownTools';
-import { ownedConnections } from '../../../src/lib/ownedConnections';
+} from '../../../../src/__tests__/helpers/shutdownTools';
+import { ownedConnections } from '../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './shutdown/harness';
 
 jest.setTimeout(30_000);

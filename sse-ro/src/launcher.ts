@@ -3,8 +3,8 @@
  *
  * sse's `main` with `fullReadOnlyToolSet`, and this command's name and version.
  * Nothing else: sse's table, credentials, cancellation, failures and shutdown.
- * It depends on lib and @mcp-abap-adt/sse only: never on core, so neither the
- * auth broker nor the stores are installed with it.
+ * The launcher is `@mcp-abap-adt/server-runtime/sse`'s; the package depends on
+ * lib and the runtime, never on another binary package.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
  * decision), and a user installs only what they need. The high,
@@ -12,7 +12,7 @@
  */
 import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { main as sseMain } from '@mcp-abap-adt/sse/launcher';
+import { main as sseMain } from '@mcp-abap-adt/server-runtime/sse';
 
 /**
  * The read-only tool set: readonly (with system and search). No high, no debugger, no background run,

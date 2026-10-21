@@ -3,9 +3,9 @@
  *
  * sse's `main` with `compactReadOnlyToolSetOf` over the half that changes
  * nothing, and this command's name and version. Nothing else: sse's table,
- * credentials, cancellation, failures and shutdown. It depends on lib and
- * @mcp-abap-adt/sse and the read-only half only: never on core, so neither the
- * auth broker nor the stores are installed with it.
+ * credentials, cancellation, failures and shutdown. The launcher is
+ * `@mcp-abap-adt/server-runtime/sse`'s; the package depends on lib, the
+ * runtime and the read-only half, never on another binary package.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
  * decision), and a user installs only what they need. The modify
@@ -17,7 +17,7 @@ import {
   compactReadOnlyToolSetOf,
   type ToolSet,
 } from '@mcp-abap-adt/lib/tool-set';
-import { main as sseMain } from '@mcp-abap-adt/sse/launcher';
+import { main as sseMain } from '@mcp-abap-adt/server-runtime/sse';
 
 /**
  * The read-only compact tool set: the half that changes nothing. No modify half, no debugger, no

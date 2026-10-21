@@ -20,6 +20,8 @@
  *   server-runtime, declaring none;
  * - server-runtime reaches no binary package and neither half; it takes lib,
  *   background-runs-memory and responsible-rules as peers;
+ * - background-runs-memory and responsible-rules take lib as a peer (the
+ *   binary package owns it: spec §2a); a peer counts as declared;
  * - http reaches no sse and sse no http; neither reaches core;
  * - the stdio packages (core, compact, core-ro, compact-ro), the http
  *   packages and the sse packages reach server-runtime's path of their
@@ -186,14 +188,14 @@ const PACKAGES: Row[] = [
     name: '@mcp-abap-adt/background-runs-memory',
     dir: 'background-runs-memory',
     forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES, RUNTIME],
-    required: ['@mcp-abap-adt/lib'],
+    peers: ['@mcp-abap-adt/lib'],
   },
   // The responsible rules: lib's hook, nothing else of ours.
   {
     name: '@mcp-abap-adt/responsible-rules',
     dir: 'responsible-rules',
     forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES, RUNTIME],
-    required: ['@mcp-abap-adt/lib'],
+    peers: ['@mcp-abap-adt/lib'],
   },
   // http: the runtime's http paths, and no broker or store through them.
   {

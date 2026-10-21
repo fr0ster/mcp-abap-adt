@@ -111,10 +111,22 @@ describe('the compact capability split holds across the packages', () => {
         join(REPO, 'compact-readonly-entries', 'package.json'),
         'utf8',
       ),
-    ) as { dependencies?: Record<string, string> };
-    expect(Object.keys(manifest.dependencies ?? {})).toEqual([
-      '@mcp-abap-adt/lib',
-    ]);
+    ) as {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+    };
+    // Every field an install reads names lib alone — a peer, since the
+    // binary package owns lib (one copy per install tree).
+    expect({
+      dependencies: Object.keys(manifest.dependencies ?? {}),
+      peerDependencies: Object.keys(manifest.peerDependencies ?? {}),
+      optionalDependencies: Object.keys(manifest.optionalDependencies ?? {}),
+    }).toEqual({
+      dependencies: [],
+      peerDependencies: ['@mcp-abap-adt/lib'],
+      optionalDependencies: [],
+    });
   });
 
   it('every compact tool file belongs to exactly one half', () => {

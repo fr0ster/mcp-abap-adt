@@ -50,10 +50,11 @@
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@mcp-abap-adt/lib": "^19.2.0"
   },
   "devDependencies": {
+    "@mcp-abap-adt/lib": "^19.2.0",
     "typescript": "^6.0.2",
     "@types/node": "^22.20.5"
   }

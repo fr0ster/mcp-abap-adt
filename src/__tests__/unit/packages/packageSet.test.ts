@@ -268,6 +268,78 @@ describe('the package set', () => {
     }
   });
 
+  // Spec §2a: one `dependencies` entry for lib per install tree — the
+  // binary package's. Everything below the binaries takes lib (and the
+  // runtime its two state packages) as a peer, so npm resolves it to the
+  // binary's one copy in every layout.
+  const BINARIES = PACKAGES.filter(([, , bin]) => bin !== null);
+  const BINARY_NAMES = BINARIES.map(([, name]) => name);
+  const STATE = [
+    '@mcp-abap-adt/background-runs-memory',
+    '@mcp-abap-adt/responsible-rules',
+  ];
+  const BELOW: ReadonlyArray<readonly [string, readonly string[]]> = [
+    ['server-runtime', ['@mcp-abap-adt/lib', ...STATE]],
+    ['compact-readonly-entries', ['@mcp-abap-adt/lib']],
+    ['compact-modify', ['@mcp-abap-adt/lib']],
+    ['background-runs-memory', ['@mcp-abap-adt/lib']],
+    ['responsible-rules', ['@mcp-abap-adt/lib']],
+  ];
+
+  it('twelve binary packages, none depending on another', () => {
+    expect(BINARIES).toHaveLength(12);
+    for (const [dir, name] of BINARIES) {
+      const manifest = manifestOf(dir);
+      const edges = (
+        ['dependencies', 'optionalDependencies', 'peerDependencies'] as const
+      ).flatMap((field) =>
+        Object.keys(manifest[field] ?? {})
+          .filter((dep) => dep !== name && BINARY_NAMES.includes(dep))
+          .map((dep) => `${field} ${dep}`),
+      );
+      expect({ dir, edges }).toEqual({ dir, edges: [] });
+    }
+  });
+
+  it.each(BINARIES)(
+    '%s: lists the runtime, lib and the two state packages in dependencies',
+    (dir) => {
+      const dependencies = manifestOf(dir).dependencies ?? {};
+      const missing = [
+        '@mcp-abap-adt/server-runtime',
+        '@mcp-abap-adt/lib',
+        ...STATE,
+      ].filter((dep) => dependencies[dep] === undefined);
+      expect(missing).toEqual([]);
+    },
+  );
+
+  it.each(BELOW)(
+    '%s: takes %j as peerDependencies (and devDependencies), not dependencies',
+    (dir, peers) => {
+      const manifest = manifestOf(dir);
+      for (const name of peers) {
+        expect({
+          dir,
+          name,
+          peer: manifest.peerDependencies?.[name],
+          dev: manifest.devDependencies?.[name],
+          dependency: manifest.dependencies?.[name],
+        }).toEqual({
+          dir,
+          name,
+          peer: '^19.2.0',
+          dev: '^19.2.0',
+          dependency: undefined,
+        });
+      }
+    },
+  );
+
+  it('server-runtime has no bin', () => {
+    expect(manifestOf('server-runtime').bin).toBeUndefined();
+  });
+
   it('the lockfile installs nothing by link', () => {
     const lock = JSON.parse(
       fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8'),

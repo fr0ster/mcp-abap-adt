@@ -25,8 +25,9 @@ done
 
 # Order matters and is not cosmetic: dependency order. core (./server), http
 # and sse each resolve @mcp-abap-adt/lib through paths into ../dist, so none
-# can build until the library has; background-runs-memory and
-# responsible-rules depend on lib, and core, http and sse depend on both;
+# can build until the library has; background-runs-memory,
+# responsible-rules, compact-readonly-entries and compact-modify take lib as
+# a peer (the binary package owns it), and core, http and sse depend on both;
 # server-runtime takes lib, background-runs-memory and responsible-rules as
 # peers and holds the stdio launch code: core, compact, core-ro and compact-ro
 # depend on it, so it goes before ./server. compact-http depends on

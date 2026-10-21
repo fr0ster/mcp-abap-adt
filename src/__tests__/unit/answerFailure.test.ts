@@ -208,6 +208,50 @@ describe('return_answer — failure', () => {
   });
 });
 
+describe('raw_body, by who said no', () => {
+  // A refusal SAP made (any status but a 2xx) carries its body at every
+  // detail; a failure a strategy raised on a 2xx — SAP's answer an ordinary
+  // document — carries it only with `detail: 'raw'`. Nothing else changes.
+  const DOCUMENT = '<mc:messageClass>…</mc:messageClass>';
+  const refusalOf = (status: number) =>
+    failure({
+      message: 'Message 999 not found in class ZX',
+      origin: 'refusal',
+      code: 'ADT_OBJECT_NOT_FOUND',
+      response: { status, data: DOCUMENT },
+    } as never);
+  const payloadAt = (status: number, detail: 'terse' | 'full' | 'raw') =>
+    JSON.parse(
+      return_answer(refusalOf(status), project, {
+        tool: 'GetMessageClassMessage',
+        detail,
+      }).content[0].text,
+    );
+
+  it.each(['terse', 'full'] as const)(
+    'a 2xx a strategy refused: no raw_body at detail=%s, the rest as it was',
+    (detail) => {
+      expect(payloadAt(200, detail)).toEqual({
+        message: 'Message 999 not found in class ZX',
+        origin: 'refusal',
+        status: 200,
+        code: 'ADT_OBJECT_NOT_FOUND',
+      });
+    },
+  );
+
+  it('a 2xx a strategy refused: raw_body at detail=raw', () => {
+    expect(payloadAt(200, 'raw').raw_body).toBe(DOCUMENT);
+  });
+
+  it.each(['terse', 'full', 'raw'] as const)(
+    "SAP's own refusal (404): raw_body at detail=%s",
+    (detail) => {
+      expect(payloadAt(404, detail).raw_body).toBe(DOCUMENT);
+    },
+  );
+});
+
 describe('the failure payload carries everything it has', () => {
   const document = corpusBody('refusal-object-not-found--01-read-source');
 

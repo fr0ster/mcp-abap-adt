@@ -2709,12 +2709,12 @@
       "t-code",
       "tcode",
       "transaction code",
-      "program of a transaction",
       "SE93",
-      "screen",
-      "authorization object"
+      "transaction text",
+      "package of a transaction",
+      "application component"
     ],
-    "semantic": "Show what a transaction code (t-code) starts: its program, screen, authorization object and type."
+    "semantic": "Show the properties of a transaction code (t-code): its text, type, package, application component and package chain."
   },
   "GetTransport": {
     "keywords": [

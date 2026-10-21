@@ -215,4 +215,30 @@ describe('detail over a data preview', () => {
   it('answers the document on raw', async () => {
     expect(String(await answerOf('raw'))).toContain('<dataPreview:tableData');
   });
+
+  // `GetTableContents` reads the same freestyle document: the rows it asked
+  // for and the table's own count, not `/datapreview/ddic`'s N+1 rows and 0.
+  it('GetTableContents answers the freestyle preview: its rows and its total', async () => {
+    const {
+      handleGetTableContents,
+    } = require('../../handlers/table/readonly/handleGetTableContents');
+    fakeClient = {
+      getUtils: () => ({
+        getSqlQuery: async () =>
+          okResponse(sqlPreview({ data: PREVIEW, status: 200 })),
+      }),
+    };
+    const result: any = await handleGetTableContents(context as any, {
+      table_name: 'I_Country',
+      max_rows: 5,
+    });
+    const terse = JSON.parse(String(result.content[0].text));
+    expect(terse).toMatchObject({
+      sql_query: 'SELECT * FROM I_Country',
+      row_number: 5,
+      total_rows: 249,
+    });
+    expect(terse.rows).toHaveLength(5);
+    expect(terse.columns).toHaveLength(13);
+  });
 });

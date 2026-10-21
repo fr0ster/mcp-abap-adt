@@ -489,7 +489,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetStructureVersions` | every call | GET /sap/bc/adt/ddic/structures/{name}/source/main/versions |
 | `GetStructureVersionSource` | every call | GET the content_uri given |
 | `GetTable` | every call | one request: GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/tables/{name} (part metadata) |
-| `GetTableContents` | every call | POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=… |
+| `GetTableContents` | every call | POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with SELECT * FROM the table as the body |
 | `GetTableVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
 | `GetTableVersionSource` | every call | GET the content_uri given |
@@ -540,7 +540,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `HandlerGet` | when part is activation_status and run_id is given | GET /sap/bc/adt/activation/runs/{run_id} |
 | `HandlerGet` | when part is activation_results and run_id is given | GET /sap/bc/adt/activation/results/{run_id} |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
-| `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name) |
+| `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body |
 | `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
 | `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerProfileList` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |

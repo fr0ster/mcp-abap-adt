@@ -93,7 +93,8 @@ const payloadOf = async (args: Record<string, unknown>) => {
 describe('GetServiceBindingPreviewUrl', () => {
   beforeEach(() => {
     systemInfo.mockReset();
-    systemInfo.mockResolvedValue(null);
+    // adt-clients 37: a `404` is `ok` and `{ present: false }`.
+    systemInfo.mockResolvedValue(okResponse({ present: false }));
   });
 
   it('composes the preview URL from the binding, the definition and the view', async () => {
@@ -280,7 +281,9 @@ describe('GetServiceBindingPreviewUrl', () => {
   it('takes the client and the language from the system when none were given', async () => {
     // What a caller cannot know and does not have to: the same record this
     // server already reads to resolve a request's system.
-    systemInfo.mockResolvedValue({ client: '100', language: 'EN' });
+    systemInfo.mockResolvedValue(
+      okResponse({ present: true, info: { client: '100', language: 'EN' } }),
+    );
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -296,7 +299,9 @@ describe('GetServiceBindingPreviewUrl', () => {
   });
 
   it('leaves the parameter out when the caller passes an empty client', async () => {
-    systemInfo.mockResolvedValue({ client: '100', language: 'EN' });
+    systemInfo.mockResolvedValue(
+      okResponse({ present: true, info: { client: '100', language: 'EN' } }),
+    );
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -329,16 +334,28 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(systemInfo).not.toHaveBeenCalled();
   });
 
+  /** A failed lookup as adt-clients 37 answers it: `ok: false`, the response and the request. */
+  const lookupFailed = (status: number, data: string) => ({
+    ok: false,
+    getResult: () => {
+      throw new Error('asked for the result of a failure');
+    },
+    getError: () => ({
+      message: `Request failed with status code ${status}`,
+      origin: 'connection',
+      response: { status, data },
+      request: {
+        method: 'GET',
+        url: '/sap/bc/adt/core/http/systeminformation',
+      },
+    }),
+  });
+
   it('still answers the URL when the system record cannot be read, and says so', async () => {
-    // `getSystemInformation` answers null where the endpoint is absent and
-    // THROWS on anything else. Neither is this tool's failure.
-    // Beside the URL, the lookup's failure is the request's error as SAP
-    // answered it, with its step — not its message folded into a sentence.
-    systemInfo.mockRejectedValue(
-      Object.assign(new Error('Request failed with status code 403'), {
-        response: { status: 403, data: 'Forbidden body' },
-      }),
-    );
+    // Any status but a `404` is `ok: false` (adt-clients 37). It is not this
+    // tool's failure: beside the URL, the lookup's failure is the error as
+    // SAP answered it, with its step — not its message folded into a sentence.
+    systemInfo.mockResolvedValue(lookupFailed(403, 'Forbidden body'));
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -358,7 +375,6 @@ describe('GetServiceBindingPreviewUrl', () => {
         method: 'GET',
         url: '/sap/bc/adt/core/http/systeminformation',
       },
-      messages: [{ type: 'E', text: 'Request failed with status code 403' }],
       raw_body: 'Forbidden body',
       step: 'read system information',
     });
@@ -366,7 +382,61 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.note).not.toContain('status code 403');
   });
 
-  it('a 401 SAP answered to the lookup ends the call with it; the binding is not read', async () => {
+  it('a 404 is the endpoint absent: the URL without a client, and no failure beside it', async () => {
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.success).toBe(true);
+    expect(payload.preview_url).not.toContain('sap-client');
+    expect(payload.system_information_failure).toBeUndefined();
+  });
+
+  it('a 405 is a failed lookup, reported beside the URL (only a 404 is absent)', async () => {
+    systemInfo.mockResolvedValue(lookupFailed(405, ''));
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.success).toBe(true);
+    expect(payload.system_information_failure).toMatchObject({
+      status: 405,
+      step: 'read system information',
+    });
+  });
+
+  it('a 401 answered as a failed lookup ends the call with it; the binding is not read', async () => {
+    systemInfo.mockResolvedValue(lookupFailed(401, ''));
+    const reads: unknown[] = [];
+    fakeClient = fakeClientOf({
+      read: async (...args: unknown[]) => {
+        reads.push(args);
+        return okResponse(reading(BINDING));
+      },
+    });
+
+    const answered: any = await handleGetServiceBindingPreviewUrl(
+      context as never,
+      { service_binding_name: 'ZSB_STUDENT_V2' } as never,
+    );
+
+    expect(answered.isError).toBe(true);
+    expect(JSON.parse(answered.content[0].text)).toMatchObject({
+      status: 401,
+      step: 'read system information',
+    });
+    expect(reads).toEqual([]);
+  });
+
+  it('a 401 thrown by the lookup ends the call with it; the binding is not read', async () => {
     systemInfo.mockRejectedValue(
       Object.assign(new Error('Request failed with status code 401'), {
         response: { status: 401, data: '' },

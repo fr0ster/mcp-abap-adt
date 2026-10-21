@@ -372,7 +372,11 @@ it arose. A tool never rewrites it:
 
 - **SAP refused** — SAP answered, with an error status or with a `2xx` the reading takes as a
   refusal: `origin` (`refusal` or `connection`, as the method gave it), `status` when SAP
-  answered with one, `adt_type`, the T100 `messages` and SAP's document in `raw_body`. Never
+  answered with one, `adt_type`, the T100 `messages` and SAP's document in `raw_body`. A
+  refusal with an error status carries `raw_body` at every `detail`; a `2xx` the reading takes
+  as a refusal carries it only with `detail: "raw"` — that document is an ordinary answer (the
+  whole message class for a number it does not hold), and the rest of the failure already says
+  what is wrong with it; a tool without a `detail` parameter answers it without. Never
   turned into an empty result, a `null`, a warning or "not found"; only a `404` where a tool
   defines what absence answers (a source or a package level that is not there) stays absence.
 - **No answer from SAP** — the connection failed: `origin: "connection"` with no `status`
@@ -425,8 +429,9 @@ folded into one text:
   enhancements request itself is read the same way, step `read enhancements`; a nested walk
   that failed as a whole is `error` beside the partial result, step `list includes`), the
   system lookup `GetServiceBindingPreviewUrl` makes for the client and the language
-  (`system_information_failure`, step `read system information`, beside the URL; a `401` there
-  ends the call, as does a `401` on its service URL lookup, step `read service URL`), a
+  (`system_information_failure`, step `read system information`, beside the URL — any answer
+  but a `2xx` record or a `404`, which is the endpoint absent and leaves the client and the
+  language out; a `401` there ends the call, as does a `401` on its service URL lookup, step `read service URL`), a
   refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and
   what a debugger stop could not undo (see [DEBUGGER.md](DEBUGGER.md#what-ends-a-session)).
   A credential failure is none of these. A `401` on `CreateTransportTask`'s task type change is

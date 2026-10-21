@@ -327,7 +327,7 @@
     "tool": "GetTableContents",
     "set": "full",
     "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
-    "sends": "POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=…"
+    "sends": "POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with SELECT * FROM the table as the body"
   },
   {
     "tool": "GetATCRunStatus",
@@ -565,7 +565,7 @@
     "tool": "HandlerGetData",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
-    "sends": "POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name)"
+    "sends": "POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body"
   },
   {
     "tool": "HandlerProfileList",

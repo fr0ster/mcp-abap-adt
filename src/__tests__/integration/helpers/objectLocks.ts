@@ -102,8 +102,11 @@ export async function systemUserName(
   logger?: { debug?: (message: string) => void },
 ): Promise<string | undefined> {
   try {
-    const info = await getSystemInformation(connection as never);
-    const name = String(info?.userName ?? '').trim();
+    const answered = await getSystemInformation(connection as never);
+    const found = answered.ok ? answered.getResult().value : undefined;
+    const name = String(
+      found?.present === true ? (found.info.userName ?? '') : '',
+    ).trim();
     return name === '' ? undefined : name;
   } catch (error: unknown) {
     logger?.debug?.(

@@ -1549,7 +1549,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as missing.
+**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 

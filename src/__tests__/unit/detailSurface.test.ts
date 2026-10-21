@@ -212,10 +212,12 @@ const JSON_ANSWERING: readonly string[] = [
   'GetATCFindings',
   'GetAdtTypes',
   'GetInactiveObjects',
+  'GetMessageClassMessage',
   'GetObjectStructure',
   'GetPackage',
   'GetSqlQuery',
   'GetTableContents',
+  'GetTransaction',
   'GetUnitTestResult',
   'ListTransports',
   'MemorySnapshotDelta',
@@ -478,8 +480,9 @@ it('wires detail the way each tool schema claims', () => {
 // One worked example beside the invariant, since `detailWiring` proves the
 // argument is wired and not that the projection honours it.
 //
-// `detail` is a claim about SUCCESSES only — a failure carries raw_body at
-// every level, and answerFailure.test.ts is where that is held.
+// `detail` is a claim about SUCCESSES, with one exception on failures: SAP's
+// own refusal carries raw_body at every level, a failure a strategy raised on
+// a 2xx only at `raw` — answerFailure.test.ts is where that is held.
 describe('a JSON-answering tool actually varies with detail', () => {
   const context = {
     connection: { getSessionId: () => null } as any,

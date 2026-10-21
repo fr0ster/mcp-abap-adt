@@ -321,4 +321,35 @@ describe('concurrentReader', () => {
     await expect(answer).rejects.toBe(refusal);
     expect(started).toHaveLength(NODE_READ_CONCURRENCY);
   });
+
+  it('an answer stopsAt accepts starts no further read; the items read are answered', async () => {
+    const started: number[] = [];
+    const held = new Map<number, () => void>();
+    const read = concurrentReader<number, string>(
+      context,
+      (n) => {
+        started.push(n);
+        if (n === 0) return Promise.resolve('refused');
+        return new Promise<string>((resolve) => {
+          held.set(n, () => resolve(`read ${n}`));
+        });
+      },
+      (value) => value === 'refused',
+    );
+    const answer = read(Array.from({ length: 40 }, (_, i) => i));
+    for (let i = 0; i < 5; i++) await tick();
+    expect(started).toEqual(
+      Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
+    );
+    for (const release of held.values()) release();
+    const out = await answer;
+    expect(started).toHaveLength(NODE_READ_CONCURRENCY);
+    expect(out).toEqual([
+      { ok: true, value: 'refused' },
+      ...Array.from({ length: NODE_READ_CONCURRENCY - 1 }, (_, i) => ({
+        ok: true,
+        value: `read ${i + 1}`,
+      })),
+    ]);
+  });
 });

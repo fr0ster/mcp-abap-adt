@@ -27,6 +27,7 @@ import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGet
 import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
+import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
 import {
   envelopeConnection,
   envelopeResponse as envelopeOf,
@@ -1222,6 +1223,33 @@ describe('GetPackageTree with descriptions: a metadata read SAP answered 401', (
       step: 'read package metadata',
     });
     expect(fake.envelopes).toHaveLength(0);
+    expect(nodeReads(fake)).toHaveLength(0);
+  });
+
+  it('more packages than are read at once: no metadata read starts after it', async () => {
+    const names = Array.from(
+      { length: NODE_READ_CONCURRENCY + 4 },
+      (_, i) => `ZPKG_${String(i).padStart(2, '0')}`,
+    );
+    const fake = system({
+      refuse: { 'GET /sap/bc/adt/packages/zpkg_00': 401 },
+    });
+    const result = await withinTurns(
+      handleGetPackageTree(contextOn(fake), {
+        package_names: names,
+        include_descriptions: true,
+      }),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      status: 401,
+      step: 'read package metadata',
+    });
+    const metadataReads = fake.directs.filter((r) =>
+      r.url.includes('/sap/bc/adt/packages/'),
+    );
+    // Only the reads already started when the refusal answered.
+    expect(metadataReads).toHaveLength(NODE_READ_CONCURRENCY);
     expect(nodeReads(fake)).toHaveLength(0);
   });
 });

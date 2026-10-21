@@ -201,7 +201,8 @@ async function readTreesBatched(
  * alone, several at a time (`concurrentReader`), on any system: (1) every
  * package's metadata; then the walk's levels for the packages whose metadata
  * was read, each node structure with its own descriptions. A metadata read
- * refused with a credential failure ends the reads.
+ * refused with a credential failure ends the reads: no metadata read not yet
+ * started is sent, as on the sequential path.
  */
 async function readTreesConcurrent(
   context: HandlerContext,
@@ -211,6 +212,7 @@ async function readTreesConcurrent(
   const metadata = await concurrentReader<string, Metadata>(
     context,
     (name, c) => readMetadata(context, c, name),
+    (answer) => credentialRefused({ ok: true, value: answer }),
   )(packageNames);
   const reads: TreeRead[] = metadata.map((m) => ({ metadata: m }));
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;

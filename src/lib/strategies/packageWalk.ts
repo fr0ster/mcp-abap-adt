@@ -122,24 +122,29 @@ export const NODE_READ_CONCURRENCY = 8;
  * one envelope, the node structure parts after the first answer other parts'
  * texts; sent alone, each answers its own). A failure that ends the call
  * (`endsTheCall`) stops the reads not yet started and is thrown as it came,
- * once the started ones have settled.
+ * once the started ones have settled. An answer `stopsAt` accepts — a refusal
+ * the read answered rather than threw, such as a `401` read with
+ * `analyseException` — stops the reads not yet started too, and is answered
+ * in its place: the result then holds the items read, in order, up to the
+ * last one started; the items after it have no entry.
  */
 export function concurrentReader<I, R>(
   context: HandlerContext,
   read: (item: I, connection: IAbapConnection) => Promise<R>,
+  stopsAt?: (value: R) => boolean,
 ): LevelReader<I, R> {
   const reader = async (items: readonly I[]): Promise<PhaseResult<R>[]> => {
     const out: PhaseResult<R>[] = new Array(items.length);
     let next = 0;
     let ended: { error: unknown } | undefined;
+    let stopped = false;
     const pump = async (): Promise<void> => {
-      while (ended === undefined && next < items.length) {
+      while (ended === undefined && !stopped && next < items.length) {
         const at = next++;
         try {
-          out[at] = {
-            ok: true,
-            value: await read(items[at] as I, context.connection),
-          };
+          const value = await read(items[at] as I, context.connection);
+          out[at] = { ok: true, value };
+          if (stopsAt?.(value)) stopped = true;
         } catch (error) {
           if (endsTheCall(error)) ended ??= { error };
           out[at] = { ok: false, error };
@@ -149,7 +154,7 @@ export function concurrentReader<I, R>(
     const pumps = Math.max(1, Math.min(NODE_READ_CONCURRENCY, items.length));
     await Promise.all(Array.from({ length: pumps }, pump));
     if (ended !== undefined) throw ended.error;
-    return out;
+    return stopped ? out.slice(0, next) : out;
   };
   return Object.assign(reader, { ownAnswers: true as const });
 }

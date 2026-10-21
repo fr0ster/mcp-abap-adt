@@ -234,6 +234,9 @@ async function bundle(work, stageDir, server, esbuild) {
     fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/sap-rfc-lite/package.json'), 'utf8'),
   );
   const rfcLitePackageRead = "require(node_path_1.default.resolve(__dirname, '..', 'package.json'))";
+  // Set when the hook below saw sap-rfc-lite's lib/binding.js: a later release
+  // that moved the read elsewhere must fail here, not in the executable.
+  let rfcLiteBindingSeen = false;
   const result = await esbuild.build({
     entryPoints: [entry],
     outfile,
@@ -248,6 +251,7 @@ async function bundle(work, stageDir, server, esbuild) {
         setup(b) {
           b.onResolve({ filter: /^node-gyp-build$/ }, () => ({ path: loader }));
           b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]sap-rfc-lite[\\/]lib[\\/]binding\.js$/ }, (args) => {
+            rfcLiteBindingSeen = true;
             const source = fs.readFileSync(args.path, 'utf8');
             const contents = source.split(rfcLitePackageRead).join(
               `({ version: ${JSON.stringify(rfcLiteManifest.version)} })`,
@@ -278,6 +282,9 @@ async function bundle(work, stageDir, server, esbuild) {
     ],
   });
   if (result.errors.length) fail('bundling failed');
+  if (!rfcLiteBindingSeen) {
+    fail('the bundle did not take @mcp-abap-adt/sap-rfc-lite/lib/binding.js: its run-time package.json read is not replaced, so RFC would not load in the executable');
+  }
   return outfile;
 }
 

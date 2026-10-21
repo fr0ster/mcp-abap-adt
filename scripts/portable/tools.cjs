@@ -39,6 +39,24 @@ function withoutSdk(value, library, exists = fs.existsSync) {
     .join(path.delimiter);
 }
 
+// The environment every executable of the smoke check runs with. The archive's
+// own SDK is what is checked: no SAPNWRFC_HOME, and no search-path folder that
+// holds an SDK library. And nothing the caller's shell states about a system
+// reaches it: the launcher takes SAP_* (the message server, SAProuter, the
+// connection and system type, …) from the environment before the env file, so
+// every SAP_* and MCP_* key and AUTH_BROKER_PATH go — the one destination is
+// the smoke's own --env-path file.
+function smokeEnv(parent, library, exists = fs.existsSync) {
+  const env = { ...parent };
+  for (const key of Object.keys(env)) {
+    if (/^(SAP|MCP)_/i.test(key) || /^(SAPNWRFC_HOME|AUTH_BROKER_PATH)$/i.test(key)) delete env[key];
+  }
+  for (const key of ['PATH', 'Path', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH']) {
+    if (env[key] !== undefined) env[key] = withoutSdk(env[key], library, exists);
+  }
+  return env;
+}
+
 // The two tools the build itself runs, at the ranges the repository declares,
 // installed into the build cache rather than taken from the checkout: building
 // then needs only the production dependencies (`npm ci --omit=dev`), not the
@@ -68,4 +86,4 @@ function markToolsInstalled(dir, specs) {
   fs.writeFileSync(path.join(dir, TOOLS_MARK), `${JSON.stringify(specs)}\n`);
 }
 
-module.exports = { npmCommand, tarCommand, withoutSdk, buildToolSpecs, toolsInstalled, markToolsInstalled };
+module.exports = { npmCommand, tarCommand, withoutSdk, smokeEnv, buildToolSpecs, toolsInstalled, markToolsInstalled };

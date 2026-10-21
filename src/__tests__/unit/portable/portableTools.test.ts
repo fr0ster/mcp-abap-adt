@@ -3,6 +3,7 @@
  * scripts/portable/elf.cjs (the RUNPATH rewrite) and tools.cjs (how npm and
  * tar are started, and the search path the smoke check runs with).
  */
+import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 const elf = require('../../../../scripts/portable/elf.cjs');
@@ -208,6 +209,64 @@ describe('the search path the smoke check runs with', () => {
     expect(tools.withoutSdk(undefined, 'libsapnwrfc.so', () => true)).toBe(
       undefined,
     );
+  });
+});
+
+describe('the environment the smoke check runs every executable with', () => {
+  // A shell that states a system: every one of these would route, or type,
+  // the smoke's RFC logon if it reached the child.
+  const parent = {
+    PATH: ['/usr/bin', '/opt/sdk/lib'].join(path.delimiter),
+    LD_LIBRARY_PATH: '/opt/sdk/lib',
+    HOME: '/home/someone',
+    SAPNWRFC_HOME: '/opt/sdk',
+    SAP_MSHOST: 'msg.unreachable.invalid',
+    SAP_MSSERV: '3600',
+    SAP_SYSID: 'SID',
+    SAP_GROUP: 'PUBLIC',
+    SAP_SAPROUTER: '/H/192.0.2.1/S/3299',
+    SAP_SYSNR: '00',
+    SAP_CONNECTION_TYPE: 'http',
+    SAP_SYSTEM_TYPE: 'cloud',
+    SAP_URL: 'http://unreachable.invalid:8000',
+    sap_username: 'someone',
+    MCP_ENV_PATH: '/home/someone/.env',
+    MCP_BROWSER: 'chrome',
+    AUTH_BROKER_PATH: '/home/someone/.config/mcp-abap-adt',
+  };
+  const sdkHere = (p: string) =>
+    p === path.join('/opt/sdk/lib', 'libsapnwrfc.so');
+
+  it('carries no SAP_*, MCP_*, AUTH_BROKER_PATH or SAPNWRFC_HOME of the caller', () => {
+    const env = tools.smokeEnv(parent, 'libsapnwrfc.so', sdkHere);
+    expect(
+      Object.keys(env).filter((key) =>
+        /^(SAP|MCP)_|^AUTH_BROKER_PATH$|^SAPNWRFC_HOME$/i.test(key),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps the rest, the search paths without an SDK folder', () => {
+    const env = tools.smokeEnv(parent, 'libsapnwrfc.so', sdkHere);
+    expect(env.HOME).toBe('/home/someone');
+    expect(env.PATH).toBe('/usr/bin');
+    expect(env.LD_LIBRARY_PATH).toBe('');
+  });
+
+  it('is the one environment smoke.mjs gives every child', () => {
+    const source = readFileSync(
+      path.join(__dirname, '../../../../scripts/portable/smoke.mjs'),
+      'utf8',
+    );
+    expect(source).toContain('const env = smokeEnv(process.env, sdkLib);');
+    // process.env is read once more, for SystemRoot only; no child gets it.
+    const reads = source.split('process.env').length - 1;
+    expect(reads).toBe(2);
+    expect(source).toContain('process.env.SystemRoot');
+    // Every child: spawnSync, spawn and the MCP transport take `env` alone.
+    expect(source.match(/\benv: (?!process)[^,}\n]+/g) ?? []).toEqual([]);
+    expect((source.match(/\{ env, encoding/g) ?? []).length).toBe(1);
+    expect((source.match(/^\s+env,$/gm) ?? []).length).toBe(2);
   });
 });
 

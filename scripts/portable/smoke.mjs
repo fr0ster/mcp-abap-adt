@@ -36,31 +36,21 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, currentPlatform } = require_('./args.cjs');
-const { withoutSdk } = require_('./tools.cjs');
+const { smokeEnv } = require_('./tools.cjs');
 const version =
   process.argv[2] ?? JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
 const platform = currentPlatform();
 const { exe, sdkLib } = PLATFORMS[platform];
 
-// The archive's own SDK folder is what is checked, not an SDK the shell knows:
-// no SAPNWRFC_HOME, and no search-path folder that holds an SDK library.
-const env = { ...process.env };
-delete env.SAPNWRFC_HOME;
-for (const key of ['PATH', 'Path', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH']) {
-  if (env[key] !== undefined) env[key] = withoutSdk(env[key], sdkLib);
-}
+// One environment for every run (tools.cjs): the archive's own SDK, and no
+// SAP_* / MCP_* / AUTH_BROKER_PATH of the caller's shell — a message server or
+// SAProuter stated there would win over the env file and route the RFC logon.
+const env = smokeEnv(process.env, sdkLib);
 if (process.platform === 'win32') {
   const system32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', sdkLib);
   if (fs.existsSync(system32)) {
     console.log(`warn ${system32} exists: Windows may load it before the archive's copy — check the loaded path as the archive README shows`);
   }
-}
-
-// The inspection start must find no destination: none named, nothing in the
-// environment that names one.
-const inspectionEnv = { ...env };
-for (const key of Object.keys(inspectionEnv)) {
-  if (/^(SAP|MCP)_/i.test(key) || key === 'AUTH_BROKER_PATH') delete inspectionEnv[key];
 }
 
 // The stores' base directory is the smoke's own, empty: no session or service
@@ -161,85 +151,89 @@ if (fs.existsSync(stageModules)) {
   console.log(`no staging node_modules at ${stageModules}: nothing to move away`);
 }
 
-for (const server of Object.values(SERVERS)) {
-  const dir = path.join(repo, 'dist-portable', `${server.name}-${version}-${platform}`);
-  const bin = path.join(dir, `${server.name}${exe}`);
-  if (!fs.existsSync(bin)) {
-    console.log(`skip ${server.name}: not built (${dir})`);
-    continue;
-  }
-  checked++;
+// The staging node_modules goes back, and the scratch folder goes, whatever
+// happens in between.
+try {
+  for (const server of Object.values(SERVERS)) {
+    const dir = path.join(repo, 'dist-portable', `${server.name}-${version}-${platform}`);
+    const bin = path.join(dir, `${server.name}${exe}`);
+    if (!fs.existsSync(bin)) {
+      console.log(`skip ${server.name}: not built (${dir})`);
+      continue;
+    }
+    checked++;
 
-  const bundle = path.join(work, `${server.name}.bundle.cjs`);
-  if (!libHasRegistry) {
-    console.log(`skip ${server.name} bundles one copy of lib — lib ${stagedLib} predates its instance registry (19.2.0)`);
-  } else if (fs.existsSync(bundle)) {
-    const copies = fs.readFileSync(bundle, 'utf8').split(REGISTRY).length - 1;
-    check(`${server.name} bundles one copy of lib`, copies === 1, `${copies} instance registr${copies === 1 ? 'y' : 'ies'} in ${bundle}`);
-  } else {
-    check(`${server.name} bundles one copy of lib`, false, `no bundle at ${bundle}: build it on this machine first`);
-  }
+    const bundle = path.join(work, `${server.name}.bundle.cjs`);
+    if (!libHasRegistry) {
+      console.log(`skip ${server.name} bundles one copy of lib — lib ${stagedLib} predates its instance registry (19.2.0)`);
+    } else if (fs.existsSync(bundle)) {
+      const copies = fs.readFileSync(bundle, 'utf8').split(REGISTRY).length - 1;
+      check(`${server.name} bundles one copy of lib`, copies === 1, `${copies} instance registr${copies === 1 ? 'y' : 'ies'} in ${bundle}`);
+    } else {
+      check(`${server.name} bundles one copy of lib`, false, `no bundle at ${bundle}: build it on this machine first`);
+    }
 
-  const run = spawnSync(bin, ['--version'], { env, encoding: 'utf8' });
-  if (run.error || run.status !== 0) {
-    const why = run.error ? String(run.error.message).split('\n')[0] : `exit ${run.status}: ${String(run.stderr).trim().split('\n')[0]}`;
-    check(`${server.name} --version`, false, `did not run: ${why}`);
-    continue;
-  }
-  const answered = run.stdout.trim();
-  check(`${server.name} --version`, answered === version, answered);
-  check(`${server.name} starts on one registered copy of lib`, !String(run.stderr).includes(SECOND_COPY), 'no second-copy line');
+    const run = spawnSync(bin, ['--version'], { env, encoding: 'utf8' });
+    if (run.error || run.status !== 0) {
+      const why = run.error ? String(run.error.message).split('\n')[0] : `exit ${run.status}: ${String(run.stderr).trim().split('\n')[0]}`;
+      check(`${server.name} --version`, false, `did not run: ${why}`);
+      continue;
+    }
+    const answered = run.stdout.trim();
+    check(`${server.name} --version`, answered === version, answered);
+    check(`${server.name} starts on one registered copy of lib`, !String(run.stderr).includes(SECOND_COPY), 'no second-copy line');
 
-  // MCP over stdio in inspection-only mode: no destination, so the start
-  // connects nothing and the server answers initialize and tools/list.
-  const client = new Client({ name: 'portable-smoke', version: '0' });
-  const transport = new StdioClientTransport({
-    command: bin,
-    args: [`--auth-broker-path=${brokerPath}`],
-    cwd: scratch,
-    env: inspectionEnv,
-    stderr: 'pipe',
-  });
-  let stderr = '';
-  transport.stderr?.on('data', (chunk) => {
-    stderr += chunk;
-  });
-  // One server's failure is reported, not thrown: the other server is still checked.
-  try {
-    await client.connect(transport);
-    check(`${server.name} MCP initialize`, client.getServerVersion()?.version === version, `server ${client.getServerVersion()?.version}`);
-    const tools = (await client.listTools()).tools.map((t) => t.name);
-    // The compact server serves only its Handler* tools; the full one the
-    // whole surface (more than 250 tools).
-    const compact = server.name.endsWith('-compact');
-    const served = compact
-      ? tools.length > 0 && tools.every((name) => name.startsWith('Handler'))
-      : tools.length > 250;
-    check(`${server.name} tools/list`, served, `${tools.length} tools`);
-    await client.close();
-  } catch (error) {
-    const last = stderr.trim().split('\n').at(-1) ?? '';
-    check(`${server.name} MCP session`, false, `${String(error.message).split('\n')[0]}${last ? ` (stderr: ${last})` : ''}`);
-    await client.close().catch(() => {});
-  }
-  check(`${server.name} MCP started without a destination`, stderr.includes(INSPECTION), 'inspection-only mode');
-  check(`${server.name} served on one registered copy of lib`, !stderr.includes(SECOND_COPY), 'no second-copy line');
+    // MCP over stdio in inspection-only mode: no destination, so the start
+    // connects nothing and the server answers initialize and tools/list.
+    const client = new Client({ name: 'portable-smoke', version: '0' });
+    const transport = new StdioClientTransport({
+      command: bin,
+      args: [`--auth-broker-path=${brokerPath}`],
+      cwd: scratch,
+      env,
+      stderr: 'pipe',
+    });
+    let stderr = '';
+    transport.stderr?.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    // One server's failure is reported, not thrown: the other server is still checked.
+    try {
+      await client.connect(transport);
+      check(`${server.name} MCP initialize`, client.getServerVersion()?.version === version, `server ${client.getServerVersion()?.version}`);
+      const tools = (await client.listTools()).tools.map((t) => t.name);
+      // The compact server serves only its Handler* tools; the full one the
+      // whole surface (more than 250 tools).
+      const compact = server.name.endsWith('-compact');
+      const served = compact
+        ? tools.length > 0 && tools.every((name) => name.startsWith('Handler'))
+        : tools.length > 250;
+      check(`${server.name} tools/list`, served, `${tools.length} tools`);
+      await client.close();
+    } catch (error) {
+      const last = stderr.trim().split('\n').at(-1) ?? '';
+      check(`${server.name} MCP session`, false, `${String(error.message).split('\n')[0]}${last ? ` (stderr: ${last})` : ''}`);
+      await client.close().catch(() => {});
+    }
+    check(`${server.name} MCP started without a destination`, stderr.includes(INSPECTION), 'inspection-only mode');
+    check(`${server.name} served on one registered copy of lib`, !stderr.includes(SECOND_COPY), 'no second-copy line');
 
-  // The RFC stack: the start's logon to a host that does not resolve.
-  const rfc = await rfcStart(bin);
-  const lines = rfc.stderr.split('\n').filter((line) => line.startsWith('[MCP]'));
-  const last = lines.at(-1) ?? '';
-  const rfcKey = /\(RFC_[A-Z_]+\)/.test(last);
-  check(
-    `${server.name} RFC stack loads from nwrfcsdk/lib`,
-    !rfc.error && rfc.status === 1 && rfcKey && !SDK_MISSING.test(rfc.stderr) && rfc.stdout === '',
-    rfc.error ? `did not run: ${rfc.error.message}` : `exit ${rfc.status}: ${last}`,
-  );
-  check(`${server.name} started on one registered copy of lib (RFC)`, !rfc.stderr.includes(SECOND_COPY), 'no second-copy line');
+    // The RFC stack: the start's logon to a host that does not resolve.
+    const rfc = await rfcStart(bin);
+    const lines = rfc.stderr.split('\n').filter((line) => line.startsWith('[MCP]'));
+    const last = lines.at(-1) ?? '';
+    const rfcKey = /\(RFC_[A-Z_]+\)/.test(last);
+    check(
+      `${server.name} RFC stack loads from nwrfcsdk/lib`,
+      !rfc.error && rfc.status === 1 && rfcKey && !SDK_MISSING.test(rfc.stderr) && rfc.stdout === '',
+      rfc.error ? `did not run: ${rfc.error.message}` : `exit ${rfc.status}: ${last}`,
+    );
+    check(`${server.name} started on one registered copy of lib (RFC)`, !rfc.stderr.includes(SECOND_COPY), 'no second-copy line');
+  }
+} finally {
+  restore();
+  fs.rmSync(scratch, { recursive: true, force: true });
 }
-
-restore();
-fs.rmSync(scratch, { recursive: true, force: true });
 if (!checked) {
   console.log(`nothing built for ${platform} at ${version}: run npm run portable:build first`);
   process.exit(1);

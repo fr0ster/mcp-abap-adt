@@ -99,8 +99,10 @@ npm run portable:smoke
   check catches.
 
 It runs them without `SAPNWRFC_HOME` and without the `PATH` / `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH`
-folders that hold an SDK library, so the archive's own SDK is what is checked, and with an empty folder
-of its own as `--auth-broker-path`, so no session or service key of the machine takes part. On Windows
+folders that hold an SDK library, so the archive's own SDK is what is checked; without any `SAP_*` or
+`MCP_*` variable or `AUTH_BROKER_PATH` of your shell — the server takes `SAP_*` from the environment
+before the env file, so a message server or SAProuter set there would route the logon — and with an
+empty folder of its own as `--auth-broker-path`, so no session or service key of the machine takes part. On Windows
 it warns when `System32` holds `sapnwrfc.dll`, which Windows could load first. It also checks that each
 executable carries one copy of `@mcp-abap-adt/lib`: the build's bundle holds one (skipped for a lib
 older than 19.2.0, which has no instance registry to count), and the executables run with the build's

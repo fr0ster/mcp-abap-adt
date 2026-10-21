@@ -28,18 +28,33 @@ Answers [the goal](../2026-10-21-server-runtime-goal.md) (#303).
   | `@mcp-abap-adt/server-runtime/sse` | SSE launcher | `@mcp-abap-adt/sse/launcher` |
   | `@mcp-abap-adt/server-runtime/sse/server` | `SseServer`, sse's parameter table | `@mcp-abap-adt/sse` |
 
-- Dependencies: the union of what `server`, `http` and `sse` declare today
-  (`@mcp-abap-adt/lib`, `background-runs-memory`, `responsible-rules`, the auth chain,
-  `connection`, `logger`, `@modelcontextprotocol/sdk`, `express`, `dotenv`), the sibling
-  ranges at `^19.2.0`.
+- Dependencies: the union of what `server`, `http` and `sse` declare today (the auth
+  chain, `connection`, `logger`, `@modelcontextprotocol/sdk`, `express`, `dotenv`),
+  except `@mcp-abap-adt/lib`, `background-runs-memory` and `responsible-rules`, which it
+  takes as **peer dependencies** (§2a); the sibling ranges at `^19.2.0`.
 - Development resolution as `server`, `http` and `sse` resolve `lib` today (tsconfig
   `paths` into `../dist`); no workspace links.
 
+## 2a. Who owns `lib`: one `dependencies` entry per install tree
+
+Matching ranges let npm deduplicate `lib`, but do not make it: with
+`--install-strategy=nested`, or a range one package cannot share, each dependent gets
+its own copy. So exactly one package of a server's tree declares `@mcp-abap-adt/lib` in
+`dependencies`: **the binary package**. Every other package of the server that uses
+`lib` or its state declares it in `peerDependencies` (and in `devDependencies` for its
+own build and tests): `server-runtime`, `compact-readonly-entries`, `compact-modify`,
+`background-runs-memory`, `responsible-rules`. npm then resolves each of them to the
+binary's one copy, in every layout. The same holds for `background-runs-memory` and
+`responsible-rules` towards `server-runtime`: the binary package declares them, the
+runtime takes them as peers. An embedder that installs `compact-readonly-entries` with
+`lib` (as today) sees no change: npm 7+ installs a missing peer, and a present one is
+used.
+
 ## 2. The twelve binary packages
 
-Every binary package depends on `@mcp-abap-adt/server-runtime`, on `@mcp-abap-adt/lib`
-and on its own parts (`compact-readonly-entries`, `compact-modify`) — and on **no other
-binary package**.
+Every binary package depends on `@mcp-abap-adt/server-runtime`, `@mcp-abap-adt/lib`,
+`background-runs-memory`, `responsible-rules` and its own parts
+(`compact-readonly-entries`, `compact-modify`) — and on **no other binary package**.
 
 - **`core`, `http`, `sse`** keep their `bin`, their version module and their exports, as
   re-exports, so an importer of today's paths sees no change:
@@ -56,17 +71,24 @@ binary package**.
 
 ## 3. The second-copy guard
 
-- **`lib` registers each loaded instance**: a module `src/lib/instance.ts` adds the
-  realpath of its package root to a set on
-  `globalThis[Symbol.for('@mcp-abap-adt/lib/instances')]` when it loads, and exports
-  `libInstances(): readonly string[]`. Every public entry of `lib` (each path in its
-  `exports` map) imports it for its side effect. `lib` itself never refuses anything, so
-  an embedder sees no change.
+- **`lib` registers each loaded copy**: a module `src/lib/instance.ts`, when it loads,
+  pushes one entry `{ file }` onto an array on
+  `globalThis[Symbol.for('@mcp-abap-adt/lib/instances')]` and exports
+  `libInstances(): readonly { file: string }[]`. The identity is the loaded module
+  itself: each copy of the module pushes once, so the array's length is the number of
+  copies. `file` is the module's `__filename` when there is one, `bundled` otherwise; it
+  is only shown, never resolved, read or compared — no package directory is looked up,
+  so a bundle (`scripts/portable`, a Node SEA executable with no `node_modules`) holds
+  one copy and registers once. Every public entry of `lib` (each path in its `exports`
+  map) imports it for its side effect. `lib` itself never refuses anything, so an
+  embedder sees no change.
 - **The runtime checks at start**: each transport's `main` calls
   `libInstances()` first, before it reads its parameters. More than one path stops the
   start with exit code `1` and one line on stderr:
-  `Two copies of @mcp-abap-adt/lib are loaded in this process (<path>, <path>): install <program> on its own (npm install -g <package>), not in one command with another mcp-abap-adt server.`
-  The two paths are the installed package roots; nothing else is printed.
+  `Two copies of @mcp-abap-adt/lib are loaded in this process (<file>, <file>): reinstall <package> (npm install -g <package>).`
+  The files are the registered ones; nothing else is printed. With §2a a supported
+  layout never reaches it; it names a defect (a hand-made tree, a broken install) instead
+  of letting it surface as a refused tool call.
 
 ## 4. Tests
 
@@ -78,11 +100,28 @@ binary package**.
 - **The dependency rule** (`packageSet.test.ts`): no binary package lists another
   binary package in `dependencies`; every binary package lists
   `@mcp-abap-adt/server-runtime`; `server-runtime` has no `bin`.
-- **The install proof** (`binSmoke`, which already packs every package and installs the
-  binaries): additionally, `npm install -g --prefix <tmp>` of each wrapper **together with
-  its former base**, from the packed tarballs, in one command; then the wrapper's process
-  loads no file outside its own install tree (its `require.cache` after requiring its
-  launcher, checked by a child `node`), and its `--version` answers its own version.
+- **The install matrix** (`binSmoke.test.ts` / `helpers/installedRelease.ts`, which pack
+  every package and install from the tarballs): every layout below, from the packed
+  tarballs only. In each, a child `node` started in the install requires the binary's
+  launcher and the packages its tool set loads, then asserts **`libInstances().length ===
+  1`** and **shared state**: inside `runWithRequestContext` entered through the
+  runtime's `lib`, the handler packages' `lib` reads the same context. Dependencies
+  outside the wrapper's directory (hoisting) are allowed; only the count and the shared
+  state are asserted. Each binary also answers `--version` with its own version.
+  1. global, each wrapper **in one command with its former base** (all nine);
+  2. global, wrapper and base in two commands, either order (one per transport);
+  3. local, default (hoisted) install of all twelve binaries;
+  4. local, `--install-strategy=nested` (one per transport, compact and plain);
+  5. a version skew the ranges allow: the binary at the release version with a
+     runtime tarball of a later patch (one case), still one copy.
+- **No registry fetch of the release's own packages** in any of these installs: every
+  `@mcp-abap-adt/*` package of the release resolves to its tarball (checked in the
+  install's lockfile / `npm ls --json` resolved fields).
+- **Portable**: `scripts/portable/smoke.mjs` starts both portable binaries with the
+  staging `node_modules` removed and asserts one registered copy (`file: bundled`).
+- **After publishing** (a release step, `RELEASE.md` step 9): a clean global install of
+  each wrapper together with its former base, from the registry, starts, and its
+  `--version` answers.
 
 ## 5. Release and build plumbing
 
@@ -90,10 +129,16 @@ binary package**.
   `./compact-modify`, before `./server`; the comment's "seventeen" becomes "eighteen".
 - `docs/deployment/RELEASE.md`: the package table (eighteen, `server-runtime` with no
   binary and its dependencies), the steps' package list, the order.
-- CI and release workflows: `server-runtime`'s `lint:check` and `test:check` beside the
-  others; the transports' `test:check` steps move to it.
-- Docker (`docker/Dockerfile`): the tarball stage includes `server-runtime`; the
-  variants are unchanged. `scripts/portable/build.mjs`: entry paths follow the move.
+- CI and release workflows (`.github/workflows/ci.yml`, `release.yml`):
+  `server-runtime`'s `lint:check` and `test:check` beside the others, the transports'
+  `test:check` steps moved to it; **`./server-runtime` in both `npm pack` lists** and in
+  every hard-coded package inventory of the install and Docker steps, so the install and
+  the images take the runtime from this checkout's tarball, never from the registry.
+- `binSmoke` / `installedRelease.ts`: the packed package list includes `server-runtime`.
+- Docker (`docker/Dockerfile`) consumes every supplied tarball already; the image check
+  (`scripts/ci/check-images.mjs`) verifies the runtime in each image came from the
+  tarball. `scripts/portable/build.mjs`: the bundle's entry still is each binary's bin;
+  the `coreVersion` substitution stays (the module stays in `core`).
 - `releaseMetadata.test.ts`: `server-runtime` has no registry entry (it is not a server);
   the twelve entries unchanged.
 - Root `package.json` build: `tsc -p server-runtime/tsconfig.json` before the binary

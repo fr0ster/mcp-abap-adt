@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact-http-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-http-ro",
-  "version": "19.1.0",
+  "version": "19.2.0",
   "description": "The read-only compact MCP server for SAP ABAP ADT over Streamable HTTP: the 17 compact tools that change nothing, with credentials only from the x-sap-* headers of each request. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -59,9 +59,9 @@
     "start": "node ./bin/mcp-abap-adt-compact-http-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/compact-readonly-entries": "^19.1.0",
-    "@mcp-abap-adt/http": "^19.1.0",
-    "@mcp-abap-adt/lib": "^19.1.0"
+    "@mcp-abap-adt/compact-readonly-entries": "^19.2.0",
+    "@mcp-abap-adt/http": "^19.2.0",
+    "@mcp-abap-adt/lib": "^19.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

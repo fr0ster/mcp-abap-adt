@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-ro",
-  "version": "19.1.0",
+  "version": "19.2.0",
   "description": "The read-only compact MCP server for SAP ABAP ADT over stdio: the 17 compact tools that change nothing, one per operation with the object in the arguments, and the leftover-session list and logoff. Configured as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC SDK at install time).",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -58,9 +58,9 @@
     "start": "node ./bin/mcp-abap-adt-compact-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/compact-readonly-entries": "^19.1.0",
-    "@mcp-abap-adt/core": "^19.1.0",
-    "@mcp-abap-adt/lib": "^19.1.0"
+    "@mcp-abap-adt/compact-readonly-entries": "^19.2.0",
+    "@mcp-abap-adt/core": "^19.2.0",
+    "@mcp-abap-adt/lib": "^19.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

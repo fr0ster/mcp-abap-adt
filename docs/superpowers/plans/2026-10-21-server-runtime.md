@@ -65,7 +65,7 @@
 
 **Files:**
 - Create: `server-runtime/package.json`, `server-runtime/tsconfig.json`, `server-runtime/README.md`, `server-runtime/LICENSE` (copy of `server/LICENSE`), `server-runtime/src/runtimeVersion.ts`
-- Modify: `.gitignore` — `!/server-runtime/package.json` beside the other packages' manifest exceptions (the bare `package.json` rule ignores a new manifest); `packageSet.test.ts`' manifest-exception check covers it; the Task 3 commit must show the manifest tracked (`git ls-files server-runtime/package.json`)
+- Modify: `.gitignore` — `!/server-runtime/package.json` beside the other packages' manifest exceptions (the bare `package.json` rule ignores a new manifest); `packageSet.test.ts`' manifest-exception check covers it, and its build-presence check validates each package's declared `exports` targets in `dist` rather than assuming `dist/index.js` (the runtime has subpath exports only); the Task 3 commit must show the manifest tracked (`git ls-files server-runtime/package.json`)
 - Move (`git mv`): `server/src/{launcher.ts,StdioServer.ts,destinationSource.ts,shutdown.ts,config/,auth/,index.ts}` → `server-runtime/src/stdio/…` (`index.ts` → `stdio/server.ts`); `server/src/__tests__/` → `server-runtime/src/stdio/__tests__/`
 - Keep in `server/`: `src/coreVersion.ts`, `bin/`; Create: `server/src/index.ts`, `server/src/launcher.ts`, `server/src/auth/index.ts` as re-export modules
 - Modify: `server/package.json`, `server/tsconfig.json`; `compact/`, `compact-ro/`, `core-ro/` — `src/launcher.ts`, `bin/*.js`, `package.json`, `tsconfig.json`

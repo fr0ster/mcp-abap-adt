@@ -41,8 +41,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   answer,
+  answerFailure,
   answerRequestThrown,
   type FailureEntry,
+  failureEntry,
   isCredentialPayload,
   requestFailureOf,
   requestThrownEntry,
@@ -148,33 +150,48 @@ export async function handleGetServiceBindingPreviewUrl(
   // caller's to supply — asked for only when one was left out.
   //
   // A failure here is not this tool's failure: the URL is answerable without a
-  // client, and `getSystemInformation` answers `null` where the endpoint is
-  // absent but THROWS on anything else. So it is caught, reported in the answer
-  // beside the URL it shaped, and never allowed to fail a read that worked.
+  // client. `getSystemInformation` (adt-clients 37) answers `{ present: false }`
+  // for a `404` — the endpoint absent, the one status this server reads so
+  // (`isSystemInformationUnavailable`) — and `ok: false` for any other status,
+  // no answer or a `2xx` that is not the record; it throws only a credential
+  // refusal SAP was never asked about. A failure is reported in the answer
+  // beside the URL it shaped, never allowed to fail a read that worked — but a
+  // credential failure ends the call, as it came: the binding's read would
+  // only be refused again.
   // An explicit empty string suppresses the parameter.
   let systemClient: string | undefined;
   let systemLanguage: string | undefined;
   let systemLookupFailed: FailureEntry | undefined;
   if (args.client === undefined || args.language === undefined) {
+    const step = 'read system information';
     try {
-      const info = await getSystemInformation(connection);
-      systemClient = info?.client;
-      systemLanguage = info?.language;
+      const answered = await getSystemInformation(connection);
+      if (answered.ok) {
+        const found = answered.getResult().value;
+        if (found.present) {
+          systemClient = found.info.client;
+          systemLanguage = found.info.language;
+        }
+      } else {
+        const failed = answered.getError();
+        const failure = failureEntry(failed, step);
+        if (isCredentialPayload(failure))
+          return answerFailure(withStep(failed, step));
+        systemLookupFailed = failure;
+      }
     } catch (error) {
       // The lookup's error as SAP answered it, with its step — beside the
       // URL, as it is, never folded into a sentence.
       const failure = requestThrownEntry(
         error,
         { method: 'GET', url: SYSTEM_INFORMATION },
-        'read system information',
+        step,
       );
-      // A credential failure is not a lookup's: the call ends with it, as it
-      // came — the binding's read would only be refused again.
       if (isCredentialPayload(failure))
         return answerRequestThrown(
           error,
           { method: 'GET', url: SYSTEM_INFORMATION },
-          'read system information',
+          step,
         );
       systemLookupFailed = failure;
     }

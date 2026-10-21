@@ -281,6 +281,11 @@ export const READING_BY_SLOT = {
   // document is the answer.
   enhancementElements: verbatim,
   enhancementOptions: verbatim,
+
+  // Arrived with adt-clients 37.0.0, on `getObjectProperties`: an
+  // `opr:objectProperties` document — the object and its facets
+  // (application component, package chain). `GetTransaction` reads it.
+  objectProperties: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**

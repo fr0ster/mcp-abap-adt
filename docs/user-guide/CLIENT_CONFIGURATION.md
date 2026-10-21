@@ -372,7 +372,7 @@ How the scope combines with the process context:
 
 Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE` (or `setSystemContext`).
 
-**The connection's parameters win, where your host makes them.** The library looks nothing up and applies no rule by default. Pass a resolver (`systemContextResolver: defaultSystemContextResolver`, `@mcp-abap-adt/lib/request-context`, asks `systeminformation`) and the rules (`systemContextRules: responsibleRules`, `@mcp-abap-adt/responsible-rules` — what core, http and sse pass) to `EmbeddableMcpServer` or `HandlerExporter`, and the connection's parameters are made once, before its first tool (a `HandlerExporter` handler: before the call it wraps), and kept:
+**The connection's parameters win, where your host makes them.** The library looks nothing up and applies no rule by default. Pass a resolver (`systemContextResolver: defaultSystemContextResolver`, `@mcp-abap-adt/lib/request-context`, asks `systeminformation`) and the rules (`systemContextRules: responsibleRules`, `@mcp-abap-adt/responsible-rules` — what every server passes) to `EmbeddableMcpServer` or `HandlerExporter`, and the connection's parameters are made once, before its first tool (a `HandlerExporter` handler: before the call it wraps), and kept:
 
 - the system names its user: `responsible` ← the system's user name, `masterSystem` ← its system id;
 - an on-premise system that gives no information (no `systeminformation`, an answer without the user, an error): the stated responsible, else the login (the connection's `SAP_USERNAME`, the request scope's `login`, the process `SAP_USERNAME`), with the stated master system; neither is `system_user_unknown`;

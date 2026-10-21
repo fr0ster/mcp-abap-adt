@@ -341,7 +341,7 @@ and nothing is kept, so the next call that creates one asks again. Never after a
 runs twice**. The lookup (`systeminformation`, through the resolver the host passes; none by
 default) answers only the information, no information, or a credential failure (a chain failure, a
 `401`: the call's as it came); what the parameters are is the rules' the host passes
-(`SystemContextRules`): core, http and sse pass `@mcp-abap-adt/responsible-rules` — the information
+(`SystemContextRules`): every server (server-runtime's launchers) passes `@mcp-abap-adt/responsible-rules` — the information
 wins; no information is, on ABAP Cloud, one step to the error (a `404`
 `cloud_without_systeminformation`: the configuration or headers are inconsistent; anything else
 `system_lookup_failed`), on-premise the stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`,

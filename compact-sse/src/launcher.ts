@@ -5,8 +5,8 @@
  * builders composed by lib's `compactToolSetOf` — and this command's name and
  * version. Nothing else: sse's table, and
  * sse's credentials, cancellation, failures and shutdown. The launcher is
- * `@mcp-abap-adt/server-runtime/sse`'s; the package depends on lib, the
- * runtime and the two halves, never on another binary package.
+ * `@mcp-abap-adt/server-runtime/sse`'s; the package depends on lib, the runtime,
+ * background-runs-memory, responsible-rules and the two halves, never on another binary package.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';

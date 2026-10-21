@@ -5,7 +5,8 @@
  * `mcp-abap-adt` runs) with `compactReadOnlyToolSetOf` over the half that
  * changes nothing, and this command's name and version. Nothing else: core's
  * table, credentials, cancellation, failures and shutdown. The package depends
- * on lib, the runtime and the read-only half, never on another binary package.
+ * on lib, the runtime, background-runs-memory, responsible-rules and the
+ * read-only half, never on another binary package.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
  * decision), and a user installs only what they need. The modify

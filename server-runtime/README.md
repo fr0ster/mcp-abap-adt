@@ -52,7 +52,7 @@ Two copies of @mcp-abap-adt/lib are loaded in this process (<file>, <file>): rei
 
 The files are the first two registered copies (inside a Node SEA executable, the executable's
 path); `<package>` is the server package that started. No install layout measured for 19.2.0
-gets there; if you see the line, reinstall each server on its own command.
+gets there; if you see the line, reinstall the package it names.
 
 ## Dependencies
 

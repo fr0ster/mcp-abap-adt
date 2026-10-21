@@ -7,7 +7,8 @@
  * composed by lib's `compactToolSetOf` — and this command's name and version.
  * Nothing else: core's table, core's
  * destination, credentials, cancellation, failures and shutdown. The package
- * depends on lib, the runtime and the two halves, never on another binary
+ * depends on lib, the runtime,
+ * background-runs-memory, responsible-rules and the two halves, never on another binary
  * package.
  *
  * **Why a command at all**, rather than a flag on the first one: the host this is

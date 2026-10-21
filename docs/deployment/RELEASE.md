@@ -125,21 +125,46 @@ so that no package goes out on top of a dependency that is missing.
    the publish; install with `--prefer-online` if it still says `ETARGET`.
 9. **Check an installed copy**, outside the repository, from the registry: each wrapper
    installed globally **in one command with its former base** — the layout that loaded two
-   copies of `lib` in 19.1.0 — starts and answers `--version` with its own version, with no
-   `Two copies of @mcp-abap-adt/lib` line. A fresh prefix per pair keeps the global tree clean:
+   copies of `lib` in 19.1.0 — starts, and each of the two binaries answers `--version` with
+   exactly `<version>` (and so with no `Two copies of @mcp-abap-adt/lib` line, which exits `1`).
+   A fresh prefix per pair keeps the global tree clean. The block runs unchanged in bash and in
+   zsh: it splits each entry with parameter expansion (no `set --`, no word splitting) and names
+   every binary itself (no glob). It runs in a subshell, so its `exit 1` on a failure ends the
+   block, not your terminal, and leaves the failure in `$?`:
    ```bash
-   for pair in "core compact" "core core-ro" "core compact-ro" \
-     "http compact-http" "http http-ro" "http compact-http-ro" \
-     "sse compact-sse" "sse sse-ro" "sse compact-sse-ro"; do
-     set -- $pair
-     prefix="$(mktemp -d)"
-     npm install -g --prefix "$prefix" --prefer-online \
-       "@mcp-abap-adt/$1@<version>" "@mcp-abap-adt/$2@<version>"
-     for bin in "$prefix"/bin/mcp-abap-adt*; do "$bin" --version || echo "FAILED: $bin"; done
-     rm -rf "$prefix"
-   done
+   (
+     version=<version>          # e.g. 19.2.0
+     bindir=bin; suffix=        # Windows (Git Bash): bindir=.; suffix=.cmd
+     failed=
+     for pair in "core:mcp-abap-adt compact:mcp-abap-adt-compact" \
+       "core:mcp-abap-adt core-ro:mcp-abap-adt-ro" \
+       "core:mcp-abap-adt compact-ro:mcp-abap-adt-compact-ro" \
+       "http:mcp-abap-adt-http compact-http:mcp-abap-adt-compact-http" \
+       "http:mcp-abap-adt-http http-ro:mcp-abap-adt-http-ro" \
+       "http:mcp-abap-adt-http compact-http-ro:mcp-abap-adt-compact-http-ro" \
+       "sse:mcp-abap-adt-sse compact-sse:mcp-abap-adt-compact-sse" \
+       "sse:mcp-abap-adt-sse sse-ro:mcp-abap-adt-sse-ro" \
+       "sse:mcp-abap-adt-sse compact-sse-ro:mcp-abap-adt-compact-sse-ro"; do
+       base=${pair%% *}; wrapper=${pair#* }
+       prefix=$(mktemp -d)
+       if npm install -g --prefix "$prefix" --prefer-online \
+         "@mcp-abap-adt/${base%%:*}@$version" "@mcp-abap-adt/${wrapper%%:*}@$version"; then
+         for entry in "$base" "$wrapper"; do
+           bin="$prefix/$bindir/${entry#*:}$suffix"
+           got=$("$bin" --version 2>&1)
+           [ "$got" = "$version" ] || failed="$failed ${entry#*:}[$got]"
+         done
+       else
+         failed="$failed install[${base%%:*}+${wrapper%%:*}]"
+       fi
+       rm -rf "$prefix"
+     done
+     if [ -n "$failed" ]; then echo "FAILED:$failed"; exit 1; fi
+     echo "OK: nine wrapper+base pairs, every binary answers $version"
+   )
    ```
-   On Windows the binaries are in `$prefix` itself, not `$prefix/bin`.
+   On Windows a global prefix puts each binary in the prefix itself with three shims
+   (`<name>`, `<name>.cmd`, `<name>.ps1`); the block runs the `.cmd` one alone.
 
 ## What the workflows check
 

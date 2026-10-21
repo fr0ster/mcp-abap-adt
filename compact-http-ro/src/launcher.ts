@@ -5,8 +5,8 @@
  * The runtime's Streamable HTTP `main` with `compactReadOnlyToolSetOf` over the half that changes
  * nothing, and this command's name and version. Nothing else: http's table,
  * credentials, cancellation, failures and shutdown. The launcher is
- * `@mcp-abap-adt/server-runtime/http`'s; the package depends on lib, the
- * runtime and the read-only half, never on another binary package.
+ * `@mcp-abap-adt/server-runtime/http`'s; the package depends on lib, the runtime,
+ * background-runs-memory, responsible-rules and the read-only half, never on another binary package.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
  * decision), and a user installs only what they need. The modify

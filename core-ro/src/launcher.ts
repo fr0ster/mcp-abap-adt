@@ -4,7 +4,8 @@
  * The runtime's stdio `main` (`@mcp-abap-adt/server-runtime/stdio`, the one
  * `mcp-abap-adt` runs) with `fullReadOnlyToolSet`, and this command's name and
  * version. Nothing else: core's table, credentials, cancellation, failures and
- * shutdown. The package depends on lib and the runtime, never on another
+ * shutdown. The package depends on lib, the runtime,
+ * background-runs-memory, responsible-rules, never on another
  * binary package.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's

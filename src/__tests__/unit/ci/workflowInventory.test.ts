@@ -117,11 +117,13 @@ describe.each(WORKFLOWS)('%s names every package of the release', (file) => {
  * other cell's `npm test` step sets `SKIP_INSTALL_MATRIX` to `'true'` (on
  * windows-latest both cells hung in that step with it).
  */
+/** A GitHub Actions expression, `$` + `{{ inner }}`, built so no literal looks like a JS template. */
+const expression = (inner: string): string =>
+  ['$', '{{ ', inner, ' }}'].join('');
+
 const INSTALL_MATRIX_GATE = {
-  'ci.yml':
-    "SKIP_INSTALL_MATRIX: ${{ (matrix.os == 'ubuntu-latest' && matrix.node-version == 22) && 'false' || 'true' }}",
-  'release.yml':
-    "SKIP_INSTALL_MATRIX: ${{ matrix.node-version == 22 && 'false' || 'true' }}",
+  'ci.yml': `SKIP_INSTALL_MATRIX: ${expression("(matrix.os == 'ubuntu-latest' && matrix.node-version == 22) && 'false' || 'true'")}`,
+  'release.yml': `SKIP_INSTALL_MATRIX: ${expression("matrix.node-version == 22 && 'false' || 'true'")}`,
 } as const;
 
 /** The lines of the step named `name`, up to the next step. */
@@ -148,7 +150,7 @@ describe.each(WORKFLOWS)('%s runs the install matrix in one cell', (file) => {
   it('the job runs where the gate assumes', () => {
     const text = lines.join('\n');
     if (file === 'ci.yml') {
-      expect(text).toContain('runs-on: ${{ matrix.os }}');
+      expect(text).toContain(`runs-on: ${expression('matrix.os')}`);
       expect(text).toContain(
         'os: [ubuntu-latest, macos-latest, windows-latest]',
       );

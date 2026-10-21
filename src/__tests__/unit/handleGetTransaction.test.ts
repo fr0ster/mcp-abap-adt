@@ -202,6 +202,33 @@ describe('GetTransaction', () => {
     expect(verdict.code).not.toBe('ADT_OBJECT_NOT_FOUND');
   });
 
+  it.each([
+    [
+      'another prefix',
+      '<p:objectProperties xmlns:p="http://www.sap.com/adt/objectproperties"><p:object text="T" name="ZTX_A" package="ZPKG_A" type="TRAN/T"/><p:property facet="TYPE" name="TRAN/T" displayName="Type"/></p:objectProperties>',
+    ],
+    [
+      'a default namespace',
+      '<objectProperties xmlns="http://www.sap.com/adt/objectproperties"><object text="T" name="ZTX_A" package="ZPKG_A" type="TRAN/T"/><property facet="TYPE" name="TRAN/T" displayName="Type"/></objectProperties>',
+    ],
+  ])('reads the document by local names: %s', async (_what, data) => {
+    getObjectProperties.mockResolvedValue(
+      throughStrategy({ status: 200, data }),
+    );
+    const answered = payload(
+      await handleGetTransaction(ctx, { transaction_name: 'ZTX_A' }),
+    );
+    expect(answered.object).toEqual({
+      text: 'T',
+      name: 'ZTX_A',
+      package: 'ZPKG_A',
+      type: 'TRAN/T',
+    });
+    expect(answered.properties).toEqual([
+      { facet: 'TYPE', name: 'TRAN/T', displayName: 'Type' },
+    ]);
+  });
+
   it('refuses a call without a name, before any request', async () => {
     const result: any = await handleGetTransaction(ctx, {} as any);
     expect(result.isError).toBe(true);

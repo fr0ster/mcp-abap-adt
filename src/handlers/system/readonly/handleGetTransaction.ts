@@ -34,6 +34,15 @@ export function transactionUri(name: string): string {
 const asArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : value === undefined ? [] : [value];
 
+/** The child whose local name (the part after any prefix) is `name`. */
+const byLocalName = (node: unknown, name: string): unknown => {
+  if (node === null || typeof node !== 'object') return undefined;
+  const key = Object.keys(node).find(
+    (k) => k.slice(k.indexOf(':') + 1) === name,
+  );
+  return key === undefined ? undefined : (node as Record<string, unknown>)[key];
+};
+
 /** An element's attributes as SAP sent them, values as text. */
 const attributesOf = (element: unknown): Record<string, string> => {
   const group = (element as { '@'?: unknown } | null | undefined)?.['@'];
@@ -59,13 +68,12 @@ export function transactionPropertiesOf(value: unknown): {
   object: Record<string, string> | undefined;
   properties: Record<string, string>[];
 } {
-  const root = (value as Record<string, unknown> | null | undefined)?.[
-    'opr:objectProperties'
-  ] as Record<string, unknown> | undefined;
-  const object = asArray(root?.['opr:object'])[0];
+  // By local name, whatever the prefix (or none) — as the strategy reads it.
+  const root = byLocalName(value, 'objectProperties');
+  const object = asArray(byLocalName(root, 'object'))[0];
   return {
     object: object === undefined ? undefined : attributesOf(object),
-    properties: asArray(root?.['opr:property']).map(attributesOf),
+    properties: asArray(byLocalName(root, 'property')).map(attributesOf),
   };
 }
 

@@ -292,21 +292,33 @@ describe('concurrentReader', () => {
     ]);
   });
 
-  it('a credential refusal starts no further read and is thrown as it came', async () => {
+  it('a credential refusal starts no further read, and is thrown once the started reads settle', async () => {
     const refusal = new AuthRefusedError(
       authError['credential-refused']({ credential: 'token' }),
       'request',
     );
     const started: number[] = [];
-    const read = concurrentReader<number, number>(context, async (n) => {
+    const held = new Map<number, () => void>();
+    const read = concurrentReader<number, number>(context, (n) => {
       started.push(n);
-      await tick();
-      if (n === 0) throw refusal;
-      return n;
+      if (n === 0) return Promise.reject(refusal);
+      return new Promise<number>((resolve) => {
+        held.set(n, () => resolve(n));
+      });
     });
-    await expect(read(Array.from({ length: 40 }, (_, i) => i))).rejects.toBe(
-      refusal,
+    let settled = false;
+    const answer = read(Array.from({ length: 40 }, (_, i) => i)).finally(() => {
+      settled = true;
+    });
+    answer.catch(() => undefined);
+    for (let i = 0; i < 5; i++) await tick();
+    // The refused read's pump stopped; the other pumps hold their reads.
+    expect(started).toEqual(
+      Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
     );
-    expect(started.length).toBeLessThan(40);
+    expect(settled).toBe(false);
+    for (const release of held.values()) release();
+    await expect(answer).rejects.toBe(refusal);
+    expect(started).toHaveLength(NODE_READ_CONCURRENCY);
   });
 });

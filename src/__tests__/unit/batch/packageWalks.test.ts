@@ -1205,6 +1205,27 @@ describe('the single arguments keep their words', () => {
   });
 });
 
+describe('GetPackageTree with descriptions: a metadata read SAP answered 401', () => {
+  it('ends the call as it came; nothing is walked', async () => {
+    const fake = system({
+      refuse: { 'GET /sap/bc/adt/packages/zroot_a': 401 },
+    });
+    const result = await withinTurns(
+      handleGetPackageTree(contextOn(fake), {
+        package_names: ['ZROOT_A', 'ZROOT_B'],
+        include_descriptions: true,
+      }),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      status: 401,
+      step: 'read package metadata',
+    });
+    expect(fake.envelopes).toHaveLength(0);
+    expect(nodeReads(fake)).toHaveLength(0);
+  });
+});
+
 describe('GetPackageTree: a metadata read SAP answered 401', () => {
   const refused = { refuse: { 'GET /sap/bc/adt/packages/zroot_a': 401 } };
   const call = (c: HandlerContext) =>
@@ -1289,7 +1310,13 @@ function leakingSystem(model: Model = {}) {
 }
 
 /** The package listings that answer descriptions, over two roots. */
-const LISTING_CALLS: Array<{ tool: string; call: Call }> = [
+const LISTING_CALLS: Array<{
+  tool: string;
+  call: Call;
+  /** The answer as the model holds it: every object with its own description, in walk order. */
+  expected: unknown;
+  pick?: (payload: unknown) => unknown;
+}> = [
   {
     tool: 'GetPackageContents',
     call: (c) =>
@@ -1299,6 +1326,14 @@ const LISTING_CALLS: Array<{ tool: string; call: Call }> = [
         max_depth: 2,
         include_descriptions: true,
       }),
+    expected: [
+      'DEVC/K ZSUB_A = Sub A',
+      'CLAS/OC ZCL_A = Class A',
+      'PROG/P ZPROG_A = Program A',
+      'DEVC/K ZSUB_B = ',
+      'INTF/OI ZIF_B = Interface B',
+      'PROG/P ZPROG_B = ',
+    ],
   },
   {
     tool: 'HandlerGet part contents',
@@ -1309,6 +1344,19 @@ const LISTING_CALLS: Array<{ tool: string; call: Call }> = [
         package_names: ['ZROOT_A', 'ZROOT_B'],
         include_descriptions: true,
       }) as Promise<unknown>,
+    expected: [
+      {
+        package_name: 'ZROOT_A',
+        contents:
+          'name\ttype\tdescription\nZSUB_A\tDEVC/K\tSub A\nZCL_A\tCLAS/OC\tClass A',
+      },
+      {
+        package_name: 'ZROOT_B',
+        contents:
+          'name\ttype\tdescription\nZSUB_B\tDEVC/K\t\nZIF_B\tINTF/OI\tInterface B',
+      },
+    ],
+    pick: (payload) => payload,
   },
   {
     tool: 'GetPackageTree',
@@ -1317,96 +1365,123 @@ const LISTING_CALLS: Array<{ tool: string; call: Call }> = [
         package_names: ['ZROOT_A', 'ZROOT_B'],
         include_descriptions: true,
       }),
+    expected: [
+      'DEVC/K ZROOT_A = ',
+      'DEVC/K ZSUB_A = Sub A',
+      'PROG/P ZPROG_A = Program A',
+      'CLAS/OC ZCL_A = Class A',
+      'DEVC/K ZROOT_B = ',
+      'DEVC/K ZSUB_B = ',
+      'PROG/P ZPROG_B = ',
+      'INTF/OI ZIF_B = Interface B',
+    ],
   },
 ];
+
+/** Every object an answer holds, in answer order: `TYPE NAME = description`. */
+const describedIn = (answer: unknown): string[] => {
+  const out: string[] = [];
+  const visit = (n: unknown): void => {
+    if (Array.isArray(n)) {
+      n.forEach(visit);
+      return;
+    }
+    if (n === null || typeof n !== 'object') return;
+    const o = n as Record<string, unknown>;
+    if (typeof o.name === 'string' && typeof o.type === 'string') {
+      out.push(`${o.type} ${o.name} = ${o.description ?? ''}`);
+    }
+    for (const v of Object.values(o)) if (typeof v === 'object') visit(v);
+  };
+  visit(answer);
+  return out;
+};
 
 /** The node structure requests a call sent alone. */
 const nodeReads = (fake: { directs: IAbapRequestOptions[] }) =>
   fake.directs.filter((r) => r.url.includes('/repository/nodestructure'));
 
-describe.each(LISTING_CALLS)('$tool: descriptions', ({ call }) => {
-  it('each node structure sent alone: its own descriptions, the sequential answer', async () => {
-    const leaking = leakingSystem();
-    const concurrent = await withinTurns(call(contextOn(leaking as Fake)));
-    const sequential = await withinTurns(
-      call(contextOn(leakingSystem() as Fake, 'absent')),
-    );
-    expect(leaking.leaks.count).toBe(0);
-    expect((concurrent as { isError?: boolean }).isError).toBe(false);
-    expect(textOf(concurrent)).toBe(textOf(sequential));
-    expect(textOf(concurrent)).toContain('Class A');
-    expect(textOf(concurrent)).toContain('Interface B');
-  });
-
-  it('no node structure in an envelope, none asked without descriptions, no object metadata read', async () => {
-    const fake = system();
-    await withinTurns(call(contextOn(fake)));
-    expect(fake.envelopes.flatMap(partKeys).some((k) => k.includes('|'))).toBe(
-      false,
-    );
-    const asked = nodeReads(fake);
-    expect(asked.length).toBeGreaterThan(0);
-    expect(
-      asked.every(
-        (r) =>
-          (r.params as { withShortDescriptions?: unknown })
-            ?.withShortDescriptions === true,
-      ),
-    ).toBe(true);
-    expect(
-      [
-        ...fake.envelopes.flatMap(partKeys),
-        ...fake.directs.map((r) => r.url),
-      ].some((k) => k.includes('/sap/bc/adt/oo/')),
-    ).toBe(false);
-  });
-
-  it('no communication batch: the same requests, the same answer', async () => {
-    const served = system();
-    const absent = system();
-    const a = await withinTurns(call(contextOn(served)));
-    const b = await withinTurns(call(contextOn(absent, 'absent')));
-    expect(absent.envelopes).toHaveLength(0);
-    expect(textOf(b)).toBe(textOf(a));
-    expect(
-      nodeReads(absent)
-        .map((r) => keyOf(r.method, r.url, r.params))
-        .sort(),
-    ).toEqual(
-      nodeReads(served)
-        .map((r) => keyOf(r.method, r.url, r.params))
-        .sort(),
-    );
-  });
-
-  it("a node structure's failure is its root's; the other root answers", async () => {
-    const fake = system({
-      refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 500 },
+describe.each(LISTING_CALLS)(
+  '$tool: descriptions',
+  ({ call, expected, pick = describedIn }) => {
+    it('each node structure sent alone: every object, each with its own description', async () => {
+      const leaking = leakingSystem();
+      const result = await withinTurns(call(contextOn(leaking as Fake)));
+      expect(leaking.leaks.count).toBe(0);
+      expect((result as { isError?: boolean }).isError).toBe(false);
+      expect(pick(payloadOf(result))).toEqual(expected);
     });
-    const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(false);
-    expect(textOf(result)).not.toContain('Class A');
-    expect(textOf(result)).toContain('Interface B');
-  });
 
-  it('a 401 SAP answered to a node structure ends the call as it came', async () => {
-    const fake = system({
-      refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 401 },
+    it('no node structure in an envelope, none asked without descriptions, no object metadata read', async () => {
+      const fake = system();
+      await withinTurns(call(contextOn(fake)));
+      expect(
+        fake.envelopes.flatMap(partKeys).some((k) => k.includes('|')),
+      ).toBe(false);
+      const asked = nodeReads(fake);
+      expect(asked.length).toBeGreaterThan(0);
+      expect(
+        asked.every(
+          (r) =>
+            (r.params as { withShortDescriptions?: unknown })
+              ?.withShortDescriptions === true,
+        ),
+      ).toBe(true);
+      expect(
+        [
+          ...fake.envelopes.flatMap(partKeys),
+          ...fake.directs.map((r) => r.url),
+        ].some((k) => k.includes('/sap/bc/adt/oo/')),
+      ).toBe(false);
     });
-    const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(textOf(result)).toContain('401');
-  });
 
-  it("the connection's credential refusal ends the call as it came", async () => {
-    const fake = system({}, undefined, () => {
-      throw credential();
+    it('no communication batch: the same requests, the same answer', async () => {
+      const served = system();
+      const absent = system();
+      const a = await withinTurns(call(contextOn(served)));
+      const b = await withinTurns(call(contextOn(absent, 'absent')));
+      expect(absent.envelopes).toHaveLength(0);
+      expect(textOf(b)).toBe(textOf(a));
+      expect(
+        nodeReads(absent)
+          .map((r) => keyOf(r.method, r.url, r.params))
+          .sort(),
+      ).toEqual(
+        nodeReads(served)
+          .map((r) => keyOf(r.method, r.url, r.params))
+          .sort(),
+      );
     });
-    const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-  });
-});
+
+    it("a node structure's failure is its root's; the other root answers", async () => {
+      const fake = system({
+        refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 500 },
+      });
+      const result = await withinTurns(call(contextOn(fake)));
+      expect((result as { isError?: boolean }).isError).toBe(false);
+      expect(textOf(result)).not.toContain('Class A');
+      expect(textOf(result)).toContain('Interface B');
+    });
+
+    it('a 401 SAP answered to a node structure ends the call as it came', async () => {
+      const fake = system({
+        refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 401 },
+      });
+      const result = await withinTurns(call(contextOn(fake)));
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(textOf(result)).toContain('401');
+    });
+
+    it("the connection's credential refusal ends the call as it came", async () => {
+      const fake = system({}, undefined, () => {
+        throw credential();
+      });
+      const result = await withinTurns(call(contextOn(fake)));
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(payloadOf(result).error).toBe('authentication_failed');
+    });
+  },
+);
 
 describe('GetObjectInfo: descriptions', () => {
   const call: Call = (c) =>

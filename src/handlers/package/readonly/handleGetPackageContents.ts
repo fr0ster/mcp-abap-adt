@@ -87,28 +87,30 @@ export async function handleGetPackageContents(
     // many requests cannot take an IResultStrategy, and a flat list and a tree
     // are two conveniences over one walk. This is the same walk that handler
     // uses, assembled the other way — level by level, each level's requests in
-    // one envelope (spec §11), then every object's description from its
-    // metadata in one more; one package after another where the system has
-    // no communication batch.
+    // one envelope (spec §11), then, when descriptions are asked for, every
+    // object's description from its metadata in one more; one package after
+    // another where the system has no communication batch.
     const walked = await withSequentialFallback(
       context,
-      async () =>
-        describeFromMetadata(
-          context,
-          await walkPackages(
-            batchReader<NodeRequest, unknown>(context, (request, c) =>
-              readNode(
-                nodeStructureOn(
-                  context,
-                  createAdtClient(c, logger).getUtils(ourUtils),
-                ),
-                request,
+      async () => {
+        const levels = await walkPackages(
+          batchReader<NodeRequest, unknown>(context, (request, c) =>
+            readNode(
+              nodeStructureOn(
+                context,
+                createAdtClient(c, logger).getUtils(ourUtils),
               ),
+              request,
             ),
-            packageNames,
-            options,
           ),
-        ),
+          packageNames,
+          options,
+        );
+        // Without descriptions the answer carries none: no metadata is read.
+        return options.includeDescriptions === false
+          ? levels
+          : describeFromMetadata(context, levels);
+      },
       () => {
         const utils = createAdtClient(connection, logger).getUtils(ourUtils);
         return rootByRoot(packageNames, (name) =>

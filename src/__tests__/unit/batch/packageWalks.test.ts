@@ -1414,3 +1414,61 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
     expect(textOf(result)).toContain('Class A');
   });
 });
+
+// ---------------------------------------------------------------------------
+// include_descriptions: false — the batched walks read no metadata (#300)
+// ---------------------------------------------------------------------------
+
+describe('include_descriptions: false', () => {
+  const walkEnvelopes = [
+    [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
+    [nodeKey('DEVC/K', 'ZSUB_A')],
+    [nodeKey('DEVC/K', 'ZSUB_A', '30')],
+  ];
+
+  it('GetPackageContents: the walk alone, no description in the answer', async () => {
+    const fake = system();
+    const result = await withinTurns(
+      handleGetPackageContents(contextOn(fake), {
+        package_name: 'ZROOT_A',
+        include_subpackages: true,
+        max_depth: 2,
+        include_descriptions: false,
+      }),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(fake.envelopes.map(partKeys)).toEqual([
+      [nodeKey('DEVC/K', 'ZROOT_A')],
+      ...walkEnvelopes,
+    ]);
+    expect(fake.directs).toHaveLength(0);
+    expect(payloadOf(result).map((i: { name: string }) => i.name)).toEqual([
+      'ZSUB_A',
+      'ZCL_A',
+      'ZPROG_A',
+    ]);
+    expect(textOf(result)).not.toContain('Class A');
+  });
+
+  it('GetPackageTree: the walk alone, no description in the answer', async () => {
+    const fake = system();
+    const result = await withinTurns(
+      handleGetPackageTree(contextOn(fake), {
+        package_name: 'ZROOT_A',
+        include_descriptions: false,
+      }),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(fake.envelopes.map(partKeys)).toEqual([
+      ['GET /sap/bc/adt/packages/zroot_a', nodeKey('DEVC/K', 'ZROOT_A')],
+      ...walkEnvelopes,
+    ]);
+    expect(fake.directs).toHaveLength(0);
+    const tree = payloadOf(result).tree;
+    expect(tree.children.map((c: { name: string }) => c.name)).toEqual([
+      'ZSUB_A',
+      'ZCL_A',
+    ]);
+    expect(textOf(result)).not.toContain('Class A');
+  });
+});

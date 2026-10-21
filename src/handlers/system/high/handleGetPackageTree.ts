@@ -188,7 +188,10 @@ async function readTreesBatched(
     options,
     kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
   );
-  const described = await describeFromMetadata(context, walked);
+  // Without descriptions the answer carries none: no metadata is read.
+  const described = options.includeDescriptions
+    ? await describeFromMetadata(context, walked)
+    : walked;
   kept.forEach((i, k) => {
     (reads[i] as TreeRead).walked = described[k];
   });

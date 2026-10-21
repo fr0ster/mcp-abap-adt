@@ -11,6 +11,12 @@ Answers [the goal](../2026-10-21-server-runtime-goal.md) (#303).
   except each binary's own version module (`coreVersion.ts`, `httpVersion.ts`,
   `sseVersion.ts`), which stays with its binary. Moved as it is, by `git mv`, so history
   follows; no behaviour change.
+- **Version defaults.** `StdioServer`, `StreamableHttpServer` and `SseServer` default
+  `opts.version` to a version module of their own package today. In the runtime they
+  default to **`RUNTIME_VERSION`**, the runtime's own version (`src/runtimeVersion.ts`,
+  read from its manifest as `coreVersion.ts` reads core's; the portable build substitutes
+  it as it substitutes `coreVersion`). A binary always passes its own version through
+  `main`, as today, so `--version` and `serverInfo.version` stay the binary's.
 - Layout: `server-runtime/src/stdio/` (today's `server/src`: `launcher.ts`,
   `StdioServer.ts`, `destinationSource.ts`, `shutdown.ts`, `config/`, `auth/`),
   `server-runtime/src/http/` (today's `http/src`), `server-runtime/src/sse/` (today's
@@ -60,7 +66,11 @@ Every binary package depends on `@mcp-abap-adt/server-runtime`, `@mcp-abap-adt/l
   re-exports, so an importer of today's paths sees no change:
   `@mcp-abap-adt/core` re-exports `server-runtime/stdio/server`, `core/launcher`
   re-exports `server-runtime/stdio`, `core/auth` re-exports `server-runtime/auth`; `http`
-  and `sse` likewise. Their `bin` calls the runtime's `main` with their tool set, program
+  and `sse` likewise. The one export that is not a plain re-export is each server class:
+  `core` exports `StdioServer` as a subclass of the runtime's that defaults
+  `opts.version` to `CORE_VERSION` (and `http` / `sse` likewise with `HTTP_VERSION` /
+  `SSE_VERSION`), so a direct constructor call without a version answers the package's
+  version as today, even when the runtime is at another patch. Their `bin` calls the runtime's `main` with their tool set, program
   name and own version, as today.
 - **The nine wrappers** (`compact`, `compact-ro`, `core-ro`, `compact-http`,
   `compact-http-ro`, `http-ro`, `compact-sse`, `compact-sse-ro`, `sse-ro`) import the
@@ -99,7 +109,22 @@ Every binary package depends on `@mcp-abap-adt/server-runtime`, `@mcp-abap-adt/l
   `exports` map: loading each entry in a fresh module registry registers one root).
 - **The dependency rule** (`packageSet.test.ts`): no binary package lists another
   binary package in `dependencies`; every binary package lists
-  `@mcp-abap-adt/server-runtime`; `server-runtime` has no `bin`.
+  `@mcp-abap-adt/server-runtime`, `lib`, `background-runs-memory` and
+  `responsible-rules` in `dependencies`; `server-runtime`, `compact-readonly-entries`,
+  `compact-modify`, `background-runs-memory` and `responsible-rules` list `lib` (and the
+  runtime its two sibling state packages) in `peerDependencies`, not in `dependencies`;
+  `server-runtime` has no `bin`.
+- **`dependencyRule.test.ts` migrates to the new graph**: `server-runtime` joins its
+  sibling directories and is walked from its `exports`; the rows requiring a wrapper to
+  declare and reach its former base (`compactOver` / `readOnlyOver`) require it to reach
+  the runtime's path of its transport instead; the rows requiring `lib` in
+  `background-runs-memory`'s and `responsible-rules`' `dependencies` require it in
+  `peerDependencies`; "declared" accepts a peer where §2a makes it one. The isolation
+  checks keep their meaning over the moved sources and the built `dist`: the HTTP and
+  SSE transports reach no stdio module and no auth-broker / auth-stores /
+  interfaces-auth-broker; only the stdio path and `auth` reach those; the read-only
+  packages reach the half that changes nothing and never the modifying half or another
+  transport; no source reaches another transport's directory by a relative path.
 - **The install matrix** (`binSmoke.test.ts` / `helpers/installedRelease.ts`, which pack
   every package and install from the tarballs): every layout below, from the packed
   tarballs only. In each, a child `node` started in the install requires the binary's

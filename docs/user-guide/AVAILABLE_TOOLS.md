@@ -1021,7 +1021,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP transaction (t-code) details — program, screen, authorization object, and transaction type (dialog, report, OO).
+**Description:** [read-only] Reads the properties of the ABAP transaction (t-code) named by transaction_name in one request. Answers the transaction under `object` (name, text, type, package) and its facets under `properties`, in the order the system gives them — the application component chain, the package chain, type, owner, language, creation and the others the system names — each entry with its facet, name, displayName and text.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 

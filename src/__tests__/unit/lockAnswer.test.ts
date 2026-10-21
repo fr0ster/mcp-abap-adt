@@ -49,24 +49,35 @@ describe('analyseLock', () => {
     });
   });
 
-  it('reaches the caller as an error carrying SAP answer as raw_body', async () => {
-    const wire = { data: LOGIN_PAGE, status: 200 };
-    const failure = analyseLock(ADT_NO_FAILURE, wire as any) as any;
-    const result = await answer(
-      { tool: 'LockClassLow', detail: 'terse' },
-      async () =>
-        ({
-          ok: false,
-          getResult: () => {
-            throw new Error('no result');
-          },
-          getError: () => failure,
-        }) as any,
-      (v) => v,
-    );
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).raw_body).toBe(LOGIN_PAGE);
-  });
+  // A refusal of a `2xx` (SAP did not refuse; the strategy did) carries the
+  // body only with `detail: 'raw'`.
+  it.each([
+    ['terse', undefined],
+    ['full', undefined],
+    ['raw', LOGIN_PAGE],
+  ] as const)(
+    'reaches the caller as an error; detail %s carries SAP answer as raw_body: %s',
+    async (detail, expected) => {
+      const wire = { data: LOGIN_PAGE, status: 200 };
+      const failure = analyseLock(ADT_NO_FAILURE, wire as any) as any;
+      const result = await answer(
+        { tool: 'LockClassLow', detail },
+        async () =>
+          ({
+            ok: false,
+            getResult: () => {
+              throw new Error('no result');
+            },
+            getError: () => ({ ...failure, response: wire }),
+          }) as any,
+        (v) => v,
+      );
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.raw_body).toBe(expected);
+      expect(payload.message).toContain('without a lock handle');
+    },
+  );
 
   it('refuses an empty handle element too', () => {
     const empty = LOCKED.replace(

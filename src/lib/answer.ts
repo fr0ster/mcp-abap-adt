@@ -110,6 +110,7 @@ interface MessageCarrier {
  */
 export function failurePayload(
   error: IAdtError & MessageCarrier,
+  detail?: AnswerDetail,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     message: error.message,
@@ -164,15 +165,33 @@ export function failurePayload(
     });
   }
 
-  // Whatever `detail` says. It is a parameter of the RESULT projection, and a
-  // failure is not a projection: on this path the consumer wants everything,
-  // and gating the one field that carries everything behind a parameter that
-  // shapes successes hid it exactly where it was the point.
+  // SAP's body, by who said no.
+  //
+  // **A refusal SAP made — any status but a `2xx` — carries it whatever
+  // `detail` says.** Its body is SAP's own account of the refusal (an
+  // `exc:exception`, a T100 message), and the consumer wants everything on
+  // this path; gating it behind a parameter that shapes successes hid it
+  // exactly where it was the point.
+  //
+  // **A failure a strategy raised on a `2xx` carries it only with
+  // `detail: 'raw'`.** SAP did not refuse: its body is an ordinary document —
+  // the whole message class for a number it does not hold, 613 KB measured —
+  // and the strategy's verdict (message, code, messages) already says what
+  // is wrong with it. Handing the document on unasked cost a model its
+  // context for a one-line answer; a caller who wants it asks for `raw`. A
+  // tool without a `detail` parameter has no way to ask, and answers such a
+  // failure without the body.
   //
   // The empty string is not a document — emitting `raw_body: ""` would read as
   // "SAP sent an empty body" when nothing was sent at all.
   const body = (error.response as { data?: unknown } | undefined)?.data;
-  if (typeof body === 'string' && body !== '') {
+  const answeredOk =
+    typeof status === 'number' && status >= 200 && status < 300;
+  if (
+    typeof body === 'string' &&
+    body !== '' &&
+    (!answeredOk || detail === 'raw')
+  ) {
     payload.raw_body = body;
   }
   return payload;
@@ -197,7 +216,7 @@ export function answerFailure(
   if (ctx !== undefined && isSystemContextRefusal(error.message)) {
     return local('system_context_missing', ctx, error.message);
   }
-  return json(failurePayload(error), true);
+  return json(failurePayload(error, ctx?.detail), true);
 }
 
 /**
@@ -209,10 +228,17 @@ export function answerFailure(
 export type FailureEntry = Record<string, unknown>;
 
 /** A method's failed answer as an entry: its error as it is, with the step. */
-export function failureEntry(failed: IAdtError, step: string): FailureEntry {
+export function failureEntry(
+  failed: IAdtError,
+  step: string,
+  detail?: AnswerDetail,
+): FailureEntry {
   const read = failureOf(failed);
   if (read !== undefined) return { ...chainFailurePayload(read), step };
-  return failurePayload(withStep(failed, step) as IAdtError & MessageCarrier);
+  return failurePayload(
+    withStep(failed, step) as IAdtError & MessageCarrier,
+    detail,
+  );
 }
 
 /**

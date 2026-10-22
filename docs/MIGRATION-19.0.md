@@ -1199,7 +1199,9 @@ transport's options only:
   check. `force_new_connection` is gone from `HandlerDelete`'s schema: compact locks and writes a
   package in an ABAP session of its own, so the call's session never holds a saved package (the
   full set's `DeletePackage` keeps it); `lock_handle` joins it. Over Streamable HTTP an include's
-  `HandlerDelete` sends the lock's `state_handle` in the `x-mcp-state-handle` header, as
+  `HandlerDelete` sends the lock's `state_handle` in the `x-mcp-state-handle` header (from 20.0.0
+  also as the `state_handle` argument:
+  [MIGRATION-20.0](MIGRATION-20.0.md#streamable-http-held-state-by-argument-and-the-long-session)), as
   `HandlerUpdate` does. Every type is recorded in batch mode (an include with its `lock_handle`),
   and so is `HandlerDeletionCheck`: a deletion check batch, then a delete batch. The full sets'
   `Delete<Type>` keep their chains.

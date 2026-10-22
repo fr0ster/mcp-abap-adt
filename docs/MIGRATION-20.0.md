@@ -111,8 +111,8 @@ stdio and SSE are unchanged: their tool lists, schemas and behaviour are those o
   `SessionOpen` and `SessionClose`; `mcp-abap-adt-compact-http` and `mcp-abap-adt-compact-http-ro`
   serve `HandlerSession` with `action: 'open' | 'close'`. They change nothing in the system, so
   the `-ro` binaries serve them too; no stdio or SSE binary serves them. The tool counts grow by
-  one or two: `mcp-abap-adt-http-ro` 71, `mcp-abap-adt-compact-http` 39,
-  `mcp-abap-adt-compact-http-ro` 19 (listed against an on-premise system).
+  one or two: `mcp-abap-adt-http` 254 → 256, `mcp-abap-adt-http-ro` 69 → 71, `mcp-abap-adt-compact-http` 38 → 39,
+  `mcp-abap-adt-compact-http-ro` 18 → 19 (listed against an on-premise system).
   - **Open** keeps an instance and its SAP connection and answers `{ "state_handle": "…" }`. Every
     call carrying it runs on that instance, on its held SAP session — no new connection, no
     `systeminformation` lookup, no logoff between the calls. Opened with the handle of an instance

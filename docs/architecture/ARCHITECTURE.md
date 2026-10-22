@@ -358,8 +358,10 @@ injected connection has them made by its first call (`systemBeforeTool`), inside
   calls between run stateless and outside it, and the `UNLOCK` reaches it. At the
   latest the instance's logoff ends it: a logoff releases the session's locks. Over
   Streamable HTTP the lock is the pooled instance's state: a request on its
-  `state_handle` reaches the held connection — with that request's credential, in the
-  same SAP session — until the `UNLOCK` or until SAP ends the session.
+  `state_handle` — the `state_handle` argument, or the `x-mcp-state-handle` header — reaches
+  the held connection — with that request's credential, in the same SAP session — until the
+  `UNLOCK`, until the instance's logoff (a long session's close — `SessionClose`, compact
+  `HandlerSession` `action: 'close'` —, the idle bound) or until SAP ends the session.
 - **A tool call cannot be cancelled.** A client's cancel aborts nothing: the call
   runs to its end; nothing is logged off and no session is reopened. The client's
   close (stdio, SSE) and the process shutdown are what end a running tool: its

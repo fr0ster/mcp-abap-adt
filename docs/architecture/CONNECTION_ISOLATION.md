@@ -82,8 +82,11 @@ when SAP ended that session.
   (the consumer's choice) where the connection lives across calls — stdio and SSE —
   with every call between them stateless; the instance's logoff ends it at the
   latest. Over Streamable HTTP the lock is the pooled instance's state: a request on
-  its `state_handle` reaches the held connection — with that request's credential, in the
-  same SAP session — and the lock with it, until the `UNLOCK` or until SAP ends the session.
+  its `state_handle` — the `state_handle` argument, or the `x-mcp-state-handle` header — reaches
+  the held connection — with that request's credential, in the same SAP session — and the lock
+  with it, until the `UNLOCK`, until the instance's logoff (a long session's close —
+  `SessionClose`, compact `HandlerSession` `action: 'close'` —, the idle bound) or until SAP ends
+  the session.
 - **A tool call cannot be cancelled**: it ends with its result or with the session.
   A client's cancel aborts nothing — a queued call keeps its place, a running one
   runs to its end; no logoff, no new session. When the client closes its connection

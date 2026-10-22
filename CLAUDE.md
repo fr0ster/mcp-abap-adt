@@ -149,8 +149,7 @@ scripts and steal npm and GitHub tokens. So:
   install script, each denied (`false`); `.npmrc` sets `strict-allow-scripts=true`,
   so a new dependency with an unreviewed install script fails the install instead of
   running it. A new entry needs the reason it is needed; the default answer is deny.
-- `.npmrc` sets `min-release-age=7` (versions at least 7 days old), except
-  `@mcp-abap-adt/*`, which the chain releases to itself the same day.
+- No `min-release-age`: it blocked installing a security fix while the gating audit failed CI.
 - npm reads these in full only from 11.19.0, so CI, the release workflow, the Docker
   images, the portable build and any install outside this checkout use
   `npm ci --ignore-scripts` / `npm install --ignore-scripts`. Our own `prepare` (husky)

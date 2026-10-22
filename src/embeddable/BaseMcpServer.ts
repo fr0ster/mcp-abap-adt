@@ -285,6 +285,13 @@ export abstract class BaseMcpServer extends McpServer {
 
   private debuggerInstance?: DebuggerInstance;
 
+  /**
+   * The debugger a call of this instance took (`debuggerFor()`, the base's
+   * or an embedder's override): what a session close reads for its
+   * `debug_session`.
+   */
+  private takenDebugger?: DebuggerInstance;
+
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<unknown>>();
 
@@ -483,6 +490,13 @@ export abstract class BaseMcpServer extends McpServer {
     return this.debuggerInstance;
   }
 
+  /** The context's `debugger`: `debuggerFor()`, kept for a session close to read. */
+  private takeDebugger(): DebuggerInstance {
+    const taken = this.debuggerFor();
+    this.takenDebugger = taken;
+    return taken;
+  }
+
   get stateHandle(): string {
     return this.state.handle;
   }
@@ -503,7 +517,7 @@ export abstract class BaseMcpServer extends McpServer {
         const holding = {
           locks: this.heldLocks?.count() ?? 0,
           batch: this.batch?.holdsState() === true,
-          debug_session: this.debuggerInstance?.holdsState() === true,
+          debug_session: this.takenDebugger?.holdsState() === true,
         };
         session.askClose();
         return holding;
@@ -1460,7 +1474,7 @@ export abstract class BaseMcpServer extends McpServer {
                 logger: this.logger,
                 adtHeaders: this.adtHeadersOf(connection),
                 state: this.state,
-                debugger: () => this.debuggerFor(),
+                debugger: () => this.takeDebugger(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
                 ...(this.batch !== undefined ? { batch: this.batch } : {}),
                 ...(batchAvailability !== undefined
@@ -2018,7 +2032,7 @@ export abstract class BaseMcpServer extends McpServer {
         connection: undefined as never,
         logger: this.logger,
         state: this.state,
-        debugger: () => this.debuggerFor(),
+        debugger: () => this.takeDebugger(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
         ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
         ...(this.longSessionPort !== undefined

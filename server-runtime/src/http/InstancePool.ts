@@ -380,6 +380,10 @@ export class InstancePool<T extends Poolable> {
     this.drop(instance);
     this.retained.delete(instance);
     this.failed.delete(instance);
+    // Closed: when the batch was the only thing held, the close's
+    // `dropBatch` empties the state and `onEmpty` evicts the instance —
+    // `dispose()` on a latched instance whose parts hold nothing, then the
+    // terminal close skipped (closed here). Harmless: nothing else to undo.
     this.closed.add(instance);
     const closing = instance.instanceClose().catch(() => undefined);
     this.closing.add(closing);

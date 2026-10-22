@@ -281,3 +281,31 @@ it('an embedder stop awaits a running instance close whose logoff is not answere
   await stopping;
   expect(stopped).toBe(true);
 });
+
+it('close ends any held state: a lock taken without SessionOpen, closed by its handle, is logged off and the handle refused', async () => {
+  const locked = await s.call('HandlerLock', LOCK);
+  expect(locked.isError).toBe(false);
+  const { state_handle: handle } = JSON.parse(locked.text) as {
+    state_handle: string;
+  };
+  expect(poolSize()).toBe(1);
+
+  const closed = await s.call('SessionClose', { state_handle: handle });
+  expect(closed.isError).toBe(false);
+  expect(JSON.parse(closed.text)).toEqual({
+    closed: true,
+    held: { locks: 1, batch: false, debug_session: false },
+  });
+  await until(() => s.standIn.logoffs() === 1);
+  const lockSession = s.standIn.requests.find((r) =>
+    r.url.includes('_action=LOCK'),
+  )?.session;
+  expect(s.standIn.loggedOff()).toEqual([lockSession]);
+  expect(poolSize()).toBe(0);
+
+  const after = await s.call('HandlerSession', {
+    action: 'close',
+    state_handle: handle,
+  });
+  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+});

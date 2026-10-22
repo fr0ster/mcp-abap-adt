@@ -28,12 +28,14 @@ import * as z from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
+import type { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import type {
   HandlerEntry,
   IHandlerGroup,
   IHandlersRegistry,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { closeInstance } from '../../../lib/instanceClose';
 import { LongSession } from '../../../lib/state/longSession';
 import {
   compactReadOnlyToolSetOf,
@@ -297,4 +299,124 @@ describe('the host declaration of state_handle', () => {
     expect(answer.isError).toBe(false);
     expect(JSON.parse(answer.text)).toEqual({ state_handle: 'H' });
   });
+});
+
+describe('close on an instance', () => {
+  /** A debugger that holds a debug session, as a listener or a stopped debuggee does. */
+  const heldDebugger = () =>
+    ({
+      holdsState: () => true,
+      pending: () => false,
+      failures: () => [],
+      observe: () => {},
+      dispose: async () => {},
+    }) as unknown as DebuggerInstance;
+
+  /** A server whose debugger is the host's own (`debuggerFor` overridden, as an embedder may). */
+  class DebuggerServer extends SessionServer {
+    private own: DebuggerInstance | undefined;
+
+    protected override debuggerFor(): DebuggerInstance {
+      if (this.own === undefined) {
+        this.own = heldDebugger();
+        this.state.attach(this.own);
+      }
+      return this.own;
+    }
+  }
+
+  /** A tool that takes the instance's debugger, as every debugger tool does. */
+  const takeDebugger: IHandlerGroup = {
+    getName: () => 'take-debugger',
+    registerHandlers: () => {},
+    getHandlers: (): HandlerEntry[] => [
+      {
+        toolDefinition: {
+          name: 'TakeDebugger',
+          description: 'takes the debugger',
+          inputSchema: { type: 'object', properties: {}, required: [] },
+        } as never,
+        handler: (async (
+          context: { debugger?: () => unknown },
+          _args: unknown,
+        ) => {
+          context.debugger?.();
+          return { content: [{ type: 'text', text: 'taken' }] };
+        }) as never,
+        connectionless: true,
+      },
+    ],
+  } as unknown as IHandlerGroup;
+
+  const sessionGroups = () =>
+    fullToolSet
+      .groups({ connection: undefined as never }, 'http')
+      .filter((group) =>
+        group
+          .getHandlers()
+          .some((entry) => entry.toolDefinition.name === 'SessionClose'),
+      );
+
+  it('names a held debug session: debug_session true', async () => {
+    const server = new DebuggerServer(
+      new CompositeHandlersRegistry([...sessionGroups(), takeDebugger]),
+      { longSession: new LongSession() },
+    );
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'long-session', version: '1.0.0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    const taken = answerOf(
+      await client.callTool({ name: 'TakeDebugger', arguments: {} }),
+    );
+    expect(taken).toEqual({ text: 'taken', isError: false });
+    expect(server.holds()).toBe(true);
+
+    const answer = answerOf(
+      await client.callTool({ name: 'SessionClose', arguments: {} }),
+    );
+    expect(answer.isError).toBe(false);
+    expect(JSON.parse(answer.text)).toEqual({
+      closed: true,
+      held: { locks: 0, batch: false, debug_session: true },
+    });
+    expect(server.closeAsked()).toBe(true);
+  });
+
+  it.each([
+    ['full', 'SessionClose', {}],
+    ['compact', 'HandlerSession', { action: 'close' }],
+  ] as const)(
+    '%s: in a debugger batch it runs at once, is not recorded, and the instance close drops the batch',
+    async (_label, tool, args) => {
+      const set =
+        tool === 'SessionClose'
+          ? fullToolSet
+          : compactToolSetOf({
+              readOnly: compactReadOnlyEntries,
+              modify: compactModifyEntries,
+            });
+      const batch = new InstanceBatch({ keepRawParts: false });
+      const { server, client } = await served(registryOf(set, 'http'), {
+        batch,
+        longSession: new LongSession(),
+      });
+      batch.begin('debugger', openRecord());
+      const answer = answerOf(
+        await client.callTool({ name: tool, arguments: { ...args } }),
+      );
+      expect(answer.isError).toBe(false);
+      expect(JSON.parse(answer.text)).toEqual({
+        closed: true,
+        held: { locks: 0, batch: true, debug_session: false },
+      });
+      // Run at once, not recorded: the batch is still open, its first number unused.
+      expect(batch.mode()).toBe('debugger');
+      expect(batch.nextNumber()).toBe(1);
+      expect(server.closeAsked()).toBe(true);
+      // The host's close once the answer is written (the pool's `closeOut`).
+      await closeInstance(server);
+      expect(batch.mode()).toBe('off');
+      expect(batch.holdsState()).toBe(false);
+    },
+  );
 });

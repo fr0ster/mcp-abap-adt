@@ -470,3 +470,75 @@ describe('the pool never names a failure by its handle', () => {
     for (const h of handles) expect(failures.join('\n')).not.toContain(h);
   });
 });
+
+describe('unique handles across the pool', () => {
+  const hex = (n: number) =>
+    n.toString(16).padStart(2, '0').repeat(16).toUpperCase();
+  const source = (...fills: number[]) => {
+    const queue = [...fills];
+    return (size: number) => Buffer.alloc(size, queue.shift() ?? 0xee);
+  };
+  class Drawn {
+    held = false;
+    readonly state: InstanceState;
+    constructor(pool: InstancePool<Drawn>, random: (n: number) => Buffer) {
+      this.state = new InstanceState({
+        isTaken: pool.isHandleTaken,
+        randomSource: random,
+      });
+      this.state.attach({
+        holdsState: () => this.held,
+        pending: () => false,
+        failures: () => [],
+        dispose: async () => {
+          this.held = false;
+        },
+        observe: () => {},
+      });
+    }
+    get stateHandle() {
+      return this.state.handle;
+    }
+    holdsState() {
+      return this.held;
+    }
+    async dispose() {
+      this.held = false;
+    }
+  }
+
+  it('an instance made while the pool holds a repeating draw gets another handle', async () => {
+    const pool = new InstancePool<Drawn>();
+    const first = new Drawn(pool, source(1));
+    first.held = true;
+    await pool.serve(
+      {},
+      () => first,
+      async () => {},
+    );
+    const second = new Drawn(pool, source(1, 2));
+    expect(first.stateHandle).toBe(hex(1));
+    expect(second.stateHandle).toBe(hex(2));
+  });
+
+  it('a rotation that would repeat a handle in the pool draws again', async () => {
+    const pool = new InstancePool<Drawn>();
+    const first = new Drawn(pool, source(1));
+    first.held = true;
+    await pool.serve(
+      {},
+      () => first,
+      async () => {},
+    );
+    const second = new Drawn(pool, source(2, 1, 3));
+    second.held = true;
+    await pool.serve(
+      {},
+      () => second,
+      async () => {},
+    );
+    second.held = false;
+    second.state.endWhenEmpty();
+    expect(second.stateHandle).toBe(hex(3));
+  });
+});

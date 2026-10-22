@@ -336,6 +336,11 @@ export abstract class BaseMcpServer extends McpServer {
      */
     stateLogger?: StateLogger;
     /**
+     * The host's index of state handles in use (a pool): a handle it answers
+     * `true` for is drawn again, so no two instances of the host share one.
+     */
+    isStateHandleTaken?: (handle: string) => boolean;
+    /**
      * The owner of the process's runtime session files, created by the host
      * and shared by its instances: each owned HTTP connection holding a
      * session keeps a file there until its logoff completed (written, and its
@@ -395,6 +400,9 @@ export abstract class BaseMcpServer extends McpServer {
     this.backgroundRuns = options.backgroundRuns;
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
+      ...(options.isStateHandleTaken !== undefined && {
+        isTaken: options.isStateHandleTaken,
+      }),
       logger: stateLoggerOf(options),
       // The idle bound's stop is a terminal disposal of what the state
       // owns: its connections are closed whatever the undo answered.

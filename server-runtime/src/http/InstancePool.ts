@@ -170,6 +170,9 @@ export class InstancePool<T extends Poolable> {
     return `instance ${n}`;
   }
 
+  /** Whether a handle is filed in the index: an instance's state draws again when so. */
+  isHandleTaken = (handle: string): boolean => this.index.has(handle);
+
   size(): number {
     return this.held.size;
   }

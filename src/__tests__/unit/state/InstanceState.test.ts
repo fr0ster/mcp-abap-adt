@@ -254,4 +254,59 @@ describe('InstanceState — isolation', () => {
     // settled: a later call runs afresh (nothing held, nothing to dispose)
     await expect(s.shutdown()).resolves.toEqual([]);
   });
+
+  describe('unique handles', () => {
+    /** A random source that answers the given 16-byte fills in order. */
+    const source = (...fills: number[]) => {
+      const queue = [...fills];
+      return (size: number) => Buffer.alloc(size, queue.shift() ?? 0xee);
+    };
+    const hex = (n: number) =>
+      n.toString(16).padStart(2, '0').repeat(16).toUpperCase();
+
+    it('a handle the host holds is drawn again at creation', () => {
+      const taken = new Set([hex(1), hex(2)]);
+      const s = new InstanceState({
+        isTaken: (h) => taken.has(h),
+        randomSource: source(1, 2, 3),
+      });
+      expect(s.handle).toBe(hex(3));
+    });
+    it('a handle the host holds is drawn again at rotation', () => {
+      const taken = new Set<string>();
+      const s = new InstanceState({
+        isTaken: (h) => taken.has(h),
+        randomSource: source(1, 2, 3, 4),
+      });
+      const a = part();
+      s.attach(a.p);
+      expect(s.handle).toBe(hex(1));
+      taken.add(hex(2));
+      taken.add(hex(3));
+      s.endWhenEmpty();
+      expect(s.handle).toBe(hex(4));
+    });
+    it('without isTaken every draw stands', () => {
+      const s = new InstanceState({ randomSource: source(7) });
+      expect(s.handle).toBe(hex(7));
+    });
+    it('two instances created in a row never share a handle', () => {
+      const held = new Set<string>();
+      const make = () => {
+        const s = new InstanceState({
+          isTaken: (h) => held.has(h),
+          randomSource: source(5, 5, 6),
+        });
+        held.add(s.handle);
+        return s;
+      };
+      const a = make();
+      const b = new InstanceState({
+        isTaken: (h) => held.has(h),
+        randomSource: source(5, 6),
+      });
+      expect(a.handle).toBe(hex(5));
+      expect(b.handle).toBe(hex(6));
+    });
+  });
 });

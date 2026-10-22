@@ -519,6 +519,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         state: {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
+          isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
@@ -562,6 +563,8 @@ export class StreamableHttpServer extends BaseMcpServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        // A handle the pool already files is drawn again.
+        isStateHandleTaken: this.pool.isHandleTaken,
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
         }),

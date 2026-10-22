@@ -46,7 +46,15 @@ export class StateCleanupError extends Error {
 }
 
 /** 32 upper-case hex characters, 128 random bits. */
-const newHandle = () => randomBytes(16).toString('hex').toUpperCase();
+const newHandle = (
+  source: (size: number) => Buffer,
+  isTaken: ((handle: string) => boolean) | undefined,
+): string => {
+  for (;;) {
+    const handle = source(16).toString('hex').toUpperCase();
+    if (!isTaken?.(handle)) return handle;
+  }
+};
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Where a failing observer, and the idle bound's end of the state, are reported. */
@@ -96,6 +104,14 @@ export interface InstanceStateOptions {
    * on the state logger, never thrown.
    */
   onIdleStop?: () => Promise<void>;
+  /**
+   * The host's index of handles in use: a handle it answers `true` for is
+   * drawn again, at creation and at rotation, so no two instances of one host
+   * share a handle. Absent (stdio, SSE): every draw stands.
+   */
+  isTaken?: (handle: string) => boolean;
+  /** The random source (16 bytes asked); default `crypto.randomBytes`. For tests. */
+  randomSource?: (size: number) => Buffer;
 }
 
 export class InstanceState {
@@ -104,8 +120,14 @@ export class InstanceState {
   readonly idleMinutes: number;
 
   private readonly onIdleStop: (() => Promise<void>) | undefined;
+  private readonly isTaken: ((handle: string) => boolean) | undefined;
+  private readonly randomSource: (size: number) => Buffer;
+  private current: string;
 
   constructor(options: InstanceStateOptions = {}) {
+    this.isTaken = options.isTaken;
+    this.randomSource = options.randomSource ?? randomBytes;
+    this.current = this.draw();
     this.log = options.logger ?? processLogger;
     this.onIdleStop = options.onIdleStop;
     this.idleMinutes =
@@ -114,7 +136,6 @@ export class InstanceState {
         : parseStateIdleMinutes(options.idleMinutes, 'stateIdleMinutes');
   }
 
-  private current = newHandle();
   private readonly parts: StatePart[] = [];
   private readonly emptyListeners: Array<() => void> = [];
   private readonly changeListeners = new Set<() => void>();
@@ -129,6 +150,10 @@ export class InstanceState {
   private closed = false;
   /** The bound's stop is under way: "ended" is said once the state is empty. */
   private idleEnding = false;
+
+  private draw(): string {
+    return newHandle(this.randomSource, this.isTaken);
+  }
 
   get handle(): string {
     return this.current;
@@ -277,7 +302,7 @@ export class InstanceState {
     const emptied = this.wasHolding && !holding;
     this.wasHolding = holding;
     if (!holding && this.endRequested) {
-      this.current = newHandle(); // the old handle is invalid for good
+      this.current = this.draw(); // the old handle is invalid for good
       this.endRequested = false;
     }
     this.reviewBound();

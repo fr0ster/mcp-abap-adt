@@ -68,8 +68,10 @@ pool after the close call's answer, with the instance unindexed at once.
 registration), `server-runtime/src/http/StreamableHttpServer.ts` (`createPerRequestServer`),
 `src/lib/state/heldLocks.ts`, the descriptions in `compact-modify/src/handlers/handleHandler{Lock,
 Update,Delete,Unlock}.ts`, `src/lib/compact/batch/handleHandlerBatch.ts`,
-`src/handlers/batch/batch/handleBatchBegin.ts`, the debug batch begin handlers; surface fixtures
-`tests/fixtures/tools/surface.json`, `compact/tests/fixtures/surface.json`, parity tests.
+`src/handlers/batch/batch/handleBatchBegin.ts`, the debug batch begin handlers; a new HTTP surface
+test and fixture. The entry fixtures `tests/fixtures/tools/surface.json` and
+`compact/tests/fixtures/surface.json` enumerate transport-independent groups and entries: they stay
+as they are (only description text changes there).
 
 - [ ] Write the failing tests: on the per-request HTTP server every tool's schema has an optional
       string `state_handle` with the spec's description, and the debugger tools keep theirs
@@ -81,8 +83,10 @@ Update,Delete,Unlock}.ts`, `src/lib/compact/batch/handleHandlerBatch.ts`,
 - [ ] One function adds the property to a schema that lacks it; the registration applies it only
       when the host states it (an option the HTTP per-request server sets). Update the refusal and
       the descriptions to the spec's words.
-- [ ] Update the HTTP surface fixtures by their own scripts if they have one; stdio/SSE fixtures
-      must not change.
+- [ ] Add an HTTP surface test that enumerates the schemas actually registered by a per-request
+      HTTP server for each of `http`, `http-ro`, `compact-http`, `compact-http-ro`, against a new
+      fixture written by that test's own update switch (as the existing surface tests do); the
+      entry fixtures change only by the description texts above.
 - [ ] Run the full unit suite: green.
 - [ ] Commit.
 
@@ -139,23 +143,38 @@ whole close awaits the logoffs' answers, `logoffsAnswered`, not only their write
       `holdsState()` and watching it go red; revert.
 - [ ] Commit.
 
-### Task 6: documentation, generated docs, changelog
+### Task 6: transport-aware tool documentation
+
+**Files:** `tools/generate-tools-docs.js` (selects groups with transport `stdio`),
+`compact/tools/generate-docs.js` (renders entry schemas before any HTTP registration), their
+outputs.
+
+- [ ] Write the failing check: the generated docs of the HTTP binaries name the optional
+      `state_handle` argument of every tool and list the session tools; the stdio and SSE docs do
+      not; the generated text no longer says HTTP serves the stdio set minus the leftover-session
+      tools without these additions.
+- [ ] Run it: red.
+- [ ] Make both generators read the HTTP surface from the same registration the HTTP server uses
+      (Task 2's function and Task 3's registration), and render it as the HTTP section of the
+      existing documents, beside the stdio set.
+- [ ] Regenerate; run the check: green.
+- [ ] Commit.
+
+### Task 7: documentation, changelog
 
 **Files:** `http/README.md`, `compact-http/README.md`, `README.md`, `compact/README.md`,
 `docs/user-guide/{CLIENT_CONFIGURATION,BATCH_MODE,DEBUGGER}.md`,
 `docs/architecture/STATEFUL_SESSION_GUIDE.md`, `docs/MIGRATION-19.0.md` only where it states the
-current contract, `server-runtime/src/http/launcher.ts` help text; generated
-`docs/user-guide/AVAILABLE_TOOLS*.md` and `compact/docs/AVAILABLE_TOOLS.md`; `CHANGELOG.md`.
+current contract, `server-runtime/src/http/launcher.ts` help text; `CHANGELOG.md`.
 
 - [ ] The argument first, the header as the alternative; the long session (open, use, close, the
       idle bound, the model keeps its handles); what another credential does on a held instance, as
       the code does it (the session and its locks kept, the credential taken over).
-- [ ] Regenerate the tool docs with `npm run docs:tools` and the compact package's `docs:tools`.
 - [ ] `CHANGELOG.md` `[19.3.0]`, dated.
 - [ ] Run lint, typecheck and the unit suites as CI runs them.
 - [ ] Commit.
 
-### Task 7: live check (owner's go only)
+### Task 8: live check (owner's go only)
 
 - [ ] Ping the system first. Over `compact-http`, one scenario through a long session: open, a read,
       lock, update, unlock, close; count SAP requests per call with `DEBUG_HTTP_WIRE=true`; check in

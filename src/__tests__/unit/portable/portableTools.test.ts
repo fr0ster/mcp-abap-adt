@@ -201,6 +201,18 @@ describe('RUNPATH added in place of the SONAME', () => {
     image.writeBigUInt64LE(sonameValue + 3n, entryAt(0) + 8);
     expect(() => elf.addRunpath(image, '$ORIGIN')).toThrow(/shares its string/);
   });
+
+  it('refuses a SONAME that is the tail of another name', () => {
+    const image = elfImage([
+      [1, 'libsapnwrfc.node'],
+      [14, 'sapnwrfc.node'],
+    ]);
+    // The SONAME pointed into the tail of the NEEDED name, as a linker that
+    // tail-merges strings would leave it: overwriting it would change that name.
+    const neededValue = image.readBigUInt64LE(entryAt(0) + 8);
+    image.writeBigUInt64LE(neededValue + 3n, entryAt(1) + 8);
+    expect(() => elf.addRunpath(image, '$ORIGIN')).toThrow(/shares its string/);
+  });
 });
 
 describe('npm without a shell', () => {

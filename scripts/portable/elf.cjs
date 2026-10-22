@@ -167,11 +167,13 @@ function addRunpath(bytes, newPath) {
   if (Buffer.byteLength(newPath) > soname.end - soname.start) {
     throw new Error(`the new RUNPATH "${newPath}" is longer than the SONAME "${name}" it replaces`);
   }
-  // Any other name beginning inside the SONAME's string, or at its start,
-  // would be overwritten with it.
-  const others = nameStarts(bytes, image, soname.strings).filter(
-    (start) => start >= soname.start && start <= soname.end,
-  );
+  // Any other name whose bytes overlap the SONAME's string — beginning inside
+  // it or at its start, or ending in it (a linker tail-merges a name into a
+  // longer one's tail) — would be overwritten with it.
+  const others = nameStarts(bytes, image, soname.strings).filter((start) => {
+    const end = bytes.indexOf(0, start);
+    return start <= soname.end && (end < 0 || end >= soname.start);
+  });
   if (others.length !== 1) {
     throw new Error(`the SONAME "${name}" of the RFC addon shares its string with another name: no RUNPATH is added`);
   }

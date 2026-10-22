@@ -38,8 +38,8 @@ docker run -i --rm -v "$PWD/service-keys:/app/service-keys:ro" -v "$PWD/sessions
 
 - **The system type** is required and set by no image: `-e SAP_SYSTEM_TYPE=onprem|cloud|legacy` (or
   `--system-type=…`). Without it a listener does not start, and a stdio destination does not either.
-- **HTTP only.** The image carries no SAP NW RFC SDK and no compiler, and installs with
-  `--omit=optional`: RFC and SNC are not available. See
+- **HTTP only.** The image carries no SAP NW RFC SDK (SAP does not allow redistributing it), and
+  installs with `--omit=optional`: RFC and SNC are not available. See
   [docs/installation/RFC_SETUP.md](../docs/installation/RFC_SETUP.md) for what an RFC image would need.
 - **TLS** settings are container environment variables, not lines in a destination `.env`:
   `NODE_EXTRA_CA_CERTS=<path to a mounted CA file>` to trust a CA, `TLS_REJECT_UNAUTHORIZED=0` to

@@ -180,9 +180,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    SAP_MSHOST (refused naming both otherwise)
     SAP_GROUP                      Logon group (connection default: PUBLIC)
     SAP_SAPROUTER                  SAProuter string, with either addressing
-    Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency,
-    compiled by npm install: SAPNWRFC_HOME and a C++ toolchain must be there before it;
-    npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out)
+    Requires: @mcp-abap-adt/sap-rfc-lite (an optional dependency, prebuilt for
+    linux-x64 glibc, win32-x64 and darwin-arm64, nothing compiled on install;
+    npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out) and,
+    at run time, the SAP NW RFC library: SAP GUI's 64-bit sapnwrfc.dll in System32
+    on Windows, else the SAP NW RFC SDK on the library search path
 
   System Context (first found wins; reads are unaffected):
     SAP_RESPONSIBLE                Responsible person of created objects, always sent. First

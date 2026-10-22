@@ -4,29 +4,27 @@ RFC is an alternative connection transport to HTTP. It works with any SAP system
 
 This applies to both servers, `@mcp-abap-adt/core` (`mcp-abap-adt`) and `@mcp-abap-adt/compact` (`mcp-abap-adt-compact`): the RFC module comes with either. The variants side by side: [Installation variants](INSTALLATION.md#installation-variants).
 
-## Why the order matters
+## What RFC needs
 
-The RFC module, `@mcp-abap-adt/sap-rfc-lite`, ships as C++ source with no prebuilt binary: **`npm install` compiles it**, against the SDK that `SAPNWRFC_HOME` names. It is an optional dependency, so when the compile fails — no SDK, `SAPNWRFC_HOME` unset in the shell that runs `npm install`, no compiler — npm leaves it out and still reports success. The server then installs, starts and lists every tool, and only the first RFC call is refused with `@mcp-abap-adt/sap-rfc-lite is not available`.
+The RFC module, `@mcp-abap-adt/sap-rfc-lite`, is an optional dependency with **no install script**: `npm install` compiles nothing and downloads nothing for it, and installs it with the server.
 
-So: **the SDK and a compiler first, then `SAPNWRFC_HOME`, then `npm install`, then check.**
+- **A prebuilt binding** comes with it for **Linux x64 (glibc), Windows x64 and macOS ARM64**, loaded when the first RFC call needs it. No C++ toolchain and no `SAPNWRFC_HOME` are needed for the install.
+- **Anywhere else** — another platform or architecture, or Linux with musl (Alpine and the like) — there is no binding until you build one, as the [sap-rfc-lite README, "Installation"](https://github.com/fr0ster/sap-rfc-lite#installation) describes (a C++ toolchain and `SAPNWRFC_HOME`). Until then the server installs, starts and lists every tool, and the first RFC call is refused with `@mcp-abap-adt/sap-rfc-lite is not available`.
 
-## 1. A C++ build toolchain
+The binding needs the **SAP NetWeaver RFC library** at run time, which SAP does not allow redistributing, so it never comes with the package:
 
-| Platform | Install |
-|---|---|
-| Windows | Visual Studio Build Tools with the **"Desktop development with C++"** workload, and Python 3 (node-gyp needs it) |
-| macOS | Xcode Command Line Tools: `xcode-select --install` |
-| Linux | `g++`, `make` and Python 3 — on Debian/Ubuntu `sudo apt-get install -y build-essential python3` |
+- **Windows where SAP GUI installed its 64-bit RFC library**: nothing to install. SAP GUI, when its RFC libraries are installed, puts a 64-bit `sapnwrfc.dll` into `C:\Windows\System32` (`where.exe sapnwrfc.dll` lists it), and the binding loads it.
+- **Anywhere else** — Windows with no 64-bit `sapnwrfc.dll` in `System32`, Linux, macOS, Docker images: the **SAP NW RFC SDK**, steps 1 and 2.
 
-## 2. SAP NW RFC SDK
+## 1. SAP NW RFC SDK
 
 Download from [SAP Support Portal](https://support.sap.com/en/product/connectors/nwrfcsdk.html) (requires S-user) — the package for your platform and architecture (Windows x64, Linux x64, macOS ARM or x64).
 
 Extract to a directory that stays where it is, e.g. `C:\nwrfcsdk\nwrfcsdk` (Windows) or `~/nwrfcsdk` (Linux/macOS).
 
-## 3. Environment variables
+## 2. Make the SDK loadable
 
-`SAPNWRFC_HOME` is read **when `npm install` compiles the module**: set it in the shell that runs the install. On Windows the SDK's `lib` directory must also be on `PATH` **when the server runs**, so its DLLs load. These are process-level variables — a destination's `.env` does not set them.
+The binding does not look for the SDK itself: the operating system's loader finds its libraries when the server makes its first RFC call, so the SDK's `lib` directory must be on the library search path **of the process that runs the server**. These are process-level variables — a destination's `.env` does not set them. An MCP client that starts the server needs them in its `env` block, or must itself be started from such an environment.
 
 **Windows (PowerShell, current window):**
 
@@ -35,28 +33,38 @@ $env:SAPNWRFC_HOME = "C:\nwrfcsdk\nwrfcsdk"
 $env:PATH = "$env:SAPNWRFC_HOME\lib;$env:PATH"
 ```
 
-To keep them, add the same two lines to `$PROFILE`, or set them in **System Properties** > **Environment Variables** (`SAPNWRFC_HOME`, and `%SAPNWRFC_HOME%\lib` appended to `PATH`) — then open a new terminal: a running one does not see the change. An MCP client that starts the server needs `PATH` in its `env` block, or must itself be started from such an environment.
+To keep them, add the same two lines to `$PROFILE`, or set them in **System Properties** > **Environment Variables** (`SAPNWRFC_HOME`, and `%SAPNWRFC_HOME%\lib` appended to `PATH`) — then open a new terminal: a running one does not see the change. Windows searches `System32` before `PATH`, so where SAP GUI's `sapnwrfc.dll` is there too, that one is loaded.
 
-**Linux/macOS (bash/zsh):**
+**Linux (bash/zsh):**
 
 ```bash
 export SAPNWRFC_HOME=~/nwrfcsdk
+export LD_LIBRARY_PATH="$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH"
+# or, system-wide:
+echo "$SAPNWRFC_HOME/lib" | sudo tee /etc/ld.so.conf.d/nwrfcsdk.conf && sudo ldconfig
 ```
 
-At runtime nothing more is needed: the build records `$SAPNWRFC_HOME/lib` in the module (an rpath), so the SDK must stay in that directory after the install. Moved, it needs `LD_LIBRARY_PATH` (Linux) — or a reinstall.
+**macOS (zsh):**
 
-## 4. Install and check
+```bash
+export SAPNWRFC_HOME=~/nwrfcsdk
+export DYLD_LIBRARY_PATH="$SAPNWRFC_HOME/lib"
+```
+
+The prebuilt binding carries no path of the machine it was built on, so it needs this wherever the SDK is installed. A binding you compiled yourself on Linux also records `$SAPNWRFC_HOME/lib` as it was at build time.
+
+## 3. Install and check
 
 ```bash
 npm install -g @mcp-abap-adt/core        # or @mcp-abap-adt/compact
 npm ls -g @mcp-abap-adt/sap-rfc-lite
 ```
 
-`npm ls` must show `@mcp-abap-adt/sap-rfc-lite@<version>`. **`(empty)` means the module was not built**: run the install again with `--foreground-scripts` to see the compiler's output, fix what it names, and reinstall. Installing `@mcp-abap-adt/sap-rfc-lite` on its own (`npm install -g @mcp-abap-adt/sap-rfc-lite`, same environment) also works: the server finds a globally installed copy.
+`npm ls` must show `@mcp-abap-adt/sap-rfc-lite@<version>`. **`(empty)` means it was left out**: an install with `--no-optional` / `--omit=optional` leaves RFC out on purpose — install again without it. Installing `@mcp-abap-adt/sap-rfc-lite` on its own (`npm install -g @mcp-abap-adt/sap-rfc-lite`) also works: the server finds a globally installed copy.
 
-Do not install with `--no-optional` / `--omit=optional`: that leaves RFC out on purpose.
+The order no longer matters: the install needs neither the SDK nor `SAPNWRFC_HOME`, so the SDK can come before or after it — it must be loadable when the server runs.
 
-## 5. SAP authorization
+## 4. SAP authorization
 
 The SAP user needs `S_RFC` authorization for function module `SADT_REST_RFC_ENDPOINT`. See SAP Note 3569684.
 
@@ -233,22 +241,25 @@ The package integration test (create, two updates through the tools on one conne
 
 ### "@mcp-abap-adt/sap-rfc-lite is not available … Cannot find module"
 
-The RFC module is not installed: the compile failed during `npm install` and npm left it out. Check:
+The RFC module is not installed: the install left it out (`--no-optional` / `--omit=optional`). Check:
 
 ```bash
-npm ls -g @mcp-abap-adt/sap-rfc-lite     # (empty) = not built
-echo $SAPNWRFC_HOME                      # PowerShell: $env:SAPNWRFC_HOME
+npm ls -g @mcp-abap-adt/sap-rfc-lite     # (empty) = not installed
 ```
 
-Make sure the toolchain (step 1) is installed and `SAPNWRFC_HOME` is set in the shell, then reinstall with `--foreground-scripts` to see the compiler output. Do not test with `node -e "require(...)"`: it resolves from the current directory, and fails for a global install even when the module is there.
+Install again without that option. Do not test with `node -e "require(...)"`: it resolves from the current directory, and fails for a global install even when the module is there.
+
+### "@mcp-abap-adt/sap-rfc-lite is not available … No native build was found"
+
+There is no binding for this platform: the package carries prebuilt ones for Linux x64 (glibc), Windows x64 and macOS ARM64 only. Build one as the [sap-rfc-lite README, "Installation"](https://github.com/fr0ster/sap-rfc-lite#installation) describes. On a musl distribution other than Alpine the glibc binding is found and fails to load instead.
 
 ### "@mcp-abap-adt/sap-rfc-lite is not available … cannot open shared object file" / "The specified module could not be found"
 
-The module was built but a library it links cannot be loaded. The message still says to install the module — it is installed; the `Details:` part names what is missing.
+The binding is there but a library it links cannot be loaded. The message still says to install the module — it is installed; the `Details:` part names what is missing.
 
-- **Windows** (`The specified module could not be found: sapnwrfc.node`): `%SAPNWRFC_HOME%\lib` is not on `PATH` in the server process. Set it (step 3) and restart the terminal or the MCP client.
-- **Linux/macOS, an SDK library**: the SDK was moved after the install. Put it back, or reinstall.
-- **Linux, a system library** (`libuuid.so.1`, measured 2026-10-05): seen with a Node.js from Linuxbrew, which runs on Linuxbrew's own loader and C library and does not search the system's library directories — and pointing `LD_LIBRARY_PATH` at them breaks Node.js itself. Use a Node.js built for the system (the distribution's package, NodeSource or nvm) and reinstall.
+- **Windows** (`The specified module could not be found: sapnwrfc.node`): no 64-bit `sapnwrfc.dll` in `System32`, and `%SAPNWRFC_HOME%\lib` is not on `PATH` in the server process. Set it (step 2) and restart the terminal or the MCP client.
+- **Linux/macOS, an SDK library** (`libsapnwrfc`, `libsapucum`): the SDK's `lib` directory is not on `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` in the server process (step 2), or the SDK was moved.
+- **Linux, a system library** (`libuuid.so.1`, measured 2026-10-05): seen with a Node.js from Linuxbrew, which runs on Linuxbrew's own loader and C library and does not search the system's library directories — and pointing `LD_LIBRARY_PATH` at them breaks Node.js itself. Use a Node.js built for the system (the distribution's package, NodeSource or nvm), or expose that one library alone as the [sap-rfc-lite README, "Runtime library loading"](https://github.com/fr0ster/sap-rfc-lite#runtime-library-loading) shows.
 
 ### "no usable SNC library was found"
 

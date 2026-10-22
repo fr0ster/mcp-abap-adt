@@ -22,32 +22,33 @@ The installed variants — npm, RFC, SNC — are in [Installation variants](INST
 
 - the SAP NW RFC SDK of this platform, with `SAPNWRFC_HOME` pointing at it: its runtime libraries go
   into the archive;
-- the RFC module comes as `@mcp-abap-adt/sap-rfc-lite` installs it: the prebuilt binding it carries for
-  these three platforms (0.2.3 and later), so no compiler is needed. To compile it against your SDK
-  instead, run the build with `--build-from-source` (`npm run portable:build --build-from-source`); that
-  needs a C++ toolchain, as for the npm install ([RFC Setup](RFC_SETUP.md)) — Windows: Visual Studio
-  Build Tools, "Desktop development with C++"; macOS: Xcode Command Line Tools; Linux: `g++`, `make`,
-  Python 3;
+- no compiler: the RFC module is the prebuilt binding `@mcp-abap-adt/sap-rfc-lite` carries for these
+  three platforms, and installing it compiles nothing (it has no install script);
 - Node.js 22 or 24 and a checkout of this repository with its production dependencies:
   `npm ci --omit=dev --ignore-scripts` is enough — the build installs the two tools it runs (esbuild and
   postject, at the versions the repository declares) into its cache, so the linter, the test runner and the
   rest of the development dependencies are not needed;
 - on Windows, the system `tar` (`%SystemRoot%\System32\tar.exe`, present since Windows 10) — the build
   calls it by that path, so a GNU tar earlier on the `PATH` (Git Bash) does not get in the way;
-- on Linux, `readelf` (binutils, part of the toolchain) to cross-check the RFC module after its
-  `RUNPATH` is rewritten — without it the build says the check was skipped.
+- on Linux, `readelf` (binutils) to cross-check the RFC module after its `RUNPATH` is set — without it
+  the build says the check was skipped.
 
 Only these machines can build: Linux x64, Windows x64, macOS arm64 (Apple silicon). Another one —
 Linux on ARM, an Intel Mac — is refused with that list.
 
 The Node.js 24 runtime that goes inside the executable is downloaded from nodejs.org and its SHA-256
 checksum verified. The servers themselves are installed from npm at the repository's version, so a
-version not yet published cannot be built: name a published one with `--version`.
+version not yet published cannot be built: name a published one with `--version`. Every copy of
+`@mcp-abap-adt/sap-rfc-lite` they install must be 0.3.0 or later — an older one reads its own
+`package.json` at run time, which an executable does not have — so a version whose packages pin an older
+range is refused, naming each such copy.
 
 The build takes the RFC module the way the package itself loads it (its own `node-gyp-build`): a
-compiled `build/Release` first, else the prebuilt one. Whatever library search path the module carries
-— your SDK's folder, or the folder of the SDK it was prebuilt with — is rewritten to the module's own
-folder (`$ORIGIN` on Linux, `@loader_path` on macOS), so it finds the SDK beside it.
+`build/Release` you built by hand in the staged package first, else the prebuilt one. The prebuilt
+module carries no library search path, and one you compiled names your SDK's folder; either way the
+module's search path becomes its own folder (`$ORIGIN` on Linux, `@loader_path` on macOS), so it finds the
+SDK beside it. On Linux, a module with no `RUNPATH` gets one in place of its `SONAME` entry, whose string
+becomes `$ORIGIN`: the module is loaded by its path, never by that name.
 
 ## Building
 
@@ -75,8 +76,7 @@ dist-portable/
 are kept in `<temp>/mcp-abap-adt-portable/<version>/<platform>/`, the build tools in
 `<temp>/mcp-abap-adt-portable/tools/` (`<temp>` is the
 system's temporary folder: `/tmp` on Linux, `%TEMP%` on Windows, `$TMPDIR` on macOS). A build reuses it
-only for the same version, the same `SAPNWRFC_HOME` and the same choice of `--build-from-source`, and
-only when the RFC module is really there; anything else is installed again. The tools are reinstalled when the
+only for the same version and the same `SAPNWRFC_HOME`, and only when the RFC module is really there; anything else is installed again. The tools are reinstalled when the
 repository declares other versions of them. To start from nothing, delete `<temp>/mcp-abap-adt-portable/`.
 
 Then check what was built:
@@ -136,8 +136,12 @@ and SmartScreen asks once. Enough for a build that stays on your machine.
 - **Linux x64:** in a clean container with no Node.js, the archive mounted read-only — version, MCP
   `initialize`, `tools/list`, and the RFC stack loading from `nwrfcsdk/lib` (`npm run portable:smoke`).
   Built again from npm at 19.1.0 with `@mcp-abap-adt/sap-rfc-lite` 0.2.4's prebuilt module (2026-10-21):
-  `npm run portable:smoke -- 19.1.0` passes for both servers. Not yet for the prebuilt module on
-  Windows and macOS.
+  `npm run portable:smoke -- 19.1.0` passes for both servers. With `@mcp-abap-adt/sap-rfc-lite`
+  0.3.1's prebuilt module, which carries no `RUNPATH` (2026-10-22): 19.2.0 staged from npm with the
+  module overridden to 0.3.1 (the published 19.2.0 pins 0.2.x, which this build now refuses) — the
+  module gets a `RUNPATH` of `$ORIGIN` in place of its `SONAME`, and `npm run portable:smoke` passes
+  all 18 checks for both servers; without that `RUNPATH`, `ldd` finds neither `libsapnwrfc.so` nor
+  `libsapucum.so` beside it. Not yet for the prebuilt module on Windows and macOS.
 - **Windows 11 x64:** built with `npm run portable:build` and used with SNC; the RFC module and the SDK
   DLLs load from the archive's `nwrfcsdk/lib`. Rebuilt after the build switched to `System32\\tar.exe` and npm
   without a shell (2026-10-06): builds and works.

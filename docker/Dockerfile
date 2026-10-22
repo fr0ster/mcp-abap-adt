@@ -21,9 +21,9 @@
 #   docker build --build-arg VARIANT=http --build-arg PACKAGE_SOURCE=tarballs \
 #     --build-context tarballs=<directory of *.tgz> -t mcp-abap-adt-http docker
 #
-# RFC and SNC are not available in this image: @mcp-abap-adt/sap-rfc-lite is
-# compiled at install time against the SAP NW RFC SDK, which the image does not
-# carry, so the optional dependency is left out on purpose.
+# RFC and SNC are not available in this image: @mcp-abap-adt/sap-rfc-lite needs
+# the SAP NW RFC SDK at run time, which SAP does not allow redistributing and
+# the image does not carry, so the optional dependency is left out on purpose.
 #
 # The system type is never set here: state it when the container runs
 # (SAP_SYSTEM_TYPE, or --system-type). No variant starts a destination or a

@@ -145,21 +145,22 @@ The checkout is not runnable as a server by itself; to run what you built, see
 
 ### RFC and SNC
 
-RFC and SNC need, **before** `npm install -g`: the SAP NW RFC SDK, a C++ toolchain, and
-`SAPNWRFC_HOME` set in the shell that runs the install.
+The RFC module comes with a prebuilt binding for Apple Silicon (`darwin-arm64`), and `npm install`
+compiles nothing. RFC and SNC need the SAP NW RFC SDK **when the server runs**, with
+`DYLD_LIBRARY_PATH` pointing at its `lib` directory in the server process. On an Intel Mac there is no
+prebuilt binding: build one first ([RFC Setup](../RFC_SETUP.md)).
 
-- **Toolchain:** `xcode-select --install`.
 - **SDK:** the macOS ARM package on Apple Silicon (x64 on Intel).
 - **SNC:** the library is found at `/Applications/Secure Login Client.app/Contents/MacOS/lib/libsapcrypto.dylib`.
 
 ```bash
-export SAPNWRFC_HOME=~/nwrfcsdk
 npm install -g @mcp-abap-adt/core
 npm ls -g @mcp-abap-adt/sap-rfc-lite
+export DYLD_LIBRARY_PATH="$HOME/nwrfcsdk/lib"   # in the server's environment
 ```
 
-`(empty)` from `npm ls` means npm silently dropped the RFC module. Details and the SNC `.env`:
-[RFC Setup](../RFC_SETUP.md).
+`(empty)` from `npm ls` means the install left the RFC module out (`--no-optional` /
+`--omit=optional`). Details and the SNC `.env`: [RFC Setup](../RFC_SETUP.md).
 
 ## ⚙️ Step 5: Configure SAP Connection
 

@@ -27,7 +27,7 @@ Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`
 | Connection | Authentication (`SAP_AUTH_TYPE`) | What the machine needs besides Node.js |
 |---|---|---|
 | **HTTP** (default) | `basic`, or `jwt` (browser login with a service key; a token you hold goes in the `x-sap-jwt-token` header of the HTTP and SSE binaries, not over stdio) | Nothing. |
-| **RFC** (`SAP_CONNECTION_TYPE=rfc`) | `basic` | The SAP NW RFC SDK and a C++ build toolchain **at install time** — the RFC module is compiled by `npm install`. |
+| **RFC** (`SAP_CONNECTION_TYPE=rfc`) | `basic` | The SAP NW RFC library **at run time**: SAP GUI's 64-bit `sapnwrfc.dll` in `System32` on Windows, else the SAP NW RFC SDK. The RFC module comes prebuilt for Linux x64 (glibc), Windows x64 and macOS ARM64; nothing is compiled by `npm install`. |
 | **SNC** (RFC, passwordless) | `snc` | Everything RFC needs, plus an SNC product logged on — typically SAP Secure Login Client. No user, no password in the `.env`. |
 
 The authentications in full: [Authentication & Destinations](../user-guide/AUTHENTICATION.md).
@@ -43,17 +43,20 @@ npm install -g @mcp-abap-adt/compact     # mcp-abap-adt-compact
 npm install -g @mcp-abap-adt/compact-ro  # mcp-abap-adt-compact-ro: the compact tools that change nothing
 ```
 
-**RFC and SNC** — the same command, run **after** the SDK and the toolchain are in place and with
-`SAPNWRFC_HOME` set in the shell that runs it:
+**RFC and SNC** — the same command. The install compiles nothing, so it needs neither the SDK nor
+`SAPNWRFC_HOME`; the RFC library must be loadable **when the server runs**:
 
 ```bash
-# Linux / macOS
-export SAPNWRFC_HOME=/path/to/nwrfcsdk
+# Linux: the SDK's lib directory on the library search path
+export LD_LIBRARY_PATH="/path/to/nwrfcsdk/lib:$LD_LIBRARY_PATH"
+# macOS
+export DYLD_LIBRARY_PATH="/path/to/nwrfcsdk/lib"
 npm install -g @mcp-abap-adt/core        # or @mcp-abap-adt/compact
 ```
 
 ```powershell
-# Windows (PowerShell)
+# Windows (PowerShell): nothing, where SAP GUI installed its 64-bit sapnwrfc.dll in System32
+# (where.exe sapnwrfc.dll); else the SDK's lib directory on PATH
 $env:SAPNWRFC_HOME = "C:\nwrfcsdk\nwrfcsdk"
 $env:PATH = "$env:SAPNWRFC_HOME\lib;$env:PATH"
 npm install -g @mcp-abap-adt/core        # or @mcp-abap-adt/compact
@@ -65,16 +68,16 @@ Then check that the RFC module is there:
 npm ls -g @mcp-abap-adt/sap-rfc-lite
 ```
 
-**`(empty)` means the server was installed without RFC.** `@mcp-abap-adt/sap-rfc-lite` is an optional
-dependency, and when it cannot be compiled — no SDK, `SAPNWRFC_HOME` unset, no compiler — npm drops it
-and still reports success. The server then starts with every tool and refuses the first RFC call with
-`@mcp-abap-adt/sap-rfc-lite is not available`. Fix the cause and run the install again. The toolchain per
-platform, the runtime settings and the SNC prerequisites: [RFC Setup](RFC_SETUP.md).
+**`(empty)` means the server was installed without RFC** (`--no-optional` / `--omit=optional`): run
+the install again without that option. On a platform with no prebuilt binding (another platform or
+architecture, Linux with musl), the module is installed but has no binding until you build one, and the
+server refuses the first RFC call with `@mcp-abap-adt/sap-rfc-lite is not available`. The runtime
+settings per platform, building a binding and the SNC prerequisites: [RFC Setup](RFC_SETUP.md).
 
 ### Portable build (personal)
 
 One executable per server and platform, with Node.js and your own SAP NW RFC SDK inside: unpack and run,
-no Node.js, npm or compiler on the machine — HTTP, RFC and, on Windows and macOS, SNC. You build it
+no Node.js, npm or SDK installation on the machine — HTTP, RFC and, on Windows and macOS, SNC. You build it
 yourself from this repository (`npm run portable:build`) and keep it: it carries the SDK, so it is never
 handed on. See [Portable Build](PORTABLE.md).
 

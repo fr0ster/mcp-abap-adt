@@ -40,7 +40,7 @@ There is no `--transport` (a binary is its transport) and no `--exposition`: pas
 config file's `exposition`, stops the start with a sentence naming the binary that serves what you
 asked for — for example `--exposition=high` names `mcp-abap-adt` (`@mcp-abap-adt/core`).
 
-**One destination per process** through the auth broker, exactly as `mcp-abap-adt`: a service key, a session, an `--env` file, the browser login. It connects to the ABAP system over HTTP (basic or JWT), RFC (basic) or SNC (passwordless, over RFC); **RFC and SNC need the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` set before `npm install`** (see [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/RFC_SETUP.md)).
+**One destination per process** through the auth broker, exactly as `mcp-abap-adt`: a service key, a session, an `--env` file, the browser login. It connects to the ABAP system over HTTP (basic or JWT), RFC (basic) or SNC (passwordless, over RFC); **RFC and SNC need the SAP NW RFC library when the server runs** — SAP GUI's 64-bit `sapnwrfc.dll` on Windows, else the SAP NW RFC SDK; the RFC module comes prebuilt for Linux x64 (glibc), Windows x64 and macOS ARM64 (see [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/RFC_SETUP.md)).
 
 Every binary and its tools:
 [Handler sets](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/HANDLERS_MANAGEMENT.md);

@@ -38,7 +38,7 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 
 ## Getting Started
 
-Pick a variant first — full or compact server, and HTTP, RFC or SNC to the system. HTTP needs nothing but Node.js 22 or 24; **RFC and SNC need the SAP NW RFC SDK and a C++ toolchain on the machine before `npm install`**, because the RFC module is compiled during the install and silently left out when it cannot be. [Installation variants](docs/installation/INSTALLATION.md#installation-variants) has the table and the commands; [RFC Setup](docs/installation/RFC_SETUP.md) the steps. To run without Node.js on a machine, build your own [portable executable](docs/installation/PORTABLE.md) — Node.js and your SAP NW RFC SDK inside.
+Pick a variant first — full or compact server, and HTTP, RFC or SNC to the system. HTTP needs nothing but Node.js 22 or 24; **RFC and SNC need the SAP NW RFC library when the server runs** — SAP GUI's 64-bit `sapnwrfc.dll` on Windows, else the SAP NW RFC SDK; the RFC module comes prebuilt for Linux x64 (glibc), Windows x64 and macOS ARM64, and `npm install` compiles nothing. [Installation variants](docs/installation/INSTALLATION.md#installation-variants) has the table and the commands; [RFC Setup](docs/installation/RFC_SETUP.md) the steps. To run without Node.js on a machine, build your own [portable executable](docs/installation/PORTABLE.md) — Node.js and your SAP NW RFC SDK inside.
 
 Install the server and configure your client using the configurator:
 
@@ -97,6 +97,7 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only.
 Coming from 18.x? See the [19.0 migration note](docs/MIGRATION-19.0.md) — the server split into a
 package per transport and tool set, the system type required, the low set gone, the auth chain on
 6.0. Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
@@ -291,7 +292,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 ### For Users
 - **[Docs Index](docs/README.md)** - Full documentation index
 - **[Installation Guide](docs/installation/README.md)** - Installation variants (full or compact; HTTP, RFC or SNC) and platform guides
-- **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
+- **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC library at run time, the prebuilt RFC module and where to build one
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
 - **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - Record independent calls, send them together in batch envelopes at `BatchEnd`, read their answers by number; which calls are recorded
@@ -313,6 +314,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only
 - **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end
 - **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint
 - **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
@@ -333,7 +335,7 @@ and six packages declare the contracts both of them and this project are written
 
 The verdict on an ADT answer is a strategy, not a default: since `adt-clients` 23 no member judges its own answer, and **[@mcp-abap-adt/adt-strategies](https://www.npmjs.com/package/@mcp-abap-adt/adt-strategies)** holds the readings this project passes to every call. That is what keeps a refusal ADT embeds in an HTTP `200` — an activation that did not activate, a delete that was refused — from reaching a caller as success.
 
-Everything above is installed by `npm install` and published to npm. `@mcp-abap-adt/sap-rfc-lite` is optional and only needed for the RFC transport (and so for SNC). It is compiled during `npm install` against the SAP NW RFC SDK that `SAPNWRFC_HOME` names, and npm leaves it out without an error when it cannot be — check with `npm ls -g @mcp-abap-adt/sap-rfc-lite`. See [RFC Setup](docs/installation/RFC_SETUP.md).
+Everything above is installed by `npm install` and published to npm. `@mcp-abap-adt/sap-rfc-lite` is optional and only needed for the RFC transport (and so for SNC). It has no install script: it carries a prebuilt binding for Linux x64 (glibc), Windows x64 and macOS ARM64 and compiles nothing on install; elsewhere a binding is built by hand. At run time it needs the SAP NW RFC library — SAP GUI's 64-bit `sapnwrfc.dll` in `System32` on Windows, else the SAP NW RFC SDK. Check it is installed with `npm ls -g @mcp-abap-adt/sap-rfc-lite`. See [RFC Setup](docs/installation/RFC_SETUP.md).
 
 ---
 
@@ -450,7 +452,7 @@ SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 SAP_RESPONSIBLE=<your ABAP user>
 # Optional: SAP_SNC_QOP, SAP_SNC_LIB, SAP_SNC_MYNAME
 ```
-The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. `SAP_CONNECTION_TYPE=rfc` (or `--connection-type=rfc`) is required: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
+The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. `SAP_CONNECTION_TYPE=rfc` (or `--connection-type=rfc`) is required: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC library (SAP GUI's on Windows, else the SDK) and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
 
 > **Not supported since 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `cannot be used: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
 

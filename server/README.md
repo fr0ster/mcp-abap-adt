@@ -25,9 +25,10 @@ this one naming the binary to run. Only the stdio servers (this one, `compact`, 
 `compact-ro`) load `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores`.
 
 It connects to the ABAP system over **HTTP** (basic or JWT), **RFC** (basic) or **SNC**
-(passwordless, over RFC). HTTP needs nothing more. **RFC and SNC need the SAP NW RFC SDK, a C++
-toolchain and `SAPNWRFC_HOME` set before `npm install`**: the RFC module is compiled during the
-install and silently left out when it cannot be — check with `npm ls -g @mcp-abap-adt/sap-rfc-lite`.
+(passwordless, over RFC). HTTP needs nothing more. **RFC and SNC need the SAP NW RFC library when the server
+runs**: SAP GUI's 64-bit `sapnwrfc.dll` in `System32` on Windows, else the SAP NW RFC SDK. The RFC
+module comes prebuilt for Linux x64 (glibc), Windows x64 and macOS ARM64, and `npm install` compiles
+nothing — check it is there with `npm ls -g @mcp-abap-adt/sap-rfc-lite`.
 The compact variant of this server is
 [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact). Every variant:
 [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants);

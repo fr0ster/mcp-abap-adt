@@ -139,24 +139,23 @@ The checkout is not runnable as a server by itself; to run what you built, see
 
 ### RFC and SNC
 
-RFC and SNC need, **before** `npm install -g`: the SAP NW RFC SDK, a C++ toolchain, and
-`SAPNWRFC_HOME` set in the shell that runs the install.
+The RFC module comes with a prebuilt binding for Windows x64, and `npm install` compiles nothing.
 
-- **Toolchain:** Visual Studio Build Tools with the "Desktop development with C++" workload, and
-  Python 3 — e.g. `winget install Microsoft.VisualStudio.2022.BuildTools`, then add the workload in
-  the installer; `winget install Python.Python.3.12`.
-- **Runtime:** `%SAPNWRFC_HOME%\lib` on `PATH` of the server process.
+- **Runtime:** where SAP GUI installed its 64-bit RFC library (`sapnwrfc.dll` in
+  `C:\Windows\System32`; `where.exe sapnwrfc.dll` lists it), nothing more. Otherwise the SAP NW RFC
+  SDK, with `%SAPNWRFC_HOME%\lib` on `PATH` of the server process.
 - **SNC:** SAP Secure Login Client logged on; the SNC library is found via the registry.
 
 ```powershell
-$env:SAPNWRFC_HOME = "C:\nwrfcsdk\nwrfcsdk"
-$env:PATH = "$env:SAPNWRFC_HOME\lib;$env:PATH"
 npm install -g @mcp-abap-adt/core
 npm ls -g @mcp-abap-adt/sap-rfc-lite
+# only without SAP GUI's sapnwrfc.dll in System32:
+$env:SAPNWRFC_HOME = "C:\nwrfcsdk\nwrfcsdk"
+$env:PATH = "$env:SAPNWRFC_HOME\lib;$env:PATH"
 ```
 
-`(empty)` from `npm ls` means npm silently dropped the RFC module. Details and the SNC `.env`:
-[RFC Setup](../RFC_SETUP.md).
+`(empty)` from `npm ls` means the install left the RFC module out (`--no-optional` /
+`--omit=optional`). Details and the SNC `.env`: [RFC Setup](../RFC_SETUP.md).
 
 ## ⚙️ Step 4: Configure SAP Connection
 

@@ -27,7 +27,8 @@ The installed variants — npm, RFC, SNC — are in [Installation variants](INST
 - Node.js 22 or 24 and a checkout of this repository with its production dependencies:
   `npm ci --omit=dev --ignore-scripts` is enough — the build installs the two tools it runs (esbuild and
   postject, at the versions the repository declares) into its cache, so the linter, the test runner and the
-  rest of the development dependencies are not needed;
+  rest of the development dependencies are not needed. Both of the build's own installs (the tools, and the
+  servers it packages) run no install script (`--ignore-scripts`): none is needed;
 - on Windows, the system `tar` (`%SystemRoot%\System32\tar.exe`, present since Windows 10) — the build
   calls it by that path, so a GNU tar earlier on the `PATH` (Git Bash) does not get in the way;
 - on Linux, `readelf` (binutils) to cross-check the RFC module after its `RUNPATH` is set — without it

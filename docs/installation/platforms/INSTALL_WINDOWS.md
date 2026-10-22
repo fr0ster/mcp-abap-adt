@@ -130,9 +130,11 @@ $npmPrefix = npm config get prefix
 ```powershell
 git clone https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
-npm install
+npm ci --ignore-scripts
 npm run build
 ```
+
+`--ignore-scripts`: no dependency needs its install script to build or test.
 
 The checkout is not runnable as a server by itself; to run what you built, see
 [From source (development)](../INSTALLATION.md#from-source-development).

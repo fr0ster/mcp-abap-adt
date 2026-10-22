@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [20.1.0] - 2026-10-22
+
+Both ABAP Unit runners of a class, for the model to choose ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286)): a system may serve only one of the two endpoints — an on-premise system was reported with `/sap/bc/adt/abapunit/testruns` alone, without `/abapunit/runs`.
+
+### Added
+
+- **`RunUnitTestSync`** (`mcp-abap-adt`, `-http`, `-sse`; `cloud, onprem`; read-only, in the high group beside `RunUnitTest`): `class_name`, `detail`. One `POST /sap/bc/adt/abapunit/testruns`, answered `{ success, finished: true, run_result }` with the finished result — no run id, no second call. A failing test is an alert in the result, as in the asynchronous result, not an error. Recordable in batch mode (one request).
+- **`HandlerUnitTestRun` takes `runner: 'sync' | 'async'`, default `'sync'`** (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`). `sync`: the same one request, answered `{ success, finished: true, run_result }`; the endpoint addresses whole classes, so every test class of each `container_class` named runs, and `title` and `context` are not sent. `async`: the run is started and `{ success, run_id }` answered, as before, its status and result read with `HandlerUnitTestStatus` / `HandlerUnitTestResult`. Another value is refused before any request. `HandlerUnitTestRun` runs class tests only, so there is no report or function-group target to refuse. In batch mode both runners are one request each (`tools/batch-handlers.json`; an absent `runner` reads as `sync`).
+
+### Changed
+
+- **`HandlerUnitTestRun` without `runner` now runs synchronously and answers the result**, where 20.0.0 started the run and answered its `run_id`. A caller that reads `run_id` from it passes `runner: 'async'`.
+- **`RunUnitTest`'s description says which runner it is**: it starts an asynchronous run, waits for it within a bound and answers the result, or the `run_id` when the run outlasts the bound — suited to long suites. Its behaviour is unchanged.
+- **Dependency: `@mcp-abap-adt/adt-clients` `^37.1.0`** (`@mcp-abap-adt/lib`), which adds `ClassTestRunner.runSync`.
+
+Measured through the stdio binaries from this release's packed packages (2026-10-22), a class with one passing and one failing test, on premise (BASIS 816) and on an SAP BTP ABAP trial: every runner answered the same two methods, one passed and one failed. On premise `RunUnitTestSync` took 535 ms against `RunUnitTest`'s 604 ms, compact `runner: 'sync'` 161–467 ms against `async`'s 555 ms for start, status and result; on the trial 1.36 s against 2.43 s, and 0.78–0.88 s against 2.70 s.
+
 ## [20.0.0] - 2026-10-22
 
 The RFC transport on `@mcp-abap-adt/connection` 19 and `@mcp-abap-adt/sap-rfc-lite` 0.3.2, which compiles nothing on install: a platform without a prebuilt RFC binding no longer gets one from `npm install`. Migration: [`docs/MIGRATION-20.0.md`](docs/MIGRATION-20.0.md). Over Streamable HTTP, `state_handle` is a declared argument of every tool, and a long session keeps one server instance and its SAP session across calls ([#308](https://github.com/fr0ster/mcp-abap-adt/issues/308)).

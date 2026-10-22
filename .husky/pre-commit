@@ -1,2 +1,2 @@
-npx lint-staged
+lint-staged
 npm run build

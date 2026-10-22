@@ -34,20 +34,6 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "MCP Inspector - STDIO",
-      "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/cli/build/cli.js",
-      "args": ["node", "${workspaceFolder}/server/bin/mcp-abap-adt.js", "--env-path", "${workspaceFolder}/.env"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js", "${workspaceFolder}/server/dist/**/*.js", "${workspaceFolder}/server-runtime/dist/**/*.js"],
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "console": "internalConsole",
-      "env": {
-        "NODE_ENV": "development"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
       "name": "MCP Server - STDIO",
       "program": "${workspaceFolder}/server/bin/mcp-abap-adt.js",
       "args": ["--env-path", "${workspaceFolder}/.env"],

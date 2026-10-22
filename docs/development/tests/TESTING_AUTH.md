@@ -51,6 +51,9 @@ With an installed server (a checkout is not runnable by itself — see
 npx @modelcontextprotocol/inspector mcp-abap-adt --mcp=TRIAL --system-type=cloud   # stdio, in the MCP Inspector
 ```
 
+The MCP Inspector is not a dependency of this repository: the command above fetches and runs it
+from npm on your own machine, outside the checkout and its install policy.
+
 Destinations, service keys and the browser login are served only by `mcp-abap-adt` (stdio);
 `mcp-abap-adt-http` / `mcp-abap-adt-sse` take credentials from `x-sap-*` headers and answer a
 request carrying `x-mcp-destination` with `400`.

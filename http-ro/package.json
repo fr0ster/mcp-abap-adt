@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/http-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-http-ro",
-  "version": "19.2.0",
+  "version": "20.0.0",
   "description": "The read-only MCP server for SAP ABAP ADT over Streamable HTTP: the readonly tools (with system and search), no high, debugger, background-run or leftover-session tool; credentials only from each request's x-sap-* headers. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -58,10 +58,10 @@
     "start": "node ./bin/mcp-abap-adt-http-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^19.2.0",
-    "@mcp-abap-adt/lib": "^19.2.0",
-    "@mcp-abap-adt/responsible-rules": "^19.2.0",
-    "@mcp-abap-adt/server-runtime": "^19.2.0"
+    "@mcp-abap-adt/background-runs-memory": "^20.0.0",
+    "@mcp-abap-adt/lib": "^20.0.0",
+    "@mcp-abap-adt/responsible-rules": "^20.0.0",
+    "@mcp-abap-adt/server-runtime": "^20.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

@@ -79,6 +79,24 @@ RFC and SNC are not available in them, as before. An RFC image of your own no lo
 anything on install; it needs the SDK inside it, its `lib` directory on `LD_LIBRARY_PATH`, and an x64
 glibc base for the prebuilt binding. See [Docker](deployment/DOCKER.md#rfc-and-snc).
 
+## Building from a checkout: no install script runs
+
+Only for a contributor who installs this repository itself; the published packages, their code and
+their dependency ranges are not affected.
+
+- **Install with `npm ci --ignore-scripts`, then `npm run prepare`** for the git hook (husky). The
+  repository's `.npmrc` sets `strict-allow-scripts=true` and `package.json` `allowScripts` denies
+  every dependency's install script, so with npm 11.19.0 or later a new dependency with an
+  unreviewed install script fails the install (`ESTRICTALLOWSCRIPTS`) instead of running it; npm 10
+  (bundled with Node.js 22) reads neither setting, hence `--ignore-scripts` on any npm.
+- **New versions are resolved only once they are 7 days old** (`min-release-age=7`), except the
+  `@mcp-abap-adt/*` scope.
+- **`@mcp-abap-adt/lib` no longer has `@modelcontextprotocol/inspector` as a dev dependency**, and
+  `.vscode/launch.json` lost its Inspector configuration: run the Inspector as your own command
+  ([TESTING_AUTH](development/tests/TESTING_AUTH.md)).
+
+See [Installation, "From source"](installation/INSTALLATION.md#from-source-development).
+
 ## Streamable HTTP: held state by argument, and the long session
 
 For a 19.x user of `mcp-abap-adt-http`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-compact-http` or

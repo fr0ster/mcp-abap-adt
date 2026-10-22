@@ -79,7 +79,8 @@ so that no package goes out on top of a dependency that is missing.
    `npm run docs:tools`.
 4. **Build and test**:
    ```bash
-   npm ci
+   npm ci --ignore-scripts   # as the workflows do: no dependency's install script runs
+   npm run prepare           # only to install this checkout's git hook (husky)
    npm run build          # all eighteen packages
    npm run test:check
    npm test               # every package's suites, once; includes binSmoke (packs all eighteen, installs them, runs the twelve bins)
@@ -133,7 +134,7 @@ so that no package goes out on top of a dependency that is missing.
    block, not your terminal, and leaves the failure in `$?`:
    ```bash
    (
-     version=<version>          # e.g. 19.2.0
+     version=<version>          # e.g. 20.0.0
      bindir=bin; suffix=        # Windows (Git Bash): bindir=.; suffix=.cmd
      failed=
      for pair in "core:mcp-abap-adt compact:mcp-abap-adt-compact" \
@@ -169,14 +170,20 @@ so that no package goes out on top of a dependency that is missing.
 ## What the workflows check
 
 - `ci.yml` (push and pull request to `main` / `develop`): Ubuntu, macOS and Windows × Node 22 and
-  24 — Biome lint (root and each package's `lint:check`), build, test type-check, tests, the
-  server-runtime, server, http, sse, background-runs-memory and responsible-rules tests; on Ubuntu / Node 22 also
-  `npm audit --omit=dev --audit-level=high`, `npm pack` of all eighteen packages, an install of
-  the tarballs that runs each of the twelve bins' `--version` and `--help`, and the twelve Docker
-  images built from those tarballs and checked (`scripts/ci/check-images.mjs`).
-- `release.yml` (tag `v*.*.*`): the same lint, build and tests on Ubuntu × Node 22 and 24 — on
-  Node 22 also the packing, the install, the bins and the twelve images —, then a GitHub Release
+  24 — install with `npm ci --ignore-scripts`, Biome lint (root and each package's `lint:check`),
+  build, test type-check, tests, the server-runtime, server, http, sse, background-runs-memory and
+  responsible-rules test type-check; on Ubuntu / Node 22 also `npm audit --audit-level=moderate`
+  (the whole tree, dev dependencies included), `npm pack` of all eighteen packages, an install of
+  the tarballs (`--ignore-scripts`) that runs each of the twelve bins' `--version` and `--help`,
+  the twelve Docker images built from those tarballs and checked (`scripts/ci/check-images.mjs`),
+  and the Glama reference image (`docker/Dockerfile.inspect`) once its pinned `core` is on npm.
+- `release.yml` (tag `v*.*.*`): Ubuntu × Node 22 and 24 — the same install and
+  `npm audit --audit-level=moderate`, lint, build and tests — on Node 22 also the packing, the
+  install, the bins, the twelve images and the Glama reference image —, then a GitHub Release
   (`softprops/action-gh-release`, generated notes).
+
+Every job is capped by `timeout-minutes` (45 for a test job, 10 for the release job), and every
+step gates the run.
 
 No workflow publishes an image: the images are built by whoever runs them, from
 [`docker/Dockerfile`](../../docker/Dockerfile) (see [DOCKER.md](./DOCKER.md)).

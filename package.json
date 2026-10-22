@@ -229,7 +229,7 @@
     "@mcp-abap-adt/adt-strategies": "^0.15.0",
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
-    "@mcp-abap-adt/connection": "^18.0.1",
+    "@mcp-abap-adt/connection": "^19.0.0",
     "@mcp-abap-adt/interfaces-adt": "^20.1.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
@@ -247,7 +247,7 @@
     "zod": "^4.6.5"
   },
   "optionalDependencies": {
-    "@mcp-abap-adt/sap-rfc-lite": "^0.3.1"
+    "@mcp-abap-adt/sap-rfc-lite": "^0.3.2"
   },
   "engines": {
     "node": ">=22.0.0",

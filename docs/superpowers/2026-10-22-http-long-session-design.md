@@ -71,8 +71,14 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
 - **Idle bound.** Nothing new: an open long session is held state, so the existing bound
   (`--state-idle-minutes`, default 30) arms between calls; at expiry the SAP session is logged off
   and the instance leaves the pool.
-- **No list tool.** The handle is a bearer secret and the server does not identify the caller, so
-  it cannot list a caller's sessions; a list of all would hand out other clients' handles.
+- **Batch mode.** The session tools run at once, never recorded: while a communication batch or a
+  debugger batch is open they bypass batch recording and its refusal of connectionless tools, the
+  way the batch's own control tools do, and they neither end nor flush the batch. Closing a session
+  while a batch is open ends the session part; the instance stays until the batch state is released
+  (`BatchEnd`, `BatchAnswers` read out, or the idle bound), and is then evicted and logged off.
+- **No list tool.** The model keeps the handles it opened; the handle is its only link to its long
+  session, and nothing on the server tells it which sessions it opened. The handle is a bearer
+  secret and the server does not identify the caller, so there is nothing to list by.
 
 ### 3. Documentation
 
@@ -91,8 +97,10 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
   header; the refusal names the argument.
 - Long session: open answers a handle; calls carrying it reuse the instance and its SAP connection
   (one connection, one `systeminformation`, no logoff in between); close evicts and logs off and the
-  handle is then unknown; close with a lock held keeps the instance until unlock; the idle bound
-  ends an open session and logs it off.
+  handle is then unknown; close with a lock held keeps the instance until unlock; open and close
+  while a communication batch and while a debugger batch is open run at once, are not recorded,
+  leave the batch open, and the instance is evicted and logged off once the batch state is
+  released; the idle bound ends an open session and logs it off.
 - Load-bearing: each test goes red with its rule removed.
 - Live (on the owner's go, one system): a compact HTTP scenario through the long session, SAP
   requests per call counted with `DEBUG_HTTP_WIRE`.

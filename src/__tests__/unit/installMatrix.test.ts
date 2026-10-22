@@ -59,7 +59,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { packRelease, RELEASE_DIRS, ROOT } from '../helpers/installedRelease';
-import { spawnOptionsForNpx } from '../helpers/platform';
+import { spawnOptionsForNpm } from '../helpers/platform';
 import {
   startTarballRegistry,
   type TarballRegistry,
@@ -262,7 +262,7 @@ const npm = async (args: string[], cwd: string): Promise<string> =>
       env: npmEnv(),
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
-      ...spawnOptionsForNpx,
+      ...spawnOptionsForNpm,
     })
   ).stdout;
 

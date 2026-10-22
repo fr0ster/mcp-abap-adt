@@ -57,9 +57,12 @@ function stage(work, version) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
   console.log(`portable: installing ${SERVERS.full.pkg}@${version} and ${SERVERS.compact.pkg}@${version} from npm`);
+  // --ignore-scripts: no package of the servers' production tree has an
+  // install script (sap-rfc-lite 0.3 has none), so none runs here, outside the
+  // checkout and its .npmrc policy.
   run(
     npm.cmd,
-    [...npm.args, 'install', '--prefer-online', '--no-audit', '--no-fund', '--foreground-scripts',
+    [...npm.args, 'install', '--prefer-online', '--no-audit', '--no-fund', '--ignore-scripts',
       `${SERVERS.full.pkg}@${version}`, `${SERVERS.compact.pkg}@${version}`],
     { cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'] },
   );
@@ -208,7 +211,10 @@ function buildTools() {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
     console.log(`portable: installing ${specs.join(' and ')} into the build cache`);
-    run(npm.cmd, [...npm.args, 'install', '--no-audit', '--no-fund', ...specs], {
+    // --ignore-scripts: esbuild's postinstall only checks or fetches the binary
+    // its platform package (an optional dependency) installs anyway, and
+    // postject has none; this cache is outside the checkout and its .npmrc.
+    run(npm.cmd, [...npm.args, 'install', '--no-audit', '--no-fund', '--ignore-scripts', ...specs], {
       cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'],
     });
     markToolsInstalled(dir, specs);

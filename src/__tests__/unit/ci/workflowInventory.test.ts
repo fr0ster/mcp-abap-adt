@@ -96,9 +96,9 @@ describe.each(WORKFLOWS)('%s names every package of the release', (file) => {
   });
 
   it('lints each of them: the root its src, every other package its own', () => {
-    expect(hasStep(lines, 'npx biome check src --diagnostic-level=error')).toBe(
-      true,
-    );
+    expect(
+      hasStep(lines, 'npm run lint:check -- --diagnostic-level=error'),
+    ).toBe(true);
     expect(sorted(prefixed(lines, 'lint:check'))).toEqual(sorted(packages));
   });
 
@@ -172,4 +172,94 @@ it('the install matrix suite skips only on SKIP_INSTALL_MATRIX=true', () => {
   expect(source).toContain(
     "const SKIPPED = process.env.SKIP_INSTALL_MATRIX === 'true';",
   );
+});
+
+/**
+ * Supply-chain hardening (20.0.0). `package.json` `allowScripts` with `.npmrc`
+ * `strict-allow-scripts` keeps dependency install scripts from running, but
+ * only npm 11.19.0 and later read them: the Node 22 runner's npm 10 reads
+ * neither, so the workflows install with `--ignore-scripts`. Nothing calls
+ * `npx`, which fetches from the registry whatever it does not find installed.
+ */
+describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
+  const lines = read(file);
+
+  it('installs with npm ci --ignore-scripts, and only so', () => {
+    const installs = lines
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('run: npm ci'));
+    expect(installs.length).toBeGreaterThan(0);
+    for (const line of installs)
+      expect(line).toBe('run: npm ci --ignore-scripts');
+  });
+
+  it('gates on what the packages ship at moderate, and reports the whole tree', () => {
+    const gate = step(
+      lines,
+      'Security audit (production dependencies, moderate+)',
+    ).map((line) => line.trim());
+    expect(gate).toContain('run: npm audit --omit=dev --audit-level=moderate');
+    expect(gate).not.toContain('continue-on-error: true');
+    const report = step(
+      lines,
+      'Security audit (all dependencies, reported only)',
+    ).map((line) => line.trim());
+    expect(report).toContain('run: npm audit --audit-level=moderate');
+    expect(report).toContain('continue-on-error: true');
+    // The only step allowed not to gate.
+    expect(
+      lines.filter((line) => line.trim() === 'continue-on-error: true'),
+    ).toHaveLength(1);
+  });
+
+  it('caps every job', () => {
+    const body = lines.slice(lines.indexOf('jobs:') + 1);
+    const jobs = body.filter((line) => /^ {2}[a-z-]+:$/.test(line)).length;
+    const caps = body.filter((line) =>
+      /^ {4}timeout-minutes: \d+$/.test(line),
+    ).length;
+    expect(jobs).toBeGreaterThan(0);
+    expect(caps).toBe(jobs);
+  });
+
+  it('calls no npx', () => {
+    expect(lines.filter((line) => /\bnpx\b/.test(line))).toEqual([]);
+  });
+});
+
+it('no package script and no git hook calls npx', () => {
+  const offenders: string[] = [];
+  for (const dir of RELEASE_DIRS) {
+    const { scripts = {} } = JSON.parse(
+      readFileSync(join(ROOT, dir, 'package.json'), 'utf8'),
+    ) as { scripts?: Record<string, string> };
+    for (const [name, command] of Object.entries(scripts))
+      if (/\bnpx\b/.test(command)) offenders.push(`${dir}: ${name}`);
+  }
+  const hook = readFileSync(join(ROOT, '.husky', 'pre-commit'), 'utf8');
+  if (/\bnpx\b/.test(hook)) offenders.push('.husky/pre-commit');
+  expect(offenders).toEqual([]);
+});
+
+it('every dependency install script is decided, and the policy is strict', () => {
+  const lock = JSON.parse(
+    readFileSync(join(ROOT, 'package-lock.json'), 'utf8'),
+  ) as { packages: Record<string, { hasInstallScript?: boolean }> };
+  const withScripts = new Set(
+    Object.entries(lock.packages)
+      .filter(([path, entry]) => path !== '' && entry.hasInstallScript)
+      .map(([path]) => path.split('node_modules/').pop() as string),
+  );
+  const { allowScripts = {} } = JSON.parse(
+    readFileSync(join(ROOT, 'package.json'), 'utf8'),
+  ) as { allowScripts?: Record<string, boolean> };
+  expect(sorted(Object.keys(allowScripts))).toEqual(sorted(withScripts));
+  expect(
+    Object.values(allowScripts).every((allowed) => allowed === false),
+  ).toBe(true);
+  const npmrc = readFileSync(join(ROOT, '.npmrc'), 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+  expect(npmrc).toContain('strict-allow-scripts=true');
+  expect(npmrc).toContain('min-release-age=7');
 });

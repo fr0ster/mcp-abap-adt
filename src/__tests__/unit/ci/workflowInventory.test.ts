@@ -13,7 +13,7 @@
  *
  * Plain line parsing over the workflow text: no YAML parser in the repository.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RELEASE_DIRS, ROOT } from '../../helpers/installedRelease';
 
@@ -283,4 +283,25 @@ it('every dependency install script is decided, and the policy is strict', () =>
     .map((line) => line.trim());
   expect(npmrc).toContain('strict-allow-scripts=true');
   expect(npmrc).toContain('min-release-age=7');
+});
+
+it('every Dockerfile installs with --ignore-scripts', () => {
+  // Inside an image neither the checkout's .npmrc nor its allowScripts
+  // applies, and the install runs as root.
+  const dir = join(ROOT, 'docker');
+  const files = readdirSync(dir).filter((name) =>
+    name.startsWith('Dockerfile'),
+  );
+  expect(sorted(files)).toEqual(['Dockerfile', 'Dockerfile.inspect']);
+  const installs = files.flatMap((name) =>
+    readFileSync(join(dir, name), 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith('#'))
+      .filter((line) => /\bnpm (ci|install|i)\b/.test(line))
+      .map((line) => `${name}: ${line.trim()}`),
+  );
+  expect(installs.length).toBe(3);
+  expect(installs.filter((line) => !line.includes('--ignore-scripts'))).toEqual(
+    [],
+  );
 });

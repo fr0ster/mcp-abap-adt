@@ -62,20 +62,19 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
 - **Calls.** A call carrying the handle runs on that instance, on its held SAP connection: no new
   connection, no `systeminformation` lookup, no logoff. A call without it runs as today, on a new
   instance.
-- **Close.** Marks the part closed and calls `endWhenEmpty()`. With nothing else held, the state
-  empties: the handle rotates (the old one answers `state is not available`), the pool evicts the
-  instance and `terminalClose()` logs the SAP session off. With a lock, a batch or a debug session
-  still held, the instance stays until that ends, and is then evicted and logged off the same way;
-  close answers which state still holds it. Close without a handle, or with an unknown one, answers
-  `state is not available`.
+- **Close.** Ends the instance's held state the way the idle bound does — `endWhenEmpty()`, then
+  `dispose()` of every part — and logs the SAP session off (`terminalClose()`); the pool evicts the
+  instance and the handle rotates (the old one answers `state is not available`). Whatever else the
+  instance held ends with it: a lock is released by the logoff, a batch is dropped with nothing
+  sent, its kept answers are dropped, a debug session is ended. Close answers what it ended. Close
+  without a handle, or with an unknown one, answers `state is not available`.
 - **Idle bound.** Nothing new: an open long session is held state, so the existing bound
   (`--state-idle-minutes`, default 30) arms between calls; at expiry the SAP session is logged off
   and the instance leaves the pool.
 - **Batch mode.** The session tools run at once, never recorded: while a communication batch or a
   debugger batch is open they bypass batch recording and its refusal of connectionless tools, the
-  way the batch's own control tools do, and they neither end nor flush the batch. Closing a session
-  while a batch is open ends the session part; the instance stays until the batch state is released
-  (`BatchEnd`, `BatchAnswers` read out, or the idle bound), and is then evicted and logged off.
+  way the batch's own control tools do; open neither ends nor flushes the batch. Closing a session
+  while a batch is open drops the batch as described under Close.
 - **No list tool.** The model keeps the handles it opened; the handle is its only link to its long
   session, and nothing on the server tells it which sessions it opened. The handle is a bearer
   secret and the server does not identify the caller, so there is nothing to list by.
@@ -97,10 +96,9 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
   header; the refusal names the argument.
 - Long session: open answers a handle; calls carrying it reuse the instance and its SAP connection
   (one connection, one `systeminformation`, no logoff in between); close evicts and logs off and the
-  handle is then unknown; close with a lock held keeps the instance until unlock; open and close
-  while a communication batch and while a debugger batch is open run at once, are not recorded,
-  leave the batch open, and the instance is evicted and logged off once the batch state is
-  released; the idle bound ends an open session and logs it off.
+  handle is then unknown; close with a lock held releases it (logoff) and evicts; open while a
+  communication batch and while a debugger batch is open runs at once, is not recorded and leaves
+  the batch open; close while a batch is open, or with answers kept, drops them, logs off and evicts; the idle bound ends an open session and logs it off.
 - Load-bearing: each test goes red with its rule removed.
 - Live (on the owner's go, one system): a compact HTTP scenario through the long session, SAP
   requests per call counted with `DEBUG_HTTP_WIRE`.

@@ -1,6 +1,6 @@
 /**
  * The building blocks of the portable build that touch the host:
- * scripts/portable/elf.cjs (the RUNPATH rewrite) and tools.cjs (how npm and
+ * scripts/portable/elf.cjs (the RUNPATH rewritten or added) and tools.cjs (how npm and
  * tar are started, and the search path the smoke check runs with).
  */
 import { readFileSync } from 'node:fs';
@@ -113,10 +113,8 @@ describe('RUNPATH read', () => {
     expect(elf.readRunpath(elfImage([[15, '/old/lib']]))).toBe('/old/lib');
   });
 
-  it('refuses an image with none: the SDK beside it would not be found', () => {
-    expect(() => elf.readRunpath(elfImage([[1, 'libc.so.6']]))).toThrow(
-      /no RUNPATH/,
-    );
+  it('reads none from an image that carries none (a prebuilt binding)', () => {
+    expect(elf.readRunpath(elfImage([[1, 'libc.so.6']]))).toBeUndefined();
   });
 
   it('refuses an image with two', () => {
@@ -132,6 +130,76 @@ describe('RUNPATH read', () => {
 
   it('refuses what is not a 64-bit little-endian ELF', () => {
     expect(() => elf.readRunpath(Buffer.alloc(64))).toThrow(/not a 64-bit/);
+  });
+});
+
+// The file offset of the dynamic entry `index` of an elfImage, and of its value.
+const entryAt = (index: number) => 64 + index * 16;
+
+describe('RUNPATH added in place of the SONAME', () => {
+  it('turns the SONAME into a RUNPATH of the new path, the image the same size', () => {
+    const before = elfImage([
+      [1, 'libsapnwrfc.so'],
+      [14, 'sapnwrfc.node'],
+    ]);
+    const after = elf.addRunpath(before, '$ORIGIN');
+    expect(after).toHaveLength(before.length);
+    expect(elf.readRunpath(after)).toBe('$ORIGIN');
+    expect(after.readBigInt64LE(entryAt(1))).toBe(29n);
+    expect(after.toString('latin1')).not.toContain('sapnwrfc.node');
+    expect(after.toString('latin1')).toContain('\0libsapnwrfc.so\0');
+  });
+
+  it('refuses an image that already carries one: it is rewritten instead', () => {
+    expect(() =>
+      elf.addRunpath(
+        elfImage([
+          [14, 'sapnwrfc.node'],
+          [29, '/opt/sdk/lib'],
+        ]),
+        '$ORIGIN',
+      ),
+    ).toThrow(/already carries/);
+  });
+
+  it('refuses an image with no SONAME to put it in place of', () => {
+    expect(() =>
+      elf.addRunpath(elfImage([[1, 'libc.so.6']]), '$ORIGIN'),
+    ).toThrow(/no SONAME/);
+  });
+
+  it('refuses a path longer than the SONAME', () => {
+    expect(() => elf.addRunpath(elfImage([[14, 'a.node']]), '$ORIGIN')).toThrow(
+      /longer than the SONAME/,
+    );
+  });
+
+  it('adds one to the linux-x64 binding sap-rfc-lite ships, which carries none', () => {
+    const pkg = path.dirname(
+      require.resolve('@mcp-abap-adt/sap-rfc-lite/package.json'),
+    );
+    const before = readFileSync(
+      path.join(
+        pkg,
+        'prebuilds/linux-x64/@mcp-abap-adt+sap-rfc-lite.glibc.node',
+      ),
+    );
+    expect(elf.readRunpath(before)).toBeUndefined();
+    const after = elf.addRunpath(before, '$ORIGIN');
+    expect(elf.readRunpath(after)).toBe('$ORIGIN');
+    expect(after).toHaveLength(before.length);
+  });
+
+  it('refuses a SONAME whose string another name shares', () => {
+    const image = elfImage([
+      [1, 'libc.so.6'],
+      [14, 'sapnwrfc.node'],
+    ]);
+    // The NEEDED entry pointed at the tail of the SONAME, as a linker that
+    // tail-merges strings would leave it.
+    const sonameValue = image.readBigUInt64LE(entryAt(1) + 8);
+    image.writeBigUInt64LE(sonameValue + 3n, entryAt(0) + 8);
+    expect(() => elf.addRunpath(image, '$ORIGIN')).toThrow(/shares its string/);
   });
 });
 

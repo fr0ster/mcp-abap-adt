@@ -68,6 +68,15 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
   instance held ends with it: a lock is released by the logoff, a batch is dropped with nothing
   sent, its kept answers are dropped, a debug session is ended. Close answers what it ended. Close
   without a handle, or with an unknown one, answers `state is not available`.
+- **Close when a part's cleanup fails or is still finishing.** Close runs the idle bound's own stop
+  (`InstanceState.expire`'s steps, one function for both) and inherits its contract: the terminal
+  close of the instance's connections runs whatever the disposal answered, so a failed cleanup never
+  keeps a SAP session or a lock open; a part whose cleanup failed (a debugger whose cleanup threw)
+  or is still finishing (a pending AMDP cleanup) stays held, so the instance stays in the pool and the
+  handle stays routable. Close then answers that the state did not end, naming the failed parts, and
+  calling close again with the same handle retries the cleanup; the idle bound retries it as well.
+  A call queued on the instance behind close runs after it; any other call on such an instance opens
+  a new SAP session, as on a new instance.
 - **Idle bound.** Nothing new: an open long session is held state, so the existing bound
   (`--state-idle-minutes`, default 30) arms between calls; at expiry the SAP session is logged off
   and the instance leaves the pool.
@@ -98,7 +107,10 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
   (one connection, one `systeminformation`, no logoff in between); close evicts and logs off and the
   handle is then unknown; close with a lock held releases it (logoff) and evicts; open while a
   communication batch and while a debugger batch is open runs at once, is not recorded and leaves
-  the batch open; close while a batch is open, or with answers kept, drops them, logs off and evicts; the idle bound ends an open session and logs it off.
+  the batch open; close while a batch is open, or with answers kept, drops them, logs off and evicts;
+  close with a debugger cleanup that throws, and with a pending AMDP cleanup: the connections are
+  closed, close answers the state did not end, the handle still routes, a second close retries, and
+  a call queued behind close runs after it; the idle bound ends an open session and logs it off.
 - Load-bearing: each test goes red with its rule removed.
 - Live (on the owner's go, one system): a compact HTTP scenario through the long session, SAP
   requests per call counted with `DEBUG_HTTP_WIRE`.

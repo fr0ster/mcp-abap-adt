@@ -13,7 +13,7 @@
  *
  * Plain line parsing over the workflow text: no YAML parser in the repository.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RELEASE_DIRS, ROOT } from '../../helpers/installedRelease';
 
@@ -96,9 +96,9 @@ describe.each(WORKFLOWS)('%s names every package of the release', (file) => {
   });
 
   it('lints each of them: the root its src, every other package its own', () => {
-    expect(hasStep(lines, 'npx biome check src --diagnostic-level=error')).toBe(
-      true,
-    );
+    expect(
+      hasStep(lines, 'npm run lint:check -- --diagnostic-level=error'),
+    ).toBe(true);
     expect(sorted(prefixed(lines, 'lint:check'))).toEqual(sorted(packages));
   });
 
@@ -171,5 +171,128 @@ it('the install matrix suite skips only on SKIP_INSTALL_MATRIX=true', () => {
   );
   expect(source).toContain(
     "const SKIPPED = process.env.SKIP_INSTALL_MATRIX === 'true';",
+  );
+});
+
+/**
+ * Supply-chain hardening (20.0.0). `package.json` `allowScripts` with `.npmrc`
+ * `strict-allow-scripts` keeps dependency install scripts from running, but
+ * only npm 11.19.0 and later read them: the Node 22 runner's npm 10 reads
+ * neither, so the workflows install with `--ignore-scripts`. Nothing calls
+ * `npx`, which fetches from the registry whatever it does not find installed.
+ */
+describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
+  const lines = read(file);
+
+  it('installs with npm ci --ignore-scripts, and only so', () => {
+    const installs = lines
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('run: npm ci'));
+    expect(installs.length).toBeGreaterThan(0);
+    for (const line of installs)
+      expect(line).toBe('run: npm ci --ignore-scripts');
+  });
+
+  it('runs no install script in any install, a run block line included', () => {
+    // The tarball install in /tmp/install-check is outside the checkout and
+    // its .npmrc, so only the flag keeps a dependency's script from running.
+    // A release's notes (`body: |`) are text for its readers, not commands.
+    const commands: string[] = [];
+    let body = -1;
+    for (const line of lines) {
+      const indent = line.length - line.trimStart().length;
+      if (body >= 0 && (line.trim() === '' || indent > body)) continue;
+      body = line.trim() === 'body: |' ? indent : -1;
+      commands.push(line);
+    }
+    const installs = commands
+      .map((line) => line.trim().replace(/^run:\s*/, ''))
+      .filter((line) => /^npm (ci|install|i)(\s|$)/.test(line));
+    expect(installs.some((line) => line.startsWith('npm install'))).toBe(true);
+    expect(
+      installs.filter((line) => !line.includes('--ignore-scripts')),
+    ).toEqual([]);
+  });
+
+  it('gates on every known advisory of moderate severity or above', () => {
+    const audit = step(lines, 'Security audit (moderate+)').map((line) =>
+      line.trim(),
+    );
+    expect(audit).toContain('run: npm audit --audit-level=moderate');
+    expect(
+      lines.filter((line) => line.trim().startsWith('continue-on-error')),
+    ).toEqual([]);
+  });
+
+  it('caps every job', () => {
+    const body = lines.slice(lines.indexOf('jobs:') + 1);
+    const jobs = body.filter((line) => /^ {2}[a-z-]+:$/.test(line)).length;
+    const caps = body.filter((line) =>
+      /^ {4}timeout-minutes: \d+$/.test(line),
+    ).length;
+    expect(jobs).toBeGreaterThan(0);
+    expect(caps).toBe(jobs);
+  });
+
+  it('calls no npx', () => {
+    expect(lines.filter((line) => /\bnpx\b/.test(line))).toEqual([]);
+  });
+});
+
+it('no package script and no git hook calls npx', () => {
+  const offenders: string[] = [];
+  for (const dir of RELEASE_DIRS) {
+    const { scripts = {} } = JSON.parse(
+      readFileSync(join(ROOT, dir, 'package.json'), 'utf8'),
+    ) as { scripts?: Record<string, string> };
+    for (const [name, command] of Object.entries(scripts))
+      if (/\bnpx\b/.test(command)) offenders.push(`${dir}: ${name}`);
+  }
+  const hook = readFileSync(join(ROOT, '.husky', 'pre-commit'), 'utf8');
+  if (/\bnpx\b/.test(hook)) offenders.push('.husky/pre-commit');
+  expect(offenders).toEqual([]);
+});
+
+it('every dependency install script is decided, and the policy is strict', () => {
+  const lock = JSON.parse(
+    readFileSync(join(ROOT, 'package-lock.json'), 'utf8'),
+  ) as { packages: Record<string, { hasInstallScript?: boolean }> };
+  const withScripts = new Set(
+    Object.entries(lock.packages)
+      .filter(([path, entry]) => path !== '' && entry.hasInstallScript)
+      .map(([path]) => path.split('node_modules/').pop() as string),
+  );
+  const { allowScripts = {} } = JSON.parse(
+    readFileSync(join(ROOT, 'package.json'), 'utf8'),
+  ) as { allowScripts?: Record<string, boolean> };
+  expect(sorted(Object.keys(allowScripts))).toEqual(sorted(withScripts));
+  expect(
+    Object.values(allowScripts).every((allowed) => allowed === false),
+  ).toBe(true);
+  const npmrc = readFileSync(join(ROOT, '.npmrc'), 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+  expect(npmrc).toContain('strict-allow-scripts=true');
+  expect(npmrc).toContain('min-release-age=7');
+});
+
+it('every Dockerfile installs with --ignore-scripts', () => {
+  // Inside an image neither the checkout's .npmrc nor its allowScripts
+  // applies, and the install runs as root.
+  const dir = join(ROOT, 'docker');
+  const files = readdirSync(dir).filter((name) =>
+    name.startsWith('Dockerfile'),
+  );
+  expect(sorted(files)).toEqual(['Dockerfile', 'Dockerfile.inspect']);
+  const installs = files.flatMap((name) =>
+    readFileSync(join(dir, name), 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith('#'))
+      .filter((line) => /\bnpm (ci|install|i)\b/.test(line))
+      .map((line) => `${name}: ${line.trim()}`),
+  );
+  expect(installs.length).toBe(3);
+  expect(installs.filter((line) => !line.includes('--ignore-scripts'))).toEqual(
+    [],
   );
 });

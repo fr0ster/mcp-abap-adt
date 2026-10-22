@@ -140,6 +140,28 @@ The cheap signal, if the question ever comes back:
 `npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
 deciding condition, not ts-jest.
 
+### No dependency runs an install script
+
+Supply-chain worms (Shai-Hulud and its kind) spread through dependencies' install
+scripts and steal npm and GitHub tokens. So:
+
+- `allowScripts` in `package.json` lists every package in the tree that has an
+  install script, each denied (`false`); `.npmrc` sets `strict-allow-scripts=true`,
+  so a new dependency with an unreviewed install script fails the install instead of
+  running it. A new entry needs the reason it is needed; the default answer is deny.
+- `.npmrc` sets `min-release-age=7` (versions at least 7 days old), except
+  `@mcp-abap-adt/*`, which the chain releases to itself the same day.
+- npm reads these in full only from 11.19.0, so CI, the release workflow, the Docker
+  images, the portable build and any install outside this checkout use
+  `npm ci --ignore-scripts` / `npm install --ignore-scripts`. Our own `prepare` (husky)
+  is run explicitly where it is wanted.
+- `npm audit --audit-level=moderate` gates CI and the release, the whole tree. An
+  advisory with no fixed release is answered with an `overrides` entry whose reason
+  is in the CHANGELOG (today: `argparse` 2 under `js-yaml` 3), or by dropping the
+  package — never by making the audit non-gating.
+- Never `npx`: scripts call the package's own bin (`biome`, `tsc`, `lint-staged`), a
+  test spawns `process.execPath` with the resolved CLI.
+
 ## The SAP errata: ambiguity we account for, not defects we fix
 
 `node_modules/@mcp-abap-adt/adt-clients/docs/usage/ERRATA.md` — 25 entries of

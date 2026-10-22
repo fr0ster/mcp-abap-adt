@@ -12,15 +12,26 @@ import { globSync as globSyncRaw } from 'node:fs';
  */
 
 /**
- * `npx` is `npx.cmd` on Windows, and `execFile`/`spawn` do not look for the
- * extension: the call fails with `spawnSync npx ENOENT` and the whole suite
+ * `npm` is `npm.cmd` on Windows, and `execFile`/`spawn` do not look for the
+ * extension: the call fails with `spawnSync npm ENOENT` and the whole suite
  * fails to run. A shell finds it. Passing `shell` everywhere would be worse —
  * arguments would then go through shell quoting on every platform — so it is
  * asked for only where it is needed.
  */
-export const spawnOptionsForNpx = {
+export const spawnOptionsForNpm = {
   shell: process.platform === 'win32',
 } as const;
+
+/**
+ * The command that runs a TypeScript script through the installed `tsx`:
+ * this Node and tsx's own CLI, resolved from this checkout's `node_modules`.
+ * Not `npx tsx`, which falls back to fetching a package from the registry
+ * when the local one cannot be found, and not a shell.
+ */
+export const tsxCommand = (args: readonly string[]): [string, string[]] => [
+  process.execPath,
+  [require.resolve('tsx/cli'), ...args],
+];
 
 /**
  * `glob` answers the platform's own separator, so a path it returns is

@@ -196,10 +196,17 @@ their settings. A `.env` there is read only when you name it (`--env-path=./.env
 ```bash
 git clone https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
-npm install          # set SAPNWRFC_HOME first if you want RFC
+npm ci --ignore-scripts
+npm run prepare      # the git hooks (husky), if you will commit
 npm run build
 npm test             # unit tests; integration tests need a system, see docs/development/tests
 ```
+
+The repository's `.npmrc` lets no dependency run an install script that `package.json`
+`allowScripts` does not allow (it denies every one: none is needed to build or test), and resolves
+no new version younger than 7 days. npm reads both settings in full from 11.19.0; npm 10 (bundled
+with Node.js 22) reads neither, so install with `--ignore-scripts` on any npm. That also skips the
+repository's own `prepare` (husky), hence the second line.
 
 The checkout is not runnable as a server by itself: `server/` and `compact/` take `@mcp-abap-adt/lib` as a
 package. To run what you built, pack it and install the tarballs together:

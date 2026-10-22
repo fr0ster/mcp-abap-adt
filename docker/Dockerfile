@@ -51,6 +51,11 @@ COPY --from=tarballs / /tarballs/
 # tarball overrides its package wherever the tree asks for it — so no package
 # of the release comes from the registry. A tarball nothing asks for is not
 # installed.
+#
+# --ignore-scripts: no package of the production tree has an install script
+# (the lockfile's `hasInstallScript` names dev dependencies only), so none runs
+# while the image is built — a compromised release of a dependency gets no
+# install-time code execution here.
 WORKDIR /opt/mcp-abap-adt
 RUN set -eu; \
   case "$VARIANT" in \
@@ -62,7 +67,7 @@ RUN set -eu; \
   npm init -y > /dev/null; \
   case "$PACKAGE_SOURCE" in \
     registry) \
-      npm install --omit=dev --omit=optional --no-audit --no-fund "@mcp-abap-adt/$VARIANT@$MCP_ABAP_ADT_VERSION" ;; \
+      npm install --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund "@mcp-abap-adt/$VARIANT@$MCP_ABAP_ADT_VERSION" ;; \
     tarballs) \
       PACKAGE="@mcp-abap-adt/$VARIANT" node -e " \
         const fs = require('node:fs'), cp = require('node:child_process'); \
@@ -76,7 +81,7 @@ RUN set -eu; \
         if (manifest.dependencies[wanted] === undefined) { console.error('no tarball of ' + wanted + ' in the tarballs context'); process.exit(1); } \
         fs.writeFileSync('package.json', JSON.stringify(manifest, null, 2)); \
       "; \
-      npm install --omit=dev --omit=optional --no-audit --no-fund ;; \
+      npm install --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund ;; \
     *) echo "PACKAGE_SOURCE=$PACKAGE_SOURCE: registry or tarballs" >&2; exit 1 ;; \
   esac; \
   npm cache clean --force; \

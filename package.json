@@ -143,22 +143,22 @@
     }
   },
   "scripts": {
-    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
+    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' \u2014 edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
-    "test:check": "npx tsc --noEmit -p tsconfig.test.json",
+    "test:check": "tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:check": "jest --testPathPatterns='admin/shared-deps/check' --testPathIgnorePatterns='[]' --passWithNoTests",
     "polygon:backup": "adt-backup backup --package ZMCP_SHR_PKG --env-path trial.env --output tests/fixtures/polygon.backup.yaml",
-    "lint": "npx biome check --write src",
-    "lint:check": "npx biome check src",
-    "format": "npx biome format --write src",
+    "lint": "biome check --write src",
+    "lint:check": "biome check src",
+    "format": "biome format --write src",
     "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','background-runs-memory/dist','responsible-rules/dist','server-runtime/dist','http/dist','sse/dist','server/dist','compact-readonly-entries/dist','compact-modify/dist','compact/dist','compact-http/dist','compact-sse/dist','core-ro/dist','http-ro/dist','sse-ro/dist','compact-ro/dist','compact-http-ro/dist','compact-sse-ro/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
-    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p background-runs-memory/tsconfig.json && npx tsc -p responsible-rules/tsconfig.json && npx tsc -p compact-readonly-entries/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p server-runtime/tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p http/tsconfig.json && npx tsc -p sse/tsconfig.json && npx tsc -p compact/tsconfig.json && npx tsc -p compact-http/tsconfig.json && npx tsc -p compact-sse/tsconfig.json && npx tsc -p core-ro/tsconfig.json && npx tsc -p http-ro/tsconfig.json && npx tsc -p sse-ro/tsconfig.json && npx tsc -p compact-ro/tsconfig.json && npx tsc -p compact-http-ro/tsconfig.json && npx tsc -p compact-sse-ro/tsconfig.json",
-    "build:fast": "npx tsc -p tsconfig.json",
+    "build": "biome check --write --diagnostic-level=error src && tsc -p tsconfig.json && tsc -p background-runs-memory/tsconfig.json && tsc -p responsible-rules/tsconfig.json && tsc -p compact-readonly-entries/tsconfig.json && tsc -p compact-modify/tsconfig.json && tsc -p server-runtime/tsconfig.json && tsc -p server/tsconfig.json && tsc -p http/tsconfig.json && tsc -p sse/tsconfig.json && tsc -p compact/tsconfig.json && tsc -p compact-http/tsconfig.json && tsc -p compact-sse/tsconfig.json && tsc -p core-ro/tsconfig.json && tsc -p http-ro/tsconfig.json && tsc -p sse-ro/tsconfig.json && tsc -p compact-ro/tsconfig.json && tsc -p compact-http-ro/tsconfig.json && tsc -p compact-sse-ro/tsconfig.json",
+    "build:fast": "tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
     "clean": "make clean",
     "chrono": "./tools/version-stats.sh",
@@ -209,7 +209,6 @@
     "@mcp-abap-adt/auth-broker": "^5.0.6",
     "@mcp-abap-adt/auth-stores": "^5.0.1",
     "@mcp-abap-adt/interfaces-auth-broker": "^1.3.0",
-    "@modelcontextprotocol/inspector": "^2.9.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
     "dotenv": "^18.0.5",
@@ -374,5 +373,16 @@
       "biome check --write"
     ]
   },
-  "private": false
+  "private": false,
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "esbuild": false,
+    "fsevents": false,
+    "unrs-resolver": false
+  },
+  "overrides": {
+    "js-yaml@^3": {
+      "argparse": "^2.0.1"
+    }
+  }
 }

@@ -69,7 +69,7 @@ import {
 } from '../../../scripts/lib/analyseOmissions';
 import { handleCheckClass } from '../../handlers/class/low/handleCheckClass';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
-import { globSync, spawnOptionsForNpx } from '../helpers/platform';
+import { globSync, tsxCommand } from '../helpers/platform';
 
 const handlers = globSync('src/handlers/**/handle*.ts');
 
@@ -267,10 +267,12 @@ const JSON_ANSWERING: readonly string[] = [
 const surface: Array<{ group: string; name: string; inputs: string }> =
   JSON.parse(
     execFileSync(
-      'npx',
-      ['tsx', '--tsconfig', 'tsconfig.test.json', 'scripts/list-tools.ts'],
+      ...tsxCommand([
+        '--tsconfig',
+        'tsconfig.test.json',
+        'scripts/list-tools.ts',
+      ]),
       {
-        ...spawnOptionsForNpx,
         encoding: 'utf8',
         maxBuffer: 32 * 1024 * 1024,
       },

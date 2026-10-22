@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   test:
+    # A hung test is capped here instead of by GitHub's 6-hour default. The
+    # slower cell took ~14 minutes (Node 22, 2026-10-21); ci.yml's cap.
+    timeout-minutes: 45
     runs-on: ubuntu-latest
 
     strategy:
@@ -26,11 +29,21 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
+      # --ignore-scripts: the Node 22 runner's npm 10 does not read package.json
+      # `allowScripts` (nor .npmrc `strict-allow-scripts`), and no dependency's
+      # install script is needed to lint, build or test — `allowScripts` denies
+      # every one of them. It also skips the root's own `prepare` (husky), which
+      # CI has no use for.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      # As in ci.yml: any known advisory of moderate severity or above stops
+      # the release, dev dependencies included.
+      - name: Security audit (moderate+)
+        run: npm audit --audit-level=moderate
 
       - name: Run Biome lint
-        run: npx biome check src --diagnostic-level=error
+        run: npm run lint:check -- --diagnostic-level=error
 
       # The root step covers `src` only; every other package lints its own
       # sources.
@@ -170,7 +183,7 @@ jobs:
         run: |
           mkdir -p /tmp/install-check && cd /tmp/install-check
           npm init -y > /dev/null
-          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
+          npm install --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
           # **Did `core` accept the `lib` we just built, or fetch another
           # one?** Not "are the versions equal" — they need not be, and this
           # repository has shipped lib 10.1.0 and 10.2.0 against an unchanged
@@ -251,6 +264,7 @@ jobs:
 
   release:
     needs: test
+    timeout-minutes: 10
     runs-on: ubuntu-latest
 
     steps:

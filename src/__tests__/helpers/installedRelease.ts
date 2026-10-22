@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { isAbsolute, join } from 'node:path';
-import { spawnOptionsForNpx } from './platform';
+import { spawnOptionsForNpm } from './platform';
 
 /** The repository root, where the library's own manifest lives. */
 export const ROOT = join(__dirname, '../../..');
@@ -37,7 +37,7 @@ const run = (command: string, args: string[], cwd: string): string =>
     cwd,
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
-    ...spawnOptionsForNpx,
+    ...spawnOptionsForNpm,
   });
 
 /**

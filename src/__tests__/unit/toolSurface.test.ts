@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnOptionsForNpx } from '../helpers/platform';
+import { tsxCommand } from '../helpers/platform';
 
 /**
  * **The long tools on the approved list gain `timeout` (19.0.0).** The
@@ -69,10 +69,12 @@ describe('the MCP tool surface', () => {
 
   const current: Row[] = JSON.parse(
     execFileSync(
-      'npx',
-      ['tsx', '--tsconfig', 'tsconfig.test.json', 'scripts/list-tools.ts'],
+      ...tsxCommand([
+        '--tsconfig',
+        'tsconfig.test.json',
+        'scripts/list-tools.ts',
+      ]),
       {
-        ...spawnOptionsForNpx,
         encoding: 'utf8',
         maxBuffer: 32 * 1024 * 1024,
       },

@@ -8,6 +8,10 @@ on:
 
 jobs:
   build-and-test:
+    # A hung test is capped here instead of by GitHub's 6-hour default. The
+    # slowest cell took ~21 minutes (windows-latest, Node 22, 2026-10-22); on
+    # Windows the suite has hung for 40+ minutes before (see SKIP_INSTALL_MATRIX).
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -35,11 +39,16 @@ jobs:
       - name: Show the runtime
         run: node -p "process.version + ' ' + process.platform + '-' + process.arch" && npm -v
 
+      # --ignore-scripts: the Node 22 runner's npm 10 does not read package.json
+      # `allowScripts` (nor .npmrc `strict-allow-scripts`), and no dependency's
+      # install script is needed to lint, build or test — `allowScripts` denies
+      # every one of them. It also skips the root's own `prepare` (husky), which
+      # CI has no use for.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run Biome lint
-        run: npx biome check src --diagnostic-level=error
+        run: npm run lint:check -- --diagnostic-level=error
 
       # The root step covers `src` only; every other package lints its own
       # sources.
@@ -180,9 +189,11 @@ jobs:
       - name: Type-check responsible-rules tests
         run: npm --prefix responsible-rules run test:check
 
-      - name: Security audit (production deps, high+)
+      # Any known advisory of moderate severity or above fails the run, dev
+      # dependencies included: they run here and on every developer's machine.
+      - name: Security audit (moderate+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=moderate
 
       # All eighteen packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
@@ -221,7 +232,7 @@ jobs:
         run: |
           mkdir -p /tmp/install-check && cd /tmp/install-check
           npm init -y > /dev/null
-          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
+          npm install --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
           # **Did `core` accept the `lib` we just built, or fetch another
           # one?** Not "are the versions equal" — they need not be, and this
           # repository has shipped lib 10.1.0 and 10.2.0 against an unchanged

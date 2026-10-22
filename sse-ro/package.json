@@ -51,9 +51,9 @@
   },
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "npx tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "test": "npm --prefix .. test -- --roots sse-ro/src",
-    "lint:check": "npx biome check src",
+    "lint:check": "biome check src",
     "prepublishOnly": "npm run build",
     "start": "node ./bin/mcp-abap-adt-sse-ro.js"
   },

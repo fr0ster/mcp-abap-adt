@@ -245,7 +245,7 @@ jobs:
         run: |
           mkdir -p /tmp/install-check && cd /tmp/install-check
           npm init -y > /dev/null
-          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
+          npm install --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
           # **Did `core` accept the `lib` we just built, or fetch another
           # one?** Not "are the versions equal" — they need not be, and this
           # repository has shipped lib 10.1.0 and 10.2.0 against an unchanged

@@ -37,7 +37,8 @@ Jest follow-up.
 - `npm pack` of all eighteen packages (`lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`,
   `compact-modify`, `server-runtime`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`, `core-ro`,
   `http-ro`, `sse-ro`, `compact-ro`, `compact-http-ro`, `compact-sse-ro`)
-- an install of the eighteen tarballs into an empty directory, a check that no package resolved a
+- an install of the eighteen tarballs into an empty directory (`--ignore-scripts`: it is outside the
+  checkout and its `.npmrc`), a check that no package resolved a
   sibling — a dependency or a peer — other than the one built in that run (a nested copy is one the
   registry supplied), and
   `--version` and `--help` of each of the twelve bins

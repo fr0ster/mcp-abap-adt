@@ -193,6 +193,27 @@ describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
       expect(line).toBe('run: npm ci --ignore-scripts');
   });
 
+  it('runs no install script in any install, a run block line included', () => {
+    // The tarball install in /tmp/install-check is outside the checkout and
+    // its .npmrc, so only the flag keeps a dependency's script from running.
+    // A release's notes (`body: |`) are text for its readers, not commands.
+    const commands: string[] = [];
+    let body = -1;
+    for (const line of lines) {
+      const indent = line.length - line.trimStart().length;
+      if (body >= 0 && (line.trim() === '' || indent > body)) continue;
+      body = line.trim() === 'body: |' ? indent : -1;
+      commands.push(line);
+    }
+    const installs = commands
+      .map((line) => line.trim().replace(/^run:\s*/, ''))
+      .filter((line) => /^npm (ci|install|i)(\s|$)/.test(line));
+    expect(installs.some((line) => line.startsWith('npm install'))).toBe(true);
+    expect(
+      installs.filter((line) => !line.includes('--ignore-scripts')),
+    ).toEqual([]);
+  });
+
   it('gates on what the packages ship at moderate, and reports the whole tree', () => {
     const gate = step(
       lines,

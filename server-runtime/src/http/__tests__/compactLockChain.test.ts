@@ -47,6 +47,27 @@ const loseGroup: IHandlerGroup = {
   ],
 } as unknown as IHandlerGroup;
 
+/** `EchoArgs`: answers the arguments its handler received. */
+const echoGroup: IHandlerGroup = {
+  getName: () => 'echo-args',
+  registerHandlers: () => {},
+  getHandlers: () => [
+    {
+      toolDefinition: {
+        name: 'EchoArgs',
+        description: 'answers its arguments',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+        },
+      } as never,
+      handler: (async (_context: unknown, args: unknown) => ({
+        content: [{ type: 'text', text: JSON.stringify(args) }],
+      })) as never,
+    },
+  ],
+} as unknown as IHandlerGroup;
+
 let s: HttpStand;
 
 const poolSize = () =>
@@ -69,7 +90,7 @@ const UPDATE = {
 beforeEach(async () => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
   s = await httpStand({
-    groups: [new CompactModifyHandlersGroup(placeholder), loseGroup],
+    groups: [new CompactModifyHandlersGroup(placeholder), loseGroup, echoGroup],
   });
 });
 
@@ -130,7 +151,51 @@ it('lock, update, unlock over three requests with the header: one SAP session, t
   await until(() => poolSize() === 0);
 });
 
-it('without the header the write and the unlock are refused, sending nothing', async () => {
+// The spec's words (§1), copied here, never imported: the test is the copy.
+const NOT_HELD_WORDS =
+  'lock_handle is not held by this instance: send the state_handle HandlerLock answered as the state_handle argument (or in the x-mcp-state-handle header)';
+
+it('lock, update, unlock over three requests with the state_handle argument alone, no header: one SAP session, the state ends at the UNLOCK', async () => {
+  const { lockHandle, stateHandle } = await lock();
+  expect(poolSize()).toBe(1);
+
+  const updated = await s.call('HandlerUpdate', {
+    ...UPDATE,
+    lock_handle: lockHandle,
+    state_handle: stateHandle,
+  });
+  expect(updated.isError).toBe(false);
+
+  const unlocked = await s.call('HandlerUnlock', {
+    ...LOCK,
+    lock_handle: lockHandle,
+    state_handle: stateHandle,
+  });
+  expect(unlocked.isError).toBe(false);
+
+  expect(lockRequests()).toHaveLength(1);
+  expect(puts()).toHaveLength(1);
+  expect(unlocks()).toHaveLength(1);
+  const session = lockRequests()[0]?.session;
+  expect(puts()[0]?.session).toBe(session);
+  expect(unlocks()[0]?.session).toBe(session);
+  expect(puts()[0]?.url).toContain(`lockHandle=${lockHandle}`);
+  await until(() => poolSize() === 0);
+});
+
+it('the declared state_handle routes the call and reaches no handler that does not declare it: the handler gets the arguments it got before', async () => {
+  const { stateHandle } = await lock();
+  const echoed = await s.call('EchoArgs', {
+    value: 'v',
+    state_handle: stateHandle,
+  });
+  expect(echoed.isError).toBe(false);
+  expect(JSON.parse(echoed.text)).toEqual({ value: 'v' });
+  // Routed to the lock's instance: no second instance in the pool.
+  expect(poolSize()).toBe(1);
+});
+
+it('without the header or the argument the write and the unlock are refused, sending nothing, in words naming the argument', async () => {
   const { lockHandle } = await lock();
   const before = s.standIn.requests.length;
 
@@ -139,14 +204,14 @@ it('without the header the write and the unlock are refused, sending nothing', a
     lock_handle: lockHandle,
   });
   expect(updated.isError).toBe(true);
-  expect(updated.text).toContain('lock_handle is not held by this instance');
+  expect(updated.text).toContain(NOT_HELD_WORDS);
 
   const unlocked = await s.call('HandlerUnlock', {
     ...LOCK,
     lock_handle: lockHandle,
   });
   expect(unlocked.isError).toBe(true);
-  expect(unlocked.text).toContain('lock_handle is not held by this instance');
+  expect(unlocked.text).toContain(NOT_HELD_WORDS);
 
   expect(puts()).toEqual([]);
   expect(unlocks()).toEqual([]);

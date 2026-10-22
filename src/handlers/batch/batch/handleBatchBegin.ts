@@ -5,7 +5,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'BatchBegin',
   description:
-    '[read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.',
+    '[read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).',
   inputSchema: {
     type: 'object',
     properties: {},

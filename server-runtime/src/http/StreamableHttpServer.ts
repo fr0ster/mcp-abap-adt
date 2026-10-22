@@ -535,6 +535,9 @@ export class StreamableHttpServer extends BaseMcpServer {
           logger,
           ...state,
           transportCloseEndsSession: false,
+          // The pool routes a call by its `state_handle` argument: every
+          // tool declares it, so a client that sets no header can send it.
+          stateHandleArgument: true,
           // The responsible rules, once, when the instance's connection is
           // created: kept with it in the pool.
           systemContextResolver: defaultSystemContextResolver,

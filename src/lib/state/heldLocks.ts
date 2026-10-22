@@ -19,7 +19,7 @@ import type { StatePart } from './InstanceState';
 
 /** The words of a write or an unlock under a lock this instance does not hold. */
 export const LOCK_NOT_HELD_WORDS =
-  "lock_handle is not held by this instance: send the state_handle HandlerLock answered in the request's x-mcp-state-handle header";
+  'lock_handle is not held by this instance: send the state_handle HandlerLock answered as the state_handle argument (or in the x-mcp-state-handle header)';
 
 /**
  * Where a lock lives: the instance's own SAP session (`main`), or a session

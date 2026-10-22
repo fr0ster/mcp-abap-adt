@@ -138,6 +138,11 @@ import {
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
 import {
+  declaresStateHandle,
+  withoutStateHandle,
+  withStateHandle,
+} from '../lib/state/stateHandleArgument.js';
+import {
   getStatedSystemContext,
   systemContextFromConfiguration,
 } from '../lib/systemContext.js';
@@ -310,6 +315,9 @@ export abstract class BaseMcpServer extends McpServer {
   /** The locks this instance holds between requests (`heldLocks` option). */
   protected readonly heldLocks: HeldLocks | undefined;
 
+  /** Whether every tool declares `state_handle` (`stateHandleArgument` option). */
+  private readonly stateHandleArgument: boolean;
+
   /**
    * The corrected request header pairs of the systems this instance talks
    * to (`adtHeaderPairs` option), keyed by system: the host's, shared by its
@@ -393,6 +401,15 @@ export abstract class BaseMcpServer extends McpServer {
      * (`closeInstance`) or the process shutdown.
      */
     transportCloseEndsSession?: boolean;
+    /**
+     * Whether every tool's input schema declares an optional string
+     * `state_handle` (`withStateHandle`; a tool declaring its own keeps it):
+     * stated by a host that routes a call to the instance holding its state
+     * by that argument (Streamable HTTP's pool), so a client that sets no
+     * header can send it. Default `false`: stdio and SSE register the
+     * schemas as the tools declare them.
+     */
+    stateHandleArgument?: boolean;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
@@ -412,6 +429,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.batch !== undefined) this.state.attach(this.batch);
     this.heldLocks = options.heldLocks;
     if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
+    this.stateHandleArgument = options.stateHandleArgument === true;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     this.systemType = options.systemType;
     this.systemContextResolver = options.systemContextResolver ?? null;
@@ -1577,19 +1595,33 @@ export abstract class BaseMcpServer extends McpServer {
             }
           };
 
+          // The host's `state_handle` declaration, where it states one and
+          // the tool declares none of its own: the argument routes the call
+          // (the pool) and reaches no handler — the handler gets the
+          // arguments it got before.
+          const declared =
+            this.stateHandleArgument &&
+            !declaresStateHandle(entry.toolDefinition.inputSchema);
+          const inputSchema = declared
+            ? (withStateHandle(
+                entry.toolDefinition.inputSchema,
+              ) as typeof entry.toolDefinition.inputSchema)
+            : entry.toolDefinition.inputSchema;
+
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
           const wrappedHandler = (args: unknown) =>
-            this.trackCall(toolName, (signal) => runCall(args, signal));
-
+            this.trackCall(toolName, (signal) =>
+              runCall(declared ? withoutStateHandle(args) : args, signal),
+            );
           // Convert JSON Schema to Zod if needed, otherwise pass as-is
           const zodSchema =
-            entry.toolDefinition.inputSchema &&
-            typeof entry.toolDefinition.inputSchema === 'object' &&
-            entry.toolDefinition.inputSchema.type === 'object' &&
-            entry.toolDefinition.inputSchema.properties
-              ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
-              : entry.toolDefinition.inputSchema;
+            inputSchema &&
+            typeof inputSchema === 'object' &&
+            inputSchema.type === 'object' &&
+            inputSchema.properties
+              ? jsonSchemaToZod(inputSchema)
+              : inputSchema;
 
           // Skip tools not available in the stated SAP environment. The
           // kind is never guessed: with none stated (stdio's inspection-only

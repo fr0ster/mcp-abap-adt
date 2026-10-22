@@ -171,7 +171,8 @@ SAP NW RFC SDK, any system it supports).
 mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=<onprem|cloud>
 ```
 
-RFC requires the SAP NW RFC SDK installed and configured. See
+RFC requires the SAP NW RFC library at run time — SAP GUI's 64-bit `sapnwrfc.dll` on Windows,
+else the SAP NW RFC SDK installed and on the library search path. See
 [RFC Setup Guide](../installation/RFC_SETUP.md). The same option can be set with
 `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` `.env`
 (which joins the environment, never over a value already set), or YAML `connection-type: rfc`.

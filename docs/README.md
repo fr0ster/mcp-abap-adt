@@ -8,7 +8,7 @@ This directory contains all documentation for the `mcp-abap-adt` project, organi
 Complete installation instructions for different platforms and environments.
 
 - `INSTALLATION.md` - Main installation guide: the installation variants (full or compact server; HTTP, RFC or SNC) and the commands for each
-- `RFC_SETUP.md` - RFC and SNC: the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` before the install
+- `RFC_SETUP.md` - RFC and SNC: the SAP NW RFC library at run time, the prebuilt RFC module and where to build one
 - `platforms/` - Platform-specific installation guides
   - `INSTALL_WINDOWS.md` - Windows installation
   - `INSTALL_MACOS.md` - macOS installation
@@ -63,6 +63,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
 - **Installation variants** (full or compact; HTTP, RFC or SNC): [Installation Guide](installation/INSTALLATION.md#installation-variants) | [RFC Setup](installation/RFC_SETUP.md)
+- **Upgrading from 19.x**: [Migration to 20.0](MIGRATION-20.0.md)
 - **Upgrading from 18.x**: [Migration to 19.0](MIGRATION-19.0.md)
 - **Upgrading from 17.x**: [Migration to 18.0](MIGRATION-18.0.md)
 - **Upgrading from 16.x**: [Migration to 17.0](MIGRATION-17.0.md)

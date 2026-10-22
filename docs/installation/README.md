@@ -6,7 +6,7 @@ This directory contains installation guides for the MCP ABAP ADT Server.
 
 - **[INSTALLATION.md](INSTALLATION.md)** - Main installation guide: the [installation variants](INSTALLATION.md#installation-variants) (full or compact server; HTTP, RFC or SNC) and the commands for each
 - **[PORTABLE.md](PORTABLE.md)** - A personal portable build: one executable per server and platform with Node.js and your SDK inside
-- **[RFC_SETUP.md](RFC_SETUP.md)** - RFC and SNC: the C++ toolchain, the SAP NW RFC SDK, `SAPNWRFC_HOME` before the install, the check, SNC prerequisites
+- **[RFC_SETUP.md](RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC library at run time, the prebuilt RFC module and where to build one, the check, SNC prerequisites
 - **[CLINE_CONFIGURATION.md](CLINE_CONFIGURATION.md)** - Cline client configuration examples
 - **[platforms/](platforms/)** - Platform-specific installation guides
   - `INSTALL_WINDOWS.md` - Windows installation using PowerShell and winget

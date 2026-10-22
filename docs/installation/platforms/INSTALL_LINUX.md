@@ -201,21 +201,22 @@ The checkout is not runnable as a server by itself; to run what you built, see
 
 ### RFC and SNC
 
-RFC and SNC need, **before** `npm install -g`: the SAP NW RFC SDK, a C++ toolchain, and
-`SAPNWRFC_HOME` set in the shell that runs the install.
+The RFC module comes with a prebuilt binding for Linux x64 (glibc), and `npm install` compiles
+nothing. RFC and SNC need the SAP NW RFC SDK **when the server runs**, its `lib` directory on the
+library search path of the server process. On another architecture or with musl (Alpine), build the
+binding first ([RFC Setup](../RFC_SETUP.md)).
 
-- **Toolchain:** `sudo apt-get install -y build-essential python3` (or the distribution's equivalent).
 - **Node.js:** one built for the system — distribution package, NodeSource or nvm. A Linuxbrew
   Node.js was measured unable to load the SDK's system dependency `libuuid`.
 
 ```bash
-export SAPNWRFC_HOME=~/nwrfcsdk
 npm install -g @mcp-abap-adt/core
 npm ls -g @mcp-abap-adt/sap-rfc-lite
+export LD_LIBRARY_PATH="$HOME/nwrfcsdk/lib:$LD_LIBRARY_PATH"   # in the server's environment
 ```
 
-`(empty)` from `npm ls` means npm silently dropped the RFC module. Details and the SNC `.env`:
-[RFC Setup](../RFC_SETUP.md).
+`(empty)` from `npm ls` means the install left the RFC module out (`--no-optional` /
+`--omit=optional`). Details and the SNC `.env`: [RFC Setup](../RFC_SETUP.md).
 
 ## ⚙️ Step 4: Configure SAP Connection
 

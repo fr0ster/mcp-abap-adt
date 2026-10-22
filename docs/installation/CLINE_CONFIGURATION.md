@@ -13,8 +13,8 @@ to choose: [Installation variants](INSTALLATION.md#installation-variants). Ready
    npm install -g @mcp-abap-adt/compact     # compact server, command mcp-abap-adt-compact
    ```
 
-   Or run it without installing: `npx -y @mcp-abap-adt/core …`. For RFC and SNC, install **after** the
-   SAP NW RFC SDK is in place — see [RFC Setup](RFC_SETUP.md).
+   Or run it without installing: `npx -y @mcp-abap-adt/core …`. For RFC and SNC, the SAP NW RFC
+   library must be loadable when the server runs — see [RFC Setup](RFC_SETUP.md).
 
 2. Name the destination. The server reads a `.env` only when you name it — nothing is read from the
    working directory:

@@ -183,12 +183,14 @@ The server verifies the SAP system's HTTPS certificate. In a container the two s
 ## RFC and SNC
 
 Not available in these images. RFC (and SNC, which runs over RFC) needs
-`@mcp-abap-adt/sap-rfc-lite`, which `npm install` compiles against the SAP NW RFC SDK. The images carry
-neither the SDK nor a compiler and install with `--omit=optional`, so the module is absent and the
-first RFC call is refused with `@mcp-abap-adt/sap-rfc-lite is not available`.
+`@mcp-abap-adt/sap-rfc-lite` and, at run time, the SAP NW RFC SDK, which SAP does not allow
+redistributing. The images carry no SDK and install with `--omit=optional`, so the module is absent and
+the first RFC call is refused with `@mcp-abap-adt/sap-rfc-lite is not available`.
 
-An RFC image of your own needs the SDK, the build toolchain and `SAPNWRFC_HOME` set when the packages
-are installed — see [RFC_SETUP.md](../installation/RFC_SETUP.md). SNC needs, besides, an SNC product
+An RFC image of your own installs without `--omit=optional` and needs the SAP NW RFC SDK inside it, its
+`lib` directory on `LD_LIBRARY_PATH` of the server process. The module's prebuilt Linux binding is for
+x64 with glibc; on another architecture or a musl base (Alpine) a binding must be built first — see
+[RFC_SETUP.md](../installation/RFC_SETUP.md). SNC needs, besides, an SNC product
 holding a credential inside the container, which a desktop Secure Login Client does not give.
 
 ## Login

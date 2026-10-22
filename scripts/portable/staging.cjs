@@ -1,15 +1,14 @@
 'use strict';
 // The staging cache of scripts/portable/build.mjs: the published servers
-// installed from npm, with the RFC binding sap-rfc-lite installed for them.
+// installed from npm, with the RFC binding their sap-rfc-lite carries.
 // CommonJS so the unit tests can load it.
 const fs = require('node:fs');
 const { createRequire } = require('node:module');
 const path = require('node:path');
 
-// SAPNWRFC_HOME, raw: the SDK whose runtime libraries go into the archive, and
-// the one binding.gyp compiles against when the binding is built from source.
-// Relative paths do not resolve from node-gyp's working directory, so the
-// addon would silently not be built.
+// SAPNWRFC_HOME, raw: the SDK whose runtime libraries go into the archive.
+// Absolute only: a relative one would name a folder depending on where the
+// build happens to run.
 function sdkHome(env) {
   const home = env.SAPNWRFC_HOME?.trim();
   if (!home) {
@@ -24,10 +23,11 @@ function sdkHome(env) {
 }
 
 // The RFC binding the staged sap-rfc-lite loads, found by the package's own
-// loader (node-gyp-build, resolved from the package): build/Release when it was
-// compiled (`--build-from-source`, or a platform with no prebuild), else the
-// prebuilt one under prebuilds/<platform>-<arch>/ that sap-rfc-lite 0.2.3 and
-// later install. `undefined` when there is neither, or no package.
+// loader (node-gyp-build, resolved from the package): the prebuilt one under
+// prebuilds/<platform>-<arch>/ — the published package's, or one a source
+// build packed into a package of its own (sap-rfc-lite's README,
+// "Installation"). Installing compiles nothing (0.3.x has no install script).
+// `undefined` when there is none, or no package.
 function stagedAddon(dir) {
   const pkg = path.join(dir, 'node_modules/@mcp-abap-adt/sap-rfc-lite');
   try {
@@ -40,17 +40,11 @@ function stagedAddon(dir) {
 
 const markerOf = (dir) => path.join(dir, '.staged');
 
-// Staged for this version, this SDK and this way of getting the binding, and
-// the binding is really there.
-function isStaged(dir, { version, sdk, fromSource = false }) {
+// Staged for this version and this SDK, and the binding is really there.
+function isStaged(dir, { version, sdk }) {
   try {
     const staged = JSON.parse(fs.readFileSync(markerOf(dir), 'utf8'));
-    return (
-      staged.version === version &&
-      staged.sdk === sdk &&
-      (staged.fromSource ?? false) === fromSource &&
-      stagedAddon(dir) !== undefined
-    );
+    return staged.version === version && staged.sdk === sdk && stagedAddon(dir) !== undefined;
   } catch {
     return false;
   }
@@ -58,13 +52,56 @@ function isStaged(dir, { version, sdk, fromSource = false }) {
 
 // Written only once the binding exists: an install that left it out must not
 // leave a cache that the next run would trust.
-function markStaged({ dir, version, sdk, fromSource = false }) {
+function markStaged({ dir, version, sdk }) {
   if (stagedAddon(dir) === undefined) {
     throw new Error(
-      'the RFC binding is not in the staged @mcp-abap-adt/sap-rfc-lite: no prebuilt binding for this platform and none compiled (check SAPNWRFC_HOME and the C++ toolchain; npm left the optional dependency out if the compile failed)',
+      'the RFC binding is not in the staged @mcp-abap-adt/sap-rfc-lite: it ships prebuilt ones for linux-x64 (glibc), win32-x64 and darwin-arm64 only, and installing builds none (to build one, see its README, "Installation")',
     );
   }
-  fs.writeFileSync(markerOf(dir), JSON.stringify({ version, sdk, fromSource }));
+  fs.writeFileSync(markerOf(dir), JSON.stringify({ version, sdk }));
 }
 
-module.exports = { sdkHome, stagedAddon, isStaged, markStaged };
+// Every copy of sap-rfc-lite in the stage's node_modules tree, hoisted or
+// nested under the package that pinned it, older than 0.3.0: `{ dir, version }`.
+const RFC_LITE = path.join('@mcp-abap-adt', 'sap-rfc-lite');
+
+function rfcLiteTooOld(dir) {
+  const old = [];
+  const walk = (modules) => {
+    let names;
+    try {
+      names = fs.readdirSync(modules);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const entries = name.startsWith('@')
+        ? (() => {
+            try {
+              return fs.readdirSync(path.join(modules, name)).map((n) => path.join(name, n));
+            } catch {
+              return [];
+            }
+          })()
+        : [name];
+      for (const entry of entries) {
+        const pkg = path.join(modules, entry);
+        if (entry === RFC_LITE) {
+          let version;
+          try {
+            version = JSON.parse(fs.readFileSync(path.join(pkg, 'package.json'), 'utf8')).version;
+          } catch {
+            version = undefined;
+          }
+          const [major, minor] = String(version).split('.').map(Number);
+          if (!(major > 0 || minor >= 3)) old.push({ dir: pkg, version: String(version) });
+        }
+        walk(path.join(pkg, 'node_modules'));
+      }
+    }
+  };
+  walk(path.join(dir, 'node_modules'));
+  return old;
+}
+
+module.exports = { sdkHome, stagedAddon, isStaged, markStaged, rfcLiteTooOld };

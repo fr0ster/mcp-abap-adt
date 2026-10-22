@@ -1,8 +1,10 @@
 /**
  * The staging cache of `npm run portable:build` (scripts/portable/staging.cjs):
  * which SDK it was staged with, when it counts as staged, and which RFC binding
- * it takes — the one sap-rfc-lite's own loader (node-gyp-build) resolves: a
- * compiled build/Release first, else the prebuilt one the package installs.
+ * it takes — the one sap-rfc-lite's own loader (node-gyp-build) resolves, the
+ * prebuilt one the package carries (a build/Release would win, as the loader
+ * prefers it) — and which staged copies of sap-rfc-lite are too old to
+ * load inside an executable.
  */
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -62,7 +64,7 @@ describe('portable staging', () => {
     expect(() => staging.sdkHome({})).toThrow(/set SAPNWRFC_HOME/);
   });
 
-  it('refuses a relative SAPNWRFC_HOME: node-gyp would not find it', () => {
+  it('refuses a relative SAPNWRFC_HOME', () => {
     expect(() => staging.sdkHome({ SAPNWRFC_HOME: 'nwrfcsdk' })).toThrow(
       /absolute path/,
     );
@@ -74,13 +76,13 @@ describe('portable staging', () => {
     );
   });
 
-  it('takes the prebuilt binding sap-rfc-lite installs (0.2.3 and later: no build/Release)', () => {
+  it('takes the prebuilt binding sap-rfc-lite carries (no build/Release)', () => {
     const dir = tmp();
     const prebuilt = withAddon(dir);
     expect(staging.stagedAddon(dir)).toBe(prebuilt);
   });
 
-  it('takes a compiled build/Release over the prebuild, as the package loads it', () => {
+  it('takes a build/Release over the prebuild, as the package loader does', () => {
     const dir = tmp();
     withAddon(dir);
     const compiled = write(
@@ -126,24 +128,11 @@ describe('portable staging', () => {
     ).toBe(false);
   });
 
-  it('is rebuilt when a source build is asked for, or no longer asked for', () => {
+  it('is rebuilt for another version', () => {
     const dir = tmp();
     withAddon(dir);
     staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' });
-    expect(
-      staging.isStaged(dir, {
-        version: '1.0.0',
-        sdk: '/opt/sdk',
-        fromSource: true,
-      }),
-    ).toBe(false);
-    staging.markStaged({
-      dir,
-      version: '1.0.0',
-      sdk: '/opt/sdk',
-      fromSource: true,
-    });
-    expect(staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' })).toBe(
+    expect(staging.isStaged(dir, { version: '1.0.1', sdk: '/opt/sdk' })).toBe(
       false,
     );
   });
@@ -156,5 +145,59 @@ describe('portable staging', () => {
     expect(staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' })).toBe(
       false,
     );
+  });
+});
+
+describe('staged sap-rfc-lite copies older than 0.3.0', () => {
+  const copy = (modules: string, version: string) => {
+    const pkg = path.join(modules, '@mcp-abap-adt/sap-rfc-lite');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(
+      path.join(pkg, 'package.json'),
+      JSON.stringify({ name: '@mcp-abap-adt/sap-rfc-lite', version }),
+    );
+    return pkg;
+  };
+
+  it('finds none when every copy is 0.3.0 or later', () => {
+    const dir = tmp();
+    copy(path.join(dir, 'node_modules'), '0.3.2');
+    copy(
+      path.join(dir, 'node_modules/@mcp-abap-adt/connection/node_modules'),
+      '1.0.0',
+    );
+    expect(staging.rfcLiteTooOld(dir)).toEqual([]);
+  });
+
+  it('finds an older copy nested under the package that pinned it', () => {
+    const dir = tmp();
+    copy(path.join(dir, 'node_modules'), '0.3.2');
+    const nested = copy(
+      path.join(dir, 'node_modules/@mcp-abap-adt/connection/node_modules'),
+      '0.2.4',
+    );
+    expect(staging.rfcLiteTooOld(dir)).toEqual([
+      { dir: nested, version: '0.2.4' },
+    ]);
+  });
+
+  it('finds a hoisted older copy, and one with no readable version', () => {
+    const dir = tmp();
+    const hoisted = copy(path.join(dir, 'node_modules'), '0.2.3');
+    const broken = path.join(
+      dir,
+      'node_modules/other/node_modules/@mcp-abap-adt/sap-rfc-lite',
+    );
+    fs.mkdirSync(broken, { recursive: true });
+    expect(staging.rfcLiteTooOld(dir)).toEqual(
+      expect.arrayContaining([
+        { dir: hoisted, version: '0.2.3' },
+        { dir: broken, version: 'undefined' },
+      ]),
+    );
+  });
+
+  it('finds nothing in a stage with no node_modules', () => {
+    expect(staging.rfcLiteTooOld(tmp())).toEqual([]);
   });
 });

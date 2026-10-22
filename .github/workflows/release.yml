@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   test:
+    # A hung test is capped here instead of by GitHub's 6-hour default. The
+    # slower cell took ~14 minutes (Node 22, 2026-10-21); ci.yml's cap.
+    timeout-minutes: 45
     runs-on: ubuntu-latest
 
     strategy:
@@ -26,11 +29,27 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
+      # --ignore-scripts: the Node 22 runner's npm 10 does not read package.json
+      # `allowScripts` (nor .npmrc `strict-allow-scripts`), and no dependency's
+      # install script is needed to lint, build or test — `allowScripts` denies
+      # every one of them. It also skips the root's own `prepare` (husky), which
+      # CI has no use for.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      # As in ci.yml: what the packages ship gates on moderate and above; the
+      # whole tree is printed and does not gate until the Jest-only sprintf-js
+      # advisory (no fixed release; jest → … → js-yaml 3 → argparse 1 →
+      # sprintf-js) is removed — the follow-up after 20.0.0.
+      - name: Security audit (production dependencies, moderate+)
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Security audit (all dependencies, reported only)
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
 
       - name: Run Biome lint
-        run: npx biome check src --diagnostic-level=error
+        run: npm run lint:check -- --diagnostic-level=error
 
       # The root step covers `src` only; every other package lints its own
       # sources.
@@ -251,6 +270,7 @@ jobs:
 
   release:
     needs: test
+    timeout-minutes: 10
     runs-on: ubuntu-latest
 
     steps:

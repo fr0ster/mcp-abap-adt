@@ -37,15 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # As in ci.yml: what the packages ship gates on moderate and above; the
-      # whole tree is printed and does not gate until the Jest-only sprintf-js
-      # advisory (no fixed release; jest → … → js-yaml 3 → argparse 1 →
-      # sprintf-js) is removed — the follow-up after 20.0.0.
-      - name: Security audit (production dependencies, moderate+)
-        run: npm audit --omit=dev --audit-level=moderate
-
-      - name: Security audit (all dependencies, reported only)
-        continue-on-error: true
+      # As in ci.yml: any known advisory of moderate severity or above stops
+      # the release, dev dependencies included.
+      - name: Security audit (moderate+)
         run: npm audit --audit-level=moderate
 
       - name: Run Biome lint

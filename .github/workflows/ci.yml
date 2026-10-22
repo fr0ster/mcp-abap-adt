@@ -189,23 +189,10 @@ jobs:
       - name: Type-check responsible-rules tests
         run: npm --prefix responsible-rules run test:check
 
-      # What the packages ship (`--omit=dev`) fails the run on any advisory of
-      # moderate severity or above.
-      - name: Security audit (production dependencies, moderate+)
+      # Any known advisory of moderate severity or above fails the run, dev
+      # dependencies included: they run here and on every developer's machine.
+      - name: Security audit (moderate+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
-        run: npm audit --omit=dev --audit-level=moderate
-
-      # The whole tree, dev dependencies included, printed and NOT gating — the
-      # one `continue-on-error` in this workflow, and a temporary one. Its one
-      # remaining advisory (sprintf-js, GHSA-hp3w-g68c-fv3c, moderate, no fixed
-      # release) is reached only through Jest: jest → @jest/core / jest-config →
-      # @jest/transform / babel-jest → babel-plugin-istanbul →
-      # @istanbuljs/load-nyc-config → js-yaml 3 → argparse 1 → sprintf-js.
-      # Removing it (moving the suites off Jest) is the follow-up after 20.0.0;
-      # this step gates again once it is done.
-      - name: Security audit (all dependencies, reported only)
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
-        continue-on-error: true
         run: npm audit --audit-level=moderate
 
       # All eighteen packages. 10.0.0 split them: the repository root is

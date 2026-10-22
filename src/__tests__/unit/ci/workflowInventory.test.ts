@@ -214,23 +214,14 @@ describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
     ).toEqual([]);
   });
 
-  it('gates on what the packages ship at moderate, and reports the whole tree', () => {
-    const gate = step(
-      lines,
-      'Security audit (production dependencies, moderate+)',
-    ).map((line) => line.trim());
-    expect(gate).toContain('run: npm audit --omit=dev --audit-level=moderate');
-    expect(gate).not.toContain('continue-on-error: true');
-    const report = step(
-      lines,
-      'Security audit (all dependencies, reported only)',
-    ).map((line) => line.trim());
-    expect(report).toContain('run: npm audit --audit-level=moderate');
-    expect(report).toContain('continue-on-error: true');
-    // The only step allowed not to gate.
+  it('gates on every known advisory of moderate severity or above', () => {
+    const audit = step(lines, 'Security audit (moderate+)').map((line) =>
+      line.trim(),
+    );
+    expect(audit).toContain('run: npm audit --audit-level=moderate');
     expect(
-      lines.filter((line) => line.trim() === 'continue-on-error: true'),
-    ).toHaveLength(1);
+      lines.filter((line) => line.trim().startsWith('continue-on-error')),
+    ).toEqual([]);
   });
 
   it('caps every job', () => {

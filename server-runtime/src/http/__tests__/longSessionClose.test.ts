@@ -12,6 +12,7 @@
  */
 
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
+import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import {
   BatchHandlersGroup,
   type HandlerContext,
@@ -308,4 +309,22 @@ it('close ends any held state: a lock taken without SessionOpen, closed by its h
     state_handle: handle,
   });
   expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+});
+
+it('a close whose batch was the only thing held: the state empties, and the pool runs no disposal on the closed instance', async () => {
+  const begun = await s.call('BatchBegin', {});
+  expect(begun.isError).toBe(false);
+  const handle = handleOf(begun.text);
+  expect(poolSize()).toBe(1);
+  const dispose = jest.spyOn(BaseMcpServer.prototype, 'dispose');
+
+  const closed = await s.call('SessionClose', { state_handle: handle });
+  expect(JSON.parse(closed.text)).toEqual({
+    closed: true,
+    held: { locks: 0, batch: true, debug_session: false },
+  });
+  await until(() => poolSize() === 0);
+  await turns(20);
+  expect(dispose).not.toHaveBeenCalled();
+  expect(envelopes()).toEqual([]);
 });

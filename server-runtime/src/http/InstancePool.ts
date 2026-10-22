@@ -290,6 +290,7 @@ export class InstancePool<T extends Poolable> {
     if (!this.subscribed.has(instance)) {
       this.subscribed.add(instance);
       instance.state.onEmpty(() => {
+        if (this.closedOut(instance)) return;
         if (!this.busy.get(instance)) void this.evict(instance);
       });
     }
@@ -328,6 +329,8 @@ export class InstancePool<T extends Poolable> {
    * that empties synchronously inside dispose() re-enters harmlessly.
    */
   private evict(instance: T): Promise<void> {
+    // Left for good: a part emptying after its close disposes nothing.
+    if (this.closedOut(instance)) return Promise.resolve();
     const running = this.evicting.get(instance);
     if (running) return running;
     let done!: () => void;
@@ -380,14 +383,17 @@ export class InstancePool<T extends Poolable> {
     this.drop(instance);
     this.retained.delete(instance);
     this.failed.delete(instance);
-    // Closed: when the batch was the only thing held, the close's
-    // `dropBatch` empties the state and `onEmpty` evicts the instance —
-    // `dispose()` on a latched instance whose parts hold nothing, then the
-    // terminal close skipped (closed here). Harmless: nothing else to undo.
+    // Closed: a part that empties afterwards — the close's `dropBatch`, when
+    // the batch was the only thing held — runs no eviction (`closedOut`).
     this.closed.add(instance);
     const closing = instance.instanceClose().catch(() => undefined);
     this.closing.add(closing);
     void closing.finally(() => this.closing.delete(closing));
+  }
+
+  /** Whether `instance` left the pool for good: closed, and no longer held. */
+  private closedOut(instance: T): boolean {
+    return this.closed.has(instance) && !this.held.has(instance);
   }
 
   /** The terminal close of an instance leaving the pool, once. */

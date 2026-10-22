@@ -207,7 +207,7 @@ is missing, not the wire: a handler's envelope carries `message`, `origin` and
 
 ## A release is not verified until an installed copy runs
 
-`release:dry` reporting `Published: 2  Skipped: 0` says the tarballs build. It
+`release:dry` reporting `Published: 18  Skipped: 0` says the tarballs build. It
 says nothing about whether anything inside them runs: paths that resolve in a
 checkout resolve differently under `node_modules`.
 
@@ -219,9 +219,15 @@ packages had fixed exactly this one release earlier (`auth-broker` 3.0.4:
 found it — *installing the tarball into an empty directory and running each bin.*
 We took the fix and skipped the check.
 
-`src/__tests__/unit/binSmoke.test.ts` performs it now. Before a release, make sure
-it ran; when adding a bin, add it there. And treat any `__dirname`-relative path
-in `server/` as suspect: count the levels for both layouts.
+`src/__tests__/unit/binSmoke.test.ts` performs it now, and
+`src/__tests__/unit/installMatrix.test.ts` installs the binaries by name, as a
+user does, in every layout and proves one `@mcp-abap-adt/lib` per process (19.1.0
+loaded two when a wrapper and its base were installed in one command: a binary
+depended on another binary; none may now). Before a release, make sure both ran
+(CI runs the matrix on ubuntu + Node 22 only), and after publishing run
+`docs/deployment/RELEASE.md` step 9; when adding a bin, add it to both. And treat
+any `__dirname`-relative path in `server-runtime/` and in the binary packages'
+version modules as suspect: count the levels for both layouts.
 
 ## What we write names nothing concrete
 

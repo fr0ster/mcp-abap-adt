@@ -75,7 +75,7 @@ npm publishing is a manual step — see [RELEASE.md](./RELEASE.md).
 No workflow runs a dependency's install script, and nothing calls `npx`. `package.json`
 `allowScripts` names every dependency that has one and denies it, and `.npmrc` sets
 `strict-allow-scripts=true`, so a new dependency with an unreviewed install script fails the install
-instead of running it; `.npmrc` also sets `min-release-age=7` (the `@mcp-abap-adt/*` scope excluded).
+instead of running it.
 npm reads those settings in full from 11.19.0; the Node 22 runner's npm 10 reads none of them, so
 the workflows install with `--ignore-scripts`. `src/__tests__/unit/ci/workflowInventory.test.ts`
 holds both workflows, the package scripts and the git hook to this.

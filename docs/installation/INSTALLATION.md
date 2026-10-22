@@ -203,9 +203,8 @@ npm test             # unit tests; integration tests need a system, see docs/dev
 ```
 
 The repository's `.npmrc` lets no dependency run an install script that `package.json`
-`allowScripts` does not allow (it denies every one: none is needed to build or test), and resolves
-no new version younger than 7 days. npm reads both settings in full from 11.19.0; npm 10 (bundled
-with Node.js 22) reads neither, so install with `--ignore-scripts` on any npm. That also skips the
+`allowScripts` does not allow (it denies every one: none is needed to build or test). npm reads
+that setting in full from 11.19.0; npm 10 (bundled with Node.js 22) reads it not at all, so install with `--ignore-scripts` on any npm. That also skips the
 repository's own `prepare` (husky), hence the second line.
 
 The checkout is not runnable as a server by itself: `server/` and `compact/` take `@mcp-abap-adt/lib` as a

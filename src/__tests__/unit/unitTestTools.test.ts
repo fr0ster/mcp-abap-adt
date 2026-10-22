@@ -8,6 +8,7 @@
  * started it, so one capture serves every Run* tool.
  */
 
+import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
 import { handleCreateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest';
 import { handleCreateProgramUnitTest } from '../../handlers/unit_test/high/handleCreateProgramUnitTest';
 import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
@@ -15,6 +16,7 @@ import { handleRunFunctionGroupUnitTest } from '../../handlers/unit_test/high/ha
 import { handleRunFunctionModuleUnitTest } from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { handleRunProgramUnitTest } from '../../handlers/unit_test/high/handleRunProgramUnitTest';
 import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
+import { handleRunUnitTestSync } from '../../handlers/unit_test/high/handleRunUnitTestSync';
 import { handleUpdateProgramUnitTest } from '../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import {
   functionGroupMainProgram,
@@ -30,6 +32,7 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
+import { SAP_EXCEPTION_HEADERS, sapException } from '../helpers/sapRefusals';
 
 const ctx = (connection: unknown) => ({ connection, logger: undefined });
 
@@ -133,6 +136,172 @@ describe('Run* tools: start, wait, answer the result — one call', () => {
 
     expect(result.isError).toBe(true);
     expect(connection.requests).toHaveLength(1);
+  });
+});
+
+/** A run that failed one test: the result document, a failed assertion inside. */
+const FAILING_RESULT = {
+  data: corpusBody(
+    'refusal-unittest-run-failing--03-results-fa53c505dd7b1fd1abb859f1193d5d44',
+  ),
+};
+
+describe('RunUnitTestSync: one request, the finished result', () => {
+  it('posts the class to /abapunit/testruns once and answers the result', async () => {
+    const connection = recordingConnection([RESULT]);
+
+    const result: any = await handleRunUnitTestSync(ctx(connection) as any, {
+      class_name: 'zcl_x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map(line)).toEqual([
+      'POST /sap/bc/adt/abapunit/testruns',
+    ]);
+    expect(String(connection.requests[0].data)).toContain(
+      'adtcore:uri="/sap/bc/adt/oo/classes/zcl_x"',
+    );
+    const answer = payload(result);
+    expect(answer.finished).toBe(true);
+    expect(answer.run_id).toBeUndefined();
+    expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
+  });
+
+  it('a failing test is in the result, not a refusal', async () => {
+    const connection = recordingConnection([FAILING_RESULT]);
+
+    const result: any = await handleRunUnitTestSync(ctx(connection) as any, {
+      class_name: 'ZCL_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.stringify(payload(result).run_result)).toContain(
+      'deliberate failure for the corpus',
+    );
+  });
+
+  it("detail raw answers SAP's document as it came", async () => {
+    const connection = recordingConnection([RESULT]);
+
+    const result: any = await handleRunUnitTestSync(ctx(connection) as any, {
+      class_name: 'ZCL_X',
+      detail: 'raw',
+    });
+
+    expect(payload(result).run_result).toBe(RESULT.data);
+  });
+
+  it("SAP's refusal is an error, with the step", async () => {
+    const connection = recordingConnection();
+    const record = connection.makeAdtRequest.bind(connection);
+    connection.makeAdtRequest = (async (options: any) => {
+      await record(options);
+      throw Object.assign(new Error('Request failed with status code 404'), {
+        isAxiosError: true,
+        response: {
+          status: 404,
+          data: sapException('ExceptionResourceNotFound', 'Resource not found'),
+          headers: SAP_EXCEPTION_HEADERS,
+        },
+      });
+    }) as any;
+
+    const result: any = await handleRunUnitTestSync(ctx(connection) as any, {
+      class_name: 'ZCL_X',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(payload(result)).toMatchObject({ step: 'run' });
+    expect(connection.requests).toHaveLength(1);
+  });
+
+  it('asks nothing without class_name', async () => {
+    const connection = recordingConnection();
+
+    const result: any = await handleRunUnitTestSync(
+      ctx(connection) as any,
+      {} as any,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(connection.requests).toHaveLength(0);
+  });
+});
+
+describe('HandlerUnitTestRun: the runner the caller names, sync by default', () => {
+  const tests = [
+    { container_class: 'zcl_a', test_class: 'ltc_a' },
+    { container_class: 'zcl_a', test_class: 'ltc_b' },
+    { container_class: 'zcl_b', test_class: 'ltc_c' },
+  ];
+
+  it('without runner: one POST /abapunit/testruns, each container once, the finished result', async () => {
+    const connection = recordingConnection([FAILING_RESULT]);
+
+    const result: any = await handleHandlerUnitTestRun(ctx(connection) as any, {
+      tests,
+      risk_level: { dangerous: true },
+    });
+
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map(line)).toEqual([
+      'POST /sap/bc/adt/abapunit/testruns',
+    ]);
+    const body = String(connection.requests[0].data);
+    expect(body.split('/sap/bc/adt/oo/classes/zcl_a"').length - 1).toBe(1);
+    expect(body).toContain('/sap/bc/adt/oo/classes/zcl_b"');
+    const answer = payload(result);
+    expect(answer.finished).toBe(true);
+    expect(answer.run_id).toBeUndefined();
+    expect(JSON.stringify(answer.run_result)).toContain(
+      'deliberate failure for the corpus',
+    );
+  });
+
+  it('runner sync is the same request', async () => {
+    const connection = recordingConnection([RESULT]);
+
+    const result: any = await handleHandlerUnitTestRun(ctx(connection) as any, {
+      tests,
+      runner: 'sync',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map(line)).toEqual([
+      'POST /sap/bc/adt/abapunit/testruns',
+    ]);
+  });
+
+  it('runner async starts the run and answers its id, without waiting', async () => {
+    const connection = recordingConnection([STARTED]);
+
+    const result: any = await handleHandlerUnitTestRun(ctx(connection) as any, {
+      tests,
+      runner: 'async',
+      title: 'T',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map(line)).toEqual([
+      'POST /sap/bc/adt/abapunit/runs',
+    ]);
+    expect(String(connection.requests[0].data)).toContain('LTC_B');
+    expect(payload(result)).toEqual({ success: true, run_id: RUN });
+  });
+
+  it('another runner is refused before any request', async () => {
+    const connection = recordingConnection();
+
+    const result: any = await handleHandlerUnitTestRun(ctx(connection) as any, {
+      tests,
+      runner: 'later' as any,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'runner must be one of sync, async',
+    );
+    expect(connection.requests).toHaveLength(0);
   });
 });
 

@@ -395,6 +395,14 @@ describe('the MCP tool surface', () => {
    * `available_in` moved from `onprem` to `cloud, onprem`, every other row
    * was checked unchanged.
    */
+  /**
+   * **The sixth deliberate move: `RunUnitTestSync` arrived (20.1.0, #286).**
+   * A class's ABAP Unit tests with the synchronous runner — one request to
+   * `/abapunit/testruns`, the finished result in the answer — beside
+   * `RunUnitTest`, the asynchronous runner, for systems that have only one
+   * of the two endpoints. Its row joined the snapshot; every other row was
+   * checked unchanged.
+   */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(
       (tool) => !read(frozen).has(tool),

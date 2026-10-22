@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 161
+- Total tools: 162
 
 ## Navigation
 
@@ -192,6 +192,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [RunFunctionModuleUnitTest](#runfunctionmoduleunittest-high-level-unit-test)
     - [RunProgramUnitTest](#runprogramunittest-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
+    - [RunUnitTestSync](#rununittestsync-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateFunctionGroupUnitTest](#updatefunctiongroupunittest-high-level-unit-test)
     - [UpdateProgramUnitTest](#updateprogramunittest-high-level-unit-test)
@@ -2346,9 +2347,20 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.
+**Description:** [read-only] Starts an asynchronous ABAP Unit run of the tests of the ABAP class named by class_name, waits for it within a bound and returns the result; a run that outlasts the bound returns its run_id, whose status and result are read later. Suited to long suites.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
+
+**Parameters:**
+- `class_name` (string, required) - Class whose tests run.
+
+---
+
+<a id="rununittestsync-high-level-unit-test"></a>
+#### RunUnitTestSync (High-Level / Unit Test)
+**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name in one synchronous request and returns the finished result, each test method with its alerts, in the same call.
+
+**Source:** `src/handlers/unit_test/high/handleRunUnitTestSync.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.

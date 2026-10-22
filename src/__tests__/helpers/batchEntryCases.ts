@@ -921,6 +921,11 @@ const WRITES: BatchEntryCase[] = [
   },
   { tool: 'RuntimeRunProgram', args: { program_name: 'PROG_A' } },
   {
+    tool: 'RunUnitTestSync',
+    args: { class_name: 'CLAS_A' },
+    body: UNIT_RESULT,
+  },
+  {
     tool: 'RuntimeRunProgram',
     args: { program_name: 'PROG_A', profile: false },
   },
@@ -956,6 +961,17 @@ const WRITES: BatchEntryCase[] = [
       profiler_id: 'PROFILER_PLACEHOLDER',
     },
   },
+  ...[undefined, 'sync'].map((runner) => ({
+    tool: 'HandlerUnitTestRun',
+    args: {
+      tests: [
+        { container_class: 'CLAS_A', test_class: 'LTCL_A' },
+        { container_class: 'CLAS_B', test_class: 'LTCL_B' },
+      ],
+      ...(runner === undefined ? {} : { runner }),
+    },
+    body: UNIT_RESULT,
+  })),
   {
     tool: 'HandlerUnitTestRun',
     args: {
@@ -963,6 +979,7 @@ const WRITES: BatchEntryCase[] = [
         { container_class: 'CLAS_A', test_class: 'LTCL_A' },
         { container_class: 'CLAS_B', test_class: 'LTCL_B' },
       ],
+      runner: 'async',
     },
   },
   { tool: 'RuntimeListFeeds', args: {} },

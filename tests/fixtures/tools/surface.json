@@ -655,6 +655,12 @@
   },
   {
     "group": "high",
+    "name": "RunUnitTestSync",
+    "inputs": "class_name*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "GetUnitTestResult",
     "inputs": "run_id*, detail",
     "available_in": "cloud, onprem"

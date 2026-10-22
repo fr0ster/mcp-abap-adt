@@ -563,11 +563,22 @@ export const compactUnitTestRunSchema = {
         required: ['container_class', 'test_class'],
       },
     },
+    runner: {
+      type: 'string',
+      enum: ['sync', 'async'],
+      default: 'sync',
+      description:
+        'sync: one request that runs every test class of each container_class and returns the finished result. async: starts the run and returns its run_id; the status and result are read by run_id, suited to long suites.',
+    },
     title: {
       type: 'string',
-      description: 'Run title shown in ABAP Unit test logs.',
+      description:
+        'Run title shown in ABAP Unit test logs; sent by the async runner.',
     },
-    context: { type: 'string', description: 'Run context label.' },
+    context: {
+      type: 'string',
+      description: 'Run context label; sent by the async runner.',
+    },
     scope: {
       type: 'object',
       description: 'ABAP Unit test scope flags.',

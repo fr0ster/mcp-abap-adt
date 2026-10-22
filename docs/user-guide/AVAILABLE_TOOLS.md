@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 266
+- Total tools: 267
 - Read-only tools: 68
-- High-level tools: 161
+- High-level tools: 162
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -303,6 +303,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [RunFunctionModuleUnitTest](#runfunctionmoduleunittest-high-level-unit-test)
     - [RunProgramUnitTest](#runprogramunittest-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
+    - [RunUnitTestSync](#rununittestsync-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateFunctionGroupUnitTest](#updatefunctiongroupunittest-high-level-unit-test)
     - [UpdateProgramUnitTest](#updateprogramunittest-high-level-unit-test)
@@ -3500,9 +3501,20 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.
+**Description:** [read-only] Starts an asynchronous ABAP Unit run of the tests of the ABAP class named by class_name, waits for it within a bound and returns the result; a run that outlasts the bound returns its run_id, whose status and result are read later. Suited to long suites.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
+
+**Parameters:**
+- `class_name` (string, required) - Class whose tests run.
+
+---
+
+<a id="rununittestsync-high-level-unit-test"></a>
+#### RunUnitTestSync (High-Level / Unit Test)
+**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name in one synchronous request and returns the finished result, each test method with its alerts, in the same call.
+
+**Source:** `src/handlers/unit_test/high/handleRunUnitTestSync.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.

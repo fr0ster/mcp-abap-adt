@@ -232,6 +232,7 @@ const JSON_ANSWERING: readonly string[] = [
   'RunFunctionModuleUnitTest',
   'RunProgramUnitTest',
   'RunUnitTest',
+  'RunUnitTestSync',
   'SearchObject',
   'SortAndCompressTransportTask',
   'UpdateBehaviorDefinition',

@@ -517,15 +517,16 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** [read-only] ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: title, context, scope, risk_level, duration. Response: JSON.
+**Description:** [read-only] ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: runner (sync | async, default sync), title, context, scope, risk_level, duration. Response: JSON — runner sync: { success, finished, run_result }, the finished result of every test class of each container_class in one request; runner async: { success, run_id }, the status and result read later by run_id, suited to long suites.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `tests` (required) — List of test classes to run.
-- `title` — Run title shown in ABAP Unit test logs.
-- `context` — Run context label.
+- `runner` — sync: one request that runs every test class of each container_class and returns the finished result. async: starts the run and returns its run_id; the status and result are read by run_id, suited to long suites.
+- `title` — Run title shown in ABAP Unit test logs; sent by the async runner.
+- `context` — Run context label; sent by the async runner.
 - `scope` — ABAP Unit test scope flags.
 - `risk_level` — Allowed risk levels.
 - `duration` — Allowed duration classes.

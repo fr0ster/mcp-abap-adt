@@ -103,8 +103,12 @@ export { handleRunFunctionGroupUnitTest } from '../../handlers/unit_test/high/ha
 export { handleRunFunctionModuleUnitTest } from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest.js';
 export { handleRunProgramUnitTest } from '../../handlers/unit_test/high/handleRunProgramUnitTest.js';
 export { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest.js';
+export { handleRunUnitTestSync } from '../../handlers/unit_test/high/handleRunUnitTestSync.js';
 export { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest.js';
 export { handleUpdateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.js';
 export { handleUpdateProgramUnitTest } from '../../handlers/unit_test/high/handleUpdateProgramUnitTest.js';
 export { handleUpdateUnitTest } from '../../handlers/unit_test/high/handleUpdateUnitTest.js';
-export { handleStartUnitTestRun } from '../../handlers/unit_test/shared/startRun.js';
+export {
+  handleStartUnitTestRun,
+  type UnitTestRunner,
+} from '../../handlers/unit_test/shared/startRun.js';

@@ -136,7 +136,54 @@ function parametersOf(schema) {
   }));
 }
 
-function page(entries) {
+const HTTP_HEADING = 'Streamable HTTP Binaries';
+
+/** `- name (required) — description` per parameter. */
+function parameterLines(schema) {
+  const parameters = parametersOf(schema);
+  if (parameters.length === 0) return '**Parameters:** none\n\n';
+  let md = '**Parameters:**\n\n';
+  for (const parameter of parameters) {
+    md += `- \`${parameter.name}\`${parameter.required ? ' (required)' : ''} — ${parameter.description}\n`;
+  }
+  return `${md}\n`;
+}
+
+/**
+ * The page's Streamable HTTP section: what `-compact-http` and
+ * `-compact-http-ro` serve beside their stdio sets — taken from lib's
+ * `streamableHttpSurface`, the registration the HTTP server uses — and that
+ * the SSE binaries serve none of it. One section for both: they add the same
+ * tools (checked).
+ */
+function httpSection(surfaces) {
+  const names = (surface) =>
+    surface.sessionTools.map((tool) => tool.name).join(',');
+  for (const surface of surfaces) {
+    if (names(surface) !== names(surfaces[0])) {
+      throw new Error(
+        `${surface.binaries.http} adds other session tools than ${surfaces[0].binaries.http}`,
+      );
+    }
+  }
+  const [first] = surfaces;
+  const list = (values) => values.map((value) => `\`${value}\``).join(', ');
+  const stdioOnly = [
+    ...new Set(surfaces.flatMap((surface) => surface.stdioOnly)),
+  ];
+  let md = `## ${HTTP_HEADING}\n\n`;
+  md += `${list(surfaces.map((s) => s.binaries.sse))} (SSE) serve the tools of ${list(surfaces.map((s) => s.binaries.stdio))}${stdioOnly.length === 0 ? '' : ` without ${list(stdioOnly)}, which are stdio's only`}. ${list(surfaces.map((s) => s.binaries.http))} (Streamable HTTP) serve the same tools, and beside them:\n\n`;
+  md += `- **The \`state_handle\` argument.** Every tool they serve declares one more, optional argument, \`state_handle\` (string): "${first.stateHandleWords}" A tool whose own schema declares \`state_handle\` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool above are the stdio ones, without it.\n`;
+  md += `- **The long session:** ${list(first.sessionTools.map((tool) => tool.name))}, served by no stdio or SSE binary. Its parameters below are the ones these binaries register, \`state_handle\` included.\n\n`;
+  for (const tool of first.sessionTools) {
+    md += `### ${tool.name} (Streamable HTTP)\n\n`;
+    md += `**Description:** ${tool.description}\n\n`;
+    md += parameterLines(tool.inputSchema);
+  }
+  return md;
+}
+
+function page(entries, surfaces) {
   const context = () => ({});
   let md = '# Compact Tools — MCP ABAP ADT\n\n';
   md +=
@@ -154,7 +201,7 @@ function page(entries) {
   md +=
     "- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))\n";
   md +=
-    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)\n\n';
+    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool under Tools; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff. `-compact-sse` and `-compact-sse-ro` serve the same without the leftover-session tools; `-compact-http` and `-compact-http-ro` the same, with what [Streamable HTTP Binaries](#streamable-http-binaries) adds\n\n';
   md += '## How it works\n\n';
   md +=
     'One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with\n';
@@ -195,6 +242,7 @@ function page(entries) {
     md += '\n';
   }
   void context;
+  md += httpSection(surfaces);
   return md;
 }
 
@@ -237,8 +285,23 @@ function main() {
       .compactBatchEntries()
       .map((entry) => ({ half: 'batch', entry })),
   ];
+  // The Streamable HTTP surface of both compact sets, from the registration
+  // the HTTP server uses (lib's `streamableHttpSurface`).
+  const { compactToolSetOf, compactReadOnlyToolSetOf, streamableHttpSurface } =
+    requireFresh('.', path.join('lib', 'toolSet.js'));
+  const surfaces = [
+    streamableHttpSurface(
+      compactToolSetOf({
+        readOnly: readOnly.compactReadOnlyEntries,
+        modify: modify.compactModifyEntries,
+      }),
+    ),
+    streamableHttpSurface(
+      compactReadOnlyToolSetOf(readOnly.compactReadOnlyEntries),
+    ),
+  ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, page(entries), 'utf8');
+  fs.writeFileSync(OUT, page(entries, surfaces), 'utf8');
   console.log(`✅ ${entries.length} compact tools documented: ${OUT}`);
 }
 
@@ -251,4 +314,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { page, parametersOf };
+module.exports = { page, parametersOf, httpSection };

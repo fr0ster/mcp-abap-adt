@@ -65,12 +65,20 @@ import { LongSessionHandlersGroup } from './handlers/groups/LongSessionHandlersG
 import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './handlers/groups/SystemHandlersGroup.js';
-import type { HandlerContext, IHandlerGroup } from './handlers/interfaces';
+import type {
+  HandlerContext,
+  HandlerEntry,
+  IHandlerGroup,
+} from './handlers/interfaces';
 import { CompositeHandlersRegistry } from './handlers/registry/CompositeHandlersRegistry';
 import {
   expositionGroups,
   noConnectionContext,
 } from './handlers/registry/expositionRegistry';
+import {
+  STATE_HANDLE_ARGUMENT_WORDS,
+  withStateHandle,
+} from './state/stateHandleArgument';
 
 export {
   BINARIES,
@@ -116,6 +124,64 @@ export function registryOf(
   return new CompositeHandlersRegistry(
     toolSet.groups(noConnectionContext(), transport),
   );
+}
+
+/** What a Streamable HTTP binary of a set serves beside its stdio binary. */
+export interface StreamableHttpSurface {
+  /** Which of the four kinds of binary serves the set. */
+  readonly kind: ToolSetKind;
+  /** The set's binaries on each transport. */
+  readonly binaries: Readonly<Record<ServedTransport, string>>;
+  /**
+   * The tools only Streamable HTTP serves (the long session), in
+   * registration order, each as the HTTP server registers it: its schema with
+   * the declared `state_handle` (`withStateHandle`).
+   */
+  readonly sessionTools: ReadonlyArray<HandlerEntry['toolDefinition']>;
+  /** The tools the stdio binary serves and the Streamable HTTP one does not. */
+  readonly stdioOnly: readonly string[];
+  /** The description of the `state_handle` every HTTP tool declares. */
+  readonly stateHandleWords: string;
+}
+
+const namesOf = (toolSet: ToolSet, transport: ServedTransport): string[] =>
+  toolSet
+    .groups(noConnectionContext(), transport)
+    .flatMap((group) => group.getHandlers())
+    .map((entry) => entry.toolDefinition.name);
+
+/**
+ * The Streamable HTTP surface of `toolSet`, from the registration its server
+ * uses: the set's groups on `http` against its groups on `stdio`, and the
+ * `state_handle` declaration the server adds to every tool. What the tool
+ * pages render as their Streamable HTTP section.
+ */
+export function streamableHttpSurface(toolSet: ToolSet): StreamableHttpSurface {
+  const stdio = new Set(namesOf(toolSet, 'stdio'));
+  const http = toolSet
+    .groups(noConnectionContext(), 'http')
+    .flatMap((group) => group.getHandlers());
+  const httpNames = new Set(http.map((entry) => entry.toolDefinition.name));
+  const binaryOf = (transport: ServedTransport) =>
+    BINARIES[transport][toolSet.kind].bin;
+  return {
+    kind: toolSet.kind,
+    binaries: {
+      stdio: binaryOf('stdio'),
+      http: binaryOf('http'),
+      sse: binaryOf('sse'),
+    },
+    sessionTools: http
+      .filter((entry) => !stdio.has(entry.toolDefinition.name))
+      .map((entry) => ({
+        ...entry.toolDefinition,
+        inputSchema: withStateHandle(
+          entry.toolDefinition.inputSchema,
+        ) as HandlerEntry['toolDefinition']['inputSchema'],
+      })),
+    stdioOnly: [...stdio].filter((name) => !httpNames.has(name)),
+    stateHandleWords: STATE_HANDLE_ARGUMENT_WORDS,
+  };
 }
 
 /** The runtime session files, and so the leftover-session tools, are stdio's. */

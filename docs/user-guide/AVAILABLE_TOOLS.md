@@ -19,6 +19,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
+- every Streamable HTTP binary (`-http`, `-http-ro`) -> [Streamable HTTP Binaries](#streamable-http-binaries): the optional `state_handle` argument on every tool, and the long session (`SessionOpen`, `SessionClose`). No stdio or SSE binary serves these
 - every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
@@ -3656,7 +3657,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchbegin-debug-debugger"></a>
 #### DebugBatchBegin (Debug / Debugger)
-**Description:** [read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+**Description:** [read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
 
@@ -4038,7 +4039,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="batchbegin-batch-batch"></a>
 #### BatchBegin (Batch / Batch)
-**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
 
 **Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
 
@@ -4058,4 +4059,28 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-21*
+<a id="streamable-http-binaries"></a>
+## Streamable HTTP Binaries
+
+`mcp-abap-adt-sse` (SSE) serves the tools of `mcp-abap-adt` without `ListLeftoverSessions`, `LogoffLeftoverSession`, which are stdio's only. `mcp-abap-adt-http` (Streamable HTTP) serves the same tools, and beside them:
+
+- **The `state_handle` argument.** On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
+- **The long session:** `SessionOpen`, `SessionClose`, served by no stdio or SSE binary. Their parameters below are the ones `mcp-abap-adt-http` registers, `state_handle` included.
+
+### SessionOpen (Streamable HTTP)
+**Description:** [read-only] Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open.
+
+**Parameters:**
+- `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
+
+---
+
+### SessionClose (Streamable HTTP)
+**Description:** [read-only] Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.
+
+**Parameters:**
+- `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
+
+---
+
+*Last updated: 2026-10-22*

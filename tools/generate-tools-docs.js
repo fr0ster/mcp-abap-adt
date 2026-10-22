@@ -894,11 +894,24 @@ function httpSectionMarkdown(surface) {
   md += `- **The \`state_handle\` argument.** ${stateHandleRule(surface)}\n`;
   md += `- **The long session:** ${surface.sessionTools.map((tool) => `\`${tool.name}\``).join(', ')}, served by no stdio or SSE binary. Their parameters below are the ones \`${http}\` registers, \`state_handle\` included.\n\n`;
   for (const tool of surface.sessionTools) {
+    md += `<a id="${anchorFromHeading(`${tool.name} (Streamable HTTP)`)}"></a>\n`;
     md += `### ${tool.name} (Streamable HTTP)\n`;
     md += `**Description:** ${tool.description || 'No description'}\n\n`;
     md += `**Parameters:**\n`;
     md += renderParams(tool);
     md += `\n---\n\n`;
+  }
+  return md;
+}
+
+/**
+ * The Streamable HTTP section's entry in a page's navigation: the section,
+ * and each long-session tool under it (`httpSectionMarkdown` anchors them).
+ */
+function httpNavigationMarkdown(surface) {
+  let md = `- [${HTTP_HEADING}](#${anchorFromHeading(HTTP_HEADING)})\n`;
+  for (const tool of surface?.sessionTools ?? []) {
+    md += `  - [${tool.name}](#${anchorFromHeading(`${tool.name} (Streamable HTTP)`)})\n`;
   }
   return md;
 }
@@ -967,6 +980,7 @@ function generateMarkdown(tools, surface) {
       }
     }
   }
+  md += httpNavigationMarkdown(surface);
 
   md += `\n---\n\n`;
 
@@ -1007,7 +1021,13 @@ function generateMarkdown(tools, surface) {
   return md;
 }
 
-function generateLevelMarkdown(tools, level, intro, appendix) {
+function generateLevelMarkdown(
+  tools,
+  level,
+  intro,
+  appendix,
+  appendixNavigation,
+) {
   const levelTools = tools.filter((t) => t.level === level);
   const grouped = groupByLevelAndObject(levelTools);
   const objects = Object.values(grouped[level]).sort((a, b) =>
@@ -1031,6 +1051,7 @@ function generateLevelMarkdown(tools, level, intro, appendix) {
       md += `    - [${tool.name}](#${anchorFromHeading(toolHeading)})\n`;
     }
   }
+  if (appendixNavigation) md += appendixNavigation;
 
   md += `\n---\n\n`;
   md += `<a id="${anchorFromHeading(levelHeading)}"></a>\n`;
@@ -1157,6 +1178,7 @@ function main() {
       'readonly',
       READ_ONLY_PAGE_INTRO,
       httpSectionMarkdown(surfaces.readonly),
+      httpNavigationMarkdown(surfaces.readonly),
     ),
     'utf8',
   );
@@ -1167,6 +1189,7 @@ function main() {
       'high',
       HIGH_PAGE_INTRO,
       `<a id="${anchorFromHeading(HTTP_HEADING)}"></a>\n## ${HTTP_HEADING}\n\n${stateHandleRule(surfaces.all)}\n\n`,
+      httpNavigationMarkdown(undefined),
     ),
     'utf8',
   );
@@ -1222,5 +1245,6 @@ module.exports = {
   generateMarkdown,
   generateLevelMarkdown,
   httpSectionMarkdown,
+  httpNavigationMarkdown,
   stateHandleRule,
 };

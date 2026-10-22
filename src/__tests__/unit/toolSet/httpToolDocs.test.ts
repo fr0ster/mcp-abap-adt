@@ -96,6 +96,29 @@ describe('the full tool pages (npm run docs:tools)', () => {
     expect(READONLY).toContain(section);
   });
 
+  it('each page lists its Streamable HTTP section in its navigation, the long-session tools under it', () => {
+    const navigation = (page: string) => {
+      const start = page.indexOf('## Navigation');
+      expect(start).toBeGreaterThan(0);
+      return page.slice(start, page.indexOf('\n---\n', start));
+    };
+    const all = generator.httpNavigationMarkdown(
+      streamableHttpSurface(fullToolSet),
+    );
+    expect(all).toContain('[SessionOpen](#sessionopen-streamable-http)');
+    expect(all).toContain('[SessionClose](#sessionclose-streamable-http)');
+    expect(navigation(ALL)).toContain(all);
+    expect(ALL).toContain('<a id="sessionopen-streamable-http"></a>');
+    expect(navigation(READONLY)).toContain(
+      generator.httpNavigationMarkdown(
+        streamableHttpSurface(fullReadOnlyToolSet),
+      ),
+    );
+    expect(navigation(HIGH)).toContain(
+      '- [Streamable HTTP Binaries](#streamable-http-binaries)',
+    );
+  });
+
   it('AVAILABLE_TOOLS_HIGH.md names the state_handle rule of mcp-abap-adt-http', () => {
     expect(HIGH).toContain(
       generator.stateHandleRule(streamableHttpSurface(fullToolSet)),

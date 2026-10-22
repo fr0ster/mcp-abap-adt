@@ -108,6 +108,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
+- [Streamable HTTP Binaries](#streamable-http-binaries)
+  - [SessionOpen](#sessionopen-streamable-http)
+  - [SessionClose](#sessionclose-streamable-http)
 
 ---
 
@@ -1158,6 +1161,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - **The `state_handle` argument.** On `mcp-abap-adt-http-ro` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 - **The long session:** `SessionOpen`, `SessionClose`, served by no stdio or SSE binary. Their parameters below are the ones `mcp-abap-adt-http-ro` registers, `state_handle` included.
 
+<a id="sessionopen-streamable-http"></a>
 ### SessionOpen (Streamable HTTP)
 **Description:** [read-only] Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open.
 
@@ -1166,6 +1170,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="sessionclose-streamable-http"></a>
 ### SessionClose (Streamable HTTP)
 **Description:** [read-only] Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.
 

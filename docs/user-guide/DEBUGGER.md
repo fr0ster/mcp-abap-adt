@@ -59,7 +59,10 @@ is sent. An ABAP start answers the ids and the identity in force beside the hand
   is made: such a tool call logs on nowhere.
 - After a complete stop (`DebugStop`, the idle bound) the handle
   is invalid for good; the next start answers a new one. A stop that could not
-  undo everything keeps the handle valid, so the stop can be retried.
+  undo everything keeps the handle valid, so the stop can be retried. Inside an
+  open long session (Streamable HTTP, `SessionOpen` or compact `HandlerSession`
+  `open`) the handle stays after a complete stop: the session still holds the
+  instance, until `SessionClose` (or `HandlerSession` `close`) or the idle bound.
 - **The handle is a bearer secret.** Whoever holds it acts with the SAP session
   behind it, like a session cookie. It travels in tool arguments, the model's
   context and transcripts; keeping it safe (HTTPS beyond `127.0.0.1`, isolation,

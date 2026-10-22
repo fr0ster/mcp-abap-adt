@@ -83,7 +83,9 @@ glibc base for the prebuilt binding. See [Docker](deployment/DOCKER.md#rfc-and-s
 
 For a 19.x user of `mcp-abap-adt-http`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-compact-http` or
 `mcp-abap-adt-compact-http-ro` ([#308](https://github.com/fr0ster/mcp-abap-adt/issues/308)).
-stdio and SSE are unchanged: their tool lists, schemas and behaviour are those of 19.x.
+stdio and SSE keep the tool lists and schemas of 19.x; a few descriptions (`BatchBegin`,
+`DebugBatchBegin`, `HandlerBatch`, `HandlerLock`, `HandlerUpdate`, `HandlerDelete`, `HandlerUnlock`)
+now name the Streamable HTTP argument.
 
 ### What changed
 

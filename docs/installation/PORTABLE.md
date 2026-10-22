@@ -139,7 +139,7 @@ and SmartScreen asks once. Enough for a build that stays on your machine.
   `npm run portable:smoke -- 19.1.0` passes for both servers. With `@mcp-abap-adt/sap-rfc-lite`
   0.3.x's prebuilt module, which carries no `RUNPATH` (2026-10-22): the module gets a `RUNPATH` of
   `$ORIGIN` in place of its `SONAME`; without it, `ldd` finds neither `libsapnwrfc.so` nor
-  `libsapucum.so` beside it. Built from the 19.3.0 sources before
+  `libsapucum.so` beside it. Built from the 20.0.0 sources before
   their release — the packages packed with `npm pack` and staged together, which resolve one
   sap-rfc-lite, 0.3.2, through `@mcp-abap-adt/connection` 19 — `npm run portable:smoke` passes all 18
   checks for both servers. The published 19.2.0 is refused: it stages sap-rfc-lite 0.2.4. Not yet for the prebuilt module on Windows and macOS.

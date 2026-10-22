@@ -63,6 +63,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
 - **Installation variants** (full or compact; HTTP, RFC or SNC): [Installation Guide](installation/INSTALLATION.md#installation-variants) | [RFC Setup](installation/RFC_SETUP.md)
+- **Upgrading from 19.x**: [Migration to 20.0](MIGRATION-20.0.md)
 - **Upgrading from 18.x**: [Migration to 19.0](MIGRATION-19.0.md)
 - **Upgrading from 17.x**: [Migration to 18.0](MIGRATION-18.0.md)
 - **Upgrading from 16.x**: [Migration to 17.0](MIGRATION-17.0.md)

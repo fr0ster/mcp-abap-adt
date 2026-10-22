@@ -91,6 +91,11 @@ export class HeldLocks implements StatePart, HeldLockPort {
     };
   }
 
+  /** How many locks this instance holds. */
+  count(): number {
+    return this.handles.size;
+  }
+
   /** Whether `handle` is held by this instance. */
   holds(handle: string): boolean {
     return this.handles.has(handle);

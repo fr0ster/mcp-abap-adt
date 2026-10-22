@@ -10,10 +10,20 @@
  *   On an instance that already holds state (the call carried its handle),
  *   or a session already open, the same handle. Nothing is sent and no
  *   connection taken.
+ * - close: on the instance the call's handle reached, asks for its close and
+ *   answers that the session is closed, naming what the instance held (its
+ *   locks, a batch, a debug session). The close itself is the host's, once
+ *   this answer is written: the pool takes the instance out of its index and
+ *   runs the instance close (`closeInstance`) — every connection it owns
+ *   logged off, which releases the locks; an open batch dropped with
+ *   nothing sent. A call that reached an instance holding nothing (no
+ *   handle) answers `state is not available`, as the pool answers an
+ *   unknown handle.
  */
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { McpResult } from '../answer';
 import { ServerRefusal } from '../auth/serverRefusal';
+import { STATE_UNAVAILABLE_WORDS } from '../state/InstanceState';
 
 /**
  * The sentences of open, shared by `SessionOpen` and `HandlerSession`'s
@@ -38,6 +48,41 @@ export async function openLongSession(
       {
         type: 'text',
         text: JSON.stringify({ state_handle: state.handle }, null, 2),
+      },
+    ],
+  };
+}
+
+/**
+ * The sentences of close, shared by `SessionClose` and `HandlerSession`'s
+ * `action: 'close'`.
+ */
+export const CLOSE_SESSION_WORDS =
+  'Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.';
+
+/** Close: the instance's close asked; answers `{ closed, held }`. */
+export async function closeLongSession(
+  context: HandlerContext,
+): Promise<McpResult> {
+  const session = context.longSession;
+  const state = context.state;
+  if (session === undefined || state === undefined) {
+    throw new ServerRefusal('long_session_unavailable');
+  }
+  // A call without a handle reached a new instance: nothing to close.
+  if (!state.holdsState()) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: STATE_UNAVAILABLE_WORDS }],
+    };
+  }
+  const held = session.close();
+  return {
+    isError: false,
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({ closed: true, held }, null, 2),
       },
     ],
   };

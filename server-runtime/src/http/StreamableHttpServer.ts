@@ -10,6 +10,7 @@ import type {
 import {
   type AdtHeaderPairs,
   BaseMcpServer,
+  closeInstance,
   type IBackgroundRuns,
   InstanceBatch,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -559,6 +560,14 @@ export class StreamableHttpServer extends BaseMcpServer {
        */
       protected override idleStopped(): Promise<void> {
         return this.terminalClose();
+      }
+
+      /**
+       * A long session's close, started by the pool once the close call's
+       * answer is written: lib's instance close, one per instance.
+       */
+      public instanceClose(): Promise<void> {
+        return closeInstance(this);
       }
     }
     return new PerRequestServer(

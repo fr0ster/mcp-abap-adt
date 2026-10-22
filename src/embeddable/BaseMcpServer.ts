@@ -137,7 +137,7 @@ import {
   type StateLogger,
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
-import type { LongSession } from '../lib/state/longSession.js';
+import type { LongSession, LongSessionPort } from '../lib/state/longSession.js';
 import {
   withoutStateHandle,
   withStateHandle,
@@ -318,6 +318,9 @@ export abstract class BaseMcpServer extends McpServer {
   /** The instance's long session (`longSession` option). */
   protected readonly longSession: LongSession | undefined;
 
+  /** What the session tools reach of it (`longSessionPortOf`). */
+  private readonly longSessionPort: LongSessionPort | undefined;
+
   /** Whether every tool declares `state_handle` (`stateHandleArgument` option). */
   private readonly stateHandleArgument: boolean;
 
@@ -443,6 +446,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
     this.longSession = options.longSession;
     if (this.longSession !== undefined) this.state.attach(this.longSession);
+    this.longSessionPort = this.longSessionPortOf(this.longSession);
     this.stateHandleArgument = options.stateHandleArgument === true;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     this.systemType = options.systemType;
@@ -481,6 +485,35 @@ export abstract class BaseMcpServer extends McpServer {
 
   get stateHandle(): string {
     return this.state.handle;
+  }
+
+  /**
+   * The session tools' port: open and close of the long session; close
+   * asks for the instance's close and answers what the instance holds — its
+   * locks, a batch (open, or its answers kept), a debug session.
+   */
+  private longSessionPortOf(
+    session: LongSession | undefined,
+  ): LongSessionPort | undefined {
+    if (session === undefined) return undefined;
+    return {
+      open: () => session.open(),
+      isOpen: () => session.isOpen(),
+      close: () => {
+        const holding = {
+          locks: this.heldLocks?.count() ?? 0,
+          batch: this.batch?.holdsState() === true,
+          debug_session: this.debuggerInstance?.holdsState() === true,
+        };
+        session.askClose();
+        return holding;
+      },
+    };
+  }
+
+  /** Whether the instance's close was asked (a session tool's close): its host closes it after the call. */
+  closeAsked(): boolean {
+    return this.longSession?.closeAsked() === true;
   }
 
   holdsState(): boolean {
@@ -1436,8 +1469,8 @@ export abstract class BaseMcpServer extends McpServer {
                 ...(this.heldLocks !== undefined
                   ? { heldLocks: this.heldLocks }
                   : {}),
-                ...(this.longSession !== undefined
-                  ? { longSession: this.longSession }
+                ...(this.longSessionPort !== undefined
+                  ? { longSession: this.longSessionPort }
                   : {}),
                 ...(this.systemType !== undefined
                   ? { systemType: this.systemType }
@@ -1988,8 +2021,8 @@ export abstract class BaseMcpServer extends McpServer {
         debugger: () => this.debuggerFor(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
         ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
-        ...(this.longSession !== undefined
-          ? { longSession: this.longSession }
+        ...(this.longSessionPort !== undefined
+          ? { longSession: this.longSessionPort }
           : {}),
         ...(this.systemType !== undefined
           ? { systemType: this.systemType }

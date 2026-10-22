@@ -840,11 +840,16 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // a write binary and the list and logoff on a -ro one there; none on
       // any http or sse binary, compact ones included.
       const onStdio = transportName === 'stdio';
-      // The long session is Streamable HTTP's: SessionOpen on the full
-      // sets, HandlerSession on the compact ones, on http alone.
+      // The long session is Streamable HTTP's: SessionOpen and SessionClose
+      // on the full sets, HandlerSession on the compact ones, on http alone.
       const onHttp = transportName === 'http';
       const session = (tools: string[]) =>
-        tools.filter((n) => n === 'SessionOpen' || n === 'HandlerSession');
+        tools.filter(
+          (n) =>
+            n === 'SessionOpen' ||
+            n === 'SessionClose' ||
+            n === 'HandlerSession',
+        );
       expect({
         full: session(full.tools),
         fullRo: session(fullRo.tools),
@@ -853,8 +858,8 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       }).toEqual(
         onHttp
           ? {
-              full: ['SessionOpen'],
-              fullRo: ['SessionOpen'],
+              full: ['SessionClose', 'SessionOpen'],
+              fullRo: ['SessionClose', 'SessionOpen'],
               compact: ['HandlerSession'],
               compactRo: ['HandlerSession'],
             }
@@ -884,8 +889,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
       // core: the debugger, high, background runs, the three batch tools
-      // and the two debugger batch tools, always; on http SessionOpen.
-      expect(full.tools).toHaveLength(onStdio ? 256 : onHttp ? 255 : 254);
+      // and the two debugger batch tools, always; on http SessionOpen and
+      // SessionClose.
+      expect(full.tools).toHaveLength(onStdio ? 256 : onHttp ? 256 : 254);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -900,9 +906,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ]),
       );
       // core-ro: the readonly tools with system and search, the three batch
-      // tools (and, on stdio, the list and the logoff); no write, debugger,
-      // background run or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 70 : 69);
+      // tools (and, on stdio, the list and the logoff; on http SessionOpen
+      // and SessionClose); no write, debugger, background run or resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 71 : 69);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',

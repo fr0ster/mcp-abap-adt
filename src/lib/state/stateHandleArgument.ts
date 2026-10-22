@@ -35,12 +35,6 @@ function fieldsOf(inputSchema: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/** Whether the tool's own schema declares `state_handle` (the debugger's). */
-export function declaresStateHandle(inputSchema: unknown): boolean {
-  const fields = fieldsOf(inputSchema);
-  return fields !== undefined && 'state_handle' in fields;
-}
-
 /**
  * The arguments a tool that does not declare `state_handle` receives: those
  * of the call without it, as the schema's strip gave it before the host

@@ -164,7 +164,7 @@ describe('where the session tools are served', () => {
     },
   );
 
-  it('the compact HandlerSession takes action open', () => {
+  it('the compact HandlerSession takes action open and close', () => {
     const [, set] = SETS[2] ?? [];
     const tool = namesOf(set as ToolSet, 'http').find(
       (d) => d.name === 'HandlerSession',
@@ -173,7 +173,7 @@ describe('where the session tools are served', () => {
       properties: Record<string, { enum?: string[] }>;
       required?: string[];
     };
-    expect(schema.properties.action?.enum).toEqual(['open']);
+    expect(schema.properties.action?.enum).toEqual(['open', 'close']);
     expect(schema.required).toEqual(['action']);
   });
 });

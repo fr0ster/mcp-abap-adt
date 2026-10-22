@@ -78,12 +78,12 @@ const KINDS: readonly ToolSetKind[] = [
   'compact-ro',
 ];
 
-/** The long-session tool each kind of HTTP binary serves (spec §2). */
-const SESSION_TOOL: Record<ToolSetKind, string> = {
-  core: 'SessionOpen',
-  'core-ro': 'SessionOpen',
-  compact: 'HandlerSession',
-  'compact-ro': 'HandlerSession',
+/** The long-session tools each kind of HTTP binary serves (spec §2). */
+const SESSION_TOOLS: Record<ToolSetKind, readonly string[]> = {
+  core: ['SessionOpen', 'SessionClose'],
+  'core-ro': ['SessionOpen', 'SessionClose'],
+  compact: ['HandlerSession'],
+  'compact-ro': ['HandlerSession'],
 };
 
 /** Each binary's own tool set, as its command hands it to `main`. */
@@ -346,16 +346,16 @@ describe('the schemas each binary registers (WRITE_TRANSPORT_SURFACE=1 rewrites 
     expect(httpFixture()).toEqual(read(HTTP_FIXTURE));
   });
 
-  it('every HTTP binary serves the tools of its SSE binary and its long-session tool, which no stdio or SSE binary serves', () => {
+  it('every HTTP binary serves the tools of its SSE binary and its long-session tools, which no stdio or SSE binary serves', () => {
     for (const kind of KINDS) {
       const httpTools = http[binOf('http', kind)] ?? {};
       const sseTools = sse[binOf('sse', kind)] ?? {};
       const stdioTools = stdio[binOf('stdio', kind)] ?? {};
       expect({ kind, tools: Object.keys(httpTools).sort() }).toEqual({
         kind,
-        tools: [...Object.keys(sseTools), SESSION_TOOL[kind]].sort(),
+        tools: [...Object.keys(sseTools), ...SESSION_TOOLS[kind]].sort(),
       });
-      for (const tool of Object.values(SESSION_TOOL)) {
+      for (const tool of Object.values(SESSION_TOOLS).flat()) {
         expect(sseTools[tool]).toBeUndefined();
         expect(stdioTools[tool]).toBeUndefined();
       }
@@ -367,7 +367,7 @@ describe('the schemas each binary registers (WRITE_TRANSPORT_SURFACE=1 rewrites 
       const httpTools = http[binOf('http', kind)] ?? {};
       const sseTools = sse[binOf('sse', kind)] ?? {};
       for (const [name, schema] of Object.entries(httpTools)) {
-        if (name === SESSION_TOOL[kind]) {
+        if (SESSION_TOOLS[kind].includes(name)) {
           // HTTP's own: declared like every other tool, optional.
           expect({
             name,

@@ -272,11 +272,14 @@ describe('the leftover-session tools are served on stdio only', () => {
           named: set.toolsHelp(transport).includes('leftover'),
         }).toEqual({ kind, named: false });
         // The rest of the set is stdio's, unchanged; on http beside its
-        // long-session tool, which is Streamable HTTP's.
+        // long-session tools, which are Streamable HTTP's.
         expect({
           kind,
           rest: toolsOf(set, transport).filter(
-            (n) => n !== 'SessionOpen' && n !== 'HandlerSession',
+            (n) =>
+              n !== 'SessionOpen' &&
+              n !== 'SessionClose' &&
+              n !== 'HandlerSession',
           ),
         }).toEqual({
           kind,

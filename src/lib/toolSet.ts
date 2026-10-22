@@ -13,8 +13,8 @@
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
- * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen` |
- * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen` |
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
+ * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
  * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`, `HandlerDebugBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
  * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, `HandlerBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
  *
@@ -175,9 +175,9 @@ const BATCH_LINE =
 const COMPACT_BATCH_LINE =
   "batch mode: HandlerBatch (action 'begin', 'end', 'answers') — independent calls recorded, sent together in envelopes, answered by number";
 const LONG_SESSION_LINE =
-  'the long session: SessionOpen — the server instance and its SAP connection kept for the calls that carry its state_handle';
+  'the long session: SessionOpen, SessionClose — the server instance and its SAP connection kept for the calls that carry its state_handle, until its close logs it off';
 const COMPACT_LONG_SESSION_LINE =
-  "the long session: HandlerSession (action 'open') — the server instance and its SAP connection kept for the calls that carry its state_handle";
+  "the long session: HandlerSession (action 'open', 'close') — the server instance and its SAP connection kept for the calls that carry its state_handle, until its close logs it off";
 const DEBUG_LINE =
   'debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user';
 const DEBUG_BATCH_LINE =

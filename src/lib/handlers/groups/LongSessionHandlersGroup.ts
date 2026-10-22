@@ -1,10 +1,14 @@
 /**
  * The long session in the full sets (`fullToolSet`, `fullReadOnlyToolSet`),
  * served only on the Streamable HTTP binaries (#308, spec §2):
- * `SessionOpen`. It works on no connection of the instance
- * (`connectionless`), runs at once while a batch is open and is never
- * recorded (`runsBesideBatch`).
+ * `SessionOpen` and `SessionClose`. They work on no connection of the
+ * instance (`connectionless`), run at once while a batch is open and are
+ * never recorded (`runsBesideBatch`).
  */
+import {
+  handleSessionClose,
+  TOOL_DEFINITION as SessionClose_Tool,
+} from '../../../handlers/long_session/session/handleSessionClose';
 import {
   handleSessionOpen,
   TOOL_DEFINITION as SessionOpen_Tool,
@@ -20,6 +24,10 @@ export function longSessionEntries(): HandlerEntry[] {
   return [
     {
       ...defineTool(SessionOpen_Tool, handleSessionOpen),
+      connectionless: true as const,
+    },
+    {
+      ...defineTool(SessionClose_Tool, handleSessionClose),
       connectionless: true as const,
     },
   ];

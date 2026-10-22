@@ -4,7 +4,8 @@
  * (`BaseMcpServer` wires its protocol's `onclose` here unless the host states
  * `transportCloseEndsSession: false`: stdio's transport, an SSE stream, an
  * embedder's connected transport), an SSE stream that closed, an embedder's
- * own close. One promise per instance; a second caller joins it, so the
+ * own close, Streamable HTTP's pool after a long session's close call was
+ * answered. One promise per instance; a second caller joins it, so the
  * launchers' and the SSE wrapper's closes add nothing: no second logoff.
  *
  * In this order, nothing waiting for a running tool:
@@ -21,10 +22,14 @@
  *    nobody reads their answer. In the same tick **the open batch is
  *    dropped** (`dropBatch`): nothing recorded is sent, the batch's signal
  *    aborts — every recorded handler's wait for its parts ends —, and the
- *    batch connection and the last batch's answers are let go. Awaited only
- *    to each logoff's write;
- * 3. the state let go (`letGoOfState`): no idle bound any more, nothing
- *    undone — the logoff ended in SAP what the state held;
+ *    batch connection and the last batch's answers are let go. Awaited to
+ *    each logoff's write and then to its answer — SAP's, or its transport's
+ *    failure (`closeOwnedConnections` ends with `logoffsAnswered(instance)`,
+ *    no timer) —, beside the background runs' logoffs, awaited to their
+ *    writes;
+ * 3. once those are awaited, the state let go (`letGoOfState`): no idle
+ *    bound any more, nothing undone — the logoff ended in SAP what the state
+ *    held;
  * 4. the MCP server and its transport closed, awaited.
  *
  * From the latch on the instance opens no new connection (`own()`,

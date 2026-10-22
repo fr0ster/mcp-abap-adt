@@ -3186,11 +3186,12 @@
     "keywords": [
       "long session",
       "open session",
+      "close session",
       "keep session",
       "state handle",
       "stateful"
     ],
-    "semantic": "Open a long session: keep the server instance and its SAP connection for the calls that carry its state_handle."
+    "semantic": "Open a long session: keep the server instance and its SAP connection for the calls that carry its state_handle; close it to log that SAP session off."
   },
   "HandlerTransportCreate": {
     "keywords": [
@@ -3697,6 +3698,16 @@
       "next_start_at"
     ],
     "semantic": "Search the source code of the programs, classes and function groups in a package for a text or statement; a scan that stops early answers a cursor to continue from."
+  },
+  "SessionClose": {
+    "keywords": [
+      "long session",
+      "close session",
+      "end session",
+      "logoff",
+      "release locks"
+    ],
+    "semantic": "Close a long session: log off the SAP sessions of the server instance its state_handle names, which releases the locks taken in it."
   },
   "SessionOpen": {
     "keywords": [

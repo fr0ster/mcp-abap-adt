@@ -43,12 +43,12 @@ version not yet published cannot be built: name a published one with `--version`
 `package.json` at run time, which an executable does not have — so a version whose packages pin an older
 range is refused, naming each such copy.
 
-The build takes the RFC module the way the package itself loads it (its own `node-gyp-build`): a
-`build/Release` you built by hand in the staged package first, else the prebuilt one. The prebuilt
-module carries no library search path, and one you compiled names your SDK's folder; either way the
-module's search path becomes its own folder (`$ORIGIN` on Linux, `@loader_path` on macOS), so it finds the
-SDK beside it. On Linux, a module with no `RUNPATH` gets one in place of its `SONAME` entry, whose string
-becomes `$ORIGIN`: the module is loaded by its path, never by that name.
+The build takes the RFC module the way the package itself loads it (its own `node-gyp-build`): the
+prebuilt one it carries for this platform. That module carries no library search path; the build gives
+it its own folder (`$ORIGIN` on Linux, `@loader_path` on macOS), so it finds the SDK beside it. On
+Linux the `RUNPATH` takes the place of the module's `SONAME` entry, whose string becomes `$ORIGIN`: the
+module is loaded by its path, never by that name. A module that does carry a search path has it
+rewritten to the same.
 
 ## Building
 
@@ -137,11 +137,12 @@ and SmartScreen asks once. Enough for a build that stays on your machine.
   `initialize`, `tools/list`, and the RFC stack loading from `nwrfcsdk/lib` (`npm run portable:smoke`).
   Built again from npm at 19.1.0 with `@mcp-abap-adt/sap-rfc-lite` 0.2.4's prebuilt module (2026-10-21):
   `npm run portable:smoke -- 19.1.0` passes for both servers. With `@mcp-abap-adt/sap-rfc-lite`
-  0.3.1's prebuilt module, which carries no `RUNPATH` (2026-10-22): 19.2.0 staged from npm with the
-  module overridden to 0.3.1 (the published 19.2.0 pins 0.2.x, which this build now refuses) — the
-  module gets a `RUNPATH` of `$ORIGIN` in place of its `SONAME`, and `npm run portable:smoke` passes
-  all 18 checks for both servers; without that `RUNPATH`, `ldd` finds neither `libsapnwrfc.so` nor
-  `libsapucum.so` beside it. Not yet for the prebuilt module on Windows and macOS.
+  0.3.x's prebuilt module, which carries no `RUNPATH` (2026-10-22): the module gets a `RUNPATH` of
+  `$ORIGIN` in place of its `SONAME`; without it, `ldd` finds neither `libsapnwrfc.so` nor
+  `libsapucum.so` beside it. Built from the 19.3.0 sources before
+  their release — the packages packed with `npm pack` and staged together, which resolve one
+  sap-rfc-lite, 0.3.2, through `@mcp-abap-adt/connection` 19 — `npm run portable:smoke` passes all 18
+  checks for both servers. The published 19.2.0 is refused: it stages sap-rfc-lite 0.2.4. Not yet for the prebuilt module on Windows and macOS.
 - **Windows 11 x64:** built with `npm run portable:build` and used with SNC; the RFC module and the SDK
   DLLs load from the archive's `nwrfcsdk/lib`. Rebuilt after the build switched to `System32\\tar.exe` and npm
   without a shell (2026-10-06): builds and works.

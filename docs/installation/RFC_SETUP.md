@@ -51,7 +51,7 @@ export SAPNWRFC_HOME=~/nwrfcsdk
 export DYLD_LIBRARY_PATH="$SAPNWRFC_HOME/lib"
 ```
 
-The prebuilt binding carries no path of the machine it was built on, so it needs this wherever the SDK is installed. A binding you compiled yourself on Linux also records `$SAPNWRFC_HOME/lib` as it was at build time.
+The prebuilt binding carries no path of the machine it was built on, so it needs this wherever the SDK is installed.
 
 ## 3. Install and check
 

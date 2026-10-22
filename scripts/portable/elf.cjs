@@ -2,8 +2,8 @@
 // Gives the RFC addon a RUNPATH of its own folder (Linux), so it finds the SDK
 // beside it. No patchelf: nothing is moved, and the image keeps its size.
 //
-// - A binding that carries a RUNPATH (one compiled on this machine names its
-//   SDK) has that string overwritten; the new path is shorter, and the rest is
+// - A binding that carries a RUNPATH (one compiled outside sap-rfc-lite's
+//   prebuild script names its build's SDK) has that string overwritten; the new path is shorter, and the rest is
 //   padded with NULs. The match must be a whole string of the table (a NUL on
 //   both sides), found exactly once: a hit inside a longer string, or a second
 //   hit, is refused rather than guessed at.
@@ -140,7 +140,7 @@ function nameStarts(bytes, image, index) {
 
 // The RUNPATH (or, in an older image, the RPATH) the addon carries, read from
 // its dynamic section: the string patchRunpath then replaces. A binding
-// compiled here names this machine's SDK. `undefined` when it carries none, as
+// compiled outside the prebuild script names its build's SDK. `undefined` when it carries none, as
 // sap-rfc-lite's prebuilt bindings (0.3.0 and later) do: addRunpath gives it one.
 function readRunpath(bytes) {
   const found = readImage(bytes)

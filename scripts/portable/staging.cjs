@@ -23,11 +23,11 @@ function sdkHome(env) {
 }
 
 // The RFC binding the staged sap-rfc-lite loads, found by the package's own
-// loader (node-gyp-build, resolved from the package): one built by hand in the
-// staged package (build/Release) when there is one, else the prebuilt one
-// under prebuilds/<platform>-<arch>/. Installing compiles nothing (0.3.0 and
-// later have no install script). `undefined` when there is neither, or no
-// package.
+// loader (node-gyp-build, resolved from the package): the prebuilt one under
+// prebuilds/<platform>-<arch>/ — the published package's, or one a source
+// build packed into a package of its own (sap-rfc-lite's README,
+// "Installation"). Installing compiles nothing (0.3.x has no install script).
+// `undefined` when there is none, or no package.
 function stagedAddon(dir) {
   const pkg = path.join(dir, 'node_modules/@mcp-abap-adt/sap-rfc-lite');
   try {

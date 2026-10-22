@@ -1,9 +1,9 @@
 /**
  * The staging cache of `npm run portable:build` (scripts/portable/staging.cjs):
  * which SDK it was staged with, when it counts as staged, and which RFC binding
- * it takes — the one sap-rfc-lite's own loader (node-gyp-build) resolves: one
- * built by hand in the package (build/Release) first, else the prebuilt one
- * the package carries — and which staged copies of sap-rfc-lite are too old to
+ * it takes — the one sap-rfc-lite's own loader (node-gyp-build) resolves, the
+ * prebuilt one the package carries (a build/Release would win, as the loader
+ * prefers it) — and which staged copies of sap-rfc-lite are too old to
  * load inside an executable.
  */
 import * as fs from 'node:fs';
@@ -82,7 +82,7 @@ describe('portable staging', () => {
     expect(staging.stagedAddon(dir)).toBe(prebuilt);
   });
 
-  it('takes a build/Release built by hand over the prebuild, as the package loads it', () => {
+  it('takes a build/Release over the prebuild, as the package loader does', () => {
     const dir = tmp();
     withAddon(dir);
     const compiled = write(
@@ -161,7 +161,7 @@ describe('staged sap-rfc-lite copies older than 0.3.0', () => {
 
   it('finds none when every copy is 0.3.0 or later', () => {
     const dir = tmp();
-    copy(path.join(dir, 'node_modules'), '0.3.1');
+    copy(path.join(dir, 'node_modules'), '0.3.2');
     copy(
       path.join(dir, 'node_modules/@mcp-abap-adt/connection/node_modules'),
       '1.0.0',
@@ -171,7 +171,7 @@ describe('staged sap-rfc-lite copies older than 0.3.0', () => {
 
   it('finds an older copy nested under the package that pinned it', () => {
     const dir = tmp();
-    copy(path.join(dir, 'node_modules'), '0.3.1');
+    copy(path.join(dir, 'node_modules'), '0.3.2');
     const nested = copy(
       path.join(dir, 'node_modules/@mcp-abap-adt/connection/node_modules'),
       '0.2.4',

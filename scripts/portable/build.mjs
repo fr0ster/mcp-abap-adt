@@ -86,10 +86,10 @@ function checkRfcLite(stageDir) {
 }
 
 // The binding the staged sap-rfc-lite loads, as its own loader picks it
-// (staging.cjs): the prebuilt one it ships for this platform, or one built by
-// hand in the staged package. A prebuilt binding carries no library search
-// path; one compiled on this machine names its SDK folder. Either way the
-// addon's search path becomes its own folder, so it finds the SDK beside it.
+// (staging.cjs). A prebuilt binding carries no library search path; one that
+// carries one (compiled outside sap-rfc-lite's prebuild script) names its
+// build's SDK folder. Either way the addon's search path becomes its own
+// folder, so it finds the SDK beside it.
 function addon(stageDir, work, platform) {
   const built = stagedAddon(stageDir);
   if (built === undefined) fail('the staged @mcp-abap-adt/sap-rfc-lite has no RFC binding');

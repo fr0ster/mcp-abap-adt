@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The 7-day release age is dropped.** `.npmrc` no longer sets `min-release-age=7` or `min-release-age-exclude[]=@mcp-abap-adt/*`. The age gate conflicted with the gating `npm audit`: a security fix younger than the gate could not be installed while the audit blocked CI (seen 2026-10-22 with markdown-it 14.3.3). The defences that stay: `allowScripts` with `strict-allow-scripts=true` (no dependency install script runs), lockfile hashes, `npm ci --ignore-scripts` in CI and the images, and the gating `npm audit`. Dependabot's own cooldown is unchanged. The 20.0.0 entry below describes the rule as it was then.
+
 ## [20.0.0] - 2026-10-22
 
 The RFC transport on `@mcp-abap-adt/connection` 19 and `@mcp-abap-adt/sap-rfc-lite` 0.3.2, which compiles nothing on install: a platform without a prebuilt RFC binding no longer gets one from `npm install`. Migration: [`docs/MIGRATION-20.0.md`](docs/MIGRATION-20.0.md). Over Streamable HTTP, `state_handle` is a declared argument of every tool, and a long session keeps one server instance and its SAP session across calls ([#308](https://github.com/fr0ster/mcp-abap-adt/issues/308)).

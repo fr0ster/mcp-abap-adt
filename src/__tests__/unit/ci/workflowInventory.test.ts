@@ -273,7 +273,8 @@ it('every dependency install script is decided, and the policy is strict', () =>
     .split(/\r?\n/)
     .map((line) => line.trim());
   expect(npmrc).toContain('strict-allow-scripts=true');
-  expect(npmrc).toContain('min-release-age=7');
+  // The 7-day release age was dropped: it conflicted with the gating audit.
+  expect(npmrc.some((line) => line.includes('min-release-age'))).toBe(false);
 });
 
 it('every Dockerfile installs with --ignore-scripts', () => {

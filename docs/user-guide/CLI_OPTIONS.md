@@ -390,8 +390,10 @@ refused at start.
 
 ### Held state
 
-`--state-idle-minutes` bounds each pooled instance's held state, reached again by its
-`state_handle`; see [Held State](#held-state).
+`--state-idle-minutes` bounds each pooled instance's held state — a long session (`SessionOpen`),
+a lock, a batch, a debug session — reached again by its `state_handle` (the `state_handle`
+argument every tool declares, or the `x-mcp-state-handle` header); see [Held State](#held-state)
+and [`@mcp-abap-adt/http`](../../http/README.md#held-state-and-the-long-session).
 
 ### DNS-rebinding protection
 
@@ -514,7 +516,8 @@ listener's own background re-polls do not count. It exists because the listener 
 itself, so SAP's own session timeout never ends an abandoned debug session.
 
 - `mcp-abap-adt`: the stdio instance's held state.
-- `mcp-abap-adt-http`: each pooled instance's held state, reached again with its `state_handle`.
+- `mcp-abap-adt-http`: each pooled instance's held state, reached again with its `state_handle`;
+  a long session left open ends here, its SAP session logged off.
 - `mcp-abap-adt-sse`: each SSE connection's instance, until the connection closes.
 
 ```bash

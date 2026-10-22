@@ -28,10 +28,13 @@ run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-stdio / http and sse: core 256 / 254 (with the 3 batch tools and the debugger batch's 2); core-ro
-71 / 69 (each with the 3 batch tools); compact 40 / 38 (29 + 4 debugger tools + `HandlerDebugBatch`
-+ 3 background-run + `HandlerBatch`, + the 2 leftover-session tools, list and logoff, on stdio);
-compact-ro 20 / 18 (17 + `HandlerBatch`, + the leftover-session list and logoff on stdio).
+stdio / Streamable HTTP / SSE: core 256 / 256 / 254 (with the 3 batch tools and the debugger
+batch's 2); core-ro 71 / 71 / 69 (each with the 3 batch tools); compact 40 / 39 / 38 (29 + 4
+debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 20 / 19 / 18
+(17 + `HandlerBatch`). stdio adds the 2 leftover-session tools, list and logoff; Streamable HTTP
+adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`
+in the compact ones — and declares an optional `state_handle` argument on every tool
+([`@mcp-abap-adt/http`](../../http/README.md#held-state-and-the-long-session)); SSE adds neither.
 
 ## Handler Sets
 

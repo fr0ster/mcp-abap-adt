@@ -13,6 +13,7 @@ import type {
 } from '../lib/requestSystemResolution';
 import type { HeldLockPort } from '../lib/state/heldLocks';
 import type { InstanceState } from '../lib/state/InstanceState';
+import type { LongSessionPort } from '../lib/state/longSession';
 
 /**
  * Handler context containing connection and logger
@@ -70,6 +71,12 @@ export interface HandlerContext {
    * stdio and SSE, whose instance keeps its session between calls.
    */
   heldLocks?: HeldLockPort;
+  /**
+   * The instance's long session (`LongSession`), given by a host whose
+   * instances last one request each (Streamable HTTP); absent on stdio and
+   * SSE, whose instance keeps its session between calls.
+   */
+  longSession?: LongSessionPort;
   /**
    * Sends on the instance's connection through its main flow: directly from a
    * call that holds it, else in turn. `send` is handed the connection to send

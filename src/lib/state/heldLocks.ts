@@ -19,7 +19,7 @@ import type { StatePart } from './InstanceState';
 
 /** The words of a write or an unlock under a lock this instance does not hold. */
 export const LOCK_NOT_HELD_WORDS =
-  "lock_handle is not held by this instance: send the state_handle HandlerLock answered in the request's x-mcp-state-handle header";
+  'lock_handle is not held by this instance: send the state_handle HandlerLock answered as the state_handle argument (or in the x-mcp-state-handle header)';
 
 /**
  * Where a lock lives: the instance's own SAP session (`main`), or a session
@@ -50,9 +50,11 @@ export class HeldLocks implements StatePart, HeldLockPort {
   }
 
   /**
-   * The instance's SAP session ended — its connection retired for another
-   * credential, or replaced after SAP lost the session: the locks it held
-   * went with it, and are held no more.
+   * The instance's SAP session ended — SAP ended it (a timeout, a logoff,
+   * an administrator) and the connection was replaced: the locks it held
+   * went with it, and are held no more. Another credential does not end it:
+   * the held connection takes that credential over and keeps its session
+   * and its locks (`BaseMcpServer.getConnection`).
    */
   mainSessionEnded(): void {
     this.generation += 1;
@@ -89,6 +91,11 @@ export class HeldLocks implements StatePart, HeldLockPort {
       release: (handle) => this.release(handle),
       session: () => this.session(),
     };
+  }
+
+  /** How many locks this instance holds. */
+  count(): number {
+    return this.handles.size;
   }
 
   /** Whether `handle` is held by this instance. */

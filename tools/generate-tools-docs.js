@@ -709,6 +709,16 @@ function loadToolsFromHandlers() {
 
   tools.push(...readOnlyCopies(tools));
 
+  // The walk finds every handler file; the long-session tools are served by
+  // the Streamable HTTP binaries alone, so they leave the stdio groups for
+  // the page's Streamable HTTP section.
+  const httpOnly = new Set(
+    httpSurfaces().all.sessionTools.map((tool) => tool.name),
+  );
+  const stdioTools = tools.filter((tool) => !httpOnly.has(tool.name));
+  tools.length = 0;
+  tools.push(...stdioTools);
+
   tools.sort((a, b) => {
     if (a.level !== b.level)
       return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
@@ -855,7 +865,70 @@ function renderParams(tool) {
   return out;
 }
 
-function generateMarkdown(tools) {
+const HTTP_HEADING = 'Streamable HTTP Binaries';
+
+/**
+ * The `state_handle` rule of a Streamable HTTP binary, said once: every tool
+ * it serves declares the optional argument, with the words the server
+ * registers (`streamableHttpSurface` of the build).
+ */
+function stateHandleRule(surface) {
+  return `On \`${surface.binaries.http}\` (Streamable HTTP) every tool declares one more, optional argument, \`state_handle\` (string): "${surface.stateHandleWords}" A tool whose own schema declares \`state_handle\` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.`;
+}
+
+/**
+ * The Streamable HTTP section of a page: what the set's HTTP binary serves
+ * beside its stdio set — taken from `streamableHttpSurface` of the build,
+ * the registration the HTTP server uses — and that its SSE binary serves
+ * none of it.
+ */
+function httpSectionMarkdown(surface) {
+  const { stdio, http, sse } = surface.binaries;
+  const without =
+    surface.stdioOnly.length === 0
+      ? ''
+      : ` without ${surface.stdioOnly.map((name) => `\`${name}\``).join(', ')}, which are stdio's only`;
+  let md = `<a id="${anchorFromHeading(HTTP_HEADING)}"></a>\n`;
+  md += `## ${HTTP_HEADING}\n\n`;
+  md += `\`${sse}\` (SSE) serves the tools of \`${stdio}\`${without}. \`${http}\` (Streamable HTTP) serves the same tools, and beside them:\n\n`;
+  md += `- **The \`state_handle\` argument.** ${stateHandleRule(surface)}\n`;
+  md += `- **The long session:** ${surface.sessionTools.map((tool) => `\`${tool.name}\``).join(', ')}, served by no stdio or SSE binary. Their parameters below are the ones \`${http}\` registers, \`state_handle\` included.\n\n`;
+  for (const tool of surface.sessionTools) {
+    md += `<a id="${anchorFromHeading(`${tool.name} (Streamable HTTP)`)}"></a>\n`;
+    md += `### ${tool.name} (Streamable HTTP)\n`;
+    md += `**Description:** ${tool.description || 'No description'}\n\n`;
+    md += `**Parameters:**\n`;
+    md += renderParams(tool);
+    md += `\n---\n\n`;
+  }
+  return md;
+}
+
+/**
+ * The Streamable HTTP section's entry in a page's navigation: the section,
+ * and each long-session tool under it (`httpSectionMarkdown` anchors them).
+ */
+function httpNavigationMarkdown(surface) {
+  let md = `- [${HTTP_HEADING}](#${anchorFromHeading(HTTP_HEADING)})\n`;
+  for (const tool of surface?.sessionTools ?? []) {
+    md += `  - [${tool.name}](#${anchorFromHeading(`${tool.name} (Streamable HTTP)`)})\n`;
+  }
+  return md;
+}
+
+/** Each HTTP surface of the build: the full set's and the read-only one's. */
+function httpSurfaces() {
+  const distEntry = path.join(__dirname, '..', 'dist', 'lib', 'toolSet.js');
+  requireFreshBuild(distEntry);
+  const { fullToolSet, fullReadOnlyToolSet, streamableHttpSurface } =
+    require(distEntry);
+  return {
+    all: streamableHttpSurface(fullToolSet),
+    readonly: streamableHttpSurface(fullReadOnlyToolSet),
+  };
+}
+
+function generateMarkdown(tools, surface) {
   const grouped = groupByLevelAndObject(tools);
   const summary = {
     total: tools.length,
@@ -882,6 +955,7 @@ function generateMarkdown(tools) {
   md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
   md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
+  md += `- every Streamable HTTP binary (\`-http\`, \`-http-ro\`) -> [${HTTP_HEADING}](#${anchorFromHeading(HTTP_HEADING)}): the optional \`state_handle\` argument on every tool, and the long session (${surface.sessionTools.map((tool) => `\`${tool.name}\``).join(', ')}). No stdio or SSE binary serves these\n`;
   md += `- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, \`HandlerBatch\`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it\n`;
   md += `- compact -> [the compact package](../../compact/README.md): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
@@ -906,6 +980,7 @@ function generateMarkdown(tools) {
       }
     }
   }
+  md += httpNavigationMarkdown(surface);
 
   md += `\n---\n\n`;
 
@@ -940,11 +1015,19 @@ function generateMarkdown(tools) {
     }
   }
 
+  md += httpSectionMarkdown(surface);
+
   md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
   return md;
 }
 
-function generateLevelMarkdown(tools, level, intro) {
+function generateLevelMarkdown(
+  tools,
+  level,
+  intro,
+  appendix,
+  appendixNavigation,
+) {
   const levelTools = tools.filter((t) => t.level === level);
   const grouped = groupByLevelAndObject(levelTools);
   const objects = Object.values(grouped[level]).sort((a, b) =>
@@ -968,6 +1051,7 @@ function generateLevelMarkdown(tools, level, intro) {
       md += `    - [${tool.name}](#${anchorFromHeading(toolHeading)})\n`;
     }
   }
+  if (appendixNavigation) md += appendixNavigation;
 
   md += `\n---\n\n`;
   md += `<a id="${anchorFromHeading(levelHeading)}"></a>\n`;
@@ -989,6 +1073,8 @@ function generateLevelMarkdown(tools, level, intro) {
       md += `\n---\n\n`;
     }
   }
+
+  if (appendix) md += appendix;
 
   md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
   return md;
@@ -1066,7 +1152,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
 
 /** What the read-only page lists, said on the page. */
 const READ_ONLY_PAGE_INTRO =
-  "Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
+  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
 
 /** What the high-level page says beside its tools. */
 const HIGH_PAGE_INTRO =
@@ -1082,7 +1168,8 @@ function main() {
   }
 
   console.log(`✅ Found ${tools.length} tools`);
-  const markdownAll = generateMarkdown(tools);
+  const surfaces = httpSurfaces();
+  const markdownAll = generateMarkdown(tools, surfaces.all);
   fs.writeFileSync(OUTPUT_PATHS.all, markdownAll, 'utf8');
   fs.writeFileSync(
     OUTPUT_PATHS.readonly,
@@ -1090,12 +1177,20 @@ function main() {
       readOnlySetTools(tools),
       'readonly',
       READ_ONLY_PAGE_INTRO,
+      httpSectionMarkdown(surfaces.readonly),
+      httpNavigationMarkdown(surfaces.readonly),
     ),
     'utf8',
   );
   fs.writeFileSync(
     OUTPUT_PATHS.high,
-    generateLevelMarkdown(tools, 'high', HIGH_PAGE_INTRO),
+    generateLevelMarkdown(
+      tools,
+      'high',
+      HIGH_PAGE_INTRO,
+      `<a id="${anchorFromHeading(HTTP_HEADING)}"></a>\n## ${HTTP_HEADING}\n\n${stateHandleRule(surfaces.all)}\n\n`,
+      httpNavigationMarkdown(undefined),
+    ),
     'utf8',
   );
   // The legacy page writes itself back when there is something to put on it.
@@ -1149,4 +1244,7 @@ module.exports = {
   parseTopLevelProperties,
   generateMarkdown,
   generateLevelMarkdown,
+  httpSectionMarkdown,
+  httpNavigationMarkdown,
+  stateHandleRule,
 };

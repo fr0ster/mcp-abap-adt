@@ -35,7 +35,8 @@ export type ServerRefusalCode =
   | 'batch_no_timeout'
   | 'batch_ended'
   | 'batch_parts_mismatch'
-  | 'batch_unsplit';
+  | 'batch_unsplit'
+  | 'long_session_unavailable';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -153,6 +154,13 @@ export const SYSTEM_TYPE_REQUIRED_WORDS =
 /** The batch tools on an instance whose host gave it no batch owner (`batch`). */
 export const BATCH_MODE_UNAVAILABLE_WORDS =
   'batch mode is not available here: the host gave this server none';
+
+/**
+ * The session tools on an instance whose host keeps no long session for it
+ * (only the Streamable HTTP server gives one).
+ */
+export const LONG_SESSION_UNAVAILABLE_WORDS =
+  'a long session is not available here: only the Streamable HTTP server keeps one';
 
 /** A begin while a batch of the same kind is open. */
 export const BATCH_MODE_ON_WORDS =
@@ -273,6 +281,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
   batch_ended: BATCH_ENDED_WORDS,
   batch_unsplit: BATCH_UNSPLIT_WORDS,
+  long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

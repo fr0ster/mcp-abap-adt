@@ -59,7 +59,10 @@ is sent. An ABAP start answers the ids and the identity in force beside the hand
   is made: such a tool call logs on nowhere.
 - After a complete stop (`DebugStop`, the idle bound) the handle
   is invalid for good; the next start answers a new one. A stop that could not
-  undo everything keeps the handle valid, so the stop can be retried.
+  undo everything keeps the handle valid, so the stop can be retried. Inside an
+  open long session (Streamable HTTP, `SessionOpen` or compact `HandlerSession`
+  `open`) the handle stays after a complete stop: the session still holds the
+  instance, until `SessionClose` (or `HandlerSession` `close`) or the idle bound.
 - **The handle is a bearer secret.** Whoever holds it acts with the SAP session
   behind it, like a session cookie. It travels in tool arguments, the model's
   context and transcripts; keeping it safe (HTTPS beyond `127.0.0.1`, isolation,
@@ -135,7 +138,7 @@ keep the instance:
 |---|---|
 | stdio (`@mcp-abap-adt/core`, `mcp-abap-adt`) | the process: one per client session, holding the session until it exits |
 | SSE (`@mcp-abap-adt/sse`, `mcp-abap-adt-sse`) | the SSE connection: one instance per connection, its credential from the opening `GET`'s headers; when the connection closes, the debug session is stopped |
-| Streamable HTTP (`@mcp-abap-adt/http`, `mcp-abap-adt-http`) | the server's pool of instances: each request takes the instance its `tools/call`'s `state_handle` names, or a new one, and its own `x-sap-*` headers give its credential; an instance that still holds state after the response stays in the pool, one that holds nothing is disposed. One request at a time per instance; a JSON-RPC batch carrying a `state_handle` is refused. The debug session keeps the connections it opened with the creating request's credential until it ends |
+| Streamable HTTP (`@mcp-abap-adt/http`, `mcp-abap-adt-http`) | the server's pool of instances: each request takes the instance its `state_handle` names — the `state_handle` argument, or the `x-mcp-state-handle` header, which wins when both are sent — or a new one, and its own `x-sap-*` headers give its credential; an instance that still holds state after the response stays in the pool, one that holds nothing is disposed. One request at a time per instance; a JSON-RPC batch carrying a `state_handle` is refused. The debug session keeps the connections it opened with the creating request's credential until it ends |
 | embedded (`EmbeddableMcpServer`) | the embedding host |
 
 **The debuggee session is the debugger's own.** The connections a debug session
@@ -239,9 +242,11 @@ or a continue — on the AMDP session's command connection:
 | end | `DebugBatchEnd` | `HandlerDebugBatch` `action: 'end'` |
 | answers | `BatchAnswers` (`number` or `numbers`) | `HandlerDebugBatch` `action: 'answers'` (`number` or `numbers`) |
 
-No `-ro` binary serves them. The batch tools take no `state_handle`: the batch is the instance's (over
-Streamable HTTP the `x-mcp-state-handle` header reaches the instance, as for the communication
-batch, see [BATCH_MODE.md](BATCH_MODE.md#over-streamable-http)); begin answers `{ debug_batch: 'on', state_handle }`.
+No `-ro` binary serves them. The batch is the instance's: on stdio and SSE the batch tools take no
+`state_handle`; over Streamable HTTP, where every tool declares an optional `state_handle`
+argument, send the handle begin answers as that argument (or in the `x-mcp-state-handle` header)
+on every call of the batch, as for the communication batch — see
+[BATCH_MODE.md](BATCH_MODE.md#over-streamable-http); begin answers `{ debug_batch: 'on', state_handle }`.
 
 **What is recorded**, one request each:
 
@@ -646,6 +651,12 @@ ends by:
   opened — the debug session's own connections included — is logged off **at once**, and its
   running tool calls are interrupted: no stop is sent and nothing waits for a debugger call in
   flight; the logoff ends the debug session in the system.
+- **a long session's close** (Streamable HTTP: `SessionClose`, compact `HandlerSession`
+  `action: 'close'`, with the handle of an instance that holds a debug session): its answer names
+  `"debug_session": true`, then every ADT session the instance opened — the debug session's own
+  connections included — is logged off at once and its running calls are interrupted, as at the
+  client's close: no stop is sent; the logoff ends the debug session in the system. The handle then
+  answers `state is not available`.
 - **the pool**, when it lets a Streamable HTTP instance go (a stop tool emptied it): the complete
   stop, then every ADT session the instance opened is logged off, **whatever the stop answered**:
   a stop that failed is reported, never a reason to keep a session open.

@@ -840,6 +840,31 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // a write binary and the list and logoff on a -ro one there; none on
       // any http or sse binary, compact ones included.
       const onStdio = transportName === 'stdio';
+      // The long session is Streamable HTTP's: SessionOpen and SessionClose
+      // on the full sets, HandlerSession on the compact ones, on http alone.
+      const onHttp = transportName === 'http';
+      const session = (tools: string[]) =>
+        tools.filter(
+          (n) =>
+            n === 'SessionOpen' ||
+            n === 'SessionClose' ||
+            n === 'HandlerSession',
+        );
+      expect({
+        full: session(full.tools),
+        fullRo: session(fullRo.tools),
+        compact: session(compact.tools),
+        compactRo: session(compactRo.tools),
+      }).toEqual(
+        onHttp
+          ? {
+              full: ['SessionClose', 'SessionOpen'],
+              fullRo: ['SessionClose', 'SessionOpen'],
+              compact: ['HandlerSession'],
+              compactRo: ['HandlerSession'],
+            }
+          : { full: [], fullRo: [], compact: [], compactRo: [] },
+      );
       const leftover = (tools: string[]) =>
         tools.filter((n) => n.includes('LeftoverSession'));
       expect({
@@ -864,8 +889,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
       // core: the debugger, high, background runs, the three batch tools
-      // and the two debugger batch tools, always.
-      expect(full.tools).toHaveLength(onStdio ? 256 : 254);
+      // and the two debugger batch tools, always; on http SessionOpen and
+      // SessionClose.
+      expect(full.tools).toHaveLength(onStdio ? 256 : onHttp ? 256 : 254);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -880,9 +906,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ]),
       );
       // core-ro: the readonly tools with system and search, the three batch
-      // tools (and, on stdio, the list and the logoff); no write, debugger,
-      // background run or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 71 : 69);
+      // tools (and, on stdio, the list and the logoff; on http SessionOpen
+      // and SessionClose); no write, debugger, background run or resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 71 : 69);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',
@@ -910,7 +936,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // three background-run tools beside the run tool, HandlerBatch, and on
       // stdio the leftover-session list and logoff (no set serves a resume).
       expect(compact.tools).toHaveLength(
-        29 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0),
+        29 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
       );
       expect(compact.tools).toEqual(
         expect.arrayContaining([
@@ -922,7 +948,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       );
       // compact-ro: the 17 that change nothing, HandlerBatch, and on stdio
       // the list and the logoff.
-      expect(compactRo.tools).toHaveLength(17 + 1 + (onStdio ? 2 : 0));
+      expect(compactRo.tools).toHaveLength(
+        17 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+      );
       expect(compactRo.tools).toContain('HandlerGet');
       expect(compactRo.tools).toContain('HandlerDeletionCheck');
       expect(compactRo.tools).toContain('HandlerBatch');

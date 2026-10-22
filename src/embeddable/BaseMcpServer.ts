@@ -49,7 +49,7 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../lib/batch/availability.js';
-import { endsBatch, isBatchTool } from '../lib/batch/batchTools.js';
+import { endsBatch, runsBesideBatch } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
 import { batchRefusal, endWithFailure } from '../lib/batch/execute.js';
 import type {
@@ -137,6 +137,11 @@ import {
   type StateLogger,
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
+import type { LongSession, LongSessionPort } from '../lib/state/longSession.js';
+import {
+  withoutStateHandle,
+  withStateHandle,
+} from '../lib/state/stateHandleArgument.js';
 import {
   getStatedSystemContext,
   systemContextFromConfiguration,
@@ -280,6 +285,13 @@ export abstract class BaseMcpServer extends McpServer {
 
   private debuggerInstance?: DebuggerInstance;
 
+  /**
+   * The debugger a call of this instance took (`debuggerFor()`, the base's
+   * or an embedder's override): what a session close reads for its
+   * `debug_session`.
+   */
+  private takenDebugger?: DebuggerInstance;
+
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<unknown>>();
 
@@ -310,6 +322,15 @@ export abstract class BaseMcpServer extends McpServer {
   /** The locks this instance holds between requests (`heldLocks` option). */
   protected readonly heldLocks: HeldLocks | undefined;
 
+  /** The instance's long session (`longSession` option). */
+  protected readonly longSession: LongSession | undefined;
+
+  /** What the session tools reach of it (`longSessionPortOf`). */
+  private readonly longSessionPort: LongSessionPort | undefined;
+
+  /** Whether every tool declares `state_handle` (`stateHandleArgument` option). */
+  private readonly stateHandleArgument: boolean;
+
   /**
    * The corrected request header pairs of the systems this instance talks
    * to (`adtHeaderPairs` option), keyed by system: the host's, shared by its
@@ -335,6 +356,11 @@ export abstract class BaseMcpServer extends McpServer {
      * defaulted to silence (such a host passes this option itself).
      */
     stateLogger?: StateLogger;
+    /**
+     * The host's index of state handles in use (a pool): a handle it answers
+     * `true` for is drawn again, so no two instances of the host share one.
+     */
+    isStateHandleTaken?: (handle: string) => boolean;
     /**
      * The owner of the process's runtime session files, created by the host
      * and shared by its instances: each owned HTTP connection holding a
@@ -367,6 +393,15 @@ export abstract class BaseMcpServer extends McpServer {
      */
     heldLocks?: HeldLocks;
     /**
+     * The long session of this instance, created by a host whose instances
+     * last one request each (Streamable HTTP) for this instance alone: held
+     * state while open, so the host keeps the instance and its SAP
+     * connection for the calls that carry its handle. Absent: the session
+     * tools answer `long_session_unavailable` (stdio, SSE: the instance
+     * keeps its session).
+     */
+    longSession?: LongSession;
+    /**
      * The corrected request header pairs of the systems the process talks
      * to, created by the host and shared by its instances: a pair SAP
      * answered `406`/`415` to, corrected, is sent from then on to that
@@ -388,6 +423,15 @@ export abstract class BaseMcpServer extends McpServer {
      * (`closeInstance`) or the process shutdown.
      */
     transportCloseEndsSession?: boolean;
+    /**
+     * Whether every tool's input schema declares an optional string
+     * `state_handle` (`withStateHandle`; a tool declaring its own keeps it):
+     * stated by a host that routes a call to the instance holding its state
+     * by that argument (Streamable HTTP's pool), so a client that sets no
+     * header can send it. Default `false`: stdio and SSE register the
+     * schemas as the tools declare them.
+     */
+    stateHandleArgument?: boolean;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
@@ -395,6 +439,9 @@ export abstract class BaseMcpServer extends McpServer {
     this.backgroundRuns = options.backgroundRuns;
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
+      ...(options.isStateHandleTaken !== undefined && {
+        isTaken: options.isStateHandleTaken,
+      }),
       logger: stateLoggerOf(options),
       // The idle bound's stop is a terminal disposal of what the state
       // owns: its connections are closed whatever the undo answered.
@@ -404,6 +451,10 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.batch !== undefined) this.state.attach(this.batch);
     this.heldLocks = options.heldLocks;
     if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
+    this.longSession = options.longSession;
+    if (this.longSession !== undefined) this.state.attach(this.longSession);
+    this.longSessionPort = this.longSessionPortOf(this.longSession);
+    this.stateHandleArgument = options.stateHandleArgument === true;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     this.systemType = options.systemType;
     this.systemContextResolver = options.systemContextResolver ?? null;
@@ -439,8 +490,44 @@ export abstract class BaseMcpServer extends McpServer {
     return this.debuggerInstance;
   }
 
+  /** The context's `debugger`: `debuggerFor()`, kept for a session close to read. */
+  private takeDebugger(): DebuggerInstance {
+    const taken = this.debuggerFor();
+    this.takenDebugger = taken;
+    return taken;
+  }
+
   get stateHandle(): string {
     return this.state.handle;
+  }
+
+  /**
+   * The session tools' port: open and close of the long session; close
+   * asks for the instance's close and answers what the instance holds — its
+   * locks, a batch (open, or its answers kept), a debug session.
+   */
+  private longSessionPortOf(
+    session: LongSession | undefined,
+  ): LongSessionPort | undefined {
+    if (session === undefined) return undefined;
+    return {
+      open: () => session.open(),
+      isOpen: () => session.isOpen(),
+      close: () => {
+        const holding = {
+          locks: this.heldLocks?.count() ?? 0,
+          batch: this.batch?.holdsState() === true,
+          debug_session: this.takenDebugger?.holdsState() === true,
+        };
+        session.askClose();
+        return holding;
+      },
+    };
+  }
+
+  /** Whether the instance's close was asked (a session tool's close): its host closes it after the call. */
+  closeAsked(): boolean {
+    return this.longSession?.closeAsked() === true;
   }
 
   holdsState(): boolean {
@@ -1387,7 +1474,7 @@ export abstract class BaseMcpServer extends McpServer {
                 logger: this.logger,
                 adtHeaders: this.adtHeadersOf(connection),
                 state: this.state,
-                debugger: () => this.debuggerFor(),
+                debugger: () => this.takeDebugger(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
                 ...(this.batch !== undefined ? { batch: this.batch } : {}),
                 ...(batchAvailability !== undefined
@@ -1395,6 +1482,9 @@ export abstract class BaseMcpServer extends McpServer {
                   : {}),
                 ...(this.heldLocks !== undefined
                   ? { heldLocks: this.heldLocks }
+                  : {}),
+                ...(this.longSessionPort !== undefined
+                  ? { longSession: this.longSessionPort }
                   : {}),
                 ...(this.systemType !== undefined
                   ? { systemType: this.systemType }
@@ -1569,19 +1659,35 @@ export abstract class BaseMcpServer extends McpServer {
             }
           };
 
+          // The host's `state_handle` declaration, where it states one and
+          // the tool declares none of its own: the argument routes the call
+          // (the pool) and reaches no handler — the handler gets the
+          // arguments it got before.
+          // `declared`: the declaration was added — a schema that declares
+          // its own, or one it cannot extend, is registered as it is and
+          // its arguments reach the handler as they came.
+          const withHandle = this.stateHandleArgument
+            ? (withStateHandle(
+                entry.toolDefinition.inputSchema,
+              ) as typeof entry.toolDefinition.inputSchema)
+            : entry.toolDefinition.inputSchema;
+          const declared = withHandle !== entry.toolDefinition.inputSchema;
+          const inputSchema = withHandle;
+
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
           const wrappedHandler = (args: unknown) =>
-            this.trackCall(toolName, (signal) => runCall(args, signal));
-
+            this.trackCall(toolName, (signal) =>
+              runCall(declared ? withoutStateHandle(args) : args, signal),
+            );
           // Convert JSON Schema to Zod if needed, otherwise pass as-is
           const zodSchema =
-            entry.toolDefinition.inputSchema &&
-            typeof entry.toolDefinition.inputSchema === 'object' &&
-            entry.toolDefinition.inputSchema.type === 'object' &&
-            entry.toolDefinition.inputSchema.properties
-              ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
-              : entry.toolDefinition.inputSchema;
+            inputSchema &&
+            typeof inputSchema === 'object' &&
+            inputSchema.type === 'object' &&
+            inputSchema.properties
+              ? jsonSchemaToZod(inputSchema)
+              : inputSchema;
 
           // Skip tools not available in the stated SAP environment. The
           // kind is never guessed: with none stated (stdio's inspection-only
@@ -1612,7 +1718,7 @@ export abstract class BaseMcpServer extends McpServer {
             entry.toolDefinition.name,
             {
               description:
-                sentenced && !isBatchTool(entry.toolDefinition.name)
+                sentenced && !runsBesideBatch(entry.toolDefinition.name)
                   ? withBatchSentence(
                       entry.toolDefinition.description,
                       entry.toolDefinition.name,
@@ -1635,13 +1741,14 @@ export abstract class BaseMcpServer extends McpServer {
   }
   /**
    * Whether a call of `tool` meets an open batch: a batch is open and `tool`
-   * is not one of the batch tools.
+   * is neither a batch tool nor a long-session tool — those run beside it,
+   * at once, never recorded (`runsBesideBatch`).
    */
   private batchOpenFor(tool: string): boolean {
     return (
       this.batch !== undefined &&
       this.batch.mode() !== 'off' &&
-      !isBatchTool(tool)
+      !runsBesideBatch(tool)
     );
   }
 
@@ -1925,9 +2032,12 @@ export abstract class BaseMcpServer extends McpServer {
         connection: undefined as never,
         logger: this.logger,
         state: this.state,
-        debugger: () => this.debuggerFor(),
+        debugger: () => this.takeDebugger(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
         ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
+        ...(this.longSessionPort !== undefined
+          ? { longSession: this.longSessionPort }
+          : {}),
         ...(this.systemType !== undefined
           ? { systemType: this.systemType }
           : {}),
@@ -2466,7 +2576,8 @@ export abstract class BaseMcpServer extends McpServer {
     const described = (registerArgs: unknown[]): unknown[] => {
       if (this.batch === undefined) return registerArgs;
       const name = registerArgs[0];
-      if (typeof name !== 'string' || isBatchTool(name)) return registerArgs;
+      if (typeof name !== 'string' || runsBesideBatch(name))
+        return registerArgs;
       const sentence = OUTSIDE_BATCH_SENTENCE;
       const second = registerArgs[1];
       const appended = (description: string) =>

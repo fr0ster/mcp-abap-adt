@@ -70,7 +70,7 @@ held state's idle bound (`stateIdleMinutes`, 30 minutes by default) is the one c
 it.
 
 When the server instance ends with a batch open — the client closes its connection (stdio, an SSE
-stream), the HTTP pool lets the instance go, the process shuts down — or the idle bound ends the
+stream), the HTTP pool lets the instance go, a long session's `SessionClose`, the process shuts down — or the idle bound ends the
 held state, the open batch is dropped: nothing recorded is sent, and the last batch's map goes
 with it. A `BatchEnd` after the idle bound is refused `batch_mode_off`, and `BatchAnswers` answers
 "no answer with that number".
@@ -343,19 +343,27 @@ The members, their default pairs and the correction in full:
 ## Over Streamable HTTP
 
 Every HTTP request is an MCP session of its own, served by a pooled server instance. Send the
-`state_handle` `BatchBegin` answers in the `x-mcp-state-handle` request header on every call of
-the batch, `BatchEnd` and `BatchAnswers` included: the pool routes the call to the instance that
-holds the batch, one request at a time, in the order they arrive. A call without the header
-reaches an instance where no batch is open. A tool call whose handle the pool does not know — one
+`state_handle` `BatchBegin` answers as the `state_handle` argument on every call of the batch,
+`BatchEnd` and `BatchAnswers` included — every tool of the Streamable HTTP binaries declares that
+optional argument — or, from a client that sets headers, in the `x-mcp-state-handle` request
+header: the pool routes the call to the instance that holds the batch, one request at a time, in
+the order they arrive. A call without the handle reaches an instance where no batch is open. A tool call whose handle the pool does not know — one
 that never existed, or whose state ended — is answered `state is not available` by the pool itself,
 before any instance is made and with nothing logged on; a JSON-RPC array holding a tool call is
 answered the same, one such answer per request in it that has an `id` (an array whose tool call
 carries a `state_handle` argument is answered `400`: "a JSON-RPC batch cannot carry
-state_handle"). The header comes first;
-without it the pool routes by a `tools/call`'s `state_handle` argument, which only the debugger
-tools take — no batch tool takes one. The handle is a bearer secret: whoever holds it reaches the
-batch. A client that leaves during `BatchEnd` does not stop it: the map is kept for the next
-`BatchAnswers` with the header. On stdio and SSE nothing is needed: the batch is the process's
+state_handle"). When both the header and the argument are sent, the header wins. The handle is
+a bearer secret: whoever holds it reaches the batch. A client that leaves during `BatchEnd` does
+not stop it: the map is kept for the next `BatchAnswers` with the handle.
+
+**Batches inside a long session.** A long session (`SessionOpen`; compact `HandlerSession`
+`action: 'open'`) keeps one instance and its SAP session across calls, and its `state_handle` is
+the instance's: `BatchBegin` on it answers that same handle, and the phases (lock, write, unlock)
+all run on that one SAP session. The session tools run at once and are never recorded, in a
+communication batch and in a debugger batch alike: `SessionOpen` leaves an open batch open;
+`SessionClose` closes the instance, which drops an open batch and its answers with nothing sent
+and logs off the SAP session (which releases its locks); its answer names what was held
+(`"batch": true`). On stdio and SSE nothing is needed: the batch is the process's
 (stdio) or the connection's (SSE).
 
 ## Credentials and failures

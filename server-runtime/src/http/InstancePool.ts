@@ -15,7 +15,11 @@
  * `ids.ts`). One request at a time per instance (the SDK binds one
  * transport).
  * An instance that holds nothing is disposed once, after its work; a disposal
- * that fails keeps the instance for a retry. The pool keeps no clock: the
+ * that fails keeps the instance for a retry. An instance whose close was asked
+ * (a long session's close) leaves when that call settles — after its answer
+ * was written —: out of the index and, in the same tick, its instance close
+ * started (`instanceClose`), which runs on outside the routing; the shutdown
+ * awaits it. The pool keeps no clock: the
  * idle bound is the instance state's own (`InstanceState`), and an instance it
  * empties leaves through `onEmpty` like any other.
  *
@@ -40,6 +44,18 @@ export interface Poolable {
    * undo, whatever the undo answered.
    */
   terminalClose?(): Promise<void>;
+  /**
+   * Whether the instance's close was asked during its work (a long
+   * session's close): the pool then closes it instead of keeping it.
+   */
+  closeAsked?(): boolean;
+  /**
+   * The instance close (lib's `closeInstance`): the instance latched, every
+   * connection it owns logged off — awaited to each logoff's answer —, an
+   * open batch dropped, the state let go, the MCP server closed. Started
+   * synchronously; never rejects.
+   */
+  instanceClose?(): Promise<void>;
 }
 
 /** The `400` words of a batch carrying `state_handle`. */
@@ -151,6 +167,8 @@ export class InstancePool<T extends Poolable> {
   /** Disposal failed or still finishing: owned for shutdown. */
   private readonly retained = new Set<T>();
   private readonly active = new Set<Promise<unknown>>();
+  /** Instance closes the pool started and that still run: the shutdown awaits them. */
+  private readonly closing = new Set<Promise<void>>();
   private admitting = true;
   /** Instances whose terminal close ran: they left the pool for good. */
   private readonly closed = new WeakSet<T>();
@@ -169,6 +187,9 @@ export class InstancePool<T extends Poolable> {
     }
     return `instance ${n}`;
   }
+
+  /** Whether a handle is filed in the index: an instance's state draws again when so. */
+  isHandleTaken = (handle: string): boolean => this.index.has(handle);
 
   size(): number {
     return this.held.size;
@@ -269,6 +290,7 @@ export class InstancePool<T extends Poolable> {
     if (!this.subscribed.has(instance)) {
       this.subscribed.add(instance);
       instance.state.onEmpty(() => {
+        if (this.closedOut(instance)) return;
         if (!this.busy.get(instance)) void this.evict(instance);
       });
     }
@@ -283,8 +305,15 @@ export class InstancePool<T extends Poolable> {
     }
   }
 
-  /** After a request: what holds state is kept; the rest is disposed. */
+  /**
+   * After a request: an instance whose close was asked is closed; what holds
+   * state is kept; the rest is disposed.
+   */
   private async settle(instance: T): Promise<void> {
+    if (instance.closeAsked?.() && instance.instanceClose) {
+      this.closeOut(instance);
+      return;
+    }
     if (instance.holdsState()) {
       this.keep(instance);
       return;
@@ -300,6 +329,8 @@ export class InstancePool<T extends Poolable> {
    * that empties synchronously inside dispose() re-enters harmlessly.
    */
   private evict(instance: T): Promise<void> {
+    // Left for good: a part emptying after its close disposes nothing.
+    if (this.closedOut(instance)) return Promise.resolve();
     const running = this.evicting.get(instance);
     if (running) return running;
     let done!: () => void;
@@ -338,6 +369,33 @@ export class InstancePool<T extends Poolable> {
     return eviction;
   }
 
+  /**
+   * The close asked of an instance, once its call settled (its answer
+   * written): in one tick it leaves the index — a call carrying its handle
+   * is answered `state is not available` from here on, one queued behind
+   * the close included — and its instance close starts. Not awaited here:
+   * the close runs on outside the routing, its logoffs' answers awaited
+   * with no timer; the shutdown awaits it (`closing`). It owns what it
+   * closes: no disposal and no terminal close of the pool's follow.
+   */
+  private closeOut(instance: T): void {
+    if (this.closed.has(instance) || !instance.instanceClose) return;
+    this.drop(instance);
+    this.retained.delete(instance);
+    this.failed.delete(instance);
+    // Closed: a part that empties afterwards — the close's `dropBatch`, when
+    // the batch was the only thing held — runs no eviction (`closedOut`).
+    this.closed.add(instance);
+    const closing = instance.instanceClose().catch(() => undefined);
+    this.closing.add(closing);
+    void closing.finally(() => this.closing.delete(closing));
+  }
+
+  /** Whether `instance` left the pool for good: closed, and no longer held. */
+  private closedOut(instance: T): boolean {
+    return this.closed.has(instance) && !this.held.has(instance);
+  }
+
   /** The terminal close of an instance leaving the pool, once. */
   private async terminalClose(instance: T): Promise<void> {
     if (this.closed.has(instance)) return;
@@ -356,11 +414,13 @@ export class InstancePool<T extends Poolable> {
    * finishes when its last event arrives — no timer); retry once what still
    * holds; report what is still left. Every instance it owned then leaves the
    * pool through its terminal close — its connections closed with a logoff
-   * whatever its undo answered.
+   * whatever its undo answered. An instance close the pool started (a long
+   * session's close) is awaited to its end: its logoffs answered.
    */
   async shutdown(): Promise<string[]> {
     this.admitting = false;
     await Promise.allSettled([...this.active]);
+    await Promise.allSettled([...this.closing]);
     await Promise.allSettled([...this.evicting.values()]);
     const owned = [...new Set<T>([...this.held.keys(), ...this.retained])];
     for (const instance of owned) await this.evict(instance);

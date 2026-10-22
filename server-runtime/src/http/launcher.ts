@@ -79,8 +79,13 @@ CREDENTIALS (each request's headers; nothing is stored, shared or cached):
     Then SAP_RESPONSIBLE, SAP_MASTER_SYSTEM, SAP_DEBUG_TERMINAL_ID, SAP_DEBUG_IDE_ID,
     SAP_DEBUG_BREAKPOINT_CONFLICT of the environment; with x-sap-login, the login is the responsible when none is stated.
 
-  Held state (a debug session) is reached again with its state_handle, on the
-  instance that holds it; MCP_STATE_IDLE_MINUTES / --state-idle-minutes bound it.
+  Held state (a long session, a lock, a batch, a debug session) is reached again
+  with its state_handle, on the instance that holds it: send it as the
+  state_handle argument every tool declares, or in the x-mcp-state-handle header
+  (the header wins). A long session (SessionOpen / SessionClose; compact:
+  HandlerSession) keeps one instance and its SAP session for every call carrying
+  its handle, until its close logs that session off.
+  MCP_STATE_IDLE_MINUTES / --state-idle-minutes bound held state between calls.
 
   A health check answers GET /mcp/health.
 `;

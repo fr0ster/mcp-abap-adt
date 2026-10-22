@@ -2,7 +2,7 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
-Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
+Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
 - Total tools: 71
@@ -108,6 +108,9 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
     - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
+- [Streamable HTTP Binaries](#streamable-http-binaries)
+  - [SessionOpen](#sessionopen-streamable-http)
+  - [SessionClose](#sessionclose-streamable-http)
 
 ---
 
@@ -119,7 +122,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="batchbegin-read-only-batch"></a>
 #### BatchBegin (Read-Only / Batch)
-**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
 
 **Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
 
@@ -1150,4 +1153,30 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-*Last updated: 2026-10-21*
+<a id="streamable-http-binaries"></a>
+## Streamable HTTP Binaries
+
+`mcp-abap-adt-sse-ro` (SSE) serves the tools of `mcp-abap-adt-ro` without `ListLeftoverSessions`, `LogoffLeftoverSession`, which are stdio's only. `mcp-abap-adt-http-ro` (Streamable HTTP) serves the same tools, and beside them:
+
+- **The `state_handle` argument.** On `mcp-abap-adt-http-ro` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
+- **The long session:** `SessionOpen`, `SessionClose`, served by no stdio or SSE binary. Their parameters below are the ones `mcp-abap-adt-http-ro` registers, `state_handle` included.
+
+<a id="sessionopen-streamable-http"></a>
+### SessionOpen (Streamable HTTP)
+**Description:** [read-only] Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open.
+
+**Parameters:**
+- `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
+
+---
+
+<a id="sessionclose-streamable-http"></a>
+### SessionClose (Streamable HTTP)
+**Description:** [read-only] Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.
+
+**Parameters:**
+- `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
+
+---
+
+*Last updated: 2026-10-22*

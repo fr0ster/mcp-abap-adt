@@ -13,9 +13,13 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
   analysis, SQL queries, dumps, profiler traces, and the class and program runs
   (`RuntimeRunClass`, `RuntimeRunProgram`);
 - **search** (`SearchObject`);
-- the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
+- the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together;
+- the **long session** (`SessionOpen`, `SessionClose`): an instance and its SAP connection kept
+  for every call carrying the `state_handle` open answers, until close or the idle bound
+  ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http#held-state-and-the-long-session)).
+  Every tool declares the optional `state_handle` argument.
 
-69 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger and
+71 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger and
 background runs — those are
 `mcp-abap-adt-http`'s ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)).
 

@@ -10,6 +10,7 @@ import type {
 import {
   type AdtHeaderPairs,
   BaseMcpServer,
+  closeInstance,
   type IBackgroundRuns,
   InstanceBatch,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -30,6 +31,7 @@ import {
 } from '@mcp-abap-adt/lib/request-context';
 import {
   HeldLocks,
+  LongSession,
   STATE_UNAVAILABLE_WORDS,
   type StateLogger,
   StateUnavailableError,
@@ -519,9 +521,11 @@ export class StreamableHttpServer extends BaseMcpServer {
         state: {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
+          isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
+          longSession?: LongSession;
           adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
@@ -534,6 +538,9 @@ export class StreamableHttpServer extends BaseMcpServer {
           logger,
           ...state,
           transportCloseEndsSession: false,
+          // The pool routes a call by its `state_handle` argument: every
+          // tool declares it, so a client that sets no header can send it.
+          stateHandleArgument: true,
           // The responsible rules, once, when the instance's connection is
           // created: kept with it in the pool.
           systemContextResolver: defaultSystemContextResolver,
@@ -554,6 +561,14 @@ export class StreamableHttpServer extends BaseMcpServer {
       protected override idleStopped(): Promise<void> {
         return this.terminalClose();
       }
+
+      /**
+       * A long session's close, started by the pool once the close call's
+       * answer is written: lib's instance close, one per instance.
+       */
+      public instanceClose(): Promise<void> {
+        return closeInstance(this);
+      }
     }
     return new PerRequestServer(
       this.handlersRegistry,
@@ -562,6 +577,8 @@ export class StreamableHttpServer extends BaseMcpServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        // A handle the pool already files is drawn again.
+        isStateHandleTaken: this.pool.isHandleTaken,
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
         }),
@@ -573,6 +590,10 @@ export class StreamableHttpServer extends BaseMcpServer {
         // here is kept as state, so the write and the unlock under it reach
         // this instance (and its SAP session) by its state_handle.
         heldLocks: new HeldLocks(),
+        // The long session the model opens: held state while open, so this
+        // instance and its SAP connection serve every call carrying its
+        // state_handle.
+        longSession: new LongSession(),
         // The corrected header pairs: the process's, shared by every
         // instance.
         adtHeaderPairs: this.adtHeaderPairs,

@@ -69,11 +69,14 @@ describe('mcp-abap-adt-compact-http-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 18 tools (HandlerBatch among them), none of a background run or a leftover session', () => {
+  it('serves the read-only set: 19 tools (HandlerBatch and HandlerSession among them), none of a background run or a leftover session', () => {
     expect(shape(readOnlyToolSet)).toEqual(
       shape(compactReadOnlyToolSetOf(compactReadOnlyEntries)),
     );
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(18);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(19);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toContain(
+      'HandlerSession',
+    );
     expect(readOnlyToolSet.backgroundRuns).toBe(false);
     // The leftover-session tools are stdio's.
     expect(

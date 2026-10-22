@@ -75,40 +75,70 @@ As before 19.0.0, under the same names: `--host` / `--http-host` / `MCP_HTTP_HOS
 new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
 `mcp-abap-adt-http --help` lists them.
 
-## Held state (the debugger)
+## Held state, and the long session
 
-Every request is an MCP session of its own. A tool that holds state (a debug session, a batch)
-answers a `state_handle`; a request carrying it is routed to the instance that holds the state,
-one request at a time, and its own headers give its credential. The handle travels in the
-optional `x-mcp-state-handle` request header; without the header the pool reads a `tools/call`'s
-`state_handle` argument, as the debugger tools send it. A tool call whose handle the pool does
+Every request is an MCP session of its own, served by a new instance unless it names an instance
+that holds state. A tool that holds state — a long session, a lock, a batch, a debug session —
+answers a `state_handle`. **Send it as the `state_handle` argument** of every call that must reach
+that state: every tool of this binary declares that optional argument (the debugger tools keep
+their own declaration, required where it is required). A client that sets request headers may
+send it in the `x-mcp-state-handle` header instead; when both are sent, the header wins. Such a
+call is routed to the instance that holds the state, one request at a time, and its own headers
+give its credential. A tool call whose handle the pool does
 not know — one that never existed, or whose state ended — is answered `state is not available`
 by the pool itself, the same answer whatever the handle was, and no instance is made and nothing
 logs on for it — a JSON-RPC array holding a tool call too, one such answer per request in it with
 an `id` (an array whose tool call carries a `state_handle` argument is answered `400`); another request carrying such a handle (an `initialize`, a list) gets a new
-instance, as a request without a handle does. The handle is a bearer secret: whoever holds it reaches the state. Held state ends
-by its stop tool, the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's
+instance, as a request without a handle does. The handle is a bearer secret: whoever holds it
+reaches the state, and the server does not identify the caller. Held state ends
+by its stop tool (a long session's: `SessionClose`), the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's
 stop. See
 [the debugger guide](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
+**The long session.** `SessionOpen` keeps an instance and its SAP connection for a run of calls
+and answers `{ "state_handle": "…" }`. Every call carrying that `state_handle` runs on that
+instance, on its held SAP session: no new connection, no `systeminformation` lookup, no logoff
+between the calls. A call without it runs on a new instance, as before. Called with the handle of
+an instance that already holds state (a lock, a batch, a debug session), or of an open session,
+`SessionOpen` answers that same handle and keeps what the instance holds; called without a handle
+it opens a new instance with a handle of its own — each long session is its own instance.
+`SessionClose` with the handle answers `{ "closed": true, "held": { "locks": …, "batch": …,
+"debug_session": … } }` — what the instance held — and once that answer is written the instance
+leaves the pool and is closed: every SAP session it owns gets its logoff, which releases the locks
+taken in it; an open batch and its recorded calls are dropped unsent; nothing is undone (the
+logoff ends in SAP what the state held); the MCP server closes. From then on the handle answers
+`state is not available` at once, whether or not SAP has answered the logoffs yet; the close
+awaits each logoff's write and its answer with no timer of the server's, and the server's
+shutdown awaits a close still running. `SessionClose` without a handle, or with an unknown one,
+answers `state is not available`. A session never closed ends at the idle bound — no call on it for
+`--state-idle-minutes`: its state ends, every SAP session of the instance is logged off, and the instance leaves the pool.
+There is no list tool: the model keeps the handles it opened, and the handle is its only way back
+to its session. Both tools change nothing in the system, so `mcp-abap-adt-http-ro` serves them too;
+in batch mode they run at once and are never recorded — open leaves the batch open, close drops
+it. No stdio or SSE binary serves them: there the instance lives as long as the connection.
+
 **Locks (compact).** compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-`HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
-and reach the SAP session that holds the lock — without it they reach another instance and are
-refused, sending nothing. A request with the same credential headers works on the held
-connection; another credential retires it, and its logoff releases the lock. The hold ends at the
-`UNLOCK`.
+`HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it as
+the `state_handle` argument (or in the `x-mcp-state-handle` header) and reach the SAP session that
+holds the lock — without it they reach another instance and are refused, sending nothing. A
+request with another credential (a renewed token, a new user and password) works on the held
+connection too: the instance keeps its SAP session and the lock, and the new credential is put in
+force for its next sends; what SAP answers to that credential reaches the caller as it came. The
+hold ends at the `UNLOCK`, or with the instance (`SessionClose` of a long session, the idle bound,
+the server's stop), whose logoff releases the lock.
 
 **Batch mode.** `BatchBegin` (compact: `HandlerBatch` with `action: 'begin'`) holds state and
-answers the instance's `state_handle`: send it in `x-mcp-state-handle` on every call of the batch,
-`BatchEnd` and `BatchAnswers` included. A call without it reaches an instance where no batch is
-open. See
+answers the instance's `state_handle`: send it as the `state_handle` argument (or in
+`x-mcp-state-handle`) on every call of the batch, `BatchEnd` and `BatchAnswers` included. A call
+without it reaches an instance where no batch is open. See
 [Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md#over-streamable-http).
 
 ## Every ADT session ends with a logoff
 
 An instance logs off every ADT session it opened when it leaves the pool: a request's instance
 after its request, when it holds nothing; a pooled instance when its state ends (its stop tool,
-the idle bound). An instance whose state undo fails is kept for a retry — it has not left, and its
+the idle bound); a long session's instance at its `SessionClose`, with no undo — the logoff ends
+what it held. An instance whose state undo fails is kept for a retry — it has not left, and its
 sessions stay open — until a later undo succeeds or the server shuts down, where its sessions are
 logged off at once. (After the idle bound's stop a pooled instance's sessions are logged off even
 when the undo failed.) The logoff is what releases a lock a tool left. A client that drops its

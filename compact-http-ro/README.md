@@ -13,9 +13,13 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
   `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
-- **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode.
+- **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode;
+- **`HandlerSession`** (`action: 'open' | 'close'`): the long session — an instance and its SAP
+  connection kept for every call carrying the `state_handle` open answers, until close or the idle
+  bound ([compact-http](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)). Every tool
+  declares the optional `state_handle` argument.
 
-18 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+19 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger tools or the
 background-run tools — those are `mcp-abap-adt-compact-http`'s ([`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)).
 

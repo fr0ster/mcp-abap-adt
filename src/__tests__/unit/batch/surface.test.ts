@@ -53,7 +53,7 @@ const isCompact = (kind: ToolSetKind) =>
 
 // The spec's words (§3; BatchEnd's and BatchAnswers' answer as §5.3 and §6 have it), copied here, never imported: the test is the copy.
 const BEGIN_WORDS =
-  'Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.';
+  'Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).';
 const END_WORDS =
   "Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.";
 const ANSWERS_WORDS =

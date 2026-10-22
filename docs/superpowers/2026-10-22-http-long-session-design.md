@@ -63,13 +63,17 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
   connection, no `systeminformation` lookup, no logoff. A call without it runs as today, on a new
   instance.
 - **Close.** Runs on the instance the pool found by the handle: the close call answers, and once
-  its answer is written the pool closes that instance with the existing instance close
-  (`closeInstance`, `src/lib/instanceClose.ts`) and removes it from its index. The instance close
+  its answer is written the pool removes the instance from its index and starts the existing
+  instance close (`closeInstance`, `src/lib/instanceClose.ts`) on it, in the same tick: from then on
+  the handle answers `state is not available` at once, whether or not SAP has answered the logoffs
+  yet. The close runs on outside the pool's routing — the logoffs' answers are awaited with no timer
+  of the server's (`logoffsAnswered`), as for every instance close — and the process shutdown awaits
+  an instance close still running, as it does today. The instance close
   latches the instance (a call routed to it from then on is refused), sends the logoff of every
   connection it owns — security session and user session —, awaited to each logoff's write, which in
   SAP releases the locks the model took; drops an open batch and its answers with nothing sent; lets
   the state go (nothing undone: the logoff ended in SAP what the state held); and closes the MCP
-  server. The handle then answers `state is not available`. Close answers that the session is closed
+  server. Close answers that the session is closed
   and names what it held (locks, a batch, a debug session). Close without a handle, or with an
   unknown one, answers `state is not available`.
 - **Idle bound.** Nothing new: an open long session is held state, so the existing bound
@@ -106,7 +110,9 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
   (one connection, one `systeminformation`, no logoff in between); close answers, then the instance
   is closed — every owned connection logged off, a lock taken in the session released, an open batch
   and its answers dropped with nothing sent — and removed from the pool, and the handle is then
-  unknown; a call queued behind close is refused; open while a communication batch and while a
+  unknown; a call queued behind close is refused; with a logoff written but its answer never
+  arriving, a later call with the handle is refused at once and the shutdown still awaits that
+  close; open while a communication batch and while a
   debugger batch is open runs at once, is not recorded and leaves the batch open; two sessions opened
   one after the other get different handles and instances, and a handle drawn equal to a held one is
   drawn again; the idle bound ends an open session and logs it off.

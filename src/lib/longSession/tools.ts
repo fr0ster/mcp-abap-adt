@@ -8,7 +8,9 @@
  * - open: marks the instance's long session open — the instance then holds
  *   state, so the pool keeps it — and answers the instance's state handle.
  *   On an instance that already holds state (the call carried its handle),
- *   or a session already open, the same handle. Nothing is sent and no
+ *   or a session already open, the same handle. On an instance whose state
+ *   is ending (the idle bound's or a stop's cleanup running), `state is not
+ *   available`: an ending handle is never reopened. Nothing is sent and no
  *   connection taken.
  * - close: on the instance the call's handle reached, asks for its close and
  *   answers that the session is closed, naming what the instance held (its
@@ -40,6 +42,14 @@ export async function openLongSession(
   const state = context.state;
   if (session === undefined || state === undefined) {
     throw new ServerRefusal('long_session_unavailable');
+  }
+  // An ending state's handle is never taken up again: a new session is
+  // opened without a handle and gets a new one.
+  if (state.ending()) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: STATE_UNAVAILABLE_WORDS }],
+    };
   }
   session.open();
   return {

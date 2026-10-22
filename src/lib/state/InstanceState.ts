@@ -184,10 +184,19 @@ export class InstanceState {
       handle !== this.current ||
       !this.holdsState() ||
       // A complete stop is disposing: no call runs on a session being stopped.
-      (this.endRequested && this.disposing > 0)
+      this.ending()
     ) {
       throw new StateUnavailableError();
     }
+  }
+
+  /**
+   * Whether a complete stop (a stop tool's, the idle bound's) is disposing
+   * the state: its handle ends once it is empty, so nothing may take it up
+   * again — a long session's open included.
+   */
+  ending(): boolean {
+    return this.endRequested && this.disposing > 0;
   }
 
   /**

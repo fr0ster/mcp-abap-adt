@@ -7,7 +7,12 @@
  * clock (below); the HTTP calls run over real sockets.
  */
 
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import type {
+  HandlerContext,
+  HandlerEntry,
+  IHandlerGroup,
+} from '@mcp-abap-adt/lib/handlers';
+import type { StatePart } from '@mcp-abap-adt/lib/state';
 import { CompactLongSessionHandlersGroup } from '../../../../src/lib/compact/longSession/group';
 import { LongSessionHandlersGroup } from '../../../../src/lib/handlers/groups/LongSessionHandlersGroup';
 import { type HttpStand, httpStand, turns } from './shutdown/harness';
@@ -19,6 +24,56 @@ const placeholder = { connection: undefined } as unknown as HandlerContext;
 const NOT_AVAILABLE = 'state is not available';
 
 let s: HttpStand;
+
+/**
+ * A held part whose cleanup finishes only when the test lets it — as a
+ * debugger's stop awaits SAP: the state is ending while it runs.
+ */
+let letCleanupFinish: () => void = () => {};
+function slowPart(): StatePart {
+  let holding = true;
+  const listeners: Array<() => void> = [];
+  return {
+    holdsState: () => holding,
+    pending: () => false,
+    failures: () => [],
+    observe: (l) => {
+      listeners.push(l);
+    },
+    dispose: () =>
+      new Promise<void>((resolve) => {
+        if (!holding) {
+          resolve();
+          return;
+        }
+        letCleanupFinish = () => {
+          holding = false;
+          for (const l of listeners) l();
+          resolve();
+        };
+      }),
+  };
+}
+
+/** `HoldSlowPart`: attaches a slow-cleanup part to the instance state. */
+const slowPartGroup: IHandlerGroup = {
+  getName: () => 'slow-part',
+  registerHandlers: () => {},
+  getHandlers: (): HandlerEntry[] => [
+    {
+      toolDefinition: {
+        name: 'HoldSlowPart',
+        description: 'holds a part whose cleanup is slow',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      } as never,
+      handler: (async (context: HandlerContext, _args: unknown) => {
+        context.state?.attach(slowPart());
+        return { content: [{ type: 'text', text: 'held' }] };
+      }) as never,
+      connectionless: true,
+    },
+  ],
+} as unknown as IHandlerGroup;
 
 interface PoolInternals {
   size(): number;
@@ -67,6 +122,7 @@ beforeEach(async () => {
     groups: [
       new LongSessionHandlersGroup(placeholder),
       new CompactLongSessionHandlersGroup(placeholder),
+      slowPartGroup,
     ],
   });
   global.setTimeout = ((fn: () => void, ms?: number, ...rest: unknown[]) => {
@@ -137,4 +193,31 @@ it('a call within the bound restarts it: the session outlives the original deadl
   expect(poolSize()).toBe(0);
   const gone = await s.call('ProbeAdt', { id: 'three', state_handle: handle });
   expect(gone.text).toBe(NOT_AVAILABLE);
+});
+
+it('an ending session is never reopened: open with its handle while the expiry cleanup runs is refused; the handle then ends', async () => {
+  const handle = handleOf((await s.call('SessionOpen', {})).text);
+  const heldPart = await s.call('HoldSlowPart', { state_handle: handle });
+  expect(heldPart.isError).toBe(false);
+
+  advance(30 * MINUTE); // the bound fires; the cleanup waits
+  await settle();
+  expect(poolSize()).toBe(1);
+
+  const reopened = await s.call('SessionOpen', { state_handle: handle });
+  expect(reopened).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  const compact = await s.call('HandlerSession', {
+    action: 'open',
+    state_handle: handle,
+  });
+  expect(compact).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+
+  letCleanupFinish();
+  await settle();
+  expect(poolSize()).toBe(0);
+  const after = await s.call('SessionOpen', { state_handle: handle });
+  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  // A new session gets a new handle.
+  const fresh = await s.call('SessionOpen', {});
+  expect(handleOf(fresh.text)).not.toBe(handle);
 });

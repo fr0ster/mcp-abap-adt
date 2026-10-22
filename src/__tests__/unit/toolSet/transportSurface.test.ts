@@ -78,6 +78,14 @@ const KINDS: readonly ToolSetKind[] = [
   'compact-ro',
 ];
 
+/** The long-session tool each kind of HTTP binary serves (spec §2). */
+const SESSION_TOOL: Record<ToolSetKind, string> = {
+  core: 'SessionOpen',
+  'core-ro': 'SessionOpen',
+  compact: 'HandlerSession',
+  'compact-ro': 'HandlerSession',
+};
+
 /** Each binary's own tool set, as its command hands it to `main`. */
 const toolSets: Record<ServedTransport, Record<ToolSetKind, ToolSet>> = {
   stdio: {
@@ -338,14 +346,40 @@ describe('the schemas each binary registers (WRITE_TRANSPORT_SURFACE=1 rewrites 
     expect(httpFixture()).toEqual(read(HTTP_FIXTURE));
   });
 
+  it('every HTTP binary serves the tools of its SSE binary and its long-session tool, which no stdio or SSE binary serves', () => {
+    for (const kind of KINDS) {
+      const httpTools = http[binOf('http', kind)] ?? {};
+      const sseTools = sse[binOf('sse', kind)] ?? {};
+      const stdioTools = stdio[binOf('stdio', kind)] ?? {};
+      expect({ kind, tools: Object.keys(httpTools).sort() }).toEqual({
+        kind,
+        tools: [...Object.keys(sseTools), SESSION_TOOL[kind]].sort(),
+      });
+      for (const tool of Object.values(SESSION_TOOL)) {
+        expect(sseTools[tool]).toBeUndefined();
+        expect(stdioTools[tool]).toBeUndefined();
+      }
+    }
+  });
+
   it('on every HTTP binary every tool declares state_handle — the SSE schema plus that and nothing else; the debugger keeps its own', () => {
     for (const kind of KINDS) {
       const httpTools = http[binOf('http', kind)] ?? {};
       const sseTools = sse[binOf('sse', kind)] ?? {};
-      expect(Object.keys(httpTools).sort()).toEqual(
-        Object.keys(sseTools).sort(),
-      );
       for (const [name, schema] of Object.entries(httpTools)) {
+        if (name === SESSION_TOOL[kind]) {
+          // HTTP's own: declared like every other tool, optional.
+          expect({
+            name,
+            state_handle: schema.properties?.state_handle,
+            required: (schema.required ?? []).includes('state_handle'),
+          }).toEqual({
+            name,
+            state_handle: { type: 'string', description: STATE_HANDLE_WORDS },
+            required: false,
+          });
+          continue;
+        }
         const before = sseTools[name] as Schema;
         if (before.properties?.state_handle !== undefined) {
           // Declared by the tool itself: kept as it is, requiredness included.

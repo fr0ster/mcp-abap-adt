@@ -52,7 +52,8 @@ export type FailureCode =
   | 'batch_no_timeout'
   | 'batch_ended'
   | 'batch_parts_mismatch'
-  | 'batch_unsplit';
+  | 'batch_unsplit'
+  | 'long_session_unavailable';
 
 /**
  * A failure as it was read: the fields of the failure answer, and the chain's

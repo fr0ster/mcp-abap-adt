@@ -49,7 +49,7 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../lib/batch/availability.js';
-import { endsBatch, isBatchTool } from '../lib/batch/batchTools.js';
+import { endsBatch, runsBesideBatch } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
 import { batchRefusal, endWithFailure } from '../lib/batch/execute.js';
 import type {
@@ -137,8 +137,8 @@ import {
   type StateLogger,
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
+import type { LongSession } from '../lib/state/longSession.js';
 import {
-  declaresStateHandle,
   withoutStateHandle,
   withStateHandle,
 } from '../lib/state/stateHandleArgument.js';
@@ -315,6 +315,9 @@ export abstract class BaseMcpServer extends McpServer {
   /** The locks this instance holds between requests (`heldLocks` option). */
   protected readonly heldLocks: HeldLocks | undefined;
 
+  /** The instance's long session (`longSession` option). */
+  protected readonly longSession: LongSession | undefined;
+
   /** Whether every tool declares `state_handle` (`stateHandleArgument` option). */
   private readonly stateHandleArgument: boolean;
 
@@ -380,6 +383,15 @@ export abstract class BaseMcpServer extends McpServer {
      */
     heldLocks?: HeldLocks;
     /**
+     * The long session of this instance, created by a host whose instances
+     * last one request each (Streamable HTTP) for this instance alone: held
+     * state while open, so the host keeps the instance and its SAP
+     * connection for the calls that carry its handle. Absent: the session
+     * tools answer `long_session_unavailable` (stdio, SSE: the instance
+     * keeps its session).
+     */
+    longSession?: LongSession;
+    /**
      * The corrected request header pairs of the systems the process talks
      * to, created by the host and shared by its instances: a pair SAP
      * answered `406`/`415` to, corrected, is sent from then on to that
@@ -429,6 +441,8 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.batch !== undefined) this.state.attach(this.batch);
     this.heldLocks = options.heldLocks;
     if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
+    this.longSession = options.longSession;
+    if (this.longSession !== undefined) this.state.attach(this.longSession);
     this.stateHandleArgument = options.stateHandleArgument === true;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     this.systemType = options.systemType;
@@ -1422,6 +1436,9 @@ export abstract class BaseMcpServer extends McpServer {
                 ...(this.heldLocks !== undefined
                   ? { heldLocks: this.heldLocks }
                   : {}),
+                ...(this.longSession !== undefined
+                  ? { longSession: this.longSession }
+                  : {}),
                 ...(this.systemType !== undefined
                   ? { systemType: this.systemType }
                   : {}),
@@ -1599,14 +1616,16 @@ export abstract class BaseMcpServer extends McpServer {
           // the tool declares none of its own: the argument routes the call
           // (the pool) and reaches no handler — the handler gets the
           // arguments it got before.
-          const declared =
-            this.stateHandleArgument &&
-            !declaresStateHandle(entry.toolDefinition.inputSchema);
-          const inputSchema = declared
+          // `declared`: the declaration was added — a schema that declares
+          // its own, or one it cannot extend, is registered as it is and
+          // its arguments reach the handler as they came.
+          const withHandle = this.stateHandleArgument
             ? (withStateHandle(
                 entry.toolDefinition.inputSchema,
               ) as typeof entry.toolDefinition.inputSchema)
             : entry.toolDefinition.inputSchema;
+          const declared = withHandle !== entry.toolDefinition.inputSchema;
+          const inputSchema = withHandle;
 
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
@@ -1652,7 +1671,7 @@ export abstract class BaseMcpServer extends McpServer {
             entry.toolDefinition.name,
             {
               description:
-                sentenced && !isBatchTool(entry.toolDefinition.name)
+                sentenced && !runsBesideBatch(entry.toolDefinition.name)
                   ? withBatchSentence(
                       entry.toolDefinition.description,
                       entry.toolDefinition.name,
@@ -1675,13 +1694,14 @@ export abstract class BaseMcpServer extends McpServer {
   }
   /**
    * Whether a call of `tool` meets an open batch: a batch is open and `tool`
-   * is not one of the batch tools.
+   * is neither a batch tool nor a long-session tool — those run beside it,
+   * at once, never recorded (`runsBesideBatch`).
    */
   private batchOpenFor(tool: string): boolean {
     return (
       this.batch !== undefined &&
       this.batch.mode() !== 'off' &&
-      !isBatchTool(tool)
+      !runsBesideBatch(tool)
     );
   }
 
@@ -1968,6 +1988,9 @@ export abstract class BaseMcpServer extends McpServer {
         debugger: () => this.debuggerFor(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
         ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
+        ...(this.longSession !== undefined
+          ? { longSession: this.longSession }
+          : {}),
         ...(this.systemType !== undefined
           ? { systemType: this.systemType }
           : {}),
@@ -2506,7 +2529,8 @@ export abstract class BaseMcpServer extends McpServer {
     const described = (registerArgs: unknown[]): unknown[] => {
       if (this.batch === undefined) return registerArgs;
       const name = registerArgs[0];
-      if (typeof name !== 'string' || isBatchTool(name)) return registerArgs;
+      if (typeof name !== 'string' || runsBesideBatch(name))
+        return registerArgs;
       const sentence = OUTSIDE_BATCH_SENTENCE;
       const second = registerArgs[1];
       const appended = (description: string) =>

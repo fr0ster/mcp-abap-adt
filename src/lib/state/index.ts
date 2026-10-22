@@ -20,3 +20,4 @@ export {
 export * from './heldLocks';
 export * from './InstanceState';
 export * from './idleBound';
+export * from './longSession';

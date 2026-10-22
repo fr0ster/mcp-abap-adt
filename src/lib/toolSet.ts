@@ -13,16 +13,22 @@
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
- * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff |
- * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff |
- * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`, `HandlerDebugBatch`; on stdio the leftover-session list and logoff |
- * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, `HandlerBatch`; on stdio the leftover-session list and logoff |
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen` |
+ * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen` |
+ * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`, `HandlerDebugBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
+ * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, `HandlerBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
  *
  * **The leftover-session tools are stdio's**: the
  * runtime session files exist for stdio, where the process serves one user.
  * An http or sse server holds many sessions of different users: it writes no
  * session file, and none of its binaries lists a leftover-session tool — the
  * transport a set is served on is the one dimension beside the kind.
+ *
+ * **The long-session tools are Streamable HTTP's**: its instances last one
+ * request each unless they hold state, and the model keeps one — with its SAP
+ * connection — by opening a long session. stdio and SSE keep their instance
+ * between calls, and none of their binaries lists a session tool. Every kind
+ * serves it, the `-ro` ones included: it changes nothing in the system.
  *
  * No `-ro` set serves the debugger or a background run. No set serves a
  * resume of a leftover session: a stdio process is born on the one leftover
@@ -43,6 +49,7 @@ import {
   type CompactEntryBuilder,
   CompactHandlersGroup,
 } from './compact/group';
+import { CompactLongSessionHandlersGroup } from './compact/longSession/group';
 import { CompactLeftoverSessionHandlersGroup } from './compact/session/group';
 import type { RemovedParameter } from './config/authParameters';
 import {
@@ -54,6 +61,7 @@ import {
 import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
 import { LeftoverSessionHandlersGroup } from './handlers/groups/LeftoverSessionHandlersGroup.js';
+import { LongSessionHandlersGroup } from './handlers/groups/LongSessionHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './handlers/groups/SystemHandlersGroup.js';
@@ -114,6 +122,20 @@ export function registryOf(
 const servesLeftoverSessions = (transport: ServedTransport): boolean =>
   transport === 'stdio';
 
+/**
+ * The long session is Streamable HTTP's: its instances last one request each
+ * unless they hold state, and the model keeps one by opening a long session.
+ * stdio and SSE keep their instance between calls.
+ */
+const servesLongSession = (transport: ServedTransport): boolean =>
+  transport === 'http';
+
+/** The help line of the long session, on Streamable HTTP only. */
+const longSessionLine = (
+  transport: ServedTransport,
+  line: string,
+): readonly string[] => (servesLongSession(transport) ? [line] : []);
+
 /** The help line of the leftover sessions, on stdio only. */
 const leftoverLine = (
   transport: ServedTransport,
@@ -152,6 +174,10 @@ const BATCH_LINE =
   'batch mode: BatchBegin, BatchEnd, BatchAnswers — independent calls recorded, sent together in envelopes, answered by number';
 const COMPACT_BATCH_LINE =
   "batch mode: HandlerBatch (action 'begin', 'end', 'answers') — independent calls recorded, sent together in envelopes, answered by number";
+const LONG_SESSION_LINE =
+  'the long session: SessionOpen — the server instance and its SAP connection kept for the calls that carry its state_handle';
+const COMPACT_LONG_SESSION_LINE =
+  "the long session: HandlerSession (action 'open') — the server instance and its SAP connection kept for the calls that carry its state_handle";
 const DEBUG_LINE =
   'debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user';
 const DEBUG_BATCH_LINE =
@@ -182,6 +208,7 @@ export const fullToolSet: ToolSet = {
         ),
         'background runs of RuntimeRunClass and RuntimeRunProgram: read, list, discard',
         BATCH_LINE,
+        ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
         ['The readonly tools alone', 'core-ro'],
@@ -204,6 +231,10 @@ export const fullToolSet: ToolSet = {
     // Batch mode, on every transport; the debugger batch beside the debugger.
     new BatchHandlersGroup(context),
     new DebugBatchHandlersGroup(context),
+    // The long session, on Streamable HTTP alone.
+    ...(servesLongSession(transport)
+      ? [new LongSessionHandlersGroup(context)]
+      : []),
   ],
 };
 
@@ -227,6 +258,7 @@ export const fullReadOnlyToolSet: ToolSet = {
           'the leftover SAP sessions of an ended process: list, log off',
         ),
         BATCH_LINE,
+        ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
         ['The write, debugger and background-run tools', 'core'],
@@ -244,6 +276,9 @@ export const fullReadOnlyToolSet: ToolSet = {
       ? [new LeftoverSessionHandlersGroup(context)]
       : []),
     new BatchHandlersGroup(context),
+    ...(servesLongSession(transport)
+      ? [new LongSessionHandlersGroup(context)]
+      : []),
   ],
 };
 
@@ -287,6 +322,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
           ),
           'background runs of HandlerProfileRun: read, list, discard',
           COMPACT_BATCH_LINE,
+          ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [
           ['The compact tools that change nothing', 'compact-ro'],
@@ -305,6 +341,9 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
         ? [new CompactLeftoverSessionHandlersGroup(context)]
         : []),
       new CompactBatchHandlersGroup(context),
+      ...(servesLongSession(transport)
+        ? [new CompactLongSessionHandlersGroup(context)]
+        : []),
     ],
   };
 }
@@ -333,6 +372,7 @@ export function compactReadOnlyToolSetOf(
             'the leftover SAP sessions of an ended process: list, log off',
           ),
           COMPACT_BATCH_LINE,
+          ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [
           ['All compact tools, the debugger and background runs', 'compact'],
@@ -346,6 +386,9 @@ export function compactReadOnlyToolSetOf(
         ? [new CompactLeftoverSessionHandlersGroup(context)]
         : []),
       new CompactBatchHandlersGroup(context),
+      ...(servesLongSession(transport)
+        ? [new CompactLongSessionHandlersGroup(context)]
+        : []),
     ],
   };
 }

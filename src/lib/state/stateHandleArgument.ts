@@ -20,6 +20,9 @@ const isZodType = (value: unknown): boolean =>
 /** The object of a JSON Schema's `properties`, or the zod raw shape itself. */
 function fieldsOf(inputSchema: unknown): Record<string, unknown> | undefined {
   if (!inputSchema || typeof inputSchema !== 'object') return undefined;
+  // A zod schema itself (a `z.object`): its `type` is zod's, not JSON
+  // Schema's, and it is not extended here.
+  if (isZodType(inputSchema)) return undefined;
   const schema = inputSchema as Record<string, unknown>;
   if (schema.type === 'object') {
     return (schema.properties ?? {}) as Record<string, unknown>;

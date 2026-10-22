@@ -22,6 +22,28 @@ export function isBatchTool(tool: string): boolean {
   return LISTED.has(tool);
 }
 
+/**
+ * The long-session tools (Streamable HTTP, #308 spec §2): served while a
+ * batch is open, at once, never recorded — as the batch tools — and the
+ * batch stays open.
+ */
+export const LONG_SESSION_TOOLS: readonly string[] = [
+  'SessionOpen',
+  'SessionClose',
+  'HandlerSession',
+];
+
+const SESSION_LISTED = new Set(LONG_SESSION_TOOLS);
+
+/**
+ * Whether a call of `tool` runs beside an open batch — at once, never
+ * recorded, its description carrying no batch sentence: a batch tool or a
+ * long-session tool.
+ */
+export function runsBesideBatch(tool: string): boolean {
+  return LISTED.has(tool) || SESSION_LISTED.has(tool);
+}
+
 /** Whether `args` ask for numbers: `number` or `numbers` given. */
 export function asksNumbers(args: unknown): boolean {
   if (args === null || typeof args !== 'object') return false;

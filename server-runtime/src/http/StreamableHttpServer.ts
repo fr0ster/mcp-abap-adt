@@ -30,6 +30,7 @@ import {
 } from '@mcp-abap-adt/lib/request-context';
 import {
   HeldLocks,
+  LongSession,
   STATE_UNAVAILABLE_WORDS,
   type StateLogger,
   StateUnavailableError,
@@ -523,6 +524,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
+          longSession?: LongSession;
           adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
@@ -579,6 +581,10 @@ export class StreamableHttpServer extends BaseMcpServer {
         // here is kept as state, so the write and the unlock under it reach
         // this instance (and its SAP session) by its state_handle.
         heldLocks: new HeldLocks(),
+        // The long session the model opens: held state while open, so this
+        // instance and its SAP connection serve every call carrying its
+        // state_handle.
+        longSession: new LongSession(),
         // The corrected header pairs: the process's, shared by every
         // instance.
         adtHeaderPairs: this.adtHeaderPairs,

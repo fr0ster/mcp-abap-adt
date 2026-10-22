@@ -82,9 +82,21 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the environment (`SAP_DEBUG_TERMINAL_ID`). Random per instance when none is stated | `<terminal id>` |
 | `x-sap-debug-ide-id` | No | The debugger's IDE id; same order. The system keys its listener conflict by it: a shared IDE id means shared catches and no conflict ([Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one)) | `<IDE id>` |
 | `x-sap-debug-breakpoint-conflict` | No | `replace` or `refuse-if-held` ([Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)); wins over the destination's `.env` and the environment | `refuse-if-held` |
-| `x-mcp-state-handle` | No (Streamable HTTP) | The `state_handle` of the instance that holds state: send the one `BatchBegin` answers on every call of the batch, `BatchEnd` and `BatchAnswers` included ([Batch Mode](BATCH_MODE.md#over-streamable-http)). It comes first; without it a `tools/call`'s `state_handle` argument routes, as the debugger tools send it. A bearer secret | `<state_handle>` |
+| `x-mcp-state-handle` | No (Streamable HTTP) | The `state_handle` of the instance that holds state (a long session, a lock, a batch, a debug session), for a client that sets headers: the alternative to the `state_handle` argument every tool declares on the Streamable HTTP binaries, which is how a model sends it. When both are sent, the header wins. A bearer secret | `<state_handle>` |
 
 \* A request (SSE: the opening `GET`) must carry `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password`; without them it is answered `400`. `x-mcp-destination` is answered `400`.
+
+**Held state over Streamable HTTP.** Each request is served by a new instance unless it carries
+the `state_handle` of one that holds state. A tool that holds state answers its `state_handle`;
+send it as the `state_handle` argument of every call that needs that state — every tool of
+`mcp-abap-adt-http`, `-http-ro`, `-compact-http` and `-compact-http-ro` declares that optional
+argument — or in the `x-mcp-state-handle` header. To keep one SAP session for a run of calls, open
+a long session (`SessionOpen`; compact `HandlerSession` `action: 'open'`), pass its `state_handle`
+on every call, and close it (`SessionClose`; `action: 'close'`), which logs the session off and
+releases its locks; a session never closed ends at the idle bound (`--state-idle-minutes`). The
+model keeps its handles: there is no list tool. See
+[`@mcp-abap-adt/http`](../../http/README.md#held-state-and-the-long-session) and
+[Batch Mode](BATCH_MODE.md#over-streamable-http).
 
 **Notes:**
 - For a token that is renewed for you, use a destination with browser login on `mcp-abap-adt` (stdio, below), not a header.

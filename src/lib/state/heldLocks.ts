@@ -50,9 +50,11 @@ export class HeldLocks implements StatePart, HeldLockPort {
   }
 
   /**
-   * The instance's SAP session ended — its connection retired for another
-   * credential, or replaced after SAP lost the session: the locks it held
-   * went with it, and are held no more.
+   * The instance's SAP session ended — SAP ended it (a timeout, a logoff,
+   * an administrator) and the connection was replaced: the locks it held
+   * went with it, and are held no more. Another credential does not end it:
+   * the held connection takes that credential over and keeps its session
+   * and its locks (`BaseMcpServer.getConnection`).
    */
   mainSessionEnded(): void {
     this.generation += 1;

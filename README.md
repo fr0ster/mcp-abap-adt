@@ -97,7 +97,7 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only.
+Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only; over Streamable HTTP `state_handle` is an argument of every tool, and a long session keeps one SAP session across calls.
 Coming from 18.x? See the [19.0 migration note](docs/MIGRATION-19.0.md) — the server split into a
 package per transport and tool set, the system type required, the low set gone, the auth chain on
 6.0. Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
@@ -247,8 +247,8 @@ the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. Every tool's description ends with
 one sentence saying how it behaves in batch mode: recordable, recordable for the arguments it
-names, or run outside batch mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
-`x-mcp-state-handle` request header on every call of the batch. See
+names, or run outside batch mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers as the
+`state_handle` argument (or in the `x-mcp-state-handle` request header) on every call of the batch. See
 [Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
 
 ## Registries
@@ -281,6 +281,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
 - **🐞 Debugger** (in `mcp-abap-adt`, `-http`, `-sse` and the compact write binaries; in no `-ro` binary): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named): where that must not be possible, install a `-ro` binary. See [Debugger](docs/user-guide/DEBUGGER.md)
+- **🔗 Long session over Streamable HTTP** (`mcp-abap-adt-http`, `-compact-http` and their `-ro`): every tool takes an optional `state_handle` argument that routes the call to the instance holding that state (a lock, a batch, a debug session); `SessionOpen` / `SessionClose` (compact: `HandlerSession`) keep one instance and its SAP session for a run of calls and log it off at the close, or at the idle bound. See [`@mcp-abap-adt/http`](http/README.md#held-state-and-the-long-session)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
@@ -314,7 +315,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
-- **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only
+- **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only; Streamable HTTP: held state by the `state_handle` argument, and the long session
 - **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end
 - **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint
 - **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible

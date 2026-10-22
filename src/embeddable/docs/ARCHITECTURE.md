@@ -477,11 +477,26 @@ await server.start(); // standalone, or registers its routes on `app` (registerR
 
   A new `StreamableHTTPServerTransport` then serves the request on an instance from the pool.
 - **The instance pool.** A request without a `state_handle` gets an instance of its own. One that
-  names a `state_handle` is routed to the instance holding that state. An instance is kept while
+  names a `state_handle` — in the `x-mcp-state-handle` header, else a `tools/call`'s
+  `state_handle` argument — is routed to the instance holding that state. An instance is kept while
   it holds state and disposed when it no longer does. It goes back to the pool only after
-  `idle()`.
+  `idle()`. Each handle is unique among those the pool holds.
+- **The declared `state_handle`.** Each instance is built with `stateHandleArgument: true`: every
+  tool's input schema gets an optional string `state_handle` (a tool declaring its own keeps it),
+  taken out of the arguments before a handler that did not declare it. **A tool registered with a
+  whole `z.object(...)` schema gets no declared `state_handle`** — the schema is registered as it
+  is, so a model cannot send the handle to it: register your tool with a JSON Schema
+  `inputSchema` or a raw zod shape.
+- **The long session.** Each instance carries a `LongSession` state part; the tool sets of
+  `@mcp-abap-adt/lib/tool-set` give the `http` transport `SessionOpen` / `SessionClose` (compact:
+  `HandlerSession`; `streamableHttpSurface` lists what HTTP adds). Open holds the instance in the pool; once a close call's answer is
+  written the pool takes the instance out of its index and runs lib's `closeInstance` on it (every
+  owned connection logged off — awaited to the logoff's answer, no timer —, an open batch dropped,
+  the MCP server closed), outside its routing; `stop()` and the shutdown await a close still
+  running.
 - **Leaving the pool.** An instance that leaves the pool — nothing held after its request, its
-  stop tool, the idle bound, shutdown — goes through the awaited `dispose()` and then the terminal
+  stop tool, the idle bound, shutdown; a long session's close is the instance close above —
+  goes through the awaited `dispose()` and then the terminal
   close. One whose undo failed is kept for a retry (it has not left); when it leaves, the terminal
   close runs whatever the retry answered. After the idle bound's stop a pooled instance's
   connections are closed even when the undo failed.

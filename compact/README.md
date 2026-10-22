@@ -33,9 +33,22 @@ write (`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). A batch ho
 request — LOCK, UNLOCK or stateless, as its first recorded call decides; a call of another kind is
 refused `batch_other_kind`: record it in the next batch. Every tool's description ends with one sentence saying how it behaves
 in batch mode: recordable, recordable for the arguments it names, or run outside batch mode. Over Streamable HTTP send the
-`state_handle` `action: 'begin'` answers in the `x-mcp-state-handle` header on every call of the
-batch. See
+`state_handle` `action: 'begin'` answers as the `state_handle` argument (or in the
+`x-mcp-state-handle` header) on every call of the batch. See
 [Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md).
+
+**The long session: `HandlerSession`, Streamable HTTP only.** `mcp-abap-adt-compact-http` and
+`mcp-abap-adt-compact-http-ro` serve one more tool, and declare an optional `state_handle` argument
+on every tool: over Streamable HTTP each request is served by a new instance unless it carries the
+`state_handle` of one that holds state. `HandlerSession` `action: 'open'` keeps an instance and its
+SAP connection for every call that carries the `state_handle` it answers (no new connection, no
+logoff between the calls); `action: 'close'` with that handle answers what the instance held
+(`{ "closed": true, "held": { "locks", "batch", "debug_session" } }`), then logs off every SAP
+session the instance owns — which releases its locks — and drops an open batch unsent; the handle
+then answers `state is not available`. A session never closed ends at the idle bound
+(`--state-idle-minutes`, default 30). The model keeps its handles: there is no list tool. The stdio
+and SSE binaries keep their instance for the connection's life and serve neither:
+[compact-http](https://www.npmjs.com/package/@mcp-abap-adt/compact-http).
 
 ## Why two library packages
 

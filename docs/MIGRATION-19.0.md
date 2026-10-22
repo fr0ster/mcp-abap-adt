@@ -571,6 +571,8 @@ design. Send a long run to the background where the tool offers it.
   end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP the `state_handle`
   carries it**: compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
   `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+  (from 20.0.0 also as the `state_handle` argument every tool declares:
+  [MIGRATION-20.0](MIGRATION-20.0.md#streamable-http-held-state-by-argument-and-the-long-session))
   and reach the SAP session that holds the lock — without it they reach another instance and are
   refused, sending nothing. A request on the handle works on the held connection with its own
   credential — a renewed token or a new basic pair is the same user: its sends carry it in the same
@@ -1151,7 +1153,8 @@ transport's options only:
   sets' `Update<Type>` keep their chains.
 
   **Over Streamable HTTP**, `HandlerLock`'s answer now carries a `state_handle`: send it in the
-  `x-mcp-state-handle` header with `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock — without
+  `x-mcp-state-handle` header (from 20.0.0 also as the `state_handle` argument:
+  [MIGRATION-20.0](MIGRATION-20.0.md#streamable-http-held-state-by-argument-and-the-long-session)) with `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock — without
   it they are refused, sending nothing ("lock_handle is not held by this instance …"). A request
   on the handle works on the pooled instance's held SAP session with that request's credential: a
   renewed token or a new basic pair is the same user, and the locks stay held; a credential that is

@@ -53,15 +53,30 @@ reach into the connection's session.
   logoff ends it (a logoff releases the session's locks). Over Streamable HTTP every
   request is an MCP session of its own, so the `state_handle` carries the chain:
   compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-  `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+  `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it as
+  the `state_handle` argument (every tool of the Streamable HTTP binaries declares it; or in the
+  `x-mcp-state-handle` header, which wins when both are sent)
   and reach the SAP session that holds the lock — without it they reach another instance and are
   refused, sending nothing. A request on the handle works on the held connection with its own
   credential: a changed credential (a renewed token, a new basic pair) is the same user, its sends
   carry the new credential in the same SAP session, and the locks stay held; a credential that is
   not right is SAP's to answer, and its refusal reaches the caller as it came. The connection is
   replaced only when SAP ended the session (a timeout, a logoff, an administrator), and the
-  instance then holds that session's locks no more. The hold ends at the `UNLOCK`. Compact `HandlerUpdate` is the write alone and
+  instance then holds that session's locks no more. The hold ends at the `UNLOCK`, or with the
+  instance's logoff (a long session's close, the idle bound). Compact `HandlerUpdate` is the write alone and
   always takes the `lock_handle`.
+- **The long session (Streamable HTTP)**: `SessionOpen` (compact `HandlerSession`
+  `action: 'open'`) holds the instance in the pool and answers its `state_handle`; every call
+  carrying it runs on that instance's connection, in its one main flow — one SAP session, one
+  `systeminformation` lookup, no logoff between the calls; the calls stay stateless except a
+  lock's `LOCK` and `UNLOCK`, as on stdio. Opened on an instance that already holds state, it
+  answers that instance's handle. `SessionClose` (`action: 'close'`) answers what the instance
+  held, then the pool takes it out of its index and runs the instance close: every connection it
+  owns logged off — awaited to each logoff's answer, no timer — which releases its locks, an open
+  batch dropped unsent, the MCP server closed; the handle then answers `state is not available`.
+  A session never closed ends at the idle bound: its state ends and every connection of the
+  instance is logged off. Each long session is its own instance
+  with its own handle; the model keeps its handles (no list tool).
 - **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call
   runs to its end; no logoff, no new session. The client's close (stdio, SSE) and the
   process shutdown log the instance's sessions off at once — the locks go with them —

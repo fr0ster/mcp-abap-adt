@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/http",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-http",
-  "version": "19.2.0",
+  "version": "20.0.0",
   "description": "The Streamable HTTP transport of the MCP ABAP ADT server: an Express app serving the ADT tools of @mcp-abap-adt/lib over MCP Streamable HTTP, with DNS rebinding protection and TLS.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -64,10 +64,10 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^19.2.0",
-    "@mcp-abap-adt/lib": "^19.2.0",
-    "@mcp-abap-adt/responsible-rules": "^19.2.0",
-    "@mcp-abap-adt/server-runtime": "^19.2.0"
+    "@mcp-abap-adt/background-runs-memory": "^20.0.0",
+    "@mcp-abap-adt/lib": "^20.0.0",
+    "@mcp-abap-adt/responsible-rules": "^20.0.0",
+    "@mcp-abap-adt/server-runtime": "^20.0.0"
   },
   "devDependencies": {
     "@types/express": "*",

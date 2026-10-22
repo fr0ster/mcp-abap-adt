@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/responsible-rules",
-  "version": "19.2.0",
+  "version": "20.0.0",
   "description": "The rules of the MCP ABAP ADT servers that name a call's responsible, user and system: a SystemContextRules of @mcp-abap-adt/lib making each connection's parameters from its systeminformation by the system kind, and the system type the transports require.",
   "license": "Apache-2.0",
   "publishConfig": {
@@ -47,10 +47,10 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@mcp-abap-adt/lib": "^19.2.0"
+    "@mcp-abap-adt/lib": "^20.0.0"
   },
   "devDependencies": {
-    "@mcp-abap-adt/lib": "^19.2.0",
+    "@mcp-abap-adt/lib": "^20.0.0",
     "@types/jest": "*",
     "@types/node": "*",
     "typescript": "*"

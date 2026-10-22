@@ -62,28 +62,27 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
 - **Calls.** A call carrying the handle runs on that instance, on its held SAP connection: no new
   connection, no `systeminformation` lookup, no logoff. A call without it runs as today, on a new
   instance.
-- **Close.** Ends the instance's held state the way the idle bound does — `endWhenEmpty()`, then
-  `dispose()` of every part — and logs the SAP session off (`terminalClose()`); the pool evicts the
-  instance and the handle rotates (the old one answers `state is not available`). Whatever else the
-  instance held ends with it: a lock is released by the logoff, a batch is dropped with nothing
-  sent, its kept answers are dropped, a debug session is ended. Close answers what it ended. Close
-  without a handle, or with an unknown one, answers `state is not available`.
-- **Close when a part's cleanup fails or is still finishing.** Close runs the idle bound's own stop
-  (`InstanceState.expire`'s steps, one function for both) and inherits its contract: the terminal
-  close of the instance's connections runs whatever the disposal answered, so a failed cleanup never
-  keeps a SAP session or a lock open; a part whose cleanup failed (a debugger whose cleanup threw)
-  or is still finishing (a pending AMDP cleanup) stays held, so the instance stays in the pool and the
-  handle stays routable. Close then answers that the state did not end, naming the failed parts, and
-  calling close again with the same handle retries the cleanup; the idle bound retries it as well.
-  A call queued on the instance behind close runs after it; any other call on such an instance opens
-  a new SAP session, as on a new instance.
+- **Close.** Runs on the instance the pool found by the handle: the close call answers, and once
+  its answer is written the pool closes that instance with the existing instance close
+  (`closeInstance`, `src/lib/instanceClose.ts`) and removes it from its index. The instance close
+  latches the instance (a call routed to it from then on is refused), sends the logoff of every
+  connection it owns — security session and user session —, awaited to each logoff's write, which in
+  SAP releases the locks the model took; drops an open batch and its answers with nothing sent; lets
+  the state go (nothing undone: the logoff ended in SAP what the state held); and closes the MCP
+  server. The handle then answers `state is not available`. Close answers that the session is closed
+  and names what it held (locks, a batch, a debug session). Close without a handle, or with an
+  unknown one, answers `state is not available`.
 - **Idle bound.** Nothing new: an open long session is held state, so the existing bound
   (`--state-idle-minutes`, default 30) arms between calls; at expiry the SAP session is logged off
   and the instance leaves the pool.
 - **Batch mode.** The session tools run at once, never recorded: while a communication batch or a
   debugger batch is open they bypass batch recording and its refusal of connectionless tools, the
   way the batch's own control tools do; open neither ends nor flushes the batch. Closing a session
-  while a batch is open drops the batch as described under Close.
+  while a batch is open drops the batch, as the instance close does.
+- **One handle, one long session.** Each long session is its own instance with its own handle: a
+  handle is minted unique among the handles the pool holds (a drawn value already held is drawn
+  again), at the instance's creation and at every rotation, so two long sessions never share a
+  handle or an instance.
 - **No list tool.** The model keeps the handles it opened; the handle is its only link to its long
   session, and nothing on the server tells it which sessions it opened. The handle is a bearer
   secret and the server does not identify the caller, so there is nothing to list by.
@@ -104,13 +103,13 @@ Answers `docs/superpowers/2026-10-22-http-long-session-goal.md` (issue #308).
 - Pool, over a real HTTP server: Lock → Update → Unlock with the handle only as an argument, no
   header; the refusal names the argument.
 - Long session: open answers a handle; calls carrying it reuse the instance and its SAP connection
-  (one connection, one `systeminformation`, no logoff in between); close evicts and logs off and the
-  handle is then unknown; close with a lock held releases it (logoff) and evicts; open while a
-  communication batch and while a debugger batch is open runs at once, is not recorded and leaves
-  the batch open; close while a batch is open, or with answers kept, drops them, logs off and evicts;
-  close with a debugger cleanup that throws, and with a pending AMDP cleanup: the connections are
-  closed, close answers the state did not end, the handle still routes, a second close retries, and
-  a call queued behind close runs after it; the idle bound ends an open session and logs it off.
+  (one connection, one `systeminformation`, no logoff in between); close answers, then the instance
+  is closed — every owned connection logged off, a lock taken in the session released, an open batch
+  and its answers dropped with nothing sent — and removed from the pool, and the handle is then
+  unknown; a call queued behind close is refused; open while a communication batch and while a
+  debugger batch is open runs at once, is not recorded and leaves the batch open; two sessions opened
+  one after the other get different handles and instances, and a handle drawn equal to a held one is
+  drawn again; the idle bound ends an open session and logs it off.
 - Load-bearing: each test goes red with its rule removed.
 - Live (on the owner's go, one system): a compact HTTP scenario through the long session, SAP
   requests per call counted with `DEBUG_HTTP_WIRE`.

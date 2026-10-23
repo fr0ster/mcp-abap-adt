@@ -6,12 +6,12 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "20.0.0",
+  "version": "20.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact-http-ro",
-      "version": "20.0.0",
+      "version": "20.1.0",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:{MCP_HTTP_PORT}/mcp/stream/http",

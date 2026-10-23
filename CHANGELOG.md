@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [20.1.0] - 2026-10-23
+
+Both ABAP Unit runners, chosen per call with `runner: 'async' | 'sync'` ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286), [#313](https://github.com/fr0ster/mcp-abap-adt/pull/313)); a write whose cleanup UNLOCK fails says the object may be left locked, and a save refused by `CTS_WBO_API` 019 / 020 names the request that holds the object ([#314](https://github.com/fr0ster/mcp-abap-adt/issues/314), [#316](https://github.com/fr0ster/mcp-abap-adt/pull/316)); on `@mcp-abap-adt/connection` 19.1.0, which resends a request lost on a dead kept-alive socket once on a new connection (#314's `socket hang up`); the 7-day release age dropped ([#315](https://github.com/fr0ster/mcp-abap-adt/pull/315)). The eighteen packages are all at 20.1.0, every sibling range at `^20.1.0` — `@mcp-abap-adt/compact-modify` needs `@mcp-abap-adt/lib` 20.1.0 for `runner` on `HandlerUnitTestRun`.
 
 ### Added
 
@@ -19,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The generated tool pages show a parameter written as a reference with its type and default** (`tools/generate-tools-docs.js`): `part`, `timeout`, `runner` and the like were listed as `any`; the type and default now come from the build, as the description already did.
 - **Dependency: `@mcp-abap-adt/adt-clients` `^37.2.0`** (`@mcp-abap-adt/lib`): `runSync` on the class, report, function group and function module test runners.
+- **Dependency: `@mcp-abap-adt/connection` `^19.1.0`** (`@mcp-abap-adt/lib`, `server-runtime`; was `^19.0.0`): a request lost on a dead kept-alive socket — one taken from the pool whose socket ended with no byte of an answer read (`ECONNRESET`, `EPIPE`) — is sent once more on a new connection with the same cookies, session headers, CSRF token and body, so the cleanup UNLOCK of [#314](https://github.com/fr0ster/mcp-abap-adt/issues/314), which failed with `socket hang up` and left the enqueue lock with the session, now reaches SAP; `https:` keeps its sockets alive too (an idle pooled socket closed after 5 s); the logoff goes out on a connection of its own. Never resent: a request that read any byte of an answer, one on a socket opened for it, the logoff, the resend itself. The tree still holds one `@mcp-abap-adt/sap-rfc-lite`, 0.3.2.
+- **Sibling ranges at `^20.1.0`** in every manifest — `dependencies`, `peerDependencies` and `devDependencies`; `@mcp-abap-adt/compact-modify`'s peer `@mcp-abap-adt/lib` included: `HandlerUnitTestRun`'s `runner` is read by lib 20.1.0, and against lib 20.0.0 it would be ignored.
 - **The 7-day release age is dropped.** `.npmrc` no longer sets `min-release-age=7` or `min-release-age-exclude[]=@mcp-abap-adt/*`. The age gate conflicted with the gating `npm audit`: a security fix younger than the gate could not be installed while the audit blocked CI (seen 2026-10-22 with markdown-it 14.3.3). The defences that stay: `allowScripts` with `strict-allow-scripts=true` (no dependency install script runs), lockfile hashes, `npm ci --ignore-scripts` in CI and the images, and the gating `npm audit`. Dependabot's own cooldown is unchanged. The 20.0.0 entry below describes the rule as it was then.
 
 ### Fixed

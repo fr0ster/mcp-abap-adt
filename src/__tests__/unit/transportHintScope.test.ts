@@ -12,6 +12,7 @@
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import {
   answer,
@@ -22,6 +23,8 @@ import {
   callTransportRequest,
   runWithCallTransport,
 } from '../../lib/callTransport';
+import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
+import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
 import { project, terseWrite } from '../../lib/strategies/projections';
@@ -167,4 +170,60 @@ describe('runWithCallTransport', () => {
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
   });
+});
+
+/** A group registered on its own (`BaseHandlerGroup.registerHandlers`). */
+class OwnGroup extends BaseHandlerGroup {
+  protected groupName = 'own';
+  getHandlers(): HandlerEntry[] {
+    return STUBS;
+  }
+}
+
+describe('the other ways a handler is invoked enter the same scope', () => {
+  it('a group registered on its own: the call’s transport_request decides', async () => {
+    const group = new OwnGroup({ connection: {} } as never);
+    let callback: ((args: unknown) => Promise<any>) | undefined;
+    group.registerHandlers({
+      registerTool: (_n: string, _c: unknown, cb: typeof callback) => {
+        callback = cb;
+      },
+    } as unknown as McpServer);
+    const sent = await callback?.({ transport_request: 'SIDK900001' });
+    expect(JSON.parse(sent.content[0].text).hint).toEqual({
+      text: TRANSPORT_ENTRY_HELD_WORDS,
+    });
+    const other = await callback?.({ transport_request: 'SIDK900009' });
+    expect(JSON.parse(other.content[0].text).hint).toMatchObject({
+      transport_request: 'SIDK900001',
+    });
+  });
+
+  it.each([
+    ['(context, args)', 2],
+    ['(args)', 1],
+  ])(
+    'an exporter’s handed-out %s handler: the call’s transport_request decides',
+    async (_label, arity) => {
+      const exporter = new HandlerExporter();
+      const entry = {
+        ...STUBS[0],
+        handler:
+          arity === 2
+            ? async (_context: unknown, _args: unknown) => handler()
+            : async (_args: unknown) => handler(),
+      } as unknown as HandlerEntry;
+      (exporter as unknown as { handlerGroups: unknown[] }).handlerGroups = [
+        { getName: () => 'stub', getHandlers: () => [entry] },
+      ];
+      const [exported] = exporter.getHandlerEntries();
+      const run = exported?.handler as (...a: unknown[]) => Promise<any>;
+      const args = { transport_request: 'SIDK900001' };
+      const result = arity === 2 ? await run({}, args) : await run(args);
+      expect(JSON.parse(result.content[0].text).hint).toEqual({
+        text: TRANSPORT_ENTRY_HELD_WORDS,
+      });
+      expect(run.length).toBe(arity);
+    },
+  );
 });

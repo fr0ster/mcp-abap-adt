@@ -1,5 +1,6 @@
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import { runWithCallTransport } from '../callTransport.js';
 import { noopLogger } from '../handlerLogger.js';
 import {
   type SystemContextResolver,
@@ -76,8 +77,8 @@ export interface HandlerExporterOptions {
    * system before each wrapped handler runs, once per connection: an
    * answer naming the user is the information. A credential failure (a
    * chain failure, a `401`) is thrown as it came, and the handler does not
-   * run. Default: none — nothing is looked up, and `getHandlerEntries()`
-   * returns the groups' handlers unwrapped. `defaultSystemContextResolver`
+   * run. Default: none — nothing is looked up (`getHandlerEntries()` still
+   * wraps each handler in the call-transport scope). `defaultSystemContextResolver`
    * (`@mcp-abap-adt/lib/request-context`) asks `systeminformation`.
    */
   systemContextResolver?: SystemContextResolver | null;
@@ -204,31 +205,43 @@ export class HandlerExporter {
     return entries;
   }
 
+  /**
+   * Every handed-out handler runs in the call-transport scope with its own
+   * call's `transport_request` (`callTransport.ts`, the failure renderer's
+   * transport hint), and with the system lookup when a resolver is given.
+   */
   private wrapEntry(group: IHandlerGroup, entry: HandlerEntry): HandlerEntry {
     const resolver = this.systemContextResolver;
-    if (!resolver) return entry;
+    const resolved = <T>(
+      connection: HandlerContext['connection'] | undefined,
+      fn: () => Promise<T>,
+    ): Promise<T> =>
+      resolver
+        ? withResolvedSystemContext(
+            connection,
+            fn,
+            resolver,
+            this.systemType,
+            this.systemContextRules,
+          )
+        : fn();
 
     const original = entry.handler as (...args: unknown[]) => Promise<unknown>;
     const wrapped =
       original.length >= 2
         ? (context: HandlerContext, args: unknown) =>
-            withResolvedSystemContext(
-              context?.connection,
-              () => original(context, args),
-              resolver,
-              this.systemType,
-              this.systemContextRules,
+            runWithCallTransport(args, () =>
+              resolved(context?.connection, () => original(context, args)),
             )
         : // Args-only handlers close over their group's context, which the
           // embedder swaps before calling — so read it at call time.
           (...callArgs: unknown[]) =>
-            withResolvedSystemContext(
-              (group as Partial<{ context: HandlerContext }>).context
-                ?.connection,
-              () => original(...callArgs),
-              resolver,
-              this.systemType,
-              this.systemContextRules,
+            runWithCallTransport(callArgs[0], () =>
+              resolved(
+                (group as Partial<{ context: HandlerContext }>).context
+                  ?.connection,
+                () => original(...callArgs),
+              ),
             );
     Object.defineProperty(wrapped, 'length', { value: original.length });
     return { ...entry, handler: wrapped as ToolHandler };

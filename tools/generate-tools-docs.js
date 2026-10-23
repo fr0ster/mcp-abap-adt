@@ -675,6 +675,13 @@ function applyBuiltText(tools) {
       const stated = builtProperty(definition, key);
       const text = stated ? stated.description : undefined;
       if (typeof text === 'string' && text) props[key].description = text;
+      // A property written as a reference (`runner: RUNNER_PROPERTY.runner`)
+      // parses as `any`: its type and default come from the build too.
+      if (props[key].type === 'any' && stated) {
+        if (typeof stated.type === 'string') props[key].type = stated.type;
+        if (props[key].default === undefined && stated.default !== undefined)
+          props[key].default = String(stated.default);
+      }
     }
   }
   return tools;

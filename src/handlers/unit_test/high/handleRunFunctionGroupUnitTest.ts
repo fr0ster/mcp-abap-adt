@@ -7,7 +7,13 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { RUNNER_PROPERTY, runnerOf } from '../shared/runner';
+import {
+  RUNNER_PROPERTY,
+  runnerOf,
+  SCOPE_PROPERTY,
+  scopeOf,
+  type UnitTestScopeArgs,
+} from '../shared/runner';
 import { projectSync, runTestsSync } from '../shared/runSync';
 import { projectRun, runAndWait } from '../shared/runTests';
 
@@ -23,7 +29,8 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Function group whose tests run.',
       },
-      ...RUNNER_PROPERTY,
+      runner: RUNNER_PROPERTY.runner,
+      scope: SCOPE_PROPERTY.scope,
       ...DETAIL_PROPERTY,
     },
     required: ['function_group_name'],
@@ -33,6 +40,7 @@ export const TOOL_DEFINITION = {
 interface RunFunctionGroupUnitTestArgs {
   function_group_name: string;
   runner?: 'async' | 'sync';
+  scope?: UnitTestScopeArgs;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -46,20 +54,31 @@ export async function handleRunFunctionGroupUnitTest(
   const runner = runnerOf(args);
   if (runner instanceof Error) return return_error(runner);
   const detail = detailOf(args);
+  const runOptions = { scope: scopeOf(args.scope) };
   if (runner === 'sync') {
     return answer(
       { tool: 'RunFunctionGroupUnitTest', detail },
       () =>
-        runTestsSync(context, {
-          carrier: 'functionGroup',
-          functionGroupName: args.function_group_name,
-        }),
+        runTestsSync(
+          context,
+          {
+            carrier: 'functionGroup',
+            functionGroupName: args.function_group_name,
+          },
+          runOptions,
+        ),
       projectSync(detail),
     );
   }
   return answer(
     { tool: 'RunFunctionGroupUnitTest', detail },
-    () => runAndWait(context, 'functionGroup', args.function_group_name),
+    () =>
+      runAndWait(
+        context,
+        'functionGroup',
+        args.function_group_name,
+        runOptions,
+      ),
     projectRun(detail),
   );
 }

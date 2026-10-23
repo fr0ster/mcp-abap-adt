@@ -305,6 +305,75 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
   });
 });
 
+describe('Run* tools: scope reaches the run, with either runner', () => {
+  const TOOLS = [
+    ['RunUnitTest', handleRunUnitTest, { class_name: 'ZCL_X' }],
+    ['RunProgramUnitTest', handleRunProgramUnitTest, { program_name: 'ZR_X' }],
+    [
+      'RunFunctionGroupUnitTest',
+      handleRunFunctionGroupUnitTest,
+      { function_group_name: 'ZFG_X' },
+    ],
+    [
+      'RunFunctionModuleUnitTest',
+      handleRunFunctionModuleUnitTest,
+      { function_module_name: 'Z_FM_X', function_group_name: 'ZFG_X' },
+    ],
+  ] as const;
+  const scope = {
+    own_tests: false,
+    foreign_tests: true,
+    add_foreign_tests_as_preview: false,
+  };
+
+  it.each(TOOLS)(
+    '%s async: the scope given is the run configuration',
+    async (_name, handler, args) => {
+      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+
+      await (handler as any)(ctx(connection), { ...args, scope });
+
+      expect(String(connection.requests[0].data)).toContain(
+        '<aunit:scope ownTests="false" foreignTests="true" addForeignTestsAsPreview="false"/>',
+      );
+    },
+  );
+
+  it.each(TOOLS)(
+    '%s sync: the scope given is the run configuration',
+    async (_name, handler, args) => {
+      const connection = recordingConnection([RESULT]);
+
+      await (handler as any)(ctx(connection), {
+        ...args,
+        runner: 'sync',
+        scope,
+      });
+
+      expect(String(connection.requests[0].data)).toContain(
+        '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="false"/>',
+      );
+    },
+  );
+
+  it.each(TOOLS)(
+    "%s without scope: adt-clients' defaults, both runners",
+    async (_name, handler, args) => {
+      const asyncRun = recordingConnection([STARTED, FINISHED, RESULT]);
+      await (handler as any)(ctx(asyncRun), args);
+      expect(String(asyncRun.requests[0].data)).toContain(
+        '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
+      );
+
+      const syncRun = recordingConnection([RESULT]);
+      await (handler as any)(ctx(syncRun), { ...args, runner: 'sync' });
+      expect(String(syncRun.requests[0].data)).toContain(
+        '<testDeterminationStrategy sameProgram="true" assignedTests="false" appendAssignedTestsPreview="true"/>',
+      );
+    },
+  );
+});
+
 describe('HandlerUnitTestRun: the runner the caller names, async by default', () => {
   const tests = [
     { container_class: 'zcl_a', test_class: 'ltc_a' },

@@ -7,7 +7,13 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { RUNNER_PROPERTY, runnerOf } from '../shared/runner';
+import {
+  RUNNER_PROPERTY,
+  runnerOf,
+  SCOPE_PROPERTY,
+  scopeOf,
+  type UnitTestScopeArgs,
+} from '../shared/runner';
 import { projectSync, runTestsSync } from '../shared/runSync';
 import { projectRun, runAndWait } from '../shared/runTests';
 
@@ -28,7 +34,8 @@ export const TOOL_DEFINITION = {
         description:
           'Function group holding the function module; required by runner sync.',
       },
-      ...RUNNER_PROPERTY,
+      runner: RUNNER_PROPERTY.runner,
+      scope: SCOPE_PROPERTY.scope,
       ...DETAIL_PROPERTY,
     },
     required: ['function_module_name'],
@@ -39,6 +46,7 @@ interface RunFunctionModuleUnitTestArgs {
   function_module_name: string;
   function_group_name?: string;
   runner?: 'async' | 'sync';
+  scope?: UnitTestScopeArgs;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -52,6 +60,7 @@ export async function handleRunFunctionModuleUnitTest(
   const runner = runnerOf(args);
   if (runner instanceof Error) return return_error(runner);
   const detail = detailOf(args);
+  const runOptions = { scope: scopeOf(args.scope) };
   if (runner === 'sync') {
     const functionGroupName = args.function_group_name;
     if (!functionGroupName) {
@@ -64,17 +73,27 @@ export async function handleRunFunctionModuleUnitTest(
     return answer(
       { tool: 'RunFunctionModuleUnitTest', detail },
       () =>
-        runTestsSync(context, {
-          carrier: 'functionModule',
-          functionGroupName,
-          functionModuleName: args.function_module_name,
-        }),
+        runTestsSync(
+          context,
+          {
+            carrier: 'functionModule',
+            functionGroupName,
+            functionModuleName: args.function_module_name,
+          },
+          runOptions,
+        ),
       projectSync(detail),
     );
   }
   return answer(
     { tool: 'RunFunctionModuleUnitTest', detail },
-    () => runAndWait(context, 'functionModule', args.function_module_name),
+    () =>
+      runAndWait(
+        context,
+        'functionModule',
+        args.function_module_name,
+        runOptions,
+      ),
     projectRun(detail),
   );
 }

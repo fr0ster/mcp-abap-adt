@@ -18,6 +18,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IClassUnitTestRunOptions,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -45,7 +46,7 @@ export type TestCarrier =
 export interface IUnitTestRunner {
   run(
     objectName: string,
-    options: IAdtAnalyseOptions<IAdtError>,
+    options: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
   ): Promise<IAdtResponse<unknown, IAdtError>>;
   getStatus(
     runId: string,
@@ -87,10 +88,12 @@ export async function runAndWait(
   context: HandlerContext,
   carrier: TestCarrier,
   objectName: string,
+  runOptions: Omit<IClassUnitTestRunOptions, 'title' | 'context'> = {},
 ): Promise<IAdtResponse<RunAndWait, IAdtError>> {
   const runner = testRunner(context, carrier);
   const started = await atStep('run', () =>
     runner.run(objectName.toUpperCase(), {
+      ...runOptions,
       // A run SAP did not start is a failure (see adt-clients' migration guide to 23).
       analyse: analyseUnitTestStart,
     }),

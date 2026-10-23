@@ -267,11 +267,17 @@ describe('the MCP tool surface', () => {
         // sync, default async — without it a run is what it was); the
         // synchronous run of a function module addresses it under its group,
         // so that tool takes `function_group_name`, optional, which runner
-        // sync requires.
-        'high/RunUnitTest': ['runner'],
-        'high/RunProgramUnitTest': ['runner'],
-        'high/RunFunctionGroupUnitTest': ['runner'],
-        'high/RunFunctionModuleUnitTest': ['function_group_name', 'runner'],
+        // sync requires. All four take `scope`, compact HandlerUnitTestRun's
+        // shape, optional, sent to either runner (adt-clients' defaults
+        // without it).
+        'high/RunUnitTest': ['runner', 'scope'],
+        'high/RunProgramUnitTest': ['runner', 'scope'],
+        'high/RunFunctionGroupUnitTest': ['runner', 'scope'],
+        'high/RunFunctionModuleUnitTest': [
+          'function_group_name',
+          'runner',
+          'scope',
+        ],
         // 19.1.0 (#300): reading each leaf's metadata for its description is
         // the caller's choice, `include_descriptions` (default false), as in
         // GetPackageContents and GetPackageTree.

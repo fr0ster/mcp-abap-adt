@@ -7,7 +7,13 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { RUNNER_PROPERTY, runnerOf } from '../shared/runner';
+import {
+  RUNNER_PROPERTY,
+  runnerOf,
+  SCOPE_PROPERTY,
+  scopeOf,
+  type UnitTestScopeArgs,
+} from '../shared/runner';
 import { projectSync, runTestsSync } from '../shared/runSync';
 import { projectRun, runAndWait } from '../shared/runTests';
 
@@ -23,7 +29,8 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Report whose tests run.',
       },
-      ...RUNNER_PROPERTY,
+      runner: RUNNER_PROPERTY.runner,
+      scope: SCOPE_PROPERTY.scope,
       ...DETAIL_PROPERTY,
     },
     required: ['program_name'],
@@ -33,6 +40,7 @@ export const TOOL_DEFINITION = {
 interface RunProgramUnitTestArgs {
   program_name: string;
   runner?: 'async' | 'sync';
+  scope?: UnitTestScopeArgs;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -46,20 +54,25 @@ export async function handleRunProgramUnitTest(
   const runner = runnerOf(args);
   if (runner instanceof Error) return return_error(runner);
   const detail = detailOf(args);
+  const runOptions = { scope: scopeOf(args.scope) };
   if (runner === 'sync') {
     return answer(
       { tool: 'RunProgramUnitTest', detail },
       () =>
-        runTestsSync(context, {
-          carrier: 'program',
-          programName: args.program_name,
-        }),
+        runTestsSync(
+          context,
+          {
+            carrier: 'program',
+            programName: args.program_name,
+          },
+          runOptions,
+        ),
       projectSync(detail),
     );
   }
   return answer(
     { tool: 'RunProgramUnitTest', detail },
-    () => runAndWait(context, 'program', args.program_name),
+    () => runAndWait(context, 'program', args.program_name, runOptions),
     projectRun(detail),
   );
 }

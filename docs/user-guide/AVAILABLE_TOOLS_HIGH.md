@@ -213,7 +213,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
@@ -296,7 +296,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -354,7 +354,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -481,7 +481,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1070,7 +1070,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1404,7 +1404,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1459,7 +1459,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1612,7 +1612,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1732,7 +1732,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -1796,7 +1796,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
@@ -1883,7 +1883,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -1956,7 +1956,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -1992,7 +1992,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
 - `package_name` (string, optional) - Package name (give this or package_names)
 - `package_names` (array, optional) - Several package names, read together (give this or package_name)
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -2046,7 +2046,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -2313,45 +2313,54 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result.
+**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
+- `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Parameters:**
 - `program_name` (string, required) - Report whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
@@ -2412,4 +2421,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-10-22*
+*Last updated: 2026-10-23*

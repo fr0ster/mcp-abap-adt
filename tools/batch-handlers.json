@@ -1344,6 +1344,66 @@
     ]
   },
   {
+    "tool": "RunUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunUnitTest.ts#handleRunUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the class and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RunProgramUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunProgramUnitTest.ts#handleRunProgramUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the report and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RunFunctionGroupUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts#handleRunFunctionGroupUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the function group and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RunFunctionModuleUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts#handleRunFunctionModuleUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns at the module under its function group: runs every test of the group and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      },
+      {
+        "argument": "function_group_name",
+        "present": true
+      }
+    ]
+  },
+  {
     "tool": "HandlerProfileSchedule",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerProfileSchedule.ts#handleHandlerProfileSchedule",
@@ -1359,7 +1419,29 @@
     "tool": "HandlerUnitTestRun",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerUnitTestRun.ts#handleHandlerUnitTestRun",
-    "sends": "POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult"
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of each container named and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerUnitTestRun",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUnitTestRun.ts#handleHandlerUnitTestRun",
+    "sends": "POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "async"
+        ]
+      }
+    ]
   },
   {
     "tool": "RuntimeListFeeds",

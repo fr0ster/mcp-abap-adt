@@ -920,6 +920,21 @@ const WRITES: BatchEntryCase[] = [
     args: { class_name: 'CLAS_A', profile: false, background: true },
   },
   { tool: 'RuntimeRunProgram', args: { program_name: 'PROG_A' } },
+  ...(
+    [
+      ['RunUnitTest', { class_name: 'CLAS_A' }],
+      ['RunProgramUnitTest', { program_name: 'PROG_A' }],
+      ['RunFunctionGroupUnitTest', { function_group_name: 'FUGR_A' }],
+      [
+        'RunFunctionModuleUnitTest',
+        { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+      ],
+    ] as const
+  ).map(([tool, names]) => ({
+    tool,
+    args: { ...names, runner: 'sync' },
+    body: UNIT_RESULT,
+  })),
   {
     tool: 'RuntimeRunProgram',
     args: { program_name: 'PROG_A', profile: false },
@@ -963,8 +978,20 @@ const WRITES: BatchEntryCase[] = [
         { container_class: 'CLAS_A', test_class: 'LTCL_A' },
         { container_class: 'CLAS_B', test_class: 'LTCL_B' },
       ],
+      runner: 'sync',
     },
+    body: UNIT_RESULT,
   },
+  ...[undefined, 'async'].map((runner) => ({
+    tool: 'HandlerUnitTestRun',
+    args: {
+      tests: [
+        { container_class: 'CLAS_A', test_class: 'LTCL_A' },
+        { container_class: 'CLAS_B', test_class: 'LTCL_B' },
+      ],
+      ...(runner === undefined ? {} : { runner }),
+    },
+  })),
   { tool: 'RuntimeListFeeds', args: {} },
   ...['descriptors', 'variants'].map((feed_type) => ({
     tool: 'RuntimeListFeeds',

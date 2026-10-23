@@ -406,7 +406,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -422,7 +422,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -438,7 +438,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -510,7 +510,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -596,7 +596,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the include.
 - `include_name` (string, required) - Include name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -635,7 +635,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -665,7 +665,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
 - `object_type` (string, optional) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -680,7 +680,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -722,7 +722,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -763,7 +763,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -799,7 +799,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `parent_name` (string, optional) - [read-only] Parent object name (with parent_tech_name and parent_type; or give objects)
 - `parent_tech_name` (string, optional) - [read-only] Parent technical name
 - `parent_type` (string, optional) - [read-only] Parent object type (e.g. PROG/P, FUGR)
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `with_short_descriptions` (boolean, optional (default: true))) - [read-only] Include short descriptions (default: true)
 
 ---
@@ -814,7 +814,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -828,7 +828,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
@@ -844,7 +844,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -860,7 +860,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -876,7 +876,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
 - `structure_name` (string, optional) - Structure name (or give structure_names).
 - `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -892,7 +892,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `objects` (array, required) - [read-only] Object name (required, must be valid ABAP object name or mask)
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -926,7 +926,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to analyze and resolve symbols for
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -965,7 +965,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or parent_type and parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name
 - `parent_type` (string, optional) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1019,7 +1019,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1059,7 +1059,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
 - `object_type` (string, optional) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
 - `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1070,7 +1070,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
 **Parameters:**
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `top` (number, optional) - Number of top rows for summary. Default: 10.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
 - `view` (string, optional (default: hitlist)) - 
@@ -1139,7 +1139,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold (for statements view).
 - `id` (number, optional) - Statement node ID (for statements view).
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
 - `view` (string, required) - Trace view to retrieve.
 - `with_details` (boolean, optional) - Include statement details (for statements view).
@@ -1163,7 +1163,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
 - `package` (string, optional) - Dumps whose object package contains this text, in any case.
 - `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.
 - `user` (string, optional) - Entries of this SAP user (exact match).
 
@@ -1209,7 +1209,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `all_procedural_units` (boolean, optional) - 
 - `all_system_kernel_events` (boolean, optional) - 
 - `amdp_trace` (boolean, optional) - 
-- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `class_name` (string, required) - ABAP class name to execute.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
 - `explicit_on_off` (boolean, optional) - 
@@ -1239,7 +1239,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `all_procedural_units` (boolean, optional) - 
 - `all_system_kernel_events` (boolean, optional) - 
 - `amdp_trace` (boolean, optional) - 
-- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
@@ -1272,7 +1272,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -1313,7 +1313,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `user` (string, optional) - The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
 
 ---
@@ -1367,7 +1367,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
@@ -1450,7 +1450,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1508,7 +1508,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -1635,7 +1635,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -2224,7 +2224,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -2558,7 +2558,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -2613,7 +2613,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -2766,7 +2766,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
@@ -2886,7 +2886,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -2950,7 +2950,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
@@ -3037,7 +3037,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -3110,7 +3110,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -3146,7 +3146,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
 - `package_name` (string, optional) - Package name (give this or package_names)
 - `package_names` (array, optional) - Several package names, read together (give this or package_name)
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -3200,7 +3200,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
-- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
@@ -3467,45 +3467,54 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result.
+**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
+- `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Parameters:**
 - `program_name` (string, required) - Report whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
+- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
@@ -4088,4 +4097,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-22*
+*Last updated: 2026-10-23*

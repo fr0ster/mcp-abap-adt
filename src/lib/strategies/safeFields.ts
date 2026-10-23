@@ -38,8 +38,8 @@ export interface LockedObject {
  * (fr0ster/mcp-abap-adt#314).
  */
 export interface LeftLocked {
-  leftLocked?: true;
-  lockHandle?: string;
+  left_locked?: true;
+  lock_handle?: string;
   object?: LockedObject;
   warning?: string;
 }
@@ -96,9 +96,9 @@ export function safeCleanup(
 
   // The lock that may be left behind: each field by its own type, the object
   // rebuilt from its two strings — nothing else of it passes.
-  if (carrier.leftLocked === true) out.leftLocked = true;
-  if (typeof carrier.lockHandle === 'string' && carrier.lockHandle !== '')
-    out.lockHandle = carrier.lockHandle;
+  if (carrier.left_locked === true) out.left_locked = true;
+  if (typeof carrier.lock_handle === 'string' && carrier.lock_handle !== '')
+    out.lock_handle = carrier.lock_handle;
   const object = safeLockedObject(carrier.object);
   if (object !== undefined) out.object = object;
   if (typeof carrier.warning === 'string') out.warning = carrier.warning;

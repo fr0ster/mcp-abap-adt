@@ -4,13 +4,17 @@
  * A cleanup UNLOCK that fails — SAP refused it, or the client threw
  * (`socket hang up`) — says plainly that the object may be left locked: the
  * handle, the object and fixed words, beside the fields the carrier already
- * had. And a save SAP refused with `CTS_WBO_API` 019 ("already locked in
+ * had. And a save SAP refused with `CTS_WBO_API` 019 or 020 ("already locked in
  * request …") names that request as a hint; nothing is resent.
  */
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpdateLocalTestClass';
 import { handleUpdateUnderLock } from '../../handlers/common/low/handleUpdateUnderLock';
-import { TRANSPORT_HINT_WORDS, transportHint } from '../../lib/answer';
+import {
+  TRANSPORT_HINT_WORDS,
+  TRANSPORT_HINT_WORDS_020,
+  transportHint,
+} from '../../lib/answer';
 import { safeCleanup } from '../../lib/strategies/safeFields';
 import { leftLockedWarning } from '../../lib/strategies/withLock';
 import {
@@ -53,7 +57,7 @@ const saveRefused = (messages: unknown[]) =>
   } as unknown as Partial<IAdtError>);
 
 describe('a cleanup unlock that fails says the object may be left locked', () => {
-  it('a THROWN unlock after a refused save: leftLocked, handle, object, the fixed words, beside the old fields', async () => {
+  it('a THROWN unlock after a refused save: left_locked, handle, object, the fixed words, beside the old fields', async () => {
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       update: async () => saveRefused([]),
@@ -70,8 +74,8 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
       failures: [
         { error: 'client_threw', message: 'socket hang up', step: 'unlock' },
       ],
-      leftLocked: true,
-      lockHandle: 'handle-1',
+      left_locked: true,
+      lock_handle: 'handle-1',
       object: { type: 'CLASS', name: 'ZCL_OBJ' },
       warning: WARNING_HANG_UP,
     });
@@ -88,8 +92,8 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
     expect(cleanup).toMatchObject({
       message: 'Unlock refused',
       origin: 'refusal',
-      leftLocked: true,
-      lockHandle: 'handle-1',
+      left_locked: true,
+      lock_handle: 'handle-1',
       object: { type: 'CLASS', name: 'ZCL_OBJ' },
       warning: leftLockedWarning('Unlock refused'),
     });
@@ -105,8 +109,8 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
     expect(result.isError).toBe(false);
     expect(payloadOf(result).cleanup).toMatchObject({
-      leftLocked: true,
-      lockHandle: 'handle-1',
+      left_locked: true,
+      lock_handle: 'handle-1',
       object: { type: 'CLASS', name: 'ZCL_OBJ' },
     });
   });
@@ -121,7 +125,7 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
     expect(result.isError).toBe(true);
     const payload = payloadOf(result);
     expect(payload.cleanup).toBeUndefined();
-    expect(JSON.stringify(payload)).not.toContain('leftLocked');
+    expect(JSON.stringify(payload)).not.toContain('left_locked');
   });
 });
 
@@ -132,15 +136,15 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
     expect(
       safeCleanup({
         ...base,
-        leftLocked: true,
-        lockHandle: 'handle-1',
+        left_locked: true,
+        lock_handle: 'handle-1',
         object: { type: 'CLASS', name: 'OBJ' },
         warning: WARNING_HANG_UP,
       }),
     ).toEqual({
       ...base,
-      leftLocked: true,
-      lockHandle: 'handle-1',
+      left_locked: true,
+      lock_handle: 'handle-1',
       object: { type: 'CLASS', name: 'OBJ' },
       warning: WARNING_HANG_UP,
     });
@@ -150,8 +154,8 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
     expect(
       safeCleanup({
         ...base,
-        leftLocked: 'true',
-        lockHandle: 42,
+        left_locked: 'true',
+        lock_handle: 42,
         object: { type: 'CLASS', name: 'OBJ', headers: { authorization: 'x' } },
         warning: { text: 'x' },
         cookies: 'sap-contextid=secret',
@@ -169,10 +173,10 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
     expect(safeCleanup({ ...base, object })).toEqual(base);
   });
 
-  it('drops leftLocked false and an empty handle', () => {
-    expect(safeCleanup({ ...base, leftLocked: false, lockHandle: '' })).toEqual(
-      base,
-    );
+  it('drops left_locked false and an empty handle', () => {
+    expect(
+      safeCleanup({ ...base, left_locked: false, lock_handle: '' }),
+    ).toEqual(base);
   });
 });
 
@@ -224,7 +228,7 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
           {
             type: 'E',
             text: 'Object is already locked in request SIDK900001',
-            t100: { id: 'CTS_WBO_API', no: '020', values: ['SIDK900001'] },
+            t100: { id: 'CTS_WBO_API', no: '021', values: ['SIDK900001'] },
           },
         ]),
       unlock: async () => okResponse(undefined),
@@ -237,6 +241,7 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
   it.each([
     ['another message class', { id: 'SADT_RESOURCE', no: '019' }],
     ['another number', { id: 'CTS_WBO_API', no: '018' }],
+    ['the number after 020', { id: 'CTS_WBO_API', no: '021' }],
   ])('transportHint: none for %s', (_label, key) => {
     expect(
       transportHint([
@@ -287,5 +292,73 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
         },
       ])?.transport_request,
     ).toBe('SIDK900002');
+  });
+});
+
+describe('a save refused with CTS_WBO_API 020 (a task passed) names the request that holds the object', () => {
+  const HELD_BY_REQUEST = {
+    type: 'E',
+    text: 'Object R3TR PROG OBJ is already locked in request SIDK900003',
+    t100: {
+      id: 'CTS_WBO_API',
+      no: '020',
+      values: ['R3TR PROG OBJ', 'SIDK900003'],
+    },
+  };
+
+  it('UpdateLocalTestClass: hint with the request and the 020 words', async () => {
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      update: async () => saveRefused([HELD_BY_REQUEST]),
+      unlock: async () => okResponse(undefined),
+    });
+    const result: any = await handleUpdateLocalTestClass(context as any, {
+      ...ARGS,
+      transport_request: 'SIDK900004',
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).hint).toEqual({
+      transport_request: 'SIDK900003',
+      text: TRANSPORT_HINT_WORDS_020,
+    });
+  });
+
+  it('transportHint: the request wherever it stands, with the 020 words, not the 019 ones', () => {
+    const hint = transportHint([
+      {
+        type: 'E',
+        text: 'x',
+        t100: {
+          id: 'CTS_WBO_API',
+          no: '020',
+          values: ['SIDK90000', 'SIDK900005', 'R3TR PROG OBJ'],
+        },
+      },
+    ]);
+    expect(hint).toEqual({
+      transport_request: 'SIDK900005',
+      text: TRANSPORT_HINT_WORDS_020,
+    });
+    expect(TRANSPORT_HINT_WORDS_020).not.toBe(TRANSPORT_HINT_WORDS);
+  });
+
+  it.each([
+    ['no values', undefined],
+    ['no value shaped as a request', ['R3TR PROG OBJ', 'SAPUSER01']],
+    ['a task-length value', ['SIDK90000']],
+  ])('transportHint: none with %s', (_label, values) => {
+    expect(
+      transportHint([
+        {
+          type: 'E',
+          text: 'x',
+          t100: {
+            id: 'CTS_WBO_API',
+            no: '020',
+            ...(values ? { values } : {}),
+          },
+        },
+      ]),
+    ).toBeUndefined();
   });
 });

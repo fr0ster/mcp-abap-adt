@@ -11,8 +11,8 @@ const OBJECT = { type: 'CLASS', name: 'OBJ' };
 
 /** What a failed release of `handle-1` on OBJECT adds, for the given reason. */
 const leftLockedBy = (reason: string) => ({
-  leftLocked: true,
-  lockHandle: 'handle-1',
+  left_locked: true,
+  lock_handle: 'handle-1',
   object: { type: 'CLASS', name: 'OBJ' },
   warning: `the object may be left locked: the unlock failed (${reason}); it is released when the SAP session ends (logoff) or by its owner`,
 });

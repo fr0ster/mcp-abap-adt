@@ -51,9 +51,9 @@ function leftLocked<H>(
   reason: string,
 ): LeftLocked {
   return {
-    leftLocked: true,
+    left_locked: true,
     ...(typeof handle === 'string' && handle !== ''
-      ? { lockHandle: handle }
+      ? { lock_handle: handle }
       : {}),
     object: { type: object.type, name: object.name },
     warning: leftLockedWarning(reason),
@@ -118,7 +118,7 @@ async function runRelease<H>(
  * them, and they are never wrapped in this.
  *
  * `object` names what `acquire` locks. A release that fails says the object
- * may be left locked, with its handle and this identity (`leftLocked`).
+ * may be left locked, with its handle and this identity (`left_locked`).
  */
 export async function withLock<H, T>(
   acquire: () => Promise<IAdtResponse<H, IAdtError>>,

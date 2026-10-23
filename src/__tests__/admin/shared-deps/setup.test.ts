@@ -1591,6 +1591,7 @@ describe('Admin: Setup shared dependencies', () => {
                 obj.unlock({ appendStructureName: item.name }, lockHandle, {
                   analyse: analyseException,
                 }),
+              { type: 'APPEND_STRUCTURE', name: item.name },
             );
             return written.ok
               ? { isError: false }

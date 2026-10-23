@@ -131,6 +131,7 @@ export async function handleUpdateLocalTestClass(
         ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
 
       if (!written.ok || !shouldActivate) {

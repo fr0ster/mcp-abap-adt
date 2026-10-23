@@ -115,6 +115,7 @@ export async function handleUpdateLocalMacros(
         ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
 
       if (!written.ok || !shouldActivate) {

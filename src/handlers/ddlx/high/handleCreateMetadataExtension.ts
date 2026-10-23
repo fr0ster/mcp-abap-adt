@@ -143,6 +143,7 @@ export async function handleCreateMetadataExtension(
         ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+        { type: 'METADATA_EXTENSION', name: name },
       );
       if (!checked.ok) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;

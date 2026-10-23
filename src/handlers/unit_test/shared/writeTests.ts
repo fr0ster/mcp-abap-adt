@@ -95,6 +95,7 @@ export async function writeClassTests(
       tests.unlock({ className: name }, lockHandle, {
         analyse: analyseException,
       }),
+    { type: 'CLASS', name },
   );
   if (!written.ok) return written as Answer;
   return carryCleanup(
@@ -173,6 +174,7 @@ export async function writeProgramTests(
       include.unlock({ includeName }, lockHandle, {
         analyse: analyseException,
       }),
+    { type: 'INCLUDE', name: includeName },
   );
   if (!written.ok) return written as Answer;
 
@@ -237,6 +239,7 @@ export async function writeProgramTests(
         program.unlock({ programName: name }, lockHandle, {
           analyse: analyseException,
         }),
+      { type: 'PROGRAM', name },
     );
     if (!linked.ok) return linked as Answer;
     return carryCleanup(linked, activateBoth);
@@ -292,6 +295,7 @@ export async function writeFunctionGroupTests(
     ),
     (lockHandle) =>
       include.unlock(target, lockHandle, { analyse: analyseException }),
+    { type: 'FUNCTION_INCLUDE', name: includeName },
   );
   if (!written.ok) return written as Answer;
 

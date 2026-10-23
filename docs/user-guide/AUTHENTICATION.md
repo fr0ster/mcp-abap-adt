@@ -403,6 +403,24 @@ it arose. A tool never rewrites it:
   shape. A credential failure is never such an entry: on a write, its unlock or its activation it
   is the answer itself, after the unlock was tried — a `401` SAP answered to the unlock
   included, answered as the unlock's error as it is with `step: "unlock"`.
+- **A lock the cleanup could not release.** When a write's own UNLOCK fails — SAP refused it,
+  or the client threw (`socket hang up`) — `cleanup` keeps its fields and adds
+  `leftLocked: true`, the `lockHandle`, the locked `object` (`{ type, name }`; a class include
+  names its class, since the lock is the class's) and `warning`, in fixed words around the
+  unlock's own message:
+
+  ```json
+  "cleanup": { "error": "client_threw", "message": "socket hang up",
+    "failures": [{ "error": "client_threw", "message": "socket hang up", "step": "unlock" }],
+    "leftLocked": true, "lockHandle": "…", "object": { "type": "CLASS", "name": "…" },
+    "warning": "the object may be left locked: the unlock failed (socket hang up); it is released when the SAP session ends (logoff) or by its owner" }
+  ```
+
+  The same fields ride on a write that landed. An unlock that answered adds none of them.
+- **`hint` — the request SAP names.** A failure whose T100 messages hold `CTS_WBO_API` 019 (the
+  object is already locked in a transport request) carries `hint: { transport_request, text }`:
+  the request number from the message's values and fixed words saying to pass it as
+  `transport_request`. Nothing is resent; the next call is the caller's.
 
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:

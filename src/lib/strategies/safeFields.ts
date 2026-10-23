@@ -14,17 +14,35 @@
  * Something in this process threw: `client_threw`, and deliberately no origin.
  */
 export type Cleanup =
-  | {
+  | ({
       message: string;
       origin?: string;
       request?: unknown;
       failures?: readonly unknown[];
-    }
-  | {
+    } & LeftLocked)
+  | ({
       error: 'client_threw';
       message: string;
       failures?: readonly unknown[];
-    };
+    } & LeftLocked);
+
+/** The object a lock was taken on: its type and its name, as the handler knows them. */
+export interface LockedObject {
+  type: string;
+  name: string;
+}
+
+/**
+ * What a failed release says about the lock, in both shapes: the object may
+ * still be locked, under which handle, and the fixed words saying so
+ * (fr0ster/mcp-abap-adt#314).
+ */
+export interface LeftLocked {
+  leftLocked?: true;
+  lockHandle?: string;
+  object?: LockedObject;
+  warning?: string;
+}
 
 /**
  * Two fields, copied by name.
@@ -76,5 +94,23 @@ export function safeCleanup(
   if (Array.isArray(carrier.notes) && carrier.notes.length > 0)
     out.notes = carrier.notes;
 
+  // The lock that may be left behind: each field by its own type, the object
+  // rebuilt from its two strings — nothing else of it passes.
+  if (carrier.leftLocked === true) out.leftLocked = true;
+  if (typeof carrier.lockHandle === 'string' && carrier.lockHandle !== '')
+    out.lockHandle = carrier.lockHandle;
+  const object = safeLockedObject(carrier.object);
+  if (object !== undefined) out.object = object;
+  if (typeof carrier.warning === 'string') out.warning = carrier.warning;
+
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** `{ type, name }`, both non-empty strings, copied by name; anything else is absent. */
+function safeLockedObject(value: unknown): LockedObject | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const { type, name } = value as { type?: unknown; name?: unknown };
+  if (typeof type !== 'string' || type === '') return undefined;
+  if (typeof name !== 'string' || name === '') return undefined;
+  return { type, name };
 }

@@ -161,6 +161,7 @@ export async function handleUpdateFunctionModule(
           obj.unlock({ functionModuleName, functionGroupName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'FUNCTION_MODULE', name: functionModuleName },
       );
 
       if (!written.ok) {

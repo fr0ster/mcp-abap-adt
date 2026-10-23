@@ -101,6 +101,55 @@ interface MessageCarrier {
   }>;
 }
 
+/** The fixed words of the hint beside `CTS_WBO_API` 019. */
+export const TRANSPORT_HINT_WORDS =
+  'SAP answered that the object is already locked in this transport request: pass it as transport_request and call again.';
+
+/**
+ * A transport request number: three letters or digits of the system, `K`, six
+ * digits. Read by plain code, not a pattern.
+ */
+function isRequestNumber(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length !== 10) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const c = value[i] as string;
+    const letter = c >= 'A' && c <= 'Z';
+    const digit = c >= '0' && c <= '9';
+    if (!letter && !digit) return false;
+  }
+  if (value[3] !== 'K') return false;
+  for (let i = 4; i < 10; i += 1) {
+    const c = value[i] as string;
+    if (c < '0' || c > '9') return false;
+  }
+  return true;
+}
+
+/**
+ * What to pass when SAP refused a write because the object is already
+ * recorded in another request (`CTS_WBO_API` 019, "already locked in request
+ * …"; fr0ster/mcp-abap-adt#314): that request, as data, beside fixed words.
+ * Nothing is resent; the caller decides.
+ *
+ * The number is taken from the message's T100 values by its shape, so the
+ * values' order and the language of the text decide nothing. A message
+ * holding no value of that shape gives no hint.
+ */
+export function transportHint(
+  messages: MessageCarrier['messages'],
+): { transport_request: string; text: string } | undefined {
+  for (const m of messages ?? []) {
+    const t100 = m.t100;
+    if (t100 === undefined || t100.id !== 'CTS_WBO_API') continue;
+    if (String(t100.no).padStart(3, '0') !== '019') continue;
+    const request = (t100.values ?? []).find(isRequestNumber);
+    if (request !== undefined) {
+      return { transport_request: request, text: TRANSPORT_HINT_WORDS };
+    }
+  }
+  return undefined;
+}
+
 /**
  * The allowlist.
  *
@@ -163,6 +212,8 @@ export function failurePayload(
       }
       return out;
     });
+    const hint = transportHint(error.messages);
+    if (hint !== undefined) payload.hint = hint;
   }
 
   // SAP's body, by who said no.

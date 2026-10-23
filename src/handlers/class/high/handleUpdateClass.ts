@@ -157,6 +157,7 @@ export async function handleUpdateClass(
         },
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
       if (!written.ok || !shouldActivate) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;

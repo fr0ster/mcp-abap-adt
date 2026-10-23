@@ -135,6 +135,7 @@ export async function handleUpdateFunctionGroup(
           obj.unlock({ functionGroupName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'FUNCTION_GROUP', name: functionGroupName },
       );
     },
     project(detail, terseWrite),

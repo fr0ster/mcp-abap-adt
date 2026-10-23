@@ -265,6 +265,7 @@ export async function handleUpdateDataElement(
           obj.unlock({ dataElementName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'DATA_ELEMENT', name: dataElementName },
       );
 
       if (!written.ok) {

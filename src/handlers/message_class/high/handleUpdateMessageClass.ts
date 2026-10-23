@@ -124,6 +124,7 @@ export async function handleUpdateMessageClass(
         ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+        { type: 'MESSAGE_CLASS', name: name },
       );
     },
     project(detail, terseWrite),

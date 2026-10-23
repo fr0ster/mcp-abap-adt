@@ -162,6 +162,7 @@ export async function handleCreateBehaviorDefinition(
         ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+        { type: 'BEHAVIOR_DEFINITION', name: name },
       );
       if (!checked.ok) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;

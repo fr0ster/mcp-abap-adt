@@ -146,6 +146,7 @@ export async function handleUpdateFunctionInclude(
           obj.unlock({ functionGroupName, includeName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'FUNCTION_INCLUDE', name: includeName },
       );
 
       if (!written.ok || !shouldActivate) {

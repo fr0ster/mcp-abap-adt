@@ -112,6 +112,7 @@ export async function handleDeleteLocalDefinitions(
         ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
 
       if (!deleted.ok || !shouldActivate) {

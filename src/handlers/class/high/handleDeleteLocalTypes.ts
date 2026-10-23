@@ -96,6 +96,7 @@ export async function handleDeleteLocalTypes(
         ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
 
       if (!deleted.ok || !shouldActivate) {

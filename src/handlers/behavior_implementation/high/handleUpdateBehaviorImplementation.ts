@@ -154,6 +154,7 @@ export async function handleUpdateBehaviorImplementation(
         ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
 
       if (!written.ok || !shouldActivate) {

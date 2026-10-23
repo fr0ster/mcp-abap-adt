@@ -7,8 +7,8 @@ operation, and the pair a system named in a `406` / `415`, kept for that system.
 describes the members, the default pairs, how the library sends and corrects them, and what an
 embedder and a direct adt-clients consumer do.
 
-Versions: `@mcp-abap-adt/adt-clients` `^36.0.2`, `@mcp-abap-adt/interfaces-adt` `^20.0.0`,
-`@mcp-abap-adt/adt-strategies` `^0.13.0`, `@mcp-abap-adt/lib` 19.0.0. The source of every pair
+Versions: `@mcp-abap-adt/adt-clients` `^37.2.0`, `@mcp-abap-adt/interfaces-adt` `^20.1.0`,
+`@mcp-abap-adt/adt-strategies` `^0.15.0`, `@mcp-abap-adt/lib` 20.1.0 (the pairs below are unchanged since adt-clients 36.0.2). The source of every pair
 below is adt-clients' `docs/usage/MIGRATION-36.md` (shipped in the package,
 `node_modules/@mcp-abap-adt/adt-clients/docs/usage/MIGRATION-36.md`): its tables "The pairs 35.0.0 sent", "The completed pairs,
 measured" and "The corrected pairs, measured".
@@ -54,7 +54,7 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
 - **Where SAP refuses the pair 35.0.0 sent**, the default is the corrected pair MIGRATION-36
   lists ("The corrected pairs, measured"): the enhancement's `check`, whose
   `application/vnd.sap.adt.checkrun.v1+xml` pair is refused `415`. It goes with the request document
-  adt-clients 36.0.2 sends, so the server requires `^36.0.2`.
+  adt-clients 36.0.2 and later send (the server requires `^37.2.0`).
 - **Members with no pair** keep the headers adt-clients hard-codes, and have no entry here. Since
   36.0.2 the feature toggle's `validate` (`POST /sap/bc/adt/sfw/featuretoggles/validation`,
   `IAdtValidatable`, which takes no headers) sends Accept `application/vnd.sap.as+xml`, and the

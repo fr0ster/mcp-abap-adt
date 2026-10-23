@@ -3239,7 +3239,7 @@
       "test class",
       "test results"
     ],
-    "semantic": "Run ABAP Unit tests of classes, synchronously with the result or asynchronously with a run id."
+    "semantic": "Run ABAP Unit tests of classes or programs."
   },
   "HandlerUnitTestStatus": {
     "keywords": [
@@ -3541,18 +3541,7 @@
       "test results",
       "class"
     ],
-    "semantic": "Run the unit tests (ABAP Unit) of a class asynchronously and show which tests pass or fail; a long suite answers a run id."
-  },
-  "RunUnitTestSync": {
-    "keywords": [
-      "run unit tests",
-      "ABAP Unit",
-      "execute tests",
-      "test results",
-      "synchronous",
-      "class"
-    ],
-    "semantic": "Run the unit tests (ABAP Unit) of a class in one synchronous request and show which tests pass or fail."
+    "semantic": "Run the unit tests (ABAP Unit) of a class and show which tests pass or fail."
   },
   "RuntimeAnalyzeProfilerTrace": {
     "keywords": [

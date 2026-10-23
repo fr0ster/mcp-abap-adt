@@ -565,10 +565,10 @@ export const compactUnitTestRunSchema = {
     },
     runner: {
       type: 'string',
-      enum: ['sync', 'async'],
-      default: 'sync',
+      enum: ['async', 'sync'],
+      default: 'async',
       description:
-        'sync: one request that runs every test class of each container_class and returns the finished result. async: starts the run and returns its run_id; the status and result are read by run_id, suited to long suites.',
+        'async (default): starts the run and returns its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that runs every test class of each container_class and returns the finished result.',
     },
     title: {
       type: 'string',

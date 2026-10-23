@@ -650,13 +650,7 @@
   {
     "group": "high",
     "name": "RunUnitTest",
-    "inputs": "class_name*, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "RunUnitTestSync",
-    "inputs": "class_name*, detail",
+    "inputs": "class_name*, runner, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -716,7 +710,7 @@
   {
     "group": "high",
     "name": "RunProgramUnitTest",
-    "inputs": "program_name*, detail",
+    "inputs": "program_name*, runner, detail",
     "available_in": "onprem"
   },
   {
@@ -734,13 +728,13 @@
   {
     "group": "high",
     "name": "RunFunctionGroupUnitTest",
-    "inputs": "function_group_name*, detail",
+    "inputs": "function_group_name*, runner, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "RunFunctionModuleUnitTest",
-    "inputs": "function_module_name*, detail",
+    "inputs": "function_module_name*, function_group_name, runner, detail",
     "available_in": "cloud, onprem"
   },
   {

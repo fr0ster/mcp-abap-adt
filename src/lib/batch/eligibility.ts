@@ -85,11 +85,15 @@ export function batchEntries(): BatchEntry[] {
 /**
  * What an absent argument reads as, per tool — the handler's own default:
  * `HandlerGet` reads `part ?? 'source'`, `RuntimeListFeeds`
- * `feed_type ?? 'descriptors'`, `HandlerUnitTestRun` `runner ?? 'sync'`.
+ * `feed_type ?? 'descriptors'`, the unit-test start tools `runner ?? 'async'`.
  */
 const ABSENT_READS_AS: Readonly<Record<string, Record<string, string>>> = {
   HandlerGet: { part: 'source' },
-  HandlerUnitTestRun: { runner: 'sync' },
+  HandlerUnitTestRun: { runner: 'async' },
+  RunUnitTest: { runner: 'async' },
+  RunProgramUnitTest: { runner: 'async' },
+  RunFunctionGroupUnitTest: { runner: 'async' },
+  RunFunctionModuleUnitTest: { runner: 'async' },
   RuntimeListFeeds: { feed_type: 'descriptors' },
 };
 

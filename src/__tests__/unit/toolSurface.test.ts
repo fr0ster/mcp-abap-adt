@@ -263,6 +263,15 @@ describe('the MCP tool surface', () => {
           'feed_types',
         ],
         'high/CreateTransportTask': ['task_type'],
+        // 20.1.0 (#286): the unit-test start tools take `runner` (async |
+        // sync, default async — without it a run is what it was); the
+        // synchronous run of a function module addresses it under its group,
+        // so that tool takes `function_group_name`, optional, which runner
+        // sync requires.
+        'high/RunUnitTest': ['runner'],
+        'high/RunProgramUnitTest': ['runner'],
+        'high/RunFunctionGroupUnitTest': ['runner'],
+        'high/RunFunctionModuleUnitTest': ['function_group_name', 'runner'],
         // 19.1.0 (#300): reading each leaf's metadata for its description is
         // the caller's choice, `include_descriptions` (default false), as in
         // GetPackageContents and GetPackageTree.
@@ -394,14 +403,6 @@ describe('the MCP tool surface', () => {
    * and both answered on an SAP BTP ABAP trial (2026-10-21); its row's
    * `available_in` moved from `onprem` to `cloud, onprem`, every other row
    * was checked unchanged.
-   */
-  /**
-   * **The sixth deliberate move: `RunUnitTestSync` arrived (20.1.0, #286).**
-   * A class's ABAP Unit tests with the synchronous runner — one request to
-   * `/abapunit/testruns`, the finished result in the answer — beside
-   * `RunUnitTest`, the asynchronous runner, for systems that have only one
-   * of the two endpoints. Its row joined the snapshot; every other row was
-   * checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

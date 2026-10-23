@@ -140,7 +140,7 @@
   {
     "query": "Run the ABAP unit tests of program ZREP_DEMO",
     "roles": ["developer"],
-    "required": [["RunProgramUnitTest", "RunUnitTest", "RunUnitTestSync"]],
+    "required": [["RunProgramUnitTest", "RunUnitTest"]],
     "source": "heldout"
   },
   {

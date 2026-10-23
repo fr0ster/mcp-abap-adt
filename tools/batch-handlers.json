@@ -1344,10 +1344,64 @@
     ]
   },
   {
-    "tool": "RunUnitTestSync",
+    "tool": "RunUnitTest",
     "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunUnitTestSync.ts#handleRunUnitTestSync",
-    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the class and answers the finished result"
+    "handler": "src/handlers/unit_test/high/handleRunUnitTest.ts#handleRunUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the class and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RunProgramUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunProgramUnitTest.ts#handleRunProgramUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the report and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RunFunctionGroupUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts#handleRunFunctionGroupUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns: runs every test class of the function group and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "RunFunctionModuleUnitTest",
+    "set": "full",
+    "handler": "src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts#handleRunFunctionModuleUnitTest",
+    "sends": "POST /sap/bc/adt/abapunit/testruns at the module under its function group: runs every test of the group and answers the finished result",
+    "when": [
+      {
+        "argument": "runner",
+        "equals": [
+          "sync"
+        ]
+      },
+      {
+        "argument": "function_group_name",
+        "present": true
+      }
+    ]
   },
   {
     "tool": "HandlerProfileSchedule",

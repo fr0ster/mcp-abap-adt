@@ -275,7 +275,7 @@ export const QUERIES: readonly Query[] = [
   {
     query: 'Run the unit tests of class ZCL_DEMO',
     roles: DEVELOPER,
-    required: [['RunUnitTest', 'RunUnitTestSync']],
+    required: [['RunUnitTest']],
     source: 'own',
   },
   {

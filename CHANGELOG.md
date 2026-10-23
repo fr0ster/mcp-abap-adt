@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Both ABAP Unit runners, chosen per call: `runner: 'async' | 'sync'`, default `'async'`** ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286)) — a system may serve only one of the two endpoints (an on-premise system was reported with `/sap/bc/adt/abapunit/testruns` alone, without `/abapunit/runs`). On `RunUnitTest` (class), `RunProgramUnitTest` (report), `RunFunctionGroupUnitTest` and `RunFunctionModuleUnitTest` in the full sets, and on compact `HandlerUnitTestRun`. `async` is what each did before: the full-set tools start the run, wait for it within a bound and answer the result or the `run_id` of a run that outlasts the bound (read on with `GetUnitTestStatus` / `GetUnitTestResult`); `HandlerUnitTestRun` answers `{ success, run_id }` (read on with `HandlerUnitTestStatus` / `HandlerUnitTestResult`). `sync` is one `POST /sap/bc/adt/abapunit/testruns`, answered `{ success, runner: 'sync', finished: true, run_result }` with the finished result; a failing test is an alert in it, not an error. Another value is refused before any request. Recordable in batch mode with `runner: 'sync'` (one request each). `RunCdsUnitTest` is unchanged: there is no synchronous runner for a CDS unit test.
+  - **A function module's synchronous run addresses the module under its group**, so `RunFunctionModuleUnitTest` takes `function_group_name`, optional, required with `runner: 'sync'` (refused before any request without it). The run covers every test of the module's function group — nothing filters it to the module's own tests (measured by adt-clients on premise, BASIS 816, 2026-10-23; the asynchronous run answered the same there).
+  - **`HandlerUnitTestRun` with `runner: 'sync'` runs every test class of each `container_class` named**: the endpoint addresses whole classes, so a `test_class` does not narrow it; `title` and `context` are not sent. It runs class tests only, as before.
+
 ### Changed
 
+- **Dependency: `@mcp-abap-adt/adt-clients` `^37.2.0`** (`@mcp-abap-adt/lib`): `runSync` on the class, report, function group and function module test runners.
 - **The 7-day release age is dropped.** `.npmrc` no longer sets `min-release-age=7` or `min-release-age-exclude[]=@mcp-abap-adt/*`. The age gate conflicted with the gating `npm audit`: a security fix younger than the gate could not be installed while the audit blocked CI (seen 2026-10-22 with markdown-it 14.3.3). The defences that stay: `allowScripts` with `strict-allow-scripts=true` (no dependency install script runs), lockfile hashes, `npm ci --ignore-scripts` in CI and the images, and the gating `npm audit`. Dependabot's own cooldown is unchanged. The 20.0.0 entry below describes the rule as it was then.
 
 ## [20.0.0] - 2026-10-22

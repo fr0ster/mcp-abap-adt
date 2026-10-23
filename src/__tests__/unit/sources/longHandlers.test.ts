@@ -96,7 +96,6 @@ describe('the approved list of long tools', () => {
     // timeout could only end the wait, never the work.
     const notReads = [
       'RunUnitTest',
-      'RunUnitTestSync',
       'RunCdsUnitTest',
       'RunProgramUnitTest',
       'RunFunctionGroupUnitTest',

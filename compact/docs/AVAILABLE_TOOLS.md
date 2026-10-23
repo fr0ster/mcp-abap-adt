@@ -517,14 +517,14 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** [read-only] ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: runner (sync | async, default sync), title, context, scope, risk_level, duration. Response: JSON — runner sync: { success, finished, run_result }, the finished result of every test class of each container_class in one request; runner async: { success, run_id }, the status and result read later by run_id, suited to long suites.
+**Description:** [read-only] ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: runner (async | sync, default async), title, context, scope, risk_level, duration. Response: JSON — runner async: { success, run_id }, the status and result read later by run_id, suited to long suites; runner sync: { success, runner, finished, run_result }, the finished result of every test class of each container_class in one request.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `tests` (required) — List of test classes to run.
-- `runner` — sync: one request that runs every test class of each container_class and returns the finished result. async: starts the run and returns its run_id; the status and result are read by run_id, suited to long suites.
+- `runner` — async (default): starts the run and returns its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that runs every test class of each container_class and returns the finished result.
 - `title` — Run title shown in ABAP Unit test logs; sent by the async runner.
 - `context` — Run context label; sent by the async runner.
 - `scope` — ABAP Unit test scope flags.

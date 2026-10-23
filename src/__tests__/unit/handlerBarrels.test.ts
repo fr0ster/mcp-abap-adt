@@ -94,8 +94,7 @@ describe("lib's read and write handler barrels", () => {
     // 19.0.0: the trace schedule and the class and program runs under a
     // profiler id, one request each, compact's `HandlerProfileSchedule` and
     // `HandlerProfileRun` (88).
-    // 20.1.0: the class run with the synchronous runner, `RunUnitTestSync` (89).
-    expect(write).toHaveLength(89);
+    expect(write).toHaveLength(88);
   });
 
   it('share not one symbol', () => {

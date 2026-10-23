@@ -2,11 +2,11 @@
  * Run the ABAP Unit tests of named container/test class pairs — the compact
  * facade's operation (`HandlerUnitTestRun`), with the runner the caller names:
  *
- * - `sync` (the default): one `POST /abapunit/testruns`, answered with the
- *   finished result (`runSync.ts`); every test class of each named container
- *   runs, and `title` and `context` are not sent;
- * - `async`: start the run and answer its run id, without waiting — ask later
- *   with the status and result facades.
+ * - `async` (the default): start the run and answer its run id, without
+ *   waiting — ask later with the status and result facades;
+ * - `sync`: one `POST /abapunit/testruns`, answered with the finished result
+ *   (`runSync.ts`); every test class of each named container runs, and
+ *   `title` and `context` are not sent.
  *
  * The core tools run and wait in one call (`runTests.ts`, `runSync.ts`).
  */
@@ -15,14 +15,12 @@ import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { runClassTestsSync } from './runSync';
+import { runnerOf, type UnitTestRunner } from './runner';
+import { projectSync, runTestsSync } from './runSync';
 
-/** The runners a caller may name; `sync` when none is named. */
-export const UNIT_TEST_RUNNERS = ['sync', 'async'] as const;
-export type UnitTestRunner = (typeof UNIT_TEST_RUNNERS)[number];
+export type { UnitTestRunner } from './runner';
 
 export interface StartUnitTestRunArgs {
   tests: Array<{ container_class: string; test_class: string }>;
@@ -48,14 +46,8 @@ export async function handleStartUnitTestRun(
       new Error('tests array with at least one entry is required'),
     );
   }
-  const runner = args.runner ?? 'sync';
-  if (!UNIT_TEST_RUNNERS.includes(runner)) {
-    return return_error(
-      new Error(
-        `runner must be one of ${UNIT_TEST_RUNNERS.join(', ')}; got ${JSON.stringify(runner)}`,
-      ),
-    );
-  }
+  const runner = runnerOf(args);
+  if (runner instanceof Error) return return_error(runner);
   const definitions = tests.map((test) => ({
     containerClass: test.container_class.toUpperCase(),
     testClass: test.test_class.toUpperCase(),
@@ -72,16 +64,12 @@ export async function handleStartUnitTestRun(
     return answer(
       { tool: 'HandlerUnitTestRun', detail: 'terse' },
       () =>
-        runClassTestsSync(context, definitions, {
-          scope: runScope,
-          riskLevel: risk_level,
-          duration,
-        }),
-      (result: AdtReading<unknown>) => ({
-        success: true,
-        finished: true,
-        run_result: result.value,
-      }),
+        runTestsSync(
+          context,
+          { carrier: 'class', target: definitions },
+          { scope: runScope, riskLevel: risk_level, duration },
+        ),
+      projectSync('terse'),
     );
   }
 

@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 267
+- Total tools: 266
 - Read-only tools: 68
-- High-level tools: 162
+- High-level tools: 161
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -303,7 +303,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [RunFunctionModuleUnitTest](#runfunctionmoduleunittest-high-level-unit-test)
     - [RunProgramUnitTest](#runprogramunittest-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
-    - [RunUnitTestSync](#rununittestsync-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateFunctionGroupUnitTest](#updatefunctiongroupunittest-high-level-unit-test)
     - [UpdateProgramUnitTest](#updateprogramunittest-high-level-unit-test)
@@ -3468,7 +3467,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result.
+**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3479,18 +3478,19 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
+- `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
 
 ---
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result.
+**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3501,20 +3501,9 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Starts an asynchronous ABAP Unit run of the tests of the ABAP class named by class_name, waits for it within a bound and returns the result; a run that outlasts the bound returns its run_id, whose status and result are read later. Suited to long suites.
+**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class whose tests run.
-
----
-
-<a id="rununittestsync-high-level-unit-test"></a>
-#### RunUnitTestSync (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name in one synchronous request and returns the finished result, each test method with its alerts, in the same call.
-
-**Source:** `src/handlers/unit_test/high/handleRunUnitTestSync.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
@@ -4100,4 +4089,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-22*
+*Last updated: 2026-10-23*

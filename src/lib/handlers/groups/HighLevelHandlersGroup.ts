@@ -555,10 +555,6 @@ import {
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleRunUnitTest';
 import {
-  handleRunUnitTestSync,
-  TOOL_DEFINITION as RunUnitTestSync_Tool,
-} from '../../../handlers/unit_test/high/handleRunUnitTestSync';
-import {
   handleUpdateCdsUnitTest,
   TOOL_DEFINITION as UpdateCdsUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
@@ -961,10 +957,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RunUnitTest_Tool,
         handler: withContext(handleRunUnitTest),
-      },
-      {
-        toolDefinition: RunUnitTestSync_Tool,
-        handler: withContext(handleRunUnitTestSync),
       },
       {
         toolDefinition: GetUnitTestResult_Tool,

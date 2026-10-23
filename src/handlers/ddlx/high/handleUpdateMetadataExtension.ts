@@ -126,6 +126,7 @@ export async function handleUpdateMetadataExtension(
               obj.unlock({ name: ddlxName }, lockHandle, {
                 analyse: analyseException,
               }),
+            { type: 'METADATA_EXTENSION', name: ddlxName },
           );
 
       if (!written.ok) {

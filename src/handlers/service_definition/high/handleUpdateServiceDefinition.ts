@@ -131,6 +131,7 @@ export async function handleUpdateServiceDefinition(
           obj.unlock({ serviceDefinitionName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'SERVICE_DEFINITION', name: serviceDefinitionName },
       );
 
       if (!written.ok) {

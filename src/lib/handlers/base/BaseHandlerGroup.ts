@@ -7,6 +7,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
+import { runWithCallTransport } from '../../callTransport.js';
 import { runLongCall } from '../../longCall.js';
 import {
   isLongRead,
@@ -120,13 +121,17 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // carries a resolver (and rules) — see
           // src/lib/requestSystemResolution.ts; else nothing is looked up.
           const context = this.context;
+          // Inside the call-transport scope with this call's own
+          // `transport_request`: the failure renderer's transport hint.
           const withParameters = <T>(fn: () => Promise<T>) =>
-            withResolvedSystemContext(
-              context?.connection,
-              fn,
-              context?.systemContextResolver ?? null,
-              context?.systemType,
-              context?.systemContextRules ?? null,
+            runWithCallTransport(args, () =>
+              withResolvedSystemContext(
+                context?.connection,
+                fn,
+                context?.systemContextResolver ?? null,
+                context?.systemType,
+                context?.systemContextRules ?? null,
+              ),
             );
           let result: any;
           const listed = isLongTool(toolName);

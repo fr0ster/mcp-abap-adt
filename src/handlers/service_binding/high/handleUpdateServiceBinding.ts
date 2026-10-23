@@ -265,6 +265,7 @@ export async function handleUpdateServiceBinding(
           publish,
           (handle) =>
             obj.unlock({ bindingName }, handle, { analyse: analyseException }),
+          { type: 'SERVICE_BINDING', name: bindingName },
         );
       })();
     },

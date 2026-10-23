@@ -27,6 +27,7 @@ import {
   LateBoundConnection,
 } from '../../../lib/batch/lateBound';
 import { createRecorder, untilSent } from '../../../lib/batch/recorder';
+import { callTransportRequest } from '../../../lib/callTransport';
 import { createAdtClient } from '../../../lib/clients';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
@@ -478,6 +479,37 @@ describe('recording in batch mode', () => {
     await s.server.idle();
     expect(seen).toBe(s.owner.signal());
     expect(seen?.aborted).toBe(false);
+    await s.close();
+  });
+
+  it("the recorded handler runs with the call's own transport_request (the failure renderer's transport hint)", async () => {
+    jest.spyOn(eligibility, 'eligible').mockReturnValue({ ok: true } as never);
+    let seen: string | undefined;
+    const s = await stand([
+      groupOf([
+        tool(
+          'GetProgram',
+          async (context, args) => {
+            seen = callTransportRequest();
+            return oneGet('/program')(context, args);
+          },
+          {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              transport_request: { type: 'string' },
+            },
+          },
+        ),
+      ]),
+    ]);
+    const answered = await s.call('GetProgram', {
+      name: 'Z',
+      transport_request: 'SIDK900001',
+    });
+    expect(answered).toEqual({ content: [] });
+    await s.server.idle();
+    expect(seen).toBe('SIDK900001');
     await s.close();
   });
 

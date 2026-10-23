@@ -137,6 +137,7 @@ export async function handleUpdateInterface(
           obj.unlock({ interfaceName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'INTERFACE', name: interfaceName },
       );
 
       if (!written.ok || !shouldActivate) {

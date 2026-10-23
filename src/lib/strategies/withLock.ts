@@ -5,7 +5,12 @@ import {
   isCredentialPayload,
   thrownEntry,
 } from '../answer';
-import { type Cleanup, safeRequest } from './safeFields';
+import {
+  type Cleanup,
+  type LeftLocked,
+  type LockedObject,
+  safeRequest,
+} from './safeFields';
 import { atStep, stepOf, withStep } from './step';
 
 export interface CleanupCarrier {
@@ -30,9 +35,35 @@ type Released =
   | { kind: 'refused'; error: IAdtError; carrier: Cleanup }
   | { kind: 'threw'; thrown: unknown; carrier: Cleanup };
 
+/**
+ * The fixed words of a lock the release may have left held. The reason is the
+ * release's own message; the rest names what ends the lock, because the
+ * caller cannot take it again — a further LOCK is refused while it is held.
+ */
+export function leftLockedWarning(reason: string): string {
+  return `the object may be left locked: the unlock failed (${reason}); it is released when the SAP session ends (logoff) or by its owner`;
+}
+
+/** What every failed release adds: the lock may be held, its handle, its object. */
+function leftLocked<H>(
+  handle: H,
+  object: LockedObject,
+  reason: string,
+): LeftLocked {
+  return {
+    left_locked: true,
+    ...(typeof handle === 'string' && handle !== ''
+      ? { lock_handle: handle }
+      : {}),
+    object: { type: object.type, name: object.name },
+    warning: leftLockedWarning(reason),
+  };
+}
+
 async function runRelease<H>(
   release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
   handle: H,
+  object: LockedObject,
 ): Promise<Released> {
   let answered: IAdtResponse<unknown, IAdtError>;
   try {
@@ -40,15 +71,17 @@ async function runRelease<H>(
   } catch (error) {
     // No origin. `connection` and `refusal` are both claims about the server,
     // and neither is true of an argument-validation defect in this process.
+    const message = error instanceof Error ? error.message : String(error);
     return {
       kind: 'threw',
       thrown: error,
       carrier: {
         error: 'client_threw',
-        message: error instanceof Error ? error.message : String(error),
+        message,
         // The throw as an entry, with its step: a credential failure as it
         // came, a carried method error as it is.
         failures: [thrownEntry(error, 'unlock')],
+        ...leftLocked(handle, object, message),
       },
     };
   }
@@ -67,6 +100,7 @@ async function runRelease<H>(
       // The method's error as it is — status, code, adt_type, T100 messages,
       // raw body — with the step it arose at; a credential failure as it came.
       failures: [failureEntry(error, 'unlock')],
+      ...leftLocked(handle, object, error.message),
     },
   };
 }
@@ -82,11 +116,15 @@ async function runRelease<H>(
  * Only for a handler that owns the lock's whole lifetime. The `LockX` tools
  * hand the handle back on purpose; releasing before returning would destroy
  * them, and they are never wrapped in this.
+ *
+ * `object` names what `acquire` locks. A release that fails says the object
+ * may be left locked, with its handle and this identity (`left_locked`).
  */
 export async function withLock<H, T>(
   acquire: () => Promise<IAdtResponse<H, IAdtError>>,
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
   release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+  object: LockedObject,
 ): Promise<IAdtResponse<T, IAdtError>> {
   // The lock is a step of its own: a refused or thrown lock says so.
   const acquired = await atStep('lock', acquire)();
@@ -119,7 +157,7 @@ export async function withLock<H, T>(
     threw = true;
   }
 
-  const released = await runRelease(release, handle);
+  const released = await runRelease(release, handle, object);
 
   // A credential failure ends the call as it came, once the release was
   // tried: the body's, else the release's — adt-clients rejects with it, and

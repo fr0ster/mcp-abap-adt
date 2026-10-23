@@ -17,6 +17,7 @@ import {
   failurePayload as chainFailurePayload,
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
+import { callTransportRequest } from './callTransport';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
@@ -101,6 +102,101 @@ interface MessageCarrier {
   }>;
 }
 
+/** The fixed words of the hint beside `CTS_WBO_API` 019. */
+export const TRANSPORT_HINT_WORDS =
+  'SAP answered that the object is already locked in this transport request: pass it as transport_request and call again.';
+
+/**
+ * The fixed words of the hint beside `CTS_WBO_API` 020: the call passed a
+ * task, and SAP names the request that holds the object.
+ */
+export const TRANSPORT_HINT_WORDS_020 =
+  'SAP names the transport request that holds the object: pass that request as transport_request and call again.';
+
+/** The `CTS_WBO_API` numbers that name a request to pass, each with its words. */
+const TRANSPORT_HINTS: ReadonlyMap<string, string> = new Map([
+  ['019', TRANSPORT_HINT_WORDS],
+  ['020', TRANSPORT_HINT_WORDS_020],
+]);
+
+/**
+ * A transport request number: three letters or digits of the system, `K`, six
+ * digits. Read by plain code, not a pattern.
+ */
+function isRequestNumber(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length !== 10) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const c = value[i] as string;
+    const letter = c >= 'A' && c <= 'Z';
+    const digit = c >= '0' && c <= '9';
+    if (!letter && !digit) return false;
+  }
+  if (value[3] !== 'K') return false;
+  for (let i = 4; i < 10; i += 1) {
+    const c = value[i] as string;
+    if (c < '0' || c > '9') return false;
+  }
+  return true;
+}
+
+/**
+ * The fixed words when SAP names the very request the call sent: passing it
+ * again changes nothing (a deleted object's entry still recorded there makes
+ * a re-create answer `CTS_WBO_API` 019 even with that request).
+ */
+export const TRANSPORT_ENTRY_HELD_WORDS =
+  "SAP names the transport request this call already passed: the object's entry is still in that request (a deleted object's entry, say), and passing the same request again does not help. Deal with the entry first — remove the object from the request with the request's tools — then call again.";
+
+/**
+ * The request the failed call sent: the one `corrNr` of its URL, as the
+ * client wrote it. Read by `URLSearchParams` over the text after the first
+ * `?`; none, or more than one, is no request.
+ */
+export function attemptedRequest(request: unknown): string | undefined {
+  const url = safeRequest(request)?.url;
+  if (url === undefined) return undefined;
+  const at = url.indexOf('?');
+  if (at < 0) return undefined;
+  const sent = new URLSearchParams(url.slice(at + 1)).getAll('corrNr');
+  return sent.length === 1 && sent[0] !== '' ? sent[0] : undefined;
+}
+
+/**
+ * What to pass when SAP refused a write because the object is already
+ * recorded in a request (`CTS_WBO_API` 019, "already locked in request …";
+ * 020, the same when a task was passed, naming the task's request;
+ * fr0ster/mcp-abap-adt#314). Nothing is resent; the caller decides.
+ *
+ * The number is taken from the message's T100 values by its shape, so the
+ * values' order and the language of the text decide nothing. A message
+ * holding no value of that shape gives no hint.
+ *
+ * **Only a request the call did not send is offered.** When SAP names the
+ * request the call sent (`attempted`: the call's `transport_request` and
+ * the `corrNr` of its URL), the hint is
+ * `TRANSPORT_ENTRY_HELD_WORDS` alone, with no `transport_request`: the same
+ * call again would be refused the same way.
+ */
+export function transportHint(
+  messages: MessageCarrier['messages'],
+  attempted: ReadonlyArray<string | undefined> = [],
+): { transport_request?: string; text: string } | undefined {
+  for (const m of messages ?? []) {
+    const t100 = m.t100;
+    if (t100 === undefined || t100.id !== 'CTS_WBO_API') continue;
+    const no = String(t100.no).padStart(3, '0');
+    const words = TRANSPORT_HINTS.get(no);
+    if (words === undefined) continue;
+    const request = (t100.values ?? []).find(isRequestNumber);
+    if (request === undefined) continue;
+    if (attempted.some((sent) => sent?.trim().toUpperCase() === request)) {
+      return { text: TRANSPORT_ENTRY_HELD_WORDS };
+    }
+    return { transport_request: request, text: words };
+  }
+  return undefined;
+}
+
 /**
  * The allowlist.
  *
@@ -163,6 +259,14 @@ export function failurePayload(
       }
       return out;
     });
+    // What the call sent: its own argument, and the `corrNr` of the failed
+    // request's URL — either one naming SAP's request means a resend of it
+    // would not help.
+    const hint = transportHint(error.messages, [
+      callTransportRequest(),
+      attemptedRequest(error.request),
+    ]);
+    if (hint !== undefined) payload.hint = hint;
   }
 
   // SAP's body, by who said no.

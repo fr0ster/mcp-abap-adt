@@ -136,6 +136,7 @@ export async function handleUpdateTable(
         },
         (lockHandle) =>
           obj.unlock({ tableName }, lockHandle, { analyse: analyseException }),
+        { type: 'TABLE', name: tableName },
       );
 
       if (!written.ok || !shouldActivate) {

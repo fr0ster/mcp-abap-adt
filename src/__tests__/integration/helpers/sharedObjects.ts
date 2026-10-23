@@ -274,6 +274,7 @@ export async function ensureSharedDependency(
             obj.unlock({ tableName: name }, lockHandle, {
               analyse: analyseException,
             }),
+          { type: 'TABLE', name },
         );
         if (!written.ok) throw new Error(written.getError().message);
 
@@ -321,6 +322,7 @@ export async function ensureSharedDependency(
             obj.unlock({ ddlName: name }, lockHandle, {
               analyse: analyseException,
             }),
+          { type: 'DDL', name },
         );
         if (!written.ok) throw new Error(written.getError().message);
 
@@ -368,6 +370,7 @@ export async function ensureSharedDependency(
             ),
           (lockHandle) =>
             obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+          { type: 'BEHAVIOR_DEFINITION', name },
         );
         if (!written.ok) throw new Error(written.getError().message);
 

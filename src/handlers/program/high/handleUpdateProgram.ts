@@ -143,6 +143,7 @@ export async function handleUpdateProgram(
           obj.unlock({ programName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'PROGRAM', name: programName },
       );
 
       if (!written.ok || !shouldActivate) {

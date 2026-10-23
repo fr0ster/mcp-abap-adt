@@ -129,6 +129,7 @@ export async function handleUpdateDdl(
         },
         (lockHandle) =>
           obj.unlock({ ddlName }, lockHandle, { analyse: analyseException }),
+        { type: 'DDL', name: ddlName },
       );
       if (!written.ok || !shouldActivate) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;

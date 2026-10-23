@@ -293,6 +293,7 @@ export async function handleCreateDataElement(
               obj.unlock({ dataElementName }, lockHandle, {
                 analyse: analyseException,
               }),
+            { type: 'DATA_ELEMENT', name: dataElementName },
           ),
         // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — see `handleCreateDomain.ts` for

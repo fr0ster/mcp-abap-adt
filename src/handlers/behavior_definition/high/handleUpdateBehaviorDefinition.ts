@@ -122,6 +122,7 @@ export async function handleUpdateBehaviorDefinition(
             atStep('update', update),
             (lockHandle) =>
               obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+            { type: 'BEHAVIOR_DEFINITION', name: name },
           );
 
       if (!written.ok) {

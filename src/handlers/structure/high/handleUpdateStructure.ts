@@ -137,6 +137,7 @@ export async function handleUpdateStructure(
           obj.unlock({ structureName }, lockHandle, {
             analyse: analyseException,
           }),
+        { type: 'STRUCTURE', name: structureName },
       );
 
       if (!written.ok || !shouldActivate) {

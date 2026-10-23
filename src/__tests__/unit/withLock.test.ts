@@ -6,6 +6,17 @@ import {
   withLock,
 } from '../../lib/strategies/withLock';
 
+/** What every lock here is taken on. */
+const OBJECT = { type: 'CLASS', name: 'OBJ' };
+
+/** What a failed release of `handle-1` on OBJECT adds, for the given reason. */
+const leftLockedBy = (reason: string) => ({
+  left_locked: true,
+  lock_handle: 'handle-1',
+  object: { type: 'CLASS', name: 'OBJ' },
+  warning: `the object may be left locked: the unlock failed (${reason}); it is released when the SAP session ends (logoff) or by its owner`,
+});
+
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
   return {
     ok: true,
@@ -38,6 +49,7 @@ describe('withLock', () => {
       async () => refused('Object is locked by another user'),
       body as never,
       release as never,
+      OBJECT,
     );
 
     expect(result.ok).toBe(false);
@@ -54,6 +66,7 @@ describe('withLock', () => {
       async () => ok('handle-1'),
       async () => ok('written'),
       release,
+      OBJECT,
     );
 
     if (!result.ok) throw new Error('expected the body value');
@@ -69,6 +82,7 @@ describe('withLock', () => {
       async () => ok('handle-1'),
       async () => refused('Update refused'),
       release,
+      OBJECT,
     );
 
     expect(release).toHaveBeenCalledTimes(1);
@@ -89,6 +103,7 @@ describe('withLock', () => {
           throw new Error('parser blew up');
         },
         release,
+        OBJECT,
       ),
     ).rejects.toThrow('parser blew up');
 
@@ -102,6 +117,7 @@ describe('withLock', () => {
       async () => ok('handle-1'),
       async () => refused('Update refused'),
       async () => refused('Unlock refused'),
+      OBJECT,
     );
 
     if (result.ok) throw new Error('expected the body refusal');
@@ -119,6 +135,7 @@ describe('withLock', () => {
       async () => {
         throw new Error('unlock called with no handle');
       },
+      OBJECT,
     );
 
     if (result.ok) throw new Error('expected the body refusal');
@@ -133,6 +150,7 @@ describe('withLock', () => {
           step: 'unlock',
         },
       ],
+      ...leftLockedBy('unlock called with no handle'),
     });
   });
 
@@ -155,6 +173,7 @@ describe('withLock', () => {
       async () => ok('handle-1'),
       async () => ok('written'),
       async () => refused('Unlock refused'),
+      OBJECT,
     );
 
     expect(result.ok).toBe(true);
@@ -177,6 +196,7 @@ describe('withLock', () => {
           url: '/u',
           headers: { authorization: SECRET },
         }),
+      OBJECT,
     );
 
     expect(result.ok).toBe(true);
@@ -200,6 +220,7 @@ describe('withLock', () => {
       async () => {
         throw new Error('unlock called with no handle');
       },
+      OBJECT,
     );
 
     expect(result.ok).toBe(true);
@@ -215,6 +236,7 @@ describe('withLock', () => {
           step: 'unlock',
         },
       ],
+      ...leftLockedBy('unlock called with no handle'),
     });
   });
 
@@ -227,6 +249,7 @@ describe('withLock', () => {
           throw new Error('parser blew up');
         },
         async () => refused('Unlock refused'),
+        OBJECT,
       );
     } catch (thrown) {
       const error = thrown as Error & { cause?: Error; cleanup?: unknown };
@@ -251,6 +274,7 @@ describe('withLock', () => {
           url: '/u',
           headers: { authorization: SECRET },
         }),
+      OBJECT,
     );
 
     if (result.ok) throw new Error('expected the body refusal');

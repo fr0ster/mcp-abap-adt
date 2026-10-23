@@ -267,6 +267,7 @@ export async function handleCreateDomain(
               obj.unlock({ domainName }, lockHandle, {
                 analyse: analyseException,
               }),
+            { type: 'DOMAIN', name: domainName },
           ),
         // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — this is the call most likely to

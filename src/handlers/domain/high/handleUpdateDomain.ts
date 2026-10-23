@@ -230,6 +230,7 @@ export async function handleUpdateDomain(
           ),
         (lockHandle) =>
           obj.unlock({ domainName }, lockHandle, { analyse: analyseException }),
+        { type: 'DOMAIN', name: domainName },
       );
 
       if (!written.ok) {

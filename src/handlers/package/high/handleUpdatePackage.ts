@@ -133,6 +133,7 @@ export async function handleUpdatePackage(
               pkg.unlock({ packageName }, lockHandle, {
                 analyse: analyseException,
               }),
+            { type: 'PACKAGE', name: packageName },
           ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
         },
       ),

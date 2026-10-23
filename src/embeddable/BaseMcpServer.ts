@@ -62,6 +62,7 @@ import {
   OUTSIDE_BATCH_SENTENCE,
   withBatchSentence,
 } from '../lib/batch/sentence.js';
+import { runWithCallTransport } from '../lib/callTransport.js';
 import {
   createAbapConnection,
   systemKindOf,
@@ -1518,7 +1519,9 @@ export abstract class BaseMcpServer extends McpServer {
                         // nothing is sent here.
                         withKnownSystemContext(system, () => {
                           throwIfRequestAborted(signal);
-                          return fn();
+                          // The call's own transport request, for the
+                          // failure renderer's transport hint.
+                          return runWithCallTransport(args, fn);
                         }),
                     ),
                   ),
@@ -2631,6 +2634,19 @@ export abstract class BaseMcpServer extends McpServer {
  * directly, an older one that reads its group's context after it was set.
  */
 function callHandler(
+  handler: unknown,
+  group: unknown,
+  context: HandlerContext,
+  args: unknown,
+): Promise<unknown> {
+  // The call's own transport request, for the failure renderer's transport
+  // hint (`callTransport.ts`).
+  return runWithCallTransport(args, () =>
+    invokeHandler(handler, group, context, args),
+  );
+}
+
+function invokeHandler(
   handler: unknown,
   group: unknown,
   context: HandlerContext,

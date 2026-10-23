@@ -96,6 +96,7 @@ export async function handleDeleteLocalMacros(
         ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
+        { type: 'CLASS', name: className },
       );
 
       if (!deleted.ok || !shouldActivate) {

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/compact-readonly-entries",
-  "version": "20.0.0",
+  "version": "20.1.0",
   "description": "The compact ABAP ADT tools that change nothing: one tool per read operation, the object in the arguments. A tool list a consumer can hand out knowing it carries no write route.",
   "license": "Apache-2.0",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -51,10 +51,10 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@mcp-abap-adt/lib": "^20.0.0"
+    "@mcp-abap-adt/lib": "^20.1.0"
   },
   "devDependencies": {
-    "@mcp-abap-adt/lib": "^20.0.0",
+    "@mcp-abap-adt/lib": "^20.1.0",
     "typescript": "^6.0.2",
     "@types/node": "^22.20.5"
   }

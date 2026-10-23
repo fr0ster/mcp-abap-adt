@@ -110,7 +110,13 @@ with the single-step tools:
    `run_id` (`finished`, `error`, `failed`, or its progress), then `part: activation_results`
    for the messages it produced.
 
-Running unit tests is three phases, each its own batch:
+Running unit tests with the synchronous runner is one call — `HandlerUnitTestRun` with
+`runner: 'sync'` (in the full sets `RunUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`,
+and `RunFunctionModuleUnitTest` with `function_group_name`, each with `runner: 'sync'`): one
+`POST /sap/bc/adt/abapunit/testruns`, its answer the finished result at `BatchEnd`.
+`HandlerUnitTestRun` runs every test class of each container named; a function module's run covers
+every test of its group. With the asynchronous runner (`runner: 'async'`, the default) it is three
+phases, each its own batch:
 
 1. start — `HandlerUnitTestRun`, answering the run's `run_id`;
 2. the run's status, as often as you choose — `HandlerUnitTestStatus` (a CDS unit test:
@@ -389,7 +395,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-170 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+175 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -508,6 +514,9 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `ReadTransportActionLog` | every call | GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs |
 | `ReadTransportObjects` | every call | GET /sap/bc/adt/cts/transportrequests/{number} |
 | `RemoveTransportObject` | every call | PUT /sap/bc/adt/cts/transportrequests/{number} without the object |
+| `RunFunctionGroupUnitTest` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of the function group and answers the finished result |
+| `RunFunctionModuleUnitTest` | when runner is sync and function_group_name is given | POST /sap/bc/adt/abapunit/testruns at the module under its function group: runs every test of the group and answers the finished result |
+| `RunProgramUnitTest` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of the report and answers the finished result |
 | `RuntimeAnalyzeProfilerTrace` | every call | GET …/abaptraces/{id}/hitlist or /statements, summarised locally |
 | `RuntimeCreateProfilerTraceParameters` | every call | POST /sap/bc/adt/runtime/traces/abaptraces/parameters |
 | `RuntimeGetDumpById` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
@@ -518,6 +527,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `RuntimeListSystemMessages` | every call | GET /sap/bc/adt/runtime/systemmessages |
 | `RuntimeRunClass` | when profile is any value but true | POST /sap/bc/adt/oo/classrun/{name} (without profile: with it the trace is also scheduled and listed) |
 | `RuntimeRunProgram` | when profile is any value but true | POST /sap/bc/adt/programs/programrun/{name} (without profile: with it the trace is scheduled first) |
+| `RunUnitTest` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of the class and answers the finished result |
 | `SearchObject` | every call | GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
 | `SortAndCompressTransportTask` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress |
 | `ValidateServiceBinding` | every call | POST /sap/bc/adt/cts/transportchecks |
@@ -562,7 +572,8 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `HandlerTransportMoveObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
 | `HandlerTransportSortAndCompress` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress |
 | `HandlerUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
-| `HandlerUnitTestRun` | every call | POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult |
+| `HandlerUnitTestRun` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of each container named and answers the finished result |
+| `HandlerUnitTestRun` | when runner is async (absent reads as async) | POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult |
 | `HandlerUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
 | `HandlerUnlock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
 | `HandlerUnlock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |

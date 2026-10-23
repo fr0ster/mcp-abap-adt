@@ -38,7 +38,7 @@
   {
     "group": "compact",
     "name": "HandlerUnitTestRun",
-    "inputs": "tests*, title, context, scope, risk_level, duration",
+    "inputs": "tests*, runner, title, context, scope, risk_level, duration",
     "available_in": "cloud, onprem"
   },
   {

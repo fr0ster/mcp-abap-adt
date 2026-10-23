@@ -107,4 +107,7 @@ export { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpd
 export { handleUpdateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.js';
 export { handleUpdateProgramUnitTest } from '../../handlers/unit_test/high/handleUpdateProgramUnitTest.js';
 export { handleUpdateUnitTest } from '../../handlers/unit_test/high/handleUpdateUnitTest.js';
-export { handleStartUnitTestRun } from '../../handlers/unit_test/shared/startRun.js';
+export {
+  handleStartUnitTestRun,
+  type UnitTestRunner,
+} from '../../handlers/unit_test/shared/startRun.js';

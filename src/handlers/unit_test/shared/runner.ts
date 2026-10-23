@@ -47,12 +47,18 @@ export interface UnitTestScopeArgs {
  * The `scope` property of a full-set run tool: the shape compact
  * `HandlerUnitTestRun` takes, sent to both runners. What is left out is
  * adt-clients' default (own tests, foreign tests as a preview).
+ *
+ * Measured on premise (BASIS 816, 2026-10-23), a function group whose test
+ * class carries `"! @testing FUNC:<module>`, the module's run: `/testruns`
+ * with the default scope answered both methods as a preview (`isForeign`,
+ * nothing executed) and with `foreign_tests: true` executed them; `/runs`
+ * executed them with the default scope and with `foreign_tests: true` alike.
  */
 export const SCOPE_PROPERTY = {
   scope: {
     type: 'object',
     description:
-      "Which tests the run covers, with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so): they execute only with foreign_tests true; with foreign_tests false and add_foreign_tests_as_preview true (the defaults) SAP lists them as a preview, unexecuted.",
+      "Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.",
     properties: {
       own_tests: {
         type: 'boolean',

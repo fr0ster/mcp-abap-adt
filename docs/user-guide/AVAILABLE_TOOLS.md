@@ -3474,7 +3474,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `function_group_name` (string, required) - Function group whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
-- `scope` (object, optional) - Which tests the run covers, with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so): they execute only with foreign_tests true; with foreign_tests false and add_foreign_tests_as_preview true (the defaults) SAP lists them as a preview, unexecuted.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
@@ -3488,7 +3488,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
-- `scope` (object, optional) - Which tests the run covers, with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so): they execute only with foreign_tests true; with foreign_tests false and add_foreign_tests_as_preview true (the defaults) SAP lists them as a preview, unexecuted.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
@@ -3501,7 +3501,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `program_name` (string, required) - Report whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
-- `scope` (object, optional) - Which tests the run covers, with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so): they execute only with foreign_tests true; with foreign_tests false and add_foreign_tests_as_preview true (the defaults) SAP lists them as a preview, unexecuted.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
@@ -3514,7 +3514,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
-- `scope` (object, optional) - Which tests the run covers, with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so): they execute only with foreign_tests true; with foreign_tests false and add_foreign_tests_as_preview true (the defaults) SAP lists them as a preview, unexecuted.
+- `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 

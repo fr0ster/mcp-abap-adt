@@ -326,7 +326,7 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
   const name = `${server.name}-${version}-${platform}`;
   const outDir = path.join(repo, 'dist-portable', name);
   fs.rmSync(outDir, { recursive: true, force: true });
-  // A personal build, not one to hand out: the SDK SAPNWRFC_HOME names goes
+  // Never published, shared only inside the organization holding the SDK's license: the SDK SAPNWRFC_HOME names goes
   // into the archive (its runtime libraries only), and the addon beside it — so the executable needs nothing at run time and writes
   // nothing, even from a read-only folder.
   const sdkOut = path.join(outDir, 'nwrfcsdk', 'lib');
@@ -374,9 +374,22 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
       'this build was made with.' +
         (platform === 'linux-x64' ? '' : ' SNC also needs the SNC product (SAP Secure Login Client).'),
       '',
-      'A PERSONAL BUILD: it contains the SAP NW RFC SDK, which SAP licenses through its Support Portal.',
-      'Do not hand this archive on; whoever needs one builds their own (npm run portable:build).',
+      'NOT FOR PUBLICATION: it contains the SAP NW RFC SDK, which SAP licenses through its Support Portal',
+      'to your organization. Share it only inside the organization that holds that license.',
       '',
+      ...(platform === 'win-x64'
+        ? [
+            'The executable is unsigned (the server is injected into Node.js, which voids its signature):',
+            'on first start SmartScreen asks — More info, then Run anyway.',
+            '',
+          ]
+        : platform === 'macos-arm64'
+          ? [
+              'Received through a browser or a messenger? Clear the quarantine flag once, or macOS refuses it:',
+              '  xattr -dr com.apple.quarantine <this folder>',
+              '',
+            ]
+          : []),
       ...sdkFolderNote(server.name, exe, sdkLib, platform),
       'Documentation: https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md',
       '',

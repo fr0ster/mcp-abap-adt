@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **A portable archive may be shared inside the organization that licensed the SAP NW RFC SDK**, as its SAP administrators share the SDK itself; it is still never published. [Portable Build](docs/installation/PORTABLE.md), [Installation](docs/installation/INSTALLATION.md) and the archive's README say so, and the README tells a colleague how to start it: on Windows SmartScreen asks once for the unsigned executable (More info → Run anyway); on macOS an archive received through a browser or a messenger needs its quarantine flag cleared (`xattr -dr com.apple.quarantine <folder>`).
+
 ## [20.1.0] - 2026-10-23
 
 Both ABAP Unit runners, chosen per call with `runner: 'async' | 'sync'` ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286), [#313](https://github.com/fr0ster/mcp-abap-adt/pull/313)); a write whose cleanup UNLOCK fails says the object may be left locked, and a save refused by `CTS_WBO_API` 019 / 020 names the request that holds the object ([#314](https://github.com/fr0ster/mcp-abap-adt/issues/314), [#316](https://github.com/fr0ster/mcp-abap-adt/pull/316)); on `@mcp-abap-adt/connection` 19.1.0, which resends a request lost on a dead kept-alive socket once on a new connection (#314's `socket hang up`); the 7-day release age dropped ([#315](https://github.com/fr0ster/mcp-abap-adt/pull/315)). The eighteen packages are all at 20.1.0, every sibling range at `^20.1.0` — `@mcp-abap-adt/compact-modify` needs `@mcp-abap-adt/lib` 20.1.0 for `runner` on `HandlerUnitTestRun`.

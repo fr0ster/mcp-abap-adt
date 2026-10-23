@@ -78,8 +78,8 @@ settings per platform, building a binding and the SNC prerequisites: [RFC Setup]
 
 One executable per server and platform, with Node.js and your own SAP NW RFC SDK inside: unpack and run,
 no Node.js, npm or SDK installation on the machine — HTTP, RFC and, on Windows and macOS, SNC. You build it
-yourself from this repository (`npm run portable:build`) and keep it: it carries the SDK, so it is never
-handed on. See [Portable Build](PORTABLE.md).
+yourself from this repository (`npm run portable:build`): it carries the SDK, so it is never
+published, and is shared only inside the organization that holds the SDK's license. See [Portable Build](PORTABLE.md).
 
 ### HTTPS certificates
 

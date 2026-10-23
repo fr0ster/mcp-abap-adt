@@ -5,10 +5,11 @@ A portable build is one executable per server — the full one (`mcp-abap-adt`) 
 built it. Unpack it anywhere and point an MCP client at it: no Node.js, no npm, no compiler, no
 `SAPNWRFC_HOME`.
 
-**It is a personal build.** You build it yourself, from this repository, with your own SDK, and the
-archive carries that SDK. SAP licenses the SDK through its Support Portal, so a portable archive is
-never published or handed on — whoever needs one builds their own. The README inside the archive
-says so.
+**It is built, not downloaded.** You build it yourself, from this repository, with the SDK your
+organization obtained, and the archive carries that SDK. SAP licenses the SDK through its Support
+Portal to that organization, so a portable archive is **never published**: it is shared only inside
+the organization that holds the license — a team gets it from the colleague who built it, as it gets
+the SDK itself from its SAP administrators. The README inside the archive says so.
 
 | Platform | Connections | Archive |
 |---|---|---|
@@ -130,7 +131,10 @@ folder, the first RFC call is refused naming the folder it looked in.
 
 **Signing.** The macOS executable is signed ad hoc. The Windows executable is Node.js's own `node.exe`
 with the server injected, which invalidates its Authenticode signature: Windows treats it as unsigned,
-and SmartScreen asks once. Enough for a build that stays on your machine.
+and SmartScreen asks once ("Windows protected your PC" → More info → Run anyway); a corporate
+code-signing certificate (`signtool sign`) removes that for a team. On macOS the ad hoc signature
+holds on any Mac, but an archive received through a browser or a messenger carries the quarantine
+flag, which Gatekeeper refuses: clear it once with `xattr -dr com.apple.quarantine <the unpacked folder>`.
 
 ## Verified
 

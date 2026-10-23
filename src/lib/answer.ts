@@ -17,6 +17,7 @@ import {
   failurePayload as chainFailurePayload,
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
+import { callTransportRequest } from './callTransport';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
@@ -171,13 +172,14 @@ export function attemptedRequest(request: unknown): string | undefined {
  * holding no value of that shape gives no hint.
  *
  * **Only a request the call did not send is offered.** When SAP names the
- * request the call sent (`attempted`, read off its URL), the hint is
+ * request the call sent (`attempted`: the call's `transport_request` and
+ * the `corrNr` of its URL), the hint is
  * `TRANSPORT_ENTRY_HELD_WORDS` alone, with no `transport_request`: the same
  * call again would be refused the same way.
  */
 export function transportHint(
   messages: MessageCarrier['messages'],
-  attempted?: string,
+  attempted: ReadonlyArray<string | undefined> = [],
 ): { transport_request?: string; text: string } | undefined {
   for (const m of messages ?? []) {
     const t100 = m.t100;
@@ -187,7 +189,7 @@ export function transportHint(
     if (words === undefined) continue;
     const request = (t100.values ?? []).find(isRequestNumber);
     if (request === undefined) continue;
-    if (attempted !== undefined && attempted.trim().toUpperCase() === request) {
+    if (attempted.some((sent) => sent?.trim().toUpperCase() === request)) {
       return { text: TRANSPORT_ENTRY_HELD_WORDS };
     }
     return { transport_request: request, text: words };
@@ -257,7 +259,13 @@ export function failurePayload(
       }
       return out;
     });
-    const hint = transportHint(error.messages, attemptedRequest(error.request));
+    // What the call sent: its own argument, and the `corrNr` of the failed
+    // request's URL — either one naming SAP's request means a resend of it
+    // would not help.
+    const hint = transportHint(error.messages, [
+      callTransportRequest(),
+      attemptedRequest(error.request),
+    ]);
     if (hint !== undefined) payload.hint = hint;
   }
 

@@ -421,8 +421,8 @@ it arose. A tool never rewrites it:
   object is already locked in a transport request) or 020 (a task was passed, and SAP names the
   request that holds the object) carries `hint: { transport_request, text }`: the request number
   from the message's values and fixed words, one text per number, saying to pass that request as
-  `transport_request` — when the call sent no request or another one (the `corrNr` of the
-  failed request's URL). When SAP names the very request the call sent, the hint is `{ text }`
+  `transport_request` — when the call sent no request or another one (the call's own
+  `transport_request` argument, and the `corrNr` of the failed request's URL). When SAP names the very request the call sent, the hint is `{ text }`
   alone, with no `transport_request`: the object's entry is still in that request (a deleted
   object's entry refuses its re-create with 019 even so), passing it again does not help, and the
   entry is dealt with first — removed from the request with the request's tools. Nothing is

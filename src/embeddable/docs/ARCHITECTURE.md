@@ -98,6 +98,13 @@ same way.
    The call runs as its instance's (`runAsOwner`): a connection it opens is that instance's.
 2. **The handler's context.** The wrapper builds a `HandlerContext`: `{ connection, logger, state,
    debugger }`, where `connection` comes from `getConnection(signal)`.
+   **The call's transport scope.** The wrapper also runs the handler inside the call's own
+   `transport_request` (`runWithCallTransport`), which the failure's transport hint reads to tell
+   "SAP names the request this call already passed" from "pass this other request". `HandlerExporter`'s
+   handlers and a group registered on its own enter it too. An embedder that calls an exported
+   write handler directly, outside these, does not: for the two creates that send `corrNr` as query
+   parameters (metadata extension, service binding) the hint may then offer back the request it
+   was given. Call write handlers through `HandlerExporter` or a handler group to get it.
 3. **The request signal scope.** The handler runs inside `runWithRequestSignal(signal, …)`;
    `currentRequestSignal()` reads it — for the server's own waits only: a tool's sends carry no
    request signal, and nothing sent to SAP carries it. A call whose signal aborted

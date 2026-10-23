@@ -89,8 +89,6 @@ their dependency ranges are not affected.
   every dependency's install script, so with npm 11.19.0 or later a new dependency with an
   unreviewed install script fails the install (`ESTRICTALLOWSCRIPTS`) instead of running it; npm 10
   (bundled with Node.js 22) reads neither setting, hence `--ignore-scripts` on any npm.
-- **New versions are resolved only once they are 7 days old** (`min-release-age=7`), except the
-  `@mcp-abap-adt/*` scope.
 - **`@mcp-abap-adt/lib` no longer has `@modelcontextprotocol/inspector` as a dev dependency**, and
   `.vscode/launch.json` lost its Inspector configuration: run the Inspector as your own command
   ([TESTING_AUTH](development/tests/TESTING_AUTH.md)).

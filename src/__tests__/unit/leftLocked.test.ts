@@ -8,9 +8,12 @@
  * request …") names that request as a hint; nothing is resent.
  */
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
 import { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpdateLocalTestClass';
 import { handleUpdateUnderLock } from '../../handlers/common/low/handleUpdateUnderLock';
 import {
+  attemptedRequest,
+  TRANSPORT_ENTRY_HELD_WORDS,
   TRANSPORT_HINT_WORDS,
   TRANSPORT_HINT_WORDS_020,
   transportHint,
@@ -49,12 +52,28 @@ const ALREADY_LOCKED = {
   },
 };
 
-const saveRefused = (messages: unknown[]) =>
+const saveRefused = (messages: unknown[], url?: string) =>
   refusedResponse('Save failed', {
     adtType: 'ExceptionResourceSaveFailure',
     response: { status: 500, data: '<exc/>' },
     messages,
+    ...(url !== undefined ? { request: { method: 'PUT', url } } : {}),
   } as unknown as Partial<IAdtError>);
+
+/**
+ * The include's PUT as the client writes its URL (`writeQuery`): the lock
+ * handle, then `corrNr` when the call was given a request.
+ */
+const includeUrl = (config: unknown) => {
+  const sent = (config as { transportRequest?: string }).transportRequest;
+  return `/sap/bc/adt/oo/classes/zcl_obj/includes/testclasses?lockHandle=handle-1${sent ? `&corrNr=${encodeURIComponent(sent)}` : ''}`;
+};
+
+/** A save refused with these messages, its request built from the call's config. */
+const saveRefusedAsSent =
+  (messages: unknown[]) =>
+  async (...args: unknown[]) =>
+    saveRefused(messages, includeUrl(args[0]));
 
 describe('a cleanup unlock that fails says the object may be left locked', () => {
   it('a THROWN unlock after a refused save: left_locked, handle, object, the fixed words, beside the old fields', async () => {
@@ -309,7 +328,7 @@ describe('a save refused with CTS_WBO_API 020 (a task passed) names the request 
   it('UpdateLocalTestClass: hint with the request and the 020 words', async () => {
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
-      update: async () => saveRefused([HELD_BY_REQUEST]),
+      update: saveRefusedAsSent([HELD_BY_REQUEST]),
       unlock: async () => okResponse(undefined),
     });
     const result: any = await handleUpdateLocalTestClass(context as any, {
@@ -360,5 +379,123 @@ describe('a save refused with CTS_WBO_API 020 (a task passed) names the request 
         },
       ]),
     ).toBeUndefined();
+  });
+});
+
+describe('the hint offers only a request the call did not send', () => {
+  const lockedIn = (no: string, request: string) => ({
+    type: 'E',
+    text: `Object LIMU CINC OBJ is already locked in request ${request}`,
+    t100: { id: 'CTS_WBO_API', no, values: ['LIMU CINC OBJ', request] },
+  });
+
+  const update = (messages: unknown[], transport_request?: string) => {
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      update: saveRefusedAsSent(messages),
+      unlock: async () => okResponse(undefined),
+    });
+    return handleUpdateLocalTestClass(context as any, {
+      ...ARGS,
+      ...(transport_request !== undefined ? { transport_request } : {}),
+    });
+  };
+
+  it('none sent: the request SAP names, to pass', async () => {
+    const result: any = await update([lockedIn('019', 'SIDK900001')]);
+    expect(payloadOf(result).hint).toEqual({
+      transport_request: 'SIDK900001',
+      text: TRANSPORT_HINT_WORDS,
+    });
+  });
+
+  it('another request sent: the request SAP names, to pass', async () => {
+    const result: any = await update(
+      [lockedIn('019', 'SIDK900001')],
+      'SIDK900009',
+    );
+    expect(payloadOf(result).hint).toEqual({
+      transport_request: 'SIDK900001',
+      text: TRANSPORT_HINT_WORDS,
+    });
+  });
+
+  it.each(['019', '020'])(
+    '%s naming the request sent: the entry-held words, no transport_request',
+    async (no) => {
+      const result: any = await update(
+        [lockedIn(no, 'SIDK900001')],
+        'SIDK900001',
+      );
+      const { hint } = payloadOf(result);
+      expect(hint).toEqual({ text: TRANSPORT_ENTRY_HELD_WORDS });
+      expect(hint).not.toHaveProperty('transport_request');
+    },
+  );
+
+  it('the request sent in lower case is the same request', async () => {
+    const result: any = await update(
+      [lockedIn('019', 'SIDK900001')],
+      'sidk900001',
+    );
+    expect(payloadOf(result).hint).toEqual({
+      text: TRANSPORT_ENTRY_HELD_WORDS,
+    });
+  });
+
+  /**
+   * The case `handleRemoveTransportObject` documents: a deleted object's CTS
+   * entry stays on its request, and creating the name again is refused with
+   * `CTS_WBO_API` 019 even when that same request is passed.
+   */
+  it('re-creating a deleted object with the request that still holds its entry: no retry offered', async () => {
+    const create = jest.fn(async (config: unknown) =>
+      refusedResponse('Create failed', {
+        response: { status: 400, data: '<exc/>' },
+        request: {
+          method: 'POST',
+          url: `/sap/bc/adt/oo/classes?corrNr=${(config as { transportRequest: string }).transportRequest}`,
+        },
+        messages: [
+          {
+            type: 'E',
+            text: 'Object R3TR CLAS OBJ is already locked in request SIDK900001',
+            t100: {
+              id: 'CTS_WBO_API',
+              no: '019',
+              values: ['R3TR CLAS OBJ', 'SIDK900001', 'SAPUSER01'],
+            },
+          },
+        ],
+      } as unknown as Partial<IAdtError>),
+    );
+    fakeClient = fakeClientOf({ create });
+    const result: any = await handleCreateClass(context as any, {
+      class_name: 'zcl_obj',
+      package_name: 'PKG',
+      transport_request: 'SIDK900001',
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).hint).toEqual({
+      text: TRANSPORT_ENTRY_HELD_WORDS,
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['no request', undefined, undefined],
+    ['a URL with no query', { url: '/sap/bc/adt/oo/classes' }, undefined],
+    ['a URL with no corrNr', { url: '/x?lockHandle=h' }, undefined],
+    ['corrNr outside a query', { url: '/x&corrNr=SIDK900001' }, undefined],
+    ['one corrNr', { url: '/x?lockHandle=h&corrNr=SIDK900001' }, 'SIDK900001'],
+    ['an encoded corrNr', { url: '/x?corrNr=SID%4B900001' }, 'SIDK900001'],
+    [
+      'two corrNr',
+      { url: '/x?corrNr=SIDK900001&corrNr=SIDK900002' },
+      undefined,
+    ],
+    ['an empty corrNr', { url: '/x?corrNr=' }, undefined],
+  ])('attemptedRequest: %s', (_label, request, expected) => {
+    expect(attemptedRequest(request)).toBe(expected);
   });
 });

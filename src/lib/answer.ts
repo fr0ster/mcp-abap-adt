@@ -139,19 +139,46 @@ function isRequestNumber(value: unknown): value is string {
 }
 
 /**
+ * The fixed words when SAP names the very request the call sent: passing it
+ * again changes nothing (a deleted object's entry still recorded there makes
+ * a re-create answer `CTS_WBO_API` 019 even with that request).
+ */
+export const TRANSPORT_ENTRY_HELD_WORDS =
+  "SAP names the transport request this call already passed: the object's entry is still in that request (a deleted object's entry, say), and passing the same request again does not help. Deal with the entry first — remove the object from the request with the request's tools — then call again.";
+
+/**
+ * The request the failed call sent: the one `corrNr` of its URL, as the
+ * client wrote it. Read by `URLSearchParams` over the text after the first
+ * `?`; none, or more than one, is no request.
+ */
+export function attemptedRequest(request: unknown): string | undefined {
+  const url = safeRequest(request)?.url;
+  if (url === undefined) return undefined;
+  const at = url.indexOf('?');
+  if (at < 0) return undefined;
+  const sent = new URLSearchParams(url.slice(at + 1)).getAll('corrNr');
+  return sent.length === 1 && sent[0] !== '' ? sent[0] : undefined;
+}
+
+/**
  * What to pass when SAP refused a write because the object is already
  * recorded in a request (`CTS_WBO_API` 019, "already locked in request …";
  * 020, the same when a task was passed, naming the task's request;
- * fr0ster/mcp-abap-adt#314): that request, as data, beside fixed words.
- * Nothing is resent; the caller decides.
+ * fr0ster/mcp-abap-adt#314). Nothing is resent; the caller decides.
  *
  * The number is taken from the message's T100 values by its shape, so the
  * values' order and the language of the text decide nothing. A message
  * holding no value of that shape gives no hint.
+ *
+ * **Only a request the call did not send is offered.** When SAP names the
+ * request the call sent (`attempted`, read off its URL), the hint is
+ * `TRANSPORT_ENTRY_HELD_WORDS` alone, with no `transport_request`: the same
+ * call again would be refused the same way.
  */
 export function transportHint(
   messages: MessageCarrier['messages'],
-): { transport_request: string; text: string } | undefined {
+  attempted?: string,
+): { transport_request?: string; text: string } | undefined {
   for (const m of messages ?? []) {
     const t100 = m.t100;
     if (t100 === undefined || t100.id !== 'CTS_WBO_API') continue;
@@ -159,8 +186,11 @@ export function transportHint(
     const words = TRANSPORT_HINTS.get(no);
     if (words === undefined) continue;
     const request = (t100.values ?? []).find(isRequestNumber);
-    if (request !== undefined)
-      return { transport_request: request, text: words };
+    if (request === undefined) continue;
+    if (attempted !== undefined && attempted.trim().toUpperCase() === request) {
+      return { text: TRANSPORT_ENTRY_HELD_WORDS };
+    }
+    return { transport_request: request, text: words };
   }
   return undefined;
 }
@@ -227,7 +257,7 @@ export function failurePayload(
       }
       return out;
     });
-    const hint = transportHint(error.messages);
+    const hint = transportHint(error.messages, attemptedRequest(error.request));
     if (hint !== undefined) payload.hint = hint;
   }
 

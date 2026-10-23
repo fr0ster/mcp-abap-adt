@@ -380,7 +380,8 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
       ...(platform === 'win-x64'
         ? [
             'The executable is unsigned (the server is injected into Node.js, which voids its signature):',
-            'on first start SmartScreen asks — More info, then Run anyway.',
+            'on first start SmartScreen may ask — More info, then Run anyway. Where policy removes Run anyway,',
+            'ask your IT to allow the executable.',
             '',
           ]
         : platform === 'macos-arm64'

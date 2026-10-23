@@ -131,8 +131,10 @@ folder, the first RFC call is refused naming the folder it looked in.
 
 **Signing.** The macOS executable is signed ad hoc. The Windows executable is Node.js's own `node.exe`
 with the server injected, which invalidates its Authenticode signature: Windows treats it as unsigned,
-and SmartScreen asks once ("Windows protected your PC" → More info → Run anyway); a corporate
-code-signing certificate (`signtool sign`) removes that for a team. On macOS the ad hoc signature
+and SmartScreen may ask once ("Windows protected your PC" → More info → Run anyway). Where the
+organization's policy removes Run anyway, the executable has to be allowed by its IT (an allow rule,
+or signing with the organization's code-signing certificate, `signtool sign`); a signature names the
+publisher but does not by itself clear SmartScreen. On macOS the ad hoc signature
 holds on any Mac, but an archive received through a browser or a messenger carries the quarantine
 flag, which Gatekeeper refuses: clear it once with `xattr -dr com.apple.quarantine <the unpacked folder>`.
 

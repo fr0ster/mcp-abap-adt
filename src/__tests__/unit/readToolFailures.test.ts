@@ -218,11 +218,11 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
     );
     expect(payloadOf(result)).toMatchObject({
       status: 403,
-      step: 'read table type',
+      step: 'read domain',
     });
     expect(sent).toEqual([
       '/sap/bc/adt/ddic/dataelements/zt',
-      '/sap/bc/adt/ddic/tabletypes/zt',
+      '/sap/bc/adt/ddic/domains/zt',
     ]);
   });
 });

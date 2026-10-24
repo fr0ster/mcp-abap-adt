@@ -386,13 +386,15 @@ it arose. A tool never rewrites it:
   — it is not presented as SAP's answer. The tools that only parse the source they are given
   and send no request (`GetAbapAST` with `step: "parse"`, `GetAbapSemanticAnalysis` with
   `step: "analyse"`) answer a throw of their parser this way.
-- **A tool that sends its own request** (`GetTypeInfo`, `GetTransport`,
-  `GetObjectNodeFromCache`: a resource no client method reads) answers SAP's refusal in the
-  same shape, read the way a client method reads one — `request` is the request it sent and
-  `step` names it (`read domain`, `read data element`, `read table type`, `read repository
-  information`, `read structure`; `read transport request`; `read OBJECT_URI`). A
-  `GetObjectNodeFromCache` whose `OBJECT_URI` read was refused fails the call with it; the
-  node is not answered with the failure as its content.
+- **A tool of several reads** names the read that was refused as its `step`: `GetTypeInfo`
+  (`read data element`, `read domain`, `read structure`, `read table type`; a `404` there is the
+  kind absent, not a refusal) and `GetTransport` (`read transport request`). Each read is a
+  client method's, so `request` is the request it sent.
+- **A tool that sends its own request** (`GetObjectNodeFromCache`: it reads a cached node's
+  own URI, which no client method reads) answers SAP's refusal in the same shape, read the way
+  a client method reads one — `request` is the request it sent and `step` names it
+  (`read OBJECT_URI`). A `GetObjectNodeFromCache` whose `OBJECT_URI` read was refused fails
+  the call with it; the node is not answered with the failure as its content.
 - **Our own wait ran out** — a tool that waits a bounded number of polls for SAP (a unit-test
   include's activation run: 6) and gives up says so in plain words, as the method's failure
   (`client_threw`), never as SAP's refusal.

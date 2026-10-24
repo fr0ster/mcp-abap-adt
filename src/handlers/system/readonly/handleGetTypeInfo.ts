@@ -1,16 +1,18 @@
 /**
- * GetTypeInfo: what a DDIC type name is, tried in order — a data element, a
- * table type, the repository's object properties of a domain, and, unless
- * switched off, a structure. Each lookup is an adt-clients member (#235); a
- * `404` or an empty answer moves on to the next, any other refusal is the
- * call's answer.
+ * GetTypeInfo: every DDIC kind a type name is (#321).
  *
- * A domain is found through its object properties, as before #235. The
- * lookup that came first, `/ddic/domains/{name}/source/main`, answered `404`
- * for every domain (measured on E19, 2026-10-24), so it never found one; the
- * domain's metadata does answer, but nothing here reads a `doma:domain`
- * document yet, and a name that is a domain and a data element (MANDT) would
- * then answer an unread domain instead of the data element.
+ * One name can be several kinds — MANDT is a data element and a domain — so
+ * the name is read as each: a data element, a domain, a structure (unless
+ * switched off) and a table type, each through its adt-clients member (#235),
+ * and the call answers every kind that exists, in alphabetical order of kind.
+ * Measured on E19 (2026-10-24): each read answers `404` for a kind the name is
+ * not, and `200` with its own document for one it is (`blue:wbobj` /
+ * `dtel:dataElement`, `doma:domain`, `blue:blueSource`, `ttyp:tableType`), so
+ * nothing is tried in an order and nothing is guessed.
+ *
+ * A `404` (or an empty answer) is the kind's absence; any other refusal is the
+ * call's answer, with the read as its step, and so is a document the read
+ * cannot recognise. A name no read finds is the call's error.
  */
 
 import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
@@ -27,10 +29,11 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   readDataElementMetadata,
+  readDomainMetadata,
   readStructureMetadata,
 } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
@@ -38,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve ABAP type information for domains (DOMA), data elements (DTEL), table types, and structures. Returns field definitions, value ranges, fixed values, and DDIC metadata.',
+    "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -49,7 +52,7 @@ export const TOOL_DEFINITION = {
       include_structure_fallback: {
         type: 'boolean',
         description:
-          'When true (default), tries DDIC structure lookup only if type lookup returns 404/empty.',
+          'When true (default), the name is also read as a DDIC structure; false leaves the structure read out.',
         default: true,
       },
     },
@@ -57,91 +60,129 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-function parseTypeInfoXml(xml: string) {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-    trimValues: true,
-  });
-  const result = parser.parse(xml);
+/** The kinds a name is read as, in the order they are answered. */
+type Kind = 'data_element' | 'domain' | 'structure' | 'table_type';
 
-  // Data Element (DTEL/DE)
-  if (result['blue:wbobj']?.['dtel:dataElement']) {
-    const wb = result['blue:wbobj'];
-    const dtel = wb['dtel:dataElement'];
-    return {
-      name: wb['adtcore:name'],
-      objectType: 'data_element',
-      description: wb['adtcore:description'],
-      dataType: dtel['dtel:dataType'],
-      length: parseInt(dtel['dtel:dataTypeLength'], 10),
-      decimals: parseInt(dtel['dtel:dataTypeDecimals'], 10),
-      domain: dtel['dtel:typeName'],
-      package: wb['adtcore:packageRef']?.['adtcore:name'] || null,
-      labels: {
-        short: dtel['dtel:shortFieldLabel'],
-        medium: dtel['dtel:mediumFieldLabel'],
-        long: dtel['dtel:longFieldLabel'],
-        heading: dtel['dtel:headingFieldLabel'],
-      },
-    };
-  }
+// Values as written: a fixed value's bounds may be blank or carry spaces that
+// are the value, so nothing is trimmed here; metadata is trimmed where read.
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  parseAttributeValue: false,
+  parseTagValue: false,
+  trimValues: false,
+  isArray: (name) => name === 'doma:fixValue',
+});
 
-  // Domain (DOMA/DD) via repository informationsystem
-  if (result['opr:objectProperties']?.['opr:object']) {
-    const obj = result['opr:objectProperties']['opr:object'];
-    return {
-      name: obj.name,
-      objectType: 'domain',
-      description: obj.text,
-      package: obj.package,
-      type: obj.type,
-    };
-  }
-
-  // Table Type (not implemented, fallback)
-  return { raw: result };
+/** A DDIC number as it is written (`000003`), as a number; absent stays absent. */
+function numberOf(value: unknown): number | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function parseStructureInfoXml(xml: string) {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-    trimValues: true,
-  });
-  const result = parser.parse(xml);
-  const wb = result['blue:wbobj'] || {};
+/** A text element's value, trimmed; an empty element (`<x/>`) is absent. */
+function textOf(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
 
+/**
+ * A fixed value's bound as written: an empty element is the blank value
+ * (`''`), spaces are kept; only an element that is not there is absent.
+ */
+function boundOf(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** The attributes every ADT object document carries. */
+function objectFacts(root: Record<string, any>) {
   return {
-    name: wb['adtcore:name'] || null,
-    objectType: 'structure',
-    description: wb['adtcore:description'] || null,
-    package: wb['adtcore:packageRef']?.['adtcore:name'] || null,
-    resolved_as: 'structure_fallback',
-    raw: result,
+    name: textOf(root['adtcore:name']),
+    description: textOf(root['adtcore:description']),
+    package: textOf(root['adtcore:packageRef']?.['adtcore:name']),
   };
 }
 
-function hasUsableResult(value: any): boolean {
-  if (value == null) {
-    return false;
-  }
-  if (typeof value === 'string') {
-    return value.trim().length > 0;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (typeof value === 'object') {
-    if ('raw' in value) {
-      const raw = (value as any).raw;
-      return !!raw && typeof raw === 'object' && Object.keys(raw).length > 0;
-    }
-    return Object.keys(value).length > 0;
-  }
-  return true;
+function parseDataElement(xml: string) {
+  const root = parser.parse(xml)['blue:wbobj'];
+  const dtel = root?.['dtel:dataElement'];
+  if (!dtel) return undefined;
+  return {
+    objectType: 'data_element' as const,
+    ...objectFacts(root),
+    typeKind: textOf(dtel['dtel:typeKind']),
+    domain: textOf(dtel['dtel:typeName']),
+    dataType: textOf(dtel['dtel:dataType']),
+    length: numberOf(dtel['dtel:dataTypeLength']),
+    decimals: numberOf(dtel['dtel:dataTypeDecimals']),
+    labels: {
+      short: textOf(dtel['dtel:shortFieldLabel']),
+      medium: textOf(dtel['dtel:mediumFieldLabel']),
+      long: textOf(dtel['dtel:longFieldLabel']),
+      heading: textOf(dtel['dtel:headingFieldLabel']),
+    },
+  };
+}
+
+function parseDomain(xml: string) {
+  const root = parser.parse(xml)['doma:domain'];
+  const content = root?.['doma:content'];
+  if (!content) return undefined;
+  const type = content['doma:typeInformation'] ?? {};
+  const output = content['doma:outputInformation'] ?? {};
+  const values = content['doma:valueInformation'] ?? {};
+  const fixed: any[] = values['doma:fixValues']?.['doma:fixValue'] ?? [];
+  return {
+    objectType: 'domain' as const,
+    ...objectFacts(root),
+    dataType: textOf(type['doma:datatype']),
+    length: numberOf(type['doma:length']),
+    decimals: numberOf(type['doma:decimals']),
+    output: {
+      length: numberOf(output['doma:length']),
+      conversionExit: textOf(output['doma:conversionExit']),
+      lowercase: output['doma:lowercase'] === 'true',
+      signExists: output['doma:signExists'] === 'true',
+    },
+    valueTable: textOf(values['doma:valueTableRef']?.['adtcore:name']),
+    fixedValues: fixed.map((entry) => ({
+      low: boundOf(entry['doma:low']),
+      high: boundOf(entry['doma:high']),
+      text: textOf(entry['doma:text']),
+    })),
+  };
+}
+
+function parseStructure(xml: string) {
+  const root = parser.parse(xml)['blue:blueSource'];
+  if (!root) return undefined;
+  return { objectType: 'structure' as const, ...objectFacts(root) };
+}
+
+function parseTableType(xml: string) {
+  const root = parser.parse(xml)['ttyp:tableType'];
+  if (!root) return undefined;
+  const row = root['ttyp:rowType'] ?? {};
+  const builtIn = row['ttyp:builtInType'] ?? {};
+  const key = root['ttyp:primaryKey'] ?? {};
+  return {
+    objectType: 'table_type' as const,
+    ...objectFacts(root),
+    rowType: {
+      typeKind: textOf(row['ttyp:typeKind']),
+      typeName: textOf(row['ttyp:typeName']),
+      dataType: textOf(builtIn['ttyp:dataType']),
+      length: numberOf(builtIn['ttyp:length']),
+      decimals: numberOf(builtIn['ttyp:decimals']),
+    },
+    accessType: textOf(root['ttyp:accessType']),
+    primaryKey: {
+      definition: textOf(key['ttyp:definition']),
+      kind: textOf(key['ttyp:kind']),
+    },
+  };
 }
 
 /** Whether a refusal is SAP's `404`: the name is not of this kind. */
@@ -149,74 +190,92 @@ function isNotFound(error: IAdtError): boolean {
   return (error.response as { status?: unknown } | undefined)?.status === 404;
 }
 
+type Lookup = {
+  kind: Kind;
+  step: string;
+  /** The root element of the kind's document, named in a refusal to read one. */
+  document: string;
+  read: () => Promise<IAdtResponse<unknown, IAdtError>>;
+  parse: (xml: string) => object | undefined;
+};
+
 type LookupResult =
-  | { status: 'ok'; payload: any }
-  | { status: 'not_found_or_empty' }
-  /** SAP refused the lookup (not a 404): the call's answer. */
+  | { status: 'found'; payload: object }
+  | { status: 'absent' }
+  /** SAP refused the read (not a 404): the call's answer. */
   | { status: 'failed'; answer: McpResult };
 
 /**
- * One lookup, through its member. A credential refusal the connection raised
+ * One read, through its member. A credential refusal the connection raised
  * rejects from the member as it came and ends the call (the handler's catch).
  */
-async function tryLookup(
-  read: () => Promise<IAdtResponse<unknown, IAdtError>>,
-  parseFn: (xml: string) => any,
-  step: string,
-): Promise<LookupResult> {
-  const answered = await read();
+async function lookUp(lookup: Lookup): Promise<LookupResult> {
+  const answered = await lookup.read();
   if (!answered.ok) {
     const failed = answered.getError();
-    if (isNotFound(failed)) return { status: 'not_found_or_empty' };
-    // SAP's refusal as the member answered it, with the lookup as its step.
-    return { status: 'failed', answer: answerFailure(withStep(failed, step)) };
+    if (isNotFound(failed)) return { status: 'absent' };
+    return {
+      status: 'failed',
+      answer: answerFailure(withStep(failed, lookup.step)),
+    };
   }
   const raw = (answered.getResult().value as AdtReading<unknown>).raw;
-  if (!hasUsableResult(raw)) {
-    return { status: 'not_found_or_empty' };
+  if (typeof raw !== 'string' || raw.trim() === '') return { status: 'absent' };
+  // A document we cannot read is our failure, not SAP's answer, and never the
+  // kind's absence: the call ends naming the read.
+  const payload = lookup.parse(raw);
+  if (payload === undefined) {
+    throw new Error(
+      `${lookup.step}: the system answered a document that is not a ${lookup.document} document`,
+    );
   }
-
-  // A document we cannot read is our failure, not SAP's answer.
-  const payload = parseFn(raw);
-  if (!hasUsableResult(payload)) {
-    return { status: 'not_found_or_empty' };
-  }
-
-  return { status: 'ok', payload };
+  return { status: 'found', payload };
 }
 
 export async function handleGetTypeInfo(context: HandlerContext, args: any) {
   const { connection, logger } = context;
-  const includeStructureFallback = args?.include_structure_fallback !== false;
-  try {
-    if (!args?.type_name) {
-      return return_error('Type name is required');
-    }
-  } catch (error) {
-    logger?.error('Invalid parameters for GetTypeInfo', error as any);
-    return return_error(error);
+  if (!args?.type_name) {
+    return return_error('Type name is required');
   }
+  const includeStructure = args.include_structure_fallback !== false;
 
   try {
-    const typeName = args.type_name;
+    const typeName: string = args.type_name;
     const client = createAdtClient(connection, logger);
 
-    const lookups: Array<{
-      label: string;
-      step: string;
-      read: () => Promise<IAdtResponse<unknown, IAdtError>>;
-      parseFn: (xml: string) => any;
-    }> = [
+    // In alphabetical order of kind: the order the answer lists them in.
+    const lookups: Lookup[] = [
       {
-        label: 'data element',
+        kind: 'data_element',
         step: 'read data element',
+        document: 'blue:wbobj (dtel:dataElement)',
         read: () =>
           readDataElementMetadata(client, { dataElementName: typeName }),
-        parseFn: parseTypeInfoXml,
+        parse: parseDataElement,
       },
       {
-        label: 'table type',
+        kind: 'domain',
+        step: 'read domain',
+        document: 'doma:domain',
+        read: () => readDomainMetadata(client, { domainName: typeName }),
+        parse: parseDomain,
+      },
+      ...(includeStructure
+        ? [
+            {
+              kind: 'structure' as const,
+              step: 'read structure',
+              document: 'blue:blueSource',
+              read: () =>
+                readStructureMetadata(client, { structureName: typeName }),
+              parse: parseStructure,
+            },
+          ]
+        : []),
+      {
+        kind: 'table_type',
         step: 'read table type',
+        document: 'ttyp:tableType',
         read: () =>
           client
             .getTableType(resultsFor(tableTypeDocuments))
@@ -224,71 +283,43 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
               { tableTypeName: typeName },
               { analyse: analyseException },
             ),
-        parseFn: parseTypeInfoXml,
-      },
-      {
-        label: 'repository information system',
-        step: 'read repository information',
-        read: () =>
-          client
-            .getUtils(ourUtils)
-            .getObjectProperties(
-              `/sap/bc/adt/ddic/domains/${typeName.toLowerCase()}`,
-              { analyse: analyseException },
-            ),
-        parseFn: parseTypeInfoXml,
+        parse: parseTableType,
       },
     ];
 
+    // One after another: the session's requests are sequential.
+    const types: object[] = [];
     for (const lookup of lookups) {
-      logger?.debug(`Trying ${lookup.label} lookup for ${typeName}`);
-      const result = await tryLookup(lookup.read, lookup.parseFn, lookup.step);
+      logger?.debug(`Reading ${typeName} as ${lookup.kind}`);
+      const result = await lookUp(lookup);
       if (result.status === 'failed') return result.answer;
-      if (result.status === 'ok') {
-        const mcpResult = {
-          isError: false,
-          content: [{ type: 'json', json: result.payload }],
-        };
-        objectsListCache.setCache(mcpResult);
-        return mcpResult;
-      }
+      if (result.status === 'found') types.push(result.payload);
     }
 
-    if (includeStructureFallback) {
-      logger?.debug(
-        `Type lookups returned 404/empty for ${typeName}, trying structure fallback`,
-      );
-      const structureResult = await tryLookup(
-        () => readStructureMetadata(client, { structureName: typeName }),
-        parseStructureInfoXml,
-        'read structure',
-      );
-      if (structureResult.status === 'failed') return structureResult.answer;
-      if (structureResult.status === 'ok') {
-        const mcpResult = {
-          isError: false,
-          content: [{ type: 'json', json: structureResult.payload }],
-        };
-        objectsListCache.setCache(mcpResult);
-        return mcpResult;
-      }
+    if (types.length === 0) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Type ${typeName} was not found as data element, domain${includeStructure ? ', structure' : ''} or table type.`,
+          },
+        ],
+      };
     }
 
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `Type ${typeName} was not found as domain, data element, table type, or structure.`,
-        },
-      ],
+    const mcpResult = {
+      isError: false,
+      content: [{ type: 'json', json: { name: typeName, types } }],
     };
+    objectsListCache.setCache(mcpResult);
+    return mcpResult;
   } catch (error) {
     logger?.error(
       `Failed to resolve type info for ${args.type_name}`,
       error as any,
     );
-    // Not a request's failure (each lookup answers its own): ours.
+    // Not a read's refusal (each answers its own): ours.
     return answerCaught(error, { tool: 'GetTypeInfo', detail: 'terse' });
   }
 }

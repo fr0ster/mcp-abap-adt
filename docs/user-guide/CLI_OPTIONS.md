@@ -164,8 +164,13 @@ mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 ### --connection-type=\<type\>
 
-How the server communicates with the SAP system: `http` (default, HTTP/HTTPS) or `rfc` (via the
-SAP NW RFC SDK, any system it supports).
+How the server communicates with the SAP system: `http` (HTTP/HTTPS) or `rfc` (via the SAP NW RFC
+SDK, any system it supports). **Required for a destination: there is no default.** Without it a
+stdio destination does not start (exit `1`, naming the places it can be set). It may be set as
+`--connection-type`, in the process environment, in the destination's own `.env` (the `--env` /
+`--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`; it joins the environment, never over
+a value already set) or as YAML `connection-type`. Precedence: the CLI flag, then the environment,
+then YAML. A service key carries no connection type.
 
 ```bash
 mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=<onprem|cloud>
@@ -538,7 +543,7 @@ These are typically set in the destination's `.env` file:
 - `SAP_SYSTEM_TYPE` - SAP system type: `cloud`, `onprem` or `legacy` (same as `--system-type`). **Required (19.0.0): there is no default** — not for the tools offered (e.g., Programs require `onprem`), not for the connector (a `jwt` destination is no longer taken for cloud), and the kind is never guessed from the URL. Without it a stdio destination does not start (exit `1`, naming the parameter), and neither do Streamable HTTP / SSE (exit `1` before anything listens). Inspection-only stdio (no destination) needs none: it filters nothing and lists every tool of its set. It may be set in the process environment or in the `--env` / `--env-path` `.env` (which joins the environment, never over a value already set), as `--system-type` or as YAML `system-type`. Precedence: the CLI flag, then the environment, then YAML. `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth). On-premise, also the login the responsible of created objects falls back to when no `SAP_RESPONSIBLE` is stated (the destination's own first, then the process environment's); not on a cloud system, whose login is the system's user. The environment is read once: a change while the server runs is not picked up
 - `SAP_PASSWORD` - SAP password (for basic auth)
-- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` `.env`)
+- `SAP_CONNECTION_TYPE` - Connection transport: `http` or `rfc`. **Required for a destination: there is no default** (see [--connection-type](#--connection-typetype)). Process environment, or the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`)
 - `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` - RFC through a message server and a logon group: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID`, the logon group (connection's default `PUBLIC`), a SAProuter string. Process environment, or the `--env` / `--env-path` `.env`; see [--mshost, …](#--mshost---msserv---sysid---group---saprouter)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 - `SAP_MASTER_SYSTEM` - Master system of created objects (the system id), optional; no tool takes it as an argument. In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the destination's `.env` wins over the environment. Used only where an on-premise system has no `systeminformation` (`404`): elsewhere the system id the system names wins; with neither, the attribute is left out of the request and the system applies itself. Never refused

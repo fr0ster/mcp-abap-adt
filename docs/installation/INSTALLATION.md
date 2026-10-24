@@ -26,7 +26,7 @@ Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`
 
 | Connection | Authentication (`SAP_AUTH_TYPE`) | What the machine needs besides Node.js |
 |---|---|---|
-| **HTTP** (default) | `basic`, or `jwt` (browser login with a service key; a token you hold goes in the `x-sap-jwt-token` header of the HTTP and SSE binaries, not over stdio) | Nothing. |
+| **HTTP** (`SAP_CONNECTION_TYPE=http`) | `basic`, or `jwt` (browser login with a service key; a token you hold goes in the `x-sap-jwt-token` header of the HTTP and SSE binaries, not over stdio) | Nothing. |
 | **RFC** (`SAP_CONNECTION_TYPE=rfc`) | `basic` | The SAP NW RFC library **at run time**: SAP GUI's 64-bit `sapnwrfc.dll` in `System32` on Windows, else the SAP NW RFC SDK. The RFC module comes prebuilt for Linux x64 (glibc), Windows x64 and macOS ARM64; nothing is compiled by `npm install`. |
 | **SNC** (RFC, passwordless) | `snc` | Everything RFC needs, plus an SNC product logged on — typically SAP Secure Login Client. No user, no password in the `.env`. |
 

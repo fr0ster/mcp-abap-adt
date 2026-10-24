@@ -100,7 +100,7 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
 | `--auth-debug` | — | `auth-debug` | flag | Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent (default: off). **No environment variable** |
-| `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
+| `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type, required for a destination: no default. With `--mcp=<name>` the destination's `.env` may state it; a service key does not |
 | `--mshost=<host>` | `SAP_MSHOST` | `mshost` | host | RFC: the message server host; needs `--msserv` or `--sysid` |
 | `--msserv=<service>` | `SAP_MSSERV` | `msserv` | name or port | RFC: the message server service |
 | `--sysid=<SID>` | `SAP_SYSID` | `sysid` | system id | RFC: the system id |

@@ -23,6 +23,7 @@ beforeEach(() => {
     delete process.env[key];
   }
   process.env.SAP_URL = 'https://system.example.test:44300';
+  process.env.SAP_CONNECTION_TYPE = 'http';
 });
 
 afterEach(() => {
@@ -84,17 +85,28 @@ describe('getSapConfigFromEnv', () => {
     },
   );
 
-  it("reads rfc as rfc, and an absent connection type as HTTP (the launcher's documented default)", () => {
+  it('refuses a config that states no SAP_CONNECTION_TYPE rather than running over HTTP', () => {
     process.env.SAP_AUTH_TYPE = 'basic';
     process.env.SAP_USERNAME = 'user';
     process.env.SAP_PASSWORD = 'secret';
-    process.env.SAP_CONNECTION_TYPE = 'rfc';
-    expect(getSapConfigFromEnv().connectionType).toBe('rfc');
-    // In any case, as the launcher reads an enum.
-    process.env.SAP_CONNECTION_TYPE = 'RFC';
-    expect(getSapConfigFromEnv().connectionType).toBe('rfc');
     delete process.env.SAP_CONNECTION_TYPE;
-    expect(getSapConfigFromEnv().connectionType).toBeUndefined();
+    expect(() => getSapConfigFromEnv()).toThrow(
+      'SAP_CONNECTION_TYPE is not set. State one of: http, rfc.',
+    );
+  });
+
+  it.each([
+    ['http', 'http'],
+    ['rfc', 'rfc'],
+    // In any case, as the launcher reads an enum.
+    ['RFC', 'rfc'],
+    ['Http', 'http'],
+  ])('reads SAP_CONNECTION_TYPE=%s as %s', (value, wire) => {
+    process.env.SAP_AUTH_TYPE = 'basic';
+    process.env.SAP_USERNAME = 'user';
+    process.env.SAP_PASSWORD = 'secret';
+    process.env.SAP_CONNECTION_TYPE = value;
+    expect(getSapConfigFromEnv().connectionType).toBe(wire);
   });
 
   it('builds basic from what was stated', () => {

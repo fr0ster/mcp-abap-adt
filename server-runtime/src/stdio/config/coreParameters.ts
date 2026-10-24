@@ -123,7 +123,7 @@ export const CORE_ROWS: readonly Parameter[] = [
     kind: 'enum',
     values: ['http', 'rfc'],
     section: DESTINATION,
-    help: 'SAP connection type (default: http). rfc needs the SAP NW RFC SDK',
+    help: 'SAP connection type, required for a destination. rfc needs the SAP NW RFC SDK',
   },
 ];
 

@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { classify, logFields } from '@mcp-abap-adt/auth-errors';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
@@ -137,7 +138,7 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_URL                        SAP system URL (required)
     SAP_CLIENT                     SAP client number (required for basic auth)
     SAP_AUTH_TYPE                  Authentication type: basic|snc|jwt (required)
-    SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
+    SAP_CONNECTION_TYPE            Connection type: http|rfc (required for a destination)
                                    Precedence: --connection-type, then the environment
                                    (this file joins it, never over a value set), then YAML
     SAP_SYSTEM_TYPE                SAP system type: cloud | onprem | legacy (same as --system-type)
@@ -570,6 +571,13 @@ export function startSystemTypeRequiredWords(destination: string): string {
 }
 
 /**
+ * The start's words for a destination whose wire no parameter states.
+ */
+export function startConnectionTypeRequiredWords(destination: string): string {
+  return `Destination "${destination}": the SAP connection type is required — set --connection-type, SAP_CONNECTION_TYPE (the environment or the --env file) or connection-type (YAML) to http or rfc; the server did not start`;
+}
+
+/**
  * The start's words for an ABAP Cloud destination whose system has no
  * systeminformation endpoint (`404`): the configuration is inconsistent.
  */
@@ -712,15 +720,37 @@ export async function launch(
   }
 }
 
+/**
+ * The .env a destination is read from: the --env file, else for
+ * `--mcp=<name>` the broker's `<sessions>/<name>.env`. A name that is not a
+ * destination name joins nothing here; the start refuses it later, naming it.
+ */
+export function destinationEnvFileOf(config: CoreConfig): string | undefined {
+  const envFile = config.envFile ?? config.envFilePath;
+  if (envFile) return envFile;
+  const name = config.mcpDestination;
+  if (!name) return undefined;
+  try {
+    assertDestinationName(name, '--mcp');
+  } catch {
+    return undefined;
+  }
+  const sessionsDir = getPlatformPaths(config.authBrokerPath, 'sessions')[0];
+  return sessionsDir === undefined
+    ? undefined
+    : path.join(sessionsDir, `${name}.env`);
+}
+
 async function launchStdio(
   config: CoreConfig,
   options: LauncherOptions,
   deps: LauncherDeps,
 ): Promise<void> {
-  // The env file's context joins the process environment first — never over
-  // a value already there — so its SAP_CONNECTION_TYPE and SAP_SYSTEM_TYPE
-  // count (as in 15.x).
-  hydrateSystemContextFromEnvFile(config.envFile ?? config.envFilePath);
+  // The destination's own file joins the process environment first — never
+  // over a value already there — so its SAP_CONNECTION_TYPE and
+  // SAP_SYSTEM_TYPE count (as in 15.x): the --env file, or for --mcp=<name>
+  // the destination's <sessions>/<name>.env the broker reads (#320).
+  hydrateSystemContextFromEnvFile(destinationEnvFileOf(config));
   let connectionType: CoreConfig['connectionType'];
   let systemType: CoreConfig['systemType'];
   try {
@@ -840,6 +870,12 @@ async function launchStdio(
   // without it — before anything is sent and before the transport.
   if (destination && systemType === undefined) {
     deps.stderr(`[MCP] ${startSystemTypeRequiredWords(destination)}`);
+    deps.exit(1);
+    return;
+  }
+  // So is its wire (#320): an absent connection type is not HTTP.
+  if (destination && connectionType === undefined) {
+    deps.stderr(`[MCP] ${startConnectionTypeRequiredWords(destination)}`);
     deps.exit(1);
     return;
   }

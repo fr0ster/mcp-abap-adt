@@ -335,7 +335,7 @@ naming the binary that serves the tools it asked for.
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
 - `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
-- `--connection-type=http|rfc` - SAP connection type (default `http`)
+- `--connection-type=http|rfc` - SAP connection type, required for a destination (here, `SAP_CONNECTION_TYPE` in its `.env`, or `connection-type` in YAML)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … in the `.env`); see [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group)
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.

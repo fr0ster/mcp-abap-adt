@@ -1,7 +1,6 @@
 /**
- * `GetTypeInfo` tries a type name as a domain, a data element, a table type,
- * the repository's object properties of a domain and a structure, in that
- * order, each through its adt-clients member (#235). The real client over a
+ * `GetTypeInfo` tries a type name as a data element, a table type, the
+ * repository's object properties of a domain and a structure, in that order, each through its adt-clients member (#235). The real client over a
  * connection double: the requests on the wire are the members', a `404` or an
  * empty answer moves on, and the first usable answer is the call's.
  */
@@ -19,6 +18,11 @@ const DATA_ELEMENT = `<?xml version="1.0" encoding="utf-8"?>
     <dtel:shortFieldLabel>Amount</dtel:shortFieldLabel>
   </dtel:dataElement>
 </blue:wbobj>`;
+
+const OBJECT_PROPERTIES = `<?xml version="1.0" encoding="utf-8"?>
+<opr:objectProperties xmlns:opr="http://www.sap.com/adt/objectproperties">
+  <opr:object name="ZDO_AMOUNT" text="An amount domain" package="ZPKG" type="DOMA/DD"/>
+</opr:objectProperties>`;
 
 const notFound = () =>
   Object.assign(new Error('Request failed with status code 404'), {
@@ -57,7 +61,6 @@ describe('GetTypeInfo', () => {
 
     expect(result.isError).toBe(false);
     expect(sent.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/ddic/domains/zde_amount',
       '/sap/bc/adt/ddic/dataelements/zde_amount',
     ]);
     expect(result.content[0].json).toMatchObject({
@@ -82,7 +85,6 @@ describe('GetTypeInfo', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('ZT was not found');
     expect(sent.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/ddic/domains/zt',
       '/sap/bc/adt/ddic/dataelements/zt',
       '/sap/bc/adt/ddic/tabletypes/zt',
       `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodeURIComponent('/sap/bc/adt/ddic/domains/zt')}`,
@@ -101,15 +103,16 @@ describe('GetTypeInfo', () => {
     expect(sent.map((r) => r.url)).not.toContain(
       '/sap/bc/adt/ddic/structures/zt',
     );
-    expect(sent).toHaveLength(4);
+    expect(sent).toHaveLength(3);
   });
 
   it('an empty answer moves on, like a 404', async () => {
     const { connection, sent } = connectionWhere((url) =>
-      url === '/sap/bc/adt/ddic/domains/zde_amount'
+      url === '/sap/bc/adt/ddic/dataelements/zde_amount'
         ? ''
-        : url === '/sap/bc/adt/ddic/dataelements/zde_amount'
-          ? DATA_ELEMENT
+        : url ===
+            `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodeURIComponent('/sap/bc/adt/ddic/domains/zde_amount')}`
+          ? OBJECT_PROPERTIES
           : undefined,
     );
 
@@ -119,7 +122,24 @@ describe('GetTypeInfo', () => {
     );
 
     expect(result.isError).toBe(false);
-    expect(sent).toHaveLength(2);
-    expect(result.content[0].json.objectType).toBe('data_element');
+    expect(sent).toHaveLength(3);
+    expect(result.content[0].json).toMatchObject({
+      name: 'ZDO_AMOUNT',
+      objectType: 'domain',
+    });
+  });
+
+  it("does not read a domain's metadata: MANDT, a domain and a data element, answers as the data element", async () => {
+    const { connection, sent } = connectionWhere((url) =>
+      url === '/sap/bc/adt/ddic/dataelements/mandt' ? DATA_ELEMENT : undefined,
+    );
+
+    await handleGetTypeInfo({ connection, logger: undefined } as any, {
+      type_name: 'MANDT',
+    });
+
+    expect(sent.map((r) => r.url)).not.toContain(
+      '/sap/bc/adt/ddic/domains/mandt',
+    );
   });
 });

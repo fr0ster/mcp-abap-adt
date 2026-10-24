@@ -195,9 +195,8 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toEqual({
       origin: 'connection',
-      // The domain's metadata (`getDomain().readMetadata`), no longer its
-      // `/source/main`.
-      ...sapRefusal('/sap/bc/adt/ddic/domains/zt', 'read domain'),
+      // The first lookup is the data element (`getDataElement().readMetadata`).
+      ...sapRefusal('/sap/bc/adt/ddic/dataelements/zt', 'read data element'),
     });
     // The refusal is the answer: no further lookup is sent.
     expect(sent).toHaveLength(1);
@@ -219,11 +218,11 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
     );
     expect(payloadOf(result)).toMatchObject({
       status: 403,
-      step: 'read data element',
+      step: 'read table type',
     });
     expect(sent).toEqual([
-      '/sap/bc/adt/ddic/domains/zt',
       '/sap/bc/adt/ddic/dataelements/zt',
+      '/sap/bc/adt/ddic/tabletypes/zt',
     ]);
   });
 });

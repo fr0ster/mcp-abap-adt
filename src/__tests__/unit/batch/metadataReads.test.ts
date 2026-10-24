@@ -190,7 +190,7 @@ const EXCLUDED: Record<string, string> = {
   'include/readonly/handleGetIncludesList.ts':
     "a class's metadata, read to find its includes",
   'system/readonly/handleGetTypeInfo.ts':
-    'a type name tried as a domain, a data element, a table type and a structure in turn; the table type has no Get handler, so its read is its own',
+    'a type name tried as a data element, a table type and a structure in turn; the table type has no Get handler, so its read is its own',
 };
 
 const HANDLERS_DIR = join(__dirname, '../../../handlers');

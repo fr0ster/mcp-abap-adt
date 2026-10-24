@@ -1,9 +1,16 @@
 /**
- * GetTypeInfo: what a DDIC type name is, tried in order — a domain, a data
- * element, a table type, the repository's object properties of a domain, and,
- * unless switched off, a structure. Each lookup is an adt-clients member
- * (#235); a `404` or an empty answer moves on to the next, any other refusal
- * is the call's answer.
+ * GetTypeInfo: what a DDIC type name is, tried in order — a data element, a
+ * table type, the repository's object properties of a domain, and, unless
+ * switched off, a structure. Each lookup is an adt-clients member (#235); a
+ * `404` or an empty answer moves on to the next, any other refusal is the
+ * call's answer.
+ *
+ * A domain is found through its object properties, as before #235. The
+ * lookup that came first, `/ddic/domains/{name}/source/main`, answered `404`
+ * for every domain (measured on E19, 2026-10-24), so it never found one; the
+ * domain's metadata does answer, but nothing here reads a `doma:domain`
+ * document yet, and a name that is a domain and a data element (MANDT) would
+ * then answer an unread domain instead of the data element.
  */
 
 import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
@@ -20,7 +27,6 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   readDataElementMetadata,
-  readDomainMetadata,
   readStructureMetadata,
 } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -201,12 +207,6 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       read: () => Promise<IAdtResponse<unknown, IAdtError>>;
       parseFn: (xml: string) => any;
     }> = [
-      {
-        label: 'domain',
-        step: 'read domain',
-        read: () => readDomainMetadata(client, { domainName: typeName }),
-        parseFn: parseTypeInfoXml,
-      },
       {
         label: 'data element',
         step: 'read data element',

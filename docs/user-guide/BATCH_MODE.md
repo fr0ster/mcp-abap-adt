@@ -507,7 +507,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetTableVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
 | `GetTableVersionSource` | every call | GET the content_uri given |
-| `GetTransport` | every call | GET /sap/bc/adt/cts/transportrequests/{number}?includeObjects=…&includeTasks=… |
+| `GetTransport` | every call | GET /sap/bc/adt/cts/transportrequests/{number} |
 | `GetWhereUsed` | when enable_all_types is any value but true and enable_only_types is absent and disable_types is absent and objects is absent | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
 | `ListServiceBindingTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `MoveTransportObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |

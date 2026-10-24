@@ -7,8 +7,9 @@
  * message server with neither `msserv` nor `sysid`, and that refusal reaches
  * the caller as it came.
  *
- * Both readers are run: `lib/config`'s `getConfig()` and its public twin in
- * `lib/utils`.
+ * The reader is `applyMessageServerFields` (`@mcp-abap-adt/lib/config`), on a
+ * basic config built here: the two `getConfig()` copies that called it, and
+ * guessed the rest of the config from the environment, are gone (#320).
  */
 
 jest.mock('@mcp-abap-adt/connection', () => {
@@ -21,6 +22,7 @@ jest.mock('@mcp-abap-adt/connection', () => {
 });
 
 import { createConnection, rfcParamsFrom } from '@mcp-abap-adt/connection';
+import { applyMessageServerFields } from '../../../lib/config/messageServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 
@@ -63,17 +65,21 @@ afterEach(() => {
 
 type Reader = () => import('@mcp-abap-adt/connection').SapConfig;
 
-/** A fresh module, no override: what the environment says now. */
-function readerOf(modulePath: string): Reader {
-  let reader: Reader | undefined;
-  jest.isolateModules(() => {
-    const mod = require(modulePath);
-    mod.setSapConfigOverride?.(undefined);
-    mod.setConfigOverride?.(undefined);
-    reader = mod.getConfig;
-  });
-  if (!reader) throw new Error(`no getConfig in ${modulePath}`);
-  return reader;
+/** A basic RFC config, with the message-server fields the environment holds now. */
+function readerOf(): Reader {
+  return () => {
+    const config: import('@mcp-abap-adt/connection').SapConfig = {
+      url: BASE_ENV.SAP_URL,
+      authType: 'basic',
+      connectionType: 'rfc',
+      username: BASE_ENV.SAP_USERNAME,
+      password: BASE_ENV.SAP_PASSWORD,
+    };
+    const client = process.env.SAP_CLIENT?.trim();
+    if (client) config.client = client;
+    applyMessageServerFields(config, process.env);
+    return config;
+  };
 }
 
 /** The config the server reads, handed to connection: what it received. */
@@ -85,10 +91,7 @@ function handedToCreateConnection(read: Reader) {
   return calls[0][0].config as Record<string, unknown>;
 }
 
-describe.each([
-  ['lib/config', '../../../lib/config'],
-  ['lib/utils', '../../../lib/utils'],
-])('%s getConfig()', (_name, modulePath) => {
+describe('applyMessageServerFields', () => {
   it('each of SAP_MSHOST, SAP_MSSERV, SAP_SYSID, SAP_GROUP, SAP_SAPROUTER reaches the SapConfig handed to createConnection, as given (trimmed only as SAP_CLIENT is)', () => {
     process.env.SAP_CLIENT = '  100  ';
     process.env.SAP_MSHOST = '  ms.example.test  ';
@@ -97,7 +100,7 @@ describe.each([
     process.env.SAP_GROUP = ' SPACE ';
     process.env.SAP_SAPROUTER = ' /H/router.example.test/S/3299/H/ ';
 
-    const config = handedToCreateConnection(readerOf(modulePath));
+    const config = handedToCreateConnection(readerOf());
 
     expect(config.client).toBe('100');
     expect(config.mshost).toBe('ms.example.test');
@@ -111,14 +114,14 @@ describe.each([
     process.env[env] = 'value-one';
     // A message server needs msserv or sysid: one is given beside mshost.
     if (env === 'SAP_MSHOST') process.env.SAP_SYSID = 'XYZ';
-    const config = handedToCreateConnection(readerOf(modulePath));
+    const config = handedToCreateConnection(readerOf());
     expect(config[field]).toBe('value-one');
   });
 
   it('absent fields are absent, not defaulted (no group: PUBLIC from the server)', () => {
     process.env.SAP_MSHOST = 'ms.example.test';
     process.env.SAP_SYSID = 'XYZ';
-    const config = handedToCreateConnection(readerOf(modulePath));
+    const config = handedToCreateConnection(readerOf());
     expect(config.mshost).toBe('ms.example.test');
     expect(config.sysid).toBe('XYZ');
     for (const key of ['msserv', 'group', 'saprouter']) {
@@ -127,7 +130,7 @@ describe.each([
   });
 
   it('none of them set: no key of them', () => {
-    const config = handedToCreateConnection(readerOf(modulePath));
+    const config = handedToCreateConnection(readerOf());
     for (const key of Object.values(FIELDS)) {
       expect(Object.hasOwn(config, key)).toBe(false);
     }
@@ -136,14 +139,14 @@ describe.each([
   it('an empty or blank value is no value', () => {
     process.env.SAP_GROUP = '   ';
     process.env.SAP_SAPROUTER = '';
-    const config = handedToCreateConnection(readerOf(modulePath));
+    const config = handedToCreateConnection(readerOf());
     expect(Object.hasOwn(config, 'group')).toBe(false);
     expect(Object.hasOwn(config, 'saprouter')).toBe(false);
   });
 
   it('mshost without msserv and sysid: connection’s refusal reaches the caller as it came, naming both', () => {
     process.env.SAP_MSHOST = 'ms.example.test';
-    const read = readerOf(modulePath);
+    const read = readerOf();
     const config = read();
     expect(config.mshost).toBe('ms.example.test');
 
@@ -174,7 +177,7 @@ describe.each([
     process.env.SAP_MSHOST = 'ms.example.test';
     process.env.SAP_MSSERV = 'sapmsXYZ';
     process.env.SAP_SYSNR = '42';
-    const config = handedToCreateConnection(readerOf(modulePath));
+    const config = handedToCreateConnection(readerOf());
     expect(Object.hasOwn(config, 'sysnr')).toBe(false);
     const params = rfcParamsFrom(config as never);
     expect(params).not.toHaveProperty('sysnr');

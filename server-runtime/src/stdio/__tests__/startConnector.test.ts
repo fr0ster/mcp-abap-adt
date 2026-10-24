@@ -77,6 +77,7 @@ beforeEach(async () => {
       `SAP_URL=${standIn.url}`,
       'SAP_CLIENT=100',
       'SAP_AUTH_TYPE=basic',
+      'SAP_CONNECTION_TYPE=http',
       `SAP_USERNAME=${USER}`,
       'SAP_PASSWORD=start-password',
       '',

@@ -105,6 +105,7 @@ describe('the startup check', () => {
     const file = base.writeFile('conn.env', [
       `SAP_URL=${SYSTEM_URL}`,
       'SAP_AUTH_TYPE=jwt',
+      'SAP_CONNECTION_TYPE=http',
       'SAP_GRANT_TYPE=authorization_code',
     ]);
     const { stderr, exits } = await run([`--env-path=${file}`]);

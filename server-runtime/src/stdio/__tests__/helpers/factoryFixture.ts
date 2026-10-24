@@ -91,6 +91,8 @@ export const basicLines = (extra: string[] = []) => [
   `SAP_URL=${SYSTEM_URL}`,
   'SAP_CLIENT=100',
   'SAP_AUTH_TYPE=basic',
+  // A destination states its wire (#320).
+  'SAP_CONNECTION_TYPE=http',
   'SAP_USERNAME=placeholder-user',
   'SAP_PASSWORD=placeholder-password',
   ...extra,
@@ -100,6 +102,7 @@ export const basicLines = (extra: string[] = []) => [
 export const authorizationCodeLines = (uaaUrl = UAA_URL) => [
   `SAP_URL=${SYSTEM_URL}`,
   'SAP_AUTH_TYPE=jwt',
+  'SAP_CONNECTION_TYPE=http',
   'SAP_GRANT_TYPE=authorization_code',
   `SAP_UAA_URL=${uaaUrl}`,
   'SAP_UAA_CLIENT_ID=client-id',

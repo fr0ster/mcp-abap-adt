@@ -60,7 +60,7 @@ mcp: TRIAL
 # Or one env file: by destination name (sessions/<name>.env) or by path
 # env: trial
 # env-path: .env
-connection-type: http          # http (default) | rfc
+connection-type: http          # http | rfc — required for a destination, no default
 # RFC through a message server and a logon group (rfc only; mshost needs msserv or sysid):
 # mshost: msghost.example
 # msserv: sapmsABC
@@ -85,7 +85,7 @@ state-idle-minutes: 30
 | `mcp` | string | - | Default destination name: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
 | `env` | string | - | Destination name resolved from the sessions store (`sessions/<name>.env`) |
 | `env-path` | string | - | Explicit path to `.env` file. Nothing is looked up in the working directory: a `.env` there is read only when named (`env-path: ./.env`) |
-| `connection-type` | string | `http` | SAP connection transport: `http` (default) or `rfc` |
+| `connection-type` | string | — | SAP connection transport: `http` or `rfc`. Required for a destination unless the CLI, the environment or the destination's `.env` states it; no default |
 | `mshost` | string | — | RFC: the message server host. With it no RFC host or system number comes from the URL (`SAP_SYSNR` is not read); needs `msserv` or `sysid` — with neither, connection refuses naming both |
 | `msserv` | string | — | RFC: the message server service (name or port) |
 | `sysid` | string | — | RFC: the system id |

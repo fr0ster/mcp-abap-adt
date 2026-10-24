@@ -70,6 +70,7 @@ beforeEach(async () => {
       `SAP_URL=${adt.url}`,
       'SAP_CLIENT=100',
       'SAP_AUTH_TYPE=jwt',
+      'SAP_CONNECTION_TYPE=http',
       'SAP_GRANT_TYPE=authorization_code',
       `SAP_UAA_URL=${tokens.url}`,
       'SAP_UAA_CLIENT_ID=client-id',

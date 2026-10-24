@@ -8,9 +8,6 @@ import { AxiosError, type AxiosResponse } from 'axios';
 import { answerFailure } from './answer';
 import { answerRead } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
-import { applyCertKerberosFields } from './config/applyAuthFields.js';
-import { applyMessageServerFields } from './config/messageServer.js';
-import { parseAuthType } from './config/parseAuthType.js';
 import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
@@ -1002,8 +999,6 @@ export async function safeCheckOperation<T>(
     throw checkError;
   }
 }
-let sapConfigOverride: SapConfig | undefined;
-
 export interface ServerOptions {
   sapConfig?: SapConfig;
   connection?: IAbapConnection;
@@ -1012,7 +1007,6 @@ export interface ServerOptions {
 }
 
 export function setSapConfigOverride(config?: SapConfig) {
-  sapConfigOverride = config;
   setConfigOverride(config);
 }
 
@@ -1020,13 +1014,6 @@ export function setAbapConnectionOverride(connection?: IAbapConnection) {
   setConnectionOverride(connection);
 }
 
-/**
- * Retrieves SAP configuration from environment variables.
- * Reads configuration from process.env (caller is responsible for loading .env file if needed).
- *
- * @returns {SapConfig} The SAP configuration object.
- * @throws {Error} If any required environment variable is missing.
- */
 // Helper function for Windows-compatible logging
 // Only logs when DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS is enabled
 function debugLog(message: string): void {
@@ -1076,129 +1063,6 @@ function debugLog(message: string): void {
 export type { IAdtSystemContext } from './systemContext.js';
 // Re-export safe system context accessors for consumers (no HTTP, no connection mutation)
 export { getSystemContext, setSystemContext } from './systemContext.js';
-
-export function getConfig(): SapConfig {
-  debugLog(`[MCP-CONFIG] getConfig() called\n`);
-
-  if (sapConfigOverride) {
-    debugLog(`[MCP-CONFIG] Using override config\n`);
-    return sapConfigOverride;
-  }
-
-  // Read from process.env (already loaded and cleaned by launcher or at startup)
-  // No need to reload .env here - it's already in process.env
-  let url = process.env.SAP_URL;
-  let client = process.env.SAP_CLIENT;
-
-  debugLog(
-    `[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`,
-  );
-
-  // URLs from .env files are expected to be clean - just trim
-  if (url) {
-    url = url.trim();
-  } else {
-    // Log if URL is missing
-    debugLog(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
-    debugLog(
-      `[MCP-CONFIG] Available env vars: ${Object.keys(process.env)
-        .filter((k) => k.startsWith('SAP_'))
-        .join(', ')}\n`,
-    );
-  }
-
-  if (client) {
-    client = client.trim();
-  }
-
-  // Auto-detect auth type: JWT token → jwt; SAP_AUTH_TYPE → explicit; default → basic
-  const authType = parseAuthType(process.env);
-
-  // Connection type: http (default) or rfc
-  const connectionType: SapConfig['connectionType'] =
-    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
-      ? 'rfc'
-      : undefined;
-
-  if (!url) {
-    throw new Error(
-      `Missing SAP_URL in environment variables. Please check your .env file.`,
-    );
-  }
-
-  // Final validation - URL should be clean now
-  if (!/^https?:\/\//.test(url)) {
-    // Log URL in hex for debugging
-    const urlHex = Buffer.from(url, 'utf8').toString('hex');
-    throw new Error(
-      `Invalid SAP_URL format: "${url}" (hex: ${urlHex.substring(0, 100)}...). Expected format: https://your-system.sap.com`,
-    );
-  }
-
-  // Additional validation: try to create URL object to catch any remaining issues
-  try {
-    const testUrl = new URL(url);
-    // If URL object creation succeeds, use the normalized URL
-    url = testUrl.href.replace(/\/$/, ''); // Remove trailing slash if present
-  } catch (urlError) {
-    const urlHex = Buffer.from(url, 'utf8').toString('hex');
-    throw new Error(
-      `Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`,
-    );
-  }
-
-  // Log URL for debugging
-  debugLog(`[MCP-CONFIG] Final SAP_URL: "${url}" (length: ${url.length})\n`);
-
-  const config: SapConfig = {
-    url, // Already cleaned and validated above
-    authType,
-    ...(connectionType && { connectionType }),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  // RFC through a message server: carried as configured, no default.
-  applyMessageServerFields(config, process.env);
-
-  if (authType === 'jwt') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    // Values from .env are expected to be clean
-    config.jwtToken = jwtToken.trim();
-    const refreshToken = process.env.SAP_REFRESH_TOKEN;
-    if (refreshToken) {
-      config.refreshToken = refreshToken.trim();
-    }
-    const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId =
-      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret =
-      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
-    if (uaaUrl) config.uaaUrl = uaaUrl.trim();
-    if (uaaClientId) config.uaaClientId = uaaClientId.trim();
-    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
-  } else if (applyCertKerberosFields(config, process.env)) {
-    // certificate / kerberos: no username/password required
-  } else {
-    // basic and rfc both require username/password
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error(
-        `Missing SAP_USERNAME or SAP_PASSWORD for ${authType} authentication`,
-      );
-    }
-    config.username = username.trim();
-    config.password = password.trim();
-  }
-
-  return config;
-}
 
 /** What the summary says of a value it holds: that it is there. */
 const PRESENT = 'set';

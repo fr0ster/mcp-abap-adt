@@ -26,7 +26,7 @@ Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`
 
 | Connection | Authentication (`SAP_AUTH_TYPE`) | What the machine needs besides Node.js |
 |---|---|---|
-| **HTTP** (default) | `basic`, or `jwt` (browser login with a service key; a token you hold goes in the `x-sap-jwt-token` header of the HTTP and SSE binaries, not over stdio) | Nothing. |
+| **HTTP** (`SAP_CONNECTION_TYPE=http`) | `basic`, or `jwt` (browser login with a service key; a token you hold goes in the `x-sap-jwt-token` header of the HTTP and SSE binaries, not over stdio) | Nothing. |
 | **RFC** (`SAP_CONNECTION_TYPE=rfc`) | `basic` | The SAP NW RFC library **at run time**: SAP GUI's 64-bit `sapnwrfc.dll` in `System32` on Windows, else the SAP NW RFC SDK. The RFC module comes prebuilt for Linux x64 (glibc), Windows x64 and macOS ARM64; nothing is compiled by `npm install`. |
 | **SNC** (RFC, passwordless) | `snc` | Everything RFC needs, plus an SNC product logged on — typically SAP Secure Login Client. No user, no password in the `.env`. |
 
@@ -335,7 +335,7 @@ naming the binary that serves the tools it asked for.
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
 - `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
-- `--connection-type=http|rfc` - SAP connection type (default `http`)
+- `--connection-type=http|rfc` - SAP connection type, required for a destination (here, `SAP_CONNECTION_TYPE` in its `.env`, or `connection-type` in YAML)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … in the `.env`); see [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group)
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.

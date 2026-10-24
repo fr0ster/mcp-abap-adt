@@ -407,9 +407,12 @@ Whichever file is chosen is read **and written back** with a renewed token, what
 SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
+SAP_CONNECTION_TYPE=http
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 ```
+
+A destination states its connection type: `SAP_CONNECTION_TYPE` (`http` or `rfc`) in its `.env`, `--connection-type`, the process environment or YAML `connection-type`. There is no default; a destination that states none is refused at startup, naming the places it can be set. A service key carries none, so a `--mcp` destination read from one takes it from the command line, the environment or YAML.
 
 A JWT you already hold is not served over stdio: send it in the `x-sap-jwt-token` header to
 `mcp-abap-adt-http` or `mcp-abap-adt-sse` (`@mcp-abap-adt/http`, `@mcp-abap-adt/sse`), or create
@@ -425,7 +428,7 @@ SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
 ```
 
-`SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`); a port that follows no such rule needs `SAP_SYSNR` in the process environment. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK, a C++ toolchain, `SAPNWRFC_HOME` before the install).
+`SAP_CONNECTION_TYPE=rfc` in the destination's `.env` (the `--env` / `--env-path` file, or `<auth-broker-path>/sessions/<name>.env` for `--mcp=<name>`) selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`); a port that follows no such rule needs `SAP_SYSNR` in the process environment. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK, a C++ toolchain, `SAPNWRFC_HOME` before the install).
 
 **Through a message server and a logon group** (load-balanced logon): add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one of the two is required; `SAP_MSHOST` with neither is refused by `@mcp-abap-adt/connection`, naming both), and optionally `SAP_GROUP` (the logon group; `PUBLIC` when absent — connection's default, not the server's) and `SAP_SAPROUTER` (works with either addressing). Each is also `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, or the YAML key of that name, with the same precedence as the connection type; in the `.env` they belong to the `--env` / `--env-path` file. With `SAP_MSHOST` the RFC wire takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read; `SAP_URL` is still the system's URL. The server passes the five fields as configured and adds nothing. Logon through a message server is implemented and unit-tested, but not yet measured on a live system (as of 2026-10-20): if the SDK refuses `SAP_MSSERV` without `SAP_SYSID`, add `SAP_SYSID`.
 
@@ -484,7 +487,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
-- `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
+- `--connection-type=<http|rfc>` - SAP connection transport: `http` or `rfc`; required for a destination unless its `.env`, the environment or YAML states it (no default)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … — see above)
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 

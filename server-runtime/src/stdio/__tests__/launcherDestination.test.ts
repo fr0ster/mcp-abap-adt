@@ -46,7 +46,12 @@ import { readConfigFile } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
 import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
-import { AUTH_DEBUG_WARNING, factoryConfigFrom, launch } from '../launcher.js';
+import {
+  AUTH_DEBUG_WARNING,
+  factoryConfigFrom,
+  launch,
+  startConnectionTypeRequiredWords,
+} from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
 
 /** The launcher's options as `mcp-abap-adt` passes them. */
@@ -187,10 +192,12 @@ const abapKey = {
 };
 const writeKey = (name: string, body: unknown) =>
   fs.writeFileSync(path.join(keysDir, `${name}.json`), JSON.stringify(body));
-const basicLines = (password = PASSWORD) => [
+const basicLines = (password = PASSWORD, wire: string | null = 'http') => [
   `SAP_URL=${SYSTEM_URL}`,
   'SAP_CLIENT=100',
   'SAP_AUTH_TYPE=basic',
+  // A destination states its wire (#320); `null` leaves it out.
+  ...(wire === null ? [] : [`SAP_CONNECTION_TYPE=${wire}`]),
   'SAP_USERNAME=placeholder-user',
   `SAP_PASSWORD=${password}`,
 ];
@@ -225,7 +232,9 @@ async function browserOfTheLogin(
 }
 
 describe('the browser reaches the login strategy, mapped for the platform', () => {
-  const stdio = ['--mcp=dest'];
+  // A service key states no wire: the destination's connection type is given
+  // on the command line (#320).
+  const stdio = ['--mcp=dest', '--connection-type=http'];
 
   it('--browser', async () => {
     writeKey('dest', abapKey);
@@ -462,6 +471,7 @@ describe('a destination that cannot be served stops the start', () => {
     // Malformed: no system URL.
     writeSession('dest', [
       'SAP_AUTH_TYPE=basic',
+      'SAP_CONNECTION_TYPE=http',
       'SAP_USERNAME=placeholder-user',
       `SAP_PASSWORD=${PASSWORD}`,
     ]);
@@ -658,7 +668,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   };
 
   it('basic + rfc in the file: rfc', async () => {
-    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const file = envFile(basicLines(PASSWORD, 'rfc'));
     const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('rfc');
   });
@@ -676,7 +686,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('--connection-type=http beats the file', async () => {
-    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const file = envFile(basicLines(PASSWORD, 'rfc'));
     const settings = await settingsOf([
       `--env-path=${file}`,
       '--connection-type=http',
@@ -685,7 +695,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('the file beats YAML connection-type', async () => {
-    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const file = envFile(basicLines(PASSWORD, 'rfc'));
     const yamlFile = path.join(root, 'config.yaml');
     fs.writeFileSync(yamlFile, 'connection-type: http\n');
     const settings = await settingsOf([
@@ -696,17 +706,46 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('the process environment beats the file', async () => {
-    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const file = envFile(basicLines(PASSWORD, 'rfc'));
     process.env.SAP_CONNECTION_TYPE = 'http';
     const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('http');
   });
 
-  it('a word that is not a connection type: refused naming the key, not quoting it', async () => {
-    const file = envFile([
-      ...basicLines(),
-      'SAP_CONNECTION_TYPE=carrier-pigeon',
+  it("--mcp=<name>: the destination's own <sessions>/<name>.env states it", async () => {
+    writeSession('dest', basicLines(PASSWORD, 'rfc'));
+    const settings = await settingsOf([
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
     ]);
+    expect(settings.connectionType).toBe('rfc');
+  });
+
+  it('--mcp=<name> whose file states no connection type: refused, nothing started', async () => {
+    writeSession('dest', basicLines(PASSWORD, null));
+    const { exits, stderr } = await run([
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(
+      startConnectionTypeRequiredWords('dest'),
+    );
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
+
+  it('no connection type anywhere: refused naming the three places, nothing started', async () => {
+    const file = envFile(basicLines(PASSWORD, null));
+    const { exits, stderr } = await run([`--env-path=${file}`]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(
+      startConnectionTypeRequiredWords('default'),
+    );
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
+
+  it('a word that is not a connection type: refused naming the key, not quoting it', async () => {
+    const file = envFile(basicLines(PASSWORD, 'carrier-pigeon'));
     const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stderr.join('\n')).toContain('SAP_CONNECTION_TYPE');

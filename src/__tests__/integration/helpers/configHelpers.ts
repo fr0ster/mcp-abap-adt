@@ -9,8 +9,6 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
-import { applyCertKerberosFields } from '../../../lib/config/applyAuthFields';
-import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
 import { createTestLogger } from './loggerHelpers';
@@ -458,8 +456,16 @@ export function getTimeout(operationType: string = 'default'): number {
   return timeouts[operationType] || timeouts.default || 60000;
 }
 
+/** The authentications this helper builds a config for. */
+const TEST_AUTH_TYPES = ['basic', 'jwt'] as const;
+
 /**
- * Build SAP config for tests from environment variables (auth-broker or .env)
+ * Build SAP config for tests from environment variables (auth-broker or .env).
+ *
+ * Nothing is guessed (#320): `SAP_AUTH_TYPE` must be stated and be one this
+ * helper builds (`basic`, `jwt`); `basic` needs `SAP_USERNAME` and
+ * `SAP_PASSWORD`, `jwt` needs `SAP_JWT_TOKEN`. Anything else is refused,
+ * naming what is wrong.
  */
 export function getSapConfigFromEnv(): SapConfig {
   const urlRaw = process.env.SAP_URL?.trim();
@@ -477,7 +483,18 @@ export function getSapConfigFromEnv(): SapConfig {
     throw new Error(`Invalid SAP_URL: ${urlRaw}`);
   }
 
-  const authType: SapConfig['authType'] = parseAuthType(process.env);
+  const stated = process.env.SAP_AUTH_TYPE?.trim();
+  if (!stated) {
+    throw new Error(
+      `SAP_AUTH_TYPE is not set. State one of: ${TEST_AUTH_TYPES.join(', ')}.`,
+    );
+  }
+  if (!(TEST_AUTH_TYPES as readonly string[]).includes(stated)) {
+    throw new Error(
+      `SAP_AUTH_TYPE "${stated}" is not one this test helper builds: ${TEST_AUTH_TYPES.join(', ')}.`,
+    );
+  }
+  const authType = stated as (typeof TEST_AUTH_TYPES)[number];
 
   const connectionType: SapConfig['connectionType'] =
     process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
@@ -491,7 +508,11 @@ export function getSapConfigFromEnv(): SapConfig {
   };
 
   if (authType === 'jwt') {
-    config.jwtToken = process.env.SAP_JWT_TOKEN || '';
+    const token = process.env.SAP_JWT_TOKEN?.trim();
+    if (!token) {
+      throw new Error('SAP_AUTH_TYPE is jwt, but SAP_JWT_TOKEN is not set.');
+    }
+    config.jwtToken = token;
     if (process.env.SAP_REFRESH_TOKEN) {
       config.refreshToken = process.env.SAP_REFRESH_TOKEN;
     }
@@ -504,11 +525,16 @@ export function getSapConfigFromEnv(): SapConfig {
     if (process.env.SAP_UAA_CLIENT_SECRET) {
       config.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
     }
-  } else if (applyCertKerberosFields(config, process.env)) {
-    // certificate / kerberos: no username/password required
   } else {
-    config.username = process.env.SAP_USERNAME || '';
-    config.password = process.env.SAP_PASSWORD || '';
+    const username = process.env.SAP_USERNAME?.trim();
+    const password = process.env.SAP_PASSWORD;
+    if (!username || !password) {
+      throw new Error(
+        'SAP_AUTH_TYPE is basic, but SAP_USERNAME or SAP_PASSWORD is not set.',
+      );
+    }
+    config.username = username;
+    config.password = password;
   }
 
   if (process.env.SAP_CLIENT) {

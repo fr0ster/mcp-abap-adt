@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed — breaking for code that imports `@mcp-abap-adt/lib/utils`
+
+- **`getConfig()` is gone from `@mcp-abap-adt/lib/utils`**, and so are its private twin in `src/lib/config.ts`, `parseAuthType` and the certificate/Kerberos field reader ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)). `getConfig()` built a `SapConfig` from `process.env` by guessing: an absent or unknown `SAP_AUTH_TYPE` became `basic`, `snc` became `basic` too, and an absent `SAP_CONNECTION_TYPE` became `http`. No binary called it: the stdio launcher reads the `.env` itself and refuses a missing or unknown authentication, and the HTTP and SSE servers read only the request's headers. **Migrating:** build the `SapConfig` yourself from what you know, and state every field; or hand the server a connection (`setAbapConnectionOverride`) or a config (`setSapConfigOverride`, still exported).
+- The integration tests' `getSapConfigFromEnv` guesses nothing either. `SAP_AUTH_TYPE` must be `basic` or `jwt`; `basic` needs `SAP_USERNAME` and `SAP_PASSWORD`, and `jwt` needs `SAP_JWT_TOKEN`. Anything else is refused, naming what is missing.
+
 ### Changed
 
 - **A portable archive may be shared inside the organization that licensed the SAP NW RFC SDK**, as its SAP administrators share the SDK itself; it is still never published. [Portable Build](docs/installation/PORTABLE.md), [Installation](docs/installation/INSTALLATION.md) and the archive's README say so, and the README tells a colleague how to start it: on Windows SmartScreen may ask once for the unsigned executable (More info → Run anyway, or the organization's IT allows it where policy removes that); on macOS an archive received through a browser or a messenger needs its quarantine flag cleared (`xattr -dr com.apple.quarantine <folder>`).

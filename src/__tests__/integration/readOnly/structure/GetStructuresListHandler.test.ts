@@ -196,8 +196,8 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       // extension somebody created by hand on one system, and nothing in
       // this repository creates it on another — on trial, `ZOK_S_APPEND`
       // answers 404 and SAP reports zero where-used references for the base
-      // structure, scoped or unscoped (measured 2026-09-16,
-      // `scripts/probe-migration-failures.ts`). Asserting the child anyway
+      // structure, scoped or unscoped (measured 2026-09-16 by a one-off script,
+      // `scripts/probe-migration-failures.ts`, since removed in #234). Asserting the child anyway
       // turned a missing test fixture into a failure that reads like a
       // defect in the walk. So: when the named extension is absent from the
       // tree, say which of the two it is — an extension that is not on this

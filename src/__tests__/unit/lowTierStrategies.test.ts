@@ -1254,8 +1254,8 @@ describe('system — three getUtils() reads, each given analyseException (interf
   // Measured, where the earlier draft of this test reasoned from the absence
   // of a fixture. `CL_ABAP_CHAR_UTILITIES` is a standard SAP class — it
   // exists on every system — and `CLAS/OC` node `0000` answers HTTP 200 with
-  // zero bytes for it on the trial system (probed 2026-09-16,
-  // `scripts/probe-migration-failures.ts`). So a blank body outside the
+  // zero bytes for it on the trial system (probed 2026-09-16 by a one-off script,
+  // `scripts/probe-migration-failures.ts`, since removed in #234). So a blank body outside the
   // package case is an empty node, and the previous `client_threw` answered
   // an ordinary correct request with a defect report.
   it('GetNodeStructureLow answers an empty listing on a blank body for a non-package parent type, and pays no existence check for one', async () => {

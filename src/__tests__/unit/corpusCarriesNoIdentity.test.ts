@@ -4,7 +4,7 @@ import { join } from 'node:path';
 /**
  * The corpus is committed, so what is in it is published.
  *
- * `scripts/capture-adt-corpus.ts` scrubs as it records — the Authorization
+ * `scripts/capture-adt-corpus.ts` (removed in #234) scrubbed as it recorded — the Authorization
  * header, cookies, CSRF tokens, the session header, every secret the
  * environment holds, and the SAP user id, which becomes a stable placeholder
  * rather than a deletion so a strategy still sees that a user name sits there.

@@ -32,8 +32,8 @@
  * An earlier pass threw there instead, on the grounds that no fixture settled
  * it. One does now: `CL_ABAP_CHAR_UTILITIES` — a standard SAP class, which
  * plainly exists — answers `CLAS/OC` node `0000` with HTTP 200 and zero
- * bytes on the trial system (probed 2026-09-16 via
- * `scripts/probe-migration-failures.ts`). So a blank body is not a
+ * bytes on the trial system (probed 2026-09-16 by a one-off script,
+ * `scripts/probe-migration-failures.ts`, since removed in #234). So a blank body is not a
  * not-found signal outside the package case: for a class it is simply what
  * this endpoint says when the node holds nothing, and throwing made the tool
  * answer `client_threw` for an ordinary, correct request. The ambiguity the

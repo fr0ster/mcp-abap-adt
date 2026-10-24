@@ -15,8 +15,8 @@ So read the coverage table below as: which endpoint, in which state, answered
 what. Where an endpoint has one row, one state has been observed and the others
 are unknown.
 
-48 cases, 61 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
-ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
+48 cases, 61 exchanges. Captured by `scripts/capture-adt-corpus.ts` (removed in #234; last at
+`f78b9611`) against the ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
 ## Layout
 
@@ -449,11 +449,11 @@ keeping them and saying why, is a decision for the move.
 
 ## Regenerating
 
-```bash
-npx tsx scripts/capture-adt-corpus.ts --env ~/.config/mcp-abap-adt/sessions/trial.env
-npx tsx scripts/capture-adt-corpus.ts --only read-where-used-list-structure   # top up
-```
-
-The script creates one scratch class, exercises it and removes it in a `finally`.
-It never writes to the 29 polygon objects. It never runs an auth command: if the
-session is dead it stops at `connect()` and says so.
+The capture script is gone (#234): written against adt-clients' members of
+September 2026, it no longer compiled against adt-clients 37, and a script that
+does not compile is one nobody can run. The corpus stays as it was recorded.
+The script is in git history at `f78b9611` (`scripts/capture-adt-corpus.ts`),
+for its scrubbing rules and its case list. A new capture is a new script against
+the API of its day. Whatever it is, it must scrub as that one did (see
+`corpusCarriesNoIdentity.test.ts`), create only scratch objects it removes, and
+never run an auth command.

@@ -11,8 +11,8 @@
  * nothing is tried in an order and nothing is guessed.
  *
  * A `404` (or an empty answer) is the kind's absence; any other refusal is the
- * call's answer, with the read as its step. A name no read finds is the call's
- * error.
+ * call's answer, with the read as its step, and so is a document the read
+ * cannot recognise. A name no read finds is the call's error.
  */
 
 import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
@@ -63,12 +63,14 @@ export const TOOL_DEFINITION = {
 /** The kinds a name is read as, in the order they are answered. */
 type Kind = 'data_element' | 'domain' | 'structure' | 'table_type';
 
+// Values as written: a fixed value's bounds may be blank or carry spaces that
+// are the value, so nothing is trimmed here; metadata is trimmed where read.
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
   parseAttributeValue: false,
   parseTagValue: false,
-  trimValues: true,
+  trimValues: false,
   isArray: (name) => name === 'doma:fixValue',
 });
 
@@ -79,9 +81,19 @@ function numberOf(value: unknown): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-/** A text element's value; an empty element (`<x/>`) is absent. */
+/** A text element's value, trimmed; an empty element (`<x/>`) is absent. */
 function textOf(value: unknown): string | undefined {
-  return typeof value === 'string' && value !== '' ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+/**
+ * A fixed value's bound as written: an empty element is the blank value
+ * (`''`), spaces are kept; only an element that is not there is absent.
+ */
+function boundOf(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 /** The attributes every ADT object document carries. */
@@ -136,8 +148,8 @@ function parseDomain(xml: string) {
     },
     valueTable: textOf(values['doma:valueTableRef']?.['adtcore:name']),
     fixedValues: fixed.map((entry) => ({
-      low: textOf(entry['doma:low']),
-      high: textOf(entry['doma:high']),
+      low: boundOf(entry['doma:low']),
+      high: boundOf(entry['doma:high']),
       text: textOf(entry['doma:text']),
     })),
   };
@@ -181,6 +193,8 @@ function isNotFound(error: IAdtError): boolean {
 type Lookup = {
   kind: Kind;
   step: string;
+  /** The root element of the kind's document, named in a refusal to read one. */
+  document: string;
   read: () => Promise<IAdtResponse<unknown, IAdtError>>;
   parse: (xml: string) => object | undefined;
 };
@@ -207,11 +221,15 @@ async function lookUp(lookup: Lookup): Promise<LookupResult> {
   }
   const raw = (answered.getResult().value as AdtReading<unknown>).raw;
   if (typeof raw !== 'string' || raw.trim() === '') return { status: 'absent' };
-  // A document we cannot read is our failure, not SAP's answer.
+  // A document we cannot read is our failure, not SAP's answer, and never the
+  // kind's absence: the call ends naming the read.
   const payload = lookup.parse(raw);
-  return payload === undefined
-    ? { status: 'absent' }
-    : { status: 'found', payload };
+  if (payload === undefined) {
+    throw new Error(
+      `${lookup.step}: the system answered a document that is not a ${lookup.document} document`,
+    );
+  }
+  return { status: 'found', payload };
 }
 
 export async function handleGetTypeInfo(context: HandlerContext, args: any) {
@@ -230,6 +248,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       {
         kind: 'data_element',
         step: 'read data element',
+        document: 'blue:wbobj (dtel:dataElement)',
         read: () =>
           readDataElementMetadata(client, { dataElementName: typeName }),
         parse: parseDataElement,
@@ -237,6 +256,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       {
         kind: 'domain',
         step: 'read domain',
+        document: 'doma:domain',
         read: () => readDomainMetadata(client, { domainName: typeName }),
         parse: parseDomain,
       },
@@ -245,6 +265,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
             {
               kind: 'structure' as const,
               step: 'read structure',
+              document: 'blue:blueSource',
               read: () =>
                 readStructureMetadata(client, { structureName: typeName }),
               parse: parseStructure,
@@ -254,6 +275,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       {
         kind: 'table_type',
         step: 'read table type',
+        document: 'ttyp:tableType',
         read: () =>
           client
             .getTableType(resultsFor(tableTypeDocuments))

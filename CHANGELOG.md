@@ -32,11 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`GetTypeInfo` answers every DDIC type a name is, not the first one found** ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). One name can be several types; MANDT, for example, is a data element and a domain. The name is read as a data element, a domain, a structure (unless `include_structure_fallback` is `false`) and a table type, and the answer is `{ name, types: [...] }`, with `types` in alphabetical order of `objectType` (`data_element`, `domain`, `structure`, `table_type`). Each entry is read from its own document:
   - a data element: its type, length, decimals, domain and labels;
-  - a domain, now read in full (`doma:domain`): its type, length, decimals, output format, value table and fixed values;
+  - a domain, now read in full (`doma:domain`): its type, length, decimals, output format, value table and fixed values. A fixed value's `low` and `high` are kept as written: blank is `""` (XFELD's `Nein`), and spaces are kept;
   - a structure: its name, description and package. It used to be read from a root element it does not have, so it answered empty fields.
   - a table type: its row type, access type and primary key, where it used to be answered raw.
 
-  The object-properties lookup is gone. It answered a domain by name and text only, and its `422` for a non-domain such as SYST ended the call before the structure was read. Measured on E19 (2026-10-24): each read answers `404` for a type the name is not. **Migrating:** read `types[]` instead of the single object, and pick the `objectType` you need.
+  A successful answer that is not the type's document ends the call naming the read, instead of being read as the type absent. The object-properties lookup is gone. It answered a domain by name and text only, and its `422` for a non-domain such as SYST ended the call before the structure was read. Measured on E19 (2026-10-24): each read answers `404` for a type the name is not. **Migrating:** read `types[]` instead of the single object, and pick the `objectType` you need.
 
 ### Repository (nothing in the published packages)
 

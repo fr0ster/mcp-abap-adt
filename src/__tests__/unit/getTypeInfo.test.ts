@@ -186,16 +186,53 @@ describe('GetTypeInfo', () => {
     });
   });
 
-  it("reads a domain's fixed values, an empty low as absent", async () => {
+  it("keeps a domain's blank fixed value: XFELD's 'Nein' is the empty low, and it survives serialisation", async () => {
     const { connection } = systemWith({ [url.domain('xfeld')]: XFELD_DOMAIN });
     const answer = (await run(connection, { type_name: 'XFELD' })).content[0]
       .json;
     expect(answer.types).toHaveLength(1);
     expect(answer.types[0].fixedValues).toEqual([
-      { low: 'X', high: undefined, text: 'Ja' },
-      { low: undefined, high: undefined, text: 'Nein' },
+      { low: 'X', high: '', text: 'Ja' },
+      { low: '', high: '', text: 'Nein' },
     ]);
+    // What the client receives: the blank value is there, not dropped.
+    expect(JSON.parse(JSON.stringify(answer)).types[0].fixedValues[1]).toEqual({
+      low: '',
+      high: '',
+      text: 'Nein',
+    });
     expect(answer.types[0].valueTable).toBeUndefined();
+  });
+
+  it("keeps the spaces of a fixed value's bounds, which are the value", async () => {
+    const SPACED = XFELD_DOMAIN.replace(
+      '<doma:low>X</doma:low><doma:high/>',
+      '<doma:low> </doma:low><doma:high>  B </doma:high>',
+    );
+    const { connection } = systemWith({ [url.domain('xfeld')]: SPACED });
+    const answer = (await run(connection, { type_name: 'XFELD' })).content[0]
+      .json;
+    expect(answer.types[0].fixedValues[0]).toEqual({
+      low: ' ',
+      high: '  B ',
+      text: 'Ja',
+    });
+  });
+
+  it("a successful answer that is not the kind's document ends the call naming the read, instead of reading as absent", async () => {
+    const { connection, sent } = systemWith({
+      [url.dataElement('mandt')]: MANDT_DATA_ELEMENT,
+      [url.domain('mandt')]:
+        '<?xml version="1.0"?><other:thing xmlns:other="urn:x"/>',
+    });
+    const result = await run(connection, { type_name: 'MANDT' });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      error: 'client_threw',
+      message:
+        'read domain: the system answered a document that is not a doma:domain document',
+    });
+    expect(sent).toHaveLength(2);
   });
 
   it('answers a structure from its blue:blueSource document', async () => {

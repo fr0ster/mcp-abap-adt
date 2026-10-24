@@ -213,14 +213,20 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
 
 describe('GetTransport: the request SAP refused', () => {
   it("is the request's error as SAP answered it, not SAP's body as text", async () => {
+    // adt-clients' own `readObjects` (#235) over the refusing connection, so
+    // the request on the wire is the member's.
+    const connection = refusingWith(403);
+    fakeClient = jest
+      .requireActual('../../lib/clients')
+      .createAdtClient(connection);
     const result: any = await handleGetTransport(
-      { connection: refusingWith(403), logger: undefined } as any,
+      { connection, logger: undefined } as any,
       { transport_number: 'TRLK900001' } as any,
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject(
       sapRefusal(
-        '/sap/bc/adt/cts/transportrequests/TRLK900001?includeObjects=true&includeTasks=true',
+        '/sap/bc/adt/cts/transportrequests/TRLK900001',
         'read transport request',
       ),
     );

@@ -46,7 +46,6 @@ import {
   type FailureEntry,
   failureEntry,
   isCredentialPayload,
-  requestFailureOf,
   requestThrownEntry,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -270,35 +269,28 @@ export async function handleGetServiceBindingPreviewUrl(
           // composed URL remains the answer when it says nothing.
           let category: ReturnType<typeof categoryServiceUrlsOf> = {};
           if (facts.protocol !== undefined && facts.service !== undefined) {
-            const sent = {
-              method: 'GET',
-              url: `/sap/bc/adt/businessservices/${facts.protocol}/${bindingName}`,
-            };
-            try {
-              const answered = await connection.makeAdtRequest({
-                url: sent.url,
-                method: 'GET',
-                // None of the server's (`0`): a deadline closes the socket
-                // under a running request, which kills it in SAP;
-                // HandlerGet's `timeout` ends only its wait.
-                timeout: 0,
-                params: {
-                  servicename: facts.service,
-                  serviceversion: facts.version ?? '0001',
-                },
-              });
-              category = categoryServiceUrlsOf(String(answered.data ?? ''));
-            } catch (error) {
-              // A credential failure ends the call as it came — a thrown
-              // refusal rethrown, a `401` SAP answered as the lookup's error
-              // with its step; absent, refused or shaped otherwise: the
+            const looked = await binding.getServiceGroup(
+              {
+                objectname: bindingName,
+                serviceType: facts.protocol,
+                servicename: facts.service,
+                serviceversion: facts.version ?? '0001',
+              },
+              { analyse: analyseException },
+            );
+            if (looked.ok) {
+              category = categoryServiceUrlsOf(
+                (looked.getResult().value as AdtReading<unknown>).raw,
+              );
+            } else {
+              // A `401` SAP answered ends the call with the lookup's error and
+              // its step (a thrown credential refusal rejects from the member
+              // as it came); absent, refused or shaped otherwise: the
               // composed URL answers.
               const step = 'read service URL';
-              if (isCredentialPayload(requestThrownEntry(error, sent, step))) {
-                const failed = requestFailureOf(error, sent);
-                if (failed === undefined) throw error;
+              const failed = looked.getError();
+              if (isCredentialPayload(failureEntry(failed, step)))
                 return failedWith<Found>(withStep(failed, step));
-              }
             }
           }
 

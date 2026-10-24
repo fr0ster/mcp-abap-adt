@@ -7,21 +7,21 @@
  * - Included objects and tasks
  * - Change history
  *
- * @TODO Migrate to infrastructure module or enhance AdtClient.getRequest().read()
- * Current AdtClient.getRequest().read() doesn't support:
- * - includeObjects and includeTasks query parameters
- * - XML parsing (returns raw AxiosResponse)
- * This handler provides richer functionality that should be added to adt-clients
+ * The request is adt-clients' `getRequest().readObjects()` (#235): the
+ * request's document with its objects and tasks. `include_objects` and
+ * `include_tasks` choose what the answer carries from it.
  */
 
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
-import { answerCaught, answerRequestThrown } from '../../../lib/answer';
+import { answerCaught, answerFailure } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  makeAdtRequest,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withStep } from '../../../lib/strategies/step';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
@@ -195,50 +195,19 @@ export async function handleGetTransport(
       `Include objects: ${includeObjects}, Include tasks: ${includeTasks}`,
     );
 
-    let url = `/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
-
-    // Add query parameters for additional information
-    const params: string[] = [];
-    if (includeObjects) params.push('includeObjects=true');
-    if (includeTasks) params.push('includeTasks=true');
-    if (params.length > 0) {
-      url += `?${params.join('&')}`;
-    }
-
-    const headers = {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
-    };
-
-    logger?.debug(`GET from: ${url}`);
-
-    // Get transport request
-    let response: Awaited<ReturnType<typeof makeAdtRequest>>;
-    try {
-      response = await makeAdtRequest(
-        connection,
-        url,
-        'GET',
-        // No deadline of the server's: the request waits for SAP's answer.
-        0,
-        undefined,
-        undefined,
-        headers,
-      );
-    } catch (error) {
-      // The request's error as SAP answered it, with its step — a
-      // credential failure as the chain made it.
-      return answerRequestThrown(
-        error,
-        { method: 'GET', url },
-        'read transport request',
-      );
-    }
+    // The request's document: its objects and its tasks.
+    const step = 'read transport request';
+    const read = await createAdtClient(connection, logger)
+      .getRequest(resultsFor(transportDocuments))
+      .readObjects(typedArgs.transport_number, { analyse: analyseException });
+    if (!read.ok) return answerFailure(withStep(read.getError(), step));
+    const response = read.getResult().value as AdtReading<unknown>;
 
     logger?.debug(`GetTransport response status: ${response.status}`);
 
     // Parse XML response
     const transportData = parseTransportXml(
-      response.data,
+      response.raw,
       includeObjects,
       includeTasks,
     );
@@ -254,14 +223,10 @@ export async function handleGetTransport(
         null,
         2,
       ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
+    } as Parameters<typeof return_response>[0]);
   } catch (error) {
-    // Not the request's failure (answered above): ours, such as a document
-    // we could not read.
+    // Not the request's failure (answered above): a credential refusal as the
+    // chain made it, or ours, such as a document we could not read.
     return answerCaught(error, { tool: 'GetTransport', detail: 'terse' });
   }
 }

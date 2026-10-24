@@ -337,7 +337,7 @@ export interface CoreConfig extends IServerConfig {
   loginTimeoutSource?: string;
   /** `--auth-debug`: the providers' debug lines on stderr, secrets in their prepared form. */
   authDebug?: boolean;
-  /** SAP connection type: http (default) or rfc */
+  /** SAP connection type: http or rfc; required for a destination, no default */
   connectionType?: 'http' | 'rfc';
   /**
    * The form `connectionType` came from: `--connection-type`,

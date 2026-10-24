@@ -574,7 +574,7 @@ export function startSystemTypeRequiredWords(destination: string): string {
  * The start's words for a destination whose wire no parameter states.
  */
 export function startConnectionTypeRequiredWords(destination: string): string {
-  return `Destination "${destination}": the SAP connection type is required — set --connection-type, SAP_CONNECTION_TYPE (the environment or the --env file) or connection-type (YAML) to http or rfc; the server did not start`;
+  return `Destination "${destination}": the SAP connection type is required — set --connection-type, SAP_CONNECTION_TYPE (the environment or the destination's .env) or connection-type (YAML) to http or rfc; the server did not start`;
 }
 
 /**

@@ -176,16 +176,27 @@ describe('GetPackageContents: a throw', () => {
 });
 
 describe('GetTypeInfo: a direct lookup SAP refused', () => {
+  // adt-clients' own members (#235) over the connection double, so the
+  // requests on the wire are the members'.
+  const realClientOver = (connection: unknown) => {
+    fakeClient = jest
+      .requireActual('../../lib/clients')
+      .createAdtClient(connection);
+  };
+
   it("is the lookup's error as SAP answered it, with the lookup as the step", async () => {
     const sent: string[] = [];
+    const connection = refusingWith(403, sent);
+    realClientOver(connection);
     const result: any = await handleGetTypeInfo(
-      { connection: refusingWith(403, sent), logger: undefined } as any,
+      { connection, logger: undefined } as any,
       { type_name: 'ZT' },
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toEqual({
       origin: 'connection',
-      ...sapRefusal('/sap/bc/adt/ddic/domains/ZT/source/main', 'read domain'),
+      // The first lookup is the data element (`getDataElement().readMetadata`).
+      ...sapRefusal('/sap/bc/adt/ddic/dataelements/zt', 'read data element'),
     });
     // The refusal is the answer: no further lookup is sent.
     expect(sent).toHaveLength(1);
@@ -200,27 +211,38 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
         throw httpError(403);
       },
     };
+    realClientOver(connection);
     const result: any = await handleGetTypeInfo(
       { connection, logger: undefined } as any,
       { type_name: 'ZT' },
     );
     expect(payloadOf(result)).toMatchObject({
       status: 403,
-      step: 'read data element',
+      step: 'read table type',
     });
+    expect(sent).toEqual([
+      '/sap/bc/adt/ddic/dataelements/zt',
+      '/sap/bc/adt/ddic/tabletypes/zt',
+    ]);
   });
 });
 
 describe('GetTransport: the request SAP refused', () => {
   it("is the request's error as SAP answered it, not SAP's body as text", async () => {
+    // adt-clients' own `readObjects` (#235) over the refusing connection, so
+    // the request on the wire is the member's.
+    const connection = refusingWith(403);
+    fakeClient = jest
+      .requireActual('../../lib/clients')
+      .createAdtClient(connection);
     const result: any = await handleGetTransport(
-      { connection: refusingWith(403), logger: undefined } as any,
+      { connection, logger: undefined } as any,
       { transport_number: 'TRLK900001' } as any,
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject(
       sapRefusal(
-        '/sap/bc/adt/cts/transportrequests/TRLK900001?includeObjects=true&includeTasks=true',
+        '/sap/bc/adt/cts/transportrequests/TRLK900001',
         'read transport request',
       ),
     );

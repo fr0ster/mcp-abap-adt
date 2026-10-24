@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A portable archive may be shared inside the organization that licensed the SAP NW RFC SDK**, as its SAP administrators share the SDK itself; it is still never published. [Portable Build](docs/installation/PORTABLE.md), [Installation](docs/installation/INSTALLATION.md) and the archive's README say so, and the README tells a colleague how to start it: on Windows SmartScreen may ask once for the unsigned executable (More info → Run anyway, or the organization's IT allows it where policy removes that); on macOS an archive received through a browser or a messenger needs its quarantine flag cleared (`xattr -dr com.apple.quarantine <folder>`).
 
+- **Four tools no longer build ADT URLs of their own; they call adt-clients' members** ([#235](https://github.com/fr0ster/mcp-abap-adt/issues/235)). What each answers is unchanged, checked against E19 beside the previous build:
+  - `GetTransport` reads the request through `getRequest().readObjects()`. The `includeObjects`/`includeTasks` query parameters are gone: the request's document carries its objects and tasks either way (measured on E19 with all four combinations), and `include_objects`/`include_tasks` still choose what the answer carries.
+  - `GetTypeInfo` tries a data element, a table type, a domain's object properties and a structure, through their members. The first lookup it used to send, a domain's `/source/main`, answered `404` for every domain and is gone; a domain is found through its object properties, as before.
+  - `GetServiceBindingPreviewUrl` reads the service URLs through `getServiceBinding().getServiceGroup()`, which sends adt-clients' `Accept` for the protocol.
+  - `GetEnhancementImpl` and `GetEnhancementSpot` look an enhancement's subtype up through `getUtils().search()`.
+
+### Security
+
+- **The lockfile takes body-parser 2.4.0 (under express) and fast-uri 3.1.9 (under the MCP SDK's ajv)**, for GHSA advisories published against 2.3.0 (a denial of service through trailing bytes after a compressed body) and 3.1.8 (URI scheme, path and host confusion). No dependency range changed.
+
 ## [20.1.0] - 2026-10-23
 
 Both ABAP Unit runners, chosen per call with `runner: 'async' | 'sync'` ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286), [#313](https://github.com/fr0ster/mcp-abap-adt/pull/313)); a write whose cleanup UNLOCK fails says the object may be left locked, and a save refused by `CTS_WBO_API` 019 / 020 names the request that holds the object ([#314](https://github.com/fr0ster/mcp-abap-adt/issues/314), [#316](https://github.com/fr0ster/mcp-abap-adt/pull/316)); on `@mcp-abap-adt/connection` 19.1.0, which resends a request lost on a dead kept-alive socket once on a new connection (#314's `socket hang up`); the 7-day release age dropped ([#315](https://github.com/fr0ster/mcp-abap-adt/pull/315)). The eighteen packages are all at 20.1.0, every sibling range at `^20.1.0` — `@mcp-abap-adt/compact-modify` needs `@mcp-abap-adt/lib` 20.1.0 for `runner` on `HandlerUnitTestRun`.

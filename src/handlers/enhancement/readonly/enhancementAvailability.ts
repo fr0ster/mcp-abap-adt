@@ -1,6 +1,9 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isCredentialFailure } from '../../../lib/answer';
-import { makeAdtRequest } from '../../../lib/utils';
+import { createAdtClient } from '../../../lib/clients';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 
 /**
  * Enhancement types ADT does not expose. Eclipse ADT opens each in SAP GUI, and
@@ -36,18 +39,18 @@ export async function enhancementTypeOf(
   objectType: 'ENHO' | 'ENHS',
 ): Promise<string | undefined> {
   try {
-    const response = await makeAdtRequest(
-      connection,
-      `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeURIComponent(name)}&maxResults=20&objectType=${objectType}`,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-      undefined,
-      undefined,
-      { Accept: 'application/xml' },
-    );
+    const searched = await createAdtClient(connection)
+      .getUtils(ourUtils)
+      .search(
+        { query: name, objectType, maxResults: 20 },
+        { analyse: analyseException },
+      );
+    // A search that fails says nothing about the type; the caller keeps the
+    // failure it already has.
+    if (!searched.ok) return undefined;
+    const raw = (searched.getResult().value as AdtReading<unknown>).raw;
     const wanted = name.toUpperCase();
-    for (const m of String(response.data ?? '').matchAll(
+    for (const m of String(raw ?? '').matchAll(
       /<adtcore:objectReference ([^>]*)\/?>/g,
     )) {
       const attrs = m[1];

@@ -9,10 +9,16 @@
  * url rather than a plausible one.
  */
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
-import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import {
+  fakeClientOf,
+  okResponse,
+  reading,
+  refusedResponse,
+} from '../helpers/fakeClient';
 
 // The client and the language come from ADT's own `systeminformation`, so the
 // tool is tested against what that endpoint answers — including its refusals,
@@ -52,8 +58,12 @@ const clientFor = (parts: {
   binding?: string;
   definition?: string;
   view?: string;
+  /** What `getServiceGroup` answers; by default the empty list a trial sends. */
+  serviceGroup?: (...args: unknown[]) => Promise<unknown>;
 }) =>
   fakeClientOf({
+    getServiceGroup:
+      parts.serviceGroup ?? (async () => okResponse(reading(''))),
     read: async (...args: unknown[]) => {
       const config = (args[0] ?? {}) as Record<string, string>;
       if (config.bindingName !== undefined)
@@ -468,35 +478,38 @@ describe('GetServiceBindingPreviewUrl', () => {
     // field, so when it answers, its answer wins: it knows about prefixes and
     // rewrites a naming rule cannot. Measured on a trial it comes back empty, and
     // then the composed URL stays — which every other test here exercises.
+    const asked: unknown[][] = [];
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
       view: ROOT_VIEW,
-    });
-
-    const answered = await handleGetServiceBindingPreviewUrl(
-      {
-        connection: {
-          getBaseUrl: async () => 'https://epbyminsd0654.epam.com:44300/',
-          getSessionId: () => null,
-          makeAdtRequest: async () => ({
-            data: `<?xml version="1.0" encoding="utf-8"?>
+      serviceGroup: async (...args: unknown[]) => {
+        asked.push(args);
+        return okResponse(
+          reading(`<?xml version="1.0" encoding="utf-8"?>
 <odatav2:serviceList xmlns:odatav2="http://www.sap.com/categories/odatav2">
   <odatav2:services odatav2:serviceId="ZSB_STUDENT_V2" odatav2:serviceVersion="0001"
     odatav2:serviceUrl="/sap/opu/odata/sap/ELSEWHERE/" odatav2:annotationUrl="/sap/opu/odata/annotations/X/"
     odatav2:published="true"/>
-</odatav2:serviceList>`,
-            status: 200,
-          }),
-        } as never,
-        logger: undefined,
-      } as never,
-      { service_binding_name: 'ZSB_STUDENT_V2' } as never,
-    );
-    const payload = JSON.parse(
-      (answered as { content: { text: string }[] }).content[0].text,
-    );
+</odatav2:serviceList>`),
+        );
+      },
+    });
 
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    // adt-clients' getServiceGroup, not a URL built here (#235).
+    expect(asked).toEqual([
+      [
+        {
+          objectname: 'ZSB_STUDENT_V2',
+          serviceType: 'odatav2',
+          servicename: 'ZSB_STUDENT_V2',
+          serviceversion: '0001',
+        },
+        { analyse: analyseException },
+      ],
+    ]);
     expect(payload.service_url_source).toBe('system');
     expect(payload.service_url).toBe(
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata/sap/ELSEWHERE/',
@@ -506,51 +519,50 @@ describe('GetServiceBindingPreviewUrl', () => {
   });
 
   describe('the service URL lookup: a credential failure ends the call as it came', () => {
-    const run = (thrown: () => unknown) => {
+    const run = (serviceGroup: () => Promise<unknown>) => {
       fakeClient = clientFor({
         binding: BINDING,
         definition: DEFINITION,
         view: ROOT_VIEW,
+        serviceGroup,
       });
       return handleGetServiceBindingPreviewUrl(
         {
           connection: {
             getBaseUrl: async () => 'https://example.invalid/',
             getSessionId: () => null,
-            makeAdtRequest: async () => {
-              throw thrown();
-            },
           } as never,
           logger: undefined,
         } as never,
         { service_binding_name: 'ZSB_STUDENT_V2' } as never,
       ) as Promise<any>;
     };
+    const sent = {
+      method: 'GET',
+      url: '/sap/bc/adt/businessservices/odatav2/ZSB_STUDENT_V2?servicename=ZSB_STUDENT_V2&serviceversion=0001',
+    };
 
     it("a 401 SAP answered: the lookup's error as it is, with its step, not the composed URL", async () => {
-      const answered = await run(() =>
-        Object.assign(new Error('Request failed with status code 401'), {
+      const answered = await run(async () =>
+        refusedResponse('Request failed with status code 401', {
           response: { status: 401, data: '' },
-        }),
+          request: sent,
+        } as never),
       );
       expect(answered.isError).toBe(true);
       expect(JSON.parse(answered.content[0].text)).toMatchObject({
         status: 401,
         step: 'read service URL',
-        request: {
-          method: 'GET',
-          url: '/sap/bc/adt/businessservices/odatav2/ZSB_STUDENT_V2',
-        },
+        request: sent,
       });
     });
 
     it('a thrown credential refusal: the chain answer', async () => {
-      const answered = await run(
-        () =>
-          new AuthProviderFailure(
-            authError['credential-refused']({ credential: 'token' }),
-          ),
-      );
+      const answered = await run(async () => {
+        throw new AuthProviderFailure(
+          authError['credential-refused']({ credential: 'token' }),
+        );
+      });
       expect(answered.isError).toBe(true);
       expect(JSON.parse(answered.content[0].text).error).toBe(
         'authentication_failed',
@@ -558,10 +570,10 @@ describe('GetServiceBindingPreviewUrl', () => {
     });
 
     it('any other refusal stays best effort: the composed URL answers', async () => {
-      const answered = await run(() =>
-        Object.assign(new Error('Request failed with status code 403'), {
+      const answered = await run(async () =>
+        refusedResponse('Request failed with status code 403', {
           response: { status: 403, data: '' },
-        }),
+        } as never),
       );
       expect(answered.isError).toBe(false);
       expect(JSON.parse(answered.content[0].text).service_url_source).toBe(

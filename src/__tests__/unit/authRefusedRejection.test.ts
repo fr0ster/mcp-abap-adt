@@ -315,6 +315,13 @@ describe('a direct request the credential refused ends the call as the credentia
   });
 
   it("GetEnhancementImpl: the type search's refusal is the answer, not the words of an unknown collection", async () => {
+    // The search is adt-clients' `getUtils().search` (#235), which rejects
+    // with the connection's refusal as it came.
+    fakeClient = fakeClientOf({
+      search: async () => {
+        throw refused();
+      },
+    });
     const result = await handleGetEnhancementImpl(
       { connection: refusing(), logger: undefined } as any,
       { enhancement_spot: 'zspot', enhancement_name: 'ZENH' },

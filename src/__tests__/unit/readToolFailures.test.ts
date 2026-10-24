@@ -176,16 +176,28 @@ describe('GetPackageContents: a throw', () => {
 });
 
 describe('GetTypeInfo: a direct lookup SAP refused', () => {
+  // adt-clients' own members (#235) over the connection double, so the
+  // requests on the wire are the members'.
+  const realClientOver = (connection: unknown) => {
+    fakeClient = jest
+      .requireActual('../../lib/clients')
+      .createAdtClient(connection);
+  };
+
   it("is the lookup's error as SAP answered it, with the lookup as the step", async () => {
     const sent: string[] = [];
+    const connection = refusingWith(403, sent);
+    realClientOver(connection);
     const result: any = await handleGetTypeInfo(
-      { connection: refusingWith(403, sent), logger: undefined } as any,
+      { connection, logger: undefined } as any,
       { type_name: 'ZT' },
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toEqual({
       origin: 'connection',
-      ...sapRefusal('/sap/bc/adt/ddic/domains/ZT/source/main', 'read domain'),
+      // The domain's metadata (`getDomain().readMetadata`), no longer its
+      // `/source/main`.
+      ...sapRefusal('/sap/bc/adt/ddic/domains/zt', 'read domain'),
     });
     // The refusal is the answer: no further lookup is sent.
     expect(sent).toHaveLength(1);
@@ -200,6 +212,7 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
         throw httpError(403);
       },
     };
+    realClientOver(connection);
     const result: any = await handleGetTypeInfo(
       { connection, logger: undefined } as any,
       { type_name: 'ZT' },
@@ -208,6 +221,10 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       status: 403,
       step: 'read data element',
     });
+    expect(sent).toEqual([
+      '/sap/bc/adt/ddic/domains/zt',
+      '/sap/bc/adt/ddic/dataelements/zt',
+    ]);
   });
 });
 

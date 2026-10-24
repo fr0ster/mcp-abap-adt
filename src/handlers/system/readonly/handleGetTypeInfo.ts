@@ -1,26 +1,32 @@
 /**
- * @TODO Migrate to infrastructure module
- * Endpoints: Multiple fallback chain:
- * - /sap/bc/adt/ddic/domains/{name}/source/main
- * - /sap/bc/adt/ddic/dataelements/{name}
- * - /sap/bc/adt/ddic/tabletypes/{name}
- * - /sap/bc/adt/repository/informationsystem/objectproperties/values
- * This handler uses makeAdtRequest directly and should be moved to adt-clients infrastructure module
+ * GetTypeInfo: what a DDIC type name is, tried in order — a domain, a data
+ * element, a table type, the repository's object properties of a domain, and,
+ * unless switched off, a structure. Each lookup is an adt-clients member
+ * (#235); a `404` or an empty answer moves on to the next, any other refusal
+ * is the call's answer.
  */
 
+import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import {
   answerCaught,
-  answerRequestThrown,
+  answerFailure,
   type McpResult,
 } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  encodeSapObjectName,
-  makeAdtRequest,
-  return_error,
-} from '../../../lib/utils';
+  readDataElementMetadata,
+  readDomainMetadata,
+  readStructureMetadata,
+} from '../../../lib/strategies/metadataReads';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
+import { withStep } from '../../../lib/strategies/step';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
@@ -132,49 +138,40 @@ function hasUsableResult(value: any): boolean {
   return true;
 }
 
-function isNotFoundError(error: any): boolean {
-  return error?.response?.status === 404;
+/** Whether a refusal is SAP's `404`: the name is not of this kind. */
+function isNotFound(error: IAdtError): boolean {
+  return (error.response as { status?: unknown } | undefined)?.status === 404;
 }
 
 type LookupResult =
   | { status: 'ok'; payload: any }
   | { status: 'not_found_or_empty' }
-  /** SAP refused the lookup (not a 404), or the credential: the call's answer. */
+  /** SAP refused the lookup (not a 404): the call's answer. */
   | { status: 'failed'; answer: McpResult };
 
+/**
+ * One lookup, through its member. A credential refusal the connection raised
+ * rejects from the member as it came and ends the call (the handler's catch).
+ */
 async function tryLookup(
-  connection: any,
-  url: string,
+  read: () => Promise<IAdtResponse<unknown, IAdtError>>,
   parseFn: (xml: string) => any,
   step: string,
 ): Promise<LookupResult> {
-  let response: Awaited<ReturnType<typeof makeAdtRequest>>;
-  try {
-    response = await makeAdtRequest(
-      connection,
-      url,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-    );
-  } catch (error: any) {
-    if (isNotFoundError(error)) {
-      return { status: 'not_found_or_empty' };
-    }
-    // The request's error as SAP answered it, with the lookup as its step —
-    // a credential failure as the chain made it.
-    return {
-      status: 'failed',
-      answer: answerRequestThrown(error, { method: 'GET', url }, step),
-    };
+  const answered = await read();
+  if (!answered.ok) {
+    const failed = answered.getError();
+    if (isNotFound(failed)) return { status: 'not_found_or_empty' };
+    // SAP's refusal as the member answered it, with the lookup as its step.
+    return { status: 'failed', answer: answerFailure(withStep(failed, step)) };
   }
-  if (!hasUsableResult(response?.data)) {
+  const raw = (answered.getResult().value as AdtReading<unknown>).raw;
+  if (!hasUsableResult(raw)) {
     return { status: 'not_found_or_empty' };
   }
 
-  // Outside the request's catch: a document we cannot read is our failure,
-  // not SAP's answer.
-  const payload = parseFn(response.data);
+  // A document we cannot read is our failure, not SAP's answer.
+  const payload = parseFn(raw);
   if (!hasUsableResult(payload)) {
     return { status: 'not_found_or_empty' };
   }
@@ -196,51 +193,56 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
 
   try {
     const typeName = args.type_name;
-    const encodedTypeName = encodeSapObjectName(typeName);
-    const uri = encodeURIComponent(
-      `/sap/bc/adt/ddic/domains/${typeName.toLowerCase()}`,
-    );
+    const client = createAdtClient(connection, logger);
 
     const lookups: Array<{
       label: string;
       step: string;
-      url: string;
+      read: () => Promise<IAdtResponse<unknown, IAdtError>>;
       parseFn: (xml: string) => any;
     }> = [
       {
         label: 'domain',
         step: 'read domain',
-        url: `/sap/bc/adt/ddic/domains/${encodedTypeName}/source/main`,
+        read: () => readDomainMetadata(client, { domainName: typeName }),
         parseFn: parseTypeInfoXml,
       },
       {
         label: 'data element',
         step: 'read data element',
-        url: `/sap/bc/adt/ddic/dataelements/${encodedTypeName}`,
+        read: () =>
+          readDataElementMetadata(client, { dataElementName: typeName }),
         parseFn: parseTypeInfoXml,
       },
       {
         label: 'table type',
         step: 'read table type',
-        url: `/sap/bc/adt/ddic/tabletypes/${encodedTypeName}`,
+        read: () =>
+          client
+            .getTableType(resultsFor(tableTypeDocuments))
+            .readMetadata(
+              { tableTypeName: typeName },
+              { analyse: analyseException },
+            ),
         parseFn: parseTypeInfoXml,
       },
       {
         label: 'repository information system',
         step: 'read repository information',
-        url: `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${uri}`,
+        read: () =>
+          client
+            .getUtils(ourUtils)
+            .getObjectProperties(
+              `/sap/bc/adt/ddic/domains/${typeName.toLowerCase()}`,
+              { analyse: analyseException },
+            ),
         parseFn: parseTypeInfoXml,
       },
     ];
 
     for (const lookup of lookups) {
       logger?.debug(`Trying ${lookup.label} lookup for ${typeName}`);
-      const result = await tryLookup(
-        connection,
-        lookup.url,
-        lookup.parseFn,
-        lookup.step,
-      );
+      const result = await tryLookup(lookup.read, lookup.parseFn, lookup.step);
       if (result.status === 'failed') return result.answer;
       if (result.status === 'ok') {
         const mcpResult = {
@@ -257,8 +259,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         `Type lookups returned 404/empty for ${typeName}, trying structure fallback`,
       );
       const structureResult = await tryLookup(
-        connection,
-        `/sap/bc/adt/ddic/structures/${encodedTypeName}`,
+        () => readStructureMetadata(client, { structureName: typeName }),
         parseStructureInfoXml,
         'read structure',
       );

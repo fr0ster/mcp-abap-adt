@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The lockfile takes body-parser 2.4.0 (under express) and fast-uri 3.1.9 (under the MCP SDK's ajv)**, for GHSA advisories published against 2.3.0 (a denial of service through trailing bytes after a compressed body) and 3.1.8 (URI scheme, path and host confusion). No dependency range changed.
 
+### Changed — breaking for a consumer of `GetTypeInfo`'s answer
+
+- **`GetTypeInfo` answers every DDIC type a name is, not the first one found** ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). One name can be several types; MANDT, for example, is a data element and a domain. The name is read as a data element, a domain, a structure (unless `include_structure_fallback` is `false`) and a table type, and the answer is `{ name, types: [...] }`, with `types` in alphabetical order of `objectType` (`data_element`, `domain`, `structure`, `table_type`). Each entry is read from its own document:
+  - a data element: its type, length, decimals, domain and labels;
+  - a domain, now read in full (`doma:domain`): its type, length, decimals, output format, value table and fixed values;
+  - a structure: its name, description and package. It used to be read from a root element it does not have, so it answered empty fields.
+  - a table type: its row type, access type and primary key, where it used to be answered raw.
+
+  The object-properties lookup is gone. It answered a domain by name and text only, and its `422` for a non-domain such as SYST ended the call before the structure was read. Measured on E19 (2026-10-24): each read answers `404` for a type the name is not. **Migrating:** read `types[]` instead of the single object, and pick the `objectType` you need.
+
 ### Repository (nothing in the published packages)
 
 - **Every TypeScript file under `scripts/` is type-checked**: `tsconfig.test.json` includes `scripts/**/*.ts`, so `test:check` and CI refuse a script that no longer compiles ([#234](https://github.com/fr0ster/mcp-abap-adt/issues/234)). The 18 scripts that did not compile, or were one-off measurements whose results are recorded, are gone: the `probe-*` scripts, `debug-profiling`, `get-dump`, `list-dumps`, `list-traces`, `read-fm`, `classify-mcperror-throws`, `tool-provenance` and `capture-adt-corpus` (69 type errors between them, 48 in the last). The ADT corpus stays as recorded, and its README says where the capture script is in history. `tools/` holds no TypeScript.

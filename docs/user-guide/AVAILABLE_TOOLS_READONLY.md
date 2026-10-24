@@ -686,12 +686,12 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettypeinfo-read-only-system"></a>
 #### GetTypeInfo (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP type information for domains (DOMA), data elements (DTEL), table types, and structures. Returns field definitions, value ranges, fixed values, and DDIC metadata.
+**Description:** [read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key.
 
 **Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
 
 **Parameters:**
-- `include_structure_fallback` (boolean, optional (default: true)) - When true (default), tries DDIC structure lookup only if type lookup returns 404/empty.
+- `include_structure_fallback` (boolean, optional (default: true)) - When true (default), the name is also read as a DDIC structure; false leaves the structure read out.
 - `type_name` (string, required) - Name of the ABAP type
 
 ---
@@ -1179,4 +1179,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-10-23*
+*Last updated: 2026-10-24*

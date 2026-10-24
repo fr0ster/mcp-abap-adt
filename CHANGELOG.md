@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed — breaking for code that imports `@mcp-abap-adt/lib/utils`
 
 - **`getConfig()` is gone from `@mcp-abap-adt/lib/utils`**, and so are its private twin in `src/lib/config.ts`, `parseAuthType` and the certificate/Kerberos field reader ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)). `getConfig()` built a `SapConfig` from `process.env` by guessing: an absent or unknown `SAP_AUTH_TYPE` became `basic`, `snc` became `basic` too, and an absent `SAP_CONNECTION_TYPE` became `http`. No binary called it: the stdio launcher reads the `.env` itself and refuses a missing or unknown authentication, and the HTTP and SSE servers read only the request's headers. **Migrating:** build the `SapConfig` yourself from what you know, and state every field; or hand the server a connection (`setAbapConnectionOverride`) or a config (`setSapConfigOverride`, still exported).
-- The integration tests' `getSapConfigFromEnv` guesses nothing either. `SAP_AUTH_TYPE` must be `basic` or `jwt`; `basic` needs `SAP_USERNAME` and `SAP_PASSWORD`, and `jwt` needs `SAP_JWT_TOKEN`. Anything else is refused, naming what is missing.
+- The integration tests' `getSapConfigFromEnv` guesses nothing either. `SAP_AUTH_TYPE` must be `basic` or `jwt`; `basic` needs `SAP_USERNAME` and `SAP_PASSWORD`, and `jwt` needs `SAP_JWT_TOKEN`. A stated `SAP_CONNECTION_TYPE` must be `http` or `rfc` (absent is HTTP, as the launcher documents). Anything else is refused, naming what is wrong.
 
 ### Changed
 

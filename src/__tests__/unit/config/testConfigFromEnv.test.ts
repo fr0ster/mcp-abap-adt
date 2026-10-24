@@ -71,6 +71,32 @@ describe('getSapConfigFromEnv', () => {
     );
   });
 
+  it.each(['rfcc', 'tcp', 'https'])(
+    'refuses SAP_CONNECTION_TYPE=%s rather than running over HTTP',
+    (value) => {
+      process.env.SAP_AUTH_TYPE = 'basic';
+      process.env.SAP_USERNAME = 'user';
+      process.env.SAP_PASSWORD = 'secret';
+      process.env.SAP_CONNECTION_TYPE = value;
+      expect(() => getSapConfigFromEnv()).toThrow(
+        `SAP_CONNECTION_TYPE "${value}" is not one of: http, rfc.`,
+      );
+    },
+  );
+
+  it("reads rfc as rfc, and an absent connection type as HTTP (the launcher's documented default)", () => {
+    process.env.SAP_AUTH_TYPE = 'basic';
+    process.env.SAP_USERNAME = 'user';
+    process.env.SAP_PASSWORD = 'secret';
+    process.env.SAP_CONNECTION_TYPE = 'rfc';
+    expect(getSapConfigFromEnv().connectionType).toBe('rfc');
+    // In any case, as the launcher reads an enum.
+    process.env.SAP_CONNECTION_TYPE = 'RFC';
+    expect(getSapConfigFromEnv().connectionType).toBe('rfc');
+    delete process.env.SAP_CONNECTION_TYPE;
+    expect(getSapConfigFromEnv().connectionType).toBeUndefined();
+  });
+
   it('builds basic from what was stated', () => {
     process.env.SAP_AUTH_TYPE = 'basic';
     process.env.SAP_USERNAME = ' user ';

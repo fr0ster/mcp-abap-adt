@@ -496,10 +496,17 @@ export function getSapConfigFromEnv(): SapConfig {
   }
   const authType = stated as (typeof TEST_AUTH_TYPES)[number];
 
+  // Absent is HTTP, as the launcher documents (`http|rfc (default: http)`);
+  // anything stated must be one of the two, in any case as the launcher reads
+  // an enum, so a typo is refused rather than run over HTTP.
+  const statedWire = process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
+  if (statedWire && statedWire !== 'http' && statedWire !== 'rfc') {
+    throw new Error(
+      `SAP_CONNECTION_TYPE "${process.env.SAP_CONNECTION_TYPE?.trim()}" is not one of: http, rfc.`,
+    );
+  }
   const connectionType: SapConfig['connectionType'] =
-    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
-      ? 'rfc'
-      : undefined;
+    statedWire === 'rfc' ? 'rfc' : undefined;
 
   const config: SapConfig = {
     url,

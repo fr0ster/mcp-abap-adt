@@ -10,10 +10,8 @@
     // nothing and lets the audit tooling under `scripts/` type-check with
     // the tests.
     //
-    // Only the audit tooling, not all of `scripts/`. The other scripts carry
-    // eighteen errors of their own that predate this migration, and adopting
-    // them here would make "errors naming the files this task touched" — the
-    // measure every remaining task reports against — noisier for no gain.
+    // Every TypeScript file under `scripts/` is checked here (#234): a script
+    // that no longer compiles is a script nobody can run.
     "rootDir": ".",
     // The compact facade lives in sibling packages now, and the tests that
     // exercise it import them by package name. ts-jest resolves those names
@@ -84,9 +82,7 @@
     "compact-sse-ro/src/**/*",
     "src/__tests__/**/*",
     "src/lib/servers/v2/__tests__/**/*",
-    "scripts/lib/**/*",
-    "scripts/check-analyse.ts",
-    "scripts/list-tools.ts"
+    "scripts/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

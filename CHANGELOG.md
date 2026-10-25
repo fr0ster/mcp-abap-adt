@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Repository (nothing in the published packages)
 
+- **`MCP_TEST_CONFIG` set but blank, or naming a file that is not there, is refused by every reader.** A blank value used to mean the default `tests/test-config.yaml`, and Jest's global setup answered a named file it could not read with "no config" — no auth session — while the tests refused the same name. `testConfigPathFromEnv` now refuses both, so the global setup, the tests and `shared:check` fail alike, naming the variable.
 - **Every TypeScript file under `scripts/` is type-checked**: `tsconfig.test.json` includes `scripts/**/*.ts`, so `test:check` and CI refuse a script that no longer compiles ([#234](https://github.com/fr0ster/mcp-abap-adt/issues/234)). The 18 scripts that did not compile, or were one-off measurements whose results are recorded, are gone: the `probe-*` scripts, `debug-profiling`, `get-dump`, `list-dumps`, `list-traces`, `read-fm`, `classify-mcperror-throws`, `tool-provenance` and `capture-adt-corpus` (69 type errors between them, 48 in the last). The ADT corpus stays as recorded, and its README says where the capture script is in history. `tools/` holds no TypeScript.
 
 ## [20.1.0] - 2026-10-23

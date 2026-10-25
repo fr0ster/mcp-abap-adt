@@ -32,13 +32,18 @@ import { testConfigPathFromEnv } from './helpers/testConfigPath';
 function loadTestConfig(): any {
   // MCP_TEST_CONFIG names the file for this run; resolved in one place with
   // loadTestConfig, which lives one directory deeper than this file.
+  // A named file is read or the setup fails: a blank name or a missing file
+  // is refused there, and an unreadable one is not skipped as "no config".
   const chosen = testConfigPathFromEnv();
-  const configPaths = chosen
-    ? [chosen]
-    : [
-        path.resolve(process.cwd(), 'tests', 'test-config.yaml'),
-        path.resolve(__dirname, '../../../../tests/test-config.yaml'),
-      ];
+  if (chosen) {
+    const fs = require('node:fs');
+    const yaml = require('js-yaml');
+    return yaml.load(fs.readFileSync(chosen, 'utf8'));
+  }
+  const configPaths = [
+    path.resolve(process.cwd(), 'tests', 'test-config.yaml'),
+    path.resolve(__dirname, '../../../../tests/test-config.yaml'),
+  ];
   for (const configPath of configPaths) {
     try {
       const fs = require('node:fs');

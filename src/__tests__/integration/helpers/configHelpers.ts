@@ -255,13 +255,11 @@ export function loadTestConfig(): any {
   }
 
   // MCP_TEST_CONFIG names another file, so one checkout can carry a config per
-  // system. It is a statement, not a hint: a file that is not there fails here
-  // rather than falling back to the template and quietly disabling every test.
+  // system. It is a statement, not a hint: a blank value or a file that is not
+  // there is refused by testConfigPathFromEnv rather than falling back to the
+  // template and quietly disabling every test.
   const chosen = testConfigPathFromEnv();
   if (chosen) {
-    if (!fs.existsSync(chosen)) {
-      throw new Error(`MCP_TEST_CONFIG points to a missing file: ${chosen}`);
-    }
     cachedConfig =
       (yaml.load(fs.readFileSync(chosen, 'utf8')) as Record<string, unknown>) ||
       {};

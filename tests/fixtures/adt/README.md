@@ -55,6 +55,30 @@ exchanges address the same endpoint and differ only in `params`.
 - The CSRF handshake and the 403-retry are invisible here. They happen inside
   `makeAdtRequest`, below the interceptor.
 
+The `system-description-*` cases (below) were recorded by a hand-run client, not
+by the recorder, from three systems of three releases. Their bodies are byte for
+byte except for these substitutions:
+
+- **The host name becomes `abap.example.com`.** Discovery and core discovery
+  write the system's own absolute URL into a few links (the push channel's
+  `wss://` template, the stateful and stateless endpoint collections, two Web
+  Dynpro configuration templates, the 7.40 ABAP documentation link). The host is
+  replaced, the scheme and port are kept: they say whether the system advertises
+  HTTPS, and a port is not an identity. 11 substitutions in all.
+- **A system id inside a name becomes `SID`.** One software component of the
+  cloud system carries the system id in its own name; `Z<id>_CONFIG_SWC` is
+  recorded as `ZSID_CONFIG_SWC`. One substitution.
+- **No `sap-client` value, user id, IP address or transport number** was in any
+  of these answers, so nothing else was replaced. `DEV` as the release of `HOME`
+  and `LOCAL` in `system/components` is SAP's own value, written on every
+  release, not a system name.
+- **The caller's `Accept` is `*/*`** on the six GETs (the server refuses a
+  request with no Accept at all, `400` `acceptHeaderMissing`, measured on
+  S/4HANA 2025); the POST carries Eclipse's typed Accept. The client added
+  Authorization, the session cookie and, on the POST, the CSRF token; none is
+  recorded. None of these systems sent `sap-adt-saplb`, so no sidecar carries
+  it, and `set-cookie` is dropped.
+
 ## Normal cases
 
 | Case | What provoked it | What came back |
@@ -119,6 +143,45 @@ where the corpus is thin, not where it is wrong.
 `/cts/transportrequests` (empty list only) ·
 `/repository/informationsystem/usageReferences` (one hit only) · and the seven
 metadata reads, one object each.
+
+## What a system says about itself: three releases
+
+Three cases, recorded 2026-10-27, read-only: the requests Eclipse ADT sends at
+logon, asked of one system per release. The case names the release, never the
+system. `docs/architecture/SYSTEM_DESCRIPTION.md` reads them.
+
+| Exchange | Request | Status | Body |
+|---|---|---|---|
+| `system-description-s4-2025--01-core-discovery` | `GET /sap/bc/adt/core/discovery` | 200 | 2 161 B, `atomsvc+xml`, 4 workspaces |
+| `system-description-s4-2025--02-compatibility-graph` | `GET /sap/bc/adt/compatibility/graph` | 200 | 32 008 B, 207 nodes, 105 edges |
+| `system-description-s4-2025--03-discovery` | `GET /sap/bc/adt/discovery` | 200 | 401 182 B, 126 workspaces, 831 collections |
+| `system-description-s4-2025--04-system-components` | `GET /sap/bc/adt/system/components` | 200 | 18 969 B, `atom+xml` feed, 92 components |
+| `system-description-s4-2025--05-objecttypes` | `GET …/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider` | 200 | 100 415 B, 386 named items |
+| `system-description-s4-2025--06-releasestates` | `GET …/informationsystem/releasestates?maxItemCount=999&name=*` | 200 | 13 329 B, 20 named items |
+| `system-description-s4-2025--07-typestructure` | `POST /sap/bc/adt/repository/typestructure`, no body | 200 | 492 580 B, 721 type descriptors |
+| `system-description-abap-cloud--01-core-discovery` | `GET /sap/bc/adt/core/discovery` | 200 | 2 159 B, 4 workspaces |
+| `system-description-abap-cloud--02-compatibility-graph` | `GET /sap/bc/adt/compatibility/graph` | 200 | 32 008 B, identical to S/4HANA 2025's |
+| `system-description-abap-cloud--03-discovery` | `GET /sap/bc/adt/discovery` | 200 | 444 622 B, 127 workspaces, 947 collections |
+| `system-description-abap-cloud--04-system-components` | `GET /sap/bc/adt/system/components` | 200 | 2 599 B, 11 components |
+| `system-description-abap-cloud--05-objecttypes` | `GET …/informationsystem/objecttypes?…` | 200 | 97 312 B, 373 named items |
+| `system-description-abap-cloud--06-releasestates` | `GET …/informationsystem/releasestates?…` | 200 | 13 744 B, 21 named items |
+| `system-description-abap-cloud--07-typestructure` | `POST /sap/bc/adt/repository/typestructure` | 200 | 470 556 B, 708 type descriptors |
+| `system-description-basis-740--01-core-discovery` | `GET /sap/bc/adt/core/discovery` | **200** | **0 B, `text/html`** |
+| `system-description-basis-740--02-compatibility-graph` | `GET /sap/bc/adt/compatibility/graph` | 200 | 28 516 B, 182 nodes, 95 edges |
+| `system-description-basis-740--03-discovery` | `GET /sap/bc/adt/discovery` | 200 | 34 603 B, 36 workspaces, 125 collections |
+| `system-description-basis-740--04-system-components` | `GET /sap/bc/adt/system/components` | **200** | **0 B, `text/html`** |
+| `system-description-basis-740--05-objecttypes` | `GET …/informationsystem/objecttypes?…` | **404** | 26 B, `text/plain`: `No suitable resource found` |
+| `system-description-basis-740--06-releasestates` | `GET …/informationsystem/releasestates?…` | **404** | 26 B, the same text |
+| `system-description-basis-740--07-typestructure` | `POST /sap/bc/adt/repository/typestructure` | 200 | 201 721 B, 464 type descriptors |
+| `system-description-basis-740--08-core-discovery-atomsvc` | `GET /sap/bc/adt/core/discovery`, Accept `application/atomsvc+xml` | **200** | **0 B, `text/html`**: the typed Accept changes nothing |
+| `system-description-basis-740--09-system-components-atom` | `GET /sap/bc/adt/system/components`, Accept `application/atom+xml;type=feed` | **200** | **0 B, `text/html`** |
+
+On 7.40 an unserved path answers in two ways. The two information-system lists
+answer `404` with a line of plain text; `core/discovery` and `system/components`
+answer **`200` with an empty `text/html` body**, whatever the Accept — the same
+silence the package walkers answer with (measured). Why the two differ is not
+on the wire; that the second pair has no handler at all on 7.40 is an inference.
+A reading that takes `200` as "served" calls `core/discovery` present on 7.40.
 
 ## A delete is one request on adt-clients 18, not two
 

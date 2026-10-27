@@ -1,0 +1,36 @@
+{
+  "case": "system-description-s4-2025",
+  "step": 5,
+  "stepTag": "objecttypes",
+  "capturedAt": "2026-10-27T14:56:43.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/repository/informationsystem/objecttypes",
+    "params": {
+      "maxItemCount": "999",
+      "name": "*",
+      "data": "usedByProvider"
+    },
+    "effectiveUrl": "/sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run client for the system-description cases; it added Authorization, the session cookie and, on the POST, the CSRF token, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.nameditems.v1+xml; charset=utf-8",
+      "content-length": "100415",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "24752.000000",
+      "connection": "close"
+    },
+    "bodyFile": "system-description-s4-2025--05-objecttypes.body.xml"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "case": "system-description-s4-2025",
+  "step": 2,
+  "stepTag": "compatibility-graph",
+  "capturedAt": "2026-10-27T14:56:42.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/compatibility/graph",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/compatibility/graph",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run client for the system-description cases; it added Authorization, the session cookie and, on the POST, the CSRF token, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "content-length": "32008",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "9728.000000",
+      "connection": "close"
+    },
+    "bodyFile": "system-description-s4-2025--02-compatibility-graph.body.xml"
+  }
+}

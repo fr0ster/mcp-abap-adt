@@ -1,0 +1,29 @@
+{
+  "case": "system-description-basis-740",
+  "step": 6,
+  "stepTag": "releasestates",
+  "capturedAt": "2026-10-27T14:57:20.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/repository/informationsystem/releasestates",
+    "params": {
+      "maxItemCount": "999",
+      "name": "*"
+    },
+    "effectiveUrl": "/sap/bc/adt/repository/informationsystem/releasestates?maxItemCount=999&name=*",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run client for the system-description cases; it added Authorization, the session cookie and, on the POST, the CSRF token, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "Not Found",
+    "headers": {
+      "content-type": "text/plain; charset=utf-8",
+      "content-length": "26"
+    },
+    "bodyFile": "system-description-basis-740--06-releasestates.body.txt"
+  }
+}

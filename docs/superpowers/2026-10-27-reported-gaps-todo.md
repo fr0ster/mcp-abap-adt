@@ -1,9 +1,10 @@
-# To do: an external comparison with an ARC-1 fork, for ATC remediation
+# To do: reported gaps in mcp-abap-adt — check each, fix what is ours
 
-A team compared mcp-abap-adt (main, 20.1.0) with their fork of ARC-1, for one use: fixing ATC
-findings. Their account was read from the README, the docs and the source; the server was not run
-on a SAP system. Every claim below is theirs and **unverified**. The first step for each is to
-check it against the code. Then the owner decides whether it is in scope.
+A user evaluated mcp-abap-adt 20.1.0 (main) for one job: fixing ATC findings with an LLM. They
+read the README, the docs and the source; they did not run the server on a SAP system. Their list
+below is a list of **our** possible problems. Each item is checked against the code first —
+**true** (file:line), **false** (file:line) or **partly** (what is there, what is not) — and each
+true one goes to the owner: fix, or out of scope.
 
 ## Claims, by area
 
@@ -20,7 +21,7 @@ check it against the code. Then the owner decides whether it is in scope.
 
 ### Sources and writes
 - [ ] No reading a source into a file, and no writing from a file. The whole source travels in the call.
-- [ ] No guard against overwriting someone else's change (their `ifUnchanged`).
+- [ ] No guard against overwriting someone else's change (an `ifUnchanged`-style write).
 - [ ] No write of a program include (INCL) or a table type (TTYP).
 - [ ] No main programs of an include, and no activation context.
 
@@ -36,20 +37,23 @@ check it against the code. Then the owner decides whether it is in scope.
       Owner's rules to weigh: [readonly means no code change], [give capabilities, the user chooses].
 
 ### Risks they name
-- [ ] License: they say the README states AGPL-3.0 while `package.json` says Apache-2.0. Check this
-      first; it is a fact, not a design question.
+- [x] License: they read the README's AGPL-3.0 against `package.json`'s Apache-2.0. **False as a
+      contradiction**: every package declares its own licence and ships the matching LICENSE file —
+      `@mcp-abap-adt/lib` (root `package.json:199`, `LICENSE`) and the extension packages
+      (`compact-modify`, `compact-readonly-entries`, `responsible-rules`, `background-runs-memory`)
+      Apache-2.0; every server package (`server`, `http`, `sse`, `compact*`, `*-ro`,
+      `server-runtime`) AGPL-3.0-only (each `package.json` and `LICENSE`); the README's table
+      (`README.md:109-122`) states the split and why. Open: whether the table lists every package.
 - [ ] Majors 17–20 shipped in under two weeks, with breaking changes (`--exposition` removed).
 - [ ] One main author; CI runs on an ADT mock, not a real system.
 
-### What they credit
+### What they found strong
 - Version history and diffs, where-used, source search, ABAP Unit, debugger and profiler, batch
   mode, cleanup of stuck sessions with lock release.
 - They would have to forbid the debugger and program runs for their use.
 
 ## How this PR works
 
-- This draft PR carries the analysis and the fixes the owner accepts, through every review cycle.
-- Each claim gets one of three verdicts in this file: **true** (with file:line), **false** (with
-  file:line), or **partly** (what is there and what is not).
-- Each true gap goes to the owner as in scope or out. Only accepted ones become a spec and a plan here.
+- This draft PR carries the checks and the fixes the owner accepts, through every review cycle.
+- Accepted fixes get a spec and a plan here, as usual.
 - Delete this file once the work it lists is done or cancelled.

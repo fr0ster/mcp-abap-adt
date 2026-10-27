@@ -14,6 +14,7 @@ A consumer gets the same code for the same object kind in every package. A tool 
   - **discovery**: a system's ADT discovery document advertises it;
   - **unmeasured**.
   A code is entered only with its evidence. A code that an answer shows to be wrong for its kind is not entered.
+- **What a system can do is read from the system.** Its object types, their parents, name lengths, capabilities and, where it says so, the user's authorizations are read from the system once, through the reader of its declared type. What it does not state is unknown, not forbidden.
 - **One meaning per code.** A code names one object kind everywhere. A code that two maps read as different kinds is resolved by the evidence, not by the map that is used more.
 - **One vocabulary for kinds.** The friendly names a tool accepts (compact names, low-level names) map to one closed list of kinds, typed against the registry.
 - **What reaches the model is true.** A schema enum, a parameter description and an example name only codes that the path behind them accepts.

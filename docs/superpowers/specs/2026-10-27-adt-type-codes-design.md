@@ -94,7 +94,7 @@ The full answers are in the server corpus `tests/fixtures/adt/`, in the cases `s
 
 ### 1.3 The system's own address of an object (measured 2026-10-27, read only)
 
-- **The template.** Every `URI_TEMPLATE` on the three releases has one placeholder, `{name}`. It has the form `/sap/bc/adt/vit/wb/object_type/<code without slash>/object_name/{name}`. For a type with a parent (`FUGR/FF`, `PROG/I`), the template carries a 40-blank field before `{name}`.
+- **The template.** Every `URI_TEMPLATE` on the three releases has one placeholder, `{name}`. It has the form `/sap/bc/adt/vit/wb/object_type/<code without slash>/object_name/{name}`. For `FUGR/FF`, `FUGR/I` and `PROG/I` the template carries a 40-blank field before `{name}`. This is template padding, not a parent: `PROG/I`'s `PARENT_OBJECT_TYPE` is empty on all three releases. The parented types are `FUGR/FF` and `FUGR/I`.
 - **The collections.** Discovery on the two newer releases advertises the template's collection as "Basic Object Properties" (`…/vit/wb/object_type/{type}/object_name/{name}`). It also advertises `/sap/bc/adt/vit/urimapper{?uri}`. 7.40's discovery advertises neither.
 - **`GET` of a template address.** On S/4HANA 2025 it answers `application/vnd.sap.adt.basic.object.properties+xml`: the object's name, type and package, and no resource address.
 - **`GET /sap/bc/adt/vit/urimapper?uri=<template address>`.** On S/4HANA 2025 it answers `adtcore:objectReference` with the object's resource address and type:
@@ -116,28 +116,31 @@ The library declares what it supports as `as const` tables, one per variant:
 - `ADT_TYPES_CLOUD`;
 - `ADT_TYPES_BASIS_740`.
 
-They are keyed by the **API**, the client's factory, not by the code. One code can serve two APIs: a structure and an append structure share `TABL/DS`, and a class and a behavior implementation share `CLAS/OC`.
+They are keyed by the **API**, the client's factory, not by the code.
+- One code can serve two APIs. A structure and an append structure share `TABL/DS`, and a class and a behavior implementation share `CLAS/OC`.
+- One API can serve several codes, each with its own operations. `getEnhancement()` serves `ENHO/XHH`, `ENHO/XHB` and `ENHS/XSB`, and only `ENHO/XHH` reads source.
+- So an entry is an API with one or more **codes**, and the per-code facts sit under each code.
 
 ```ts
 export const ADT_TYPES_BASIS_740 = {
-  class:    { code: 'CLAS/OC', kind: 'class', parent: null, nameMaxLength: 30,
-              collection: '/sap/bc/adt/oo/classes',
-              operations: ['create', 'read', 'readMetadata', 'source', 'lock', 'unlock', 'update',
-                           'activate', 'check', 'validate', 'versions', 'delete'],
-              evidence: 'system-description-basis-740--07-typestructure' },
-  functionModule: { code: 'FUGR/FF', kind: 'function_module', parent: 'functionGroup', nameMaxLength: 30,
-              collection: '/sap/bc/adt/functions/groups', /* … */ },
+  class: { kind: 'class', collection: '/sap/bc/adt/oo/classes', codes: {
+    'CLAS/OC': { parent: null, nameMaxLength: 30,
+                 operations: ['create', 'read', 'readMetadata', 'source', 'lock', 'unlock', 'update',
+                              'activate', 'check', 'validate', 'versions', 'delete'],
+                 evidence: 'system-description-basis-740--07-typestructure' } } },
+  functionModule: { kind: 'function_module', collection: '/sap/bc/adt/functions/groups', codes: {
+    'FUGR/FF': { parent: 'functionGroup', nameMaxLength: 30, /* … */ } } },
   // … every API the library serves on 7.40; no `domain`, `table`, `behaviorImplementation` …
 } as const satisfies AdtApiTable;
 ```
 
-- **An entry holds:**
-  - **the code**;
+- **An entry holds**, for the API:
   - **the kind**, in the tools' one vocabulary;
-  - **the parent API**;
-  - **the name max length**;
   - **the ADT collection its resource lives in.** A parent-addressed API names its parent's collection.
-  - **the operations the library performs there.** They come from one closed vocabulary: create, read, readMetadata, source, lock, unlock, update, activate, check, validate, versions, deletionCheck, delete, run, and the like. Each operation corresponds to a class member.
+  - **its codes.** For each code:
+    - **the parent API**;
+    - **the name max length**;
+    - **the operations the library performs there.** They come from one closed vocabulary: create, read, readMetadata, source, lock, unlock, update, activate, check, validate, versions, deletionCheck, delete, run, and the like. Each operation corresponds to a class member.
   - **its evidence**: the corpus case that shows the code on this release.
 - **Written by hand.** The tables are the library's declaration, and the conformance check (4) proves them against the systems.
 - **Derived types:**
@@ -147,7 +150,7 @@ export const ADT_TYPES_BASIS_740 = {
   - `AdtApiWith<V, Op>`;
   - `AdtObjectKind`;
   - `AdtSourceTypeCode`: the codes whose API has `source`.
-- **One meaning per code.** A code that appears in more than one variant has the same kind in each. A test asserts it.
+- **One meaning per code.** The test groups every code of every entry of every table, duplicates inside one table included. It asserts one kind per code.
 - **What goes:**
   - `AdtObjectTypeLower`, `AdtObjectType`, `AdtSourceObjectTypeLower` and `AdtSourceObjectType` are removed;
   - `IObjectReference.type` becomes `AdtTypeCode`;
@@ -234,8 +237,11 @@ What `CAPABILITIES` say is not checked, because it is not about ADT (1.2). The o
   - The process's declared system type chooses the variant, as today: HTTP and SSE require it at the process level.
   - A stdio start without a destination (inspection) builds the tool set too. So it requires the variant to be named, and is refused naming the flag otherwise. It never picks one.
 - **The tool set** is built from the variant's table: object-oriented groups and compact entries alike.
-  - Each operation's schema enum, description list and refusal list are the APIs of the variant that offer that operation.
-- **The boundary.** A code in a tool argument is upper-cased once and checked against that list.
+  - Each operation has two projections of the variant's table, and both are typed:
+    - **the accepted ADT codes**: the codes whose entry lists the operation;
+    - **the accepted friendly names**: the API aliases and kinds the tool takes.
+  - A schema enum, a description list and a refusal list use the projection of the argument they describe.
+- **The boundary.** A code argument is upper-cased once and checked against the accepted codes. A friendly-name argument is checked against the accepted names.
 - **The server's maps** are typed against the tables, and `KIND_BY_TYPE` with its prefix fallback goes. The debugger's labels are the server's own union.
 - **The server's client contract** (#216's Part C) is composed per variant from the same tables, so that its own contract keeps the gates.
 

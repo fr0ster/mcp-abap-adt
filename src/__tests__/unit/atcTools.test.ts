@@ -176,6 +176,50 @@ describe('the fields detail=full adds, from the captured document', () => {
   });
 });
 
+describe('the source position, in the fragment shapes ADT records', () => {
+  const at = (location: string) => {
+    const doc = `<atcworklist:worklist><atcworklist:objects><atcobject:object adtcore:name="ZCL_X" adtcore:type="CLAS"><atcobject:findings><atcfinding:finding atcfinding:priority="1" atcfinding:location="${location}"/></atcobject:findings></atcobject:object></atcworklist:objects></atcworklist:worklist>`;
+    const [finding] = parseAtcWorklist(doc).findings;
+    return {
+      location: finding.location,
+      line: finding.line,
+      column: finding.column,
+    };
+  };
+
+  it('reads #start=LINE,COLUMN', () => {
+    expect(at('/sap/bc/adt/oo/classes/zcl_x/source/main#start=9,4')).toEqual({
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line: 9,
+      column: 4,
+    });
+  });
+
+  // The unit-test fixtures' shape: `;`-separated, start then end.
+  it('reads #start=LINE,COLUMN;end=LINE,COLUMN', () => {
+    expect(
+      at('/sap/bc/adt/oo/classes/zcl_x/source/main#start=8,3;end=8,0'),
+    ).toEqual({
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line: 8,
+      column: 3,
+    });
+  });
+
+  // The debugger fixtures' shape: other parts first, a line with no column.
+  it('reads #type=…;name=…;start=LINE', () => {
+    expect(
+      at(
+        '/sap/bc/adt/oo/classes/zcl_x/source/main#type=CLAS%2FOM;name=POST;start=29',
+      ),
+    ).toEqual({
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line: 29,
+      column: undefined,
+    });
+  });
+});
+
 describe('RunATC composes the three calls', () => {
   it('resolves the variant, makes a worklist, runs, and names all three', async () => {
     const calls: string[] = [];

@@ -145,7 +145,11 @@ function digits(text: string | undefined): number | undefined {
   return Number(text);
 }
 
-/** `/…/source/main#start=9,0` → the source, the 9 and the 0. */
+/**
+ * `/…/source/main#start=9,0` → the source, the 9 and the 0. ADT separates the
+ * fragment's parts with `;` — `#start=8,0;end=8,0`,
+ * `#type=CLAS%2FOM;name=POST;start=29` — and `start` is `LINE[,COLUMN]`.
+ */
 function position(location: string | undefined): {
   location?: string;
   line?: number;
@@ -157,7 +161,7 @@ function position(location: string | undefined): {
   const uri = location.slice(0, hash);
   const start = location
     .slice(hash + 1)
-    .split('&')
+    .split(';')
     .find((part) => part.startsWith('start='));
   if (!start) return { location: uri };
   const [line, column] = start.slice('start='.length).split(',');

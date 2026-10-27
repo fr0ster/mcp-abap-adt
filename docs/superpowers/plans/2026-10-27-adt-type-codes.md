@@ -127,7 +127,7 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
 
 ### Task C2b: implement them
 
-- **Members.** For each measured type, `updateMetadata`, and a source or metadata read where one was missing, sending exactly what C2a recorded. Each has a request-shape unit test.
+- **Members.** For each measured type, `updateMetadata(config, metadataXml)`, and a source or metadata read where one was missing, sending exactly what C2a recorded. A metadata update sends the consumer's whole XML as it is: no field is built or merged by the library. Each member has a request-shape unit test.
 - **Legacy.** The legacy package overrides only where 7.40 answers differently, and refuses without a request where 7.40 does not serve it.
 - **Tables.** The tables in interfaces-adt gain the operations, released as 21.1.0 (a minor) before C3 uses them.
 - **Live cycle.** Read metadata, change the description, write, read back and compare, restore. Run it per type on a system of each release in S9.

@@ -213,7 +213,12 @@ A config or object reference for an API with a parent requires the parent's name
   - a link typed `text/plain`, or untyped, means a source exists, and its `href` says where. Class, function group, structure and DDL have one, and a class lists its includes.
   - only `text/html` means there is no source, just a rendered view. Data element and package are like this.
 - **The metadata type.** The type of the metadata document a collection accepts is advertised by `discovery` as `app:accept`, for example `application/vnd.sap.adt.oo.classes.v4+xml` for classes. On 7.40, discovery advertises no `app:accept`, and its documents' links are measured in C2a.
-- **How each update is built.** Each `updateMetadata` sends what ADT accepts for that type, measured before it is written. The library writes nothing it has not measured.
+- **What a consumer passes** (owner):
+  - **A source update** takes the new source text.
+  - **A metadata update** takes the whole new metadata XML.
+  - So the consumer reads the current metadata, changes what it needs in that document, and passes the new XML back.
+  - The library neither builds nor merges metadata fields. It sends the consumer's document as it is, under the caller's lock, with the type's metadata media type. The server's tools follow the same read–modify–write.
+- **How each update is sent.** Each `updateMetadata` sends what ADT accepts for that type, measured before it is written. The library writes nothing it has not measured.
 - **Order.** Class, interface, program, function module and DDL source come first, then every other CRUD API.
 - **Per variant.**
   - On 7.40, the legacy package serves `updateMetadata` only where 7.40 measured it. Elsewhere it refuses without a request.

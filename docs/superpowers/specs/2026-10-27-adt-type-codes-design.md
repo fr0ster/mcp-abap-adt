@@ -156,7 +156,7 @@ export const ADT_TYPES_BASIS_740 = {
   - `AdtApiWith<V, Op>`;
   - `AdtObjectKind`;
   - `AdtSourceTypeCode`: the codes whose API has `source`.
-- **One meaning per code.** The test groups every code of every entry of every table, duplicates inside one table included. It asserts one kind per code.
+- **One meaning per code.** A test in adt-clients groups every code of every entry of every table, duplicates inside one table included. It asserts one kind per code.
 - **What goes:**
   - `AdtObjectTypeLower`, `AdtObjectType`, `AdtSourceObjectTypeLower` and `AdtSourceObjectType` are removed;
   - `IObjectReference.type` becomes `AdtTypeCode`;
@@ -218,26 +218,19 @@ A config or object reference for an API with a parent requires the parent's name
    - on a newer release, the address `buildObjectUri` builds for the sample differs from the system's `urimapper` answer for the same object.
 3. **Coverage.** It reports the system's types that no entry serves, with their labels.
 
-**Where it runs.**
+**Where it runs.** Only in adt-clients. interfaces-adt holds no code, so it holds no test and no fixture either, beyond the compile-time checks of `src/__typechecks__`.
 
-4. **In interfaces-adt's CI.**
-   - The three releases' `typestructure` and `discovery` answers are committed in interfaces-adt's `tests/fixtures/`.
-   - A Jest test, a dev dependency outside the published package, runs the first four conflict rules and the coverage.
-   - It is wired into interfaces-adt's CI as its own step.
-   - A conflict fails it. The coverage is asserted as a recorded list.
-5. **In adt-clients' CI.**
-   - The address rule needs `buildObjectUri`, so it runs in adt-clients.
-   - It uses the recorded `urimapper` answers, and a test per API compares them.
-6. **On a live system, on demand.**
-   - It is an adt-clients live test that reads all inputs through the library.
+4. **In adt-clients' CI.**
+   - The three releases' `typestructure`, `discovery` and `urimapper` answers are recorded in adt-clients' corpus.
+   - A test runs every conflict rule, the capability rules and the coverage against them, for the tables imported from interfaces-adt.
+   - A conflict fails the test. The coverage is asserted as a recorded list.
+5. **On a live system, on demand.**
+   - An adt-clients live test reads the same endpoints through the library and runs the same check.
    - The variant comes from the local test configuration. The system's identity is printed at run time and never committed.
-   - It skips with a named reason when no live configuration is given. A failed read is a failure, not a skip.
-   - With a write flag, which CI refuses, it scrubs the answers it read and writes them to one output directory named by configuration. It writes into no repository.
-   - **Refreshing a release.** Each repository's README documents the step:
-     - the server's corpus is the authoritative copy;
-     - interfaces-adt keeps the `typestructure` and `discovery` answers, and adt-clients the `urimapper` answers;
-     - interfaces-adt exports `ADT_RECORDED_ANSWERS`, each copy's corpus case name with its SHA-256;
-     - every repository's test checks its own copies against that constant. The version is pinned by the interfaces-adt version it depends on, so no test reads another repository.
+   - It skips with a named reason when no live configuration is given. A failed read is a failure.
+   - With a write flag, which CI refuses, it scrubs the answers and writes them to an output directory named by configuration. From there they are added to adt-clients' corpus, a step its README documents.
+   - Nothing lists the recorded answers elsewhere. What a system says is read from the endpoint, live or recorded.
+6. **The server's records.** The server's `system-description-*` answers stay as the evidence of `docs/architecture/SYSTEM_DESCRIPTION.md`. Nothing checks against them.
 7. **Load-bearing.** One deliberate break of a table entry, and one of a recorded answer, each fail the check.
 
 **Capabilities.**
@@ -278,9 +271,9 @@ The operations themselves are proved by the library's own unit and live tests, a
    - the three tables and the derived types;
    - `IAdtAnsweredObject`;
    - the reshaped parent contracts;
-   - the conformance test with its fixtures, as a dev-only test;
    - the old unions removed.
 2. **adt-strategies 0.16.0, adt-clients 38.0.0 and adt-clients-legacy 0.2.0.**
+   - adt-clients carries the conformance check, its recorded answers and the one-meaning test.
    - They are released once, with #216's Part B first.
    - The repository's order is strategies, then clients, then legacy, with the ranges `^0.16.0` and `^38.0.0`; legacy takes clients as a peer.
    - A clean install from the registry follows.

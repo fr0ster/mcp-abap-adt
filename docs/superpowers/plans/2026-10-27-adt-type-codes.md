@@ -4,8 +4,8 @@
 **Spec:** [`2026-10-27-adt-type-codes-design.md`](../specs/2026-10-27-adt-type-codes-design.md)
 
 The work spans three repositories, each with its own PR. This plan's documents live in #329. The dependencies fix the order (spec §7):
-1. the recorded answers (#329);
-2. interfaces-adt;
+1. interfaces-adt;
+2. the recorded answers, in adt-clients' PR;
 3. adt-strategies, adt-clients and adt-clients-legacy, released once, after #216's Part B;
 4. the server, released once, after #216's Part C.
 
@@ -32,28 +32,29 @@ The work spans three repositories, each with its own PR. This plan's documents l
 
 1. **A correct call still works.** Every request a served API sends today is unchanged. The existing unit suites pass with type edits only. A live pass confirms it (S9).
 2. **A call the variant does not serve does not compile.** This covers getters, operations, legacy overrides and a missing parent, each with a `@ts-expect-error` (C3).
-3. **The conformance check carries its rules.** A deliberate break of a table entry fails it, and so does a break of a recorded answer. This holds for every rule, the address rule included (I4, C6).
+3. **The conformance check carries its rules.** A deliberate break of a table entry fails it, and so does a break of a recorded answer. This holds for every rule, the address rule included (C6).
 4. **An unknown code from ADT is not lost.** It reaches the consumer as `unknownType` at every parser (C5).
 5. **What the model is offered works.** Each schema and each refusal list comes from the variant's projections. Every offered code reaches a served path (S3, S9).
 
 ---
 
-## Part M: the recorded answers (#329, mcp-abap-adt)
+## Part M: the recorded answers (mcp-abap-adt-clients, in Part C's PR)
 
-The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`, `objecttypes` and `releasestates` answers of the three releases (`37d4aafe`).
+The conformance check runs in adt-clients, so its recorded answers live in adt-clients' corpus (`packages/adt-clients/corpus/adt`). The server's `system-description-*` records stay as the evidence of `docs/architecture/SYSTEM_DESCRIPTION.md`.
 
-### Task M1: `urimapper` and the template addresses
+### Task M1: the answers the check reads
 
-- **What to record.** On S/4HANA 2025 and ABAP cloud, take one sample object of every API the library serves there. For each, record:
+- **Copy** the three releases' `typestructure` and `discovery` exchanges, body and sidecar, from the server's corpus (`37d4aafe`), byte for byte.
+- **Record**, on S/4HANA 2025 and ABAP cloud, for one sample object of every API the library serves there:
   - the `URI_TEMPLATE` address's `GET`;
   - the `GET /sap/bc/adt/vit/urimapper?uri=<template address>` answer.
-- **Which objects.** Our own objects (`ZMCP_ATC_SAMPLES` and the shared test objects), or a system object, read only.
-- **How.**
-  - Record in the corpus format, with a temporary hand-run recorder. It is never committed and is deleted after.
-  - Scrub as the corpus README says.
-  - The README names the new cases, and the "deferred" note in spec 1.3 is dropped.
+- **Sample objects** are our own (`ZMCP_ATC_SAMPLES`, the shared test objects) or a system object, read only.
+- **How** the recording is done:
+  - in the corpus format;
+  - with a temporary hand-run recorder that is never committed and is deleted after;
+  - scrubbed as the corpus README says.
 - **Verify:**
-  - the corpus guard tests pass;
+  - adt-clients' corpus guard passes;
   - every API with a served address has its `urimapper` answer, or is listed as having no sample.
 
 ## Part I: interfaces-adt (mcp-abap-adt-interfaces, its own PR, 21.0.0)
@@ -84,33 +85,16 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 - Update `tools/package-map.json`.
 - **Verify.** Type checks: a function module config without its group fails with `@ts-expect-error`, and one with it compiles. `check:surface` lists every new export.
 
-### Task I3: the one-meaning test and type checks
+### Task I3: type checks
 
-- **One meaning.** Group every code of every entry of every table, duplicates inside a table included. Assert one kind per code.
 - **Type checks** under `src/__typechecks__/`:
   - a typed map over the codes compiles;
   - each code of spec 1.1 fails with `@ts-expect-error`.
 
-### Task I4: the conformance check in CI
-
-- **Fixtures.** Copy the three releases' `typestructure` and `discovery` answers from the server's corpus, the authoritative copy, to `tests/fixtures/`.
-- **Pinning.** interfaces-adt exports a constant, `ADT_RECORDED_ANSWERS`: each fixture's corpus case name and SHA-256. A test asserts the fixtures match it.
-- **Jest.** A dev dependency, outside the published package, with its own CI step.
-- **The check, per variant:**
-  - the code is listed;
-  - the parent;
-  - the name length;
-  - the collection is advertised;
-  - `EXECUTE` and `PROFILE` strictly;
-  - `create` without `CREATE` is listed apart;
-  - a type that lists `CREATE` but has no `create` in its entry goes into the coverage;
-  - the coverage is asserted as a recorded list.
-- **Verify the check bites** (review focus 3). One negative fixture per conflict rule and per capability rule, each a minimal answer or table entry, and each makes its own rule fail.
-
-### Task I5: docs and release
+### Task I4: docs and release
 
 - README, docs, and a CHANGELOG 21.0.0 entry with a migration note.
-- Verify: `npm run check` and the new test step pass.
+- **Verify:** `npm run check` passes. interfaces-adt holds no test and no fixture beyond `src/__typechecks__`.
 - Open the PR and run the Codex review. The owner merges and publishes.
 
 ## Part C: adt-strategies, adt-clients, adt-clients-legacy (mcp-abap-adt-clients, its own PR)
@@ -160,21 +144,26 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 - adt-strategies goes to 0.16.0, with a migration note.
 - **Verify, for C2–C5 together:** build, `test:check` and every package's unit suite are green.
 
-### Task C6: the address check and the live check
+### Task C6: the conformance check, in CI and live
 
-- **The address check.**
-  - Copy the recorded `urimapper` answers (M1) to adt-clients' fixtures.
-  - One test per API compares `buildObjectUri` with the system's address.
-  - Break one and watch it fail.
-- **The live check.** It reads `typestructure`, `discovery` and `urimapper` through the library, and runs the whole check for the configured variant.
+- **The check, per variant**, for the tables imported from interfaces-adt and the recorded answers of M1:
+  - the code is listed;
+  - the parent;
+  - the name length;
+  - the collection is advertised in `discovery`;
+  - on a newer release, the address `buildObjectUri` builds for the sample equals the `urimapper` answer;
+  - `EXECUTE` and `PROFILE` strictly;
+  - `create` without `CREATE` is listed apart;
+  - a type that lists `CREATE` but has no `create` in its entry goes into the coverage;
+  - the coverage is asserted as a recorded list.
+- **One meaning per code.** Group every code of every entry of every table, duplicates inside a table included, and assert one kind per code.
+- **Verify the check bites** (review focus 3). One negative fixture per conflict rule and per capability rule. Each is a minimal answer or table entry that makes its own rule fail.
+- **The live check.**
+  - It reads `typestructure`, `discovery` and `urimapper` through the library, and runs the same check for the configured variant.
   - The system's identity is printed at run time and never committed.
   - With no live configuration, it skips with a named reason. A failed read is a failure.
-  - With a write flag, which CI refuses, it scrubs the answers and writes them to one output directory the configuration names. It writes into no repository.
-- **Refreshing a release** is a documented step in each repository's README:
-  1. copy the output into the server's corpus;
-  2. copy the subset each repository holds (interfaces-adt: `typestructure`, `discovery`; adt-clients: `urimapper`);
-  3. update `ADT_RECORDED_ANSWERS`.
-- **Pinning, in adt-clients.** A test asserts adt-clients' copies against `ADT_RECORDED_ANSWERS` from the interfaces-adt version it depends on.
+  - With a write flag, which CI refuses, it scrubs the answers and writes them to an output directory the configuration names.
+- **Refreshing a release.** adt-clients' README documents how to add the output to its corpus. Nothing else lists the recorded answers.
 
 ### Task C7: versions, ranges, scan, docs
 
@@ -250,10 +239,6 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
   - `unknownType` in answers.
 - Update the tool docs, the user guide and the package READMEs.
 - **Verify.** `npm run docs:tools` leaves the committed tool docs unchanged. The CHANGELOG names every changed tool argument.
-
-### Task S8: the corpus copies agree
-
-- A test asserts that the server's corpus files named in `ADT_RECORDED_ANSWERS` hash to its values, for the interfaces-adt version the server depends on. The registry pins the comparison, and no other repository is read.
 
 ### Task S9: live
 

@@ -1179,4 +1179,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-10-24*
+*Last updated: 2026-10-27*

@@ -1,6 +1,10 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { AtcNamedObjectType } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AtcClassIncludeKind,
+  AtcObjectType,
+  IAtcObjectRef,
+} from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
@@ -26,11 +30,51 @@ import { return_error } from '../../../lib/utils';
  * `run_id` only when there is one to poll, and `finding_stats` only when the
  * server waited and counted.
  */
+/**
+ * The kinds the schema offers: every `AtcObjectType`, typed against it. The
+ * check below fails to compile when the client's union names a kind this
+ * list leaves out.
+ */
+const ATC_OBJECT_TYPES = [
+  'class',
+  'interface',
+  'function_group',
+  'package',
+  'ddl_source',
+  'table',
+  'behavior_definition',
+  'program',
+  'program_include',
+  'function_include',
+  'class_include',
+] as const satisfies readonly AtcObjectType[];
+
+const CLASS_INCLUDE_KINDS = [
+  'definitions',
+  'implementations',
+  'macros',
+  'testclasses',
+] as const satisfies readonly AtcClassIncludeKind[];
+
+type Covers<All, Listed extends All> = [Exclude<All, Listed>] extends [never]
+  ? true
+  : never;
+const everyObjectType: Covers<
+  AtcObjectType,
+  (typeof ATC_OBJECT_TYPES)[number]
+> = true;
+const everyIncludeKind: Covers<
+  AtcClassIncludeKind,
+  (typeof CLASS_INCLUDE_KINDS)[number]
+> = true;
+void everyObjectType;
+void everyIncludeKind;
+
 export const TOOL_DEFINITION = {
   name: 'RunATC',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.",
+    "[read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group) or class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). program and program_include are available on premise. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -47,17 +91,20 @@ export const TOOL_DEFINITION = {
             },
             type: {
               type: 'string',
-              enum: [
-                'class',
-                'interface',
-                'function_group',
-                'package',
-                'ddl_source',
-                'table',
-                'behavior_definition',
-              ],
+              enum: ATC_OBJECT_TYPES,
               description:
-                'Object type. "package" checks everything inside the package.',
+                'Object type. "package" checks everything inside the package. An include is checked as the object that owns it. "program" and "program_include": available on premise. "function_include" needs function_group; "class_include" needs include_kind, with name the class.',
+            },
+            function_group: {
+              type: 'string',
+              description:
+                'For type "function_include": the function group the include belongs to.',
+            },
+            include_kind: {
+              type: 'string',
+              enum: CLASS_INCLUDE_KINDS,
+              description:
+                'For type "class_include": which include of the class named by name.',
             },
           },
           required: ['name', 'type'],
@@ -87,10 +134,15 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+interface RunATCObjectArg {
+  name?: string;
+  type?: AtcObjectType;
+  function_group?: string;
+  include_kind?: AtcClassIncludeKind;
+}
+
 interface RunATCArgs {
-  // The kinds a name alone addresses: interfaces-adt 12's include kinds carry
-  // their owner as well, and the schema above offers none of them.
-  objects?: Array<{ name?: string; type?: AtcNamedObjectType }>;
+  objects?: RunATCObjectArg[];
   check_variant?: string;
   max_findings?: number;
   wait?: boolean;
@@ -120,10 +172,13 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
     );
   }
 
-  const [first, ...rest] = objects.map((o) => ({
-    objectName: (o.name as string).toUpperCase(),
-    objectType: o.type as AtcNamedObjectType,
-  }));
+  const refs: IAtcObjectRef[] = [];
+  for (const o of objects) {
+    const ref = toObjectRef(o);
+    if (typeof ref === 'string') return return_error(new Error(ref));
+    refs.push(ref);
+  }
+  const [first, ...rest] = refs;
   const target = { objects: [first, ...rest] as const };
 
   // **Said in the schema and checked here, for the same reason the client
@@ -205,10 +260,66 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
           // have ever been seen non-zero.
           { finding_stats: run.findingStats }
         : { run_id: run.runId }),
-      objects: target.objects.map((o) => ({
-        name: o.objectName,
-        type: o.objectType,
-      })),
+      objects: target.objects.map(objectAnswered),
     }),
   );
+}
+
+/**
+ * One argument object as the client's `IAtcObjectRef`, or the words refusing
+ * it. Each kind carries what its URI needs: a function include its group, a
+ * class include which include. The switch is exhaustive over `AtcObjectType`.
+ */
+function toObjectRef(o: RunATCObjectArg): IAtcObjectRef | string {
+  const objectName = (o.name as string).toUpperCase();
+  const objectType = o.type as AtcObjectType;
+  switch (objectType) {
+    case 'function_include': {
+      const group = o.function_group?.trim();
+      if (!group) {
+        return `An object of type "function_include" needs function_group; got ${JSON.stringify(o)}.`;
+      }
+      return { objectType, objectName, functionGroup: group.toUpperCase() };
+    }
+    case 'class_include': {
+      if (!o.include_kind) {
+        return `An object of type "class_include" needs include_kind; got ${JSON.stringify(o)}.`;
+      }
+      return { objectType, objectName, includeKind: o.include_kind };
+    }
+    case 'class':
+    case 'interface':
+    case 'function_group':
+    case 'package':
+    case 'ddl_source':
+    case 'table':
+    case 'behavior_definition':
+    case 'program':
+    case 'program_include':
+      return { objectType, objectName };
+    default: {
+      const unknownType: never = objectType;
+      return `Unknown object type ${JSON.stringify(unknownType)}.`;
+    }
+  }
+}
+
+/** An object as the answer names it, in the schema's words. */
+function objectAnswered(ref: IAtcObjectRef) {
+  switch (ref.objectType) {
+    case 'function_include':
+      return {
+        name: ref.objectName,
+        type: ref.objectType,
+        function_group: ref.functionGroup,
+      };
+    case 'class_include':
+      return {
+        name: ref.objectName,
+        type: ref.objectType,
+        include_kind: ref.includeKind,
+      };
+    default:
+      return { name: ref.objectName, type: ref.objectType };
+  }
 }

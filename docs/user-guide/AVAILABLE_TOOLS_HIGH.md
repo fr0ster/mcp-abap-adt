@@ -231,7 +231,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group) or class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). program and program_include are available on premise. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -2421,4 +2421,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-10-24*
+*Last updated: 2026-10-27*

@@ -1385,7 +1385,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group) or class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). program and program_include are available on premise. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -4097,4 +4097,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-24*
+*Last updated: 2026-10-27*

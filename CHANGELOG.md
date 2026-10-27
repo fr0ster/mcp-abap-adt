@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   A successful answer that is not the type's document ends the call naming the read, instead of being read as the type absent. The object-properties lookup is gone. It answered a domain by name and text only, and its `422` for a non-domain such as SYST ended the call before the structure was read. Measured on E19 (2026-10-24): each read answers `404` for a type the name is not. **Migrating:** read `types[]` instead of the single object, and pick the `objectType` you need.
 
+### Added
+
+- **`RunATC` checks programs, program includes, function includes and class includes.** `objects[].type` also takes `program`, `program_include` (both available on premise), `function_include` (with the new `function_group`, the include's function group) and `class_include` (with the new `include_kind`: `definitions`, `implementations`, `macros` or `testclasses`; `name` is the class). Each is passed to adt-clients' run as its `IAtcObjectRef`, and an include is checked as the object that owns it. A function include without `function_group`, or a class include without `include_kind`, is refused before any call. The answer's `objects` names `function_group` / `include_kind` beside the name and type.
+
+### Fixed
+
 ### Repository (nothing in the published packages)
 
 - **`MCP_TEST_CONFIG` set but blank, or naming a file that is not there, is refused by every reader.** A blank value used to mean the default `tests/test-config.yaml`, and Jest's global setup answered a named file it could not read with "no config" — no auth session — while the tests refused the same name. `testConfigPathFromEnv` now refuses both, so the global setup, the tests and `shared:check` fail alike, naming the variable.

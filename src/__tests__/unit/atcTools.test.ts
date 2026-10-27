@@ -1,6 +1,9 @@
 import { handleGetATCFindings } from '../../handlers/atc/high/handleGetATCFindings';
 import { handleGetATCRunStatus } from '../../handlers/atc/high/handleGetATCRunStatus';
-import { handleRunATC } from '../../handlers/atc/high/handleRunATC';
+import {
+  handleRunATC,
+  TOOL_DEFINITION,
+} from '../../handlers/atc/high/handleRunATC';
 import { corpusBody } from '../../lib/adtCorpus';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
@@ -232,6 +235,113 @@ describe('RunATC composes the three calls', () => {
     const result: any = await handleRunATC(context as any, { objects: [] });
     expect(result.isError).toBe(true);
   });
+});
+
+describe('RunATC: the object kinds the client checks', () => {
+  const objectSchema = () =>
+    (TOOL_DEFINITION.inputSchema.properties.objects.items as any).properties;
+
+  it('offers every kind the client builds a URI for', () => {
+    expect([...objectSchema().type.enum].sort()).toEqual(
+      [
+        'behavior_definition',
+        'class',
+        'class_include',
+        'ddl_source',
+        'function_group',
+        'function_include',
+        'interface',
+        'package',
+        'program',
+        'program_include',
+        'table',
+      ].sort(),
+    );
+    expect([...objectSchema().include_kind.enum].sort()).toEqual(
+      ['definitions', 'implementations', 'macros', 'testclasses'].sort(),
+    );
+    expect(objectSchema().function_group.type).toBe('string');
+  });
+
+  const capture = () => {
+    const seen: { target?: any } = {};
+    atc = {
+      createWorklist: async () => okResponse('WL1'),
+      startRun: async (worklistId: string, target: any) => {
+        seen.target = target;
+        return okResponse({ waited: false, worklistId, runId: 'RUN1' });
+      },
+    };
+    return seen;
+  };
+
+  it('passes a program and a program include by name', async () => {
+    const seen = capture();
+    const result: any = await handleRunATC(context as any, {
+      objects: [
+        { name: 'zprog', type: 'program' },
+        { name: 'zprog_top', type: 'program_include' },
+      ],
+      check_variant: 'V',
+    });
+    expect(result.isError).toBe(false);
+    expect(seen.target.objects).toEqual([
+      { objectName: 'ZPROG', objectType: 'program' },
+      { objectName: 'ZPROG_TOP', objectType: 'program_include' },
+    ]);
+  });
+
+  it('passes a function include with its group, a class include with its kind', async () => {
+    const seen = capture();
+    const result: any = await handleRunATC(context as any, {
+      objects: [
+        { name: 'lzfg_f01', type: 'function_include', function_group: 'zfg' },
+        {
+          name: 'zcl_x',
+          type: 'class_include',
+          include_kind: 'testclasses',
+        },
+      ],
+      check_variant: 'V',
+    });
+    expect(result.isError).toBe(false);
+    expect(seen.target.objects).toEqual([
+      {
+        objectName: 'LZFG_F01',
+        objectType: 'function_include',
+        functionGroup: 'ZFG',
+      },
+      {
+        objectName: 'ZCL_X',
+        objectType: 'class_include',
+        includeKind: 'testclasses',
+      },
+    ]);
+    expect(payload(result).objects).toEqual([
+      { name: 'LZFG_F01', type: 'function_include', function_group: 'ZFG' },
+      { name: 'ZCL_X', type: 'class_include', include_kind: 'testclasses' },
+    ]);
+  });
+
+  it.each([
+    [{ name: 'LZFG_F01', type: 'function_include' }, 'function_group'],
+    [{ name: 'ZCL_X', type: 'class_include' }, 'include_kind'],
+  ] as const)(
+    'refuses %p without %s before making any call',
+    async (object, field) => {
+      atc = {
+        createWorklist: async () => {
+          throw new Error('should not be called');
+        },
+      };
+      const result: any = await handleRunATC(context as any, {
+        objects: [object],
+        check_variant: 'V',
+      });
+      expect(result.isError).toBe(true);
+      expect(String(result.content[0].text)).toContain(field);
+    },
+  );
 });
 
 describe('the two readers', () => {

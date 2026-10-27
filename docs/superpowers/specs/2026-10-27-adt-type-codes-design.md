@@ -88,176 +88,194 @@ The full answers are in the server corpus `tests/fixtures/adt/`, in the cases `s
   - 7.40: `CREATE`, `EXECUTE`, `PROFILE`.
   - The newer releases add `INDEX_UPD` and `KTD_DOCU`.
 - **User authorizations.** They hold only `CREATE`: on 608 types on S/4HANA 2025, on 238 on ABAP cloud. They belong to the user who asked.
-- **The system type cannot be detected.** A 7.40 system cannot be told from a newer one by `core/discovery`'s status, so the system type stays declared.
+- **The system type is not told apart by `core/discovery`.** Its status is 200 on all three releases (7.40 answers an empty body), so the system type stays declared.
+- **Capabilities are workbench actions, not ADT operations.** On the newer releases `DDLS/DF` lists only `KTD_DOCU` and `BDEF/BDO` only `KTD_DOCU` and `INDEX_UPD`, and ADT creates both. No template or parameter carries them. So nothing is concluded about an ADT operation from `CAPABILITIES`.
+- **A type in `typestructure` is a workbench type, not an ADT service.** 7.40 lists `DOMA/DD`, `DTEL/DE`, `TABL/DS`, `TABL/DT`, `TTYP/DA` and `XSLT/VT`, but its ADT serves none of their resources (measured in #271). What the library does with a type is the library's declaration (2.1), checked against the system (4).
 
-- **What a type in `typestructure` is.**
-  - It is a workbench type of the system, not an ADT service.
-  - 7.40 lists `DOMA/DD`, `DTEL/DE`, `TABL/DS`, `TABL/DT`, `TTYP/DA` and `XSLT/VT` with `CREATE`, but its ADT serves none of their resources (measured in #271, which is why the legacy getters refuse them).
-  - So what the library can do with a type is the intersection of three things:
-    - the type is listed;
-    - ADT serves its resources (`discovery`);
-    - the library implements it for that variant.
-- **The `URI_TEMPLATE` is a properties address, not the object's resource** (measured 2026-10-27, read only, no redirect followed).
-  - On S/4HANA 2025 and ABAP cloud, `GET /sap/bc/adt/vit/wb/object_type/<code>/object_name/<name>` answers 200 `application/vnd.sap.adt.basic.object.properties+xml`: `adtcore:mainObject` with the object's name, type and package, and no URI of its own.
-  - For `FUGR/FF` and `PROG/I` the template carries a 40-blank field before `{name}`, and the answer resolves the object with that field blank.
-  - On 7.40 the same GET answers 200 with an empty `text/html` body, as 7.40 answers any path it does not serve.
-  - The resource addresses stay the library's: its address table is not derived from the template.
+### 1.3 The system's own address of an object (measured 2026-10-27, read only)
+
+- **The template.** Every `URI_TEMPLATE` on the three releases has one placeholder, `{name}`. It has the form `/sap/bc/adt/vit/wb/object_type/<code without slash>/object_name/{name}`. For a type with a parent (`FUGR/FF`, `PROG/I`), the template carries a 40-blank field before `{name}`.
+- **The collections.** Discovery on the two newer releases advertises the template's collection as "Basic Object Properties" (`…/vit/wb/object_type/{type}/object_name/{name}`). It also advertises `/sap/bc/adt/vit/urimapper{?uri}`. 7.40's discovery advertises neither.
+- **`GET` of a template address.** On S/4HANA 2025 it answers `application/vnd.sap.adt.basic.object.properties+xml`: the object's name, type and package, and no resource address.
+- **`GET /sap/bc/adt/vit/urimapper?uri=<template address>`.** On S/4HANA 2025 it answers `adtcore:objectReference` with the object's resource address and type:
+
+  | Template address | `adtcore:uri` |
+  |---|---|
+  | `…/clasoc/object_name/<class>` | `/sap/bc/adt/oo/classes/<class>` |
+  | `…/fugrff/object_name/<40 blanks><module>` | `/sap/bc/adt/functions/groups/<group>/fmodules/<module>`, with the group found by the system |
+  | `…/progi/object_name/<40 blanks><include>` | `/sap/bc/adt/programs/includes/<include>` |
+
+- These answers are recorded into the corpus with the rest (plan, Part M).
 
 ## 2. interfaces-adt: the library's types (constants and types only)
 
-### 2.1 One entry per code the library serves, per variant
+### 2.1 One entry per API the library offers, per variant
 
-The library declares what it supports as `as const` entries. Each entry is the full description of one type for one variant:
+The library declares what it supports as `as const` tables, one per variant:
+- `ADT_TYPES_ONPREM`;
+- `ADT_TYPES_CLOUD`;
+- `ADT_TYPES_BASIS_740`.
+
+They are keyed by the **API**, the client's factory, not by the code. One code can serve two APIs: a structure and an append structure share `TABL/DS`, and a class and a behavior implementation share `CLAS/OC`.
 
 ```ts
 export const ADT_TYPES_BASIS_740 = {
-  'CLAS/OC': { kind: 'class', parent: null, nameMaxLength: 30, operations: ['read', 'lock', 'update', 'activate', 'check', 'delete', 'create'] },
-  'FUGR/FF': { kind: 'function_module', parent: 'FUGR/F', nameMaxLength: 30, operations: ['read', 'lock', 'update', 'activate', 'check', 'delete', 'create'] },
-  // … every code the library serves on 7.40, with the operations it serves there
-} as const satisfies AdtTypeTable;
+  class:    { code: 'CLAS/OC', kind: 'class', parent: null, nameMaxLength: 30,
+              collection: '/sap/bc/adt/oo/classes',
+              operations: ['create', 'read', 'readMetadata', 'source', 'lock', 'unlock', 'update',
+                           'activate', 'check', 'validate', 'versions', 'delete'],
+              evidence: 'system-description-basis-740--07-typestructure' },
+  functionModule: { code: 'FUGR/FF', kind: 'function_module', parent: 'functionGroup', nameMaxLength: 30,
+              collection: '/sap/bc/adt/functions/groups', /* … */ },
+  // … every API the library serves on 7.40; no `domain`, `table`, `behaviorImplementation` …
+} as const satisfies AdtApiTable;
 ```
 
-- **Three tables, one per variant:** `ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD` and `ADT_TYPES_BASIS_740`.
-  - The consumer chooses the variant by its declared system type. Nothing detects it.
-  - A table lists what the library serves on that variant, not everything the system lists. The legacy table holds no `DOMA/DD`, because 7.40's ADT does not serve it.
 - **An entry holds:**
-  - the kind, in the tools' one vocabulary of kinds;
-  - the parent;
-  - the name max length;
-  - the operations the library performs for that type on that variant.
-
-  The address of the type's resource is not here: it is logic, and lives in adt-clients (3.2).
+  - **the code**;
+  - **the kind**, in the tools' one vocabulary;
+  - **the parent API**;
+  - **the name max length**;
+  - **the ADT collection its resource lives in.** A parent-addressed API names its parent's collection.
+  - **the operations the library performs there.** They come from one closed vocabulary: create, read, readMetadata, source, lock, unlock, update, activate, check, validate, versions, deletionCheck, delete, run, and the like. Each operation corresponds to a class member.
+  - **its evidence**: the corpus case that shows the code on this release.
+- **Written by hand.** The tables are the library's declaration, and the conformance check (4) proves them against the systems.
 - **Derived types:**
-  - `AdtTypeCode` is every code of any table.
-  - `AdtVariantCode<V>` is the codes of variant `V`.
-  - `AdtCodeWith<V, Op>` is the codes of `V` that have operation `Op`.
-  - `AdtObjectKind` is the kinds.
-  - `AdtSourceTypeCode` is the codes with the `source` operation.
-- **The tables are written by hand.** They are the library's declaration. The conformance check (4) proves they do not claim what a system does not allow.
+  - `AdtApi<V>`: the APIs of a variant;
+  - `AdtTypeCode`: every code of any table;
+  - `AdtOperation`;
+  - `AdtApiWith<V, Op>`;
+  - `AdtObjectKind`;
+  - `AdtSourceTypeCode`: the codes whose API has `source`.
+- **One meaning per code.** A code that appears in more than one variant has the same kind in each. A test asserts it.
 - **What goes:**
-  - `AdtObjectTypeLower`, `AdtObjectType`, `AdtSourceObjectTypeLower` and `AdtSourceObjectType` are removed.
-  - `IObjectReference.type` becomes `AdtTypeCode`.
-  - `tools/package-map.json` drops the old symbols and maps every new export.
+  - `AdtObjectTypeLower`, `AdtObjectType`, `AdtSourceObjectTypeLower` and `AdtSourceObjectType` are removed;
+  - `IObjectReference.type` becomes `AdtTypeCode`;
+  - `tools/package-map.json` is updated.
 
 ### 2.2 Answered objects
 
-`IAdtAnsweredObject` is one of two shapes:
-- `{ type: AdtTypeCode }`;
-- `{ unknownType: string }`.
+`IAdtAnsweredObject` is `{ type: AdtTypeCode }` or `{ unknownType: string }`. Every result contract that carries objects read from an answer uses it.
 
-The result contracts that carry objects read from an answer use it, so a code the library does not know reaches the consumer as it is.
+### 2.3 Parents in the contracts
+
+A config or object reference for an API with a parent requires the parent's name in its type. The function module's config, the function include's, and the object references of the group utilities are reshaped so that the parent is required where the table says so. A `Partial<…>` that drops it is not used for those.
 
 ## 3. adt-clients, adt-strategies, adt-clients-legacy
 
 ### 3.1 One client, parameterised by its variant
 
-- **`AdtClient<V>`** is one class in adt-clients.
-  - A getter is available only for a code in `AdtVariantCode<V>`. The method's `this` parameter requires it.
-  - Each handler class is generic in the variant too. An operation method exists only for a code whose entry lists that operation.
-  - A type with a parent requires the parent's name in its config.
-  - A call the variant does not support does not compile.
-- **Two entry points**, `AdtClientOnPrem` and `AdtClientCloud`, each fixing `V`. Neither holds behaviour.
-  - `createAdtClient(connection, { variant })` answers the matching one.
-  - It reads nothing and probes nothing.
-- **adt-clients-legacy.** `AdtClientLegacy` extends `AdtClient<'basis740'>` and keeps its endpoint overrides. Its existing refusals (`absentOnLegacy`) stay for callers outside the type system.
-- **How far the compiler reaches.** The compiler holds a caller that uses the library's classes. A consumer that composes its own client contract from interfaces-adt, as #216 has it, is held by that contract's own types. The server builds its contracts and schemas from the same tables (5).
-- **#216's Part B comes first.** Factories answer their classes there, and this change builds on it.
+- **`AdtClient<V>`**:
+  - A factory is callable only for an API of `V`. Its `this` parameter requires it.
+  - Each handler class is generic in `V`. An operation member is callable only when the API's entry lists that operation.
+- **Entry points and creation.**
+  - Two entry points, `AdtClientOnPrem` and `AdtClientCloud`, each fix `V`.
+  - `createAdtClient(connection, { variant })` answers one of them. It reads nothing and probes nothing.
+- **Legacy.**
+  - `AdtClientLegacy` extends `AdtClient<'basis740'>`.
+  - Every override keeps the same `this` gate as its base. The legacy handler classes it returns are fixed to `'basis740'`.
+  - `absentOnLegacy` stays only for callers outside the type system.
+- **Negative compile checks**, each with `@ts-expect-error`, cover:
+  - a factory the variant lacks;
+  - an operation the API lacks;
+  - the same call through a legacy override;
+  - an API with a parent called without the parent.
+- **#216's Part B lands first.**
 
-### 3.2 The library's own maps
+### 3.2 Addresses from the tables
 
-- **`buildObjectUri`** becomes a complete table over the codes with an address, typed per code.
-  - A parent-addressed code requires its parent.
-  - `FUNC` and every code of 1.1 go.
-  - A code from outside the type system is looked up once where it enters.
-- **The other maps.** These are typed against the tables:
-  - `WHERE_USED_ALIASES`;
-  - `objectWire`;
-  - checkRun;
-  - the legacy refusal maps;
-  - the create and validation payloads.
+- **`buildObjectUri`** builds an object's address from its API's `collection`, and the parent's address where the table names a parent. Its own hand-written list of addresses goes. What does not follow the collection rule stays as typed exceptions, each with its corpus case.
+- **`FUNC` and the codes of 1.1 go.** So does every map that held them: `WHERE_USED_ALIASES`, `objectWire`, checkRun, the legacy refusal maps, and the payloads are typed against the tables.
+- **A new member, `getUtils().getTypeStructure()`**, reads `typestructure`, so the live check can use the library.
 
 ### 3.3 The answer boundary (adt-strategies)
 
-- A strategy that reads a code from an answer looks it up once, and answers `IAdtAnsweredObject`.
-- Codes are extracted by XML context only:
-  - `adtcore:type`;
-  - `OBJECT_TYPE` text;
-  - `type` attributes on elements that carry an object type;
-  - the `type=` part of an ADT URI fragment, URL-decoded.
-- The result types change. This is a breaking change of a 0.x package, so a minor (0.16.0) with a migration note.
+- A strategy that reads a code from an answer looks it up once and answers `IAdtAnsweredObject`.
+- Codes are extracted by XML context: `adtcore:type`, `OBJECT_TYPE` text, the object-type `type` attributes, and the URL-decoded `type=` of an ADT URI fragment.
+- adt-strategies 0.16.0 is a breaking 0.x minor, with a migration note.
 
 ## 4. The conformance check
 
-A check reads what a system says and compares it with the library's tables. It is not run in the library at run time.
+**What it reads, and what it reports.**
+1. **Inputs:**
+   - `typestructure`;
+   - `discovery`;
+   - for newer releases, one `urimapper` answer per API for a sample object.
+2. **Conflicts.** It reports each of these for each entry of the variant's table:
+   - the code is not listed;
+   - the parent API's code is not the listed `PARENT_OBJECT_TYPE` (an empty element is read as no parent);
+   - `nameMaxLength` exceeds the listed `OBJNAME_MAXLENGTH`;
+   - `collection` is not advertised in `discovery`;
+   - on a newer release, the address `buildObjectUri` builds for the sample differs from the system's `urimapper` answer for the same object.
+3. **Coverage.** It reports the system's types that no entry serves, with their labels.
 
-1. **It reads two answers:**
-   - `typestructure`: the types, their parents, name lengths and capabilities;
-   - `discovery`: the collections ADT serves.
-2. **It reports conflicts.** For each entry of the variant's table, any of these is a conflict:
-   - the system does not list the code;
-   - its parent differs;
-   - the library's name max length is longer than the system's;
-   - the library lists `create` and the system's capabilities lack `CREATE`;
-   - the entry's address belongs to a collection that `discovery` does not advertise.
-3. **It reports coverage.** The system types that the table does not serve, with their labels and categories.
-4. **It runs on the recorded releases in CI.**
-   - The three `typestructure` and `discovery` answers of the corpus (1.2) are committed beside the tables in interfaces-adt's `tests/fixtures/`.
-   - A Jest test there runs the check for each variant against its release.
-   - A conflict fails the test. The coverage is asserted as a recorded list, so a change in either side is noticed.
-5. **It runs on a live system on demand.**
-   - It is a live test in adt-clients, which reads the two answers through the library.
-   - It names the system it runs on, and skips with that reason elsewhere.
-   - With a write flag, refused under CI, it adds the answers it read to the corpus, scrubbed like the rest of the corpus. A new release is then checked in CI too.
-6. **It proves itself.** One deliberate break of a table entry makes the CI check fail. One break of a recorded answer does the same.
+**Where it runs.**
+
+4. **In interfaces-adt's CI.**
+   - The three releases' `typestructure` and `discovery` answers are committed in interfaces-adt's `tests/fixtures/`.
+   - A Jest test, a dev dependency outside the published package, runs the first four conflict rules and the coverage.
+   - It is wired into interfaces-adt's CI as its own step.
+   - A conflict fails it. The coverage is asserted as a recorded list.
+5. **In adt-clients' CI.**
+   - The address rule needs `buildObjectUri`, so it runs in adt-clients.
+   - It uses the recorded `urimapper` answers, and a test per API compares them.
+6. **On a live system, on demand.**
+   - It is an adt-clients live test that reads all inputs through the library.
+   - The variant comes from the local test configuration. The system's identity is printed at run time and never committed.
+   - It skips with a named reason when no live configuration is given. A failed read is a failure, not a skip.
+   - With a write flag, refused under CI, it scrubs the answers it read and adds them to the server's corpus and to interfaces-adt's fixtures. A new release is then checked in CI.
+7. **Load-bearing.** One deliberate break of a table entry, and one of a recorded answer, each fail the check.
+
+What `CAPABILITIES` say is not checked, because it is not about ADT (1.2). The operations are proved by the library's own unit and live tests, as today.
 
 ## 5. The mcp-abap-adt server
 
-- **The process's declared system type chooses the variant.** This is as today: the HTTP and SSE launchers require a process-level type, and no request header changes it.
-  - The variant picks the client.
-  - It also picks the tool set's codes. The tool set is built at start, from the variant's table.
-- **Per-operation subsets.** Each operation that takes a code declares its served codes, typed against the variant's table.
-  - The schema enum, the description's list and the refusal's list are that subset.
-  - So the model is offered what the library serves on that variant.
-- **A code from outside.** A code in a tool argument is upper-cased once and checked against the operation's subset. That is the only runtime check on it.
-- **The server's maps** (`TYPE_TO_FAMILY`, `READS`, packageEnumerator, `ADT_TYPE_BY_COMPACT_TYPE`, `VALID_TYPES`, the compact names) are typed against the tables.
-  - `KIND_BY_TYPE` and its prefix fallback go.
-  - The debugger's target labels (`CLAS`, `PROG`, `INCL`, `FUNC`) are the server's own union, mapped to `CLAS/OC`, `PROG/P`, `PROG/I` and `FUGR/FF`.
+- **The variant.**
+  - The process's declared system type chooses the variant, as today: HTTP and SSE require it at the process level.
+  - A stdio start without a destination (inspection) builds the tool set too. So it requires the variant to be named, and is refused naming the flag otherwise. It never picks one.
+- **The tool set** is built from the variant's table: object-oriented groups and compact entries alike.
+  - Each operation's schema enum, description list and refusal list are the APIs of the variant that offer that operation.
+- **The boundary.** A code in a tool argument is upper-cased once and checked against that list.
+- **The server's maps** are typed against the tables, and `KIND_BY_TYPE` with its prefix fallback goes. The debugger's labels are the server's own union.
+- **The server's client contract** (#216's Part C) is composed per variant from the same tables, so that its own contract keeps the gates.
 
 ## 6. The literal scan
 
-- **One Jest test per repository.** It uses the TypeScript compiler API and its type checker. It tokenises with plain code, not a regex.
-- **The rule.** A code in production source passes only where its contextual type is `AdtTypeCode` or a subset of it. Both shapes are covered:
-  - `XXXX/Y…`;
-  - a bare code such as `AUTH` or `DEVC`.
-- **Also allowed:**
-  - in the tables;
-  - in the server's debugger label union;
-  - in tests and fixtures;
-  - in a short committed allowlist of non-codes: MIME types and path pieces.
-- **Comments and descriptions** are scanned too.
-- **Load-bearing.** One deliberate break proves the rule.
+- **One Jest test per repository**, using the TypeScript compiler API and its type checker. It tokenises with plain code.
+- **Code.** A code in production source passes only where its contextual type is `AdtTypeCode` or a subset of it. That covers both `XXXX/Y…` and bare codes. Also allowed:
+  - the tables;
+  - the server's debugger label union;
+  - tests and fixtures;
+  - a short committed allowlist of non-codes.
+- **Prose.** A code named in a comment or in a tool description must be a code of the tables. Generated descriptions interpolate typed values. A test covers both a valid mention and an invalid one.
+- **Load-bearing.** One deliberate break proves it.
 
 ## 7. Order and versions
 
-1. **interfaces-adt 21.0.0** (major): the three tables, the derived types, `IAdtAnsweredObject`, and the conformance check with its fixtures. The old unions go.
-2. **adt-strategies 0.16.0, adt-clients 38.0.0, adt-clients-legacy 0.2.0.**
-   - Released once, carrying #216's Part B first and this part second.
-   - The order inside the repository is strategies, then clients, then legacy.
-   - Ranges: clients takes strategies `^0.16.0`; legacy takes clients `^38.0.0` as a peer.
+1. **interfaces-adt 21.0.0** (major):
+   - the three tables and the derived types;
+   - `IAdtAnsweredObject`;
+   - the reshaped parent contracts;
+   - the conformance test with its fixtures, as a dev-only test;
+   - the old unions removed.
+2. **adt-strategies 0.16.0, adt-clients 38.0.0 and adt-clients-legacy 0.2.0.**
+   - They are released once, with #216's Part B first.
+   - The repository's order is strategies, then clients, then legacy, with the ranges `^0.16.0` and `^38.0.0`; legacy takes clients as a peer.
    - A clean install from the registry follows.
-3. **mcp-abap-adt 21.0.0.** Released once, carrying #216's Part C first and this part second.
-4. **Docs.** Every package's README, docs and examples are updated. Each major or 0.x minor carries a migration note covering:
+3. **mcp-abap-adt 21.0.0.** Released once, with #216's Part C first.
+4. **Docs and migration notes** in every package:
    - the removed unions;
    - the dropped codes;
    - the variants and entry points;
+   - the parent requirement;
    - `type` / `unknownType`;
-   - the conformance check and how to run it live.
+   - how to run the live check.
 5. **One PR per repository.** The goal, this spec and the plan live in #329.
 
 ## 8. Not in this work
 
-- **No runtime check against the system.** No descriptor is read by the library, the client or the server.
-- **No coverage tool for the model.** Left for later (owner).
-- **No new object kind gets support.** Coverage lists what is not served; it does not serve it.
-- **No behaviour change for a correct code.**
-- **No detection of the system type.**
+- No runtime check against the system.
+- No coverage tool for the model (later, owner).
+- No new API gets support. Coverage lists what is not served.
+- No behaviour change for a correct code.
+- No detection of the system type.

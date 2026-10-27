@@ -89,7 +89,13 @@ The full answers are in the server corpus `tests/fixtures/adt/`, in the cases `s
   - The newer releases add `INDEX_UPD` and `KTD_DOCU`.
 - **User authorizations.** They hold only `CREATE`: on 608 types on S/4HANA 2025, on 238 on ABAP cloud. They belong to the user who asked.
 - **The system type is not told apart by `core/discovery`.** Its status is 200 on all three releases (7.40 answers an empty body), so the system type stays declared.
-- **Capabilities are workbench actions, not ADT operations.** On the newer releases `DDLS/DF` lists only `KTD_DOCU` and `BDEF/BDO` only `KTD_DOCU` and `INDEX_UPD`, and ADT creates both. No template or parameter carries them. So nothing is concluded about an ADT operation from `CAPABILITIES`.
+- **Capabilities are the operations a type offers, and `CREATE`'s absence is not a refusal.**
+  - `EXECUTE` and `PROFILE` are listed on all three releases exactly for `CLAS/OC`, `PROG/P` and `FUGR/FF`. Those are the types the library runs and profiles.
+  - `CREATE` is listed for the classic types. It is absent for types ADT creates through their own collection:
+    - on 7.40, `DDLS/DF` lists no capability, and ADT created a DDL there (`201`, record B4, step `d1-create`);
+    - on the newer releases, `DDLS/DF`, `BDEF/BDO`, `SRVD/SRV`, `SRVB/SVB` and `DDLX/EX` list no `CREATE`.
+  - On the newer releases, 97 and 111 discovery collections carry a category term equal to a type's code without its slash, the same token as the `URI_TEMPLATE`'s. 86 and 99 of those types list no `CREATE`. On 7.40 no category term is a type code.
+  - Inference, not measured: `CREATE` marks creation by the generic workbench path, and wbobj-framework types are created through their own collection.
 - **A type in `typestructure` is a workbench type, not an ADT service.** 7.40 lists `DOMA/DD`, `DTEL/DE`, `TABL/DS`, `TABL/DT`, `TTYP/DA` and `XSLT/VT`, but its ADT serves none of their resources (measured in #271). What the library does with a type is the library's declaration (2.1), checked against the system (4).
 
 ### 1.3 The system's own address of an object (measured 2026-10-27, read only)
@@ -229,7 +235,12 @@ A config or object reference for an API with a parent requires the parent's name
    - With a write flag, refused under CI, it scrubs the answers it read and adds them to the server's corpus and to interfaces-adt's fixtures. A new release is then checked in CI.
 7. **Load-bearing.** One deliberate break of a table entry, and one of a recorded answer, each fail the check.
 
-What `CAPABILITIES` say is not checked, because it is not about ADT (1.2). The operations are proved by the library's own unit and live tests, as today.
+**Capabilities.**
+- An entry with `run` whose type lacks `EXECUTE`, or with profiling whose type lacks `PROFILE`, is a conflict.
+- An entry with `create` whose type lacks `CREATE` is not a conflict. It is listed apart in the report, because ADT creates these types through their own collection (1.2).
+- A type listing `CREATE` that no entry creates goes into the coverage.
+
+The operations themselves are proved by the library's own unit and live tests, as today.
 
 ## 5. The mcp-abap-adt server
 

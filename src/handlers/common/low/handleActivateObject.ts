@@ -169,8 +169,8 @@ type ActivationFamily =
 /**
  * ADT type codes (and this codebase's own friendly names, accepted
  * elsewhere in `common/low`) mapped to the family that serves them. Anything
- * not named here — `FUGR/FF` included — falls back to group activation; see
- * the module doc comment.
+ * not named here — `FUGR/FF` and the table type `TTYP/DA` included — falls
+ * back to group activation; see the module doc comment.
  */
 export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
   'clas/oc': 'class',
@@ -183,7 +183,12 @@ export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
   function_group: 'function_group',
   'tabl/dt': 'table',
   table: 'table',
-  'ttyp/st': 'structure',
+  // ADT names a structure `TABL/DS`. This read `ttyp/st` from 2025-11-08
+  // (a211af39, where `'TTYP/ST' (structure)` was written into the schema):
+  // a code ADT never sends, so a structure went to group activation and a
+  // call naming `TTYP/ST` activated a structure. A table type (`TTYP/DA`)
+  // has no family here and goes to group activation.
+  'tabl/ds': 'structure',
   structure: 'structure',
   'ddls/df': 'ddl',
   ddl: 'ddl',

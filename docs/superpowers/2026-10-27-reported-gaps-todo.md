@@ -88,3 +88,6 @@ Found beside the list:
 - **No guard against activating other users' drafts.** Out of scope. In SAP, anyone with change
   rights may change an object that is not locked. Deciding what to activate is the LLM's
   responsibility, and the server does not guard it.
+- **What a group activation really activated** is checked by a read of the inactive objects
+  afterwards (`GetInactiveObjects`). The group activation's answer already points the caller there
+  (`handleActivateObject.ts:436-444`).

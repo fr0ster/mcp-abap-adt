@@ -128,7 +128,7 @@ export const TOOL_DEFINITION = {
       preaudit: {
         type: 'boolean',
         description:
-          'Request pre-audit before activation. Default: true. Honored only when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family) — the per-object activate() this tool prefers for a single object has no preaudit parameter at all.',
+          "Request pre-audit before activation. Default: true. Sent as preauditRequested when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family). A single object of a mapped type is activated by its own family's activate(), which always sends preauditRequested=true.",
       },
       detail: {
         type: 'string',

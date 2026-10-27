@@ -1769,7 +1769,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested when more than one object is activated, or one object of a type without a family of its own here. A single class, program, interface, function group, table, structure, CDS source, domain, data element, behavior definition or metadata extension is activated by its own family's activate(), which always sends preauditRequested=true.
 
 ---
 

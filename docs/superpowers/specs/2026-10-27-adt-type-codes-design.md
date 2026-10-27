@@ -203,6 +203,21 @@ A config or object reference for an API with a parent requires the parent's name
 - Codes are extracted by XML context: `adtcore:type`, `OBJECT_TYPE` text, the object-type `type` attributes, and the URL-decoded `type=` of an ADT URI fragment.
 - adt-strategies 0.16.0 is a breaking 0.x minor, with a migration note.
 
+### 3.4 Source and metadata, read and update, for every CRUD API
+
+- **The rule.** Every API that the library offers CRUD for reads and updates what the object has: its source (`source`, `update`) where it has one, and its metadata (`readMetadata`, `updateMetadata`) where it has metadata. Today `updateMetadata` is missing for most objects that have both, so a description or a program's attributes cannot be changed (I0).
+- **Where the knowledge comes from.** Which objects have a source and which have metadata is the library's knowledge, recorded in the tables. Neither `typestructure` nor `discovery` states it (1.2):
+  - `CATEGORY` does not follow it;
+  - discovery's `/source/main` templates cover only some collections.
+- **How each update is built.** Each `updateMetadata` sends what ADT accepts for that type, measured before it is written. The library writes nothing it has not measured.
+- **Order.** Class, interface, program, function module and DDL source come first, then every other CRUD API.
+- **Per variant.**
+  - On 7.40, the legacy package serves `updateMetadata` only where 7.40 measured it. Elsewhere it refuses without a request.
+  - The tables gain the operation per variant. interfaces-adt ships them as a minor (21.1.0): new values in the tables, no contract change.
+- **Proof.** Every `updateMetadata` has:
+  - a request-shape unit test;
+  - a live cycle: read metadata → change the description → write → read back and compare → restore.
+
 ## 4. The conformance check
 
 **What it reads, and what it reports.**

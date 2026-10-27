@@ -115,6 +115,23 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
 - **New member.** Add `getUtils().getTypeStructure()`.
 - **Verify:** the request-shape tests show every payload and address unchanged.
 
+### Task C2a: measure source and metadata, read and update
+
+- **What.** For class, interface, program, function module and DDL source first, then every other CRUD API in I0. On S/4HANA 2025, and on 7.40 for the APIs the legacy package serves, measure:
+  - how ADT answers a read of the source and a read of the metadata;
+  - what it accepts for an update of each: method, URI, `Content-Type`, the lock and `corrNr`.
+- **On which objects.** On new objects created for the measurement in `$TMP`, named `ZMCP_MD_*` on S/4HANA 2025 and `ZLG7_MD_*` on 7.40. They are deleted after the measurement.
+- **The record.** It goes to adt-clients' corpus, in the corpus format, scrubbed.
+- **Verify.** Every API of the five has a recorded answer for all four operations, or the refusal that proves an operation is not served.
+
+### Task C2b: implement them
+
+- **Members.** For each measured type, `updateMetadata`, and a source or metadata read where one was missing, sending exactly what C2a recorded. Each has a request-shape unit test.
+- **Legacy.** The legacy package overrides only where 7.40 answers differently, and refuses without a request where 7.40 does not serve it.
+- **Tables.** The tables in interfaces-adt gain the operations, released as 21.1.0 (a minor) before C3 uses them.
+- **Live cycle.** Read metadata, change the description, write, read back and compare, restore. Run it per type on a system of each release in S9.
+- **Verify.** Build and every unit suite are green, and the request-shape tests match the C2a records.
+
 ### Task C3: the variant client and its gates
 
 - **The client.** `AdtClient<V>`, generic. Its factories are gated by `AdtApi<V>`, and its operation members by the entry's operations.

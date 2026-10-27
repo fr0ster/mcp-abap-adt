@@ -121,15 +121,23 @@ export const ADT_RELEASE_BASIS_740 = {
   - `AdtVariantCode<V>`: the codes of one variant;
   - `AdtCodeWith<V, A>`: the codes of variant `V` that have action `A`.
 
-### 2.2 The variants
+### 2.2 The variants: three shipped descriptors, or the consumer's own
 
-There are three variants. The consumer's declared system type chooses one; nothing detects it.
+The consumer picks one of the three shipped descriptors, or makes its own. Nothing detects the system.
 
-| Declared | Variant | Release description |
+| Shipped descriptor | For | Built from |
 |---|---|---|
-| on-premise | `onprem` | `ADT_RELEASE_S4_2025` |
-| cloud | `cloud` | `ADT_RELEASE_ABAP_CLOUD` |
-| legacy, 7.40 | `basis740` | `ADT_RELEASE_BASIS_740` |
+| `ADT_SYSTEM_ONPREM` | on-premise | `ADT_RELEASE_S4_2025` |
+| `ADT_SYSTEM_CLOUD` | cloud | `ADT_RELEASE_ABAP_CLOUD` |
+| `ADT_SYSTEM_BASIS_740` | legacy, 7.40 | `ADT_RELEASE_BASIS_740` |
+
+- The three are data: `as const` constants of the `IAdtSystemDescriptor` shape (2.4), in interfaces-adt.
+- **The consumer's own descriptor** is any value of that shape. For example:
+  - one read from a live system through a reader (3.4);
+  - one generated from another release's recorded answers;
+  - one narrowed by hand to what the consumer allows.
+
+  Its own literal type is its variant, so the compiler checks against it as it does for the shipped ones.
 
 The on-premise description is the one recorded release, S/4HANA 2025. An older on-premise release may lack a type it lists. That case belongs to the descriptor (2.4), not to the compiler.
 
@@ -159,9 +167,17 @@ export type AdtObjectKind = (typeof ADT_OBJECT_KINDS)[AdtServedTypeCode];
   - `IObjectReference.type` becomes `AdtTypeCode`; it is an input contract.
   - `tools/package-map.json` drops the old symbols and maps every new export.
 
-### 2.4 The system descriptor: one live system, the paranoid mode
+### 2.4 The system descriptor contract
 
-`IAdtSystemDescriptor` describes one live system. It is read once, from that system's `typestructure`. Unlike a release description, it holds the user's authorizations.
+`IAdtSystemDescriptor` is the shape every descriptor has, shipped or the consumer's.
+- **The types it lists**, each with:
+  - parent;
+  - name max length;
+  - capabilities;
+  - scopes, where known;
+  - the user's authorizations, where known.
+- **A shipped descriptor** states no user authorizations: they belong to whoever asked.
+- **A live descriptor** states them where its system does.
 
 - **Unknown and forbidden are distinct types:** `type Stated<T> = { stated: true; value: T } | { stated: false }`. A 7.40 descriptor's user authorizations are `{ stated: false }`, never an empty list.
 - **The reader.** `IAdtSystemDescriptorReader.read(): Promise<IAdtSystemDescriptor>` reads the descriptor once. A malformed or missing answer is the reader's error, not an empty descriptor.
@@ -183,7 +199,7 @@ export type AdtObjectKind = (typeof ADT_OBJECT_KINDS)[AdtServedTypeCode];
   - `AdtClientCloud` (`AdtClient<'cloud'>`).
 
   Each only fixes `V`. Neither holds behaviour.
-- **`createAdtClient(connection, { systemType })`** answers the client that the declared type names. It reads nothing and probes nothing.
+- **`createAdtClient(connection, descriptor)`** answers `AdtClient<V>`, with `V` taken from the descriptor's type. The consumer declares the system by the descriptor it passes. The function reads nothing and probes nothing.
 - **adt-clients-legacy.** `AdtClientLegacy` extends `AdtClient<'basis740'>`.
   - It keeps its endpoint overrides.
   - Its existing refusals (`absentOnLegacy`) stay, for callers outside the type system. A typed caller can no longer reach them.
@@ -209,31 +225,31 @@ export type AdtObjectKind = (typeof ADT_OBJECT_KINDS)[AdtServedTypeCode];
   - the `type=` part of an ADT URI fragment, URL-decoded.
 - **Version.** The result types change. That is a breaking change of a 0.x package, so a minor (0.16.0), with a migration note.
 
-### 3.4 The paranoid mode
+### 3.4 The descriptor at an object's creation; the live reader
 
-- **The consumer opts in.** It reads an `IAdtSystemDescriptor` through a reader and hands it to the client (`options.systemDescriptor`). Without one, nothing is read and nothing is checked at run time.
-- **When it checks.** At the creation of an object only, never on every request.
-- **What it checks**, as the last check before the create:
+- **The client holds the descriptor it was created from.** A handler's `create` checks it as the last step before any request. It never checks on every request, and nothing else consults the descriptor at run time.
+- **With a shipped descriptor** the check reads release data, and no request is made for it. With a live descriptor it is the paranoid mode: the consumer read the system once, before creating the client.
+- **What `create` checks:**
   - the code is on this system;
   - its `CREATE` capability is present;
   - the name fits `nameMaxLength`;
   - the user's `CREATE` authorization, where the descriptor states it. Where it is not stated, as on 7.40, that check is skipped.
 - **A refusal.** A failed check is answered as a refusal, with no request. It names what the system said.
-- **The readers.**
+- **The live readers** are one way to make the consumer's own descriptor.
   - adt-clients ships the modern reader.
   - adt-clients-legacy ships `AdtSystemDescriptorReaderLegacy`. It extends the modern reader and overrides only what 7.40 answers differently: no authorizations, no scopes. Its constructor is one `super(...)` call.
 
 ## 4. The mcp-abap-adt server
 
-- **The declared system type chooses the client and the tool set.**
-  - The client: `AdtClientOnPrem`, `AdtClientCloud` or `AdtClientLegacy`, by the destination's declared system type.
-  - The tool set's codes, from the same declared type. On stdio the tool set is built at start. On HTTP and SSE it is built per instance, from the request's declared type.
+- **The destination's declared system type chooses the shipped descriptor.**
+  - That descriptor chooses the client and the tool set's codes.
+  - On stdio the tool set is built at start. On HTTP and SSE it is built per instance, from the request's declared type.
 - **Per-operation subsets.**
   - Each operation that takes a code declares its served subset, typed against the registry.
   - The schema enum, the description's code list and the refusal's list are that subset intersected with the variant's codes, at build time.
   - So the model is offered what the release lists and the library serves.
 - **A code from outside.** A code in a tool argument is upper-cased once and checked against that intersection. No other runtime check is made on it.
-- **The paranoid mode** is a server option, off by default. When it is on, the server reads the descriptor once for the session's destination and user, and hands it to the client.
+- **The paranoid mode** is a server option, off by default. When it is on, the server reads a live descriptor once, for the session's destination and user, and creates the client from it instead of the shipped one.
 - **The server's maps.** `TYPE_TO_FAMILY`, `READS`, packageEnumerator, `ADT_TYPE_BY_COMPACT_TYPE`, `VALID_TYPES` and the compact names are typed against the registry.
   - `KIND_BY_TYPE` and its prefix fallback go.
   - The debugger's target labels (`CLAS`, `PROG`, `INCL`, `FUNC`) are the server's own union, mapped to `CLAS/OC`, `PROG/P`, `PROG/I` and `FUGR/FF`.
@@ -289,6 +305,6 @@ export type AdtObjectKind = (typeof ADT_OBJECT_KINDS)[AdtServedTypeCode];
 
 - **A coverage tool for the model.** Later (owner).
 - **Support for new object kinds.** Coverage lists what is not served; it does not serve it.
-- **A check on every request.** The paranoid mode checks at an object's creation only, and only when the consumer opts in.
+- **A check on every request.** The descriptor is checked at an object's creation only.
 - **Any behaviour change for a correct code.**
 - **Detection of the system type.**

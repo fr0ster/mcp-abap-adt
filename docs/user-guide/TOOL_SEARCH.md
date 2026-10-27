@@ -70,7 +70,7 @@ every set (the full set, the `-ro` sets and the compact sets).
   collection is every other tool of the full set. Each is searched for its own
   top K. This is not the same as splitting by the `[read-only]` marker: some
   tools that change no repository object (the syntax checks, the version
-  reads, a class's local includes, the ATC status and findings, the unit-test runs, the debugger's
+  reads, a class's local includes, the unit-test runs, the debugger's
   tools) are not served by the `-ro` binary, and the `-ro` binary also serves the run tools.
   A tool that scored nothing is never counted as found, whatever its place.
 

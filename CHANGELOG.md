@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The read-only binaries serve `RunATC`, `GetATCRunStatus` and `GetATCFindings`.** Each says "[read-only]", and none of `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` served them: they were in the high group alone. They are system tools now (`SystemHandlersGroup`, beside the run tools), so `fullToolSet` and `fullReadOnlyToolSet` serve them on every transport: core-ro 74 / 74 / 72 tools (stdio / Streamable HTTP / SSE). No compact binary has an ATC route. An embedder that builds groups itself finds them in `SystemHandlersGroup`, no longer in `HighLevelHandlersGroup`. `CreateClass` gained the search keyword "class on a transport", which keeps it in the write collection's top five for "create a class and add it to a transport" with the ATC tools gone from that collection.
 ### Repository (nothing in the published packages)
 
 - **`MCP_TEST_CONFIG` set but blank, or naming a file that is not there, is refused by every reader.** A blank value used to mean the default `tests/test-config.yaml`, and Jest's global setup answered a named file it could not read with "no config" — no auth session — while the tests refused the same name. `testConfigPathFromEnv` now refuses both, so the global setup, the tests and `shared:check` fail alike, naming the variable.

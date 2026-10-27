@@ -909,11 +909,14 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // core-ro: the readonly tools with system and search, the three batch
       // tools (and, on stdio, the list and the logoff; on http SessionOpen
       // and SessionClose); no write, debugger, background run or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 71 : 69);
+      expect(fullRo.tools).toHaveLength(onStdio ? 74 : onHttp ? 74 : 72);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',
           'GetWhereUsed',
+          'RunATC',
+          'GetATCRunStatus',
+          'GetATCFindings',
           'SearchObject',
           'BatchBegin',
           'BatchEnd',

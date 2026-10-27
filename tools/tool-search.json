@@ -606,7 +606,8 @@
       "methods",
       "OO",
       "helper class",
-      "test helper class"
+      "test helper class",
+      "class on a transport"
     ],
     "semantic": "Create a new global ABAP class with any name, a test helper class included, in a package and recorded on a transport request."
   },

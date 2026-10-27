@@ -5,11 +5,15 @@ Generated from code in `src/handlers/**` (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 71
+- Total tools: 74
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Atc](#read-only-atc)
+    - [RunATC](#runatc-read-only-atc)
+    - [GetATCRunStatus](#getatcrunstatus-read-only-atc)
+    - [GetATCFindings](#getatcfindings-read-only-atc)
   - [Batch](#read-only-batch)
     - [BatchBegin](#batchbegin-read-only-batch)
     - [BatchEnd](#batchend-read-only-batch)
@@ -116,6 +120,46 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-atc"></a>
+### Read-Only / Atc
+
+<a id="runatc-read-only-atc"></a>
+#### RunATC (Read-Only / Atc)
+**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group) or class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). program and program_include are available on premise. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+
+**Source:** `src/handlers/atc/high/handleRunATC.ts`
+
+**Parameters:**
+- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
+
+---
+
+<a id="getatcrunstatus-read-only-atc"></a>
+#### GetATCRunStatus (Read-Only / Atc)
+**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
+
+**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
+
+**Parameters:**
+- `run_id` (string, required) - Run identifier an ATC run started with wait=false answered.
+
+---
+
+<a id="getatcfindings-read-only-atc"></a>
+#### GetATCFindings (Read-Only / Atc)
+**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+
+**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
+
+**Parameters:**
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `worklist_id` (string, required) - Worklist identifier an ATC run answered.
+
+---
 
 <a id="read-only-batch"></a>
 ### Read-Only / Batch

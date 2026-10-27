@@ -1,4 +1,16 @@
 import {
+  TOOL_DEFINITION as GetATCFindings_Tool,
+  handleGetATCFindings,
+} from '../../../handlers/atc/high/handleGetATCFindings';
+import {
+  TOOL_DEFINITION as GetATCRunStatus_Tool,
+  handleGetATCRunStatus,
+} from '../../../handlers/atc/high/handleGetATCRunStatus';
+import {
+  handleRunATC,
+  TOOL_DEFINITION as RunATC_Tool,
+} from '../../../handlers/atc/high/handleRunATC';
+import {
   TOOL_DEFINITION as GetPackageTree_Tool,
   handleGetPackageTree,
 } from '../../../handlers/system/high/handleGetPackageTree';
@@ -176,6 +188,22 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RuntimeRunProgram_Tool,
         handler: (args: any) => handleRuntimeRunProgram(this.context, args),
+      },
+      // ATC — the run is three calls and the composite is this repository's,
+      // which is what `AdtAtc` says in as many words when it explains why it
+      // stopped being `IAdtRunnable`. Here, beside the run tools: a check run
+      // changes no object, so the read-only binaries serve it too.
+      {
+        toolDefinition: RunATC_Tool,
+        handler: (args: any) => handleRunATC(this.context, args),
+      },
+      {
+        toolDefinition: GetATCRunStatus_Tool,
+        handler: (args: any) => handleGetATCRunStatus(this.context, args),
+      },
+      {
+        toolDefinition: GetATCFindings_Tool,
+        handler: (args: any) => handleGetATCFindings(this.context, args),
       },
       {
         toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,

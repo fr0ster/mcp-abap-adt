@@ -374,6 +374,41 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
 });
 
 /**
+ * The three ATC tools read and run checks, and change no object: the
+ * read-only object-oriented binaries serve them on every transport, as the
+ * full ones do. No compact set has an ATC route.
+ */
+describe('the ATC tools', () => {
+  const ATC = ['RunATC', 'GetATCRunStatus', 'GetATCFindings'];
+  const transports: ServedTransport[] = ['stdio', 'http', 'sse'];
+
+  it.each([
+    ['core', fullToolSet],
+    ['core-ro', fullReadOnlyToolSet],
+  ] as const)('%s serves all three on every transport', (kind, set) => {
+    for (const transport of transports) {
+      const names = toolsOf(set, transport);
+      expect({
+        kind,
+        transport,
+        served: ATC.filter((n) => names.includes(n)),
+      }).toEqual({ kind, transport, served: ATC });
+    }
+  });
+
+  it.each([
+    ['compact', compact],
+    ['compact-ro', compactRo],
+  ] as const)('%s serves none of them', (kind, set) => {
+    const names = toolsOf(set);
+    expect({ kind, served: ATC.filter((n) => names.includes(n)) }).toEqual({
+      kind,
+      served: [],
+    });
+  });
+});
+
+/**
  * The run tools in a -ro set (the owner's decision: running code changes
  * no code, as in SAP): served, but without `background` — a -ro set keeps no
  * background run, so the parameter, and its pointer to GetBackgroundRun, do

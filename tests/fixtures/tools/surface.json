@@ -222,19 +222,19 @@
     "available_in": "cloud, onprem"
   },
   {
-    "group": "high",
+    "group": "system",
     "name": "RunATC",
     "inputs": "objects*, check_variant, max_findings, wait",
     "available_in": "cloud, onprem"
   },
   {
-    "group": "high",
+    "group": "system",
     "name": "GetATCRunStatus",
     "inputs": "run_id*",
     "available_in": "cloud, onprem"
   },
   {
-    "group": "high",
+    "group": "system",
     "name": "GetATCFindings",
     "inputs": "worklist_id*, detail",
     "available_in": "cloud, onprem"

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Every ADT object type code that the stack sends, accepts, matches or offers to a model comes from one registry. No code is written by hand anywhere else. The registry holds only codes that ADT is known to answer, and each code carries its evidence. A code nobody has measured is marked as such and never presented as measured.
+Every ADT object type code that the stack sends, accepts, matches or offers to a model comes from one registry. No code is written outside the registry unless its type is the registry's, so the compiler checks it. The registry holds only codes that ADT is known to answer, and each code carries its evidence. A code nobody has measured is marked as such and never presented as measured.
 
 A consumer gets the same code for the same object kind in every package. A tool never offers a model a code that its own library refuses. A code that is not in the registry does not compile, and a test proves that the code really is what ADT answers.
 
@@ -14,7 +14,7 @@ A consumer gets the same code for the same object kind in every package. A tool 
   - **discovery**: a system's ADT discovery document advertises it;
   - **unmeasured**.
   A code is entered only with its evidence. A code that an answer shows to be wrong for its kind is not entered.
-- **What a system can do comes from a descriptor the consumer chooses.** The consumer takes one of the shipped descriptors (generated from a release's recorded answers) or makes its own (read once from a live system, or narrowed), and creates the client from it. The compiler checks what the descriptor allows; an object's creation checks the descriptor once more; nothing is checked on every request. What a system does not state is unknown, not forbidden.
+- **The library's types carry what it supports, and a tool checks them against the system.** Each code the library serves has a constant entry per variant — address, parent, name length, allowed operations — and the compiler holds code to it. A separate check reads what a system says (`typestructure`, `discovery`) and reports every conflict between the library's types and the system, and every system type the library does not cover; it runs on the recorded releases in CI and on a live system on demand. Nothing is checked against the system at run time.
 - **One meaning per code.** A code names one object kind everywhere. A code that two maps read as different kinds is resolved by the evidence, not by the map that is used more.
 - **One vocabulary for kinds.** The friendly names a tool accepts (compact names, low-level names) map to one closed list of kinds, typed against the registry.
 - **What reaches the model is true.** A schema enum, a parameter description and an example name only codes that the path behind them accepts.

@@ -105,6 +105,77 @@ describe('the ATC worklist reading, against the captured document', () => {
   });
 });
 
+describe('the fields detail=full adds, from the captured document', () => {
+  it('reads the column, the check and message ids, the documentation, the exemption and the quick fixes', () => {
+    const finding = parseAtcWorklist(WORKLIST).findings[0];
+
+    // `#start=9,0`: the line and the column beside it.
+    expect(finding.line).toBe(9);
+    expect(finding.column).toBe(0);
+    expect(finding.check_id).toBe('F8607CD40A0F8B30BDF8590205B306E8');
+    expect(finding.check_class).toBe('CL_CI_TEST_EXTENDED_CHECK');
+    expect(finding.message_id).toBe('1713');
+    expect(finding.documentation_uri).toBe(
+      '/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A64EB9/index/1426',
+    );
+    // As the document carries them: `-` for the approval, an empty kind
+    // left out.
+    expect(finding.exemption_approval).toBe('-');
+    expect(finding.exemption_kind).toBeUndefined();
+    expect(finding.quickfixes).toEqual({
+      manual: false,
+      automatic: false,
+      pseudo: false,
+      ai_based: false,
+      ai_enabled: false,
+    });
+  });
+
+  it('reads a quick fix flag set to true as true', () => {
+    const doc = WORKLIST.replace(
+      'atcfinding:manual="false"',
+      'atcfinding:manual="true"',
+    );
+    expect(parseAtcWorklist(doc).findings[0].quickfixes?.manual).toBe(true);
+  });
+
+  it('answers the fields under full, and terse as before', async () => {
+    atc = { getFindings: async () => okResponse(WORKLIST) };
+    const terse: any = await handleGetATCFindings(context as any, {
+      worklist_id: 'WL1',
+    });
+    expect(Object.keys(payload(terse).findings[0]).sort()).toEqual(
+      [
+        'check',
+        'line',
+        'location',
+        'message',
+        'object',
+        'object_type',
+        'priority',
+      ].sort(),
+    );
+
+    atc = { getFindings: async () => okResponse(WORKLIST) };
+    const full: any = await handleGetATCFindings(context as any, {
+      worklist_id: 'WL1',
+      detail: 'full',
+    });
+    expect(payload(full).findings[0]).toMatchObject({
+      line: 9,
+      column: 0,
+      check_id: 'F8607CD40A0F8B30BDF8590205B306E8',
+      check_class: 'CL_CI_TEST_EXTENDED_CHECK',
+      message_id: '1713',
+      documentation_uri:
+        '/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A64EB9/index/1426',
+      exemption_approval: '-',
+      quickfixes: { manual: false, automatic: false },
+    });
+    expect(payload(full).finding_count).toBe(6);
+  });
+});
+
 describe('RunATC composes the three calls', () => {
   it('resolves the variant, makes a worklist, runs, and names all three', async () => {
     const calls: string[] = [];

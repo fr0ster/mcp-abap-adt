@@ -49,8 +49,58 @@ export interface AtcFinding {
   message?: string;
 }
 
+/** The finding's `quickfixes` element, its flags as the document gives them. */
+export interface AtcQuickfixFlags {
+  manual?: boolean;
+  automatic?: boolean;
+  pseudo?: boolean;
+  /** `aiBasedQF`. */
+  ai_based?: boolean;
+  /** `ai_enabled`. */
+  ai_enabled?: boolean;
+}
+
+/**
+ * Everything `detail: 'full'` answers: the terse fields and what else the
+ * captured worklist carries per finding.
+ */
+export interface AtcFindingFull extends AtcFinding {
+  /** From `location`'s `#start=LINE,COLUMN`, absent when it carries none. */
+  column?: number;
+  /** `checkId`. */
+  check_id?: string;
+  /** `checkClass` — the check's ABAP class. */
+  check_class?: string;
+  /** `messageId`. */
+  message_id?: string;
+  /**
+   * The `href` of the finding's `atom:link` whose `rel` is ADT's
+   * documentation relation (`/sap/bc/adt/documentation/atc/…`).
+   */
+  documentation_uri?: string;
+  /** `exemptionApproval`, verbatim (`-` in every captured finding). */
+  exemption_approval?: string;
+  /** `exemptionKind`, verbatim; absent when empty. */
+  exemption_kind?: string;
+  /** Which kinds of quick fix the finding offers. */
+  quickfixes?: AtcQuickfixFlags;
+}
+
+/** The terse fields of a finding, in the order they were always answered. */
+export function terseFinding(finding: AtcFindingFull): AtcFinding {
+  return {
+    object: finding.object,
+    object_type: finding.object_type,
+    location: finding.location,
+    line: finding.line,
+    priority: finding.priority,
+    check: finding.check,
+    message: finding.message,
+  };
+}
+
 export interface AtcWorklistReading {
-  findings: AtcFinding[];
+  findings: AtcFindingFull[];
   /** How many objects the run covered, findings or not. */
   objects_checked: number;
   /**
@@ -88,19 +138,63 @@ const attribute = (element: Element, name: string): string | undefined => {
   return typeof value === 'string' && value !== '' ? value : undefined;
 };
 
-/** `/…/source/main#start=9,0` → the source and the 9. */
+/** A run of decimal digits as a number; anything else is absent. */
+function digits(text: string | undefined): number | undefined {
+  if (!text) return undefined;
+  for (const c of text) if (c < '0' || c > '9') return undefined;
+  return Number(text);
+}
+
+/** `/…/source/main#start=9,0` → the source, the 9 and the 0. */
 function position(location: string | undefined): {
   location?: string;
   line?: number;
+  column?: number;
 } {
   if (!location) return {};
-  const [uri, fragment] = location.split('#');
-  const line = /start=(\d+)/.exec(fragment ?? '')?.[1];
-  return { location: uri, line: line ? Number(line) : undefined };
+  const hash = location.indexOf('#');
+  if (hash < 0) return { location };
+  const uri = location.slice(0, hash);
+  const start = location
+    .slice(hash + 1)
+    .split('&')
+    .find((part) => part.startsWith('start='));
+  if (!start) return { location: uri };
+  const [line, column] = start.slice('start='.length).split(',');
+  return { location: uri, line: digits(line), column: digits(column) };
+}
+
+const DOCUMENTATION_RELATION = 'http://www.sap.com/adt/relations/documentation';
+
+/** The `href` of the finding's documentation link. */
+function documentationUri(finding: Element): string | undefined {
+  const link = asList(finding.link).find(
+    (l) => attribute(l, 'rel') === DOCUMENTATION_RELATION,
+  );
+  return link ? attribute(link, 'href') : undefined;
+}
+
+/** `"true"` / `"false"` as booleans; anything else is absent. */
+function flag(element: Element, name: string): boolean | undefined {
+  const value = attribute(element, name);
+  return value === 'true' ? true : value === 'false' ? false : undefined;
+}
+
+/** The finding's `quickfixes` element, when it has one. */
+function quickfixes(finding: Element): AtcQuickfixFlags | undefined {
+  const [element] = asList(finding.quickfixes);
+  if (!element) return undefined;
+  return {
+    manual: flag(element, 'manual'),
+    automatic: flag(element, 'automatic'),
+    pseudo: flag(element, 'pseudo'),
+    ai_based: flag(element, 'aiBasedQF'),
+    ai_enabled: flag(element, 'ai_enabled'),
+  };
 }
 
 export function parseAtcWorklist(document: string): AtcWorklistReading {
-  const findings: AtcFinding[] = [];
+  const findings: AtcFindingFull[] = [];
   const by_priority: Record<string, number> = {};
   let objects_checked = 0;
 
@@ -128,6 +222,13 @@ export function parseAtcWorklist(document: string): AtcWorklistReading {
             priority: priority ? Number(priority) : undefined,
             check: attribute(finding, 'checkTitle'),
             message: attribute(finding, 'messageTitle'),
+            check_id: attribute(finding, 'checkId'),
+            check_class: attribute(finding, 'checkClass'),
+            message_id: attribute(finding, 'messageId'),
+            documentation_uri: documentationUri(finding),
+            exemption_approval: attribute(finding, 'exemptionApproval'),
+            exemption_kind: attribute(finding, 'exemptionKind'),
+            quickfixes: quickfixes(finding),
           });
         }
       }

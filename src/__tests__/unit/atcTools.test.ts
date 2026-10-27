@@ -415,6 +415,58 @@ describe('RunATC: the object kinds the client checks', () => {
   );
 });
 
+describe('RunATC: a field the type does not use', () => {
+  it.each([
+    [
+      { name: 'ZCL_X', type: 'class', function_group: 'ZFG' },
+      'function_group',
+      'class',
+    ],
+    [
+      { name: 'ZPROG', type: 'program', include_kind: 'macros' },
+      'include_kind',
+      'program',
+    ],
+    [
+      {
+        name: 'LZFG_F01',
+        type: 'function_include',
+        function_group: 'ZFG',
+        include_kind: 'macros',
+      },
+      'include_kind',
+      'function_include',
+    ],
+    [
+      {
+        name: 'ZCL_X',
+        type: 'class_include',
+        include_kind: 'macros',
+        function_group: 'ZFG',
+      },
+      'function_group',
+      'class_include',
+    ],
+  ] as const)(
+    'refuses %p, naming %s and %s, before any call',
+    async (object, field, type) => {
+      atc = {
+        createWorklist: async () => {
+          throw new Error('should not be called');
+        },
+      };
+      const result: any = await handleRunATC(context as any, {
+        objects: [object],
+        check_variant: 'V',
+      });
+      expect(result.isError).toBe(true);
+      const text = String(result.content[0].text);
+      expect(text).toContain(field);
+      expect(text).toContain(`"${type}"`);
+    },
+  );
+});
+
 describe('the two readers', () => {
   it('answers the status as the server words it, and the flag the client draws', async () => {
     atc = {

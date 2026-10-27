@@ -13,24 +13,6 @@ import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /**
- * An ATC run is three calls, and the client says so.
- *
- * `AdtAtc` deliberately stopped being `IAdtRunnable` in 19.0.0: *"That atom's
- * `run` is one call, and an ATC run is three: the check variant, a worklist
- * for it, then the run itself. A member that made all three chose the order
- * and denied the caller a worklist they could reuse. The atom stays in the
- * contract for whoever composes them."* Composing them is this handler's job,
- * which is where composites belong.
- *
- * **The worklist is the durable half.** A run is not a choice between
- * synchronous and asynchronous: `wait` only decides whether the server holds
- * the request until the checks are done. Either way the findings are written
- * into the worklist the caller created here, and stay readable by
- * `GetATCFindings` long afterwards. So `worklist_id` is in every answer;
- * `run_id` only when there is one to poll, and `finding_stats` only when the
- * server waited and counted.
- */
-/**
  * The kinds the schema offers: every `AtcObjectType`, typed against it. The
  * check below fails to compile when the client's union names a kind this
  * list leaves out.
@@ -56,20 +38,39 @@ const CLASS_INCLUDE_KINDS = [
   'testclasses',
 ] as const satisfies readonly AtcClassIncludeKind[];
 
+/** `true` when `Listed` names every member of `All`, else `false`. */
 type Covers<All, Listed extends All> = [Exclude<All, Listed>] extends [never]
   ? true
-  : never;
-const everyObjectType: Covers<
-  AtcObjectType,
-  (typeof ATC_OBJECT_TYPES)[number]
-> = true;
-const everyIncludeKind: Covers<
-  AtcClassIncludeKind,
-  (typeof CLASS_INCLUDE_KINDS)[number]
-> = true;
-void everyObjectType;
-void everyIncludeKind;
+  : false;
+/** Compiles only for `true`. */
+type Holds<T extends true> = T;
+/** Fails to compile when the client's union names a kind the list leaves out. */
+type EveryAtcObjectTypeListed = Holds<
+  Covers<AtcObjectType, (typeof ATC_OBJECT_TYPES)[number]>
+>;
+/** The same, for the class include kinds. */
+type EveryClassIncludeKindListed = Holds<
+  Covers<AtcClassIncludeKind, (typeof CLASS_INCLUDE_KINDS)[number]>
+>;
 
+/**
+ * An ATC run is three calls, and the client says so.
+ *
+ * `AdtAtc` deliberately stopped being `IAdtRunnable` in 19.0.0: *"That atom's
+ * `run` is one call, and an ATC run is three: the check variant, a worklist
+ * for it, then the run itself. A member that made all three chose the order
+ * and denied the caller a worklist they could reuse. The atom stays in the
+ * contract for whoever composes them."* Composing them is this handler's job,
+ * which is where composites belong.
+ *
+ * **The worklist is the durable half.** A run is not a choice between
+ * synchronous and asynchronous: `wait` only decides whether the server holds
+ * the request until the checks are done. Either way the findings are written
+ * into the worklist the caller created here, and stay readable by
+ * `GetATCFindings` long afterwards. So `worklist_id` is in every answer;
+ * `run_id` only when there is one to poll, and `finding_stats` only when the
+ * server waited and counted.
+ */
 export const TOOL_DEFINITION = {
   name: 'RunATC',
   available_in: ['onprem', 'cloud'] as const,
@@ -98,13 +99,13 @@ export const TOOL_DEFINITION = {
             function_group: {
               type: 'string',
               description:
-                'For type "function_include": the function group the include belongs to.',
+                'For type "function_include" only: the function group the include belongs to. Refused on any other type.',
             },
             include_kind: {
               type: 'string',
               enum: CLASS_INCLUDE_KINDS,
               description:
-                'For type "class_include": which include of the class named by name.',
+                'For type "class_include" only: which include of the class named by name. Refused on any other type.',
             },
           },
           required: ['name', 'type'],
@@ -273,6 +274,14 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
 function toObjectRef(o: RunATCObjectArg): IAtcObjectRef | string {
   const objectName = (o.name as string).toUpperCase();
   const objectType = o.type as AtcObjectType;
+  // A field only one kind reads is refused on every other kind, rather than
+  // dropped without a word.
+  if (o.function_group !== undefined && objectType !== 'function_include') {
+    return `function_group is read only for type "function_include"; an object of type "${objectType}" takes none. Got ${JSON.stringify(o)}.`;
+  }
+  if (o.include_kind !== undefined && objectType !== 'class_include') {
+    return `include_kind is read only for type "class_include"; an object of type "${objectType}" takes none. Got ${JSON.stringify(o)}.`;
+  }
   switch (objectType) {
     case 'function_include': {
       const group = o.function_group?.trim();

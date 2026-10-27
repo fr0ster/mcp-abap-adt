@@ -58,15 +58,21 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 
 ## Part I: interfaces-adt (mcp-abap-adt-interfaces, its own PR, 21.0.0)
 
+### Task I0: what each variant really serves
+
+- **The inventory.** Inventory, API by API and code by code, what the library serves today on each variant.
+  - A member counts only if it sends a request and is covered by a unit test of its request shape.
+  - A refusal stub is not served: `absentOnLegacy`, `noDeletionCheck`, `legacyMeasuredRefusal`, `noTransportResource` and the like. Neither is a member that always answers a refusal.
+- **Where it goes.** Attach the inventory to the PR description as a table: variant × API × code × operation, each cell served or refused, with the member and test that prove it. It is the input of I1.
+- **Verify.** Every refusal stub in the three packages appears as "refused" in the inventory.
+
 ### Task I1: the tables
 
 - **The three tables.** Write `ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD` and `ADT_TYPES_BASIS_740`, keyed by API.
   - Each entry holds a kind, a collection and one or more codes.
   - Each code holds its parent API, name length, operations and evidence (spec 2.1).
-- **Where the content comes from.** From what the library serves today, API by API:
-  - the operations from the classes' members;
-  - the collections from today's addresses;
-  - the legacy table from `AdtClientLegacy`'s served getters only.
+- **Where the content comes from.** The I0 inventory, cell for cell. The collections come from today's addresses.
+- **Verify.** A test asserts each table against the inventory's recorded form: every served cell is an operation of its entry, and no refused cell is one.
 - **Vocabulary and derived types.** The closed operation vocabulary. Then `AdtApi<V>`, `AdtTypeCode`, `AdtOperation`, `AdtApiWith<V, Op>`, `AdtObjectKind` and `AdtSourceTypeCode`, derived from the tables.
 
 ### Task I2: the contracts
@@ -76,6 +82,7 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 - Reshape the configs and references that require a parent (spec 2.3).
 - Remove `AdtObjectTypeLower`, `AdtObjectType`, `AdtSourceObjectTypeLower` and `AdtSourceObjectType`, together with their uses in interfaces-adt.
 - Update `tools/package-map.json`.
+- **Verify.** Type checks: a function module config without its group fails with `@ts-expect-error`, and one with it compiles. `check:surface` lists every new export.
 
 ### Task I3: the one-meaning test and type checks
 
@@ -86,7 +93,8 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 
 ### Task I4: the conformance check in CI
 
-- **Fixtures.** Copy the three releases' `typestructure` and `discovery` answers to `tests/fixtures/`.
+- **Fixtures.** Copy the three releases' `typestructure` and `discovery` answers from the server's corpus, the authoritative copy, to `tests/fixtures/`.
+- **Pinning.** interfaces-adt exports a constant, `ADT_RECORDED_ANSWERS`: each fixture's corpus case name and SHA-256. A test asserts the fixtures match it.
 - **Jest.** A dev dependency, outside the published package, with its own CI step.
 - **The check, per variant:**
   - the code is listed;
@@ -95,8 +103,9 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
   - the collection is advertised;
   - `EXECUTE` and `PROFILE` strictly;
   - `create` without `CREATE` is listed apart;
+  - a type that lists `CREATE` but has no `create` in its entry goes into the coverage;
   - the coverage is asserted as a recorded list.
-- **Verify the check bites** (review focus 3): break one table entry, then one recorded answer, and watch each fail.
+- **Verify the check bites** (review focus 3). One negative fixture per conflict rule and per capability rule, each a minimal answer or table entry, and each makes its own rule fail.
 
 ### Task I5: docs and release
 
@@ -130,23 +139,26 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
   - `AdtClientLegacy extends AdtClient<'basis740'>`.
   - Every override keeps the base's gate.
   - The legacy handlers are fixed to `'basis740'`.
+- **Per-code gates inside one API.** An operation whose entry differs by code (an enhancement's `read`/`source` only for `ENHO/XHH`) takes the code in its argument's type, so that the gate follows it.
 - **Negative compile checks** (review focus 2). One `@ts-expect-error` each for:
   - a factory the variant lacks;
   - an operation the API lacks;
+  - an operation one code of the API lacks, with the code that has it compiling;
   - the same through a legacy override;
   - a missing parent.
-- **Verify:** build, `test:check` and every package's unit suite are green.
+- **Verify:** the negative compile checks fail as expected and the positive ones compile. The full green gate is at the end of C5, because C2–C5 are one migration.
 
 ### Task C4: the overlap with #216
 
 - Where #216's Part B and this part touch the same lines, the spec of the change that owns the line decides.
-- **Verify:** build and every package's unit suite are green.
+- **Verify:** no conflict marker is left, and `test:check` lists no error that comes from a merge.
 
 ### Task C5: the answer boundary (adt-strategies)
 
 - Every strategy that reads a code from an answer looks it up once and answers `IAdtAnsweredObject`.
 - One unit test per strategy, with a recorded answer and with an unknown code (review focus 4).
 - adt-strategies goes to 0.16.0, with a migration note.
+- **Verify, for C2–C5 together:** build, `test:check` and every package's unit suite are green.
 
 ### Task C6: the address check and the live check
 
@@ -157,7 +169,12 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 - **The live check.** It reads `typestructure`, `discovery` and `urimapper` through the library, and runs the whole check for the configured variant.
   - The system's identity is printed at run time and never committed.
   - With no live configuration, it skips with a named reason. A failed read is a failure.
-  - With a write flag, which CI refuses, it scrubs the answers and adds them to the server's corpus and to interfaces-adt's fixtures.
+  - With a write flag, which CI refuses, it scrubs the answers and writes them to one output directory the configuration names. It writes into no repository.
+- **Refreshing a release** is a documented step in each repository's README:
+  1. copy the output into the server's corpus;
+  2. copy the subset each repository holds (interfaces-adt: `typestructure`, `discovery`; adt-clients: `urimapper`);
+  3. update `ADT_RECORDED_ANSWERS`.
+- **Pinning, in adt-clients.** A test asserts adt-clients' copies against `ADT_RECORDED_ANSWERS` from the interfaces-adt version it depends on.
 
 ### Task C7: versions, ranges, scan, docs
 
@@ -165,7 +182,13 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
   - strategies 0.16.0, clients 38.0.0, legacy 0.2.0;
   - clients takes strategies `^0.16.0`;
   - legacy takes clients `^38.0.0` as a peer and dev dependency.
-- **The literal scan** over `packages/*/src`, code and prose. Break it once and watch it fail.
+- **The literal scan** (spec 6) over `packages/*/src`:
+  - one Jest test using the TypeScript compiler API and its type checker;
+  - a literal passes only with a contextual type of `AdtTypeCode` or a subset of it;
+  - the spec's exceptions, as a committed allowlist;
+  - prose checked against the tables.
+
+  Tests cover a typed literal that passes, an untyped one that fails, a valid prose mention and an invalid one.
 - **Docs.** The README and docs of all three packages, the examples, and the migration notes.
 - **Verify before the review:** every CI step is green (lint, build, `test:check`, every unit suite, `check:packed`, `check:publish`).
 - **Release.** Run the Codex review. The owner merges and publishes in order. Then do a clean install of all three from the registry, outside the repository.
@@ -176,7 +199,9 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 
 - Move interfaces-adt to `^21.0.0`, adt-clients to `^38.0.0` and adt-strategies to `^0.16.0`, all from the registry.
 - #216's Part C lands first. Its client contract is composed per variant from the tables.
-- **Verify:** build and `test:check` are green before S2.
+- **Verify:**
+  - negative compile checks through the server's own contract: a factory the variant lacks and an operation the API lacks each fail with `@ts-expect-error`;
+  - build and `test:check` are green before S2.
 
 ### Task S2: the variant and the tool set
 
@@ -201,11 +226,14 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
 - **Removed.** `KIND_BY_TYPE` and its prefix fallback go.
 - **The debugger's labels** become one union, mapped to their codes.
 - **Pinning tests.** The tests that pinned `doma/dm` and `bdef/bd` pin the served codes instead.
+- **Verify:**
+  - for every operation family, a unit test with a valid code, a wrong code and a friendly name, each answered as its projection says;
+  - `KIND_BY_TYPE` is gone, which a grep shows.
 
 ### Task S5: the literal scan
 
-- It runs over `src` and every package directory, on code and prose, descriptions included.
-- Break it once and watch it fail.
+- The same scan as C7, with the same mechanics, exceptions and four tests, over `src` and every package directory, descriptions included.
+- interfaces-adt has no scan: its only code literals are the tables, which the scan allows.
 
 ### Task S6: the five defects, re-checked
 
@@ -221,11 +249,11 @@ The corpus already holds the `typestructure`, `discovery`, `compatibility/graph`
   - the dropped codes;
   - `unknownType` in answers.
 - Update the tool docs, the user guide and the package READMEs.
+- **Verify.** `npm run docs:tools` leaves the committed tool docs unchanged. The CHANGELOG names every changed tool argument.
 
 ### Task S8: the corpus copies agree
 
-- The server's corpus and interfaces-adt's fixtures hold the same answers.
-- A test asserts they agree, so a newly recorded release reaches both.
+- A test asserts that the server's corpus files named in `ADT_RECORDED_ANSWERS` hash to its values, for the interfaces-adt version the server depends on. The registry pins the comparison, and no other repository is read.
 
 ### Task S9: live
 

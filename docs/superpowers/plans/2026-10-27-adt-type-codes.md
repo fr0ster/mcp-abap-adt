@@ -43,9 +43,17 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 ### Task M1: a recorder for the corpus
 
 - Read the corpus README (`tests/fixtures/adt/README.md`). It says where the deleted capture script is in history and gives the corpus format: file naming, the `.json` sidecar, scrubbing.
-- Bring the capture back as a temporary hand-run script, out of the repository.
+- Bring the capture back from `f78b9611:scripts/capture-adt-corpus.ts` as a temporary hand-run script.
+  - It imports repository-relative paths, so it runs from an untracked, gitignored path inside the worktree.
+  - It is never committed, and it is deleted after M2.
+- Adapt it until it compiles against today's code (the README says it no longer does).
 - The answers it writes follow the corpus format and the scrubbing rules.
-- Verify: one known case is recorded again and comes out byte-for-byte as committed, apart from the scrubbed fields.
+- Extend the corpus guard (`corpusCarriesNoIdentity.test.ts`) to refuse a system id and a transport number as well as a user name. Scrub the existing answers it then catches (e.g. `adtcore:masterSystem`).
+- Verify:
+  - one known case is recorded again;
+  - its body comes out byte-for-byte as committed, apart from the scrubbed fields;
+  - its sidecar matches after normalising `capturedAt`;
+  - the extended guard passes.
 
 ### Task M2: record the missing codes on E19
 
@@ -53,7 +61,7 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 - Codes to record:
   - `FUGR/I`, `PROG/I` and `PROG/P` from `ZMCP_ATC_SAMPLES`;
   - `INTF/OI`, `TTYP/DA`, `MSAG/N`, `XSLT/VT`, `DSFD/SCF`, `DSFI/SFI`, `FTG2/FT`, `ENHO/*` and `ENHS/*` from a shared test object or a system object, read only;
-  - `SRVB/SVB`, `VIEW/DV`, `AUTH` and `SCGR` where E19 has such an object.
+  - `SRVB/SVB`, `VIEW/DV`, `AUTH`, `SCGR` and `DCLS/DL` where E19 has such an object.
 - A code with no object to read stays `unmeasured`. List it in the PR.
 - Scrub every answer: no system, system id, transport number or user name.
 - Commit the answers to `tests/fixtures/adt/`.
@@ -88,8 +96,8 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 - Add a type check under `src/__typechecks__/`:
   - a typed map over `AdtTypeCode` compiles;
   - each wrong code from spec §1 fails, with `@ts-expect-error`.
-- Add the README entry, and a CHANGELOG 21.0.0 entry with a migration note.
-- Verify with the repository's checks: build, typecheck, `check-surface`, `check-graph`, `check-packed`.
+- Update the README, every doc and example that names the old unions, and a CHANGELOG 21.0.0 entry with a migration note.
+- Verify: `npm run check`. It runs `test:check`, `check:surface`, `check:graph`, `check:packed` and `check:publish`.
 - Commit, open the PR, run the Codex review. The owner merges and publishes.
 
 ## Part C: adt-clients, adt-strategies, adt-clients-legacy (mcp-abap-adt-clients, its own PR)
@@ -97,9 +105,12 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 ### Task C1: the base and the dependency
 
 - Start after #216's B tasks, whose PR also makes 38.0.0 and 0.2.0, on its branch or on main once it is merged.
+  - 38.0.0 and 0.2.0 are released **once**, carrying both changes. Neither is published before this part is done.
 - Move `@mcp-abap-adt/interfaces-adt` to `^21.0.0` from the registry, in every package that names it.
 - Regenerate the lockfile with npm and check it: no link but the workspace siblings.
-- Verify: build and the unit suites are green before any map changes.
+- Verify:
+  - the lockfile check passes;
+  - `test:check` lists the compile errors the removed unions cause (`objectWire` and others). That list is the work of C2–C4, and no error is silenced.
 
 ### Task C2: `buildObjectUri` becomes a complete table
 
@@ -125,6 +136,7 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 ### Task C5: the overlap with #216
 
 - Wherever #216's B tasks and this part touch the same file, rebase and resolve here. Each conflict is decided by the spec of the change that owns the line.
+- Verify: build, `test:check` and every package's unit suite are green, legacy included.
 
 ### Task C6: adt-strategies at the answer boundary
 
@@ -160,16 +172,17 @@ There are three repositories. Each gets its own PR, and this plan's documents li
   - the dropped wrong codes and `FUNC`;
   - the narrowed arguments;
   - `type` / `unknownType`.
+- Verify, before the review: every CI step of the repository is green (lint, build, `test:check`, every package's unit suite, `check:packed`, `check:publish`).
 - Commit, push, run the Codex review. The owner merges and publishes in order. Then do a clean install from the registry, outside the repository, of all three.
 
 ## Part S: the server (#329, mcp-abap-adt 21.0.0)
 
 ### Task S1: dependencies
 
-- Move `@mcp-abap-adt/interfaces-adt` to `^21.0.0` and `@mcp-abap-adt/adt-clients` to `^38.0.0`, from the registry.
+- Move `@mcp-abap-adt/interfaces-adt` to `^21.0.0`, `@mcp-abap-adt/adt-clients` to `^38.0.0` and `@mcp-abap-adt/adt-strategies` to `^0.16.0`, from the registry.
 - Regenerate the lockfile with npm.
 - Fix every compile error the majors cause before Task S2.
-- If #216's Part C lands in the same 21.0.0, it goes first. Its client contract is typed against the same interfaces-adt.
+- #216's Part C (the server's client contract) is also in 21.0.0. It goes first, and the server's 21.0.0 is released once, carrying both.
 
 ### Task S2: the maps
 
@@ -196,6 +209,7 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 - The subset is checked against adt-clients' address table by type.
 - Regenerate the tool docs and the tool-surface fixtures.
 - Check the tool-search retrieval set.
+- A unit test walks every operation's subset and proves each code reaches a library address or family, with no refusal (review focus 3).
 
 ### Task S4: the debugger labels
 
@@ -220,14 +234,16 @@ There are three repositories. Each gets its own PR, and this plan's documents li
 ### Task S7: the five defects, re-checked
 
 - Re-run the review of the five PR #329 defects on top of the registry. The TYPE_TO_FAMILY and preaudit changes now derive from it.
+- Verify: the review reports no open finding.
 
 ### Task S8: docs and release notes
 
 - Write the CHANGELOG `[Unreleased]` entries under the major heading, with a migration note:
   - the codes the tools accept now, per operation;
   - the dropped wrong codes;
-  - the refusal's wording.
-- Update the tool docs and the user guide.
+  - the refusal's wording;
+  - where a tool's answer now carries `unknownType` instead of a code it did not know.
+- Update the tool docs, the user guide, every package README and the examples.
 
 ### Task S9: live on E19
 
@@ -241,8 +257,10 @@ The realm is checked first. Run as the test user, on our own objects only:
 - ActivateObjects with each code its subset offers, on our own objects.
 - GetWhereUsed with each code its subset offers.
 - GetIncludesList with each parent kind.
+- DescribeByList, GetObjectInfo and ActivateObjectLow with each code their subsets offer, on our own objects.
+- The compact routes that take a code: one call per code their subsets offer.
 - Each answer is read for success, not only for the status.
-- Then the Codex review. Then the owner's word on merge.
+- Verify: every CI step green (lint, build, `test:check`, `npm test`). Then the Codex review. Then the owner's word on merge.
 
 ## Closing
 

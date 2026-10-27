@@ -232,7 +232,12 @@ A config or object reference for an API with a parent requires the parent's name
    - It is an adt-clients live test that reads all inputs through the library.
    - The variant comes from the local test configuration. The system's identity is printed at run time and never committed.
    - It skips with a named reason when no live configuration is given. A failed read is a failure, not a skip.
-   - With a write flag, refused under CI, it scrubs the answers it read and adds them to the server's corpus and to interfaces-adt's fixtures. A new release is then checked in CI.
+   - With a write flag, which CI refuses, it scrubs the answers it read and writes them to one output directory named by configuration. It writes into no repository.
+   - **Refreshing a release.** Each repository's README documents the step:
+     - the server's corpus is the authoritative copy;
+     - interfaces-adt keeps the `typestructure` and `discovery` answers, and adt-clients the `urimapper` answers;
+     - interfaces-adt exports `ADT_RECORDED_ANSWERS`, each copy's corpus case name with its SHA-256;
+     - every repository's test checks its own copies against that constant. The version is pinned by the interfaces-adt version it depends on, so no test reads another repository.
 7. **Load-bearing.** One deliberate break of a table entry, and one of a recorded answer, each fail the check.
 
 **Capabilities.**

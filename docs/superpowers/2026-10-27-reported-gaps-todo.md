@@ -82,3 +82,9 @@ true one goes to the owner: fix, or out of scope.
 Found beside the list:
 - The three ATC tools are only in the full core set (`HighLevelHandlersGroup.ts:598-611`, `toolSet.ts:293`). Each description says "[read-only]", yet no read-only build serves them, and no compact build has an ATC route.
 - `ActivateObjects` names TTYP in its description (`handleActivateObjects.ts:33`), but `TYPE_TO_FAMILY` maps `ttyp/st` to the structure family (`handleActivateObject.ts:186`). This needs checking.
+
+## Owner's rulings
+
+- **No guard against activating other users' drafts.** Out of scope. In SAP, anyone with change
+  rights may change an object that is not locked. Deciding what to activate is the LLM's
+  responsibility, and the server does not guard it.

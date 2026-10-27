@@ -56,9 +56,9 @@ An audit of all three repositories found the facts below. The literal scan (sect
 
    ```ts
    export const ADT_OBJECT_TYPES = {
-     'CLAS/OC': { kind: 'class', objectDirectory: 'CLAS', evidence: 'recorded' },
-     'FUGR/FF': { kind: 'function_module', objectDirectory: 'FUGR', evidence: 'recorded', under: 'FUGR/F' },
-     'TTYP/DA': { kind: 'table_type', objectDirectory: 'TTYP', evidence: 'recorded' },
+     'CLAS/OC': { kind: 'class', objectDirectory: 'CLAS', evidence: 'recorded', source: 'server-corpus' },
+     'FUGR/FF': { kind: 'function_module', objectDirectory: 'FUGR', evidence: 'recorded', source: 'server-corpus', under: 'FUGR/F' },
+     'CMPT': { kind: 'code_composer_template', objectDirectory: 'CMPT', evidence: 'discovery', source: 'clients-discovery' },
      'SRVB/SVB': { kind: 'service_binding', objectDirectory: 'SRVB', evidence: 'unmeasured' },
      // …
    } as const satisfies Readonly<Record<string, AdtObjectTypeEntry>>;
@@ -74,6 +74,10 @@ An audit of all three repositories found the facts below. The literal scan (sect
    - `evidence` is `'recorded' | 'discovery' | 'unmeasured'`, and with it `source`: which committed document proves the code.
      - `server-corpus`: the server's `tests/fixtures/adt/`.
      - `clients-discovery`: adt-clients' `docs/discovery/`.
+     The allowed pairs are typed:
+     - `recorded` with `server-corpus`;
+     - `discovery` with `clients-discovery`;
+     - `unmeasured` with no `source`.
      Section 5 makes both true.
 2. **Entries.**
    - One per code that section 1's evidence shows, and one per code the stack must address but nobody has measured, marked `unmeasured`.
@@ -84,7 +88,9 @@ An audit of all three repositories found the facts below. The literal scan (sect
    - The source-reading contracts (`IAdtUtilities`, which today take `AdtSourceObjectType`) take `AdtSourceTypeCode`: an explicit, named subset of `AdtTypeCode`. It is the contract of what a source read accepts, checked by `satisfies readonly AdtTypeCode[]`.
    - `tools/package-map.json` drops the old symbols and maps every new export, so `check-surface` covers them.
    - What a consumer passes where they stood is an `AdtTypeCode`, an `AdtObjectKind`, or an `AdtObjectDirectoryType`, as the member's contract states.
-   - `IObjectReference.type` becomes `AdtTypeCode`.
+   - `IObjectReference.type` becomes `AdtTypeCode`. It is an input contract: what a caller passes.
+   - What an answer carries is a separate contract, `IAdtAnsweredObject`: `type: AdtTypeCode`, or `unknownType: string` when the code is not in the registry. Exactly one of the two is present, a union the compiler checks.
+   - The result contracts that today reuse `IObjectReference` for answered objects (`IInactiveObjectsResponse.objects`, …) take `IAdtAnsweredObject`. An unknown inactive object survives as it is.
 4. **The server's debugger target labels** (`CLAS`, `PROG`, `INCL`, `FUNC`) are the stack's own vocabulary for a breakpoint target, not ADT type codes.
    - The debugger contract takes a source URI (`IAbapDebugger`).
    - The labels stay in the server, as a closed union mapped to registry codes: `FUNC` to `FUGR/FF`, `INCL` to `PROG/I`.
@@ -106,10 +112,10 @@ An audit of all three repositories found the facts below. The literal scan (sect
 3. **Payloads and validation.**
    - The create payloads' `adtcore:type` and the validation `objtype` are written from the registry.
    - The validation `objtype` without a slash (`ttypda`) is derived from the code, not written by hand.
-4. **Comments** name the code the code uses (`DSFD/SCF`, `DSFI/SFI`, `AUTH`).
+4. **Comments** name the code the code uses (`DSFD/SCF`, `DSFI/SFI`, `AUTH`). A code in a comment is allowed by the scan and must be a registry code (6).
 5. **The ADT-answer boundary is in adt-strategies.** A strategy that reads a code out of an answer looks it up in the registry once.
    - A known code is answered as `type: AdtTypeCode`.
-   - An unknown code is answered as it is: `type` absent and `unknownType: string` present. It is never cast, never dropped and never guessed into a kind.
+   - An unknown code is answered as it is, through `IAdtAnsweredObject` (2.3): `type` absent and `unknownType: string` present. It is never cast, never dropped and never guessed into a kind.
    - The result types change: today their fields are `string` (`results/utils.ts`). A consumer reads `type` or `unknownType`. This is a breaking change of a 0.x package, so a minor (owner's rule) with a migration note.
 6. **Tests.**
    - The literal scan (section 6) runs over `packages/*/src`.
@@ -128,7 +134,7 @@ An audit of all three repositories found the facts below. The literal scan (sect
    - The schema enum, the code list in the description and the refusal's list of accepted codes all derive from that subset. Its codes are checked against the library's address table by type.
    - A description's example names only a code its path accepts.
    - The preaudit list built in PR #329 is derived the same way.
-3. **The debugger** maps its breakpoint types through interfaces-adt's debugger union (2.4).
+3. **The debugger** maps its target labels through the server's own label union (2.4).
    - `GetAbapSystemSymbols`' output label `FUNC` for a function module stays a label: it is the debugger's vocabulary, typed so.
 4. **The boundary.** A code in a tool argument is upper-cased once and checked against the operation's subset. When it is not there, it is refused with that subset's list. That is the only runtime check for an argument; an answer's codes are checked in adt-strategies (3.5).
 5. **Tests.**
@@ -161,12 +167,14 @@ An audit of all three repositories found the facts below. The literal scan (sect
 
 - One Jest test per repository: adt-clients for `packages/*/src`, and the server for `src` and the package directories.
 - It walks every string literal, template piece and JSDoc comment with the TypeScript compiler API. It tokenises with plain code, not a regex.
-- **Production code writes no code literal at all.** A token of the shape `XXXX/Y…`, or one equal to a registry `objectDirectory` (bare `CLAS`, `AUTH`, `SCGR`, `CMPT`, …), fails the test in production source. It is allowed only:
+- **Production code writes no untyped code literal.** A token of the shape `XXXX/Y…`, or one equal to a registry `objectDirectory` (bare `CLAS`, `AUTH`, `SCGR`, `CMPT`, …), fails the test in production source. It is allowed only:
+  - where the type checker gives the literal a contextual type that is `AdtTypeCode`, `AdtObjectDirectoryType` or a subset of them, so that the compiler has proven membership. Examples: a key in a `Record<AdtTypeCode, …>`, an argument typed `AdtTypeCode`, `ADT_OBJECT_TYPES['TTYP/DA']`. The scan asks the type checker, not a pattern;
   - in the registry module itself;
   - in the server's debugger label union (2.4);
   - in tests and fixtures, where a wrong code is still written to prove it is refused;
   - as an entry of a short committed allowlist of non-codes: MIME types such as `text/html`, path pieces.
-- A production consumer references registry values (`ADT_OBJECT_TYPES['TTYP/DA']`, a derived constant) or a typed key, never a string.
+- A production consumer writes a code only where it is typed as one. A plain `string` holding a code fails.
+- **Comments** may name codes, and each named code must be a registry code. A wrong code in a comment fails the test.
 - Descriptions are scanned too, so a wrong code, or any written-out code, in a tool description fails the test. Descriptions are built from the subsets (4.2).
 - The rule is proven load-bearing by one deliberate break.
 

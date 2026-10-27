@@ -94,6 +94,76 @@ import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
+/** The families whose own `activate()` this dispatcher can reach directly. */
+type ActivationFamily =
+  | 'class'
+  | 'program'
+  | 'interface'
+  | 'function_group'
+  | 'table'
+  | 'structure'
+  | 'ddl'
+  | 'domain'
+  | 'data_element'
+  | 'behavior_definition'
+  | 'metadata_extension';
+
+/**
+ * ADT type codes (and this codebase's own friendly names, accepted
+ * elsewhere in `common/low`) mapped to the family that serves them. Anything
+ * not named here — `FUGR/FF`, a bare code such as `CLAS`, and the table type
+ * `TTYP/DA` included — falls back to group activation; see the module doc
+ * comment.
+ */
+export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
+  'clas/oc': 'class',
+  class: 'class',
+  'prog/p': 'program',
+  program: 'program',
+  'intf/oi': 'interface',
+  interface: 'interface',
+  'fugr/f': 'function_group',
+  function_group: 'function_group',
+  'tabl/dt': 'table',
+  table: 'table',
+  // ADT names a structure `TABL/DS`. This read `ttyp/st` from 2025-11-08
+  // (a211af39, where `'TTYP/ST' (structure)` was written into the schema):
+  // a code ADT never sends, so a structure went to group activation and a
+  // call naming `TTYP/ST` activated a structure. A table type (`TTYP/DA`)
+  // has no family here and goes to group activation, where adt-clients
+  // refuses it: its `buildObjectUri` has no ADT address for `TTYP/DA` (it
+  // maps `TTYP`, `TTYP/DF` and `TTYP/TT`). The code `TTYP` works.
+  'tabl/ds': 'structure',
+  structure: 'structure',
+  'ddls/df': 'ddl',
+  ddl: 'ddl',
+  // ADT's code, as recorded answers and adt-clients name it.
+  'doma/dd': 'domain',
+  // Not seen in a recorded answer.
+  'doma/dm': 'domain',
+  domain: 'domain',
+  'dtel/de': 'data_element',
+  data_element: 'data_element',
+  // Not seen in a recorded answer.
+  'bdef/bd': 'behavior_definition',
+  'bdef/bdo': 'behavior_definition',
+  behavior_definition: 'behavior_definition',
+  'ddlx/ex': 'metadata_extension',
+  metadata_extension: 'metadata_extension',
+};
+
+/**
+ * The codes of {@link TYPE_TO_FAMILY} as the preaudit descriptions name them:
+ * ADT codes upper-case, this codebase's names as they are. Built from the
+ * map, so the descriptions cannot name a code the map does not route.
+ */
+export const SINGLE_OBJECT_TYPE_CODES = Object.keys(TYPE_TO_FAMILY)
+  .map((code) => (code.includes('/') ? code.toUpperCase() : code))
+  .join(', ');
+
+/** What `preaudit` does, for both activation tools. */
+export const PREAUDIT_DESCRIPTION = `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: ${SINGLE_OBJECT_TYPE_CODES}. Their family's activate() always sends preauditRequested=true.`;
+
 export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
@@ -127,8 +197,7 @@ export const TOOL_DEFINITION = {
       },
       preaudit: {
         type: 'boolean',
-        description:
-          "Request pre-audit before activation. Default: true. Sent as preauditRequested when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family). A single object of a mapped type is activated by its own family's activate(), which always sends preauditRequested=true.",
+        description: PREAUDIT_DESCRIPTION,
       },
       detail: {
         type: 'string',
@@ -151,57 +220,6 @@ interface ActivateObjectArgs {
   preaudit?: boolean;
   detail?: 'terse' | 'full' | 'raw';
 }
-
-/** The families whose own `activate()` this dispatcher can reach directly. */
-type ActivationFamily =
-  | 'class'
-  | 'program'
-  | 'interface'
-  | 'function_group'
-  | 'table'
-  | 'structure'
-  | 'ddl'
-  | 'domain'
-  | 'data_element'
-  | 'behavior_definition'
-  | 'metadata_extension';
-
-/**
- * ADT type codes (and this codebase's own friendly names, accepted
- * elsewhere in `common/low`) mapped to the family that serves them. Anything
- * not named here — `FUGR/FF` and the table type `TTYP/DA` included — falls
- * back to group activation; see the module doc comment.
- */
-export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
-  'clas/oc': 'class',
-  class: 'class',
-  'prog/p': 'program',
-  program: 'program',
-  'intf/oi': 'interface',
-  interface: 'interface',
-  'fugr/f': 'function_group',
-  function_group: 'function_group',
-  'tabl/dt': 'table',
-  table: 'table',
-  // ADT names a structure `TABL/DS`. This read `ttyp/st` from 2025-11-08
-  // (a211af39, where `'TTYP/ST' (structure)` was written into the schema):
-  // a code ADT never sends, so a structure went to group activation and a
-  // call naming `TTYP/ST` activated a structure. A table type (`TTYP/DA`)
-  // has no family here and goes to group activation.
-  'tabl/ds': 'structure',
-  structure: 'structure',
-  'ddls/df': 'ddl',
-  ddl: 'ddl',
-  'doma/dm': 'domain',
-  domain: 'domain',
-  'dtel/de': 'data_element',
-  data_element: 'data_element',
-  'bdef/bd': 'behavior_definition',
-  'bdef/bdo': 'behavior_definition',
-  behavior_definition: 'behavior_definition',
-  'ddlx/ex': 'metadata_extension',
-  metadata_extension: 'metadata_extension',
-};
 
 function familyFor(typeCode: string): ActivationFamily | undefined {
   return TYPE_TO_FAMILY[typeCode.toLowerCase()];

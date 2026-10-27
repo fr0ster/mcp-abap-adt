@@ -6,7 +6,10 @@
  */
 
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { handleActivateObject } from '../low/handleActivateObject';
+import {
+  handleActivateObject,
+  PREAUDIT_DESCRIPTION,
+} from '../low/handleActivateObject';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjects',
@@ -38,8 +41,7 @@ export const TOOL_DEFINITION = {
       },
       preaudit: {
         type: 'boolean',
-        description:
-          "Request pre-audit before activation. Default: true. Sent as preauditRequested when more than one object is activated, or one object of a type without a family of its own here. A single class, program, interface, function group, table, structure, CDS source, domain, data element, behavior definition or metadata extension is activated by its own family's activate(), which always sends preauditRequested=true.",
+        description: PREAUDIT_DESCRIPTION,
       },
     },
     required: ['objects'],

@@ -29,6 +29,7 @@ jest.mock('../../lib/clients', () => ({
 
 import { TOOL_DEFINITION as ActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import {
+  TOOL_DEFINITION as ActivateObjectLow,
   handleActivateObject,
   TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject';
@@ -59,6 +60,7 @@ describe('ActivateObject: each type code and where it goes', () => {
     ['tabl/dt', 'table'],
     ['tabl/ds', 'structure'],
     ['ddls/df', 'ddl'],
+    ['doma/dd', 'domain'],
     ['doma/dm', 'domain'],
     ['dtel/de', 'data_element'],
     ['bdef/bd', 'behavior_definition'],
@@ -97,5 +99,38 @@ describe('ActivateObject: each type code and where it goes', () => {
         .description;
     expect(typeText).toContain('TTYP (table type)');
     expect(typeText).toContain('STRU (structure)');
+  });
+});
+
+/**
+ * Which codes take single-object activation is said in the preaudit text,
+ * and taken from the map, so the two cannot drift: a bare code the map does
+ * not name (`CLAS`) takes group activation and sends `preaudit` as given.
+ */
+describe('the preaudit text names exactly the codes the map routes to a family', () => {
+  const codesIn = (text: string) => {
+    const marker = 'single-object activation: ';
+    const start = text.indexOf(marker);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = text.indexOf('.', start);
+    return text
+      .slice(start + marker.length, end)
+      .split(', ')
+      .map((code) => code.toLowerCase())
+      .sort();
+  };
+
+  it.each([
+    [
+      'ActivateObjects',
+      ActivateObjects.inputSchema.properties.preaudit.description,
+    ],
+    [
+      'ActivateObjectLow',
+      ActivateObjectLow.inputSchema.properties.preaudit.description,
+    ],
+  ])('%s', (_tool, text) => {
+    expect(codesIn(text)).toEqual(Object.keys(TYPE_TO_FAMILY).sort());
+    expect(codesIn(text)).not.toContain('clas');
   });
 });

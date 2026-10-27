@@ -47,7 +47,8 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
 - **Copy** the three releases' `typestructure` and `discovery` exchanges, body and sidecar, from the server's corpus (`37d4aafe`), byte for byte.
 - **Record**, on S/4HANA 2025 and ABAP cloud, for one sample object of every API the library serves there:
   - the `URI_TEMPLATE` address's `GET`;
-  - the `GET /sap/bc/adt/vit/urimapper?uri=<template address>` answer.
+  - the `GET /sap/bc/adt/vit/urimapper?uri=<template address>` answer;
+  - the sample's own metadata document (`GET <object URI>`). On 7.40, the same for the APIs the legacy package serves.
 - **Sample objects** are our own (`ZMCP_ATC_SAMPLES`, the shared test objects) or a system object, read only.
 - **How** the recording is done:
   - in the corpus format;
@@ -172,6 +173,8 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
   - `EXECUTE` and `PROFILE` strictly;
   - `create` without `CREATE` is listed apart;
   - a type that lists `CREATE` but has no `create` in its entry goes into the coverage;
+  - `source` in an entry if and only if the sample's metadata document has a `rel=…/source` link typed `text/plain` or untyped;
+  - `updateMetadata`'s media type among the collection's `app:accept`, where the release advertises any;
   - the coverage is asserted as a recorded list.
 - **One meaning per code.** Group every code of every entry of every table, duplicates inside a table included, and assert one kind per code.
 - **Verify the check bites** (review focus 3). One negative fixture per conflict rule and per capability rule. Each is a minimal answer or table entry that makes its own rule fail.

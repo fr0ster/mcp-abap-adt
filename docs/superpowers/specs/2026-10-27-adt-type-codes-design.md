@@ -206,9 +206,13 @@ A config or object reference for an API with a parent requires the parent's name
 ### 3.4 Source and metadata, read and update, for every CRUD API
 
 - **The rule.** Every API that the library offers CRUD for reads and updates what the object has: its source (`source`, `update`) where it has one, and its metadata (`readMetadata`, `updateMetadata`) where it has metadata. Today `updateMetadata` is missing for most objects that have both, so a description or a program's attributes cannot be changed (I0).
-- **Where the knowledge comes from.** Which objects have a source and which have metadata is the library's knowledge, recorded in the tables. Neither `typestructure` nor `discovery` states it (1.2):
-  - `CATEGORY` does not follow it;
+- **Where the knowledge comes from.** Which objects have a source and which have metadata is the library's knowledge, recorded in the tables. The system-level answers do not state it (1.2):
+  - `typestructure`'s `CATEGORY` does not follow it;
   - discovery's `/source/main` templates cover only some collections.
+- **The object's own metadata document states it** (measured on the recorded corpus). Each document carries `atom:link rel="http://www.sap.com/adt/relations/source"` links:
+  - a link typed `text/plain`, or untyped, means a source exists, and its `href` says where. Class, function group, structure and DDL have one, and a class lists its includes.
+  - only `text/html` means there is no source, just a rendered view. Data element and package are like this.
+- **The metadata type.** The type of the metadata document a collection accepts is advertised by `discovery` as `app:accept`, for example `application/vnd.sap.adt.oo.classes.v4+xml` for classes. On 7.40, discovery advertises no `app:accept`, and its documents' links are measured in C2a.
 - **How each update is built.** Each `updateMetadata` sends what ADT accepts for that type, measured before it is written. The library writes nothing it has not measured.
 - **Order.** Class, interface, program, function module and DDL source come first, then every other CRUD API.
 - **Per variant.**
@@ -232,6 +236,11 @@ A config or object reference for an API with a parent requires the parent's name
    - `collection` is not advertised in `discovery`;
    - on a newer release, the address `buildObjectUri` builds for the sample differs from the system's `urimapper` answer for the same object.
 3. **Coverage.** It reports the system's types that no entry serves, with their labels.
+3a. **Source and metadata** (3.4). For the sample object of each API, the recorded metadata document is read:
+   - an entry with `source` (or a source `update`) needs a `rel=…/source` link typed `text/plain` or untyped;
+   - an entry without `source` must have no such link;
+   - the media type the library sends for `updateMetadata` must be among the collection's `app:accept` in `discovery`, on releases that advertise `app:accept`.
+   A mismatch is a conflict.
 
 **Where it runs.** Only in adt-clients. interfaces-adt holds no code, so it holds no test and no fixture either, beyond the compile-time checks of `src/__typechecks__`.
 

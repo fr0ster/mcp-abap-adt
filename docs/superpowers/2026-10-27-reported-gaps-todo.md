@@ -57,3 +57,28 @@ true one goes to the owner: fix, or out of scope.
 - This draft PR carries the checks and the fixes the owner accepts, through every review cycle.
 - Accepted fixes get a spec and a plan here, as usual.
 - Delete this file once the work it lists is done or cancelled.
+
+## Verdicts (checked in code, 20.1.0; no SAP run)
+
+| # | Item | Verdict | Evidence |
+|---|---|---|---|
+| 1 | RunATC: no PROG | **true** | `handleRunATC.ts:50-58` allows 7 types (class, interface, function_group, package, ddl_source, table, behavior_definition), enforced by the zod schema; adt-clients also takes program, program_include, function_include, class_include (`IAtcRun` `AtcObjectType`); the handler says "not offered yet" (`:91-93`, MIGRATION-17.0 `:59-60`) |
+| 2 | Finding fields | **partly** | parsed: object, type, line, location URI, priority, check and message titles (`atcFindings.ts:35-50,124-131`); the column is in `#start=L,C` and dropped (`:98`); checkId, checkClass, messageId, doc link, exemption, quickfix, itemid raw only; `full` = `terse` (`handleGetATCFindings.ts:68-70`); exempted findings absent even raw (adt-clients `includeExemptedFindings=false`) |
+| 3 | Past run by Display ID | **true** | only `worklist_id` / `run_id`; no list, no lookup; adt-clients has none either |
+| 4 | Package: subpackages, long runs | **true** | nothing documented; one inclusive objectSet, no subpackage flag; whether SAP includes subpackages is not known from code (measure) |
+| 5 | Findings into context, `max_findings` | **partly** | `max_findings` caps what SAP records (`maximumVerdicts`), not what GetATCFindings returns (no paging, no filter); counts are answered; no file |
+| 6 | ATC check documentation | **true** | no tool, no adt-clients endpoint; the link only in raw |
+| 7 | Source to/from file | **true** | sources inline only (e.g. `handleUpdateProgram.ts:39-66`) |
+| 8 | Only-if-unchanged guard | **true** | no ETag / If-Match / version / hash anywhere; only SAP's lock |
+| 9 | INCL / TTYP writes | **true (server)** | no tool; adt-clients has both (`getInclude()`, `getTableType()` with full CRUD) |
+| 10 | Include main programs, activation context | **partly** | no tool; GetEnhancements reads `contextRef` internally (`handleGetEnhancements.ts:334-358`); activate takes no context; `uri` carried, never read (`handleActivateObject.ts:328-342`) |
+| 11 | Activation guards, what was activated | **partly** | no guard on others' drafts; group activation echoes the request (`handleActivateObject.ts:409-430`); "preaudit group-only" false — single activation always sends `preauditRequested=true`, and our own description says otherwise (`:128-132`, misleading); inactive list is parsed (`projections.ts:109-160`, GetInactiveObjects) but without owner |
+| 12 | Z*/$TMP, type restriction | **true** | no option anywhere |
+| 13 | Per-tool / action deny | **true (binaries)** | the binary fixes the set; an embedder can pick groups or a registry in code (`EmbeddableMcpServer.ts:99-109`); -ro keeps RuntimeRunClass / RuntimeRunProgram |
+| 14 | SQL / table contents in -ro | **true, all six** | core-ro, http-ro, sse-ro (`toolSet.ts:336-339`); compact-*-ro `HandlerGetData` (rows or any `sql_query`) |
+| 15 | Majors 17–20 < 2 weeks | **partly** | 17.0.0 10-05 → 20.0.0 10-22 = 17 days; `--exposition` removed in 19.0.0 |
+| 16 | One author; CI on a mock | **partly** | one author true; CI runs no real system, but unit tests replay recorded real ADT answers; integration and live suites run outside CI |
+
+Found beside the list:
+- The three ATC tools are only in the full core set (`HighLevelHandlersGroup.ts:598-611`, `toolSet.ts:293`). Each description says "[read-only]", yet no read-only build serves them, and no compact build has an ATC route.
+- `ActivateObjects` names TTYP in its description (`handleActivateObjects.ts:33`), but `TYPE_TO_FAMILY` maps `ttyp/st` to the structure family (`handleActivateObject.ts:186`). This needs checking.

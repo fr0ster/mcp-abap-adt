@@ -215,11 +215,10 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
 ### Task S2: the variant and the tool set
 
 - **The variant.** The process's declared system type picks it, as today.
-- **Inspection.** A stdio start with no destination requires the variant to be named. Without it, the start is refused, naming the flag.
+- **Inspection.** A stdio start with no destination stays as today; its tool set comes from the declared system type, like any start. No new flag.
 - **The tool set** is built from the variant's table, for the object-oriented groups and the compact entries alike.
 - **Verify:**
-  - one unit test per variant asserts the tool-surface fixtures;
-  - the inspection start without a variant is refused.
+  - one unit test per variant asserts the tool-surface fixtures.
 
 ### Task S3: per-operation projections
 
@@ -253,7 +252,6 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
 
 - The CHANGELOG `[Unreleased]` entries go under the major heading, with a migration note on:
   - the variant;
-  - the inspection flag;
   - the codes each operation accepts;
   - the dropped codes;
   - `unknownType` in answers.

@@ -273,7 +273,7 @@ The operations themselves are proved by the library's own unit and live tests, a
 
 - **The variant.**
   - The process's declared system type chooses the variant, as today: HTTP and SSE require it at the process level.
-  - A stdio start without a destination (inspection) stays as it is today: its tool set comes from the process's declared system type, as for any other start. No new flag (owner).
+  - A stdio start without a destination (inspection) builds the tool set too. So it requires the variant to be named, and is refused naming the flag otherwise. It never picks one.
 - **The tool set** is built from the variant's table: object-oriented groups and compact entries alike.
   - Each operation has two projections of the variant's table, and both are typed:
     - **the accepted ADT codes**: the codes whose entry lists the operation;

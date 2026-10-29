@@ -50,6 +50,8 @@ interface VersionedTypeRow {
   nameParam: string;
   /** Human label used in descriptions (e.g. "ABAP class", "CDS view"). */
   label: string;
+  /** A sentence appended to each version tool's description, when the type needs one. */
+  note?: string;
   /** Environments — MUST match this type's existing high-level Get<X> TOOL_DEFINITION. */
   available_in?: readonly SapEnvironment[];
 }
@@ -78,6 +80,7 @@ export const VERSIONED_TYPES: VersionedTypeRow[] = [
     display: 'Program',
     nameParam: 'program_name',
     label: 'ABAP program',
+    note: "On ABAP Cloud, the programs are SAP's standard programs.",
     available_in: ['onprem', 'cloud'],
   },
   {
@@ -151,7 +154,7 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Lists the version history of the ${row.label} named by ${row.nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.`,
+    description: `[read-only] Lists the version history of the ${row.label} named by ${row.nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.${row.note ? ` ${row.note}` : ''}`,
     inputSchema: {
       type: 'object',
       properties,
@@ -220,7 +223,7 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionSource`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Reads the source of the ${row.label} version named by content_uri, an entry of the ${row.label}'s version history.`,
+    description: `[read-only] Reads the source of the ${row.label} version named by content_uri, an entry of the ${row.label}'s version history.${row.note ? ` ${row.note}` : ''}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -278,7 +281,7 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionDiff`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Compares the two ${row.label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.`,
+    description: `[read-only] Compares the two ${row.label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.${row.note ? ` ${row.note}` : ''}`,
     inputSchema: {
       type: 'object',
       properties: {

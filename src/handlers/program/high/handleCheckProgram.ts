@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckProgram',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages.',
+    "[read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.",
   inputSchema: {
     type: 'object',
     properties: {

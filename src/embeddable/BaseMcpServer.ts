@@ -147,6 +147,7 @@ import {
   getStatedSystemContext,
   systemContextFromConfiguration,
 } from '../lib/systemContext.js';
+import { declareSystemKind } from '../lib/systemKind.js';
 import {
   normalizeToolContent,
   type ToolResultLike,
@@ -156,6 +157,10 @@ import {
   toolSearchText,
 } from '../lib/toolSearch/index.js';
 import { return_error } from '../lib/utils.js';
+import {
+  servedDefinition,
+  variantOfEnvironment,
+} from '../lib/variantToolSet.js';
 import type {
   ConnectionContext,
   ResolvedConnection,
@@ -1359,6 +1364,26 @@ export abstract class BaseMcpServer extends McpServer {
       for (const group of groups) {
         const handlers = group.getHandlers();
         for (const entry of handlers) {
+          // The tool as the declared variant's ADT type table serves it
+          // (`servedDefinition`): not at all when the table lists no
+          // operation it needs, a compact tool without the members the
+          // table does not serve. No variant stated: as it is.
+          const environment = statedEnvironment(
+            this.systemType ?? process.env.SAP_SYSTEM_TYPE,
+          );
+          const served =
+            environment === undefined
+              ? entry.toolDefinition
+              : servedDefinition(
+                  entry.toolDefinition,
+                  variantOfEnvironment(environment),
+                );
+          if (served === undefined) {
+            this.logger.debug(
+              `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: the ADT type table of ${environment} does not serve it`,
+            );
+            continue;
+          }
           // Wrap handler to inject connection from context
           // Original handler: (context: HandlerContext, args: any) => Promise<any>
           type HandlerFnWithContext = (
@@ -1470,6 +1495,9 @@ export abstract class BaseMcpServer extends McpServer {
               // The call's destination's port, whichever connection
               // its reads go on (a long read's own one included).
               const batchAvailability = this.batchAvailabilityOf(connection);
+              // The variant of the call's ADT client: the kind this server
+              // states, for a connection the factory did not build.
+              declareSystemKind(connection, this.systemType);
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
@@ -1671,10 +1699,10 @@ export abstract class BaseMcpServer extends McpServer {
           // its arguments reach the handler as they came.
           const withHandle = this.stateHandleArgument
             ? (withStateHandle(
-                entry.toolDefinition.inputSchema,
+                served.inputSchema,
               ) as typeof entry.toolDefinition.inputSchema)
-            : entry.toolDefinition.inputSchema;
-          const declared = withHandle !== entry.toolDefinition.inputSchema;
+            : served.inputSchema;
+          const declared = withHandle !== served.inputSchema;
           const inputSchema = withHandle;
 
           // Tracked from its entry, with its own request signal (`trackCall`).

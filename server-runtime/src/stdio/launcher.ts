@@ -142,10 +142,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    Precedence: --connection-type, then the environment
                                    (this file joins it, never over a value set), then YAML
     SAP_SYSTEM_TYPE                SAP system type: cloud | onprem | legacy (same as --system-type)
-                                   Required for a destination: no default, never guessed (not
-                                   from the auth type, not from the URL); it decides the tools
-                                   offered (e.g. Programs need onprem), the connector and how
-                                   the system's answers are read
+                                   Required for a destination and for the inspection mode (no
+                                   destination): no default, never guessed (not from the auth
+                                   type, not from the URL); it decides the tools offered (its
+                                   ADT type table: e.g. Programs need onprem), the connector
+                                   and how the system's answers are read
     SAP_USERNAME                   SAP username (required for basic auth)
     SAP_PASSWORD                   SAP password (required for basic auth)
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
@@ -571,6 +572,15 @@ export function startSystemTypeRequiredWords(destination: string): string {
 }
 
 /**
+ * The start's words for the inspection-only mode (no destination) when no
+ * parameter states the system type: the tool set is the declared variant's
+ * (its ADT type table), so listing it needs the variant; it is never picked.
+ */
+export function startInspectionSystemTypeRequiredWords(): string {
+  return 'Inspection-only mode (no destination): the SAP system type is required, because the tools listed are those of its ADT type table — set --system-type, SAP_SYSTEM_TYPE (the environment) or system-type (YAML) to onprem, cloud or legacy; the server did not start';
+}
+
+/**
  * The start's words for a destination whose wire no parameter states.
  */
 export function startConnectionTypeRequiredWords(destination: string): string {
@@ -876,6 +886,14 @@ async function launchStdio(
   // So is its wire (#320): an absent connection type is not HTTP.
   if (destination && connectionType === undefined) {
     deps.stderr(`[MCP] ${startConnectionTypeRequiredWords(destination)}`);
+    deps.exit(1);
+    return;
+  }
+
+  // Inspection lists the declared variant's tool set: without a system type
+  // there is none to list, and none is picked.
+  if (!destination && systemType === undefined) {
+    deps.stderr(`[MCP] ${startInspectionSystemTypeRequiredWords()}`);
     deps.exit(1);
     return;
   }

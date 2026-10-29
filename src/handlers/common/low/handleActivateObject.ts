@@ -81,7 +81,7 @@ import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type ActivationRunOutcome,
@@ -271,8 +271,9 @@ function activateFamily(
           ),
       );
     case 'program':
+      // A program is activated on premise only (`ADT_TYPES_ONPREM`).
       return withAdtHeaders(context, 'program.activate', (headers) =>
-        client
+        createOnPremAdtClient(context.connection, context.logger)
           .getProgram(resultsFor(programDocuments))
           .activate(
             { programName: name },

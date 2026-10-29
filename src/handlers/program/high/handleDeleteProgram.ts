@@ -9,7 +9,7 @@
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -66,7 +66,7 @@ export async function handleDeleteProgram(
       deleteIfDeletable(
         context,
         'program',
-        createAdtClient(connection, logger).getProgram(
+        createOnPremAdtClient(connection, logger).getProgram(
           resultsFor(programDocuments),
         ),
         { programName, transportRequest: transport_request },

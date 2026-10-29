@@ -30,7 +30,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   connectionHoldingPackageLock,
@@ -161,7 +161,8 @@ export async function handleUnlockObject(
               analyse: analyseException,
             });
         case 'program':
-          return client
+          // A program is locked on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
             .getProgram(resultsFor(programDocuments))
             .unlock({ programName: objectName }, lock_handle, {
               analyse: analyseException,

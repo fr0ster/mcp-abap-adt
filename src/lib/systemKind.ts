@@ -14,3 +14,32 @@ export function statedSystemKind(
   if (declared === 'onprem' || declared === 'legacy') return 'onprem';
   return undefined;
 }
+
+/**
+ * The system kind a server states for a connection it did not build (an
+ * embedder's own, a handler group's context): its `systemType` option, as
+ * it handed the connection to a tool (`declareSystemKind`). A connection the
+ * factory built keeps the kind it was built for (`systemKindOf` reads that
+ * first).
+ */
+const declaredKinds = new WeakMap<object, AbapSystemKind>();
+
+/**
+ * Records the kind `declared` states for `connection` — a server's
+ * `systemType` option, for a connection it hands a tool. A value that states
+ * no kind records nothing.
+ */
+export function declareSystemKind(
+  connection: object,
+  declared: string | undefined,
+): void {
+  const kind = statedSystemKind(declared);
+  if (kind !== undefined) declaredKinds.set(connection, kind);
+}
+
+/** The kind declared for `connection` (`declareSystemKind`), if any. */
+export function declaredSystemKindOf(
+  connection: object,
+): AbapSystemKind | undefined {
+  return declaredKinds.get(connection);
+}

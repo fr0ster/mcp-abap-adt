@@ -173,7 +173,13 @@ export type ClassApi<
     ReturnType<R['versionSource']>
   >;
 
-/** What the server calls on `getProgram()`'s answer. */
+/**
+ * What the server calls on `getProgram()`'s answer. A program is created,
+ * changed, activated, locked and deleted only where the variant's table lists
+ * the operation (`ADT_TYPES_ONPREM`; ABAP cloud reads, checks and lists
+ * versions only), so those members are gated here, per table, even where the
+ * library leaves them ungated.
+ */
 export type ProgramApi<
   R extends IProgramResults,
   V extends AdtVariant,
@@ -182,17 +188,32 @@ export type ProgramApi<
   ReturnType<R['enhancementElements']>,
   ReturnType<R['enhancementOptions']>
 > &
-  IAdtCreatable<IProgramConfig, ReturnType<R['created']>> &
+  PerformedOn<
+    V,
+    'program',
+    'create',
+    IAdtCreatable<IProgramConfig, ReturnType<R['created']>>
+  > &
   IAdtReadable<IProgramConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>> &
-  Omit<
-    IAdtDeletable<
-      IProgramConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    'checkDeletion'
+  PerformedOn<
+    V,
+    'program',
+    'update',
+    IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>>
+  > &
+  PerformedOn<
+    V,
+    'program',
+    'delete',
+    Omit<
+      IAdtDeletable<
+        IProgramConfig,
+        ReturnType<R['deletion']>,
+        ReturnType<R['deletionCheck']>
+      >,
+      'checkDeletion'
+    >
   > &
   PerformedOn<
     V,
@@ -207,17 +228,32 @@ export type ProgramApi<
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IProgramConfig, ReturnType<R['validation']>> &
+  PerformedOn<
+    V,
+    'program',
+    'validate',
+    IAdtValidatable<IProgramConfig, ReturnType<R['validation']>>
+  > &
   IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IProgramConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IProgramConfig> &
+  PerformedOn<
+    V,
+    'program',
+    'activate',
+    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>>
+  > &
+  PerformedOn<V, 'program', 'lock', IAdtLockable<IProgramConfig>> &
   IAdtVersionable<
     IProgramConfig,
     ReturnType<R['versions']>,
     ReturnType<R['versionSource']>
   >;
 
-/** What the server calls on `getInclude()`'s answer. */
+/**
+ * What the server calls on `getInclude()`'s answer. An include is created,
+ * changed, activated, locked and deleted only where the variant's table lists
+ * the operation (`ADT_TYPES_ONPREM`; ABAP cloud reads it only), so those
+ * members are gated here, per table.
+ */
 export type IncludeApi<
   R extends IIncludeResults,
   V extends AdtVariant,
@@ -226,20 +262,40 @@ export type IncludeApi<
   ReturnType<R['enhancementElements']>,
   ReturnType<R['enhancementOptions']>
 > &
-  IAdtCreatable<IIncludeConfig, ReturnType<R['created']>> &
+  PerformedOn<
+    V,
+    'include',
+    'create',
+    IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>
+  > &
   IAdtReadable<IIncludeConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>> &
-  Omit<
-    IAdtDeletable<
-      IIncludeConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    'checkDeletion'
+  PerformedOn<
+    V,
+    'include',
+    'update',
+    IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>>
   > &
-  IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IIncludeConfig>;
+  PerformedOn<
+    V,
+    'include',
+    'delete',
+    Omit<
+      IAdtDeletable<
+        IIncludeConfig,
+        ReturnType<R['deletion']>,
+        ReturnType<R['deletionCheck']>
+      >,
+      'checkDeletion'
+    >
+  > &
+  PerformedOn<
+    V,
+    'include',
+    'activate',
+    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>
+  > &
+  PerformedOn<V, 'include', 'lock', IAdtLockable<IIncludeConfig>>;
 
 /** What the server calls on `getInterface()`'s answer. */
 export type InterfaceApi<

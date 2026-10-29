@@ -29,7 +29,7 @@ import {
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
 import {
@@ -185,7 +185,8 @@ export async function handleLockObject(
             .getClass(resultsFor(classDocuments))
             .lock({ className: objectName }, { analyse: analyseLock });
         case 'program':
-          return client
+          // A program is locked on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
             .getProgram(resultsFor(programDocuments))
             .lock({ programName: objectName }, { analyse: analyseLock });
         case 'interface':

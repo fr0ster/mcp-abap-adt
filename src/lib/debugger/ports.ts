@@ -13,6 +13,7 @@ import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
 import { ServerRefusal } from '../auth/serverRefusal';
+import { createOnPremExecutor } from '../clients';
 import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
@@ -98,14 +99,15 @@ async function run(
     ...(debuggee ? { debuggee } : {}),
   };
   // A program's run is on premise only: only that table lists `run` for
-  // `PROG/P`, so its executor is the on-premise one; the request is the one
-  // sent before.
+  // `PROG/P`, so its executor is the on-premise one, and a connection
+  // declared `cloud` is refused (`variant_not_served`) before the run is
+  // sent; the request is the one sent before.
   const answer =
     target.kind === 'class'
       ? await new AdtExecutor(connection)
           .getClassExecutor(ourClassExecutor)
           .run({ className: target.name }, options)
-      : await new AdtExecutor<'onprem'>(connection)
+      : await createOnPremExecutor(connection)
           .getProgramExecutor(ourProgramExecutor)
           .run({ programName: target.name }, options);
   return answer.ok

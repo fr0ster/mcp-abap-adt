@@ -35,7 +35,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
@@ -257,14 +257,17 @@ export async function handleValidateObject(
     () => {
       switch (normalizedType) {
         case 'program':
-          return client.getProgram(resultsFor(programDocuments)).validate(
-            {
-              programName: objectName,
-              packageName,
-              description: normalizedDescription,
-            },
-            { analyse: analyseException },
-          );
+          // A program is validated on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
+            .getProgram(resultsFor(programDocuments))
+            .validate(
+              {
+                programName: objectName,
+                packageName,
+                description: normalizedDescription,
+              },
+              { analyse: analyseException },
+            );
         case 'class':
           return client.getClass(resultsFor(classDocuments)).validate(
             {

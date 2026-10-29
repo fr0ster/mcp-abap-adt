@@ -20,7 +20,7 @@ import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -95,7 +95,7 @@ export async function handleUpdateProgram(
     { tool: 'UpdateProgramLow', detail },
     () =>
       withAdtHeaders(context, 'program.update', (headers) =>
-        createAdtClient(connection, logger)
+        createOnPremAdtClient(connection, logger)
           .getProgram(resultsFor(programDocuments))
           .update(
             {

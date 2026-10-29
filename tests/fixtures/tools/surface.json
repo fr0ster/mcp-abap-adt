@@ -195,7 +195,7 @@
     "group": "readonly",
     "name": "GetProgram",
     "inputs": "program_name*, part, version",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
@@ -711,7 +711,7 @@
     "group": "high",
     "name": "RunProgramUnitTest",
     "inputs": "program_name*, runner, scope, detail",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -819,7 +819,7 @@
     "group": "high",
     "name": "GetProgram",
     "inputs": "program_name*, version",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1053,7 +1053,7 @@
     "group": "high",
     "name": "CheckProgram",
     "inputs": "program_name*, version",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1095,19 +1095,19 @@
     "group": "high",
     "name": "GetProgramVersions",
     "inputs": "program_name*",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersionSource",
     "inputs": "content_uri*",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",

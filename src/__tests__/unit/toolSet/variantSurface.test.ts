@@ -169,6 +169,36 @@ describe('the tool set of each declared variant (WRITE_VARIANT_SURFACE=1 rewrite
     expect(current.legacy).toEqual(frozen().legacy);
   });
 
+  it('cloud serves a program’s read, check, versions and unit run (ADT_TYPES_CLOUD), and none of its writes', () => {
+    const programReads = [
+      'CheckProgram',
+      'GetProgram',
+      'GetProgramVersionDiff',
+      'GetProgramVersionSource',
+      'GetProgramVersions',
+      'RunProgramUnitTest',
+    ];
+    const programWrites = [
+      'ActivateProgram',
+      'CreateProgram',
+      'DeleteProgram',
+      'UpdateProgram',
+    ];
+    expect(current.cloud.core.tools).toEqual(
+      expect.arrayContaining(programReads),
+    );
+    expect(current.cloud['core-ro'].tools).toContain('GetProgram');
+    for (const write of programWrites) {
+      expect(current.cloud.core.tools).not.toContain(write);
+    }
+    expect(current.cloud.compact.members['HandlerGet.object_type']).toContain(
+      'PROGRAM',
+    );
+    expect(
+      current.cloud.compact.members['HandlerCreate.object_type'],
+    ).not.toContain('PROGRAM');
+  });
+
   it('the surface is not vacuous: every kind lists tools on onprem and cloud', () => {
     for (const environment of ['onprem', 'cloud'] as const) {
       for (const kind of KINDS) {

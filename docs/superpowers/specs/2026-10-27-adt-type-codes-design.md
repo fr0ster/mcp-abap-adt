@@ -298,7 +298,7 @@ A config or object reference for an API with a parent requires the parent's name
 
 ### 3.6 The search filter: the names of the object types list (measured 2026-10-29, read only)
 
-- **The list.** `GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider` answers `200` `application/xml` (`nameditem:namedItemList`) on S/4HANA 2025 (386 names) and ABAP cloud (373; 349 shared, 36 on premise only, 23 cloud only). Each item has a name and `type:<code>;usedBy:…`; every item lists `quick_search`. On 7.40 the endpoint answers `404`.
+- **The list.** `GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider` answers `200` `application/xml` (`nameditem:namedItemList`) on S/4HANA 2025 (386 items, 385 names) and ABAP cloud (373 items, 372 names; `HOTA` is an item twice, a code and a group). Each item has a name and `type:<code>;usedBy:…`; every item lists `quick_search`. On 7.40 the endpoint answers `404`.
   - Most names are a main type, its `type` the main code (`DEVC` → `DEVC/K`, `CLAS` → `CLAS/OC`, `AUTH` → `AUTH`).
   - Six names are aliases of one code: `STRU` → `TABL/DS`, `DTAB` → `TABL/DT`, `REPO` → `PROG/P`, `INCL` → `PROG/I`, `FUNC` → `FUGR/FF`, `BADI` → `ENHS/XB`.
   - About fifty are groups (`type:WGRP`); `ABAP_TEST_COCKPIT` answers `CHKO`, `CHKV`, `CHKC` and `CHKE` hits.

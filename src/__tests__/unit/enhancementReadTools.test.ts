@@ -1,6 +1,10 @@
 import { handleGetEnhancementImpl } from '../../handlers/enhancement/readonly/handleGetEnhancementImpl';
 import { handleGetEnhancementSpot } from '../../handlers/enhancement/readonly/handleGetEnhancementSpot';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 /**
  * The enhancement readers against the answers a system gives — what they read
  * today must keep working, and what ADT does not expose must say so.

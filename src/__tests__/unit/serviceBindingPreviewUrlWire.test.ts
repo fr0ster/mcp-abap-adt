@@ -11,6 +11,10 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const BINDING = `<?xml version="1.0" encoding="utf-8"?>
 <srvb:serviceBinding srvb:published="true" srvb:bindingCreated="true"
   adtcore:name="ZSB_STUDENT_V2" adtcore:type="SRVB/SVB"

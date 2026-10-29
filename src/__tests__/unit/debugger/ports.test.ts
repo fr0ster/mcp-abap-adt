@@ -3,6 +3,10 @@ import { runWithRequestContext } from '../../../lib/requestContext';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 describe('the request user, no rules', () => {
   const saved = {
     SAP_USERNAME: process.env.SAP_USERNAME,

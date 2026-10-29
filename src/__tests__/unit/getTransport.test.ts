@@ -8,6 +8,10 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const REQUEST = `<?xml version="1.0" encoding="utf-8"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="TRLK900001">
   <tm:request tm:number="TRLK900001" tm:desc="A request" tm:type="K" tm:status="D" tm:owner="DEVELOPER" tm:target="QAS">

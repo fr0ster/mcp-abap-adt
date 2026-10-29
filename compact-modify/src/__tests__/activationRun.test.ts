@@ -25,6 +25,10 @@ import { RUN_START_WITHOUT_ID } from '../../../src/handlers/common/low/handleAct
 import { corpusBody } from '../../../src/lib/adtCorpus';
 import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
 async function settle(): Promise<void> {

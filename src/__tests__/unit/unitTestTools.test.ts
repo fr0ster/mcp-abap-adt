@@ -33,6 +33,10 @@ import {
 } from '../helpers/recordingConnection';
 import { SAP_EXCEPTION_HEADERS, sapException } from '../helpers/sapRefusals';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const ctx = (connection: unknown) => ({ connection, logger: undefined });
 
 const RUN = 'FA53C505DD7B1FD1ABB8599833A05D44';

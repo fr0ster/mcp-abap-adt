@@ -114,6 +114,12 @@ const createClass = async () => {
 };
 
 describe('on-premise', () => {
+  // The process declares its system type, as every launcher requires: the
+  // ADT client is the declared variant's (`variantOf`), never a default.
+  beforeEach(() => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+  });
+
   it('basic: the stated responsible, no master system is sent, nothing is refused', async () => {
     process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();

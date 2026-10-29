@@ -42,6 +42,10 @@ import {
 } from '../../helpers/batchStand';
 import { withinTurns } from '../../helpers/withinTurns';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 /** SAP: a lock answers its handle, an unlock nothing, `missing` 404, any other read its address. */
 function sap(inner: InnerRequest): PartAnswer {
   if (inner.url.includes('_action=LOCK')) {

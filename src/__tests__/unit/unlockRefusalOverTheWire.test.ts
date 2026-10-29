@@ -10,6 +10,10 @@ import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
   '<namespace id="com.sap.adt"/><type id="ExceptionResourceNoAuthorization"/>' +

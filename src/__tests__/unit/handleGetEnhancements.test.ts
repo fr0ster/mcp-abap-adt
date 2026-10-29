@@ -1,6 +1,10 @@
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { createBatchAvailability } from '../../lib/batch/availability';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 /**
  * GetEnhancements addresses the object it was told about.
  *

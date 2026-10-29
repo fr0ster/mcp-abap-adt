@@ -6,6 +6,10 @@
 import { handleGetInactiveObjects } from '../../handlers/system/readonly/handleGetInactiveObjects';
 import { recordingConnection } from '../helpers/recordingConnection';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const ONE_INACTIVE_BDEF =
   '<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">' +
   '<ioc:entry><ioc:object ioc:user="OKYSLYTSIA" ioc:deleted="false">' +

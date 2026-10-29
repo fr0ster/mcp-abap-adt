@@ -27,6 +27,10 @@ import { batchStand, payloadOf } from '../../helpers/batchStand';
 import { HandlerLedger } from '../../helpers/handlerLedger';
 import { runPlainNode } from '../../helpers/plainNode';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const SCENARIO = 'src/__tests__/unit/batch/scenarios/batchDrop.scenario.ts';
 const DURING_END =
   'src/__tests__/unit/batch/scenarios/closeDuringEnd.scenario.ts';

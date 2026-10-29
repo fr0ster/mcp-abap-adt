@@ -32,6 +32,10 @@ import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
 import { runCase, servedTools } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 describe('no request of a batch entry waits for another answer', () => {
   const context = {
     connection: undefined,

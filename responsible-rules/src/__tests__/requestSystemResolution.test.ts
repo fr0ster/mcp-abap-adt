@@ -7,7 +7,8 @@
  */
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  AdtClient: jest.fn(),
+  AdtClientOnPrem: jest.fn(),
+  AdtClientCloud: jest.fn(),
   AdtClientLegacy: jest.fn(),
 }));
 jest.mock('../../../src/lib/systemInformation', () => ({
@@ -15,7 +16,7 @@ jest.mock('../../../src/lib/systemInformation', () => ({
   readSystemInformation: jest.fn(),
 }));
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClientCloud, AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
@@ -115,8 +116,21 @@ type Options =
   | { responsible?: string; masterSystem?: string; masterLanguage?: string }
   | undefined;
 
+/** The options of the last client built, of either variant. */
 function lastOptions(): Options {
-  return (AdtClient as jest.Mock).mock.calls.at(-1)?.[2];
+  const built = [
+    ...jest
+      .mocked(AdtClientOnPrem)
+      .mock.invocationCallOrder.map((order, i) => ({
+        order,
+        options: jest.mocked(AdtClientOnPrem).mock.calls[i]?.[2],
+      })),
+    ...jest.mocked(AdtClientCloud).mock.invocationCallOrder.map((order, i) => ({
+      order,
+      options: jest.mocked(AdtClientCloud).mock.calls[i]?.[2],
+    })),
+  ].sort((a, b) => a.order - b.order);
+  return built.at(-1)?.options;
 }
 
 function seen() {
@@ -138,7 +152,8 @@ beforeEach(() => {
   delete process.env.SAP_SYSTEM_TYPE;
   resetSystemContextCache();
   setSystemContext({});
-  (AdtClient as jest.Mock).mockClear();
+  jest.mocked(AdtClientOnPrem).mockClear();
+  jest.mocked(AdtClientCloud).mockClear();
   lookup.mockReset();
   lookup.mockResolvedValue({
     user: 'CB_USER',

@@ -22,6 +22,10 @@ import {
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { batchStand } from '../../helpers/batchStand';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const answerOf = (number: number): BatchAnswer => ({
   number,
   content: [{ type: 'text', text: `answer ${number}` }],

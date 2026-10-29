@@ -15,7 +15,7 @@ import { handleRunProgramUnitTest } from '../../../../handlers/unit_test/high/ha
 import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
-import { createAdtClient } from '../../../../lib/clients';
+import { createOnPremAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
@@ -56,7 +56,7 @@ describe('Unit Test High-Level Handlers (report)', () => {
             typeof (context.connection as any)?.makeAdtRequest === 'function'
               ? context.connection
               : (await createTestConnectionAndSession()).connection;
-          const deleted = await createAdtClient(connection as any)
+          const deleted = await createOnPremAdtClient(connection as any)
             .getInclude(includeDocuments)
             .delete(
               {

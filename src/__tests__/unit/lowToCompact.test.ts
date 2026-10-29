@@ -38,6 +38,10 @@ import {
   TABLE_START,
 } from '../helpers/lowToCompact';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const TABLE = JSON.parse(
   fs.readFileSync(
     path.join(__dirname, '..', '..', '..', 'tools', 'low-to-compact.json'),

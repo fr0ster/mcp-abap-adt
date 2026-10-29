@@ -10,6 +10,10 @@ import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { enhancementTypeOf } from '../../handlers/enhancement/readonly/enhancementAvailability';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const HITS = `<?xml version="1.0" encoding="utf-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
   <adtcore:objectReference adtcore:uri="/sap/bc/adt/enhancements/enhoxhh/zother" adtcore:type="ENHO/XHH" adtcore:name="ZOTHER"/>

@@ -25,6 +25,10 @@ import {
   unsupportedMediaTypeBody,
 } from '../../helpers/sapRefusals';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 /** The one media type SAP takes here — not the one adt-clients sends. */
 const SUPPORTED = 'application/vnd.placeholder.source+text';
 

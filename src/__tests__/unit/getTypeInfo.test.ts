@@ -11,6 +11,10 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const ADTCORE = 'xmlns:adtcore="http://www.sap.com/adt/core"';
 
 const MANDT_DATA_ELEMENT = `<?xml version="1.0" encoding="utf-8"?>

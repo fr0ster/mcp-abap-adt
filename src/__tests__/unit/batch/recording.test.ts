@@ -42,6 +42,10 @@ import * as longCall from '../../../lib/longCall';
 import * as packageSessions from '../../../lib/packageSessions';
 import { currentRequestSignal } from '../../../lib/requestSignal';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 /** The instance's connection: answers at once and counts what reaches it. */

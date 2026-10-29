@@ -95,12 +95,19 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.calls` needs this wiring; tests that need a real document
 // swap `fakeClient` to `fakeClientOf(...)` for their own call and restore it.
 const seen = recordAnalyse();
 let fakeClient: unknown = seen.client;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  createAdtClient: () => fakeClient,
+  createOnPremAdtClient: () => fakeClient,
+}));
 
 const context = {
   connection: { getSessionId: () => null } as any,

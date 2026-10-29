@@ -54,18 +54,25 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
-let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
 
-// SHAPE 3's door: `handleRuntimeRunProgram.ts` does not go through
-// `createAdtClient` — it writes `new AdtExecutor(connection,
-// logger)` directly and reaches its members through `executor.getProgramExecutor()`,
-// so the `../../lib/clients` mock above does nothing for them. `jest.mock` must sit
+let fakeClient: any;
+let programExecutor: Record<string, unknown>;
+jest.mock('../../lib/clients', () => ({
+  createAdtClient: () => fakeClient,
+  // SHAPE 3's door: `handleRuntimeRunProgram.ts` reaches its members through
+  // the on-premise executor (`createOnPremExecutor`, an `AdtExecutor<'onprem'>`).
+  createOnPremExecutor: () => ({ getProgramExecutor: () => programExecutor }),
+}));
+
+// The class executors still come from `new AdtExecutor(connection, logger)`
+// directly, so the `../../lib/clients` mock above does nothing for them. `jest.mock` must sit
 // at module top level (not nested in a `describe`) for babel-plugin-jest-hoist to
 // hoist it above the handlers' own `import { AdtExecutor } from
 // '@mcp-abap-adt/adt-clients'` — nested inside a `describe` callback it runs too
 // late, after those imports already bound the real class.
-let programExecutor: Record<string, unknown>;
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtExecutor: jest.fn(() => ({ getProgramExecutor: () => programExecutor })),

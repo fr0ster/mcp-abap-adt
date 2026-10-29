@@ -51,6 +51,7 @@ import {
   factoryConfigFrom,
   launch,
   startConnectionTypeRequiredWords,
+  startInspectionSystemTypeRequiredWords,
 } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
 
@@ -463,6 +464,28 @@ describe('one destination per process', () => {
     expect(constructed).not.toHaveBeenCalled();
     expect(stdioStart).toHaveBeenCalledWith(undefined);
     expect(stderr[0]).toContain('inspection-only mode');
+  });
+
+  // Inspection lists the declared variant's tool set (its ADT type table):
+  // without a system type there is none to list, and none is picked.
+  it('neither, and no system type stated: refused naming --system-type, exit 1, no transport', async () => {
+    delete process.env.SAP_SYSTEM_TYPE;
+    const { stderr, exits } = await run([]);
+    expect(exits).toEqual([1]);
+    expect(stdioStart).not.toHaveBeenCalled();
+    expect(constructed).not.toHaveBeenCalled();
+    expect(stderr).toContain(
+      `[MCP] ${startInspectionSystemTypeRequiredWords()}`,
+    );
+    expect(startInspectionSystemTypeRequiredWords()).toContain('--system-type');
+  });
+
+  it('neither, with --system-type=cloud: inspection-only, the cloud tool set', async () => {
+    delete process.env.SAP_SYSTEM_TYPE;
+    const { exits } = await run(['--system-type=cloud']);
+    expect(exits).toEqual([]);
+    expect(stdioStart).toHaveBeenCalledWith(undefined);
+    expect(process.env.SAP_SYSTEM_TYPE).toBe('cloud');
   });
 });
 

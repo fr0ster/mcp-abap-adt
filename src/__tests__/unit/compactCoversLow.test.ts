@@ -17,6 +17,10 @@ import {
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 function tools(connection: unknown): Map<string, HandlerEntry> {
   const context = { connection, logger: silentLogger } as HandlerContext;
   return new Map(

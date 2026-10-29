@@ -38,6 +38,10 @@ import {
   TOOL_DEFINITION,
 } from '../handlers/handleHandlerUpdate';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 type Sent = { method: string; url: string; data?: unknown; params?: unknown };
 type Mode = 'pending' | 'answered' | 'not-found' | 'forbidden';
 type Answer = { isError?: boolean; content?: Array<{ text?: string }> };

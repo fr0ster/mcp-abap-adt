@@ -50,6 +50,10 @@ import {
 import { readSystemInformation } from '../../../lib/systemInformation';
 import { presented } from '../../helpers/presented';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
 >;

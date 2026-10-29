@@ -32,6 +32,10 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 

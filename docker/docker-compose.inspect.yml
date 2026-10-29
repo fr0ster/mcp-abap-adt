@@ -1,8 +1,17 @@
+# One service per inspection image: the tool set of an on-premise system and of
+# ABAP cloud. `docker compose -f docker-compose.inspect.yml run --rm inspect-cloud`
 services:
-  mcp-abap-adt:
+  inspect-onprem:
     build:
       context: .
-      dockerfile: Dockerfile.inspect
-    image: mcp-abap-adt:inspect
+      dockerfile: Dockerfile.inspect.onprem
+    image: mcp-abap-adt:inspect-onprem
+    stdin_open: true
+    tty: true
+  inspect-cloud:
+    build:
+      context: .
+      dockerfile: Dockerfile.inspect.cloud
+    image: mcp-abap-adt:inspect-cloud
     stdin_open: true
     tty: true

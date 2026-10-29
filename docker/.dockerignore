@@ -2,4 +2,5 @@
 # the Dockerfiles, never service-keys/, sessions/ or a .env.
 *
 !Dockerfile
-!Dockerfile.inspect
+!Dockerfile.inspect.onprem
+!Dockerfile.inspect.cloud

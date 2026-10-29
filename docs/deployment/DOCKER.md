@@ -41,7 +41,7 @@ nothing from it.
 | File | What it is |
 |---|---|
 | `docker/Dockerfile` + `docker-compose.yml` | **Install, then run.** The install stage puts `@mcp-abap-adt/<VARIANT>` (and what it depends on, nothing else) into `/opt/mcp-abap-adt`; the runtime image copies that installation, without npm's cache, and runs the variant's binary as its entrypoint. Build arguments: `VARIANT` (default `core`), `MCP_ABAP_ADT_VERSION` — the variant package's version (default `latest`) —, `PACKAGE_SOURCE` (`registry`, the default; `tarballs` is for CI, below). |
-| `docker/Dockerfile.inspect` + `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, with no destination: the image Glama builds for inspecting the tools. Not for deployment. |
+| `docker/Dockerfile.inspect.onprem`, `docker/Dockerfile.inspect.cloud` + `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, with no destination, one image per system type (`--system-type=onprem`, `--system-type=cloud`): the images Glama builds for inspecting the tools of each. Not for deployment. |
 
 All are `node:22-bookworm-slim` and run as the unprivileged `node` user. The images are not
 published to a registry: build the one you need.

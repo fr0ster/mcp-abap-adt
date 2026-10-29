@@ -66,7 +66,7 @@ so that no package goes out on top of a dependency that is missing.
      `server-sse-ro.json`, `server-compact-sse-ro.json`: both version fields each, at the version of
      the package the entry names, and a description of at most 100 characters (see
      [MCP_REGISTRY.md](./MCP_REGISTRY.md));
-   - `docker/Dockerfile.inspect`: `ARG CORE_VERSION=<version>` — the image Glama builds, pinned so a
+   - `docker/Dockerfile.inspect.onprem` and `docker/Dockerfile.inspect.cloud`: `ARG CORE_VERSION=<version>` — the images Glama builds, pinned so a
      rebuild cannot put a newer package under an older release number;
    - `glama.json`: the description, when what the server does changed.
 
@@ -176,7 +176,7 @@ so that no package goes out on top of a dependency that is missing.
   (the whole tree, dev dependencies included), `npm pack` of all eighteen packages, an install of
   the tarballs (`--ignore-scripts`) that runs each of the twelve bins' `--version` and `--help`,
   the twelve Docker images built from those tarballs and checked (`scripts/ci/check-images.mjs`),
-  and the Glama reference image (`docker/Dockerfile.inspect`) once its pinned `core` is on npm.
+  and the Glama reference images (`docker/Dockerfile.inspect.onprem`, `docker/Dockerfile.inspect.cloud`) once their pinned `core` is on npm.
 - `release.yml` (tag `v*.*.*`): Ubuntu × Node 22 and 24 — the same install and
   `npm audit --audit-level=moderate`, lint, build and tests — on Node 22 also the packing, the
   install, the bins, the twelve images and the Glama reference image —, then a GitHub Release

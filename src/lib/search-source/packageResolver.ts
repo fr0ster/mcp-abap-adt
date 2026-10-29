@@ -1,5 +1,6 @@
 import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
+import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -7,7 +8,8 @@ import { carryingFailure } from '../strategies/step';
 
 export interface SearchObjectsArgs {
   query: string;
-  objectType: 'DEVC';
+  /** A package: the code of the tables (bare `DEVC` is no code of them). */
+  objectType: Extract<AdtTypeCode, 'DEVC/K'>;
   maxResults: number;
 }
 
@@ -33,7 +35,7 @@ export async function resolvePackagePatterns(
     if (isPattern(entry)) {
       const names = await deps.searchObjects({
         query: entry,
-        objectType: 'DEVC',
+        objectType: 'DEVC/K',
         maxResults: 1000,
       });
       resolved.push(...names);

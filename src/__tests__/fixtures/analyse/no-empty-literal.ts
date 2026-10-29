@@ -1,11 +1,12 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: no.
  *
  * An options object is passed, but it is empty — no `analyse` key at all.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 
 export const call = () =>
-  client.getClass().read({ className: 'X' }, 'active', {});
+  client.getClass(classDocuments).read({ className: 'X' }, 'active', {});

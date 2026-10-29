@@ -246,7 +246,7 @@ export async function handleUnlockObject(
         case 'behavior_implementation':
           // The implementation class's own unlock, pairing the lock.
           return client
-            .getBehaviorImplementation()
+            .getBehaviorImplementation(classDocuments)
             .unlock({ className: objectName }, lock_handle, {
               analyse: analyseException,
             });

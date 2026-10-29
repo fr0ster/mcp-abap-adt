@@ -1,5 +1,6 @@
+import { structureDocuments, tableDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtTypeCode, IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type FailureEntry,
@@ -225,7 +226,7 @@ async function structuresListOf(
       return return_error(new Error('structure_name is required'));
 
     const client = createAdtClient(connection, logger);
-    const obj = client.getStructure();
+    const obj = client.getStructure(structureDocuments);
     const utils = client.getUtils(ourUtils);
     const rootName = structure_name.toUpperCase();
 
@@ -275,7 +276,7 @@ async function structuresListOf(
       if (structure != null) return { source: structure };
       const table = await attempt('read table', () =>
         client
-          .getTable()
+          .getTable(tableDocuments)
           .read({ tableName: name }, version as 'active' | 'inactive', {
             analyse: analyseException,
           }),
@@ -309,7 +310,7 @@ async function structuresListOf(
       let references: Array<{ name?: string; type?: string }> = [];
       let resolved = false;
       let lastErr: unknown;
-      for (const objectType of ['structure', 'table'] as const) {
+      for (const objectType of ['TABL/DS', 'TABL/DT'] as const) {
         try {
           const wu = await fetchWhereUsedReferences(
             whereUsedOn(context, utils),
@@ -472,7 +473,7 @@ async function structuresListOf(
 }
 
 type DdlStep = 'read structure' | 'read table';
-type WhereUsedType = 'structure' | 'table';
+type WhereUsedType = Extract<AdtTypeCode, 'TABL/DS' | 'TABL/DT'>;
 
 /**
  * One endpoint's attempt at a name's DDL, from its answer — the sequential
@@ -568,7 +569,7 @@ function structureReads(
     let references: Array<{ name?: string; type?: string }> = [];
     let resolved = false;
     let lastErr: unknown;
-    for (const objectType of ['structure', 'table'] as const) {
+    for (const objectType of ['TABL/DS', 'TABL/DT'] as const) {
       try {
         const key = pairKey(baseName, objectType);
         const wu = await fetchWhereUsedReferences(
@@ -620,7 +621,7 @@ function structureReads(
       if (fresh.length === 0) return;
       const read = await runPhase(context, fresh, (name, connection) =>
         createAdtClient(connection, logger)
-          .getStructure()
+          .getStructure(structureDocuments)
           .read({ structureName: name }, version, {
             analyse: analyseException,
           }),
@@ -638,7 +639,7 @@ function structureReads(
         second.length > 0
           ? await runPhase(context, second, (name, connection) =>
               createAdtClient(connection, logger)
-                .getTable()
+                .getTable(tableDocuments)
                 .read({ tableName: name }, version, {
                   analyse: analyseException,
                 }),
@@ -680,7 +681,7 @@ function structureReads(
       const pairs = [...new Set(bases)]
         .filter((name) => !outcomes.has(name))
         .flatMap((name) =>
-          (['structure', 'table'] as const).map((objectType) => ({
+          (['TABL/DS', 'TABL/DT'] as const).map((objectType) => ({
             name,
             objectType,
             key: pairKey(name, objectType),

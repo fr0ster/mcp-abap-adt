@@ -154,7 +154,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
       },
     });
     const fn = createPackagePatternResolver(context as any);
-    await fn({ query: 'ZMCP*', objectType: 'DEVC', maxResults: 1000 });
+    await fn({ query: 'ZMCP*', objectType: 'DEVC/K', maxResults: 1000 });
     expect(seen).toEqual([analyseException]);
   });
 });

@@ -1,3 +1,5 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: no.
  *
@@ -7,12 +9,13 @@
  * there; only the value — followed here to its literal initializer — says
  * what is.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 
 export const call = () => {
   const options: IAdtOperationOptions = {};
-  return client.getClass().read({ className: 'X' }, 'active', options);
+  return client
+    .getClass(classDocuments)
+    .read({ className: 'X' }, 'active', options);
 };

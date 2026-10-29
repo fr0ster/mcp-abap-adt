@@ -35,7 +35,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
-import type { createAdtClient } from '../../../lib/clients';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import type { DELETION_CHECK_TYPES } from '../../../lib/compact/compactSchemas';
 import type {
   CheckedDeletable,
@@ -44,7 +44,7 @@ import type {
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 
-type AdtClient = ReturnType<typeof createAdtClient>;
+type AdtClient = IServerAdtClient;
 
 /** The object's names, upper-cased; a function module also names its group. */
 export interface DeletionName {

@@ -1,3 +1,5 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: unknown.
  *
@@ -7,15 +9,16 @@
  * `let` can look like this and prove the opposite of what its initializer
  * says.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 
 export const call = () => {
   let options: { analyse?: typeof analyseException } = {
     analyse: analyseException,
   };
   options = {};
-  return client.getClass().read({ className: 'X' }, 'active', options);
+  return client
+    .getClass(classDocuments)
+    .read({ className: 'X' }, 'active', options);
 };

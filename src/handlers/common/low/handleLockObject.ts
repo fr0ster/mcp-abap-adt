@@ -237,7 +237,7 @@ export async function handleLockObject(
         case 'behavior_implementation':
           // The implementation class's own lock, as the low tool sent it.
           return client
-            .getBehaviorImplementation()
+            .getBehaviorImplementation(classDocuments)
             .lock({ className: objectName }, { analyse: analyseLock });
         case 'service_definition':
           return client

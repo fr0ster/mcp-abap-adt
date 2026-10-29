@@ -1,3 +1,4 @@
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Integration test: the five PR227 transport-object tools, end to end
  * (GitHub #221)
@@ -466,7 +467,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         }
 
         const deleted = await createAdtClient(connection, logger)
-          .getRequest()
+          .getRequest(transportDocuments)
           .delete({ transportNumber: task } as any, {
             headers: DEFAULT_ADT_HEADERS['request.delete'],
             analyse: analyseDeletion,
@@ -486,7 +487,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     if (secondRequestNumber) {
       try {
         const deleted = await createAdtClient(connection, logger)
-          .getRequest()
+          .getRequest(transportDocuments)
           .delete({ transportNumber: secondRequestNumber } as any, {
             headers: DEFAULT_ADT_HEADERS['request.delete'],
             analyse: analyseDeletion,

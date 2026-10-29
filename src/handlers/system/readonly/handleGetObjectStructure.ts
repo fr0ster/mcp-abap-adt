@@ -3,6 +3,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -215,6 +216,13 @@ export async function handleGetObjectStructure(
     );
   }
 
+  const code = typeCodeOf(objectType);
+  if (code === undefined) {
+    return return_error(
+      new Error(notATableCode('objecttype/object_type', objectType)),
+    );
+  }
+
   logger?.info(`Fetching object structure for ${objectType}/${objectName}`);
   const detail = detailOf(args);
 
@@ -228,7 +236,7 @@ export async function handleGetObjectStructure(
     async () => {
       const response = await createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getObjectStructure(objectType, objectName, {
+        .getObjectStructure(code, objectName, {
           analyse: analyseException,
         });
       if (detail === 'terse' && response.ok) {

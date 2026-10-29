@@ -1,5 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { ISearchObjectsParams } from '@mcp-abap-adt/interfaces-adt';
+import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -110,7 +111,11 @@ export async function handleSearchObject(
     maxResults: maxResults || 100,
   };
   if (object_type) {
-    searchParams.objectType = object_type;
+    const objectType = typeCodeOf(object_type);
+    if (objectType === undefined) {
+      return return_error(notATableCode('object_type', object_type));
+    }
+    searchParams.objectType = objectType;
   }
 
   logger?.info(

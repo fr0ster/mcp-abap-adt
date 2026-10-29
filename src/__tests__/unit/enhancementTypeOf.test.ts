@@ -41,13 +41,13 @@ describe('enhancementTypeOf', () => {
     const { connection, sent } = connectionAnswering(ok(HITS));
 
     await expect(
-      enhancementTypeOf(connection, 'zenh_impl', 'ENHO'),
+      enhancementTypeOf(connection, 'zenh_impl', 'ENHO/XHH'),
     ).resolves.toBe('ENHO/XHB');
 
     expect(sent).toHaveLength(1);
     expect(sent[0].method).toBe('GET');
     expect(sent[0].url).toBe(
-      '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=zenh_impl&maxResults=20&objectType=ENHO',
+      '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=zenh_impl&maxResults=20&objectType=ENHO%2FXHH',
     );
     expect(sent[0].headers?.Accept).toBe('application/xml');
   });
@@ -55,7 +55,7 @@ describe('enhancementTypeOf', () => {
   it('answers undefined when no hit carries the name', async () => {
     const { connection } = connectionAnswering(ok(HITS));
     await expect(
-      enhancementTypeOf(connection, 'ZNOT_THERE', 'ENHO'),
+      enhancementTypeOf(connection, 'ZNOT_THERE', 'ENHO/XHH'),
     ).resolves.toBeUndefined();
   });
 
@@ -67,7 +67,7 @@ describe('enhancementTypeOf', () => {
       });
     });
     await expect(
-      enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHS'),
+      enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHS/XSB'),
     ).resolves.toBeUndefined();
   });
 
@@ -81,7 +81,7 @@ describe('enhancementTypeOf', () => {
       throw refused;
     });
     await expect(
-      enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHO'),
+      enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHO/XHH'),
     ).rejects.toBe(refused);
   });
 });

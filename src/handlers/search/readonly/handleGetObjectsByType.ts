@@ -1,4 +1,5 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
@@ -178,13 +179,17 @@ export async function handleGetObjectsByType(
   // `NodeLevel` it builds, never keeping the wire text beside it — there is
   // no `.raw` for `detail: 'raw'` to answer without changing that shared
   // strategy.
+  const parentType = typeCodeOf(parent_type);
+  if (parentType === undefined) {
+    return return_error(new Error(notATableCode('parent_type', parent_type)));
+  }
   return answer(
     { tool: 'GetObjectsByType', detail: 'terse' },
     () =>
       withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
         createAdtClient(connection, logger)
           .getUtils(ourUtils)
-          .fetchNodeStructure(parent_type, parentName, {
+          .fetchNodeStructure(parentType, parentName, {
             headers,
             analyse: analyseException,
             nodeId: node_id,

@@ -25,6 +25,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
@@ -334,7 +335,7 @@ const ACTIVATION_POLLS = 6;
  */
 async function activateWithMainProgram(
   context: AdtHeadersContext,
-  client: ReturnType<typeof createAdtClient>,
+  client: IServerAdtClient,
   groupName: string,
   includeName: string,
 ): Promise<Answer> {

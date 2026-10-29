@@ -1,6 +1,16 @@
+import {
+  classDocuments,
+  functionGroupDocuments,
+  includeDocuments,
+  programDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtTypeCode,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
@@ -261,20 +271,22 @@ async function determineObjectTypeAndPath(
   const classPath = {
     type: 'class' as const,
     readElements: () =>
-      client.getClass().readEnhancementElements({ className: name }, analyse),
+      client
+        .getClass(classDocuments)
+        .readEnhancementElements({ className: name }, analyse),
   };
   const programPath = {
     type: 'program' as const,
     readElements: () =>
       client
-        .getProgram()
+        .getProgram(programDocuments)
         .readEnhancementElements({ programName: name }, analyse),
   };
   const groupPath = (group: string) => ({
     type: 'function_group' as const,
     readElements: () =>
       client
-        .getFunctionGroup()
+        .getFunctionGroup(functionGroupDocuments)
         .readEnhancementElements({ functionGroupName: group }, analyse),
   });
   // `SAPL<fg>` is the group's main program: address the group.
@@ -334,7 +346,7 @@ async function determineObjectTypeAndPath(
   const asInclude = async () => {
     const metadata = await probe('read include metadata', () =>
       client
-        .getInclude()
+        .getInclude(includeDocuments)
         .readMetadata({ includeName: name }, { analyse: analyseException }),
     );
     if (metadata === undefined) return undefined;
@@ -360,7 +372,7 @@ async function determineObjectTypeAndPath(
       type: 'include' as const,
       readElements: () =>
         client
-          .getInclude()
+          .getInclude(includeDocuments)
           .readEnhancementElements(
             { includeName: name },
             { context: program, analyse: analyseException },
@@ -395,7 +407,7 @@ async function determineObjectTypeAndPath(
   if (
     (await probe('read class metadata', () =>
       client
-        .getClass()
+        .getClass(classDocuments)
         .readMetadata({ className: name }, { analyse: analyseException }),
     )) !== undefined
   ) {
@@ -404,7 +416,7 @@ async function determineObjectTypeAndPath(
   if (
     (await probe('read program metadata', () =>
       client
-        .getProgram()
+        .getProgram(programDocuments)
         .readMetadata({ programName: name }, { analyse: analyseException }),
     )) !== undefined
   ) {
@@ -921,7 +933,12 @@ type EnhancementRead =
       name: string;
       program?: string;
     }
-  | { kind: 'node'; parentType: string; parentName: string; nodeId: string };
+  | {
+      kind: 'node';
+      parentType: AdtTypeCode;
+      parentName: string;
+      nodeId: string;
+    };
 
 const enhancementKey = (read: EnhancementRead): string =>
   read.kind === 'node'
@@ -949,32 +966,34 @@ function sendEnhancementRead(
   const analyse = { analyse: analyseException };
   if (read.kind === 'metadata') {
     if (read.host === 'class')
-      return client.getClass().readMetadata({ className: read.name }, analyse);
+      return client
+        .getClass(classDocuments)
+        .readMetadata({ className: read.name }, analyse);
     if (read.host === 'program')
       return client
-        .getProgram()
+        .getProgram(programDocuments)
         .readMetadata({ programName: read.name }, analyse);
     return client
-      .getInclude()
+      .getInclude(includeDocuments)
       .readMetadata({ includeName: read.name }, analyse);
   }
   if (read.kind === 'elements') {
     switch (read.host) {
       case 'class':
         return client
-          .getClass()
+          .getClass(classDocuments)
           .readEnhancementElements({ className: read.name }, analyse);
       case 'program':
         return client
-          .getProgram()
+          .getProgram(programDocuments)
           .readEnhancementElements({ programName: read.name }, analyse);
       case 'function_group':
         return client
-          .getFunctionGroup()
+          .getFunctionGroup(functionGroupDocuments)
           .readEnhancementElements({ functionGroupName: read.name }, analyse);
       case 'include':
         return client
-          .getInclude()
+          .getInclude(includeDocuments)
           .readEnhancementElements(
             { includeName: read.name },
             { context: read.program as string, analyse: analyseException },
@@ -1236,7 +1255,7 @@ async function resolvePaths(
 function includesParentOf(
   objectName: string,
   objectType: EnhancementPath['type'],
-): { parentType: string; parentName: string } {
+): { parentType: AdtTypeCode; parentName: string } {
   const upper = objectName.toUpperCase();
   const isGroup =
     objectType === 'function_group' ||

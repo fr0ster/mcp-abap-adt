@@ -93,17 +93,19 @@ async function run(
   target: RunTarget,
   debuggee?: IDebuggeeIds,
 ): Promise<RunOutcome> {
-  const executor = new AdtExecutor(connection);
   const options = {
     analyse: analyseException,
     ...(debuggee ? { debuggee } : {}),
   };
+  // A program's run is on premise only: only that table lists `run` for
+  // `PROG/P`, so its executor is the on-premise one; the request is the one
+  // sent before.
   const answer =
     target.kind === 'class'
-      ? await executor
+      ? await new AdtExecutor(connection)
           .getClassExecutor(ourClassExecutor)
           .run({ className: target.name }, options)
-      : await executor
+      : await new AdtExecutor<'onprem'>(connection)
           .getProgramExecutor(ourProgramExecutor)
           .run({ programName: target.name }, options);
   return answer.ok
@@ -123,7 +125,7 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
       void endConnection(connection);
     },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
-      new AbapDebugger(c, undefined, undefined, { onConflict }),
+      AbapDebugger.create(c, { onConflict }),
     requestUser: async () => requestUserOf(),
     run,
   };
@@ -133,7 +135,7 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
-    amdpDebugger: (c) => new AmdpDebugger(c),
+    amdpDebugger: (c) => AmdpDebugger.create(c),
     requestUser: async () => requestUserOf(),
     run,
   };

@@ -58,7 +58,9 @@ export async function handleMemorySnapshotGet(
   context: HandlerContext,
   args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const snapshots = new MemorySnapshots(context.connection, context.logger);
+  const snapshots = MemorySnapshots.create(context.connection, {
+    logger: context.logger,
+  });
   const opts = { analyse: analyseException };
   return debugAnswer(
     args,

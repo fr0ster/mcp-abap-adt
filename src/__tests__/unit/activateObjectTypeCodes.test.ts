@@ -89,7 +89,8 @@ describe('ActivateObject: each type code and where it goes', () => {
         objects: [{ name: 'zt_x', type }],
       } as never);
       expect(familyCalls).toEqual([]);
-      expect(groupObjects).toEqual([{ name: 'ZT_X', type }]);
+      // A bare main type is read as the code of the tables it names.
+      expect(groupObjects).toEqual([{ name: 'ZT_X', type: 'TTYP/DA' }]);
     },
   );
 

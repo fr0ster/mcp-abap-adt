@@ -6,6 +6,7 @@
  * one at a time and confirming the matching test (and only that test) turns
  * red — see the task's fix-round-1 report for the reintroduction log.
  */
+
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree';
@@ -18,6 +19,7 @@ import { handleRuntimeListFeeds } from '../../handlers/system/readonly/handleRun
 import { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeListSystemMessages } from '../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { feedVariantsOf } from '../../lib/strategies/feedVariants';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const context = { connection: {} as any, logger: undefined };
@@ -32,20 +34,23 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtRuntimeClient: jest.fn(() => ({
     getProfiler: () => profiler,
-    getFeeds: () => feeds,
+    // RuntimeListFeeds reads the variants with a feed set of its own reading
+    // (`feedVariantsOf` in the `feeds` slot): the fake answers the feed list
+    // and applies that reading to it. Any other set gets the test's fake.
+    getFeeds: (results?: any) =>
+      results?.feeds === feedVariantsOf
+        ? {
+            list: async () => ({
+              ok: true,
+              getResult: () => ({
+                value: results.feeds({ data: feedListXml }),
+              }),
+            }),
+          }
+        : feeds,
     getDumps: () => dumps,
   })),
   AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
-  // RuntimeListFeeds reads the variants with a FeedRepository of its own
-  // reading: the fake answers the feed list and applies that reading to it.
-  FeedRepository: jest.fn(
-    (_connection: unknown, _logger: unknown, results: any) => ({
-      list: async () => ({
-        ok: true,
-        getResult: () => ({ value: results.feeds({ data: feedListXml }) }),
-      }),
-    }),
-  ),
 }));
 
 // `handleGetPackageTree` is the only handler in this file that reaches

@@ -79,7 +79,7 @@ describe('GetStructuresList append handling (#128)', () => {
 
     expect(result.isError).toBe(false);
     expect(mockGetWhereUsedScope).toHaveBeenCalledWith(
-      expect.objectContaining({ object_name: 'ZS', object_type: 'structure' }),
+      expect.objectContaining({ object_name: 'ZS', object_type: 'TABL/DS' }),
       { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsedScope'] },
     );
     expect(mockModifyWhereUsedScope).toHaveBeenCalledWith(
@@ -89,7 +89,7 @@ describe('GetStructuresList append handling (#128)', () => {
     expect(mockGetWhereUsed).toHaveBeenCalledWith(
       expect.objectContaining({
         object_name: 'ZS',
-        object_type: 'structure',
+        object_type: 'TABL/DS',
         scopeXml: '<scope-modified/>',
       }),
       { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },
@@ -99,7 +99,7 @@ describe('GetStructuresList append handling (#128)', () => {
 
   it('falls back to object_type "table" when the structure URI 404s', async () => {
     mockGetWhereUsedScope.mockImplementation((p: any) => {
-      if (p.object_type === 'structure') {
+      if (p.object_type === 'TABL/DS') {
         return Promise.resolve(
           refusedResponse('Request failed with status code 404'),
         );
@@ -114,7 +114,7 @@ describe('GetStructuresList append handling (#128)', () => {
 
     expect(result.isError).toBe(false);
     const types = mockGetWhereUsedScope.mock.calls.map((c) => c[0].object_type);
-    expect(types).toEqual(['structure', 'table']);
+    expect(types).toEqual(['TABL/DS', 'TABL/DT']);
     expect(payload(result).appends_unavailable).toBeUndefined();
   });
 

@@ -77,7 +77,9 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -211,8 +213,35 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-interface ActivationObject extends IObjectReference {
+/**
+ * One object of the tool's argument, as the caller sent it: `type` is an ADT
+ * type code or one of {@link TYPE_TO_FAMILY}'s names, either case — text from
+ * outside the type system. A single object of a mapped type goes to its
+ * family; everything else goes to group activation, which takes codes of the
+ * tables only (`groupReferences`).
+ */
+interface ActivationObject {
+  name: string;
+  type: string;
   uri?: string;
+  parentName?: string;
+}
+
+/**
+ * The objects of a group activation as references the tables type, or the
+ * fixed words naming the first whose `type` is no code of the tables (nothing
+ * is sent then).
+ */
+function groupReferences(
+  objects: readonly ActivationObject[],
+): IObjectReference[] | string {
+  const references: IObjectReference[] = [];
+  for (const obj of objects) {
+    const type = typeCodeOf(obj.type);
+    if (type === undefined) return notATableCode('objects[].type', obj.type);
+    references.push({ ...obj, type });
+  }
+  return references;
 }
 
 interface ActivateObjectArgs {
@@ -227,7 +256,7 @@ function familyFor(typeCode: string): ActivationFamily | undefined {
 
 function activateFamily(
   context: HandlerContext,
-  client: ReturnType<typeof createAdtClient>,
+  client: IServerAdtClient,
   family: ActivationFamily,
   name: string,
 ) {
@@ -404,6 +433,9 @@ export async function handleActivateObject(
   // errors". `getActivationRun` then says whether the run is still going, and
   // `getActivationResults` carries the `chkl:messages` the single-object
   // endpoint answers inline. See `lib/strategies/activationRun.ts`.
+  const references = groupReferences(activationObjects);
+  if (typeof references === 'string')
+    return return_error(new Error(references));
   const utils = client.getUtils(ourUtils);
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
@@ -412,7 +444,7 @@ export async function handleActivateObject(
         context,
         'utils.activateObjectsGroup',
         (headers) =>
-          utils.activateObjectsGroup(activationObjects, preaudit, {
+          utils.activateObjectsGroup(references, preaudit, {
             headers,
             analyse: analyseException,
           }),
@@ -528,6 +560,9 @@ export async function handleActivateObjectOnce(
   }
 
   const preaudit = args.preaudit !== false; // default true
+  const references = groupReferences(activationObjects);
+  if (typeof references === 'string')
+    return return_error(new Error(references));
   const utils = createAdtClient(connection, logger).getUtils(ourUtils);
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
@@ -536,7 +571,7 @@ export async function handleActivateObjectOnce(
         context,
         'utils.activateObjectsGroup',
         (headers) =>
-          utils.activateObjectsGroup(activationObjects, preaudit, {
+          utils.activateObjectsGroup(references, preaudit, {
             headers,
             analyse: analyseException,
           }),

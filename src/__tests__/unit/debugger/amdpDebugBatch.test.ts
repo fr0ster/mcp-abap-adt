@@ -186,8 +186,7 @@ async function stand(set: SetKind): Promise<Stand> {
         openConnection: open,
         closeConnection: async () => undefined,
         dropConnection: () => undefined,
-        abapDebugger: (c, onConflict) =>
-          new AbapDebugger(c, undefined, undefined, { onConflict }),
+        abapDebugger: (c, onConflict) => AbapDebugger.create(c, { onConflict }),
         requestUser: async () => 'TESTUSER',
         run: async () => ({ ok: true, output: '' }),
       },
@@ -199,7 +198,7 @@ async function stand(set: SetKind): Promise<Stand> {
       // The session's own connections answer through the script; a
       // recorder (a recorded call's connection) through a real debugger.
       amdpDebugger: (c) =>
-        own(c) ? (scripted.dbg as never) : new AmdpDebugger(c),
+        own(c) ? (scripted.dbg as never) : AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',
       run: async () => ({ ok: true, output: '' }),
     }),

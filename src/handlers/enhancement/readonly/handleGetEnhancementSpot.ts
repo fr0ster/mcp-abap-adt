@@ -183,7 +183,7 @@ export async function handleGetEnhancementSpot(
       const type = await enhancementTypeOf(
         connection,
         String(enhancementSpot),
-        'ENHS',
+        'ENHS/XSB',
       );
       const why = type
         ? notThroughAdt(String(enhancementSpot), type)

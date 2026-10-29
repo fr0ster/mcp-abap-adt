@@ -1,3 +1,4 @@
+import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
@@ -49,6 +50,7 @@ export const TOOL_DEFINITION = {
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtTypeCode,
   IAdtError,
   IAdtFailure,
   IAdtResponse,
@@ -132,7 +134,7 @@ function flatObjects(level: NodeLevel): FlatObject[] {
 async function collectValidObjects(
   context: AdtHeadersContext,
   utils: NodeSource,
-  parentType: string,
+  parentType: AdtTypeCode,
   parentName: string,
   nodeId: string,
   withShortDescriptions: boolean,
@@ -181,7 +183,7 @@ async function collectValidObjects(
 
 /** A parent whose node tree is walked. */
 interface Parent {
-  type: string;
+  type: AdtTypeCode;
   name: string;
 }
 
@@ -403,10 +405,15 @@ export async function handleGetObjectsList(
         );
       }
     }
-    const parents = listed.map((entry) => ({
-      type: String(entry.parent_type),
-      name: String(entry.parent_name).toUpperCase(),
-    }));
+    const parents: Parent[] = [];
+    for (const entry of listed) {
+      const text = String(entry.parent_type);
+      const type = typeCodeOf(text);
+      if (type === undefined) {
+        return return_error(notATableCode('objects[].parent_type', text));
+      }
+      parents.push({ type, name: String(entry.parent_name).toUpperCase() });
+    }
     let read: ParentWalks = { walks: [] };
     return answer(
       { tool: 'GetObjectsList', detail: 'terse' },
@@ -468,6 +475,10 @@ export async function handleGetObjectsList(
   }
 
   const parentName = parent_name.toUpperCase();
+  const parentType = typeCodeOf(parent_type);
+  if (parentType === undefined) {
+    return return_error(notATableCode('parent_type', parent_type));
+  }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
   // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
@@ -485,7 +496,7 @@ export async function handleGetObjectsList(
         async () => {
           const read = await walkParentsBatched(
             context,
-            [{ type: parent_type, name: parentName }],
+            [{ type: parentType, name: parentName }],
             withDescriptions,
           );
           const walk = (read.ended ?? read.walks[0]) as ParentWalk;
@@ -496,7 +507,7 @@ export async function handleGetObjectsList(
           collectValidObjects(
             context,
             utilsOf(context),
-            parent_type,
+            parentType,
             parentName,
             '000000',
             withDescriptions,

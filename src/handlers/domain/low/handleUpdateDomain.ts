@@ -1,3 +1,4 @@
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
  *
@@ -111,12 +112,12 @@ export async function handleUpdateDomain(
       const written = await sequence(
         atStep('read metadata', () =>
           client
-            .getDomain()
+            .getDomain(domainDocuments)
             .readMetadata({ domainName }, { analyse: analyseException }),
         ),
         atStep('update metadata', (current) =>
           withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
-            client.getDomain().updateMetadata(
+            client.getDomain(domainDocuments).updateMetadata(
               {
                 domainName,
                 transportRequest,

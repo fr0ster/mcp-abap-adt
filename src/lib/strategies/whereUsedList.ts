@@ -1,4 +1,5 @@
 import type {
+  AdtTypeCode,
   IAdtError,
   IAdtHeaders,
   IAdtResponse,
@@ -24,7 +25,7 @@ import { atStep } from './step';
 export interface WhereUsedSource {
   getWhereUsedScope(params: {
     object_name: string;
-    object_type: string;
+    object_type: AdtTypeCode;
   }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   /** Local — issues no request. */
   modifyWhereUsedScope(
@@ -38,7 +39,7 @@ export interface WhereUsedSource {
   ): string;
   getWhereUsed(params: {
     object_name: string;
-    object_type: string;
+    object_type: AdtTypeCode;
     scopeXml?: string;
   }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 }
@@ -49,12 +50,16 @@ export interface WhereUsedSource {
  */
 export interface WhereUsedMembers {
   getWhereUsedScope(
-    params: { object_name: string; object_type: string },
+    params: { object_name: string; object_type: AdtTypeCode },
     options: { headers: IAdtHeaders },
   ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   modifyWhereUsedScope: WhereUsedSource['modifyWhereUsedScope'];
   getWhereUsed(
-    params: { object_name: string; object_type: string; scopeXml?: string },
+    params: {
+      object_name: string;
+      object_type: AdtTypeCode;
+      scopeXml?: string;
+    },
     options: { headers: IAdtHeaders },
   ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 }
@@ -208,7 +213,7 @@ function noResult<T>(value: T): IAdtResponse<T, IAdtError> {
  */
 export async function fetchWhereUsedReferences(
   utils: WhereUsedSource,
-  params: { object_name: string; object_type: string } & WhereUsedFilter,
+  params: { object_name: string; object_type: AdtTypeCode } & WhereUsedFilter,
 ): Promise<IAdtResponse<WhereUsedListResult, IAdtError>> {
   let scopeXml: string | undefined;
 

@@ -1,3 +1,4 @@
+import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseMessageClassMessage } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -70,7 +71,7 @@ export async function handleGetMessageClassMessage(
     { tool: 'GetMessageClassMessage', detail },
     () =>
       createAdtClient(connection, logger)
-        .getMessageClassMessage()
+        .getMessageClassMessage(messageDocuments)
         .read({ className, msgno }, undefined, {
           analyse: analyseMessageClassMessage(msgno),
         }),

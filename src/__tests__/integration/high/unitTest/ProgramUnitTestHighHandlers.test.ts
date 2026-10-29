@@ -1,3 +1,4 @@
+import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Integration tests for a report's ABAP Unit tools: CreateProgramUnitTest,
  * RunProgramUnitTest, UpdateProgramUnitTest. The suite builds its own report and
@@ -56,7 +57,7 @@ describe('Unit Test High-Level Handlers (report)', () => {
               ? context.connection
               : (await createTestConnectionAndSession()).connection;
           const deleted = await createAdtClient(connection as any)
-            .getInclude()
+            .getInclude(includeDocuments)
             .delete(
               {
                 includeName: programTestInclude(programName),

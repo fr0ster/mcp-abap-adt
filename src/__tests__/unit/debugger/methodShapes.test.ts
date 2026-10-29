@@ -102,21 +102,21 @@ describe('what AbapDebugger members answer through their default strategies', ()
   it.each(DOCUMENT_MEMBERS)(
     '%s answers the recorded document as it came',
     async (_member, name, call) => {
-      expect(bodyOf(await call(new AbapDebugger(replaying(name))))).toBe(
+      expect(bodyOf(await call(AbapDebugger.create(replaying(name))))).toBe(
         corpusBody(name),
       );
     },
   );
 
   it('a listen the server held to its end answers an empty string', async () => {
-    const answer = await new AbapDebugger(
+    const answer = await AbapDebugger.create(
       replaying('debugger-conversation--03-listen-timeout-no-trigger'),
     ).listen(IDENTITY, { holdSeconds: 60 });
     expect(bodyOf(answer)).toBe('');
   });
 
   it('terminateDebuggee: its 500 is a success under analyseDebuggeeEnd, and answers nothing (the `done` strategy)', async () => {
-    const answer = await new AbapDebugger(
+    const answer = await AbapDebugger.create(
       replaying('debugger-terminate--01-terminate-debuggee'),
     ).terminateDebuggee({ analyse: analyseDebuggeeEnd });
     expect(answer.ok).toBe(true);
@@ -128,7 +128,7 @@ describe('what AbapDebugger members answer through their default strategies', ()
     const ended = corpusBody(
       'debugger-terminate--01-terminate-debuggee',
     ).replace('terminateDebuggee', 'debuggeeEnded');
-    const answer = await new AbapDebugger(
+    const answer = await AbapDebugger.create(
       replaying('debugger-terminate--01-terminate-debuggee', ended),
     ).step('stepContinue', { analyse: analyseDebuggeeEnd });
     expect(answer.ok).toBe(true);
@@ -169,7 +169,7 @@ describe('terminateDebugger under analyseDebuggerFreed (errata: the debugger fre
     headers: Record<string, string>,
     data: unknown,
   ) =>
-    new AbapDebugger(answering(status, headers, data)).terminateDebugger({
+    AbapDebugger.create(answering(status, headers, data)).terminateDebugger({
       analyse: analyseDebuggerFreed,
     });
 

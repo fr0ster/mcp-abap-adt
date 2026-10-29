@@ -80,7 +80,8 @@ describe('GetWhereUsed type-filter params', () => {
     expect(mockGetWhereUsed).toHaveBeenCalledWith(
       expect.objectContaining({
         object_name: 'ZT',
-        object_type: 'table',
+        // `table` is sent as the code of the tables it names.
+        object_type: 'TABL/DT',
         scopeXml: '<scope-modified/>',
       }),
       { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },

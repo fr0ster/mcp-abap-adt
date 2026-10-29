@@ -4,6 +4,7 @@
  * batched walks send for an object's description (spec §11). Both call the
  * same function, so the two requests cannot drift apart.
  */
+
 import {
   accessControlDocuments,
   behaviorDefinitionDocuments,
@@ -11,6 +12,7 @@ import {
   dataElementDocuments,
   ddlDocuments,
   domainDocuments,
+  enhancementDocuments,
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
@@ -26,10 +28,10 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { createAdtClient } from '../clients';
+import type { IServerAdtClient } from '../adtClientContract';
 import { resultsFor } from './resultSets';
 
-type Client = ReturnType<typeof createAdtClient>;
+type Client = IServerAdtClient;
 
 const analysed = { analyse: analyseException };
 
@@ -163,7 +165,7 @@ export const readEnhancementSpotMetadata = (
   config: { enhancementName: string },
 ) =>
   c
-    .getEnhancement()
+    .getEnhancement(enhancementDocuments)
     .readMetadata({ ...config, enhancementType: 'enhsxsb' as const }, analysed);
 
 /** An access control's metadata (DCL source, `DCLS/DL`). */

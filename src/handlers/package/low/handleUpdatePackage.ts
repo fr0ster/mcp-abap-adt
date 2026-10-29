@@ -1,3 +1,4 @@
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * UpdatePackage Handler - Update ABAP Package Description
  *
@@ -131,12 +132,12 @@ export async function handleUpdatePackage(
       const written = await sequence(
         atStep('read metadata', () =>
           client
-            .getPackage()
+            .getPackage(packageDocuments)
             .readMetadata({ packageName }, { analyse: analyseException }),
         ),
         atStep('update metadata', (current) =>
           withAdtHeaders(context, 'package.updateMetadata', (headers) =>
-            client.getPackage().updateMetadata(
+            client.getPackage(packageDocuments).updateMetadata(
               {
                 packageName,
                 ...(transport_request && {

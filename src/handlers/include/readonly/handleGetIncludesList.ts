@@ -303,7 +303,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       // main), with no name of their own.
       const meta = await sourceOf(
         `class ${parent.name}`,
-        utils.readObjectMetadata('class', parent.name),
+        utils.readObjectMetadata('CLAS/OC', parent.name),
       );
       children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
         (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
@@ -343,7 +343,7 @@ async function includesListOf(context: HandlerContext, args: any) {
         parent.kind === 'PROG/P'
           ? await sourceOf(
               `program ${parent.name}`,
-              utils.readObjectSource('program', parent.name),
+              utils.readObjectSource('PROG/P', parent.name),
             )
           : await readInclude(parent.name);
       children = await expand(
@@ -403,11 +403,11 @@ function sendRead(
 ): Promise<unknown> {
   switch (read.kind) {
     case 'program':
-      return utils.readObjectSource('program', read.name);
+      return utils.readObjectSource('PROG/P', read.name);
     case 'include':
       return utils.getInclude(read.name);
     case 'class':
-      return utils.readObjectMetadata('class', read.name);
+      return utils.readObjectMetadata('CLAS/OC', read.name);
     case 'group': {
       // `fetchFunctionGroupChildren`'s two requests: the group's node
       // structure, then its includes node — on the source it reads.

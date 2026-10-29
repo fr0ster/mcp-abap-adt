@@ -1,3 +1,15 @@
+import {
+  appendStructureDocuments,
+  behaviorDefinitionDocuments,
+  classDocuments,
+  ddlDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  serviceDefinitionDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+
 /**
  * Admin script: Setup ALL shared dependencies on a SAP system.
  *
@@ -15,11 +27,11 @@
  * Run:  npm run shared:setup
  */
 
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
+import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
@@ -37,6 +49,7 @@ import { handleSearchObject } from '../../../handlers/search/readonly/handleSear
 import { handleUpdateServiceDefinition } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import {
@@ -63,13 +76,13 @@ const testsLogger = createTestLogger('shared-setup');
 
 /**
  * Force-save DDL source for a CDS view by bypassing syntax check.
- * Uses AdtClient.getDdl().lock() / update(lockHandle) / unlock() — public IAdtObject API.
+ * Uses IServerAdtClient.getDdl().lock() / update(lockHandle) / unlock() — public IAdtObject API.
  * Needed for views with circular dependencies (RAP root/child composition)
  * that cannot pass checkView before the counterpart view is active.
  * Group activation handles the mutual refs once both have stored source.
  */
 async function forceSaveViewSource(
-  client: AdtClient,
+  client: IServerAdtClient,
   viewName: string,
   ddlSource: string,
   transportRequest?: string,
@@ -78,7 +91,7 @@ async function forceSaveViewSource(
   // (IAdtCapabilities.ts), and `update` takes the source through
   // `options.source`, not `config.source` (see UpdateDdlLow).
   const lockResponse = await client
-    .getDdl()
+    .getDdl(ddlDocuments)
     .lock({ ddlName: viewName }, { analyse: analyseException });
   if (!lockResponse.ok) {
     throw new Error(lockResponse.getError().message);
@@ -101,7 +114,7 @@ async function forceSaveViewSource(
   // unreleased lock is named after it rather than instead of it.
   const failures: string[] = [];
   try {
-    const updated = await client.getDdl().update(
+    const updated = await client.getDdl(ddlDocuments).update(
       { ddlName: viewName, transportRequest },
       {
         headers: DEFAULT_ADT_HEADERS['ddl.update'],
@@ -118,7 +131,7 @@ async function forceSaveViewSource(
   }
   try {
     const released = await client
-      .getDdl()
+      .getDdl(ddlDocuments)
       .unlock({ ddlName: viewName }, lockHandle, {
         analyse: analyseException,
       });
@@ -138,7 +151,7 @@ async function forceSaveViewSource(
 }
 
 /** Map shared_dependencies section name to ADT object type code */
-const TYPE_CODES: Record<string, string> = {
+const TYPE_CODES: Record<string, AdtTypeCode> = {
   tables: 'TABL/DT',
   structures: 'TABL/DS',
   views: 'DDLS/DF',
@@ -195,7 +208,7 @@ async function writeSource(answer: Promise<any>): Promise<void> {
   }
 }
 
-function strictClient(client: AdtClient): AdtClient {
+function strictClient(client: IServerAdtClient): IServerAdtClient {
   const WRITES = new Set(['create', 'update', 'activate']);
   return new Proxy(client, {
     get(target, prop, receiver) {
@@ -234,7 +247,7 @@ function strictClient(client: AdtClient): AdtClient {
         });
       };
     },
-  }) as AdtClient;
+  }) as IServerAdtClient;
 }
 
 function resolvePackageName(sharedConfig: any): string {
@@ -275,7 +288,7 @@ const normalizedSource = (source: string): string =>
  * different, so it is written.
  */
 async function sameActiveSource(
-  client: AdtClient,
+  client: IServerAdtClient,
   kind: string,
   name: string,
   source: string,
@@ -324,7 +337,7 @@ async function sameActiveSource(
 
 describe('Admin: Setup shared dependencies', () => {
   let connection: IAbapConnection;
-  let client: AdtClient;
+  let client: IServerAdtClient;
   // An admin script runs only when asked for (npm run shared:*), so a system
   // it cannot reach is a failure, not a skip: a green run that did nothing
   // reads as "the shared objects are set up".
@@ -375,7 +388,7 @@ describe('Admin: Setup shared dependencies', () => {
       // Collect names for group activation
       const toActivate: Array<{
         name: string;
-        type: string;
+        type: AdtTypeCode;
         parentName?: string;
       }> = [];
 
@@ -396,7 +409,7 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getTable()
+                .getTable(tableDocuments)
                 .read({ tableName: item.name }, undefined, {
                   analyse: analyseException,
                 });
@@ -406,7 +419,7 @@ describe('Admin: Setup shared dependencies', () => {
             }
 
             if (!exists) {
-              const createdTable = await client.getTable().create(
+              const createdTable = await client.getTable(tableDocuments).create(
                 {
                   tableName: item.name,
                   packageName,
@@ -520,7 +533,7 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getStructure()
+                .getStructure(structureDocuments)
                 .read({ structureName: item.name }, undefined, {
                   analyse: analyseException,
                 });
@@ -532,18 +545,20 @@ describe('Admin: Setup shared dependencies', () => {
             if (!exists) {
               try {
                 // create() only builds the skeleton (does NOT apply ddlCode)
-                const createdStructure = await client.getStructure().create(
-                  {
-                    structureName: item.name,
-                    packageName,
-                    description: item.description || 'Shared test structure',
-                    transportRequest,
-                  },
-                  {
-                    headers: DEFAULT_ADT_HEADERS['structure.create'],
-                    analyse: analyseException,
-                  },
-                );
+                const createdStructure = await client
+                  .getStructure(structureDocuments)
+                  .create(
+                    {
+                      structureName: item.name,
+                      packageName,
+                      description: item.description || 'Shared test structure',
+                      transportRequest,
+                    },
+                    {
+                      headers: DEFAULT_ADT_HEADERS['structure.create'],
+                      analyse: analyseException,
+                    },
+                  );
                 if (!createdStructure.ok) {
                   throw new Error(createdStructure.getError().message);
                 }
@@ -590,13 +605,15 @@ describe('Admin: Setup shared dependencies', () => {
               );
               testsLogger?.info?.(`Updated structure ${item.name} source`);
             }
-            const activatedStructure = await client.getStructure().activate(
-              { structureName: item.name },
-              {
-                headers: DEFAULT_ADT_HEADERS['structure.activate'],
-                analyse: analyseActivation,
-              },
-            );
+            const activatedStructure = await client
+              .getStructure(structureDocuments)
+              .activate(
+                { structureName: item.name },
+                {
+                  headers: DEFAULT_ADT_HEADERS['structure.activate'],
+                  analyse: analyseActivation,
+                },
+              );
             if (!activatedStructure.ok) {
               throw new Error(activatedStructure.getError().message);
             }
@@ -638,7 +655,7 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getDdl()
+                .getDdl(ddlDocuments)
                 .read({ ddlName: item.name }, undefined, {
                   analyse: analyseException,
                 });
@@ -648,7 +665,7 @@ describe('Admin: Setup shared dependencies', () => {
             }
 
             if (!exists) {
-              const createdDdl = await client.getDdl().create(
+              const createdDdl = await client.getDdl(ddlDocuments).create(
                 {
                   ddlName: item.name,
                   packageName,
@@ -767,7 +784,7 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getBehaviorDefinition()
+                .getBehaviorDefinition(behaviorDefinitionDocuments)
                 .read({ name: item.name }, undefined, {
                   analyse: analyseException,
                 });
@@ -778,7 +795,7 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (!exists) {
               const createdBehaviorDefinition = await client
-                .getBehaviorDefinition()
+                .getBehaviorDefinition(behaviorDefinitionDocuments)
                 .create(
                   {
                     name: item.name,
@@ -889,7 +906,7 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getClass()
+                .getClass(classDocuments)
                 .read({ className: item.name }, undefined, {
                   analyse: analyseException,
                 });
@@ -906,7 +923,7 @@ describe('Admin: Setup shared dependencies', () => {
                 status: 'existed',
               });
             } else {
-              const createdClass = await client.getClass().create(
+              const createdClass = await client.getClass(classDocuments).create(
                 {
                   className: item.name,
                   packageName,
@@ -1027,7 +1044,7 @@ describe('Admin: Setup shared dependencies', () => {
               // A function group has no source of its own — only a document
               // (IAdtMetadataReadable, not IAdtReadable): AdtFunctionGroup.d.ts.
               const readResult = await client
-                .getFunctionGroup()
+                .getFunctionGroup(functionGroupDocuments)
                 .readMetadata(
                   { functionGroupName: item.name },
                   { analyse: analyseException },
@@ -1039,7 +1056,7 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (!exists) {
               const createdFunctionGroup = await client
-                .getFunctionGroup()
+                .getFunctionGroup(functionGroupDocuments)
                 .create(
                   {
                     functionGroupName: item.name,
@@ -1117,14 +1134,16 @@ describe('Admin: Setup shared dependencies', () => {
           try {
             let exists = false;
             try {
-              const readResult = await client.getFunctionModule().read(
-                {
-                  functionModuleName: item.name,
-                  functionGroupName: item.group,
-                },
-                undefined,
-                { analyse: analyseException },
-              );
+              const readResult = await client
+                .getFunctionModule(functionModuleDocuments)
+                .read(
+                  {
+                    functionModuleName: item.name,
+                    functionGroupName: item.group,
+                  },
+                  undefined,
+                  { analyse: analyseException },
+                );
               exists = readResult.ok;
             } catch {
               exists = false;
@@ -1137,7 +1156,7 @@ describe('Admin: Setup shared dependencies', () => {
               // dropped rather than ported; it never reached the wire either
               // way, and the type now says so.
               const createdFunctionModule = await client
-                .getFunctionModule()
+                .getFunctionModule(functionModuleDocuments)
                 .create(
                   {
                     functionModuleName: item.name,
@@ -1169,13 +1188,15 @@ describe('Admin: Setup shared dependencies', () => {
               ))
             ) {
               try {
-                const lockResponse = await client.getFunctionModule().lock(
-                  {
-                    functionModuleName: item.name,
-                    functionGroupName: item.group,
-                  },
-                  { analyse: analyseException },
-                );
+                const lockResponse = await client
+                  .getFunctionModule(functionModuleDocuments)
+                  .lock(
+                    {
+                      functionModuleName: item.name,
+                      functionGroupName: item.group,
+                    },
+                    { analyse: analyseException },
+                  );
                 if (!lockResponse.ok) {
                   throw new Error(lockResponse.getError().message);
                 }
@@ -1185,19 +1206,21 @@ describe('Admin: Setup shared dependencies', () => {
                 // release is not enough.
                 const moduleFailures: string[] = [];
                 try {
-                  const updated = await client.getFunctionModule().update(
-                    {
-                      functionModuleName: item.name,
-                      functionGroupName: item.group,
-                      transportRequest,
-                    },
-                    {
-                      headers: DEFAULT_ADT_HEADERS['functionModule.update'],
-                      source: item.source,
-                      lockHandle,
-                      analyse: analyseException,
-                    },
-                  );
+                  const updated = await client
+                    .getFunctionModule(functionModuleDocuments)
+                    .update(
+                      {
+                        functionModuleName: item.name,
+                        functionGroupName: item.group,
+                        transportRequest,
+                      },
+                      {
+                        headers: DEFAULT_ADT_HEADERS['functionModule.update'],
+                        source: item.source,
+                        lockHandle,
+                        analyse: analyseException,
+                      },
+                    );
                   if (!updated.ok) {
                     moduleFailures.push(
                       `write refused: ${updated.getError().message}`,
@@ -1214,7 +1237,7 @@ describe('Admin: Setup shared dependencies', () => {
                 }
                 try {
                   const releasedModule = await client
-                    .getFunctionModule()
+                    .getFunctionModule(functionModuleDocuments)
                     .unlock(
                       {
                         functionModuleName: item.name,
@@ -1312,7 +1335,7 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getServiceDefinition()
+                .getServiceDefinition(serviceDefinitionDocuments)
                 .read({ serviceDefinitionName: item.name }, undefined, {
                   analyse: analyseException,
                 });
@@ -1323,7 +1346,7 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (!exists) {
               const createdServiceDefinition = await client
-                .getServiceDefinition()
+                .getServiceDefinition(serviceDefinitionDocuments)
                 .create(
                   {
                     serviceDefinitionName: item.name,
@@ -1440,7 +1463,7 @@ describe('Admin: Setup shared dependencies', () => {
       const viaHandlers: Array<{
         section: string;
         label: string;
-        typeCode: string;
+        typeCode: AdtTypeCode;
         create: (item: any) => Promise<any[]>;
         /** Writes the configured source; runs for an existing object too. */
         update?: (item: any) => Promise<any>;
@@ -1551,7 +1574,7 @@ describe('Admin: Setup shared dependencies', () => {
           typeCode: 'TABL/DS',
           create: async (item) => {
             const createdAppendStructure = await client
-              .getAppendStructure()
+              .getAppendStructure(appendStructureDocuments)
               .create(
                 {
                   appendStructureName: item.name,
@@ -1570,7 +1593,7 @@ describe('Admin: Setup shared dependencies', () => {
             return [];
           },
           update: async (item) => {
-            const obj = client.getAppendStructure();
+            const obj = client.getAppendStructure(appendStructureDocuments);
             const written = await withLock(
               () =>
                 obj.lock(

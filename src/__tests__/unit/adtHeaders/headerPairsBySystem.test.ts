@@ -1,3 +1,4 @@
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * The corrected header pairs are the system's, not the credentials'
  * (`AdtHeaderPairs`): the dispatch hands every call the port of its
@@ -48,9 +49,9 @@ const probe: HandlerEntry = {
   handler: (async (context: HandlerContext, _args: unknown) => {
     const answer = await withAdtHeaders(context, OP, (headers) =>
       createAdtClient(context.connection)
-        .getUtils()
+        .getUtils(utilDocuments)
         .getWhereUsed(
-          { object_name: 'ZCL_PROBE', object_type: 'class' },
+          { object_name: 'ZCL_PROBE', object_type: 'CLAS/OC' },
           { headers },
         ),
     );

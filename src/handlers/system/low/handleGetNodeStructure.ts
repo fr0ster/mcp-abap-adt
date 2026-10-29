@@ -60,6 +60,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -181,6 +182,10 @@ async function nodeStructure(
   if (!parent_name) {
     return return_error(new Error('parent_name is required'));
   }
+  const parentType = typeCodeOf(parent_type);
+  if (parentType === undefined) {
+    return return_error(new Error(notATableCode('parent_type', parent_type)));
+  }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
   // shape: `nodeLevel` (`lib/strategies/packageWalk.ts`) parses
@@ -199,7 +204,7 @@ async function nodeStructure(
           withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
             client
               .getUtils({ ...ourUtils, node: rawNodeStructureXml })
-              .fetchNodeStructure(parent_type, parent_name, {
+              .fetchNodeStructure(parentType, parent_name, {
                 headers,
                 analyse: analyseException,
                 nodeId: node_id || '000000',

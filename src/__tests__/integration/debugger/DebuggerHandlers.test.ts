@@ -442,7 +442,7 @@ describe('Debugger handlers (integration)', () => {
     (
       conn as { setSessionType?: (t: 'stateful' | 'stateless') => void }
     ).setSessionType?.('stateful');
-    const dbg = new AbapDebugger(conn, undefined, undefined, {
+    const dbg = AbapDebugger.create(conn, {
       onConflict: 'refuse' as IDebuggerListenerConflict,
     }) as unknown as Debugger;
     const requestUser = await requestUserOf(connection);

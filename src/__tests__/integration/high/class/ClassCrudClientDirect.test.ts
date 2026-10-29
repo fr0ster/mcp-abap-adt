@@ -1,3 +1,5 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+
 /**
  * Reference test - uses AdtClient directly (without handlers)
  *
@@ -12,7 +14,6 @@
  * Run: npm test -- --testPathPattern=integration/class/ClassAdtClientDirect
  */
 
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   type IAdtMessageFailure,
@@ -20,6 +21,7 @@ import {
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
+import type { IServerAdtClient } from '../../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import { createAbapConnection } from '../../../../lib/connectionFactory';
@@ -83,7 +85,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
 
       // Create a separate connection for this test (not using getManagedConnection)
       let connection: IAbapConnection | null = null;
-      let client: AdtClient | null = null;
+      let client: IServerAdtClient | null = null;
       let diagnosticsTracker: ReturnType<
         typeof createDiagnosticsTracker
       > | null = null;
@@ -324,7 +326,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         // on the failure side, because a success carries no transport frame
         // any more (IAdtResponse.ts: `IAdtResult<T>` is `{ value }`).
         const validateResponse = await client
-          .getClass()
+          .getClass(classDocuments)
           .validate(validateParams, { analyse: analyseException });
 
         debugLog('VALIDATE_RESPONSE', `Validation completed`, {
@@ -423,10 +425,12 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           if (!client) {
             throw new Error('Client not initialized');
           }
-          createResponse = await client.getClass().create(createParams, {
-            headers: DEFAULT_ADT_HEADERS['class.create'],
-            analyse: analyseException,
-          });
+          createResponse = await client
+            .getClass(classDocuments)
+            .create(createParams, {
+              headers: DEFAULT_ADT_HEADERS['class.create'],
+              analyse: analyseException,
+            });
         } catch (createError: any) {
           // Log error details for debugging (only if DEBUG_TESTS is enabled)
           if (process.env.DEBUG_TESTS === 'true') {
@@ -483,7 +487,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           throw new Error('Client not initialized');
         }
         const checkResponse = await client
-          .getClass()
+          .getClass(classDocuments)
           .check(checkParams, undefined, {
             headers: DEFAULT_ADT_HEADERS['class.check'],
             analyse: analyseException,

@@ -10,7 +10,6 @@
  */
 
 import {
-  type AdtClient,
   behaviorDefinitionDocuments,
   classDocuments,
   ddlDocuments,
@@ -26,6 +25,7 @@ import {
   type IObjectVersion,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
@@ -70,7 +70,7 @@ export interface ResolvedVersionedObject {
  * @throws Error for a malformed function_module identity (missing group name).
  */
 export function resolveVersionedObject(
-  client: AdtClient,
+  client: IServerAdtClient,
   objectType: string,
   objectName: string,
   functionGroupName?: string,

@@ -294,7 +294,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'getObjectStructure')
       .at(-1);
-    expect(call?.args).toEqual(['class', 'ZCL_X']);
+    expect(call?.args).toEqual(['CLAS/OC', 'ZCL_X']);
   });
 
   it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {

@@ -354,7 +354,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = seen.client;
     await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
@@ -384,7 +384,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = finishedRun('<chkl:messages/>');
     const result: any = await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
@@ -399,7 +399,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = finishedRun('<chkl:messages/>');
     const result: any = await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
@@ -442,7 +442,7 @@ describe('ActivateObjectLow', () => {
     });
     const result: any = await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });

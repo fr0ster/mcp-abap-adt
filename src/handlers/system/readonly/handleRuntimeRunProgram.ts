@@ -1,7 +1,7 @@
 /**
  * RuntimeRunProgram Handler - Execute an ABAP program, optionally profiled
  *
- * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
+ * Uses `new AdtExecutor<'onprem'>(connection, logger).getProgramExecutor()` from
  * @mcp-abap-adt/adt-clients 19 — not `createAdtClient`, per
  * `AdtExecutor`'s own shape (see `handleRuntimeRunClass.ts`
  * and Task 24's class-profiling pair for the same door).
@@ -108,7 +108,9 @@ export async function handleRuntimeRunProgram(
   }
 
   const programName = args.program_name.trim().toUpperCase();
-  const executor = new AdtExecutor(connection, logger);
+  // On premise: the tool is listed only where the declared system type is
+  // `onprem` (`available_in`), and only that table lists a program's `run`.
+  const executor = new AdtExecutor<'onprem'>(connection, logger);
   const programExecutor = executor.getProgramExecutor(ourProgramExecutor);
 
   if (!args.profile) {
@@ -198,7 +200,7 @@ export async function handleRuntimeRunProgramUnderProfiler(
     );
   }
   const programName = args.program_name.trim().toUpperCase();
-  const programExecutor = new AdtExecutor(
+  const programExecutor = new AdtExecutor<'onprem'>(
     connection,
     logger,
   ).getProgramExecutor(ourProgramExecutor);

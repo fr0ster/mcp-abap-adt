@@ -46,14 +46,14 @@ describe('the URI an activation carries for a function module', () => {
    */
   it('throws when nothing names the group', () => {
     expect(() => buildObjectUri('Z_AC_FM01', 'FUGR/FF')).toThrow(
-      /addressed under its function group; pass the group as parentName/,
+      /is addressed under its parent \(functionGroup\); pass the parent's name as parentName/,
     );
   });
 
   /** The recommendation this file replaced, kept so it cannot come back. */
   it('does not read a GROUP|MODULE name as the group — that convention is another builder’s', () => {
     expect(() => buildObjectUri('ZAC_FGR01|Z_AC_FM01', 'FUGR/FF')).toThrow(
-      /pass the group as parentName/,
+      /pass the parent's name as parentName/,
     );
   });
 

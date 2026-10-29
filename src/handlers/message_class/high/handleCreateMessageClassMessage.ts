@@ -1,3 +1,4 @@
+import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * CreateMessageClassMessage Handler - Add (upsert) a single message to a
  * Message Class (MSAG)
@@ -107,7 +108,7 @@ export async function handleCreateMessageClassMessage(
     () =>
       withAdtHeaders(context, 'messageClassMessage.create', (headers) =>
         createAdtClient(connection, logger)
-          .getMessageClassMessage()
+          .getMessageClassMessage(messageDocuments)
           .create(
             {
               className,

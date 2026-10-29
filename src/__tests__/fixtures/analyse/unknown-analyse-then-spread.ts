@@ -1,3 +1,5 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: unknown.
  *
@@ -8,14 +10,13 @@
  * of the pair that catches a left-to-right regression in `carriesAnalyse`:
  * scanned left to right, this file would wrongly read as `yes`.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 declare function opaque(): Record<string, unknown>;
 
 export const call = () =>
-  client.getClass().read({ className: 'X' }, 'active', {
+  client.getClass(classDocuments).read({ className: 'X' }, 'active', {
     analyse: analyseException,
     ...opaque(),
   });

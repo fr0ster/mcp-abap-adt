@@ -1,3 +1,5 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: yes.
  *
@@ -9,14 +11,13 @@
  * opposite order: a left-to-right scan would get this one right and that
  * one wrong, and only the pair together proves the scan direction.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 declare function opaque(): Record<string, unknown>;
 
 export const call = () =>
-  client.getClass().read({ className: 'X' }, 'active', {
+  client.getClass(classDocuments).read({ className: 'X' }, 'active', {
     ...opaque(),
     analyse: analyseException,
   });

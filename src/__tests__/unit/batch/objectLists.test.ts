@@ -154,7 +154,7 @@ const REPOSITORY: Record<string, PartAnswer> = {
   'qs:ZCL_A:CLAS/OC': ok(
     hitsXml([{ name: 'ZCL_A', type: 'CLAS/OC', description: 'Class A' }]),
   ),
-  'qs:ZPROG_B:WRONG': BAD_REQUEST,
+  'qs:ZPROG_B:PROG/I': BAD_REQUEST,
   'qs:ZPROG_B:': ok(
     hitsXml([{ name: 'ZPROG_B', type: 'PROG/P', description: 'Program B' }]),
   ),
@@ -548,7 +548,7 @@ describe('ListTransports', () => {
 
 const OBJECTS = [
   { name: 'ZCL_A', type: 'CLAS/OC' },
-  { name: 'ZPROG_B', type: 'WRONG' },
+  { name: 'ZPROG_B', type: 'PROG/I' },
   { name: 'ZT*' },
   { name: 'ZNONE' },
 ];
@@ -576,7 +576,7 @@ describe('DescribeByList', () => {
       TURNS,
     );
     expect(phasesOf(fake)).toEqual([
-      ['qs:ZCL_A:CLAS/OC', 'qs:ZPROG_B:WRONG', 'qs:ZT*:', 'qs:ZNONE:'],
+      ['qs:ZCL_A:CLAS/OC', 'qs:ZPROG_B:PROG/I', 'qs:ZT*:', 'qs:ZNONE:'],
       ['qs:ZPROG_B:'],
     ]);
     const names = (result as { content: Array<{ text: string }> }).content.map(
@@ -684,7 +684,7 @@ describe('DescribeByList', () => {
   it('a typed search answered 406 is that object’s error; no typeless search', async () => {
     const fake = system({
       answers: {
-        'qs:ZPROG_B:WRONG': { status: 406, statusText: 'Not Acceptable' },
+        'qs:ZPROG_B:PROG/I': { status: 406, statusText: 'Not Acceptable' },
       },
     });
     const result = await withinTurns(
@@ -692,7 +692,7 @@ describe('DescribeByList', () => {
       TURNS,
     );
     expect(phasesOf(fake)).toEqual([
-      ['qs:ZCL_A:CLAS/OC', 'qs:ZPROG_B:WRONG', 'qs:ZT*:', 'qs:ZNONE:'],
+      ['qs:ZCL_A:CLAS/OC', 'qs:ZPROG_B:PROG/I', 'qs:ZT*:', 'qs:ZNONE:'],
     ]);
     const entries = (
       result as { content: Array<{ text: string }> }

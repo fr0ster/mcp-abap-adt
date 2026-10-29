@@ -1,3 +1,4 @@
+import { enhancementDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -161,7 +162,7 @@ export async function handleGetEnhancementImpl(
     const name = String(enhancementName);
     /** What the name's type says about this read, after the search. */
     const explained = async () => {
-      const type = await enhancementTypeOf(connection, name, 'ENHO');
+      const type = await enhancementTypeOf(connection, name, 'ENHO/XHH');
       return type ? explainByType(name, type, collection) : undefined;
     };
 
@@ -179,7 +180,7 @@ export async function handleGetEnhancementImpl(
     // read uses.
     const step = 'read enhancement source';
     const answer = await createAdtClient(connection, logger)
-      .getEnhancement()
+      .getEnhancement(enhancementDocuments)
       .read({ enhancementName: name, enhancementType: 'enhoxhh' }, 'active', {
         analyse: analyseException,
       });

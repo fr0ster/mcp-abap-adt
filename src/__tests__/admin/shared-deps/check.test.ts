@@ -19,7 +19,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSharedDependenciesConfig,
@@ -329,7 +329,7 @@ describe('Config: shared_dependencies consistency', () => {
 const liveIt = TEST_CONFIG_PRESENT ? it : it.skip;
 
 describe('Live: shared_dependencies exist on the system', () => {
-  let client: AdtClient | undefined;
+  let client: IServerAdtClient | undefined;
   let connectionError: unknown;
 
   beforeAll(async () => {

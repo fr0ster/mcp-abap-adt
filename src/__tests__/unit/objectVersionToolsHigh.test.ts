@@ -180,16 +180,19 @@ describe('per-object high-level version tools (#30)', () => {
     }
     // no duplicate tool names in the whole HighLevel group
     expect(new Set(registered).size).toBe(registered.length);
-    // program version tools are onprem-gated in the registered set
+    // program version tools are on premise and cloud in the registered set
     const prog = group
       .getHandlers()
       .find((e) => e.toolDefinition.name === 'GetProgramVersions');
-    expect(prog?.toolDefinition.available_in).toEqual(['onprem']);
+    expect(prog?.toolDefinition.available_in).toEqual(['onprem', 'cloud']);
   });
 
-  it('program version tools are onprem-gated (mirrors GetProgram)', () => {
+  it('program version tools are on premise and cloud (mirrors GetProgram)', () => {
     for (const name of ['GetProgramVersions', 'GetProgramVersionSource']) {
-      expect(tool(name).toolDefinition.available_in).toEqual(['onprem']);
+      expect(tool(name).toolDefinition.available_in).toEqual([
+        'onprem',
+        'cloud',
+      ]);
     }
     // class is both modern environments (mirrors GetClass)
     expect(tool('GetClassVersions').toolDefinition.available_in).toEqual([

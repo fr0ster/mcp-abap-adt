@@ -721,7 +721,6 @@ describe('program', () => {
         'activate',
         { program_name: 'Z_X' },
       ],
-      ['CheckProgramLow', handleCheckProgram, 'check', { program_name: 'Z_X' }],
       [
         'UpdateProgramLow',
         handleUpdateProgram,
@@ -753,6 +752,15 @@ describe('program', () => {
         expect(callTo(member)).toBeDefined();
       },
     );
+
+    // A program's check is served on cloud (`ADT_TYPES_CLOUD` lists it), and
+    // `CheckProgram` delegates here: no refusal stands in its way.
+    it('CheckProgramLow reaches its member on a cloud connection', async () => {
+      await sessionContext.run(cloudStore, () =>
+        handleCheckProgram(context as any, { program_name: 'Z_X' }),
+      );
+      expect(callTo('check')).toBeDefined();
+    });
   });
 });
 

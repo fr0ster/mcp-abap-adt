@@ -284,7 +284,11 @@ it('every Dockerfile installs with --ignore-scripts', () => {
   const files = readdirSync(dir).filter((name) =>
     name.startsWith('Dockerfile'),
   );
-  expect(sorted(files)).toEqual(['Dockerfile', 'Dockerfile.inspect']);
+  expect(sorted(files)).toEqual([
+    'Dockerfile',
+    'Dockerfile.inspect.cloud',
+    'Dockerfile.inspect.onprem',
+  ]);
   const installs = files.flatMap((name) =>
     readFileSync(join(dir, name), 'utf8')
       .split(/\r?\n/)
@@ -292,7 +296,7 @@ it('every Dockerfile installs with --ignore-scripts', () => {
       .filter((line) => /\bnpm (ci|install|i)\b/.test(line))
       .map((line) => `${name}: ${line.trim()}`),
   );
-  expect(installs.length).toBe(3);
+  expect(installs.length).toBe(4);
   expect(installs.filter((line) => !line.includes('--ignore-scripts'))).toEqual(
     [],
   );

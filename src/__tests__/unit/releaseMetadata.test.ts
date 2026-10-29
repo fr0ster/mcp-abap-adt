@@ -215,12 +215,28 @@ describe('release metadata names the version npm will carry', () => {
     }
   });
 
-  // Glama builds from npm; the reference image pins the release, so a rebuild
-  // cannot put a newer package under an older release number.
-  it('the Glama image installs this release of core', () => {
-    const pinned = read('docker/Dockerfile.inspect').match(
-      /^ARG CORE_VERSION=(\S+)$/m,
-    )?.[1];
-    expect(pinned).toBe(manifests.core.version);
-  });
+  // Glama builds from npm; each reference image (one per system type) pins
+  // the release, so a rebuild cannot put a newer package under an older
+  // release number.
+  it.each(['onprem', 'cloud'])(
+    'the Glama image of %s installs this release of core',
+    (variant) => {
+      const pinned = read(`docker/Dockerfile.inspect.${variant}`).match(
+        /^ARG CORE_VERSION=(\S+)$/m,
+      )?.[1];
+      expect(pinned).toBe(manifests.core.version);
+    },
+  );
+
+  // Each image starts the inspection with its system type: the tools listed
+  // are those of the variant's ADT type table. `--` ends mcp-proxy's own
+  // options, so the flag reaches the server.
+  it.each(['onprem', 'cloud'])(
+    'the Glama image of %s starts the inspection with --system-type=%s',
+    (variant) => {
+      expect(read(`docker/Dockerfile.inspect.${variant}`)).toContain(
+        `CMD ["mcp-proxy", "--", "mcp-abap-adt", "--system-type=${variant}"]`,
+      );
+    },
+  );
 });

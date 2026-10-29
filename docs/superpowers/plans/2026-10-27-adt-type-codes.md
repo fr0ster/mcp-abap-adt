@@ -200,7 +200,69 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
   Tests cover a typed literal that passes, an untyped one that fails, a valid prose mention and an invalid one.
 - **Docs.** The README and docs of all three packages, the examples, and the migration notes.
 - **Verify before the review:** every CI step is green (lint, build, `test:check`, every unit suite, `check:packed`, `check:publish`).
-- **Release.** Run the Codex review. The owner merges and publishes in order. Then do a clean install of all three from the registry, outside the repository.
+- **Release.** Run the Codex review. The owner merges and publishes in order. Then do a clean install of all three from the registry, outside the repository. The release waits for Part U, which ships in the same 38.0.0.
+
+## Part U: ABAP Unit runs (spec 3.5)
+
+Order: U1 is published before U2 builds on it, because dependencies come from the registry. U2–U4 go into adt-clients' PR #282, before C7's release.
+
+### Task U1: the registry entry (interfaces-adt, its own PR, a minor)
+
+- **`ABAP_UNIT_RUN_TYPES`.** One entry per `osl:object type` value. Each entry carries what it runs and the scope that needs (own tests, or assigned tests with `foreignTests`), plus its evidence:
+  - **recorded**, for a run measured on S/4HANA 2025 and ABAP cloud: `CLAS`, `CLAS/OC`, `CLAS/OCL`, `PROG`, `PROG/P`, `FUGR`, `FUGR/F`, `FUNC`, and `DDLS/DF` and `DDLS` with assigned tests;
+  - **metadata**, for the rest of the 23 codes of `/abapunit/metadata`;
+  - **`FUGR/FF`** carries "metadata lists it, a run answered empty".
+- **The derived types.**
+  - The run object type is the union of the constant's keys.
+  - The run target is a discriminated union: `{ kind: 'object', name, type }` or `{ kind: 'package', name, includeSubpackages }`.
+- **The runner contract.** A run by target and a run by ADT URIs, with the existing scope, risk level and duration options.
+- **Verify.**
+  - A recorded typecheck proves three things:
+    - every key is in the run type;
+    - a package cannot be passed as an object type;
+    - an unlisted value does not compile.
+  - Mutation-proven, as the earlier patches were.
+  - README and CHANGELOG, with no migration needed (nothing is removed).
+- **Release.** Codex review, then merge and tag on the owner's word; the owner publishes. Verify on the registry.
+
+### Task U2: the recorded answers
+
+- Record `GET /sap/bc/adt/abapunit/metadata` of S/4HANA 2025 and ABAP cloud into `corpus/adt/abapunit/<release>/`, scrubbed as the rest of the corpus. Read only.
+- Add the folder to the corpus README's layout table and to the identity test's note.
+- **Verify:** `corpusCarriesNoIdentity` passes with the new files.
+
+### Task U3: the generic runner (adt-clients)
+
+- **The runner** implements U1's contract:
+  - an object target goes as `osl:flatObjectSet` with one `osl:object`;
+  - a package target goes as `osl:packageSet` with `osl:package name includeSubpackages`;
+  - URIs go to `/testruns`;
+  - status and result use the existing members.
+
+  The bodies are the ones measured in spec 3.5.
+- **A getter on the executor** returns it. It follows the result-set pattern of the other runners.
+- **The four runners** keep the values they send. `startByObject` and the run object's `type` take U1's run type, so no request changes.
+- **The scan.** The four ABAP Unit allowlist entries go; the literals are typed by U1.
+- **The conformance check** gains two rules, each with a negative fixture:
+  - every code in a release's recorded metadata is in `ABAP_UNIT_RUN_TYPES`;
+  - every entry with evidence "metadata" is in the recorded metadata of each release.
+- **Verify.**
+  - Request-shape unit tests for the object target, the package target (with and without subpackages) and the URI run.
+  - The four runners' existing request-shape tests unchanged.
+  - Every CI step green.
+
+### Task U4: legacy and live
+
+- **Legacy.** The legacy runner refuses an object or package target without a request (7.40 has no `/runs`). It keeps the URI run on `/testruns`. Each path gets a unit test.
+- **Live suites** on S/4HANA 2025 and ABAP cloud, our own objects in local packages only, with fresh names. Each suite creates its objects, runs them and deletes them, then reads back their absence:
+  - a class run with `CLAS/OC`;
+  - a CDS view's assigned test run with `DDLS/DF` and `foreignTests`;
+  - a package run through the package target.
+- **Docs.**
+  - README and usage docs: the generic runner, the two targets, the scope a CDS run needs, and that a wrong type is answered with an empty result, not an error.
+  - CHANGELOG 38.0.0: the new runner under Added; the run type replacing `string` under Changed. No narrowing, because the type holds every measured value.
+  - The interfaces-adt range bumped to U1's version.
+- **Verify:** the three live suites pass on both releases; Codex review of U2–U4.
 
 ## Part S: the server (#329, mcp-abap-adt 21.0.0)
 
@@ -259,6 +321,18 @@ The conformance check runs in adt-clients, so its recorded answers live in adt-c
   - `unknownType` in answers.
 - Update the tool docs, the user guide and the package READMEs.
 - **Verify.** `npm run docs:tools` leaves the committed tool docs unchanged. The CHANGELOG names every changed tool argument.
+
+### Task S8: the ABAP Unit run tool
+
+- **The tool.** One tool runs ABAP Unit by U1's target, an object or a package, with the scope options.
+  - Its `type` enum comes from `ABAP_UNIT_RUN_TYPES`.
+  - Its description says that a CDS view's tests are assigned tests, which need `foreignTests`.
+  - Today's per-object test tools keep working.
+- **Legacy servers** offer only the URI run.
+- **Verify.**
+  - A unit test asserts that the tool's enum equals the registry's keys.
+  - The tool-surface fixtures are regenerated.
+  - S9 runs the tool live.
 
 ### Task S9: live
 

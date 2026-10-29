@@ -248,7 +248,9 @@ A config or object reference for an API with a parent requires the parent's name
   - `FUNC` (function module).
 
   `FUGR/FF`, which metadata lists, answered an **empty** result for a module.
-- **CDS assigned tests.** A view's assigned tests are local test classes marked `"! @testing <view>`; the plain name worked, and `DDLS:<view>` did not link. They ran with `DDLS/DF` and with `DDLS`, but only when the run's scope sets `foreignTests="true"`. With own tests only, the result was empty.
+- **CDS assigned tests.** A view's assigned tests are local test classes marked `"! @testing <view>`; the plain name worked, and `DDLS:<view>` did not link. They ran with `DDLS/DF` and with `DDLS`, but only when the run's scope sets `foreignTests="true"`. A test that fails on purpose then carries its `failedAssertion` alert.
+  - **Own tests only, preview off:** the result was empty.
+  - **Own tests only, `addForeignTestsAsPreview="true"`** (the library's default): the result lists the assigned test methods with no alert at all, a failing one included. A preview lists the tests and does not execute them, so a consumer reading a CDS run sets `foreignTests="true"`.
 - **A package** ran its tests only as `osl:packageSet` with `<osl:package name includeSubpackages>`, alone or inside `osl:unionSet`. `osl:object type="DEVC/K"` and `type="DEVC"` answered empty.
 - **A type the endpoint does not run is not refused.** The start answers `201`, and the result is an empty `<aunit:runResult/>`. Only the compiler can catch a wrong type.
 - **`/sap/bc/adt/abapunit/testruns`** (the synchronous runner, and the only one on 7.40) names objects by ADT URI, not by type.

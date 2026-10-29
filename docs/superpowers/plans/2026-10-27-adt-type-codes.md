@@ -272,12 +272,13 @@ Order: T1 is published before T2 builds on it; T2 is published before S1 moves t
 
 - `main` on every code entry of the three tables, required by the table type and equal to `AdtMainTypeOf<code>`.
 - `AdtMainTypeOf<C>`, `AdtMainType` (and per variant), `CodesOfMain<M>`.
-- The search filter's parameter type becomes `AdtTypeCode | AdtMainType`.
-- **Verify:** a recorded typecheck — a wrong `main` and a missing `main` do not compile, `AdtMainTypeOf<'ENHO/XHH'>` is `'ENHO'`, `CodesOfMain<'ENHO'>` holds `ENHO/XHH`, an address parameter refuses a main type; each `@ts-expect-error` mutation-proven. README, CHANGELOG (Added, no migration). Codex review; merge, tag and publish on the owner's word.
+- `ADT_SEARCH_TYPES_ONPREM`, `ADT_SEARCH_TYPES_CLOUD` from the recorded object types lists, `ADT_SEARCH_TYPES_BASIS_740` from the recorded 7.40 searches; the search filter's parameter takes the variant's names (spec 3.6).
+- **Verify:** a recorded typecheck — a wrong `main` and a missing `main` do not compile, `AdtMainTypeOf<'ENHO/XHH'>` is `'ENHO'`, `CodesOfMain<'ENHO'>` holds `ENHO/XHH`, an address parameter refuses a main type, the search filter takes `STRU` and refuses `TABL/DS` and `NOPE`, every table main type is a search name of its variant; each `@ts-expect-error` mutation-proven. README, CHANGELOG (Added, no migration). Codex review; merge, tag and publish on the owner's word.
 
 ### Task T2: the search and the group utilities (adt-clients, its own PR, a minor)
 
-- Move to T1's interfaces-adt. The search accepts `AdtTypeCode | AdtMainType`; request unchanged for a code.
+- Move to T1's interfaces-adt. The search takes the variant's search names (spec 3.6).
+- Record the object types lists of S/4HANA 2025 and ABAP cloud into the corpus (`corpus/adt/informationsystem/<release>/`); the conformance check gains: the constant equals the recorded list, name for name and type for type, and every table main type is a name.
 - `AdtUtils` satisfies interfaces-adt's typed atoms (`IAdtTypedGroupLifecycle`, `IAdtTypedWhereUsed`): its code sets include `VIEW/DV`, its references require `parentName` where the table says so (spec 2.3).
 - The literal scan treats a main type literal as it treats a code literal.
 - **Verify:** request-shape tests for the search with a main type and with a code; a compile check that `AdtUtils` is assignable to the typed atoms; every CI step green. Codex review; merge, tag and publish on the owner's word.

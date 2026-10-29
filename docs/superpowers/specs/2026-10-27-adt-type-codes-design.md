@@ -178,8 +178,8 @@ A config or object reference for an API with a parent requires the parent's name
 - **Derived types**, both directions of the relation:
   - `AdtMainTypeOf<C>`: `C extends \`${infer M}/${string}\` ? M : C`;
   - `AdtMainType` (and per variant): the main types of the tables' codes;
-  - `CodesOfMain<M>`: `Extract<AdtTypeCode, \`${M}/${string}\`>`.
-- **A main type is not an address.** `TABL` is `TABL/DT` or `TABL/DS`, `PROG` is `PROG/P` or `PROG/I`. Operations that build an address (read, write, metadata, URI, where-used, group operations) take only a code. A main type is accepted only by a parameter the endpoint is measured to read as one; today that is the search filter (3.6).
+  - `CodesOfMain<M>`: `Extract<AdtTypeCode, M | \`${M}/${string}\`>` (a code without `/`, such as `AUTH`, is its own main type).
+- **A main type is not an address.** `TABL` is `TABL/DT` or `TABL/DS`, `PROG` is `PROG/P` or `PROG/I`. Operations that build an address (read, write, metadata, URI, where-used, group operations) take only a code. A main type is accepted only where the endpoint is measured to read one; the search filter takes the object types list's names (3.6), of which every table main type is one.
 - **A literal main type** in production source is refused by the literal scan (6), as a literal code is: the compiler cannot tell a hand-written `'ENHO'` from the table's value.
 
 ## 3. adt-clients, adt-strategies, adt-clients-legacy
@@ -296,13 +296,22 @@ A config or object reference for an API with a parent requires the parent's name
 - adt-clients ships the generic runner in 38.0.0.
 - The server's tool for it is Part S's, after the spec's review.
 
-### 3.6 The search filter takes a main type (measured 2026-10-29, read only)
+### 3.6 The search filter: the names of the object types list (measured 2026-10-29, read only)
 
-- **Measured** on S/4HANA 2025 and ABAP cloud, `quickSearch` with `maxResults=200`, identical on both:
-  - the filter selects by the main type only: `DEVC`, `DEVC/K` and `DEVC/XX` all answer `DEVC/K` only; `ENHO/XHH` answers `ENHO/XHB`, `ENHO/XHH` and `ENHO/XH`; a nonexistent subtype (`ENHO/XX`, `ENHS/XX`) answers exactly what the real code answers;
-  - a main type and a code of it answer different first 200 hits (`ENHO`: XHB 86, XHH 113, XH 1; `ENHO/XHH`: XHB 157, XHH 41, XH 2 on S/4HANA 2025). So sending a code instead of the main type changes what a capped search returns.
-- **So the search filter's type is `AdtTypeCode | AdtMainType`**, and the server sends the main type where it sent one on adt-clients 37 (`DEVC`, `ENHO`, `ENHS`), taken from the entry (`….codes['DEVC/K'].main`), never written as a literal.
-- **Not solved here:** the subtype is not a filter on the system's side; a caller wanting one subtype filters the hits. Hits of types outside the tables (seen on both: `SUSH`, `AUTH`, `SIA6`, `SUSO/B`, `NONT/NOT`, …) cannot be filtered for through the types; whether the search gets a type of its own for everything the endpoint accepts is the owner's question.
+- **The list.** `GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider` answers `200` `application/xml` (`nameditem:namedItemList`) on S/4HANA 2025 (386 names) and ABAP cloud (373; 349 shared, 36 on premise only, 23 cloud only). Each item has a name and `type:<code>;usedBy:…`; every item lists `quick_search`. On 7.40 the endpoint answers `404`.
+  - Most names are a main type, its `type` the main code (`DEVC` → `DEVC/K`, `CLAS` → `CLAS/OC`, `AUTH` → `AUTH`).
+  - Six names are aliases of one code: `STRU` → `TABL/DS`, `DTAB` → `TABL/DT`, `REPO` → `PROG/P`, `INCL` → `PROG/I`, `FUNC` → `FUGR/FF`, `BADI` → `ENHS/XB`.
+  - About fifty are groups (`type:WGRP`); `ABAP_TEST_COCKPIT` answers `CHKO`, `CHKV`, `CHKC` and `CHKE` hits.
+  - Every main type of the on-premise and cloud tables is a name of its release's list.
+- **The filter, quickSearch with `maxResults=200`, identical on S/4HANA 2025 and ABAP cloud:**
+  - a name selects what the list says: `STRU` only `TABL/DS`, `DTAB` only `TABL/DT`, `TABL` both, a group its members;
+  - a code equal to an item's `type` selects as that item (`TABL/DS` only `TABL/DS`); any other code selects as the text before `/` (`ENHO/XHH` and `ENHO/XX` answer as `ENHO`; `DEVC/XX` as `DEVC`), and a main type and such a code answer different capped hits (`ENHO`: XHB 86, XHH 113, XH 1; `ENHO/XHH`: XHB 157, XHH 41, XH 2 on S/4HANA 2025);
+  - an unknown name answers `400`; an unknown code (`NOPE/XX`) answers `200` and no hits, silently.
+  - The mechanism (a code matched against the items' types, else cut at `/`) is Inference; the answers are Measured.
+- **On 7.40 (measured over RFC):** no list; `DEVC`, `CLAS`, `INTF`, `PROG`, `FUGR`, `FUNC`, `DDLS`, `MSAG`, `TABL`, `ENHO`, `ENHS` select; every code selects as its main type (`TABL/DS` answers both table kinds); the aliases `STRU`, `DTAB`, `REPO`, `INCL`, `BADI` and an unknown name answer `200` and no hits, silently.
+- **So the filter's type is the list's names, per variant** — `ADT_SEARCH_TYPES_ONPREM`, `ADT_SEARCH_TYPES_CLOUD` (written from the recorded lists, each name with its `type` code or group, evidence the recorded list) and `ADT_SEARCH_TYPES_BASIS_740` (the names measured above, evidence the recorded searches). A code is not a filter value: one that is no item's type widens or empties the search silently, which the types cannot see. A subtype is searched by its alias (`STRU`).
+- **The server** sends the main type taken from the table entry (`….codes['DEVC/K'].main`: `DEVC`, `ENHO`, `ENHS`, as on 37); the conformance check proves every table main type is a search name of its variant.
+- **Not solved here:** a subtype without an alias (`ENHO/XHH`) cannot be searched alone; the caller filters the hits.
 
 ## 4. The conformance check
 

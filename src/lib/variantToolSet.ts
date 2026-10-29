@@ -14,7 +14,10 @@
  * **Beside `available_in`, not instead of it.** A tool is registered when
  * `available_in` admits the environment *and* the table serves its need: the
  * table only removes. Where a tool is restricted by `available_in` although
- * the table serves it, `available_in` keeps deciding. Discovery stays where it
+ * the table serves it (`GetProgram` on cloud: `ADT_TYPES_CLOUD` lists a
+ * program's `read`), `available_in` keeps deciding. For programs on cloud
+ * that is a decision, not a gap: a user creates no program there, and the
+ * SAP programs ADT still serves are not what the tools are for. Discovery stays where it
  * decides today (a feed, a collection the system announces): the table is the
  * type gate, not the system's word.
  *

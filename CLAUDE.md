@@ -62,9 +62,9 @@ Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available every
 
 ### Cloud vs On-Prem
 
-- Programs on ABAP Cloud: read, source, versions, check and the unit run are served (SAP programs; `ADT_TYPES_CLOUD`); create, update, delete, activate, lock and validate are on premise only
+- Programs are NOT available on ABAP Cloud (`available_in: ['onprem', 'legacy']`)
 - Runtime profiling (class-based) and dumps work on both cloud and onprem
-- `RuntimeRunProgram*` tools are on premise only (a program cannot be run on cloud)
+- `RuntimeRunProgramWithProfiling` is onprem-only (no programs on cloud)
 
 ## npm Package Verification
 

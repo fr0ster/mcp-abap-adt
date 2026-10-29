@@ -227,6 +227,61 @@ A config or object reference for an API with a parent requires the parent's name
   - a request-shape unit test;
   - a live cycle: read metadata → change the description → write → read back and compare → restore.
 
+### 3.5 ABAP Unit runs: what a run names, from the registry
+
+**Why.** The library starts an ABAP Unit run only through four runners (class, program, function group, function module). Each runner fixes its own `osl:object type`, and the member that takes any type is `protected`. A consumer therefore cannot run the tests of anything else that ABAP Unit runs: a CDS view's assigned tests, a package, a class include. Typing the runners' parameter from their four callers would cut what the endpoint accepts. The type must instead name what the endpoint accepts (owner).
+
+**What the systems say** (measured 2026-10-29 on S/4HANA 2025 and ABAP cloud, with identical results; on our own objects in local packages, deleted afterwards):
+
+- **`GET /sap/bc/adt/abapunit/metadata`** (`application/vnd.sap.adt.abapunit.metadata.result.v1+xml`) lists 23 `supportedTypeFeatures`. Each entry has a `globalWorkbenchType` and three flags: `ownTests`, `assignedTests` and `coverage`. The 23 codes are:
+  - classes: `CLAS/OC`, `CLAS/OCI`, `CLAS/OCP`, `CLAS/OCL`, `CLAS/OLD`;
+  - programs: `PROG/P`, `PROG/I`, `PROG/PL`, `PROG/PLM`;
+  - function groups: `FUGR/F`, `FUGR/FF`, `FUGR/I`, `FUGR/PL`, `FUGR/PLM`;
+  - containers: `DEVC/K`, `RQRQ/RQ`;
+  - assigned tests only: `DDLS/DF`, `DCLS/DL`, `BDEF/BDO`, `SRVB/SVB`, `XSLT/VT`, `TABL/DT`, `CMPT`.
+
+  It also answers `clientSetup maxRiskLevel` and `executionDenied` for the client and for the user. 7.40 has no such endpoint.
+- **`POST /sap/bc/adt/abapunit/runs` with `osl:flatObjectSet`** names one object by name and `osl:object type`. These types ran the object's tests:
+  - `CLAS`, `CLAS/OC` and `CLAS/OCL` (class);
+  - `PROG` and `PROG/P` (report);
+  - `FUGR` and `FUGR/F` (function group);
+  - `FUNC` (function module).
+
+  `FUGR/FF`, which metadata lists, answered an **empty** result for a module.
+- **CDS assigned tests.** A view's assigned tests are local test classes marked `"! @testing <view>`; the plain name worked, and `DDLS:<view>` did not link. They ran with `DDLS/DF` and with `DDLS`, but only when the run's scope sets `foreignTests="true"`. With own tests only, the result was empty.
+- **A package** ran its tests only as `osl:packageSet` with `<osl:package name includeSubpackages>`, alone or inside `osl:unionSet`. `osl:object type="DEVC/K"` and `type="DEVC"` answered empty.
+- **A type the endpoint does not run is not refused.** The start answers `201`, and the result is an empty `<aunit:runResult/>`. Only the compiler can catch a wrong type.
+- **`/sap/bc/adt/abapunit/testruns`** (the synchronous runner, and the only one on 7.40) names objects by ADT URI, not by type.
+
+**The registry entry** (interfaces-adt, constants and types only):
+
+- **Run object types.** `ABAP_UNIT_RUN_TYPES` holds every `osl:object type` value measured to run tests. Each value carries:
+  - what it runs: own tests, or assigned tests, and with them the scope it needs (`foreignTests`);
+  - its evidence: recorded, or the metadata answer only.
+
+  The 23 codes of `/abapunit/metadata` are entered with evidence "metadata", unless a run measured them otherwise; `FUGR/FF` is entered as "metadata lists it, a run answered empty". The type a run takes is the union of every value in the constant, so it narrows nothing the endpoint was measured to accept.
+- **Run targets.** A run names either an object, `{ kind: 'object', name, type }`, or a package, `{ kind: 'package', name, includeSubpackages }`. The two are a discriminated union, so a package cannot be named as an object type.
+- **The runner contract.** It covers a run by target and a run by ADT URIs (`testruns`). The scope, risk level and duration options stay the consumer's.
+
+**adt-clients.**
+
+- **A public generic runner** implements the contract on `/runs` (object and package targets) and on `/testruns` (URIs). The request body is the one measured above.
+- **The four runners stay** and keep the types they send today (`CLAS`, `PROG`, `FUGR`, `FUNC`), now typed by the registry's union. No request changes.
+- **The literal scan** has no ABAP Unit exception left: the literals are typed by the registry.
+- **The metadata answers** of both releases go into the corpus (`corpus/adt/abapunit/`). The conformance check asserts:
+  - every metadata code is in `ABAP_UNIT_RUN_TYPES`;
+  - every registry value marked "metadata" is in the recorded answer of its release.
+- **Proof.**
+  - Request-shape unit tests for each target kind.
+  - Live cycles on S/4HANA 2025 and ABAP cloud: a class run by `CLAS/OC`, a CDS view's assigned test by `DDLS/DF` with `foreignTests`, and a package run.
+- **7.40.** The legacy package keeps `testruns` (URIs). It serves no `/runs` target and refuses it without a request.
+
+**Versions.**
+
+- interfaces-adt takes the constant, the types and the contract as a minor: new members, nothing removed.
+- adt-clients ships the generic runner in 38.0.0.
+- The server's tool for it is Part S's, after the spec's review.
+
 ## 4. The conformance check
 
 **What it reads, and what it reports.**
@@ -320,6 +375,6 @@ The operations themselves are proved by the library's own unit and live tests, a
 
 - No runtime check against the system.
 - No coverage tool for the model (later, owner).
-- No new API gets support. Coverage lists what is not served.
+- No new API gets support. Coverage lists what is not served. The one exception is the generic ABAP Unit runner of 3.5 (owner, 2026-10-29).
 - No behaviour change for a correct code.
 - No detection of the system type.

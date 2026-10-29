@@ -264,6 +264,24 @@ Order: U1 is published before U2 builds on it, because dependencies come from th
   - The interfaces-adt range bumped to U1's version.
 - **Verify:** the three live suites pass on both releases; Codex review of U2–U4.
 
+## Part T: main types (spec 2.4, 3.6)
+
+Order: T1 is published before T2 builds on it; T2 is published before S1 moves to it.
+
+### Task T1: main types in the tables (interfaces-adt, its own PR, a minor)
+
+- `main` on every code entry of the three tables, required by the table type and equal to `AdtMainTypeOf<code>`.
+- `AdtMainTypeOf<C>`, `AdtMainType` (and per variant), `CodesOfMain<M>`.
+- The search filter's parameter type becomes `AdtTypeCode | AdtMainType`.
+- **Verify:** a recorded typecheck — a wrong `main` and a missing `main` do not compile, `AdtMainTypeOf<'ENHO/XHH'>` is `'ENHO'`, `CodesOfMain<'ENHO'>` holds `ENHO/XHH`, an address parameter refuses a main type; each `@ts-expect-error` mutation-proven. README, CHANGELOG (Added, no migration). Codex review; merge, tag and publish on the owner's word.
+
+### Task T2: the search and the group utilities (adt-clients, its own PR, a minor)
+
+- Move to T1's interfaces-adt. The search accepts `AdtTypeCode | AdtMainType`; request unchanged for a code.
+- `AdtUtils` satisfies interfaces-adt's typed atoms (`IAdtTypedGroupLifecycle`, `IAdtTypedWhereUsed`): its code sets include `VIEW/DV`, its references require `parentName` where the table says so (spec 2.3).
+- The literal scan treats a main type literal as it treats a code literal.
+- **Verify:** request-shape tests for the search with a main type and with a code; a compile check that `AdtUtils` is assignable to the typed atoms; every CI step green. Codex review; merge, tag and publish on the owner's word.
+
 ## Part S: the server (#329, mcp-abap-adt 21.0.0)
 
 ### Task S1: dependencies and #216's Part C
@@ -273,6 +291,7 @@ Order: U1 is published before U2 builds on it, because dependencies come from th
 - **Verify:**
   - negative compile checks through the server's own contract: a factory the variant lacks and an operation the API lacks each fail with `@ts-expect-error`;
   - build and `test:check` are green before S2.
+- **After T2:** move to T1's and T2's versions; the package and enhancement searches send the main type from the table entry (`DEVC`, `ENHO`, `ENHS`, as on 37); the contract's `getUtils` uses the typed atoms.
 
 ### Task S2: the variant and the tool set
 

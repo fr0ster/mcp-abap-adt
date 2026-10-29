@@ -170,6 +170,18 @@ export const ADT_TYPES_BASIS_740 = {
 
 A config or object reference for an API with a parent requires the parent's name in its type. The function module's config, the function include's, and the object references of the group utilities are reshaped so that the parent is required where the table says so. A `Partial<…>` that drops it is not used for those.
 
+### 2.4 Main types: the base of every code
+
+- **Every code entry names its main type**, the TADIR object type of `R3TR <type>` (`CLAS`, `DEVC`, `ENHO`, `ENHS`, `TABL`): `'ENHO/XHH': { main: 'ENHO', parent: null, … }`.
+  - The table type requires `main` on every code and requires it to equal `AdtMainTypeOf<code>`, so a missing or wrong main type does not compile.
+  - The value is read from the entry; nothing splits a code at runtime.
+- **Derived types**, both directions of the relation:
+  - `AdtMainTypeOf<C>`: `C extends \`${infer M}/${string}\` ? M : C`;
+  - `AdtMainType` (and per variant): the main types of the tables' codes;
+  - `CodesOfMain<M>`: `Extract<AdtTypeCode, \`${M}/${string}\`>`.
+- **A main type is not an address.** `TABL` is `TABL/DT` or `TABL/DS`, `PROG` is `PROG/P` or `PROG/I`. Operations that build an address (read, write, metadata, URI, where-used, group operations) take only a code. A main type is accepted only by a parameter the endpoint is measured to read as one; today that is the search filter (3.6).
+- **A literal main type** in production source is refused by the literal scan (6), as a literal code is: the compiler cannot tell a hand-written `'ENHO'` from the table's value.
+
 ## 3. adt-clients, adt-strategies, adt-clients-legacy
 
 ### 3.1 One client, parameterised by its variant
@@ -283,6 +295,14 @@ A config or object reference for an API with a parent requires the parent's name
 - interfaces-adt takes the constant, the types and the contract as a minor: new members, nothing removed.
 - adt-clients ships the generic runner in 38.0.0.
 - The server's tool for it is Part S's, after the spec's review.
+
+### 3.6 The search filter takes a main type (measured 2026-10-29, read only)
+
+- **Measured** on S/4HANA 2025 and ABAP cloud, `quickSearch` with `maxResults=200`, identical on both:
+  - the filter selects by the main type only: `DEVC`, `DEVC/K` and `DEVC/XX` all answer `DEVC/K` only; `ENHO/XHH` answers `ENHO/XHB`, `ENHO/XHH` and `ENHO/XH`; a nonexistent subtype (`ENHO/XX`, `ENHS/XX`) answers exactly what the real code answers;
+  - a main type and a code of it answer different first 200 hits (`ENHO`: XHB 86, XHH 113, XH 1; `ENHO/XHH`: XHB 157, XHH 41, XH 2 on S/4HANA 2025). So sending a code instead of the main type changes what a capped search returns.
+- **So the search filter's type is `AdtTypeCode | AdtMainType`**, and the server sends the main type where it sent one on adt-clients 37 (`DEVC`, `ENHO`, `ENHS`), taken from the entry (`….codes['DEVC/K'].main`), never written as a literal.
+- **Not solved here:** the subtype is not a filter on the system's side; a caller wanting one subtype filters the hits. Hits of types outside the tables (seen on both: `SUSH`, `AUTH`, `SIA6`, `SUSO/B`, `NONT/NOT`, …) cannot be filtered for through the types; whether the search gets a type of its own for everything the endpoint accepts is the owner's question.
 
 ## 4. The conformance check
 

@@ -78,7 +78,7 @@ export const VERSIONED_TYPES: VersionedTypeRow[] = [
     display: 'Program',
     nameParam: 'program_name',
     label: 'ABAP program',
-    available_in: ['onprem'],
+    available_in: ['onprem', 'cloud'],
   },
   {
     object_type: 'interface',

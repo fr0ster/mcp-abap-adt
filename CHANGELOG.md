@@ -26,6 +26,10 @@ stdio has no idle bound: the stdio server's life and its held state are the clie
 
 - **Sibling ranges at `^20.1.1`** in every manifest — `dependencies`, `peerDependencies` and `devDependencies`: server-runtime's stdio server reads lib's `NO_IDLE_BOUND`, and every binary takes the server-runtime that states it.
 
+### Security
+
+- **The lockfile takes body-parser 2.4.0 (under express) and fast-uri 3.1.9 (under the MCP SDK's ajv)**, for GHSA advisories published against 2.3.0 (a denial of service through trailing bytes after a compressed body) and 3.1.8 (URI scheme, path and host confusion). No dependency range changed.
+
 ## [20.1.0] - 2026-10-23
 
 Both ABAP Unit runners, chosen per call with `runner: 'async' | 'sync'` ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286), [#313](https://github.com/fr0ster/mcp-abap-adt/pull/313)); a write whose cleanup UNLOCK fails says the object may be left locked, and a save refused by `CTS_WBO_API` 019 / 020 names the request that holds the object ([#314](https://github.com/fr0ster/mcp-abap-adt/issues/314), [#316](https://github.com/fr0ster/mcp-abap-adt/pull/316)); on `@mcp-abap-adt/connection` 19.1.0, which resends a request lost on a dead kept-alive socket once on a new connection (#314's `socket hang up`); the 7-day release age dropped ([#315](https://github.com/fr0ster/mcp-abap-adt/pull/315)). The eighteen packages are all at 20.1.0, every sibling range at `^20.1.0` — `@mcp-abap-adt/compact-modify` needs `@mcp-abap-adt/lib` 20.1.0 for `runner` on `HandlerUnitTestRun`.

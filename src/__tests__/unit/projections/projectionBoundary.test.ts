@@ -145,7 +145,10 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
         'program',
         refused('Unsupported object_type "program": Supported: PROG/P'),
       ],
-      wrong: ['FUGR', 'Unsupported object_type "FUGR": Supported: PROG/P'],
+      wrong: [
+        'FUGR/FF',
+        'Unsupported object_type "FUGR/FF": Supported: PROG/P',
+      ],
     },
   ),
   // Any code of the variant's table, or a name.

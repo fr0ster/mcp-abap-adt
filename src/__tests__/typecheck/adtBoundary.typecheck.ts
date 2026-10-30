@@ -11,17 +11,31 @@
  */
 
 import {
+  ACTIVATION_CODES,
+  type ActivationCode,
+  type AmbiguousMainTypes,
   type CHECK_KIND_ROUTES,
   CHECK_KINDS,
   type COMPACT_ACTIVATE_ROUTES,
   type COMPACT_CHECK_ROUTES,
+  type INCLUDES_PARENT_ROUTES,
   type KindsOf,
   type LOCK_KINDS,
+  type MainTypeCodes,
+  type MainTypeOfOne,
+  type ServedName,
+  type SINGLE_ACTIVATION_ROUTES,
+  type TABLE_CODES,
   type VersionedKind,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
+  type WhereUsedCode,
 } from '../../lib/adtProjections';
-import { acceptedCodeOf, acceptedOf } from '../../lib/adtTypeCode';
+import {
+  acceptedCodeOf,
+  acceptedOf,
+  mainTypeCodeOf,
+} from '../../lib/adtTypeCode';
 import type {
   BREAKPOINT_OBJECT_CODES,
   BreakpointLabel,
@@ -117,3 +131,74 @@ export const groupLabel: BreakpointLabel = 'FUGR';
 export const classRun: RunKind = 'class';
 // @ts-expect-error an interface is not run: no table lists `run` for it.
 export const interfaceRun: RunKind = 'interface';
+
+// --- Main types (S4b): one code, or refused naming the codes ---------------
+
+type WhereUsedOnPremMains = MainTypeCodes<WhereUsedCode<'onprem'>>;
+type WhereUsedOnPremShared = AmbiguousMainTypes<WhereUsedCode<'onprem'>>;
+
+/** Where-used has one message class code: `MSAG` stands for it… */
+export const msagWhereUsed: WhereUsedOnPremMains['MSAG'] = 'MSAG/N';
+// @ts-expect-error …a table and a structure share `TABL`: no single code…
+export const tablWhereUsed: WhereUsedOnPremMains['TABL'] = 'TABL/DT';
+/** …it is ambiguous, with both its codes… */
+export const tablShared: WhereUsedOnPremShared['TABL'] = ['TABL/DT', 'TABL/DS'];
+// @ts-expect-error …and `MSAG`, with one code, is not ambiguous.
+export const msagShared: WhereUsedOnPremShared['MSAG'] = ['MSAG/N'];
+
+/** A code equal to its main type is a code, never a main type of the map. */
+export const authIsACode: WhereUsedCode<'onprem'> = 'AUTH';
+// @ts-expect-error `AUTH` has no slash: the map does not hold it.
+export const authAsMain: WhereUsedOnPremMains['AUTH'] = 'AUTH';
+
+type TableMains = MainTypeCodes<(typeof TABLE_CODES.onprem)[number]>;
+type TableShared = AmbiguousMainTypes<(typeof TABLE_CODES.onprem)[number]>;
+
+/** The table holds one data source code… */
+export const dsfdInTable: TableMains['DSFD'] = 'DSFD/SCF';
+// @ts-expect-error …but two message class codes, so `MSAG` is no code there…
+export const msagInTable: TableMains['MSAG'] = 'MSAG/N';
+/** …it is ambiguous there, with both. */
+export const msagSharedInTable: TableShared['MSAG'] = ['MSAG/N', 'MSAG/NN'];
+
+/** An enhancement spot is one code on cloud's group activation… */
+export const enhsOnCloud: MainTypeOfOne<ActivationCode<'cloud'>> = 'ENHS';
+// @ts-expect-error …an enhancement implementation is two (`XHH`, `XHB`).
+export const enhoOnCloud: MainTypeOfOne<ActivationCode<'cloud'>> = 'ENHO';
+// @ts-expect-error A program is not activated on cloud: no `PROG` at all.
+export const progOnCloud: MainTypeOfOne<ActivationCode<'cloud'>> = 'PROG';
+
+/** GetIncludesList reads `CLAS` as its one class parent… */
+export const clasParent: MainTypeOfOne<
+  ServedName<'onprem', typeof INCLUDES_PARENT_ROUTES>
+> = 'CLAS';
+// @ts-expect-error …while a program and an include share `PROG`.
+export const progParent: MainTypeOfOne<
+  ServedName<'onprem', typeof INCLUDES_PARENT_ROUTES>
+> = 'PROG';
+
+/** Past the boundary, a main type is the projection's code… */
+export const mainOfActivation:
+  | (typeof ACTIVATION_CODES.cloud)[number]
+  | undefined = mainTypeCodeOf('ENHS', ACTIVATION_CODES.cloud);
+// @ts-expect-error …never a code the projection does not hold.
+export const mainOfActivationProgram: 'PROG/P' | undefined = mainTypeCodeOf(
+  'ENHS',
+  ACTIVATION_CODES.cloud,
+);
+
+/**
+ * Every single-object activation code is a group activation code on its
+ * variant, so a main type is read over the group's codes alone
+ * (`activationTextOf`).
+ */
+type SingleCodes<V extends 'onprem' | 'cloud'> = Extract<
+  ServedName<V, typeof SINGLE_ACTIVATION_ROUTES>,
+  `${string}/${string}`
+>;
+export const singleCodesAreGroupCodes: [
+  SingleCodes<'onprem'>,
+  SingleCodes<'cloud'>,
+] extends [ActivationCode<'onprem'>, ActivationCode<'cloud'>]
+  ? true
+  : false = true;

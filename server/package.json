@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "20.1.0",
+  "version": "20.1.1",
   "description": "Standalone MCP server for SAP ABAP ADT over stdio: one destination through the auth broker (service keys, sessions, the browser login); connects to the system over HTTP, RFC or SNC (passwordless). RFC and SNC need the SAP NW RFC library at run time. Streamable HTTP is @mcp-abap-adt/http, SSE @mcp-abap-adt/sse; the compact variant is @mcp-abap-adt/compact.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -77,10 +77,10 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^20.1.0",
-    "@mcp-abap-adt/lib": "^20.1.0",
-    "@mcp-abap-adt/responsible-rules": "^20.1.0",
-    "@mcp-abap-adt/server-runtime": "^20.1.0"
+    "@mcp-abap-adt/background-runs-memory": "^20.1.1",
+    "@mcp-abap-adt/lib": "^20.1.1",
+    "@mcp-abap-adt/responsible-rules": "^20.1.1",
+    "@mcp-abap-adt/server-runtime": "^20.1.1"
   },
   "devDependencies": {
     "@types/jest": "*",

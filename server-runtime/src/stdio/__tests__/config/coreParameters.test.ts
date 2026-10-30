@@ -14,6 +14,7 @@ import {
   readStartupConfig,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { NO_IDLE_BOUND } from '@mcp-abap-adt/lib/state';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { load } from 'js-yaml';
 import { CORE_PARAMETERS, readCoreConfig } from '../../config/coreParameters';
@@ -84,6 +85,8 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
     stderr: written.join(''),
     exits,
     served: served.mock.calls.length,
+    /** The servers whose start was called. */
+    servers: served.mock.contexts,
   };
 }
 
@@ -104,6 +107,11 @@ describe("core's help", () => {
     'MCP_TLS_',
     '--allow-destination-header',
     'x-sap-debug-',
+    // stdio has no idle bound (20.1.1): the client governs the server's life.
+    '--state-idle-minutes',
+    'MCP_STATE_IDLE_MINUTES',
+    'state-idle-minutes',
+    'HELD STATE',
   ])('lists no %s', (name) => {
     expect(help).not.toContain(name);
   });
@@ -124,8 +132,6 @@ describe("core's help", () => {
     '--connection-type',
     '--system-type',
     '--conf',
-    '--state-idle-minutes',
-    'MCP_STATE_IDLE_MINUTES',
     '--shutdown-timeout',
     'MCP_SHUTDOWN_TIMEOUT',
     'SAP_DEBUG_TERMINAL_ID',
@@ -169,27 +175,53 @@ describe('--shutdown-timeout is a row of core', () => {
   });
 });
 
-describe('--state-idle-minutes is a row of core', () => {
-  it("29 stops the start with main's words", async () => {
-    const { stderr, exits, served } = await start(['--state-idle-minutes=29']);
-    expect(stderr).toContain(
-      'Invalid --state-idle-minutes: "29". Must be a whole number of minutes, at least 30',
-    );
+// stdio has no idle bound (20.1.1): the parameter is gone from core's table.
+// Stated to stdio — the CLI flag, the YAML key — it stops the start in the
+// removed parameter's words, never ignored, so a configuration that states a
+// bound learns it has none. MCP_STATE_IDLE_MINUTES is the HTTP and SSE
+// binaries' variable: stdio does not read it (an environment is inherited).
+describe('--state-idle-minutes is gone from core', () => {
+  const GONE =
+    'was removed from `mcp-abap-adt` in 20.1.1: stdio has no idle bound — held state ends by its stop tool, the client closing stdin, the backend or the shutdown; remove it from the configuration (the HTTP and SSE binaries keep it)';
+
+  it.each([
+    [['--state-idle-minutes=45'], {}, '--state-idle-minutes'],
+    [['--state-idle-minutes', '45'], {}, '--state-idle-minutes'],
+  ])('%p %p stops the start, naming %s', async (argv, env, form) => {
+    const { stderr, exits, served } = await start(argv, env);
+    expect(stderr).toContain(`[MCP] ${form} ${GONE}`);
     expect(exits).toEqual([1]);
     expect(served).toBe(0);
   });
 
-  it('CLI, env and YAML reach the config; 30 by default', () => {
-    expect(readCoreConfig([], {}).stateIdleMinutes).toBe(30);
+  it('the CLI flag and the YAML key are refused by the reader', () => {
+    expect(() => readCoreConfig(['--state-idle-minutes=45'], {})).toThrow(
+      `--state-idle-minutes ${GONE}`,
+    );
+    expect(() => readCoreConfig([], {}, { 'state-idle-minutes': 45 })).toThrow(
+      `state-idle-minutes (config file) ${GONE}`,
+    );
     expect(
-      readCoreConfig(['--state-idle-minutes=45'], {}).stateIdleMinutes,
-    ).toBe(45);
+      validateYamlConfig(CORE_PARAMETERS, { 'state-idle-minutes': 45 }).errors,
+    ).toEqual([`state-idle-minutes (config file) ${GONE}`]);
+  });
+
+  it('the config carries no bound', () => {
+    expect('stateIdleMinutes' in readCoreConfig([], {})).toBe(false);
+  });
+
+  it('an inherited MCP_STATE_IDLE_MINUTES is not read: stdio starts, with no bound', async () => {
     expect(
-      readCoreConfig([], { MCP_STATE_IDLE_MINUTES: '40' }).stateIdleMinutes,
-    ).toBe(40);
-    expect(
-      readCoreConfig([], {}, { 'state-idle-minutes': 35 }).stateIdleMinutes,
-    ).toBe(35);
+      'stateIdleMinutes' in
+        readCoreConfig([], { MCP_STATE_IDLE_MINUTES: '45' }),
+    ).toBe(false);
+    const { stderr, exits, served, servers } = await start([], {
+      MCP_STATE_IDLE_MINUTES: '45',
+    });
+    expect(stderr).not.toContain('MCP_STATE_IDLE_MINUTES');
+    expect(exits).toEqual([]);
+    expect(served).toBe(1);
+    expect(servers[0]?.state.idleMinutes).toBe(NO_IDLE_BOUND);
   });
 });
 
@@ -351,7 +383,6 @@ describe('the YAML template and validation come from the table', () => {
   it('the template is valid and sets only defaults', () => {
     expect(validateYamlConfig(CORE_PARAMETERS, parsed).errors).toEqual([]);
     const config = readCoreConfig([], {}, parsed);
-    expect(config.stateIdleMinutes).toBe(30);
     expect(config.mcpDestination).toBeUndefined();
   });
 
@@ -375,7 +406,6 @@ describe('the YAML template and validation come from the table', () => {
         'renewal',
         'saprouter',
         'shutdown-timeout',
-        'state-idle-minutes',
         'sysid',
         'system-type',
         'unsafe',

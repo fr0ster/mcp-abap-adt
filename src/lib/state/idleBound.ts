@@ -1,11 +1,26 @@
 /**
  * The idle bound on held state: the user's one exception to "no timeouts"
- * (2026-10-10). Held state ends when the USER has not called for this many
- * minutes. Waiting for the server is never timed: a tool call in flight
- * pauses the bound, and a part's own background work (a listener's re-poll)
- * is not a call. The listener re-polls by itself, so SAP's own session
- * timeout never fires on an abandoned debug session — this bound does.
+ * (2026-10-10), for the server variants only (Streamable HTTP, SSE). Held
+ * state ends when the USER has not called for this many minutes. Waiting for
+ * the server is never timed: a tool call in flight pauses the bound, and a
+ * part's own background work (a listener's re-poll) is not a call. The
+ * listener re-polls by itself, so SAP's own session timeout never fires on
+ * an abandoned debug session — this bound does.
+ *
+ * stdio has none (`NO_IDLE_BOUND`): its life and its state are governed by
+ * the client that started it — state ends by an explicit tool, the client
+ * closing stdin, the backend's answer, or process shutdown, never on the
+ * server's clock.
  */
+
+/**
+ * No idle bound: held state never ends on the server's clock. What stdio
+ * states; an instance given it arms no timer.
+ */
+export const NO_IDLE_BOUND = 'none';
+
+/** The idle bound of an instance: whole minutes, or none. */
+export type StateIdleBound = number | typeof NO_IDLE_BOUND;
 
 export const DEFAULT_STATE_IDLE_MINUTES = 30;
 export const MIN_STATE_IDLE_MINUTES = 30;

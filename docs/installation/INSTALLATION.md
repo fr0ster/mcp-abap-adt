@@ -321,8 +321,9 @@ mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 #### Command Line Options
 
 Each binary takes only its own options; an option of another binary, or `--transport`, stops the
-start naming the binary that serves it. Every binary takes `--help`, `--version`, `--conf`,
-`--system-type` and `--state-idle-minutes`; `--exposition` is gone (19.0.0) and stops the start,
+start naming the binary that serves it. Every binary takes `--help`, `--version`, `--conf` and
+`--system-type`; the HTTP and SSE binaries also `--state-idle-minutes` (stdio has no idle bound:
+there it stops the start, removed in 20.1.1); `--exposition` is gone (19.0.0) and stops the start,
 naming the binary that serves the tools it asked for.
 
 **`mcp-abap-adt` (stdio):**

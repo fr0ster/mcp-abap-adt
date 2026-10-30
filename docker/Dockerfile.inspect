@@ -11,7 +11,7 @@ FROM node:22-bookworm-slim
 # --ignore-scripts: no install script is needed (mcp-proxy's `tldjs` would
 # refresh its public-suffix list from the network; the packaged one serves),
 # and none runs as root while the image is built.
-ARG CORE_VERSION=20.1.0
+ARG CORE_VERSION=20.1.1
 RUN npm install -g --omit=optional --ignore-scripts --no-audit --no-fund "@mcp-abap-adt/core@${CORE_VERSION}" mcp-proxy@6.7.19 \
  && npm cache clean --force \
  && mcp-abap-adt --version

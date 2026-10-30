@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [21.0.0] - 2026-10-30
+
+A major for two breaking changes: `getConfig()` is gone and a stdio destination states its connection type ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)), and `GetTypeInfo` answers every DDIC type a name is ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). Each has its migration note below. 21.0.0 also brings 20.1.1 to npm: 20.1.1 is tagged (`v20.1.1`) but not published, so a consumer on 20.1.0 gets its changes (stdio has no idle bound; the body-parser and fast-uri lockfile versions) with 21.0.0; its entry below says what they are. The eighteen packages are all at 21.0.0, every sibling range at `^21.0.0`.
+
 ### Removed — breaking for code that imports `@mcp-abap-adt/lib/utils`
 
 - **`getConfig()` is gone from `@mcp-abap-adt/lib/utils`**, and so are its private twin in `src/lib/config.ts`, `parseAuthType` and the certificate/Kerberos field reader ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)). `getConfig()` built a `SapConfig` from `process.env` by guessing: an absent or unknown `SAP_AUTH_TYPE` became `basic`, `snc` became `basic` too, and an absent `SAP_CONNECTION_TYPE` became `http`. No binary called it: the stdio launcher reads the `.env` itself and refuses a missing or unknown authentication, and the HTTP and SSE servers read only the request's headers. **Migrating:** build the `SapConfig` yourself from what you know, and state every field; or hand the server a connection (`setAbapConnectionOverride`) or a config (`setSapConfigOverride`, still exported).
@@ -24,10 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GetServiceBindingPreviewUrl` reads the service URLs through `getServiceBinding().getServiceGroup()`, which sends adt-clients' `Accept` for the protocol.
   - `GetEnhancementImpl` and `GetEnhancementSpot` look an enhancement's subtype up through `getUtils().search()`.
 
-### Security
-
-- **The lockfile takes body-parser 2.4.0 (under express) and fast-uri 3.1.9 (under the MCP SDK's ajv)**, for GHSA advisories published against 2.3.0 (a denial of service through trailing bytes after a compressed body) and 3.1.8 (URI scheme, path and host confusion). No dependency range changed.
-
 ### Changed — breaking for a consumer of `GetTypeInfo`'s answer
 
 - **`GetTypeInfo` answers every DDIC type a name is, not the first one found** ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). One name can be several types; MANDT, for example, is a data element and a domain. The name is read as a data element, a domain, a structure (unless `include_structure_fallback` is `false`) and a table type, and the answer is `{ name, types: [...] }`, with `types` in alphabetical order of `objectType` (`data_element`, `domain`, `structure`, `table_type`). Each entry is read from its own document:
@@ -42,6 +42,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`MCP_TEST_CONFIG` set but blank, or naming a file that is not there, is refused by every reader.** A blank value used to mean the default `tests/test-config.yaml`, and Jest's global setup answered a named file it could not read with "no config" — no auth session — while the tests refused the same name. `testConfigPathFromEnv` now refuses both, so the global setup, the tests and `shared:check` fail alike, naming the variable.
 - **Every TypeScript file under `scripts/` is type-checked**: `tsconfig.test.json` includes `scripts/**/*.ts`, so `test:check` and CI refuse a script that no longer compiles ([#234](https://github.com/fr0ster/mcp-abap-adt/issues/234)). The 18 scripts that did not compile, or were one-off measurements whose results are recorded, are gone: the `probe-*` scripts, `debug-profiling`, `get-dump`, `list-dumps`, `list-traces`, `read-fm`, `classify-mcperror-throws`, `tool-provenance` and `capture-adt-corpus` (69 type errors between them, 48 in the last). The ADT corpus stays as recorded, and its README says where the capture script is in history. `tools/` holds no TypeScript.
+
+## [20.1.1] - 2026-10-30
+
+stdio has no idle bound: the stdio server's life and its held state are the client's.
+
+### Fixed
+
+- **stdio: held state no longer ends after an idle bound; the stdio server's life is the client's.** The stdio server (`mcp-abap-adt` and its compact and `-ro` variants) ended held state — a debug session, an open batch, its connections — after 30 minutes without a tool call, and logged off its SAP connections. On stdio nothing now expires on the server's clock: held state ends by its stop tool, the client closing stdin (the server then shuts down and logs off), the backend's answer, or the process's shutdown. `StdioServer` states `NO_IDLE_BOUND` and its `InstanceState` never arms a timer. Streamable HTTP and SSE keep their idle bound unchanged (`--state-idle-minutes`, default and minimum 30).
+
+### Removed — from the stdio binaries only
+
+- **`--state-idle-minutes` and the YAML key `state-idle-minutes` are gone from `mcp-abap-adt`** (and `-ro`, `-compact`, `-compact-ro`): the row left core's parameter table and its help, and either one stated to stdio stops the start as a removed parameter, naming the form used (`--state-idle-minutes was removed from \`mcp-abap-adt\` in 20.1.1: stdio has no idle bound — …`), so a configuration that states a bound is never silently ignored. Remove it from a stdio configuration; the HTTP and SSE binaries keep it. `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an inherited one changes nothing, and stdio starts with no bound.
+- **`@mcp-abap-adt/server-runtime` types:** `StdioServerOptions.stateIdleMinutes` and `CoreConfig.stateIdleMinutes` are removed (`CoreConfig` extends `Omit<IServerConfig, 'stateIdleMinutes'>`); a TypeScript caller that passed or read them no longer compiles and drops them.
+
+### Added
+
+- **`NO_IDLE_BOUND` and `StateIdleBound`** (`@mcp-abap-adt/lib/state`): an instance's idle bound is whole minutes or `NO_IDLE_BOUND`, "no bound", stated by type. `InstanceState`'s `idleMinutes` option and `BaseMcpServer`'s `stateIdleMinutes` take it; absent is still the default 30, so an embedder that passes nothing (`EmbeddableMcpServer`) keeps its bound.
+
+### Changed
+
+- **Sibling ranges at `^20.1.1`** in every manifest — `dependencies`, `peerDependencies` and `devDependencies`: server-runtime's stdio server reads lib's `NO_IDLE_BOUND`, and every binary takes the server-runtime that states it.
+
+### Security
+
+- **The lockfile takes body-parser 2.4.0 (under express) and fast-uri 3.1.9 (under the MCP SDK's ajv)**, for GHSA advisories published against 2.3.0 (a denial of service through trailing bytes after a compressed body) and 3.1.8 (URI scheme, path and host confusion). No dependency range changed.
 
 ## [20.1.0] - 2026-10-23
 

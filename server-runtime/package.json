@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/server-runtime",
-  "version": "20.1.0",
+  "version": "21.0.0",
   "description": "The launch code of the MCP ABAP ADT servers: the stdio launcher and server with the destination layer (the auth broker per destination), the Streamable HTTP launcher and server, and the HTTP+SSE launcher and server. No command of its own — each server package (@mcp-abap-adt/core and its siblings) carries its binary and depends on this one.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -114,14 +114,14 @@
     "express": "^5.2.1"
   },
   "peerDependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^20.1.0",
-    "@mcp-abap-adt/lib": "^20.1.0",
-    "@mcp-abap-adt/responsible-rules": "^20.1.0"
+    "@mcp-abap-adt/background-runs-memory": "^21.0.0",
+    "@mcp-abap-adt/lib": "^21.0.0",
+    "@mcp-abap-adt/responsible-rules": "^21.0.0"
   },
   "devDependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^20.1.0",
-    "@mcp-abap-adt/lib": "^20.1.0",
-    "@mcp-abap-adt/responsible-rules": "^20.1.0",
+    "@mcp-abap-adt/background-runs-memory": "^21.0.0",
+    "@mcp-abap-adt/lib": "^21.0.0",
+    "@mcp-abap-adt/responsible-rules": "^21.0.0",
     "@types/express": "*",
     "@types/jest": "*",
     "@types/node": "*",

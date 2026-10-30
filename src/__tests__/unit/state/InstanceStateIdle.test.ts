@@ -3,6 +3,7 @@ import {
   type StatePart,
   StateUnavailableError,
 } from '../../../lib/state/InstanceState';
+import { NO_IDLE_BOUND } from '../../../lib/state/idleBound';
 
 const MINUTE = 60_000;
 
@@ -273,6 +274,37 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     await s.dispose(); // e.g. the host, or a stop the user sent
     expect(() => s.check(handle)).toThrow(StateUnavailableError);
     expect(s.handle).not.toBe(handle);
+  });
+});
+
+describe('InstanceState — no bound (stdio)', () => {
+  it('held, calls start and end, no call for a day: no timer is ever armed, nothing disposed, nothing said', async () => {
+    const l = logs();
+    const s = new InstanceState({
+      logger: l.logger,
+      idleMinutes: NO_IDLE_BOUND,
+    });
+    expect(s.idleMinutes).toBe(NO_IDLE_BOUND);
+    const a = part();
+    s.attach(a.p);
+    s.callStarted();
+    a.hold();
+    s.callEnded();
+    a.repoll();
+    const handle = s.handle;
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(24 * 60 * MINUTE);
+    await flush();
+    expect(jest.getTimerCount()).toBe(0);
+    expect(a.dispose).not.toHaveBeenCalled();
+    expect(s.holdsState()).toBe(true);
+    expect(() => s.check(handle)).not.toThrow();
+    expect(l.info).toEqual([]);
+    expect(l.error).toEqual([]);
+  });
+
+  it('absent is the default bound, 30 minutes: an embedder that passes nothing keeps it', () => {
+    expect(new InstanceState({ logger: logs().logger }).idleMinutes).toBe(30);
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/compact-modify",
-  "version": "20.1.0",
+  "version": "21.0.0",
   "description": "The compact ABAP ADT tools that write, lock, activate or execute: one tool per operation, the object in the arguments.",
   "license": "Apache-2.0",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -54,10 +54,10 @@
     "@mcp-abap-adt/interfaces-adt": "^20.1.0"
   },
   "peerDependencies": {
-    "@mcp-abap-adt/lib": "^20.1.0"
+    "@mcp-abap-adt/lib": "^21.0.0"
   },
   "devDependencies": {
-    "@mcp-abap-adt/lib": "^20.1.0",
+    "@mcp-abap-adt/lib": "^21.0.0",
     "typescript": "^6.0.2",
     "@types/node": "^22.20.5"
   }

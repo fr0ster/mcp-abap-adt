@@ -140,8 +140,11 @@ describe('ActivateObject: each type code and where it goes', () => {
       ActivateObjects.inputSchema.properties.objects.items.properties.type
         .description;
     // Each code, with the names that stand for it (`ACTIVATION_NAMES`).
-    expect(typeText).toContain('TTYP/DA (ttyp)');
-    expect(typeText).toContain('TABL/DS (structure, stru, stru/ds)');
+    expect(typeText).toContain('TABL/DS (structure, stru)');
+    // A main type is no name: `TTYP` reads as `TTYP/DA` through the
+    // projection, so `ttyp` stands beside no code.
+    expect(typeText).toContain('TTYP/DA, ');
+    expect(typeText).not.toContain('(ttyp)');
     // A bare main type no table lists is not offered.
     expect(typeText).not.toContain('ENHO (');
   });

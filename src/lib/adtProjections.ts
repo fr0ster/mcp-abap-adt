@@ -227,9 +227,12 @@ export type MainTypeOfOne<P extends string> = keyof MainTypeCodes<P> & string;
 /**
  * The names the tools took for a type before adt-clients 38 stopped reading
  * them, each with the code of the tables it addressed: the friendly names of
- * its where-used aliases and the main types its address builder read
- * (adt-clients 37.2.0). The tools' arguments name them, so the server reads
- * them now; each code is checked against the tables here.
+ * its where-used aliases (adt-clients 37.2.0), `func` for the function module
+ * (the releases' quick-search name `FUNC`) and `stru` for the structure. The
+ * tools' arguments name them, so the server reads them now; each code is
+ * checked against the tables here. A main type (`CLAS`, `TABL`, …) is no
+ * name: it reads as a code only through the argument's projection
+ * ({@link MainTypeCodes}).
  */
 export const TYPE_NAMES = {
   class: 'CLAS/OC',
@@ -246,26 +249,8 @@ export const TYPE_NAMES = {
   view: 'DDLS/DF',
   functionmodule: 'FUGR/FF',
   function_module: 'FUGR/FF',
-  clas: 'CLAS/OC',
-  prog: 'PROG/P',
-  fugr: 'FUGR/F',
-  func: 'FUGR/F',
-  tabl: 'TABL/DT',
+  func: 'FUGR/FF',
   stru: 'TABL/DS',
-  'stru/ds': 'TABL/DS',
-  ddls: 'DDLS/DF',
-  dtel: 'DTEL/DE',
-  doma: 'DOMA/DD',
-  intf: 'INTF/OI',
-  ttyp: 'TTYP/DA',
-  srvd: 'SRVD/SRV',
-  srvb: 'SRVB/SVB',
-  ddlx: 'DDLX/EX',
-  bdef: 'BDEF/BDO',
-  dcls: 'DCLS/DL',
-  xslt: 'XSLT/VT',
-  ftg2: 'FTG2/FT',
-  devc: 'DEVC/K',
 } as const satisfies Readonly<Record<string, AdtTypeCode>>;
 
 /** A name of {@link TYPE_NAMES}. */
@@ -362,26 +347,8 @@ export const TYPE_NAME_LIST = [
   'view',
   'functionmodule',
   'function_module',
-  'clas',
-  'prog',
-  'fugr',
   'func',
-  'tabl',
   'stru',
-  'stru/ds',
-  'ddls',
-  'dtel',
-  'doma',
-  'intf',
-  'ttyp',
-  'srvd',
-  'srvb',
-  'ddlx',
-  'bdef',
-  'dcls',
-  'xslt',
-  'ftg2',
-  'devc',
 ] as const satisfies readonly TypeName[];
 
 /** {@link TYPE_NAME_LIST} names every name of {@link TYPE_NAMES}. */
@@ -398,7 +365,7 @@ export const WHERE_USED_NAMES = projected<
 
 /**
  * The codes of `codes`, each followed by the names of `names` that stand for
- * it: `CLAS/OC (class, clas), INTF/OI (interface, intf), DSFD/SCF`.
+ * it: `CLAS/OC (class), TABL/DS (structure, stru), DSFD/SCF`.
  */
 export function codesWithNames(
   codes: readonly AdtTypeCode[],
@@ -549,11 +516,7 @@ export const ACTIVATION_NAMES = projected<
 >()({
   onprem: TYPE_NAME_LIST,
   cloud: TYPE_NAME_LIST.filter(
-    (name) =>
-      name !== 'program' &&
-      name !== 'prog' &&
-      name !== 'include' &&
-      name !== 'ftg2',
+    (name) => name !== 'program' && name !== 'include',
   ),
 });
 

@@ -16,6 +16,10 @@ import {
   TOOL_DEFINITION as HandlerValidate,
   handleHandlerValidate,
 } from '../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
+import {
+  handleValidateServiceBinding,
+  TOOL_DEFINITION as ValidateServiceBinding,
+} from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import type { ProjectionVariant } from '../../lib/adtProjections';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import {
@@ -203,4 +207,50 @@ describe('the arguments a compact tool needs for one object type', () => {
       }
     },
   );
+});
+
+/**
+ * ValidateServiceBinding, the full tool the compact SERVICE_BINDING
+ * validation serves: its schema requires `package_name` (the next major), and
+ * a call without it is refused naming it, nothing sent.
+ */
+describe('ValidateServiceBinding requires package_name', () => {
+  it('the schema requires it', () => {
+    expect(ValidateServiceBinding.inputSchema.required).toContain(
+      'package_name',
+    );
+  });
+
+  it.each([{}, { package_name: '' }, { package_name: '  ' }])(
+    'a call with %j is refused naming it, nothing sent',
+    async (absent) => {
+      const connection = recordingConnection();
+      declareSystemKind(connection, 'onprem');
+      const answered = await handleValidateServiceBinding(
+        { connection },
+        {
+          service_binding_name: 'ZSRVB_A',
+          service_definition_name: 'ZSRVD_A',
+          ...absent,
+        },
+      );
+      expect(textOf(answered)).toContain('package_name is required');
+      expect(answered.isError).toBe(true);
+      expect(connection.requests).toEqual([]);
+    },
+  );
+
+  it('a call with it reaches the client', async () => {
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'onprem');
+    await handleValidateServiceBinding(
+      { connection },
+      {
+        service_binding_name: 'ZSRVB_A',
+        service_definition_name: 'ZSRVD_A',
+        package_name: 'ZPKG_A',
+      },
+    );
+    expect(connection.requests.length).toBeGreaterThan(0);
+  });
 });

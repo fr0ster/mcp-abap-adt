@@ -65,7 +65,8 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'ABAP package for the binding. Required for validation.',
+        description:
+          'ABAP package of the binding, which the validation checks.',
       },
       service_binding_version: {
         type: 'string',
@@ -74,7 +75,11 @@ export const TOOL_DEFINITION = {
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['service_binding_name', 'service_definition_name'],
+    required: [
+      'service_binding_name',
+      'service_definition_name',
+      'package_name',
+    ],
   },
 } as const;
 

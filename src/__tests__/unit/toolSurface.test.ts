@@ -213,9 +213,17 @@ describe('the MCP tool surface', () => {
       // breakpoints, and a listener with none of its own catches nothing it
       // asked for. `breakpoints` leaves and `breakpoints*` arrives, which is this
       // one pair per tool and nothing else. It lands in the 18.0.0 major.
+      //
+      // **A second, decided by the owner for the next major (#329).**
+      // `ValidateServiceBinding` requires `package_name`: the transport check
+      // it runs names the binding's package, and every call without one was
+      // refused (before, adt-clients failed on it with a TypeError). The
+      // schema now says what the handler already required: `package_name`
+      // leaves and `package_name*` arrives, this one pair and nothing else.
       const MAY_TIGHTEN_REQUIRED: Record<string, string> = {
         'debug/DebugStartListener': 'breakpoints',
         'debug/DebugTakeOverListener': 'breakpoints',
+        'high/ValidateServiceBinding': 'package_name',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the
@@ -359,7 +367,8 @@ describe('the MCP tool surface', () => {
               ? ['version']
               : relaxed !== undefined
                 ? []
-                : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail'])),
+                : (EXTRA_ALLOWED_ADDITIONS[tool] ??
+                  (tightened !== undefined ? [] : ['detail']))),
         ].sort(),
       });
     }

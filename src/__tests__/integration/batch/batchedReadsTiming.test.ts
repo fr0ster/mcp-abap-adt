@@ -227,11 +227,11 @@ const transport = (connection: IAbapConnection): string =>
 describe('batched reads timed against the sequential path on the system the test config names', () => {
   let connection: IAbapConnection | null = null;
   let packages: Array<{ label: string; name: string }> = [];
-  // An on-premise run: the config's system type says so before any logon.
-  const onPremise = getSystemType() === 'onprem';
+  // Legacy support is parked: a legacy config skips before any logon.
+  const served = getSystemType() !== 'legacy';
 
   beforeAll(async () => {
-    if (!onPremise) return;
+    if (!served) return;
     try {
       connection = (await createTestConnectionAndSession()).connection;
       packages = packagesRead();
@@ -245,9 +245,9 @@ describe('batched reads timed against the sequential path on the system the test
       it(
         `${tool.tool} on ${scope}: the same answer, timed on both paths`,
         async () => {
-          if (!onPremise) {
+          if (!served) {
             testLogger?.info(
-              `⏭️  Skipping: runs on an on-premise system; the test config names ${getSystemType()}`,
+              '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
             );
             return;
           }

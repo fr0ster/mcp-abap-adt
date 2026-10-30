@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Repository (nothing in the published packages)
 
-- **No integration case runs on a legacy system while legacy support is parked.** The test-config template lists `legacy` in no case's `available_in` (`run_atc`'s case names `onprem` and `cloud`), the debugger suite writes its probe only on a system its case names, and the batched-reads timing runs on an on-premise system only. Measured against SAP_BASIS 7.40 SP04: 32 failing tests before, none after.
+- **The test-config template's cases skip a legacy system while legacy support is parked.** The template lists `legacy` in no case's `available_in` (`run_atc`'s case names `onprem` and `cloud`); a case skipped for its system runs no cleanup, so it sends no delete for an object it never created; the debugger suite writes its probe only on a system its case names; the batched-reads timing skips a legacy configuration. Measured against SAP_BASIS 7.40 SP04: 32 failing tests before, none after.
 
 ## [21.0.0] - 2026-10-30
 

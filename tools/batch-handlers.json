@@ -983,7 +983,30 @@
           "INTERFACE",
           "FUNCTION_GROUP",
           "BEHAVIOR_DEFINITION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "BEHAVIOR_IMPLEMENTATION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the function module under its function group (object_name GROUP|MODULE, or with function_group_name), answering { run_id }",
+    "when": [
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "object_adt_type",
+        "present": false
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "FUNCTION_MODULE"
         ]
       }
     ]

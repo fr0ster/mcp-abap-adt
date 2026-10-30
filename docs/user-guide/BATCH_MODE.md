@@ -396,7 +396,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-175 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+176 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -537,7 +537,8 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 | Tool | Recorded | Sends |
 |---|---|---|
-| `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
+| `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION, BEHAVIOR_IMPLEMENTATION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
+| `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is FUNCTION_MODULE | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the function module under its function group (object_name GROUP\|MODULE, or with function_group_name), answering { run_id } |
 | `HandlerActivate` | when objects is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |

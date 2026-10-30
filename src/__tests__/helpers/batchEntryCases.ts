@@ -692,6 +692,7 @@ const WRITES: BatchEntryCase[] = [
     'FUNCTION_GROUP',
     'BEHAVIOR_DEFINITION',
     'METADATA_EXTENSION',
+    'BEHAVIOR_IMPLEMENTATION',
   ].map((object_type) => ({
     tool: 'HandlerActivate',
     args: { object_type, object_name: 'OBJ_A' },
@@ -707,6 +708,19 @@ const WRITES: BatchEntryCase[] = [
   {
     tool: 'HandlerActivate',
     args: { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' },
+  },
+  // A function module: one activation run under its group.
+  {
+    tool: 'HandlerActivate',
+    args: { object_type: 'FUNCTION_MODULE', object_name: 'FUGR_A|FM_A' },
+  },
+  {
+    tool: 'HandlerActivate',
+    args: {
+      object_type: 'FUNCTION_MODULE',
+      object_name: 'FM_A',
+      function_group_name: 'FUGR_A',
+    },
   },
   {
     tool: 'HandlerActivate',

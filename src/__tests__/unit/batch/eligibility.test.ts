@@ -6,6 +6,10 @@
  * an absent `part` of `HandlerGet` read as `source`.
  */
 
+import {
+  COMPACT_ACTIVATE,
+  PROJECTION_VARIANTS,
+} from '../../../lib/adtProjections';
 import { eligible, whenHolds } from '../../../lib/batch/eligibility';
 
 const LOCK = 'LOCK_HANDLE_PLACEHOLDER';
@@ -227,6 +231,29 @@ describe('eligible', () => {
     }
   });
 
+  /**
+   * Every member HandlerActivate activates (`COMPACT_ACTIVATE`, each
+   * variant) sends one request: its type's own activation, or one activation
+   * run — a function module's under its group, named GROUP|MODULE. Each is
+   * listed, so a member the activate routes gain cannot be left out.
+   */
+  it('every member HandlerActivate activates is eligible, on each variant', () => {
+    for (const variant of PROJECTION_VARIANTS) {
+      for (const member of COMPACT_ACTIVATE[variant]) {
+        const object_name = member === 'FUNCTION_MODULE' ? 'G|M' : 'O';
+        expect({
+          variant,
+          member,
+          eligible: eligible(
+            'HandlerActivate',
+            { object_type: member, object_name },
+            'http',
+          ),
+        }).toEqual({ variant, member, eligible: { ok: true } });
+      }
+    }
+  });
+
   it('the writes and runs are eligible only under the arguments whose requests do not chain', () => {
     const no = { ok: false, reason: 'arguments' };
     expect(eligible('ActivateClass', { class_name: 'C' }, 'rfc')).toEqual({
@@ -248,14 +275,6 @@ describe('eligible', () => {
     ]) {
       expect(eligible('HandlerActivate', args, 'http')).toEqual({ ok: true });
     }
-    // A single object of a type neither activation addresses by name alone.
-    expect(
-      eligible(
-        'HandlerActivate',
-        { object_type: 'FUNCTION_MODULE', object_name: 'F' },
-        'http',
-      ),
-    ).toEqual(no);
     // The activation run's reads, by run_id.
     for (const part of ['activation_status', 'activation_results']) {
       expect(eligible('HandlerGet', { part, run_id: 'R' }, 'http')).toEqual({

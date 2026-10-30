@@ -310,17 +310,141 @@ describe('a main type is read where it names one code, refused where it names se
     },
   );
 
-  it.each(VARIANTS)(
-    'a friendly name is read as in S4, before a main type: one object TABL is the name tabl, TABL/DT (%s)',
-    async (variant) => {
-      const argument = ARGUMENTS.find(
-        (each) => each.tool === 'ActivateObjects.objects[].type (one object)',
+  /**
+   * The arguments that take friendly names (`TYPE_NAMES`): a main type is no
+   * name there (S4c), so `TABL`, `PROG` and `FUGR` are read through the
+   * projection like any other main type.
+   */
+  const named = ARGUMENTS.filter(
+    (argument) => !argument.tool.startsWith('GetIncludesList'),
+  );
+  const namedCases = VARIANTS.flatMap((variant) =>
+    named.map((argument) => [argument.tool, variant, argument] as const),
+  );
+  const activation = (argument: Argument) =>
+    argument.tool.startsWith('ActivateObjects') ||
+    argument.tool.startsWith('HandlerActivate');
+
+  it.each(namedCases)(
+    '%s on %s: TABL names a table and a structure, so it is refused naming both, nothing sent',
+    async (_tool, variant, argument) => {
+      for (const value of ['TABL', 'tabl']) {
+        const { requests, answered } = await run(argument, variant, value);
+        expect(unescaped(answered)).toContain(
+          `"${value}" is the main type of TABL/DT, TABL/DS: name one of these codes; nothing was sent`,
+        );
+        expect(requests).toEqual([]);
+      }
+    },
+  );
+
+  it.each(namedCases)(
+    '%s on %s: PROG is refused naming PROG/P and PROG/I where both are served, nothing sent',
+    async (_tool, variant, argument) => {
+      for (const value of ['PROG', 'prog']) {
+        const { requests, answered } = await run(argument, variant, value);
+        expect(unescaped(answered)).toContain(
+          activation(argument) && variant === 'cloud'
+            ? `"${value}" is not one of: CLAS/OC`
+            : `"${value}" is the main type of PROG/P, PROG/I: name one of these codes; nothing was sent`,
+        );
+        expect(requests).toEqual([]);
+      }
+    },
+  );
+
+  it.each(namedCases)(
+    '%s on %s: FUGR is refused naming the function codes served, nothing sent',
+    async (_tool, variant, argument) => {
+      const codes = argument.tool.startsWith('GetWhereUsed')
+        ? 'FUGR/F, FUGR/FF'
+        : 'FUGR/F, FUGR/FF, FUGR/I';
+      const { requests, answered } = await run(argument, variant, 'FUGR');
+      expect(unescaped(answered)).toContain(
+        `"FUGR" is the main type of ${codes}: name one of these codes; nothing was sent`,
       );
-      if (argument === undefined) throw new Error('no such argument');
-      const byName = await run(argument, variant, 'TABL');
-      const byCode = await run(argument, variant, 'tabl');
-      expect(byName.requests.length).toBeGreaterThan(0);
+      expect(requests).toEqual([]);
+    },
+  );
+
+  it.each(namedCases)(
+    '%s on %s: CLAS is the one class code, and sends exactly what CLAS/OC sends',
+    async (_tool, variant, argument) => {
+      const byCode = await run(argument, variant, 'CLAS/OC');
+      const byMain = await run(argument, variant, 'CLAS');
+      const byLower = await run(argument, variant, 'clas');
+      expect(byCode.requests.length).toBeGreaterThan(0);
+      expect(byMain.requests).toEqual(byCode.requests);
+      expect(byLower.requests).toEqual(byCode.requests);
+    },
+  );
+
+  it.each(namedCases)(
+    '%s on %s: stru/ds is no code and no name, refused, nothing sent; stru is the structure',
+    async (_tool, variant, argument) => {
+      const refused = await run(argument, variant, 'stru/ds');
+      expect(unescaped(refused.answered)).toContain(
+        '"stru/ds" is not one of: CLAS/OC',
+      );
+      expect(refused.requests).toEqual([]);
+      // One object of TABL/DS is activated through the structure family;
+      // `stru` is no single-activation name and goes to the group (as before).
+      if (
+        argument.tool === 'ActivateObjects.objects[].type (one object)' ||
+        argument.tool === 'HandlerActivate.object_adt_type'
+      ) {
+        return;
+      }
+      const byCode = await run(argument, variant, 'TABL/DS');
+      const byName = await run(argument, variant, 'stru');
+      expect(byCode.requests.length).toBeGreaterThan(0);
       expect(byName.requests).toEqual(byCode.requests);
+    },
+  );
+
+  /** The arguments `func` is sent through, each with a function module's name. */
+  const FUNCTION_MODULE: readonly Argument[] = [
+    {
+      tool: 'GetWhereUsed.object_type',
+      send: (context, value) =>
+        handleGetWhereUsed(context, {
+          object_type: value,
+          object_name: 'ZG|ZA',
+        }),
+      one: ['func', 'FUGR/FF'],
+      shared: ['FUGR', 'FUGR/F, FUGR/FF'],
+    },
+    {
+      tool: 'ActivateObjects.objects[].type (group)',
+      send: (context, value) =>
+        handleActivateObjects(context, {
+          objects: [
+            { name: 'ZA', type: value, parentName: 'ZG' },
+            { name: 'ZB', type: value, parentName: 'ZG' },
+          ],
+        }),
+      one: ['func', 'FUGR/FF'],
+      shared: ['FUGR', 'FUGR/F, FUGR/FF, FUGR/I'],
+    },
+    ...TABLE_TOOLS,
+  ];
+  const functionModuleCases = VARIANTS.flatMap((variant) =>
+    FUNCTION_MODULE.map(
+      (argument) => [argument.tool, variant, argument] as const,
+    ),
+  );
+
+  it.each(functionModuleCases)(
+    '%s on %s: func is the function module, FUGR/FF, not the group',
+    async (_tool, variant, argument) => {
+      const byModule = await run(argument, variant, 'FUGR/FF');
+      const byGroup = await run(argument, variant, 'FUGR/F');
+      const byName = await run(argument, variant, 'func');
+      const byUpper = await run(argument, variant, 'FUNC');
+      expect(byModule.requests.length).toBeGreaterThan(0);
+      expect(byName.requests).toEqual(byModule.requests);
+      expect(byUpper.requests).toEqual(byModule.requests);
+      expect(byName.requests).not.toEqual(byGroup.requests);
     },
   );
 

@@ -19,6 +19,8 @@ import {
   type INCLUDES_PARENT_ROUTES,
   projected,
   type ServedName,
+  type TYPE_NAMES,
+  type TypeName,
   type TypeNameFor,
   type VERSIONED_ROUTES,
   type WhereUsedCode,
@@ -68,10 +70,18 @@ export const groupActivatedPackage: ActivationCode<'onprem'> = 'DEVC/K';
 // @ts-expect-error an include is activated on premise only.
 export const groupActivatedIncludeOnCloud: ActivationCode<'cloud'> = 'PROG/I';
 
-/** A name stands for its code: `prog` is `PROG/P`, activated on premise only. */
-export const progOnPrem: TypeNameFor<ActivationCode<'onprem'>> = 'prog';
+/** A name stands for its code: `program` is `PROG/P`, activated on premise only. */
+export const programOnPrem: TypeNameFor<ActivationCode<'onprem'>> = 'program';
 // @ts-expect-error …so not a name a cloud activation takes.
-export const progOnCloud: TypeNameFor<ActivationCode<'cloud'>> = 'prog';
+export const programOnCloud: TypeNameFor<ActivationCode<'cloud'>> = 'program';
+// @ts-expect-error a main type is no name: `prog` reads only through the projection.
+export const progIsNoName: TypeName = 'prog';
+// @ts-expect-error `stru/ds` is no code a release lists, so no name either.
+export const struDsIsNoName: TypeName = 'stru/ds';
+/** `func` is the function module, the releases' quick-search name `FUNC`. */
+export const funcIsTheModule: (typeof TYPE_NAMES)['func'] = 'FUGR/FF';
+// @ts-expect-error …not the function group.
+export const funcIsNoGroup: (typeof TYPE_NAMES)['func'] = 'FUGR/F';
 
 // --- A tool's names: its routes the table serves ---------------------------
 

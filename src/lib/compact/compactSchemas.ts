@@ -15,6 +15,7 @@ import {
 } from '../adtProjections';
 import { COMPACT_BACKGROUND_PROPERTY } from '../backgroundRuns/tools';
 import { TIMEOUT_PROPERTY } from '../longTools';
+import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
 
 const versionSchema = {
   type: 'string',
@@ -1218,7 +1219,7 @@ export const compactSearchSchema = {
     },
     object_type: {
       type: 'string',
-      description: 'ADT object type to restrict the search to.',
+      description: SEARCH_TYPE_DESCRIPTION,
     },
     max_results: {
       type: 'number',

@@ -25,12 +25,14 @@
  */
 
 import type {
+  IAdtHeaders,
   IDdlResults,
   IDomainResults,
   IIncludeResults,
   IPackageResults,
   IProgramResults,
   ITransformationResults,
+  IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../lib/adtClientContract';
 
@@ -112,4 +114,78 @@ export function onPremOnlyMembers() {
   void cloud.getInclude(include).read;
   // @ts-expect-error the cloud table lists no update for an include
   void cloud.getInclude(include).update;
+}
+
+declare const utilResults: IUtilResults;
+declare const headers: IAdtHeaders;
+
+/**
+ * `getUtils()`'s search takes the variant's search names
+ * (`IAdtSearchObjectsParamsOf<V>`, adt-clients 39): a name of the variant's
+ * object types list, not a code, and not a name only another variant lists.
+ */
+export function searchTakesTheVariantsNames() {
+  const onPremUtils = onPrem.getUtils(utilResults);
+  const cloudUtils = cloud.getUtils(utilResults);
+  const modernUtils = modern.getUtils(utilResults);
+  void onPremUtils.search({ query: 'Z*', objectType: 'DEVC' });
+  void cloudUtils.search({ query: 'Z*', objectType: 'STRU' });
+  void onPremUtils.search({ query: 'Z*', objectType: 'BCCH' });
+  void cloudUtils.search({ query: 'Z*', objectType: 'TXPA' });
+  void modernUtils.search({ query: 'Z*', objectType: 'ENHO' });
+  // @ts-expect-error a code is no filter value
+  void onPremUtils.search({ query: 'Z*', objectType: 'DEVC/K' });
+  // @ts-expect-error a name only the on-premise list holds
+  void cloudUtils.search({ query: 'Z*', objectType: 'BCCH' });
+  // @ts-expect-error a name only the cloud list holds
+  void onPremUtils.search({ query: 'Z*', objectType: 'TXPA' });
+  // @ts-expect-error the default contract takes the names both lists hold
+  void modernUtils.search({ query: 'Z*', objectType: 'BCCH' });
+}
+
+/**
+ * Where-used and the group members are the typed atoms of the variant
+ * (`IAdtTypedWhereUsed`, `IAdtTypedGroupLifecycle`): `VIEW/DV` is taken, a
+ * function module names its group, and a code the variant's group
+ * activation does not take is refused.
+ */
+export function groupMembersTakeTheTypedReferences() {
+  const onPremUtils = onPrem.getUtils(utilResults);
+  const cloudUtils = cloud.getUtils(utilResults);
+  void onPremUtils.getWhereUsed(
+    { object_name: 'ZV', object_type: 'VIEW/DV' },
+    { headers },
+  );
+  void onPremUtils.activateObjectsGroup(
+    [{ name: 'ZV', type: 'VIEW/DV' }],
+    true,
+    { headers },
+  );
+  void onPremUtils.activateObjectsGroup(
+    [{ name: 'Z_FM', type: 'FUGR/FF', parentName: 'ZFG' }],
+    true,
+    { headers },
+  );
+  void onPremUtils.activateObjectsGroup(
+    [{ name: 'ZP', type: 'PROG/P' }],
+    true,
+    { headers },
+  );
+  void onPremUtils.activateObjectsGroup(
+    // @ts-expect-error a function module's reference names its group
+    [{ name: 'Z_FM', type: 'FUGR/FF' }],
+    true,
+    { headers },
+  );
+  void cloudUtils.activateObjectsGroup(
+    // @ts-expect-error the cloud table activates no program
+    [{ name: 'ZP', type: 'PROG/P' }],
+    true,
+    { headers },
+  );
+  void onPremUtils.getWhereUsed(
+    // @ts-expect-error where-used is asked of no function include
+    { object_name: 'ZI', object_type: 'FUGR/I' },
+    { headers },
+  );
 }

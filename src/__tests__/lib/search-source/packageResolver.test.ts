@@ -80,7 +80,7 @@ describe('createPackagePatternResolver — hits from `search`', () => {
     const fn = createPackagePatternResolver(fakeCtx);
     const names = await fn({
       query: 'ZFI*',
-      objectType: 'DEVC/K',
+      objectType: 'DEVC',
       maxResults: 1000,
     });
     expect(names).toEqual(['ZFI', 'ZFI_BUDGET']);
@@ -90,7 +90,7 @@ describe('createPackagePatternResolver — hits from `search`', () => {
     const fn = createPackagePatternResolver(fakeCtx);
     const names = await fn({
       query: 'EMPTY*',
-      objectType: 'DEVC/K',
+      objectType: 'DEVC',
       maxResults: 1000,
     });
     expect(names).toEqual([]);

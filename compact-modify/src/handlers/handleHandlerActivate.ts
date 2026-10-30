@@ -3,15 +3,14 @@ import {
   byVariant,
   COMPACT_ACTIVATE,
   COMPACT_ACTIVATE_ROUTES,
-  COMPACT_SINGLE_ACTIVATION,
   type CompactObjectType,
   compactActivateDescription,
   compactActivateSchemaFor,
-  SINGLE_ACTIVATION_ROUTES,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
   activatePlanOnce,
+  activationPlan,
   compactActivatableTypes,
   handleActivateObjectOnce,
 } from '@mcp-abap-adt/lib/handlers/write';
@@ -101,7 +100,10 @@ export async function handleHandlerActivate(
 
   // The boundary of object_type: one of the names the declared variant's
   // table activates (`COMPACT_ACTIVATE`), each with its code
-  // (`COMPACT_ACTIVATE_ROUTES`); past it, nothing is checked again.
+  // (`COMPACT_ACTIVATE_ROUTES`). Its code goes on as the list form's one
+  // object (`activationPlan`): one object of a type its own API activates
+  // directly through that API, every other one in a group activation typed
+  // by the declared variant.
   const variant = variantOf(context.connection);
   const member = acceptedOf(args.object_type, COMPACT_ACTIVATE[variant]);
   if (member === undefined) {
@@ -109,38 +111,15 @@ export async function handleHandlerActivate(
       `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${compactActivatableTypes(context.connection).join(', ')}.`,
     );
   }
-  const name = args.object_name.toUpperCase();
-
-  if (member === 'FUNCTION_MODULE') {
-    const reference = functionModuleReference(
-      args.object_name,
-      args.function_group_name,
-    );
-    if (typeof reference === 'string') return return_error(reference);
-    return activatePlanOnce(
-      context,
-      {
-        group: [{ ...reference, type: COMPACT_ACTIVATE_ROUTES[member] }],
-      },
-      args.preaudit,
-    );
-  }
-
-  // One object of a type its own API activates directly
-  // (`COMPACT_SINGLE_ACTIVATION`); every other one in a group activation.
-  const single = COMPACT_SINGLE_ACTIVATION[variant].find(
-    (direct) => direct === member,
+  const reference =
+    member === 'FUNCTION_MODULE'
+      ? functionModuleReference(args.object_name, args.function_group_name)
+      : { name: args.object_name.toUpperCase() };
+  if (typeof reference === 'string') return return_error(reference);
+  const plan = activationPlan(
+    [{ ...reference, type: COMPACT_ACTIVATE_ROUTES[member] }],
+    variant,
   );
-  return activatePlanOnce(
-    context,
-    single === undefined
-      ? { group: [{ name, type: COMPACT_ACTIVATE_ROUTES[member] }] }
-      : {
-          single: {
-            api: SINGLE_ACTIVATION_ROUTES[COMPACT_ACTIVATE_ROUTES[single]].api,
-            name,
-          },
-        },
-    args.preaudit,
-  );
+  if (typeof plan === 'string') return return_error(plan);
+  return activatePlanOnce(context, plan, args.preaudit);
 }

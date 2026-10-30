@@ -25,10 +25,8 @@ const families = () => ({
   getMetadataExtension: activates('metadataExtension'),
 });
 
-jest.mock('../../lib/clients', () => ({
-  variantOf: () => 'onprem',
-  createOnPremAdtClient: () => families(),
-  createAdtClient: () => ({
+jest.mock('../../lib/clients', () => {
+  const client = () => ({
     ...families(),
     getUtils: () => ({
       activateObjectsGroup: (objects: unknown) => {
@@ -39,8 +37,15 @@ jest.mock('../../lib/clients', () => ({
         });
       },
     }),
-  }),
-}));
+  });
+  return {
+    variantOf: () => 'onprem',
+    // A program's activation and an on-premise group activation are the
+    // on-premise client's.
+    createOnPremAdtClient: client,
+    createAdtClient: client,
+  };
+});
 
 import { TOOL_DEFINITION as ActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import {

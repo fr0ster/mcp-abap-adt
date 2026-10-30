@@ -204,10 +204,15 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
     variant,
     (context, value) =>
       handleSearchObject(context, { object_name: 'Z*', object_type: value }),
+    // The filter takes the variant's search names; a code stands for the
+    // name that selects it (`searchTypes.ts`).
     {
       valid: 'DDLS/DF',
-      name: ['view', sent],
-      wrong: ['BIMP/BIM', 'object_type "BIMP/BIM" is not one of: CLAS/OC'],
+      name: ['ddls', sent],
+      wrong: [
+        'NOPE',
+        'object_type "NOPE" is neither a name of this system\'s object types list nor an ADT type code standing for one: it takes the search names',
+      ],
     },
   ),
   // The version tools' kinds.

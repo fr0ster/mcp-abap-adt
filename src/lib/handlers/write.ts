@@ -26,9 +26,12 @@ export { handleUpdateLocalMacros } from '../../handlers/class/high/handleUpdateL
 export { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpdateLocalTestClass.js';
 export { handleUpdateLocalTypes } from '../../handlers/class/high/handleUpdateLocalTypes.js';
 export {
+  type ActivationObject,
   type ActivationPlan,
   activatePlanOnce,
+  activationPlan,
   compactActivatableTypes,
+  type GroupActivation,
   handleActivateObject,
   handleActivateObjectOnce,
 } from '../../handlers/common/low/handleActivateObject.js';

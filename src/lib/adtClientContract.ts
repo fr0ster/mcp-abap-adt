@@ -27,14 +27,15 @@ import type {
   IAccessControlConfig,
   IAccessControlResults,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtDataPreview,
   IAdtDeletable,
   IAdtEnhancementHost,
+  IAdtError,
   IAdtGroupLifecycle,
   IAdtIncludeEnhancementHost,
-  IAdtInformationSystem,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -43,16 +44,24 @@ import type {
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
+  IAdtResponse,
+  IAdtSearchObjectsParamsOf,
   IAdtServiceBindingTypes,
   IAdtServiceGroupReadable,
   IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
   IAdtTransportSearchConfigurations,
   IAdtTransportSortAndCompress,
+  IAdtTypeCatalogue,
+  IAdtTypedGroupLifecycle,
+  IAdtTypedWhereUsed,
   IAdtTypeTables,
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAdtVirtualFolders,
+  IAdtWhereUsed,
+  IAnalyse,
   IAppendStructureConfig,
   IAppendStructureResults,
   IBehaviorDefinitionConfig,
@@ -1005,28 +1014,64 @@ export type LocalMacrosApi<
   IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig>;
 
-/** What the server calls on `getUtils()`'s answer. */
+/**
+ * The repository search of variant `V`: `IAdtObjectSearch`'s member, its
+ * filter the search names every variant of `V` takes
+ * (`IAdtSearchObjectsParamsOf<V>`, interfaces-adt 24) — a name of the
+ * release's object types list, not a code.
+ */
+export interface IServerObjectSearch<TSearch, V extends AdtVariant> {
+  search<E extends IAdtError>(
+    criteria: IAdtSearchObjectsParamsOf<V>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<TSearch, E>>;
+  search(
+    criteria: IAdtSearchObjectsParamsOf<V>,
+    options?: IAdtAnalyseOptions,
+  ): Promise<IAdtResponse<TSearch>>;
+}
+
+/**
+ * What the server calls on `getUtils()`'s answer. Where-used and the group
+ * members are the typed atoms of variant `V` (`IAdtTypedWhereUsed`,
+ * `IAdtTypedGroupLifecycle`): their references take the codes each request
+ * serves on `V` and require `parentName` where the table names a parent.
+ */
 export type UtilsApi<
   R extends IUtilResults,
   V extends AdtVariant,
-> = IAdtInformationSystem<
-  ReturnType<R['search']>,
-  ReturnType<R['whereUsed']>,
-  ReturnType<R['whereUsedScope']>,
-  ReturnType<R['folders']>,
-  ReturnType<R['types']>
-> &
+> = IServerObjectSearch<ReturnType<R['search']>, V> &
+  IAdtTypedWhereUsed<
+    ReturnType<R['whereUsed']>,
+    ReturnType<R['whereUsedScope']>,
+    V
+  > &
+  Pick<
+    IAdtWhereUsed<ReturnType<R['whereUsed']>, ReturnType<R['whereUsedScope']>>,
+    'modifyWhereUsedScope'
+  > &
+  IAdtVirtualFolders<ReturnType<R['folders']>> &
+  IAdtTypeCatalogue<ReturnType<R['types']>> &
   IAdtRepositoryStructure<
     ReturnType<R['node']>,
     ReturnType<R['objectStructure']>
   > &
-  IAdtGroupLifecycle<
-    ReturnType<R['inactive']>,
+  Pick<
+    IAdtGroupLifecycle<
+      ReturnType<R['inactive']>,
+      ReturnType<R['activation']>,
+      ReturnType<R['run']>,
+      ReturnType<R['results']>,
+      ReturnType<R['deletionCheck']>,
+      ReturnType<R['deletion']>
+    >,
+    'getInactiveObjects' | 'getActivationRun' | 'getActivationResults'
+  > &
+  IAdtTypedGroupLifecycle<
     ReturnType<R['activation']>,
-    ReturnType<R['run']>,
-    ReturnType<R['results']>,
     ReturnType<R['deletionCheck']>,
-    ReturnType<R['deletion']>
+    ReturnType<R['deletion']>,
+    V
   > &
   IAdtDataPreview<
     ReturnType<R['query']>,

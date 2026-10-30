@@ -41,6 +41,9 @@ jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
   variantOf: () => 'onprem',
   createAdtClient: () => fakeClient,
+  // The declared variant's client, tagged with it (SearchObject's filter is
+  // that variant's search names).
+  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
 }));
 
 const payloadOf = (result: any) => JSON.parse(result.content[0].text);

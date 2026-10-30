@@ -1,10 +1,14 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { ISearchObjectsParams } from '@mcp-abap-adt/interfaces-adt';
-import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
+import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
-import { createAdtClient, variantOf } from '../../../lib/clients';
+import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  notASearchType,
+  SEARCH_TYPE_DESCRIPTION,
+  searchNameOf,
+} from '../../../lib/searchTypes';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -14,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'SearchObject',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.).',
+    '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
   ),
   inputSchema: {
     type: 'object',
@@ -26,8 +30,7 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: 'string',
-        description:
-          "[read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')",
+        description: `[read-only] ${SEARCH_TYPE_DESCRIPTION}`,
       },
       maxResults: {
         type: 'number',
@@ -91,6 +94,49 @@ function objectReferenceLines(value: unknown): string {
   return lines.join('\n');
 }
 
+/**
+ * The search `served`'s variant sends for `query`: its filter the search name
+ * `objectType` is or stands for on that variant (`searchNameOf`), read once
+ * here; the refusal in fixed words when it names none, and nothing is sent.
+ */
+function searchOn(
+  served: ServerAdtClient,
+  query: string,
+  maxResults: number,
+  objectType: string | undefined,
+) {
+  if (served.variant === 'onprem') {
+    const name =
+      objectType === undefined ? undefined : searchNameOf('onprem', objectType);
+    if (objectType !== undefined && name === undefined) {
+      return notASearchType('object_type', objectType);
+    }
+    const params: IAdtSearchObjectsParamsOf<'onprem'> = {
+      query,
+      maxResults,
+      ...(name === undefined ? {} : { objectType: name }),
+    };
+    return () =>
+      served.client
+        .getUtils(ourUtils)
+        .search(params, { analyse: analyseException });
+  }
+  const name =
+    objectType === undefined ? undefined : searchNameOf('cloud', objectType);
+  if (objectType !== undefined && name === undefined) {
+    return notASearchType('object_type', objectType);
+  }
+  const params: IAdtSearchObjectsParamsOf<'cloud'> = {
+    query,
+    maxResults,
+    ...(name === undefined ? {} : { objectType: name }),
+  };
+  return () =>
+    served.client
+      .getUtils(ourUtils)
+      .search(params, { analyse: analyseException });
+}
+
 export async function handleSearchObject(
   context: HandlerContext,
   args: {
@@ -106,18 +152,14 @@ export async function handleSearchObject(
     return return_error('object_name is required');
   }
 
-  const searchParams: ISearchObjectsParams = {
-    query: object_name,
-    maxResults: maxResults || 100,
-  };
-  if (object_type) {
-    const variant = variantOf(connection);
-    const objectType = tableTypeOf(object_type, variant);
-    if (objectType === undefined) {
-      return return_error(notATableType('object_type', object_type, variant));
-    }
-    searchParams.objectType = objectType;
-  }
+  const served = adtClientOf(connection, logger);
+  const search = searchOn(
+    served,
+    object_name,
+    maxResults || 100,
+    object_type || undefined,
+  );
+  if (typeof search === 'string') return return_error(search);
 
   logger?.info(
     `Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`,
@@ -125,20 +167,9 @@ export async function handleSearchObject(
 
   const detail = detailOf(args);
 
-  // `search` accepts NO second argument through the typed contract `getUtils`
-  // hands back once given a result set: `IAdtObjectSearch<TSearch>.search`
-  // declares one parameter, and the wider `AdtUtils`-own `search<E>(criteria,
-  // options?)` is not the type this call sees once `ourUtils` is injected —
-  // verified with `tsc`: passing a second `{ analyse }` argument here is
-  // TS2554, "Expected 1 arguments, but got 2." The brief says this member
-  // "accepts an analyse and gets one"; the installed declaration disagrees,
-  // so none is passed.
   return answer(
     { tool: 'SearchObject', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getUtils(ourUtils)
-        .search(searchParams, { analyse: analyseException }),
+    search,
     project(detail, (value) => objectReferenceLines(value)),
   );
 }

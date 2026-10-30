@@ -1,4 +1,4 @@
-import type { AdtCodes, AdtMainTypeOf } from '../../../lib/adtProjections';
+import type { AdtCodes, TableMainOf } from '../../../lib/adtProjections';
 import {
   answerCaught,
   type FailureEntry,
@@ -79,14 +79,14 @@ interface AbapParameterInfo {
  * alone.
  */
 type SymbolObjectType =
-  | AdtMainTypeOf<AdtCodes<'CLAS/OC' | 'INTF/OI'>>
+  | TableMainOf<AdtCodes<'CLAS/OC' | 'INTF/OI'>>
   | 'FUNC'
   | 'LOCAL';
 
 /** A class, by its main type. */
-const CLASS_SYMBOL: AdtMainTypeOf<AdtCodes<'CLAS/OC'>> = 'CLAS';
+const CLASS_SYMBOL: TableMainOf<AdtCodes<'CLAS/OC'>> = 'CLAS';
 /** An interface, by its main type. */
-const INTERFACE_SYMBOL: AdtMainTypeOf<AdtCodes<'INTF/OI'>> = 'INTF';
+const INTERFACE_SYMBOL: TableMainOf<AdtCodes<'INTF/OI'>> = 'INTF';
 /** A function module, by this tool's own word for one. */
 const FUNCTION_SYMBOL: SymbolObjectType = 'FUNC';
 

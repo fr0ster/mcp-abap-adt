@@ -27,6 +27,8 @@ jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
   variantOf: () => 'onprem',
   createAdtClient: () => fakeClient,
+  // An on-premise group activation is the on-premise client's.
+  createOnPremAdtClient: () => fakeClient,
 }));
 
 // As in domainLow.test.ts: nothing here asserts that a handler injects

@@ -174,23 +174,48 @@ export const MAIN_TYPE_SENTENCE =
 // Main types: the TADIR type a code belongs to (spec 2.4)
 // ---------------------------------------------------------------------------
 
+/** The `codes` objects of table `T`, one per API that lists codes. */
+type CodesIn<T> = {
+  [A in keyof T]: T[A] extends { readonly codes: infer C } ? C : never;
+}[keyof T];
+
+/** The `main` the code entries of `E` (a union of `codes` objects) state for `C`. */
+type MainStated<E, C extends string> = E extends unknown
+  ? C extends keyof E
+    ? E[C] extends { readonly main: infer M extends string }
+      ? M
+      : never
+    : never
+  : never;
+
 /**
- * The main type of code `C`, the TADIR object type of `R3TR <type>`: the
- * text before its slash; a code without one is its own main type (`AUTH`).
+ * The main type of code `C`, the TADIR object type of `R3TR <type>`, as the
+ * variants' tables state it: the `main` of `C`'s code entry (interfaces-adt
+ * 24, spec 2.4). A code no table holds — a group-only code (`VIEW/DV`), a
+ * code a release answers but no API serves — has none (`never`): nothing is
+ * cut from a code's text.
  */
-export type AdtMainTypeOf<C extends string> = C extends `${infer M}/${string}`
-  ? M
-  : C;
+export type TableMainOf<C extends AdtUtilityCode> = MainStated<
+  CodesIn<VariantTables['onprem']> | CodesIn<VariantTables['cloud']>,
+  C
+>;
 
 /**
  * The codes of projection `P` that carry a main type of their own: those
- * with a slash. A code equal to its main type (`AUTH`) is just a code.
+ * whose entry states a main type other than the code itself (a code without
+ * a slash, `AUTH`, is its own main type and is just a code).
  */
-type CodeWithMainType<P extends string> = Extract<P, `${string}/${string}`>;
+type CodeWithMainType<P extends AdtUtilityCode> = {
+  [C in P]: [TableMainOf<C>] extends [never]
+    ? never
+    : TableMainOf<C> extends C
+      ? never
+      : C;
+}[P];
 
-/** The codes of projection `P` whose main type is `M`. */
-export type CodesOfMainType<P extends string, M extends string> = {
-  [C in CodeWithMainType<P>]: AdtMainTypeOf<C> extends M ? C : never;
+/** The codes of projection `P` whose main type (`main`) is `M`. */
+export type CodesOfMainType<P extends AdtUtilityCode, M extends string> = {
+  [C in CodeWithMainType<P>]: TableMainOf<C> extends M ? C : never;
 }[CodeWithMainType<P>];
 
 /** Whether `T` is exactly one member. */
@@ -206,8 +231,8 @@ type IsOne<T, All = T> = [T] extends [never]
  * The main types projection `P` reads as a code: each main type exactly one
  * code of `P` has, mapped to that code.
  */
-export type MainTypeCodes<P extends string> = {
-  readonly [M in AdtMainTypeOf<CodeWithMainType<P>> as IsOne<
+export type MainTypeCodes<P extends AdtUtilityCode> = {
+  readonly [M in TableMainOf<CodeWithMainType<P>> as IsOne<
     CodesOfMainType<P, M>
   > extends true
     ? M
@@ -218,8 +243,8 @@ export type MainTypeCodes<P extends string> = {
  * The main types projection `P` refuses as ambiguous: each main type two or
  * more codes of `P` share, mapped to those codes.
  */
-export type AmbiguousMainTypes<P extends string> = {
-  readonly [M in AdtMainTypeOf<CodeWithMainType<P>> as IsOne<
+export type AmbiguousMainTypes<P extends AdtUtilityCode> = {
+  readonly [M in TableMainOf<CodeWithMainType<P>> as IsOne<
     CodesOfMainType<P, M>
   > extends true
     ? never
@@ -227,7 +252,8 @@ export type AmbiguousMainTypes<P extends string> = {
 };
 
 /** The main types projection `P` reads as a code ({@link MainTypeCodes}). */
-export type MainTypeOfOne<P extends string> = keyof MainTypeCodes<P> & string;
+export type MainTypeOfOne<P extends AdtUtilityCode> = keyof MainTypeCodes<P> &
+  string;
 
 // ---------------------------------------------------------------------------
 // The names the tools have always taken for a code
@@ -290,6 +316,7 @@ export const WHERE_USED_CODES = projected<
     'FUGR/FF',
     'DEVC/K',
     'DDLS/DF',
+    'VIEW/DV',
     'TABL/DT',
     'TABL/DS',
     'TTYP/DA',
@@ -319,6 +346,7 @@ export const WHERE_USED_CODES = projected<
     'FUGR/FF',
     'DEVC/K',
     'DDLS/DF',
+    'VIEW/DV',
     'TABL/DT',
     'TABL/DS',
     'TTYP/DA',
@@ -378,7 +406,7 @@ export const WHERE_USED_NAMES = projected<
  * it: `CLAS/OC (class), TABL/DS (structure, stru), DSFD/SCF`.
  */
 export function codesWithNames(
-  codes: readonly AdtTypeCode[],
+  codes: readonly AdtUtilityCode[],
   names: readonly TypeName[],
 ): string {
   return codes
@@ -472,6 +500,7 @@ export const ACTIVATION_CODES = projected<
     'FUGR/I',
     'DEVC/K',
     'DDLS/DF',
+    'VIEW/DV',
     'TABL/DT',
     'TABL/DS',
     'TTYP/DA',
@@ -499,6 +528,7 @@ export const ACTIVATION_CODES = projected<
     'FUGR/I',
     'DEVC/K',
     'DDLS/DF',
+    'VIEW/DV',
     'TABL/DT',
     'TABL/DS',
     'TTYP/DA',

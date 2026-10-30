@@ -1,17 +1,30 @@
 import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
-import type { AdtCodes } from '../adtProjections';
+import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { carryingFailure } from '../strategies/step';
 
+/** A package's code in the tables. */
+const PACKAGE_CODE: AdtCodes<'DEVC/K'> = 'DEVC/K';
+
 export interface SearchObjectsArgs {
   query: string;
-  /** A package: the code of the tables (bare `DEVC` is no code of them). */
-  objectType: AdtCodes<'DEVC/K'>;
+  /** Packages: the search name of their main type (`DEVC`; spec 3.6). */
+  objectType: TableMainOf<typeof PACKAGE_CODE>;
   maxResults: number;
 }
+
+/**
+ * The search name packages are found by: the main type the package code's
+ * entry states (`DEVC`), a name of every modern release's object types
+ * list. Both modern tables state it alike: `main` is the code's main type
+ * by the table contract.
+ */
+export const PACKAGE_SEARCH_NAME =
+  ADT_TYPES_ONPREM.package.codes[PACKAGE_CODE].main;
 
 export type SearchObjectsFn = (args: SearchObjectsArgs) => Promise<string[]>;
 
@@ -35,7 +48,7 @@ export async function resolvePackagePatterns(
     if (isPattern(entry)) {
       const names = await deps.searchObjects({
         query: entry,
-        objectType: 'DEVC/K',
+        objectType: PACKAGE_SEARCH_NAME,
         maxResults: 1000,
       });
       resolved.push(...names);

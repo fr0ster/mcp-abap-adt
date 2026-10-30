@@ -85,6 +85,9 @@ jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
   variantOf: () => 'onprem',
   createAdtClient: () => fakeClient,
+  // The declared variant's client, tagged with it (SearchObject's filter is
+  // that variant's search names).
+  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
 }));
 // The unit-test Get* functions take their runner from `AdtExecutor` (adt-clients
 // 24), not from `createAdtClient`: route that door to the same double.

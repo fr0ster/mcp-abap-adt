@@ -1,5 +1,5 @@
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
-import type { AdtCodes, AdtMainTypeOf } from '../adtProjections';
+import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -12,7 +12,7 @@ import {
 import { ourUtils } from '../strategies/resultSets';
 
 /** What a scan reads: programs, function groups and classes, by main type. */
-export type ScanObjectType = AdtMainTypeOf<
+export type ScanObjectType = TableMainOf<
   AdtCodes<'PROG/P' | 'FUGR/F' | 'CLAS/OC'>
 >;
 

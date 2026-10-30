@@ -31,7 +31,10 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtGroupActivationCode,
+  AdtTypeCode,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
@@ -51,7 +54,8 @@ import { handleUpdateStructure } from '../../../handlers/structure/high/handleUp
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
-import { createAdtClient } from '../../../lib/clients';
+import { type GroupObject, namesItsParent } from '../../../lib/adtTypeCode';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import {
   type ActivationRunSource,
   awaitActivationRun,
@@ -151,7 +155,7 @@ async function forceSaveViewSource(
 }
 
 /** Map shared_dependencies section name to ADT object type code */
-const TYPE_CODES: Record<string, AdtTypeCode> = {
+const TYPE_CODES: Record<string, AdtGroupActivationCode<'onprem'>> = {
   tables: 'TABL/DT',
   structures: 'TABL/DS',
   views: 'DDLS/DF',
@@ -386,11 +390,9 @@ describe('Admin: Setup shared dependencies', () => {
       }> = [];
 
       // Collect names for group activation
-      const toActivate: Array<{
-        name: string;
-        type: AdtTypeCode;
-        parentName?: string;
-      }> = [];
+      // The shared objects include programs, which only the on-premise
+      // table activates: the group activation is the on-premise client's.
+      const toActivate: GroupObject<AdtGroupActivationCode<'onprem'>>[] = [];
 
       // --- Tables ---
       const tables = sharedConfig.tables || [];
@@ -1463,7 +1465,7 @@ describe('Admin: Setup shared dependencies', () => {
       const viaHandlers: Array<{
         section: string;
         label: string;
-        typeCode: AdtTypeCode;
+        typeCode: AdtGroupActivationCode<'onprem'>;
         create: (item: any) => Promise<any[]>;
         /** Writes the configured source; runs for an existing object too. */
         update?: (item: any) => Promise<any>;
@@ -1734,11 +1736,15 @@ describe('Admin: Setup shared dependencies', () => {
             // inactive, with not one SAP message to say why. The run id, then
             // `getActivationRun` until it settles, then `getActivationResults`
             // — see `lib/strategies/activationRun.ts`.
-            const utils = client.getUtils(ourUtils);
-            const started = await utils.activateObjectsGroup(toActivate, true, {
-              headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
-              analyse: analyseException,
-            });
+            const utils = createOnPremAdtClient(connection).getUtils(ourUtils);
+            const started = await utils.activateObjectsGroup(
+              toActivate.filter(namesItsParent),
+              true,
+              {
+                headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
+                analyse: analyseException,
+              },
+            );
             if (!started.ok) {
               throw new Error(started.getError().message);
             }
@@ -1838,11 +1844,16 @@ describe('Admin: Setup shared dependencies', () => {
                 // The same three requests as the bulk path above: a chunk is
                 // still an activation run, and its POST still answers only the
                 // id.
-                const utils = client.getUtils(ourUtils);
-                const resp = await utils.activateObjectsGroup(chunk, true, {
-                  headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
-                  analyse: analyseException,
-                });
+                const utils =
+                  createOnPremAdtClient(connection).getUtils(ourUtils);
+                const resp = await utils.activateObjectsGroup(
+                  chunk.filter(namesItsParent),
+                  true,
+                  {
+                    headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
+                    analyse: analyseException,
+                  },
+                );
                 if (!resp.ok) {
                   throw new Error(resp.getError().message);
                 }

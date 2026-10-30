@@ -15,7 +15,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../../../lib/adtHeaders/withAdtHeaders';
-import type { AdtCodes, AdtMainTypeOf } from '../../../lib/adtProjections';
+import type { AdtCodes, TableMainOf } from '../../../lib/adtProjections';
 import {
   type FailureEntry,
   failedPayloadOf,
@@ -52,13 +52,16 @@ class EnhancementInputError extends Error {}
 
 /**
  * How a caller may name a host GetEnhancements reads by its type: the code,
- * its main type, and the tool's own names, each upper-cased.
+ * its main type — the one its entry in the tables states (`main`) — and the
+ * tool's own names, each upper-cased.
  */
-interface HostSpelling {
-  readonly code: AdtTypeCode;
-  readonly main?: AdtMainTypeOf<AdtTypeCode>;
-  readonly names: readonly string[];
-}
+type HostSpelling = {
+  [C in AdtTypeCode]: {
+    readonly code: C;
+    readonly main?: TableMainOf<C>;
+    readonly names: readonly string[];
+  };
+}[AdtTypeCode];
 
 /** The hosts GetEnhancements takes a type for, as a caller may name each. */
 const HOST_SPELLINGS = {

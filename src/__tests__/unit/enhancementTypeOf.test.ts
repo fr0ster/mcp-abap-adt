@@ -51,7 +51,7 @@ describe('enhancementTypeOf', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].method).toBe('GET');
     expect(sent[0].url).toBe(
-      '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=zenh_impl&maxResults=20&objectType=ENHO%2FXHH',
+      '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=zenh_impl&maxResults=20&objectType=ENHO',
     );
     expect(sent[0].headers?.Accept).toBe('application/xml');
   });

@@ -70,7 +70,13 @@ describe('HandlerActivate and the type it was given', () => {
     });
 
     // `DEVC/K`, the code `COMPACT_ACTIVATE_ROUTES` gives it.
-    expect(planned).toEqual({ group: [{ name: 'ZMCP_PKG', type: 'DEVC/K' }] });
+    // The group is typed by the declared variant.
+    expect(planned).toEqual({
+      group: {
+        variant: 'onprem',
+        references: [{ name: 'ZMCP_PKG', type: 'DEVC/K' }],
+      },
+    });
   });
 
   it('prefers the explicit ADT type when the caller gives one', async () => {
@@ -163,7 +169,12 @@ describe('HandlerActivate and the type it was given', () => {
       object_type: 'FUNCTION_MODULE',
     });
     expect(planned).toEqual({
-      group: [{ name: 'Z_AC_FM01', parentName: 'ZAC_FGR01', type: 'FUGR/FF' }],
+      group: {
+        variant: 'onprem',
+        references: [
+          { name: 'Z_AC_FM01', parentName: 'ZAC_FGR01', type: 'FUGR/FF' },
+        ],
+      },
     });
 
     await handleHandlerActivate(context, {
@@ -172,7 +183,12 @@ describe('HandlerActivate and the type it was given', () => {
       object_type: 'FUNCTION_MODULE',
     });
     expect(planned).toEqual({
-      group: [{ name: 'Z_AC_FM01', parentName: 'ZAC_FGR01', type: 'FUGR/FF' }],
+      group: {
+        variant: 'onprem',
+        references: [
+          { name: 'Z_AC_FM01', parentName: 'ZAC_FGR01', type: 'FUGR/FF' },
+        ],
+      },
     });
   });
 

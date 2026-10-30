@@ -1,5 +1,12 @@
 import { answeredObject } from '@mcp-abap-adt/adt-strategies';
-import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_TYPES_CLOUD,
+  ADT_TYPES_ONPREM,
+  type AdtApiTable,
+  type AdtTypeCode,
+  type AdtUtilityCode,
+  type IAdtCodedReference,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   type ProjectionVariant,
   TABLE_CODES,
@@ -28,21 +35,88 @@ function valueNamed<T extends string>(
   return accepted.find((value) => value.toUpperCase() === upper);
 }
 
+/** The tables of the variants the server serves, read as the entry shape they satisfy. */
+const API_TABLES: readonly AdtApiTable<string>[] = [
+  ADT_TYPES_ONPREM,
+  ADT_TYPES_CLOUD,
+];
+
+/**
+ * The main type each code entry of the tables states (`main`, interfaces-adt
+ * 24): nothing is cut from a code's text. A code no table holds (a
+ * group-only code, `VIEW/DV`) has none.
+ */
+const MAIN_OF_CODE: ReadonlyMap<string, string> = new Map(
+  API_TABLES.flatMap((table) =>
+    Object.values(table).flatMap((entry) =>
+      entry === undefined
+        ? []
+        : Object.entries(entry.codes).map(([code, facts]): [string, string] => [
+            code,
+            facts.main,
+          ]),
+    ),
+  ),
+);
+
+/** The main type the tables state for `code` (`main`), else `undefined`. */
+export function mainOfCode(code: string): string | undefined {
+  return MAIN_OF_CODE.get(code);
+}
+
+/**
+ * The codes of the tables whose entry names a parent API (`parent`: the
+ * function group of `FUGR/FF` and `FUGR/I`): a reference to one names its
+ * parent (`IAdtCodedReference`).
+ */
+const PARENTED_CODES: ReadonlySet<string> = new Set(
+  API_TABLES.flatMap((table) =>
+    Object.values(table).flatMap((entry) =>
+      entry === undefined
+        ? []
+        : Object.entries(entry.codes)
+            .filter(([, facts]) => facts.parent !== null)
+            .map(([code]) => code),
+    ),
+  ),
+);
+
+/** One object of a group request, as a tool's argument names it. */
+export interface GroupObject<C extends AdtUtilityCode> {
+  name: string;
+  type: C;
+  uri?: string;
+  parentName?: string;
+}
+
+/**
+ * Whether `object` is a reference a group request takes
+ * (`IAdtCodedReference`): it names its parent, or its code has none
+ * ({@link PARENTED_CODES}). `parentName` is the caller's argument, checked
+ * here because the compiler cannot see it.
+ */
+export function namesItsParent<C extends AdtUtilityCode>(
+  object: GroupObject<C>,
+): object is GroupObject<C> & IAdtCodedReference<C> {
+  return object.parentName !== undefined || !PARENTED_CODES.has(object.type);
+}
+
 /**
  * The codes of `codes` whose main type `upper` (already upper-cased) names:
- * those that begin with it and a slash. A code without a slash
- * (`AUTH`) is its own main type and is named as a code.
+ * those whose entry states it as `main` ({@link MAIN_OF_CODE}). A code
+ * whose main type is itself (`AUTH`) is named as a code.
  */
-function codesOfMain<C extends AdtTypeCode>(
+function codesOfMain<C extends AdtUtilityCode>(
   upper: string,
   codes: readonly C[],
 ): C[] {
-  const prefix = `${upper}/`;
-  return codes.filter((code) => code.startsWith(prefix));
+  return codes.filter(
+    (code) => code !== upper && MAIN_OF_CODE.get(code) === upper,
+  );
 }
 
 /** The one code of `codes` whose main type `upper` names, else `undefined`. */
-function oneCodeOfMain<C extends AdtTypeCode>(
+function oneCodeOfMain<C extends AdtUtilityCode>(
   upper: string,
   codes: readonly C[],
 ): C | undefined {
@@ -73,7 +147,7 @@ export function acceptedOf<T extends string>(
  * has it, or two or more share it (`AmbiguousMainTypes`, which
  * {@link notAccepted} names).
  */
-export function mainTypeCodeOf<C extends AdtTypeCode>(
+export function mainTypeCodeOf<C extends AdtUtilityCode>(
   text: string,
   codes: readonly C[],
 ): C | undefined {
@@ -87,7 +161,7 @@ export function mainTypeCodeOf<C extends AdtTypeCode>(
  * main type it names; either case, upper-cased once. `undefined` for any
  * other text, a main type two codes share included.
  */
-export function acceptedCodeOf<C extends AdtTypeCode, N extends TypeName>(
+export function acceptedCodeOf<C extends AdtUtilityCode, N extends TypeName>(
   text: string,
   codes: readonly C[],
   names: readonly N[],
@@ -107,7 +181,7 @@ export function acceptedCodeOf<C extends AdtTypeCode, N extends TypeName>(
 export function sharedMainType(
   argument: string,
   text: string,
-  codes: readonly AdtTypeCode[],
+  codes: readonly AdtUtilityCode[],
 ): string | undefined {
   const shared = codesOfMain(text.toUpperCase(), codes);
   return shared.length < 2
@@ -125,7 +199,7 @@ export function notAccepted(
   argument: string,
   text: string,
   accepted: readonly string[],
-  codes: readonly AdtTypeCode[],
+  codes: readonly AdtUtilityCode[],
 ): string {
   return (
     sharedMainType(argument, text, codes) ??

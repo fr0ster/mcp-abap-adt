@@ -7,16 +7,18 @@
  *
  * Each case runs the tool's own handler over a recording connection declared
  * the variant — real adt-clients code, no SAP.
+ *
+ * SearchObject's filter is no longer here: it takes the variant's search
+ * names, of which every table main type is one (`searchObjectTypes.test.ts`).
  */
 
-import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtUtilityCode } from '@mcp-abap-adt/interfaces-adt';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
-import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
 import { handleGetNodeStructure } from '../../../handlers/system/low/handleGetNodeStructure';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetObjectStructure } from '../../../handlers/system/readonly/handleGetObjectStructure';
@@ -122,13 +124,6 @@ const TABLE_TOOLS: readonly Argument[] = [
         objects: [{ object_type: value, object_name: 'ZA' }],
       }),
     one: ['DSFD', 'DSFD/SCF'],
-    shared: ['MSAG', 'MSAG/N, MSAG/NN'],
-  },
-  {
-    tool: 'SearchObject.object_type',
-    send: (context, value) =>
-      handleSearchObject(context, { object_name: 'Z*', object_type: value }),
-    one: ['ENHS', 'ENHS/XSB'],
     shared: ['MSAG', 'MSAG/N, MSAG/NN'],
   },
   {
@@ -520,7 +515,7 @@ describe('a main type is read where it names one code, refused where it names se
  * own list: those it reads as one code and those it refuses as shared, in
  * the order the list first names them.
  */
-function mainTypesOf(codes: readonly AdtTypeCode[]) {
+function mainTypesOf(codes: readonly AdtUtilityCode[]) {
   const mains = [
     ...new Set(
       codes.flatMap((code) => {

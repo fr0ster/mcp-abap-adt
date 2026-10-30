@@ -19,7 +19,7 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
-  AdtTypeCode,
+  AdtWhereUsedCode,
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -445,7 +445,10 @@ async function whereUsedInEnvelopes(
       : undefined;
     return code === undefined ? [] : [{ target, i, code }];
   });
-  const params = (entry: { target: WhereUsedArgs; code: AdtTypeCode }) => ({
+  const params = (entry: {
+    target: WhereUsedArgs;
+    code: AdtWhereUsedCode;
+  }) => ({
     object_name: entry.target.object_name,
     object_type: entry.code,
   });

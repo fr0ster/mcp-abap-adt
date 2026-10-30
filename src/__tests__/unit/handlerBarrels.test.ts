@@ -103,7 +103,9 @@ describe("lib's read and write handler barrels", () => {
     // checked at the boundary, and the chain-create refusal, for compact's
     // `HandlerActivate`, `HandlerLock`, `HandlerUnlock` and `HandlerCreate`
     // (92).
-    expect(write).toHaveLength(92);
+    // 22.0.0: the boundary of an activation's objects, whose group is typed
+    // by the declared variant, for compact's `HandlerActivate` (93).
+    expect(write).toHaveLength(93);
   });
 
   it('share not one symbol', () => {

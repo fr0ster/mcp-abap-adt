@@ -17,8 +17,11 @@
 import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
+  ADT_UTILITY_CODES_CLOUD,
+  ADT_UTILITY_CODES_ONPREM,
   type AdtApiName,
   type AdtApiTable,
+  type AdtUtilityCodeTable,
 } from '@mcp-abap-adt/interfaces-adt';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import {
@@ -115,6 +118,14 @@ const TABLES: { readonly [V in ProjectionVariant]: AdtApiTable<string> } = {
   cloud: ADT_TYPES_CLOUD,
 };
 
+/** The utility codes of each variant: what `getUtils()` takes beyond the tables. */
+const UTILITY_CODES: {
+  readonly [V in ProjectionVariant]: AdtUtilityCodeTable<string>;
+} = {
+  onprem: ADT_UTILITY_CODES_ONPREM,
+  cloud: ADT_UTILITY_CODES_CLOUD,
+};
+
 /** The collection `variant`'s table gives `api`. */
 function collectionOfApi(variant: ProjectionVariant, api: AdtApiName): string {
   const entry = TABLES[variant][api];
@@ -122,13 +133,20 @@ function collectionOfApi(variant: ProjectionVariant, api: AdtApiName): string {
   return entry.collection;
 }
 
-/** The collection `variant`'s table gives `code` (its own, else its API's). */
+/**
+ * The collection `variant`'s table gives `code` (its own, else its API's),
+ * or, for a group-only code (`VIEW/DV`), its utility table's.
+ */
 function collectionOfCode(variant: ProjectionVariant, code: string): string {
   for (const entry of Object.values(TABLES[variant])) {
     if (entry === undefined) continue;
     const facts = Object.entries(entry.codes).find(([own]) => own === code);
     if (facts !== undefined) return facts[1].collection ?? entry.collection;
   }
+  const utility = Object.entries(UTILITY_CODES[variant]).find(
+    ([own]) => own === code,
+  )?.[1].collection;
+  if (utility !== undefined) return utility;
   throw new Error(`${code} is not in the table`);
 }
 

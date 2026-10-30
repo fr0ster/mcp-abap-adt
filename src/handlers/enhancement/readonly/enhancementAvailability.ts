@@ -1,4 +1,5 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtCodes } from '../../../lib/adtProjections';
 import { isCredentialFailure } from '../../../lib/answer';
@@ -30,16 +31,18 @@ export function notThroughAdt(name: string, type: string): string | undefined {
  * the repository search; `undefined` when the search does not name it.
  *
  * Asked only after a read failed, so the read that works stays one request.
- * `objectType` names the main type by one of its codes in the tables (a bare
- * main type is no code of them): the search ignores a subtype filter and
- * answers mixed subtypes (measured on premise, 2026-10-02), and the subtype
- * is in each hit's `adtcore:type`.
+ * The search is filtered by the search name of `code`'s main type, read from
+ * its entry in the tables (`ENHO`, `ENHS`; spec 3.6): a code is no filter
+ * value, and the subtype is in each hit's `adtcore:type`, which the search
+ * answers for every subtype of the main type (measured on premise,
+ * 2026-10-02).
  */
 export async function enhancementTypeOf(
   connection: IAbapConnection,
   name: string,
-  objectType: AdtCodes<'ENHO/XHH' | 'ENHS/XSB'>,
+  code: AdtCodes<'ENHO/XHH' | 'ENHS/XSB'>,
 ): Promise<string | undefined> {
+  const objectType = ADT_TYPES_ONPREM.enhancement.codes[code].main;
   try {
     const searched = await createAdtClient(connection)
       .getUtils(ourUtils)

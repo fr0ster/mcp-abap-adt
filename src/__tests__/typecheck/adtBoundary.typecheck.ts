@@ -10,6 +10,11 @@
  * Nothing runs here: it is not a test file, and Jest never loads it.
  */
 
+import type {
+  AdtMainTypeOf,
+  AdtSearchTypeOf,
+  AdtTypeCodeOf,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ACTIVATION_CODES,
   type ActivationCode,
@@ -26,6 +31,7 @@ import {
   type ServedName,
   type SINGLE_ACTIVATION_ROUTES,
   type TABLE_CODES,
+  type TableMainOf,
   type VersionedKind,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
@@ -41,6 +47,8 @@ import type {
   BreakpointLabel,
   RunKind,
 } from '../../lib/debugger/objectUri';
+import { PACKAGE_SEARCH_NAME } from '../../lib/search-source/packageResolver';
+import { searchNameOf } from '../../lib/searchTypes';
 
 // --- Past the boundary, a value is typed as its projection -----------------
 
@@ -202,3 +210,49 @@ export const singleCodesAreGroupCodes: [
 ] extends [ActivationCode<'onprem'>, ActivationCode<'cloud'>]
   ? true
   : false = true;
+
+// ---------------------------------------------------------------------------
+// Main types from the tables' `main`, and the search names (interfaces-adt 24)
+// ---------------------------------------------------------------------------
+
+/** `true` when every member of `T` is `true`. */
+type AllTrue<T> = [Exclude<T, true>] extends [never] ? true : false;
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/** The codes of the two modern tables. */
+type ModernCode = AdtTypeCodeOf<'onprem'> | AdtTypeCodeOf<'cloud'>;
+
+// `TableMainOf` reads a code's entry: `ENHO/XHH` states `ENHO`.
+export const enhoMain: TableMainOf<'ENHO/XHH'> = 'ENHO';
+// @ts-expect-error the entry of ENHO/XHH states ENHO, not ENHS
+export const enhoIsNotEnhs: TableMainOf<'ENHO/XHH'> = 'ENHS';
+// A code no API table holds has no main type: nothing is cut from its text.
+// @ts-expect-error VIEW/DV is a group-only code: no entry states its main type (a prefix rule would give VIEW)
+export const groupOnlyHasNone: TableMainOf<'VIEW/DV'> = 'VIEW';
+
+/**
+ * No code of the modern tables states a main type other than the text
+ * before its slash (interfaces-adt's `AdtCheckedTable` requires `main` to be
+ * `AdtMainTypeOf` its key), so reading `main` sends what the prefix did.
+ */
+export const everyMainIsItsPrefix: AllTrue<
+  { [C in ModernCode]: Same<TableMainOf<C>, AdtMainTypeOf<C>> }[ModernCode]
+> = true;
+
+// The package search sends the main type the package code's entry states.
+export const packageSearch: 'DEVC' = PACKAGE_SEARCH_NAME;
+// @ts-expect-error the package search sends no code
+export const packageSearchIsNoCode: 'DEVC/K' = PACKAGE_SEARCH_NAME;
+
+// SearchObject's filter is the declared variant's names.
+export const onPremName: AdtSearchTypeOf<'onprem'> | undefined = searchNameOf(
+  'onprem',
+  'STRU',
+);
+export const cloudName: AdtSearchTypeOf<'cloud'> | undefined = searchNameOf(
+  'cloud',
+  'STRU',
+);
+// @ts-expect-error an on-premise name is not a name of every variant
+export const onPremAsModern: AdtSearchTypeOf<'onprem' | 'cloud'> | undefined =
+  searchNameOf('onprem', 'STRU');

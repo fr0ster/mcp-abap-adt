@@ -653,8 +653,10 @@ export const STATE_IDLE_YAML = 'state-idle-minutes';
 /**
  * `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`:
  * the idle bound on held state, the owner's one exception to "no timeouts",
- * as main reads it (a whole number, 30 to 35 791, default 30), in every
- * binary's table.
+ * as main reads it (a whole number, 30 to 35 791, default 30), in the HTTP
+ * and SSE binaries' tables. stdio has no idle bound: core's table refuses
+ * the CLI flag and the YAML key as a removed parameter, and does not read
+ * the environment variable (another binary's).
  */
 export const STATE_IDLE_ROW: Parameter = {
   key: 'stateIdleMinutes',

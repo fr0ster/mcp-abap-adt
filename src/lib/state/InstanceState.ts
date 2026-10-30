@@ -4,13 +4,20 @@
  * Generic on purpose: the host keeps instances by this handle (MCP SEP-2567 —
  * no protocol session; state named by an explicit handle), whatever the state
  * is. The debugger is one part; locks will be another. State ends by an
- * explicit stop, the host, the backend, process shutdown — or the idle bound
- * (`idleBound.ts`): the user's one exception to "no timeouts", counted from
- * the end of the last tool call and paused while any call runs.
+ * explicit stop, the host, the backend, process shutdown — or, where the host
+ * states one, the idle bound (`idleBound.ts`): the user's one exception to
+ * "no timeouts", counted from the end of the last tool call and paused while
+ * any call runs. A host that states `NO_IDLE_BOUND` (stdio) has none: no
+ * timer is ever armed.
  */
 import { randomBytes } from 'node:crypto';
 import { logger as processLogger } from '../logger';
-import { DEFAULT_STATE_IDLE_MINUTES, parseStateIdleMinutes } from './idleBound';
+import {
+  DEFAULT_STATE_IDLE_MINUTES,
+  NO_IDLE_BOUND,
+  parseStateIdleMinutes,
+  type StateIdleBound,
+} from './idleBound';
 
 /**
  * One stateful part of an instance.
@@ -95,9 +102,11 @@ export interface InstanceStateOptions {
   logger?: StateLogger;
   /**
    * The idle bound: held state ends after this many minutes without a tool
-   * call. A whole number, at least 30 (the default); anything else is refused.
+   * call. A whole number, at least 30 (the default when absent); anything
+   * else is refused. `NO_IDLE_BOUND` (stdio): none — no timer is ever armed,
+   * and held state ends only by a stop, the host, the backend or shutdown.
    */
-  idleMinutes?: number;
+  idleMinutes?: StateIdleBound;
   /**
    * Run after the idle bound's stop, whatever its undo answered: the host's
    * terminal close of what the state owns. A failure is reported
@@ -116,8 +125,8 @@ export interface InstanceStateOptions {
 
 export class InstanceState {
   private readonly log: StateLogger;
-  /** The idle bound, in minutes. */
-  readonly idleMinutes: number;
+  /** The idle bound, in minutes; `NO_IDLE_BOUND` when there is none. */
+  readonly idleMinutes: StateIdleBound;
 
   private readonly onIdleStop: (() => Promise<void>) | undefined;
   private readonly isTaken: ((handle: string) => boolean) | undefined;
@@ -133,7 +142,9 @@ export class InstanceState {
     this.idleMinutes =
       options.idleMinutes === undefined
         ? DEFAULT_STATE_IDLE_MINUTES
-        : parseStateIdleMinutes(options.idleMinutes, 'stateIdleMinutes');
+        : options.idleMinutes === NO_IDLE_BOUND
+          ? NO_IDLE_BOUND
+          : parseStateIdleMinutes(options.idleMinutes, 'stateIdleMinutes');
   }
 
   private readonly parts: StatePart[] = [];
@@ -238,11 +249,14 @@ export class InstanceState {
   }
 
   /**
-   * Armed only while something is held and nothing runs. A change of a part
-   * (a listener's own re-poll) never restarts a running bound: only a call does.
+   * Armed only while something is held and nothing runs, and never without a
+   * bound. A change of a part (a listener's own re-poll) never restarts a
+   * running bound: only a call does.
    */
   private reviewBound(): void {
+    const minutes = this.idleMinutes;
     if (
+      minutes === NO_IDLE_BOUND ||
       this.closed ||
       this.disposing > 0 ||
       this.callsInFlight > 0 ||
@@ -255,7 +269,7 @@ export class InstanceState {
     this.idleTimer = setTimeout(() => {
       this.idleTimer = undefined;
       void this.expire();
-    }, this.idleMinutes * 60_000);
+    }, minutes * 60_000);
     this.idleTimer.unref(); // never keeps the process alive
   }
 

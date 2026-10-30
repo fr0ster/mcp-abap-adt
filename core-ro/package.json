@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-ro",
-  "version": "20.1.0",
+  "version": "21.0.0",
   "description": "The read-only MCP server for SAP ABAP ADT over stdio: the readonly tools (with system and search) and the leftover-session list and logoff, no high, debugger, background-run or resume tool. One destination through the auth broker, as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -57,10 +57,10 @@
     "start": "node ./bin/mcp-abap-adt-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^20.1.0",
-    "@mcp-abap-adt/lib": "^20.1.0",
-    "@mcp-abap-adt/responsible-rules": "^20.1.0",
-    "@mcp-abap-adt/server-runtime": "^20.1.0"
+    "@mcp-abap-adt/background-runs-memory": "^21.0.0",
+    "@mcp-abap-adt/lib": "^21.0.0",
+    "@mcp-abap-adt/responsible-rules": "^21.0.0",
+    "@mcp-abap-adt/server-runtime": "^21.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

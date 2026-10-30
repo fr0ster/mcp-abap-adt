@@ -123,7 +123,10 @@ same way.
 
 An instance holds state between tool calls, such as a debug session, in `state` (`InstanceState`),
 named by its handle (`stateHandle`). Held state ends after `stateIdleMinutes` without a tool call
-(default 30). It also ends through its own stop tool, `dispose()` / `shutdownState()`, or the
+(default 30 when the option is absent, so an embedder that passes nothing keeps the bound). The
+option `NO_IDLE_BOUND` (`@mcp-abap-adt/lib/state`) states none: no timer is ever armed — the stdio
+server states it, because its life and its state are the client's (Streamable HTTP and SSE keep
+their bound). It also ends through its own stop tool, `dispose()` / `shutdownState()`, or the
 system. `idle()` resolves when every tool call of the instance has settled.
 
 ### How an instance ends
@@ -437,7 +440,8 @@ creates.
 - **Held state.** `InstanceBatch` is a `StatePart`, attached to the instance's `InstanceState` at
   construction (`BaseMcpServer`'s `batch` option): `holdsState()` is true while a batch is open or
   answers are kept — what keeps an HTTP instance in the pool between requests — so batch state is
-  under the idle bound on every transport, the one clock that touches it. `dispose()` (the pool's
+  under the idle bound wherever the host states one (Streamable HTTP, SSE; stdio states none), the
+  one clock that touches it. `dispose()` (the pool's
   undo, the idle bound) is `drop()`.
 - **The instance's end.** The instance close (`closeInstance`) lets go of the state without
   `dispose()`, so it drops the batch itself: `BaseMcpServer.dropBatch()`, in the tick the close

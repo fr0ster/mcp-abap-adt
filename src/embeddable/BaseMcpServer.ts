@@ -138,6 +138,7 @@ import {
   type StateLogger,
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
+import type { StateIdleBound } from '../lib/state/idleBound.js';
 import type { LongSession, LongSessionPort } from '../lib/state/longSession.js';
 import {
   withoutStateHandle,
@@ -353,8 +354,12 @@ export abstract class BaseMcpServer extends McpServer {
     systemContextResolver?: SystemContextResolver | null;
     /** The rules that make a connection's parameters; default none. */
     systemContextRules?: SystemContextRules | null;
-    /** The idle bound on held state, in minutes: at least 30, default 30. */
-    stateIdleMinutes?: number;
+    /**
+     * The idle bound on held state, in minutes: at least 30, default 30.
+     * `NO_IDLE_BOUND`: none — held state never ends on the server's clock
+     * (stdio states it: the client governs the server's life).
+     */
+    stateIdleMinutes?: StateIdleBound;
     /**
      * Where the state's lifecycle lines go (the bound's end of a state, a
      * failed cleanup, a failing observer). Default: the `logger` passed

@@ -15,6 +15,7 @@ import {
   type AcceptedCode,
   type AcceptedKind,
   type ActivationCode,
+  type AdtCodes,
   type COMPACT_CREATE_ROUTES,
   type INCLUDES_PARENT_ROUTES,
   projected,
@@ -120,3 +121,10 @@ export const parentTooMany = projected<Parents, Parents>()({
   // @ts-expect-error a list one value too many (`FUGR`, a main type, no code).
   cloud: ['PROG/P', 'PROG/I', 'FUGR/F', 'CLAS/OC', 'FUGR'],
 });
+
+// --- Codes written out in a type -------------------------------------------
+
+/** A function module's code is a code of the tables… */
+export type FunctionModuleCode = AdtCodes<'FUGR/FF'>;
+// @ts-expect-error …`FUNC`, a run's and the symbols tool's short word, is none.
+export type FunctionShortWord = AdtCodes<'FUNC'>;

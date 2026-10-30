@@ -75,19 +75,20 @@ interface AbapParameterInfo {
 
 /**
  * What a symbol resolved to: a class or an interface by main type, a function
- * module by its short type (`FUNC`), or a symbol of the source alone.
+ * module by this tool's own word for one (`FUNC`), or a symbol of the source
+ * alone.
  */
 type SymbolObjectType =
   | AdtMainTypeOf<AdtCodes<'CLAS/OC' | 'INTF/OI'>>
-  | AdtCodes<'FUNC'>
+  | 'FUNC'
   | 'LOCAL';
 
 /** A class, by its main type. */
 const CLASS_SYMBOL: AdtMainTypeOf<AdtCodes<'CLAS/OC'>> = 'CLAS';
 /** An interface, by its main type. */
 const INTERFACE_SYMBOL: AdtMainTypeOf<AdtCodes<'INTF/OI'>> = 'INTF';
-/** A function module, by its short type. */
-const FUNCTION_SYMBOL: AdtCodes<'FUNC'> = 'FUNC';
+/** A function module, by this tool's own word for one. */
+const FUNCTION_SYMBOL: SymbolObjectType = 'FUNC';
 
 interface AbapSystemInfo {
   exists: boolean;

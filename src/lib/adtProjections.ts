@@ -24,7 +24,6 @@ import type {
   AdtWhereUsedCode,
 } from '@mcp-abap-adt/adt-clients';
 import type {
-  AbapUnitRunObjectType,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
   AdtApiName,
@@ -41,10 +40,9 @@ import type { AbapSystemKind } from './systemKind';
 /**
  * Codes written out in a type, checked against the tables: `AdtCodes<'FUGR/FF'
  * | 'FUGR/I'>` is that union, and a code no table holds does not compile. A
- * code of the type tables, the utility tables' group-only codes, or an ABAP
- * Unit run's `osl:object` type (`FUNC`, the function module's short type).
+ * code of the type tables, or one of the utility tables' group-only codes.
  */
-export type AdtCodes<C extends AdtUtilityCode | AbapUnitRunObjectType> = C;
+export type AdtCodes<C extends AdtUtilityCode> = C;
 
 /** A variant the server serves: the table its tool set is built from. */
 export type ProjectionVariant = AbapSystemKind;

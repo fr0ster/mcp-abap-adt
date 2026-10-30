@@ -54,6 +54,10 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     "The first four letters of a function module's name (the `VIEW…` maintenance modules), compared with a name, not a type.",
   ],
   [
+    'src/handlers/system/readonly/handleGetAbapSystemSymbols.ts:FUNC',
+    "A function module in the symbols tool's own object-type answer (CLAS, INTF, FUNC or LOCAL): that tool's word for what a symbol resolved to, not an ADT type code.",
+  ],
+  [
     'src/lib/clients.ts:HTTP/SSE',
     'The two HTTP transports named together, not a type code.',
   ],

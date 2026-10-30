@@ -166,7 +166,7 @@ describe('the literal scan of type codes', () => {
           'export function isClass(code: AdtTypeCode): boolean {',
           "  return code === 'CLAS/OC';",
           '}',
-          "export type Module = AdtCodes<'FUGR/FF' | 'FUNC'>;",
+          "export type Module = AdtCodes<'FUGR/FF' | 'FUGR/I'>;",
         ].join('\n'),
       ),
     ).toEqual([]);

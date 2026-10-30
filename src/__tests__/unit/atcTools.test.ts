@@ -9,6 +9,7 @@ import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
 import { declareSystemKind } from '../../lib/systemKind';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { recordingConnection } from '../helpers/recordingConnection';
 
 /**
  * The three ATC tools, and the two things about them that are this
@@ -490,8 +491,7 @@ describe('RunATC: the object kinds of each variant', () => {
   const stated = (variant: 'onprem' | 'cloud') =>
     TOOL_DEFINITION.variants[variant];
   const typeEnum = (variant: 'onprem' | 'cloud') =>
-    (stated(variant).inputSchema.properties.objects.items as any).properties
-      .type.enum;
+    stated(variant).inputSchema.properties.objects.items.properties.type.enum;
 
   it.each([
     ['onprem', ONPREM],
@@ -521,11 +521,11 @@ describe('RunATC: the object kinds of each variant', () => {
         return okResponse({ waited: false, worklistId, runId: 'RUN1' });
       },
     };
-    const connection = {};
+    const connection = recordingConnection();
     declareSystemKind(connection, variant);
-    const answered: any = await handleRunATC(
-      { connection, logger: undefined } as any,
-      { objects: [{ name: 'ZOBJ', type }], check_variant: 'V' } as any,
+    const answered = await handleRunATC(
+      { connection },
+      { objects: [{ name: 'ZOBJ', type }], check_variant: 'V' },
     );
     return { answered, calls };
   }

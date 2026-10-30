@@ -5,18 +5,28 @@
  * Uses the ADT group activation endpoint (/sap/bc/adt/activation).
  */
 
+import type { ProjectionVariant } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { byVariant } from '../../../lib/variantDefinition';
 import {
+  activationTypeDescription,
   handleActivateObject,
-  PREAUDIT_DESCRIPTION,
+  preauditDescription,
 } from '../low/handleActivateObject';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjects',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.',
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.',
+    inputSchema: activateObjectsSchema(variant),
+  })),
+} as const;
+
+/** ActivateObjects' input on `variant`. */
+function activateObjectsSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       objects: {
@@ -32,8 +42,7 @@ export const TOOL_DEFINITION = {
             },
             type: {
               type: 'string',
-              description:
-                'Object type code: DOMA (domain), DTEL (data element), TABL (table), STRU (structure), DDLS (CDS view), CLAS (class), INTF (interface), PROG (program), FUGR (function group), FUGR/FF (function module), TTYP (table type), SRVD (service definition), SRVB (service binding), BDEF (behavior definition), DDLX (metadata extension), DCLS (access control), ENHO (enhancement)',
+              description: activationTypeDescription(variant),
             },
           },
           required: ['name', 'type'],
@@ -41,12 +50,12 @@ export const TOOL_DEFINITION = {
       },
       preaudit: {
         type: 'boolean',
-        description: PREAUDIT_DESCRIPTION,
+        description: preauditDescription(variant),
       },
     },
     required: ['objects'],
-  },
-} as const;
+  } as const;
+}
 
 export async function handleActivateObjects(
   context: HandlerContext,

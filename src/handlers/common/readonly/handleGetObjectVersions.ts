@@ -6,13 +6,18 @@
  * opaque contentUri, to be passed to GetObjectVersionSource). Closes #30.
  */
 
-import { createAdtClient } from '../../../lib/clients';
+import {
+  type ProjectionVariant,
+  VERSIONED_KINDS,
+} from '../../../lib/adtProjections';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
   return_error,
   return_response,
 } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 import {
   readVersions,
   resolveVersionedObject,
@@ -22,15 +27,22 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersions',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+    inputSchema: objectVersionsSchema(variant),
+  })),
+} as const;
+
+/** GetObjectVersions's input on `variant`. */
+function objectVersionsSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
         description: 'Object type.',
-        enum: [...VERSIONED_OBJECT_TYPES],
+        enum: VERSIONED_KINDS[variant],
       },
       object_name: {
         type: 'string',
@@ -43,8 +55,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: ['object_type', 'object_name'],
-  },
-} as const;
+  } as const;
+}
 
 interface GetObjectVersionsArgs {
   object_type: string;
@@ -69,7 +81,7 @@ export async function handleGetObjectVersions(
     if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_OBJECT_TYPES.join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variantOf(connection)].join(', ')}`,
         ),
       );
     }

@@ -20,7 +20,10 @@
 
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  compactCheckRunSchema,
+  byVariant,
+  COMPACT_CHECK,
+  compactCheckRunDescription,
+  compactCheckRunSchemaFor,
   toLowObjectType,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
@@ -29,9 +32,10 @@ import { handleCheckObject } from '@mcp-abap-adt/lib/handlers/read';
 export const TOOL_DEFINITION = {
   name: 'HandlerCheckRun',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks unsaved source given in the call, for CLASS, STRUCTURE and DDL.',
-  inputSchema: compactCheckRunSchema,
+  ...byVariant((variant) => ({
+    description: compactCheckRunDescription(variant),
+    inputSchema: compactCheckRunSchemaFor(COMPACT_CHECK[variant]),
+  })),
 } as const;
 
 type HandlerCheckRunArgs = {

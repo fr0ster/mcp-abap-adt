@@ -79,9 +79,21 @@ import {
 import type { IAdtError, IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  ACTIVATION_CODES,
+  ACTIVATION_NAMES,
+  COMPACT_ACTIVATE,
+  codesWithNames,
+  type ProjectionVariant,
+  SINGLE_ACTIVATION,
+} from '../../../lib/adtProjections';
 import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type ActivationRunOutcome,
@@ -95,6 +107,7 @@ import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 
 /** The families whose own `activate()` this dispatcher can reach directly. */
 type ActivationFamily =
@@ -155,23 +168,41 @@ export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
 };
 
 /**
- * The codes of {@link TYPE_TO_FAMILY} as the preaudit descriptions name them:
- * ADT codes upper-case, this codebase's names as they are. Built from the
- * map, so the descriptions cannot name a code the map does not route.
+ * What `preaudit` does on `variant`, for both activation tools: the codes and
+ * names a single object is activated by through its own type's activation
+ * there (`SINGLE_ACTIVATION`).
  */
-export const SINGLE_OBJECT_TYPE_CODES = Object.keys(TYPE_TO_FAMILY)
-  .map((code) => (code.includes('/') ? code.toUpperCase() : code))
-  .join(', ');
+export function preauditDescription(variant: ProjectionVariant): string {
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: ${SINGLE_ACTIVATION[variant].join(', ')}. Their family's activate() always sends preauditRequested=true.`;
+}
 
-/** What `preaudit` does, for both activation tools. */
-export const PREAUDIT_DESCRIPTION = `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: ${SINGLE_OBJECT_TYPE_CODES}. Their family's activate() always sends preauditRequested=true.`;
+/**
+ * What `objects[].type` takes on `variant`: a code a group activation takes
+ * (`ACTIVATION_CODES`), or a name standing for one (`ACTIVATION_NAMES`); one
+ * object alone also by the kind its own activation serves
+ * (`SINGLE_ACTIVATION`).
+ */
+export function activationTypeDescription(variant: ProjectionVariant): string {
+  const named = new Set<string>(ACTIVATION_NAMES[variant]);
+  const kinds = SINGLE_ACTIVATION[variant].filter(
+    (name) => !name.includes('/') && !named.has(name),
+  );
+  return `Object type, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}.`;
+}
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
+    inputSchema: activateObjectSchema(variant),
+  })),
+} as const;
+
+/** ActivateObjectLow's input on `variant`. */
+function activateObjectSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       objects: {
@@ -184,8 +215,7 @@ export const TOOL_DEFINITION = {
             name: { type: 'string', description: 'Object name in uppercase' },
             type: {
               type: 'string',
-              description:
-                "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')",
+              description: activationTypeDescription(variant),
             },
             uri: { type: 'string', description: 'Optional ADT URI' },
             parentName: {
@@ -199,7 +229,7 @@ export const TOOL_DEFINITION = {
       },
       preaudit: {
         type: 'boolean',
-        description: PREAUDIT_DESCRIPTION,
+        description: preauditDescription(variant),
       },
       detail: {
         type: 'string',
@@ -210,8 +240,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: ['objects'],
-  },
-} as const;
+  } as const;
+}
 
 /**
  * One object of the tool's argument, as the caller sent it: `type` is an ADT
@@ -509,6 +539,15 @@ export async function handleActivateObject(
       };
     },
   );
+}
+
+/**
+ * The compact names `HandlerActivate` activates from `object_type` alone on
+ * the variant declared for `connection` (`COMPACT_ACTIVATE`): what its
+ * refusal lists.
+ */
+export function compactActivatableTypes(connection: object): readonly string[] {
+  return COMPACT_ACTIVATE[variantOf(connection)];
 }
 
 /** The step a run start's failure arose at. */

@@ -1,11 +1,14 @@
 import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import {
-  COMPACT_OBJECT_TYPES,
+  byVariant,
+  COMPACT_ACTIVATE,
   type CompactObjectType,
-  compactActivateSchema,
+  compactActivateDescription,
+  compactActivateSchemaFor,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
+  compactActivatableTypes,
   handleActivateObjectOnce,
   TYPE_TO_FAMILY,
 } from '@mcp-abap-adt/lib/handlers/write';
@@ -63,17 +66,13 @@ function adtTypeFor(type: CompactObjectType | undefined): string | undefined {
   return ADT_TYPE_BY_COMPACT_TYPE[type];
 }
 
-/** The types a caller may name without reaching for `object_adt_type`. */
-function knownCompactTypes(): string[] {
-  return COMPACT_OBJECT_TYPES.filter((type) => adtTypeFor(type) !== undefined);
-}
-
 export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type takes object_adt_type (e.g. "CLAS/OC"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION or METADATA_EXTENSION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.',
-  inputSchema: compactActivateSchema,
+  ...byVariant((variant) => ({
+    description: compactActivateDescription(variant),
+    inputSchema: compactActivateSchemaFor(COMPACT_ACTIVATE[variant]),
+  })),
 } as const;
 
 type HandlerActivateArgs = {
@@ -129,7 +128,7 @@ export async function handleHandlerActivate(
       why
         ? `HandlerActivate cannot activate ${args.object_type} from a name alone: ${why}.`
         : args.object_type
-          ? `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${knownCompactTypes().join(', ')}.`
+          ? `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${compactActivatableTypes(context.connection).join(', ')}.`
           : 'Provide either objects[] or object_name + (object_type or object_adt_type) for activation',
     );
   }

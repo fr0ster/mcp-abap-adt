@@ -26,6 +26,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import { VERSIONED_KINDS } from '../../../lib/adtProjections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
@@ -36,17 +37,7 @@ import { carryingFailure } from '../../../lib/strategies/step';
 // throw "not supported", so exposing them here advertised a capability that
 // never worked. The lock switch (handleLockObject) is intentionally wider:
 // those types ARE lockable, just not versioned.
-export const VERSIONED_OBJECT_TYPES = [
-  'class',
-  'program',
-  'interface',
-  'function_module',
-  'table',
-  'structure',
-  'ddl',
-  'behavior_definition',
-  'metadata_extension',
-] as const;
+export const VERSIONED_OBJECT_TYPES = VERSIONED_KINDS.onprem;
 
 export interface ResolvedVersionedObject {
   /**

@@ -14,12 +14,17 @@ import type {
   IAdtVersionable,
 } from '@mcp-abap-adt/interfaces-adt';
 import { createTwoFilesPatch } from 'diff';
+import {
+  type ProjectionVariant,
+  VERSIONED_KINDS,
+} from '../../../lib/adtProjections';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 import {
   resolveVersionedObject,
   VERSIONED_OBJECT_TYPES,
@@ -124,16 +129,23 @@ export async function buildVersionDiff(
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionDiff',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+    inputSchema: objectVersionDiffSchema(variant),
+  })),
+} as const;
+
+/** GetObjectVersionDiff's input on `variant`. */
+function objectVersionDiffSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
         description:
           'Object type (the same value the version history was read with).',
-        enum: [...VERSIONED_OBJECT_TYPES],
+        enum: VERSIONED_KINDS[variant],
       },
       content_uri_from: {
         type: 'string',
@@ -147,8 +159,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: ['object_type', 'content_uri_from', 'content_uri_to'],
-  },
-} as const;
+  } as const;
+}
 
 interface GetObjectVersionDiffArgs {
   object_type: string;
@@ -175,7 +187,7 @@ export async function handleGetObjectVersionDiff(
     if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_OBJECT_TYPES.join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variantOf(connection)].join(', ')}`,
         ),
       );
     }

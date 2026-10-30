@@ -5,11 +5,11 @@
  * `legacy`, an on-premise system, as `statedSystemKind` reads it) is
  * `ADT_TYPES_ONPREM`, `cloud` is `ADT_TYPES_CLOUD`. A tool that works on
  * one API of the client names what it needs of it — one operation of that
- * API ({@link TOOL_NEEDS}); a compact tool whose `object_type` (or
- * `target_type`) picks the API names what each member needs
- * ({@link COMPACT_MEMBER_NEEDS}). A tool the variant's table does not serve
- * is not registered for that variant, and a member it does not serve is not
- * in the argument's enum there.
+ * API ({@link TOOL_NEEDS}). A tool the variant's table does not serve is not
+ * registered for that variant. A tool whose arguments name objects' types
+ * states its enums and descriptions per variant (`variants`, built from the
+ * projections of `adtProjections.ts`): the declared variant's are
+ * registered, so a value the table does not serve there is not offered.
  *
  * **Beside `available_in`, not instead of it.** A tool is registered when
  * `available_in` admits the environment *and* the table serves its need: the
@@ -25,36 +25,14 @@
 import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
-  type AdtApiName,
   type AdtApiTable,
-  type AdtApiWith,
-  type AdtOperation,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtNeed } from './adtProjections';
 import type { ServerVariant } from './clients';
-import type { CompactObjectType } from './compact/compactObjectTypes';
 import type { SapEnvironment, ToolDefinition } from './handlers/interfaces';
 import { statedSystemKind } from './systemKind';
 
-/**
- * The operations some table lists for API `A` (one of its codes, or its
- * codeless entry): a need naming another does not compile.
- */
-type AdtOperationOf<A extends AdtApiName> = {
-  [Op in AdtOperation]: A extends
-    | AdtApiWith<'onprem', Op>
-    | AdtApiWith<'cloud', Op>
-    | AdtApiWith<'basis740', Op>
-    ? Op
-    : never;
-}[AdtOperation];
-
-/** What a tool needs of the variant's table: one operation of one API. */
-export type AdtNeed = {
-  [A in AdtApiName]: {
-    readonly api: A;
-    readonly operation: AdtOperationOf<A>;
-  };
-}[AdtApiName];
+export type { AdtNeed } from './adtProjections';
 
 /** The table of each variant the server serves. */
 const TABLES: { readonly [V in ServerVariant]: AdtApiTable<string> } = {
@@ -412,258 +390,6 @@ export const TOOLS_WITHOUT_NEED: ReadonlySet<string> = new Set([
   'MemorySnapshotDelta',
 ]);
 
-/** What a compact tool's members need: the argument, and each member's need. */
-export interface CompactMemberNeeds {
-  /** The argument whose enum lists the members. */
-  readonly argument: 'object_type' | 'target_type';
-  /**
-   * Each member's need. A member not named here (a runtime profile, a type
-   * the tool does not route) is not gated.
-   */
-  readonly members: Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
-}
-
-/** The objects every compact CRUD tool routes, with the API each is of. */
-const create = {
-  PACKAGE: { api: 'package', operation: 'create' },
-  DOMAIN: { api: 'domain', operation: 'create' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'create' },
-  TRANSPORT: { api: 'request', operation: 'create' },
-  TABLE: { api: 'table', operation: 'create' },
-  STRUCTURE: { api: 'structure', operation: 'create' },
-  DDL: { api: 'ddl', operation: 'create' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'create' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'create' },
-  CLASS: { api: 'class', operation: 'create' },
-  UNIT_TEST: { api: 'localTestClass', operation: 'update' },
-  CDS_UNIT_TEST: { api: 'class', operation: 'create' },
-  PROGRAM: { api: 'program', operation: 'create' },
-  INTERFACE: { api: 'interface', operation: 'create' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'create' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'create' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'create' },
-  BEHAVIOR_IMPLEMENTATION: {
-    api: 'behaviorImplementation',
-    operation: 'create',
-  },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'create' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-const read = {
-  PACKAGE: { api: 'package', operation: 'readMetadata' },
-  DOMAIN: { api: 'domain', operation: 'readMetadata' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'readMetadata' },
-  TRANSPORT: { api: 'request', operation: 'readObjects' },
-  TABLE: { api: 'table', operation: 'read' },
-  STRUCTURE: { api: 'structure', operation: 'read' },
-  DDL: { api: 'ddl', operation: 'read' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'read' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'read' },
-  CLASS: { api: 'class', operation: 'read' },
-  UNIT_TEST: { api: 'class', operation: 'unitTestResult' },
-  CDS_UNIT_TEST: { api: 'class', operation: 'unitTestResult' },
-  LOCAL_TEST_CLASS: { api: 'localTestClass', operation: 'read' },
-  LOCAL_TYPES: { api: 'localTypes', operation: 'read' },
-  LOCAL_DEFINITIONS: { api: 'localDefinitions', operation: 'read' },
-  LOCAL_MACROS: { api: 'localMacros', operation: 'read' },
-  PROGRAM: { api: 'program', operation: 'read' },
-  INTERFACE: { api: 'interface', operation: 'read' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'read' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'read' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'read' },
-  BEHAVIOR_IMPLEMENTATION: { api: 'behaviorImplementation', operation: 'read' },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'read' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-const update = {
-  PACKAGE: { api: 'package', operation: 'updateMetadata' },
-  DOMAIN: { api: 'domain', operation: 'updateMetadata' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'updateMetadata' },
-  TABLE: { api: 'table', operation: 'update' },
-  STRUCTURE: { api: 'structure', operation: 'update' },
-  DDL: { api: 'ddl', operation: 'update' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'update' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'update' },
-  CLASS: { api: 'class', operation: 'update' },
-  UNIT_TEST: { api: 'localTestClass', operation: 'update' },
-  CDS_UNIT_TEST: { api: 'localTestClass', operation: 'update' },
-  LOCAL_TEST_CLASS: { api: 'localTestClass', operation: 'update' },
-  LOCAL_TYPES: { api: 'localTypes', operation: 'update' },
-  LOCAL_DEFINITIONS: { api: 'localDefinitions', operation: 'update' },
-  LOCAL_MACROS: { api: 'localMacros', operation: 'update' },
-  PROGRAM: { api: 'program', operation: 'update' },
-  INTERFACE: { api: 'interface', operation: 'update' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'update' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'update' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'update' },
-  BEHAVIOR_IMPLEMENTATION: {
-    api: 'behaviorImplementation',
-    operation: 'update',
-  },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'update' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-const remove = {
-  PACKAGE: { api: 'package', operation: 'delete' },
-  DOMAIN: { api: 'domain', operation: 'delete' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'delete' },
-  TABLE: { api: 'table', operation: 'delete' },
-  STRUCTURE: { api: 'structure', operation: 'delete' },
-  DDL: { api: 'ddl', operation: 'delete' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'delete' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'delete' },
-  CLASS: { api: 'class', operation: 'delete' },
-  // A class include and the unit tests are deleted by writing the include
-  // empty under the class's lock (`handleDeleteOnly`).
-  UNIT_TEST: { api: 'localTestClass', operation: 'update' },
-  CDS_UNIT_TEST: { api: 'class', operation: 'delete' },
-  LOCAL_TEST_CLASS: { api: 'localTestClass', operation: 'update' },
-  LOCAL_TYPES: { api: 'localTypes', operation: 'update' },
-  LOCAL_DEFINITIONS: { api: 'localDefinitions', operation: 'update' },
-  LOCAL_MACROS: { api: 'localMacros', operation: 'update' },
-  PROGRAM: { api: 'program', operation: 'delete' },
-  INTERFACE: { api: 'interface', operation: 'delete' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'delete' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'delete' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'delete' },
-  BEHAVIOR_IMPLEMENTATION: {
-    api: 'behaviorImplementation',
-    operation: 'delete',
-  },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'delete' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/** The single objects `HandlerActivate` activates from `object_type` alone. */
-const activate = {
-  CLASS: { api: 'class', operation: 'activate' },
-  PROGRAM: { api: 'program', operation: 'activate' },
-  INTERFACE: { api: 'interface', operation: 'activate' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'activate' },
-  TABLE: { api: 'table', operation: 'activate' },
-  STRUCTURE: { api: 'structure', operation: 'activate' },
-  DDL: { api: 'ddl', operation: 'activate' },
-  DOMAIN: { api: 'domain', operation: 'activate' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'activate' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'activate' },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'activate' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'activate' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'activate' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/** What `HandlerLock` and `HandlerUnlock` lock and unlock. */
-const lock = {
-  CLASS: { api: 'class', operation: 'lock' },
-  PROGRAM: { api: 'program', operation: 'lock' },
-  INTERFACE: { api: 'interface', operation: 'lock' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'lock' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'lock' },
-  TABLE: { api: 'table', operation: 'lock' },
-  STRUCTURE: { api: 'structure', operation: 'lock' },
-  DDL: { api: 'ddl', operation: 'lock' },
-  DOMAIN: { api: 'domain', operation: 'lock' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'lock' },
-  PACKAGE: { api: 'package', operation: 'lock' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'lock' },
-  BEHAVIOR_IMPLEMENTATION: { api: 'behaviorImplementation', operation: 'lock' },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'lock' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'lock' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'lock' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/** What `HandlerValidate` validates. */
-const validate = {
-  CLASS: { api: 'class', operation: 'validate' },
-  PROGRAM: { api: 'program', operation: 'validate' },
-  INTERFACE: { api: 'interface', operation: 'validate' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'validate' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'validate' },
-  TABLE: { api: 'table', operation: 'validate' },
-  STRUCTURE: { api: 'structure', operation: 'validate' },
-  DDL: { api: 'ddl', operation: 'validate' },
-  DOMAIN: { api: 'domain', operation: 'validate' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'validate' },
-  PACKAGE: { api: 'package', operation: 'validate' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'validate' },
-  BEHAVIOR_IMPLEMENTATION: {
-    api: 'behaviorImplementation',
-    operation: 'validate',
-  },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'validate' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'validate' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/** What `HandlerCheckRun` checks. */
-const check = {
-  CLASS: { api: 'class', operation: 'check' },
-  PROGRAM: { api: 'program', operation: 'check' },
-  INTERFACE: { api: 'interface', operation: 'check' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'check' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'check' },
-  TABLE: { api: 'table', operation: 'check' },
-  STRUCTURE: { api: 'structure', operation: 'check' },
-  DDL: { api: 'ddl', operation: 'check' },
-  DOMAIN: { api: 'domain', operation: 'check' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'check' },
-  PACKAGE: { api: 'package', operation: 'check' },
-  BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'check' },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'check' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/** What `HandlerDeletionCheck` asks about. */
-const deletionCheck = {
-  PACKAGE: { api: 'package', operation: 'deletionCheck' },
-  DOMAIN: { api: 'domain', operation: 'deletionCheck' },
-  DATA_ELEMENT: { api: 'dataElement', operation: 'deletionCheck' },
-  TABLE: { api: 'table', operation: 'deletionCheck' },
-  STRUCTURE: { api: 'structure', operation: 'deletionCheck' },
-  DDL: { api: 'ddl', operation: 'deletionCheck' },
-  SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'deletionCheck' },
-  SERVICE_BINDING: { api: 'serviceBinding', operation: 'deletionCheck' },
-  CLASS: { api: 'class', operation: 'deletionCheck' },
-  CDS_UNIT_TEST: { api: 'class', operation: 'deletionCheck' },
-  PROGRAM: { api: 'program', operation: 'deletionCheck' },
-  INTERFACE: { api: 'interface', operation: 'deletionCheck' },
-  FUNCTION_GROUP: { api: 'functionGroup', operation: 'deletionCheck' },
-  FUNCTION_MODULE: { api: 'functionModule', operation: 'deletionCheck' },
-  BEHAVIOR_DEFINITION: {
-    api: 'behaviorDefinition',
-    operation: 'deletionCheck',
-  },
-  BEHAVIOR_IMPLEMENTATION: {
-    api: 'behaviorImplementation',
-    operation: 'deletionCheck',
-  },
-  METADATA_EXTENSION: { api: 'metadataExtension', operation: 'deletionCheck' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/** What `HandlerProfileRun` runs under the profiler. */
-const profile = {
-  CLASS: { api: 'class', operation: 'profile' },
-  PROGRAM: { api: 'program', operation: 'profile' },
-} as const satisfies Partial<Record<CompactObjectType, AdtNeed>>;
-
-/**
- * Each compact tool whose members pick the API: the argument naming them, and
- * what each member needs. A compact tool not named here is not gated.
- */
-export const COMPACT_MEMBER_NEEDS: ReadonlyMap<string, CompactMemberNeeds> =
-  new Map<string, CompactMemberNeeds>([
-    ['HandlerCreate', { argument: 'object_type', members: create }],
-    ['HandlerGet', { argument: 'object_type', members: read }],
-    ['HandlerUpdate', { argument: 'object_type', members: update }],
-    ['HandlerDelete', { argument: 'object_type', members: remove }],
-    ['HandlerActivate', { argument: 'object_type', members: activate }],
-    ['HandlerLock', { argument: 'object_type', members: lock }],
-    ['HandlerUnlock', { argument: 'object_type', members: lock }],
-    ['HandlerValidate', { argument: 'object_type', members: validate }],
-    ['HandlerCheckRun', { argument: 'object_type', members: check }],
-    [
-      'HandlerDeletionCheck',
-      { argument: 'object_type', members: deletionCheck },
-    ],
-    ['HandlerProfileRun', { argument: 'target_type', members: profile }],
-  ]);
-
 /**
  * The variant a stated environment names: `cloud` is ABAP cloud, `onprem`
  * and `legacy` the on-premise table (`statedSystemKind`).
@@ -674,23 +400,11 @@ export function variantOfEnvironment(
   return statedSystemKind(environment) === 'cloud' ? 'cloud' : 'onprem';
 }
 
-/** Whether a member of `needs` is served on `variant`: unnamed ones are. */
-function memberServed(
-  needs: CompactMemberNeeds,
-  member: unknown,
-  variant: ServerVariant,
-): boolean {
-  const need = Object.entries(needs.members).find(
-    ([name]) => name === member,
-  )?.[1];
-  return need === undefined || variantServes(variant, need);
-}
-
 /**
  * The definition `variant` registers for `definition`: `undefined` when the
- * variant's table does not serve the tool's need; for a compact tool, its
- * members' enum without the members the table does not serve; else the
- * definition as it is.
+ * variant's table does not serve the tool's need; for a tool whose arguments
+ * are projected from the tables (`variants`), what it states on that
+ * variant; else the definition as it is.
  */
 export function servedDefinition(
   definition: ToolDefinition,
@@ -698,24 +412,11 @@ export function servedDefinition(
 ): ToolDefinition | undefined {
   const need = TOOL_NEEDS.get(definition.name);
   if (need !== undefined && !variantServes(variant, need)) return undefined;
-  const members = COMPACT_MEMBER_NEEDS.get(definition.name);
-  if (members === undefined) return definition;
-  const schema = definition.inputSchema;
-  const property = schema?.properties?.[members.argument];
-  const listed: unknown = property?.enum;
-  if (!Array.isArray(listed)) return definition;
-  const served = listed.filter((member) =>
-    memberServed(members, member, variant),
-  );
-  if (served.length === listed.length) return definition;
+  const stated = definition.variants?.[variant];
+  if (stated === undefined) return definition;
   return {
     ...definition,
-    inputSchema: {
-      ...schema,
-      properties: {
-        ...schema.properties,
-        [members.argument]: { ...property, enum: served },
-      },
-    },
+    description: stated.description,
+    inputSchema: stated.inputSchema,
   };
 }

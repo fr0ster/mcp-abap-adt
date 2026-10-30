@@ -1,6 +1,9 @@
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  compactUnlockSchema,
+  byVariant,
+  COMPACT_UNLOCK,
+  compactUnlockDescription,
+  compactUnlockSchemaFor,
   LOCK_NOT_HELD_WORDS,
   lockHeldHere,
   toLockObjectType,
@@ -12,9 +15,10 @@ import { return_error } from '@mcp-abap-adt/lib/utils';
 export const TOOL_DEFINITION = {
   name: 'HandlerUnlock',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*) [onprem only], INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*); an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the unlock ends the instance's hold on the lock.",
-  inputSchema: compactUnlockSchema,
+  ...byVariant((variant) => ({
+    description: compactUnlockDescription(variant),
+    inputSchema: compactUnlockSchemaFor(COMPACT_UNLOCK[variant]),
+  })),
 } as const;
 
 type HandlerUnlockArgs = {

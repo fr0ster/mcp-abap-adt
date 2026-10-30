@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import type { AbapSystemKind } from '../systemKind.js';
 import type { ArgsOf } from './argsOf.js';
 
 // Re-export HandlerContext for consumers
@@ -27,6 +28,21 @@ export interface ToolDefinition {
    * If omitted, the tool is available in all environments.
    */
   available_in?: readonly SapEnvironment[];
+  /**
+   * What the tool states on each variant, where an argument's values (an
+   * enum, a description listing them) are projected from the variant's ADT
+   * type table (`adtProjections.ts`): the server registers the declared
+   * variant's (`servedDefinition`). The definition's own `description` and
+   * `inputSchema` are the on-premise one's, served when no variant is
+   * declared.
+   */
+  variants?: { readonly [V in AbapSystemKind]: VariantToolDefinition };
+}
+
+/** A tool's description and input schema on one variant. */
+export interface VariantToolDefinition {
+  readonly description: string;
+  readonly inputSchema: any;
 }
 
 /**

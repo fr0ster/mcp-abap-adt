@@ -1,6 +1,11 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
+  INCLUDES_PARENTS,
+  type ProjectionVariant,
+  supported,
+} from '../../../lib/adtProjections';
+import {
   answerCaught,
   failedPayloadOf,
   failureEntry,
@@ -13,7 +18,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
@@ -28,13 +33,21 @@ import {
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }).',
-  ),
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description: withLongToolAdvice(
+      '[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }).',
+    ),
+    inputSchema: includesListSchema(variant),
+  })),
+} as const;
+
+/** GetIncludesList's input on `variant`. */
+function includesListSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       timeout: TIMEOUT_PROPERTY,
@@ -45,9 +58,8 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: 'string',
-        enum: ['PROG/P', 'PROG/I', 'FUGR', 'CLAS/OC'],
-        description:
-          "[read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.",
+        enum: INCLUDES_PARENTS[variant],
+        description: `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])}`,
       },
       objects: {
         type: 'array',
@@ -62,9 +74,8 @@ export const TOOL_DEFINITION = {
             },
             object_type: {
               type: 'string',
-              enum: ['PROG/P', 'PROG/I', 'FUGR', 'CLAS/OC'],
-              description:
-                "ADT object type: 'PROG/P', 'PROG/I', 'FUGR' or 'CLAS/OC'",
+              enum: INCLUDES_PARENTS[variant],
+              description: `ADT object type. ${supported(INCLUDES_PARENTS[variant])}`,
             },
           },
           required: ['object_name', 'object_type'],
@@ -78,8 +89,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: [],
-  },
-} as const;
+  } as const;
+}
 
 interface IncludeNode {
   name: string;
@@ -215,7 +226,7 @@ async function includesListOf(context: HandlerContext, args: any) {
     const parent = resolveParent(object_type, object_name);
     if (!parent) {
       return return_error(
-        `Unsupported object_type "${object_type}": use PROG/P, PROG/I, FUGR or CLAS/OC.`,
+        `Unsupported object_type "${object_type}": ${supported(INCLUDES_PARENTS[variantOf(connection)])}`,
       );
     }
 

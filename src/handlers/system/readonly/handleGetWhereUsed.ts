@@ -24,6 +24,12 @@ import type {
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  codesWithNames,
+  type ProjectionVariant,
+  WHERE_USED_CODES,
+  WHERE_USED_NAMES,
+} from '../../../lib/adtProjections';
 import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
 import {
   answer,
@@ -54,14 +60,30 @@ import {
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Lists where the object named by object_name and object_type is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }).',
-  ),
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description: withLongToolAdvice(
+      '[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }).',
+    ),
+    inputSchema: whereUsedSchema(variant),
+  })),
+} as const;
+
+/**
+ * What `object_type` takes on `variant`: a where-used code
+ * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
+ */
+function whereUsedTypeDescription(variant: ProjectionVariant): string {
+  return `Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says.`;
+}
+
+/** GetWhereUsed's input on `variant`. */
+function whereUsedSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       timeout: TIMEOUT_PROPERTY,
@@ -72,8 +94,7 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: 'string',
-        description:
-          "Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).",
+        description: whereUsedTypeDescription(variant),
       },
       objects: {
         type: 'array',
@@ -115,8 +136,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: [],
-  },
-} as const;
+  } as const;
+}
 
 interface WhereUsedArgs {
   object_name: string;

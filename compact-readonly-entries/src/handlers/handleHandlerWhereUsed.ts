@@ -1,6 +1,9 @@
 import {
-  compactWhereUsedSchema,
-  withLongToolAdvice,
+  byVariant,
+  COMPACT_WHERE_USED,
+  COMPACT_WHERE_USED_ROUTES,
+  compactWhereUsedDescription,
+  compactWhereUsedSchemaFor,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetWhereUsed } from '@mcp-abap-adt/lib/handlers/read';
@@ -9,10 +12,10 @@ import { return_error } from '@mcp-abap-adt/lib/utils';
 export const TOOL_DEFINITION = {
   name: 'HandlerWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON.',
-  ),
-  inputSchema: compactWhereUsedSchema,
+  ...byVariant((variant) => ({
+    description: compactWhereUsedDescription(variant),
+    inputSchema: compactWhereUsedSchemaFor(COMPACT_WHERE_USED[variant]),
+  })),
 } as const;
 
 type HandlerWhereUsedArgs = {
@@ -23,20 +26,8 @@ type HandlerWhereUsedArgs = {
 };
 
 /** The compact object types, as the where-used tool names them. */
-const WHERE_USED_TYPE: Record<string, string> = {
-  CLASS: 'class',
-  INTERFACE: 'interface',
-  PROGRAM: 'program',
-  INCLUDE: 'include',
-  FUNCTION_GROUP: 'functiongroup',
-  FUNCTION_MODULE: 'functionmodule',
-  PACKAGE: 'package',
-  TABLE: 'table',
-  STRUCTURE: 'structure',
-  DOMAIN: 'domain',
-  DATA_ELEMENT: 'dataelement',
-  DDL: 'view',
-};
+const WHERE_USED_TYPE: Readonly<Record<string, string>> =
+  COMPACT_WHERE_USED_ROUTES;
 
 type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
 

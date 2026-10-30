@@ -1,5 +1,6 @@
 import { answeredObject } from '@mcp-abap-adt/adt-strategies';
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import { TYPE_NAMES as TYPE_NAME_CODES } from './adtProjections';
 
 /**
  * A type-code argument as a code of the ADT type tables: the text, upper-cased
@@ -19,48 +20,11 @@ export function notATableCode(argument: string, text: string): string {
 }
 
 /**
- * The names the tools took for a type before adt-clients 38 stopped reading
- * them, each with the code of the tables it addressed: the friendly names of
- * its where-used aliases and the main types its address builder read
- * (adt-clients 37.2.0). The tools' arguments name them, so the server reads
- * them now; the code each maps to is checked against the tables here.
+ * The names the tools have always taken for a type, each with its code
+ * (`TYPE_NAMES`, `adtProjections.ts`, where each operation's names are
+ * projected from them), read by any name.
  */
-const TYPE_NAMES: Readonly<Record<string, AdtTypeCode>> = {
-  class: 'CLAS/OC',
-  program: 'PROG/P',
-  include: 'PROG/I',
-  function: 'FUGR/F',
-  functiongroup: 'FUGR/F',
-  interface: 'INTF/OI',
-  package: 'DEVC/K',
-  table: 'TABL/DT',
-  structure: 'TABL/DS',
-  domain: 'DOMA/DD',
-  dataelement: 'DTEL/DE',
-  view: 'DDLS/DF',
-  functionmodule: 'FUGR/FF',
-  function_module: 'FUGR/FF',
-  clas: 'CLAS/OC',
-  prog: 'PROG/P',
-  fugr: 'FUGR/F',
-  func: 'FUGR/F',
-  tabl: 'TABL/DT',
-  stru: 'TABL/DS',
-  'stru/ds': 'TABL/DS',
-  ddls: 'DDLS/DF',
-  dtel: 'DTEL/DE',
-  doma: 'DOMA/DD',
-  intf: 'INTF/OI',
-  ttyp: 'TTYP/DA',
-  srvd: 'SRVD/SRV',
-  srvb: 'SRVB/SVB',
-  ddlx: 'DDLX/EX',
-  bdef: 'BDEF/BDO',
-  dcls: 'DCLS/DL',
-  xslt: 'XSLT/VT',
-  ftg2: 'FTG2/FT',
-  devc: 'DEVC/K',
-};
+const TYPE_NAMES: Readonly<Record<string, AdtTypeCode>> = TYPE_NAME_CODES;
 
 /**
  * A type argument as a code of the tables: one of the names the tools have

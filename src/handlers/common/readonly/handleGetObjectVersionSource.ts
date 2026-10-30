@@ -6,13 +6,18 @@
  * getVersionSource(content_uri). Closes #30.
  */
 
-import { createAdtClient } from '../../../lib/clients';
+import {
+  type ProjectionVariant,
+  VERSIONED_KINDS,
+} from '../../../lib/adtProjections';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
   return_error,
   return_response,
 } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 import {
   readVersionSource,
   resolveVersionedObject,
@@ -22,16 +27,23 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionSource',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
+    inputSchema: objectVersionSourceSchema(variant),
+  })),
+} as const;
+
+/** GetObjectVersionSource's input on `variant`. */
+function objectVersionSourceSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
         description:
           'Object type (the same value the version history was read with).',
-        enum: [...VERSIONED_OBJECT_TYPES],
+        enum: VERSIONED_KINDS[variant],
       },
       content_uri: {
         type: 'string',
@@ -40,8 +52,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: ['object_type', 'content_uri'],
-  },
-} as const;
+  } as const;
+}
 
 interface GetObjectVersionSourceArgs {
   object_type: string;
@@ -65,7 +77,7 @@ export async function handleGetObjectVersionSource(
     if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_OBJECT_TYPES.join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variantOf(connection)].join(', ')}`,
         ),
       );
     }

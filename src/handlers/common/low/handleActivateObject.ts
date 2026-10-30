@@ -87,7 +87,9 @@ import {
   MAIN_TYPE_SENTENCE,
   type ProjectionVariant,
   SINGLE_ACTIVATION,
+  SINGLE_ACTIVATION_NAMES,
   SINGLE_ACTIVATION_ROUTES,
+  TYPE_NAMES,
 } from '../../../lib/adtProjections';
 import {
   acceptedCodeOf,
@@ -118,8 +120,8 @@ import { byVariant } from '../../../lib/variantDefinition';
 
 /**
  * The APIs whose own `activate()` this dispatcher reaches directly: those of
- * `SINGLE_ACTIVATION_ROUTES`, which names each code and friendly name a
- * single object is activated by (the tables' `activate`). Every other code
+ * `SINGLE_ACTIVATION_ROUTES`, which names each code and kind a single object
+ * is activated by (the tables' `activate`). Every other code
  * goes to group activation; see the module doc comment.
  */
 type SingleActivationApi =
@@ -127,11 +129,12 @@ type SingleActivationApi =
 
 /**
  * What `preaudit` does on `variant`, for both activation tools: the codes and
- * names a single object is activated by through its own type's activation
- * there (`SINGLE_ACTIVATION`).
+ * kinds a single object is activated by through its own type's activation
+ * there (`SINGLE_ACTIVATION`), and the names standing for those codes
+ * (`SINGLE_ACTIVATION_NAMES`).
  */
 export function preauditDescription(variant: ProjectionVariant): string {
-  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: ${SINGLE_ACTIVATION[variant].join(', ')}. Their family's activate() always sends preauditRequested=true.`;
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type standing for one of these codes. Their family's activate() always sends preauditRequested=true.`;
 }
 
 /**
@@ -227,26 +230,30 @@ export type ActivationPlan =
   | { readonly group: IObjectReference[] };
 
 /**
- * `text` as the boundary of `objects[].type` reads it on `variant`: itself
- * when it is a code or a name of a single-object or a group activation, else
- * the one code of the group activation's codes whose main type it names
- * (every single-object code is one of them, `adtBoundary.typecheck.ts`) — the
- * call then goes on exactly as if that code had been sent. Any other text,
- * a main type two codes share included, stays as sent and is refused.
+ * `text` as the boundary of `objects[].type` reads it on `variant`: a name of
+ * `ACTIVATION_NAMES` is its code (`TYPE_NAMES`), read once here, so one
+ * object of a name is routed exactly as one object of its code; a code or a
+ * kind of a single-object or a group activation is itself; else the one code
+ * of the group activation's codes whose main type it names (every
+ * single-object code is one of them, `adtBoundary.typecheck.ts`) — the call
+ * then goes on exactly as if that code had been sent. Any other text, a main
+ * type two codes share included, stays as sent and is refused.
  */
 function activationTextOf(text: string, variant: ProjectionVariant): string {
+  const name = acceptedOf(text, ACTIVATION_NAMES[variant]);
+  if (name !== undefined) return TYPE_NAMES[name];
   return acceptedOf(text, SINGLE_ACTIVATION[variant]) !== undefined ||
-    acceptedOf(text, ACTIVATION_CODES[variant]) !== undefined ||
-    acceptedOf(text, ACTIVATION_NAMES[variant]) !== undefined
+    acceptedOf(text, ACTIVATION_CODES[variant]) !== undefined
     ? text
     : (mainTypeCodeOf(text, ACTIVATION_CODES[variant]) ?? text);
 }
 
 /**
  * The boundary of `objects[].type` on `variant`: one object of a code or
- * name of `SINGLE_ACTIVATION` is activated through its API; every other call
- * is a group activation, each type a code of `ACTIVATION_CODES` or a name of
- * `ACTIVATION_NAMES` standing for one. A main type one code has stands for
+ * kind of `SINGLE_ACTIVATION`, or of a name standing for such a code, is
+ * activated through its API; every other call is a group activation, each
+ * type a code of `ACTIVATION_CODES` or a name of `ACTIVATION_NAMES` standing
+ * for one. A main type one code has stands for
  * that code ({@link activationTextOf}). Anything else is refused in fixed
  * words naming what the argument takes there — for a main type two codes
  * share, those codes — and nothing is sent.

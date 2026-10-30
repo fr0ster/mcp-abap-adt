@@ -49,7 +49,9 @@ import {
 } from '../../handlers/common/low/handleActivateObject';
 import {
   SINGLE_ACTIVATION,
+  SINGLE_ACTIVATION_NAMES,
   SINGLE_ACTIVATION_ROUTES,
+  TYPE_NAMES,
 } from '../../lib/adtProjections';
 
 /**
@@ -152,8 +154,9 @@ describe('ActivateObject: each type code and where it goes', () => {
 
 /**
  * Which codes take single-object activation is said in the preaudit text,
- * and taken from the map, so the two cannot drift: a bare code the map does
- * not name (`CLAS`) takes group activation and sends `preaudit` as given.
+ * and taken from the map, so the two cannot drift. A main type (`CLAS`) is
+ * not listed: the text's own sentence says a main type standing for a listed
+ * code takes it too.
  */
 describe('the preaudit text names exactly the codes the map routes to a family', () => {
   const codesIn = (text: string) => {
@@ -179,14 +182,21 @@ describe('the preaudit text names exactly the codes the map routes to a family',
     ],
   ])('%s', (_tool, text) => {
     // The projection of the variant (`SINGLE_ACTIVATION`), every value of
-    // which `SINGLE_ACTIVATION_ROUTES` routes to its API's activation; the
-    // codes no table holds (`doma/dm`, `bdef/bd`) are not offered.
+    // which `SINGLE_ACTIVATION_ROUTES` routes to its API's activation, then
+    // the names standing for those codes (`SINGLE_ACTIVATION_NAMES`), each
+    // routed as its code; the codes no table holds (`doma/dm`, `bdef/bd`)
+    // are not offered.
     expect(codesIn(text)).toEqual(
-      SINGLE_ACTIVATION.onprem.map((code) => code.toLowerCase()).sort(),
+      [...SINGLE_ACTIVATION.onprem, ...SINGLE_ACTIVATION_NAMES.onprem]
+        .map((code) => code.toLowerCase())
+        .sort(),
     );
-    const routed = Object.keys(SINGLE_ACTIVATION_ROUTES).map((code) =>
-      code.toLowerCase(),
-    );
+    const routed = [
+      ...Object.keys(SINGLE_ACTIVATION_ROUTES),
+      ...SINGLE_ACTIVATION_NAMES.onprem.filter((name) =>
+        Object.hasOwn(SINGLE_ACTIVATION_ROUTES, TYPE_NAMES[name]),
+      ),
+    ].map((code) => code.toLowerCase());
     for (const code of codesIn(text)) {
       expect(routed).toContain(code);
     }

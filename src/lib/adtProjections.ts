@@ -550,16 +550,15 @@ const SINGLE_ACTIVATION_CODE_ROUTES = {
   'DDLX/EX': { api: 'metadataExtension', operation: 'activate' },
 } as const satisfies Partial<Record<AdtTypeCode, AdtNeed>>;
 
-/** The friendly names of {@link SINGLE_ACTIVATION_CODE_ROUTES}' activations. */
+/**
+ * The kinds one object alone is also activated by through its family, beside
+ * {@link SINGLE_ACTIVATION_CODE_ROUTES}' codes: names no code stands for in
+ * {@link TYPE_NAMES}. A name of {@link TYPE_NAMES} is read as its code at the
+ * boundary and routed by that code.
+ */
 const SINGLE_ACTIVATION_NAME_ROUTES = {
-  class: { api: 'class', operation: 'activate' },
-  program: { api: 'program', operation: 'activate' },
-  interface: { api: 'interface', operation: 'activate' },
   function_group: { api: 'functionGroup', operation: 'activate' },
-  table: { api: 'table', operation: 'activate' },
-  structure: { api: 'structure', operation: 'activate' },
   ddl: { api: 'ddl', operation: 'activate' },
-  domain: { api: 'domain', operation: 'activate' },
   data_element: { api: 'dataElement', operation: 'activate' },
   behavior_definition: { api: 'behaviorDefinition', operation: 'activate' },
   metadata_extension: { api: 'metadataExtension', operation: 'activate' },
@@ -567,64 +566,87 @@ const SINGLE_ACTIVATION_NAME_ROUTES = {
 
 /**
  * The single objects the activation tools activate through their family's
- * own `activate()` (`handleActivateObject`): each code, and each friendly
- * name, with the API whose activation it is.
+ * own `activate()` (`handleActivateObject`): each code, and each kind, with
+ * the API whose activation it is.
  */
 export const SINGLE_ACTIVATION_ROUTES = {
   ...SINGLE_ACTIVATION_CODE_ROUTES,
   ...SINGLE_ACTIVATION_NAME_ROUTES,
 };
 
-/** The codes and names of a single-object activation on each variant. */
+/** The codes and kinds of a single-object activation on each variant. */
 export const SINGLE_ACTIVATION = projected<
   ServedName<'onprem', typeof SINGLE_ACTIVATION_ROUTES>,
   ServedName<'cloud', typeof SINGLE_ACTIVATION_ROUTES>
 >()({
   onprem: [
     'CLAS/OC',
-    'class',
     'PROG/P',
-    'program',
     'INTF/OI',
-    'interface',
     'FUGR/F',
-    'function_group',
     'TABL/DT',
-    'table',
     'TABL/DS',
-    'structure',
     'DDLS/DF',
-    'ddl',
     'DOMA/DD',
-    'domain',
     'DTEL/DE',
-    'data_element',
     'BDEF/BDO',
-    'behavior_definition',
     'DDLX/EX',
+    'function_group',
+    'ddl',
+    'data_element',
+    'behavior_definition',
     'metadata_extension',
   ],
   cloud: [
     'CLAS/OC',
-    'class',
     'INTF/OI',
-    'interface',
     'FUGR/F',
-    'function_group',
     'TABL/DT',
-    'table',
     'TABL/DS',
-    'structure',
     'DDLS/DF',
-    'ddl',
     'DOMA/DD',
-    'domain',
     'DTEL/DE',
-    'data_element',
     'BDEF/BDO',
-    'behavior_definition',
     'DDLX/EX',
+    'function_group',
+    'ddl',
+    'data_element',
+    'behavior_definition',
     'metadata_extension',
+  ],
+});
+
+/**
+ * The names of {@link TYPE_NAMES} whose code is a single-object activation
+ * code on each variant: one object of such a name is activated exactly as one
+ * object of its code (the boundary reads the name as its code).
+ */
+export const SINGLE_ACTIVATION_NAMES = projected<
+  TypeNameFor<ServedName<'onprem', typeof SINGLE_ACTIVATION_CODE_ROUTES>>,
+  TypeNameFor<ServedName<'cloud', typeof SINGLE_ACTIVATION_CODE_ROUTES>>
+>()({
+  onprem: [
+    'class',
+    'program',
+    'functiongroup',
+    'interface',
+    'table',
+    'structure',
+    'domain',
+    'dataelement',
+    'view',
+    'stru',
+  ],
+  cloud: [
+    'class',
+    'functiongroup',
+    'interface',
+    'table',
+    'structure',
+    'domain',
+    'dataelement',
+    'view',
+    'stru',
   ],
 });
 

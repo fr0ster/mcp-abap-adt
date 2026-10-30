@@ -387,14 +387,8 @@ describe('a main type is read where it names one code, refused where it names se
         '"stru/ds" is not one of: CLAS/OC',
       );
       expect(refused.requests).toEqual([]);
-      // One object of TABL/DS is activated through the structure family;
-      // `stru` is no single-activation name and goes to the group (as before).
-      if (
-        argument.tool === 'ActivateObjects.objects[].type (one object)' ||
-        argument.tool === 'HandlerActivate.object_adt_type'
-      ) {
-        return;
-      }
+      // One object of `stru` is activated as one object of TABL/DS, through
+      // the structure family (S6), like every other argument here.
       const byCode = await run(argument, variant, 'TABL/DS');
       const byName = await run(argument, variant, 'stru');
       expect(byCode.requests.length).toBeGreaterThan(0);

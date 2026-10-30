@@ -10,6 +10,9 @@ A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
 `HandlerCreate` with `object_type`. Twenty-seven tool schemas instead of hundreds.
+Each `object_type` enum, and each tool's description, is the declared system type's: its
+members are those the system type's ADT type table serves (22.0.0) — on cloud the writes offer
+no `PROGRAM` — and a member outside them is refused naming the list, before anything is sent.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP

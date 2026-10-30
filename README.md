@@ -97,6 +97,7 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+Coming from 21.x? See the [22.0 migration note](docs/MIGRATION-22.0.md) — the tools, their enums and the object types each argument accepts are the declared system type's (onprem or cloud), inspection needs `--system-type` too, `function` / `func` are the function module, main types stand for their one code, `RunATC` on cloud offers no program, and `ValidateServiceBinding` requires `package_name`.
 Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only; over Streamable HTTP `state_handle` is an argument of every tool, and a long session keeps one SAP session across calls.
 Coming from 18.x? See the [19.0 migration note](docs/MIGRATION-19.0.md) — the server split into a
 package per transport and tool set, the system type required, the low set gone, the auth chain on
@@ -315,6 +316,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-22.0.md](docs/MIGRATION-22.0.md)** - The system type decides the tools and the object types each argument accepts (the ADT type tables of interfaces-adt 23.1, adt-clients 38); inspection needs the system type; friendly names and main types; RunATC per system type; arguments now required
 - **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only; Streamable HTTP: held state by the `state_handle` argument, and the long session
 - **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end
 - **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint

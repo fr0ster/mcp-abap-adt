@@ -65,7 +65,7 @@ the source (`--mcp`, `destination`) and never quotes the name.
   asked), any failure ending the process with exit `1`, and kept for the session; the user and the
   credentials are fixed for the process, and the session is only renewed (refresh token, or a
   new login when the refresh fails) and written back — the same user.
-- With no default destination the server starts in inspection-only mode: the tool list answers, and
+- With no default destination the server starts in inspection-only mode (the system type stated): the tool list answers, and
   a tool call answers the server's own `inspection_only` refusal before any connection is built.
 
 ### Streamable HTTP and SSE

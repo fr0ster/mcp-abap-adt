@@ -90,7 +90,7 @@ npm run portable:smoke
 (`npm run portable:smoke -- <version>` for a build made with `--version`.) For each executable it checks:
 
 - `--version` answers the version built;
-- MCP over stdio: started with no destination, in inspection-only mode — the start connects nothing — it
+- MCP over stdio: started with no destination, in inspection-only mode with `SAP_SYSTEM_TYPE=onprem` — the start connects nothing — it
   answers `initialize` with that version and `tools/list` (the compact server only its `Handler…` tools,
   the full one more than 250);
 - the RFC stack: started against an RFC destination whose host does not resolve (`unreachable.invalid`,

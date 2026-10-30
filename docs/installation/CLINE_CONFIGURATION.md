@@ -253,8 +253,8 @@ Write paths with forward slashes (`C:/path/to/<destination>.env`) or escaped bac
 
 ### "No tools available" or every call fails
 
-1. Without `--mcp`, `--env` or `--env-path`, stdio starts in inspection-only mode: the tool list answers,
-   a tool call needs a connection.
+1. Without `--mcp`, `--env` or `--env-path`, stdio starts in inspection-only mode: the tool list answers
+   (that of `--system-type`, which it needs too), a tool call needs a connection.
 2. Check the credentials in the `.env`; a destination refused at startup names the fields it lacks.
 3. For RFC: `npm ls -g @mcp-abap-adt/sap-rfc-lite` must show a version — see [RFC Setup](RFC_SETUP.md#troubleshooting).
 4. Test stdio by hand:

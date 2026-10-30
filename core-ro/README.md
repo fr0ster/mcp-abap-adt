@@ -18,7 +18,7 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
   SAP sessions a killed server process left open, only the caller's own;
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-74 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger
+74 tools in all on premise, 72 on cloud: the tools, their enums and the object types each argument accepts are those of `--system-type`'s ADT type table ([MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md)). **Not here:** the high tools (create, update, delete, activate), the debugger
 and background runs — those are
 `mcp-abap-adt`'s ([`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)).
 

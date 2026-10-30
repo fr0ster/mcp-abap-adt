@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact-sse",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-sse",
-  "version": "20.1.1",
+  "version": "21.0.0",
   "description": "The compact MCP server for SAP ABAP ADT over HTTP+SSE: one tool per operation with the object in the arguments — 28 tools instead of 370 — with credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -58,12 +58,12 @@
     "start": "node ./bin/mcp-abap-adt-compact-sse.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^20.1.1",
-    "@mcp-abap-adt/compact-modify": "^20.1.1",
-    "@mcp-abap-adt/compact-readonly-entries": "^20.1.1",
-    "@mcp-abap-adt/lib": "^20.1.1",
-    "@mcp-abap-adt/responsible-rules": "^20.1.1",
-    "@mcp-abap-adt/server-runtime": "^20.1.1"
+    "@mcp-abap-adt/background-runs-memory": "^21.0.0",
+    "@mcp-abap-adt/compact-modify": "^21.0.0",
+    "@mcp-abap-adt/compact-readonly-entries": "^21.0.0",
+    "@mcp-abap-adt/lib": "^21.0.0",
+    "@mcp-abap-adt/responsible-rules": "^21.0.0",
+    "@mcp-abap-adt/server-runtime": "^21.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

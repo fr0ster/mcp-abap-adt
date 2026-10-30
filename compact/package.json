@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact",
-  "version": "20.1.1",
+  "version": "21.0.0",
   "description": "The compact MCP server for SAP ABAP ADT: one tool per operation with the object in the arguments — 28 tools instead of 370, for a host that cannot build a retrieval pipeline of its own. Connects over HTTP, RFC or SNC, configured as @mcp-abap-adt/core; RFC and SNC need the SAP NW RFC library at run time.",
   "license": "AGPL-3.0-only",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -58,12 +58,12 @@
     "docs:tools": "node ./tools/generate-docs.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^20.1.1",
-    "@mcp-abap-adt/compact-modify": "^20.1.1",
-    "@mcp-abap-adt/compact-readonly-entries": "^20.1.1",
-    "@mcp-abap-adt/lib": "^20.1.1",
-    "@mcp-abap-adt/responsible-rules": "^20.1.1",
-    "@mcp-abap-adt/server-runtime": "^20.1.1"
+    "@mcp-abap-adt/background-runs-memory": "^21.0.0",
+    "@mcp-abap-adt/compact-modify": "^21.0.0",
+    "@mcp-abap-adt/compact-readonly-entries": "^21.0.0",
+    "@mcp-abap-adt/lib": "^21.0.0",
+    "@mcp-abap-adt/responsible-rules": "^21.0.0",
+    "@mcp-abap-adt/server-runtime": "^21.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

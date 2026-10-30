@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [21.0.0] - 2026-10-30
+
+A major for two breaking changes: `getConfig()` is gone and a stdio destination states its connection type ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)), and `GetTypeInfo` answers every DDIC type a name is ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). Each has its migration note below. 21.0.0 also brings 20.1.1 to npm: 20.1.1 is tagged (`v20.1.1`) but not published, so a consumer on 20.1.0 gets its changes (stdio has no idle bound; the body-parser and fast-uri lockfile versions) with 21.0.0; its entry below says what they are. The eighteen packages are all at 21.0.0, every sibling range at `^21.0.0`.
+
 ### Removed — breaking for code that imports `@mcp-abap-adt/lib/utils`
 
 - **`getConfig()` is gone from `@mcp-abap-adt/lib/utils`**, and so are its private twin in `src/lib/config.ts`, `parseAuthType` and the certificate/Kerberos field reader ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)). `getConfig()` built a `SapConfig` from `process.env` by guessing: an absent or unknown `SAP_AUTH_TYPE` became `basic`, `snc` became `basic` too, and an absent `SAP_CONNECTION_TYPE` became `http`. No binary called it: the stdio launcher reads the `.env` itself and refuses a missing or unknown authentication, and the HTTP and SSE servers read only the request's headers. **Migrating:** build the `SapConfig` yourself from what you know, and state every field; or hand the server a connection (`setAbapConnectionOverride`) or a config (`setSapConfigOverride`, still exported).

@@ -320,7 +320,7 @@ function finding(
   why: string,
   linesInto = 0,
 ): ITypeCodeFinding {
-  const file = relative(root, source.fileName);
+  const file = posixPath(relative(root, source.fileName));
   const { line } = source.getLineAndCharacterOfPosition(position);
   return {
     key: `${file}:${text}`,
@@ -422,6 +422,14 @@ function commentRangesOf(source: ts.SourceFile): ts.CommentRange[] {
   return comments;
 }
 
+/**
+ * A path with `/` separators: TypeScript hands the host `/`-separated names on
+ * every platform, and a finding names its file the same way on every platform.
+ */
+function posixPath(path: string): string {
+  return path.split('\\').join('/');
+}
+
 /** Production source under a directory: `.ts`, outside tests and fixtures. */
 export function productionFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -452,18 +460,21 @@ export function typeCodeFindings(
   );
   const options = { ...parsed.options, noEmit: true };
   const host = ts.createCompilerHost(options);
+  const inMemory = new Map(
+    [...virtual].map(([name, text]) => [posixPath(name), text]),
+  );
   const readFile = host.readFile.bind(host);
   const fileExists = host.fileExists.bind(host);
   const getSourceFile = host.getSourceFile.bind(host);
-  host.readFile = (name) => virtual.get(name) ?? readFile(name);
-  host.fileExists = (name) => virtual.has(name) || fileExists(name);
+  host.readFile = (name) => inMemory.get(posixPath(name)) ?? readFile(name);
+  host.fileExists = (name) => inMemory.has(posixPath(name)) || fileExists(name);
   host.getSourceFile = (name, language, ...rest) => {
-    const text = virtual.get(name);
+    const text = inMemory.get(posixPath(name));
     return text !== undefined
       ? ts.createSourceFile(name, text, language, true)
       : getSourceFile(name, language, ...rest);
   };
-  const roots = [...files, ...virtual.keys()];
+  const roots = [...files, ...inMemory.keys()];
   const program = ts.createProgram(roots, options, host);
   const checker = program.getTypeChecker();
   return roots.flatMap((file) => {

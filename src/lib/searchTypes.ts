@@ -18,7 +18,7 @@
  * the list. A friendly name of `TYPE_NAMES` the variant serves (`class`,
  * `structure`, `view`, …) is read as its code first, once, and that code as
  * above (`class` → `CLAS/OC` → `CLAS`, `table` → `TABL/DT` → `DTAB`, `view` →
- * `DDLS/DF` → `DDLS`), so every name the tools took is still taken. Any other
+ * `DDLS/DF` → `DDLS`, `dbview` → `VIEW/DV` → `VIEW`), so every name the tools took is still taken. Any other
  * text is refused, and nothing is sent.
  */
 import {
@@ -28,8 +28,8 @@ import {
   type AdtSearchTypeOf,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
+  ALL_TYPE_NAMES,
   type ProjectionVariant,
-  TYPE_NAME_VALUES,
   TYPE_NAMES,
 } from './adtProjections';
 import { acceptedOf, mainOfCode } from './adtTypeCode';
@@ -88,7 +88,7 @@ export function searchNameOf(
   text: string,
 ): AdtSearchTypeOf<'cloud'> | undefined;
 export function searchNameOf(variant: ProjectionVariant, text: string) {
-  const friendly = acceptedOf(text, TYPE_NAME_VALUES[variant]);
+  const friendly = acceptedOf(text, ALL_TYPE_NAMES[variant]);
   return SEARCH_NAMES[variant](
     friendly === undefined ? text.toUpperCase() : TYPE_NAMES[friendly],
   );
@@ -96,7 +96,7 @@ export function searchNameOf(variant: ProjectionVariant, text: string) {
 
 /** What a search type argument takes, for its description. */
 export const SEARCH_TYPE_DESCRIPTION =
-  "Optional: restrict the search to one type, either case: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), or a name standing for a code (e.g. class, structure, table, function), read as its code.";
+  "Optional: restrict the search to one type, either case: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), or a name standing for a code (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW).";
 
 /** The refusal of a search type argument {@link searchNameOf} does not read. */
 export function notASearchType(argument: string, text: string): string {

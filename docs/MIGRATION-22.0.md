@@ -79,7 +79,8 @@ What changes for a caller on 21.x:
 A main type (the part of a code before its slash) stands for its code where exactly one accepted
 code has it; where several share it, the refusal names them. A group activation of a function
 module (`FUGR/FF`) or a function include (`FUGR/I`) names its group in `parentName`, or is refused.
-`VIEW/DV`, a dictionary view, is a where-used and a group-activation code.
+`VIEW/DV`, a dictionary view, is a where-used and a group-activation code; the new friendly name
+`dbview` stands for it (`view` stays a CDS view, `DDLS/DF`).
 
 ## Callers: the search filter is a search name
 
@@ -99,7 +100,7 @@ object_type "NOPE" is neither a name of this system's object types list nor an A
 | a search name (`CLAS`, `STRU`, `ABAP_TEST_COCKPIT`, …) | sent as given | sent upper-cased |
 | a code (`CLAS/OC`, `TABL/DS`, `FUGR/FF`, `ENHO/XHH`, …) | sent as given | sent as its name (`CLAS`, `STRU`, `FUNC`, `ENHO`) |
 | `class`, `program`, `include`, `function`, `functiongroup`, `interface`, `package`, `table`, `structure`, `domain`, `dataelement`, `functionmodule`, `function_module` | sent as given | read as its code, sent as that code's name: `CLAS`, `PROG`, `INCL`, `FUNC`, `FUGR`, `INTF`, `DEVC`, `DTAB`, `STRU`, `DOMA`, `DTEL`, `FUNC`, `FUNC` |
-| `view` (any case) | sent as given | a CDS view, `DDLS/DF`, sent as `DDLS`; the dictionary views are `VIEW/DV` |
+| `view` (any case) | sent as given | a CDS view, `DDLS/DF`, sent as `DDLS`; the dictionary views are `dbview` / `VIEW/DV`, sent as `VIEW` |
 | a code no list or table holds (`NOPE/XX`) | sent; the system answered no hits | refused |
 
 ## Callers on cloud

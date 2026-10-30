@@ -264,7 +264,8 @@ export type MainTypeOfOne<P extends AdtUtilityCode> = keyof MainTypeCodes<P> &
  * them, each with the code of the tables it addressed: the friendly names of
  * its where-used aliases (adt-clients 37.2.0), `function` and `func` for the
  * function module (`func` the releases' quick-search name `FUNC`),
- * `functiongroup` for the function group and `stru` for the structure. The
+ * `functiongroup` for the function group, `stru` for the structure and
+ * `dbview` for a dictionary view (`VIEW/DV`; `view` is a CDS view). The
  * tools' arguments name them, so the server reads them now; each code is
  * checked against the tables here. A main type (`CLAS`, `TABL`, …) is no
  * name: it reads as a code only through the argument's projection
@@ -287,7 +288,8 @@ export const TYPE_NAMES = {
   function_module: 'FUGR/FF',
   func: 'FUGR/FF',
   stru: 'TABL/DS',
-} as const satisfies Readonly<Record<string, AdtTypeCode>>;
+  dbview: 'VIEW/DV',
+} as const satisfies Readonly<Record<string, AdtUtilityCode>>;
 
 /** A name of {@link TYPE_NAMES}. */
 export type TypeName = keyof typeof TYPE_NAMES;
@@ -387,12 +389,27 @@ export const TYPE_NAME_LIST = [
   'function_module',
   'func',
   'stru',
+  'dbview',
 ] as const satisfies readonly TypeName[];
 
 /** {@link TYPE_NAME_LIST} names every name of {@link TYPE_NAMES}. */
-export const TYPE_NAME_VALUES = projected<TypeName, TypeName>()({
+export const ALL_TYPE_NAMES = projected<TypeName, TypeName>()({
   onprem: TYPE_NAME_LIST,
   cloud: TYPE_NAME_LIST,
+});
+
+/**
+ * The names of {@link TYPE_NAMES} whose code is a code of the variant's
+ * table: what a tool whose request names a type of the table takes (a node
+ * structure, an object structure). `dbview` (`VIEW/DV`, a group-only code)
+ * is in no table.
+ */
+export const TYPE_NAME_VALUES = projected<
+  TypeNameFor<AdtTypeCodeOf<'onprem'>>,
+  TypeNameFor<AdtTypeCodeOf<'cloud'>>
+>()({
+  onprem: TYPE_NAME_LIST.filter((name) => name !== 'dbview'),
+  cloud: TYPE_NAME_LIST.filter((name) => name !== 'dbview'),
 });
 
 /** The names of {@link TYPE_NAMES} GetWhereUsed takes for a where-used code. */

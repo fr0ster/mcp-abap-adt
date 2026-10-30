@@ -32,6 +32,8 @@ import {
   type SINGLE_ACTIVATION_ROUTES,
   type TABLE_CODES,
   type TableMainOf,
+  type TYPE_NAME_VALUES,
+  TYPE_NAMES,
   type VersionedKind,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
@@ -256,3 +258,12 @@ export const cloudName: AdtSearchTypeOf<'cloud'> | undefined = searchNameOf(
 // @ts-expect-error an on-premise name is not a name of every variant
 export const onPremAsModern: AdtSearchTypeOf<'onprem' | 'cloud'> | undefined =
   searchNameOf('onprem', 'STRU');
+
+// `dbview` is the dictionary view, `VIEW/DV`; `view` stays the CDS view.
+export const dbviewCode: 'VIEW/DV' = TYPE_NAMES.dbview;
+export const viewCode: 'DDLS/DF' = TYPE_NAMES.view;
+// Where-used and a group activation take it on both variants…
+export const dbviewWhereUsed: (typeof WHERE_USED_NAMES.cloud)[number] =
+  'dbview';
+// @ts-expect-error …a structure tool does not: VIEW/DV is in no API table
+export const dbviewInTable: (typeof TYPE_NAME_VALUES.onprem)[number] = 'dbview';

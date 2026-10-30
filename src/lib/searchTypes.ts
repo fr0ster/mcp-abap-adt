@@ -15,7 +15,11 @@
  * `DEVC/K` → `DEVC`) — where two items list it (`PROG/P`: `PROG` and
  * `REPO`), the one that is its main type —, else the main type its entry in
  * the type tables states (`main`; `ENHO/XHH` → `ENHO`) when that is a name of
- * the list. Any other text is refused, and nothing is sent.
+ * the list. A friendly name of `TYPE_NAMES` the variant serves (`class`,
+ * `structure`, `view`, …) is read as its code first, once, and that code as
+ * above (`class` → `CLAS/OC` → `CLAS`, `table` → `TABL/DT` → `DTAB`, `view` →
+ * `DDLS/DF` → `DDLS`), so every name the tools took is still taken. Any other
+ * text is refused, and nothing is sent.
  */
 import {
   ADT_SEARCH_TYPES_CLOUD,
@@ -23,8 +27,12 @@ import {
   type AdtListedSearchType,
   type AdtSearchTypeOf,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { ProjectionVariant } from './adtProjections';
-import { mainOfCode } from './adtTypeCode';
+import {
+  type ProjectionVariant,
+  TYPE_NAME_VALUES,
+  TYPE_NAMES,
+} from './adtProjections';
+import { acceptedOf, mainOfCode } from './adtTypeCode';
 
 /** A search type table of a release with a list: its names and what each selects. */
 type ListedSearchTypes<N extends string> = {
@@ -67,8 +75,9 @@ const SEARCH_NAMES = {
 
 /**
  * The search name of the variant's object types list `text` names, either
- * case, upper-cased once: the name itself, or the name a code stands for
- * (see the module comment); `undefined` for any other text.
+ * case, upper-cased once: the code of the friendly name it is
+ * (`TYPE_NAMES`), read as that code; else the name itself, or the name a
+ * code stands for (see the module comment); `undefined` for any other text.
  */
 export function searchNameOf(
   variant: 'onprem',
@@ -79,14 +88,17 @@ export function searchNameOf(
   text: string,
 ): AdtSearchTypeOf<'cloud'> | undefined;
 export function searchNameOf(variant: ProjectionVariant, text: string) {
-  return SEARCH_NAMES[variant](text.toUpperCase());
+  const friendly = acceptedOf(text, TYPE_NAME_VALUES[variant]);
+  return SEARCH_NAMES[variant](
+    friendly === undefined ? text.toUpperCase() : TYPE_NAMES[friendly],
+  );
 }
 
 /** What a search type argument takes, for its description. */
 export const SEARCH_TYPE_DESCRIPTION =
-  "Optional: restrict the search to one type, either case: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO).";
+  "Optional: restrict the search to one type, either case: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), or a name standing for a code (e.g. class, structure, table, function), read as its code.";
 
 /** The refusal of a search type argument {@link searchNameOf} does not read. */
 export function notASearchType(argument: string, text: string): string {
-  return `${argument} "${text}" is neither a name of this system's object types list nor an ADT type code standing for one: it takes the search names (e.g. CLAS, DEVC, STRU); nothing was sent`;
+  return `${argument} "${text}" is neither a name of this system's object types list nor an ADT type code or a name standing for one: it takes the search names (e.g. CLAS, DEVC, STRU), an ADT type code (e.g. TABL/DS) or a name standing for a code (e.g. class, structure); nothing was sent`;
 }

@@ -65,7 +65,7 @@ async function search(
 
 /** The refusal of a filter value that names no search name. */
 const refusal = (value: string) =>
-  `object_type "${value}" is neither a name of this system's object types list nor an ADT type code standing for one: it takes the search names (e.g. CLAS, DEVC, STRU); nothing was sent`;
+  `object_type "${value}" is neither a name of this system's object types list nor an ADT type code or a name standing for one: it takes the search names (e.g. CLAS, DEVC, STRU), an ADT type code (e.g. TABL/DS) or a name standing for a code (e.g. class, structure); nothing was sent`;
 
 /** A name only the other variant's list holds, per variant. */
 const OTHERS_ONLY: { readonly [V in ProjectionVariant]: string } = {
@@ -119,7 +119,29 @@ describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
     expect(sentObjectType(requests)).toBe(wire);
   });
 
-  it.each(['NOPE', 'NOPE/XX', 'class', 'structure', OTHERS_ONLY[variant]])(
+  it.each([
+    // The code of the name is the item's type.
+    ['class', 'CLAS'],
+    ['structure', 'STRU'],
+    ['table', 'DTAB'],
+    ['FUNCTION', 'FUNC'],
+    ['function_module', 'FUNC'],
+    ['functiongroup', 'FUGR'],
+    ['include', 'INCL'],
+    ['package', 'DEVC'],
+    // Two items list the code (`PROG`, `REPO`): the one that is its main type.
+    ['program', 'PROG'],
+    // A name is read as its code before the list: `view` is a CDS view
+    // (`DDLS/DF`), in either case; the dictionary views are `VIEW/DV`.
+    ['view', 'DDLS'],
+    ['VIEW', 'DDLS'],
+    ['VIEW/DV', 'VIEW'],
+  ])('a friendly name, %s, reaches the wire as %s', async (value, wire) => {
+    const { requests } = await search(variant, value);
+    expect(sentObjectType(requests)).toBe(wire);
+  });
+
+  it.each(['NOPE', 'NOPE/XX', 'classes', OTHERS_ONLY[variant]])(
     '%s names no search name: refused, nothing sent',
     async (value) => {
       const { result, requests } = await search(variant, value);
@@ -160,7 +182,7 @@ describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
     declareSystemKind(connection, variant);
     await handleDescribeByList(
       { connection, batchAvailability: oneByOne() },
-      { objects: [{ name: 'ZT', type: 'TABLE' }] },
+      { objects: [{ name: 'ZT', type: 'NOPE' }] },
     );
     expect(sentObjectType(connection.requests)).toBeNull();
   });

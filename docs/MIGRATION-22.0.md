@@ -87,18 +87,19 @@ module (`FUGR/FF`) or a function include (`FUGR/I`) names its group in `parentNa
 list, the quick search's own filter: a main type (`CLAS`, `DEVC`, `TABL`), an alias of one subtype
 (`STRU`, `DTAB`, `FUNC`, `INCL`) or a group (`ABAP_TEST_COCKPIT`). An ADT type code is still taken,
 and sent as the name the search reads it as (`TABL/DS` as `STRU`, `CLAS/OC` as `CLAS`, `ENHO/XHH` as
-`ENHO`): it selects what it selected. Anything else is refused before anything is sent:
+`ENHO`): it selects what it selected. A friendly name (`class`, `table`, `view`, …) is read as its
+code, and that code as its name. Anything else is refused before anything is sent:
 
 ```text
-object_type "class" is neither a name of this system's object types list nor an ADT type code standing for one: it takes the search names (e.g. CLAS, DEVC, STRU); nothing was sent
+object_type "NOPE" is neither a name of this system's object types list nor an ADT type code or a name standing for one: it takes the search names (e.g. CLAS, DEVC, STRU), an ADT type code (e.g. TABL/DS) or a name standing for a code (e.g. class, structure); nothing was sent
 ```
 
 | You sent | 21.x | 22.0 |
 |---|---|---|
 | a search name (`CLAS`, `STRU`, `ABAP_TEST_COCKPIT`, …) | sent as given | sent upper-cased |
 | a code (`CLAS/OC`, `TABL/DS`, `FUGR/FF`, `ENHO/XHH`, …) | sent as given | sent as its name (`CLAS`, `STRU`, `FUNC`, `ENHO`) |
-| `class`, `program`, `include`, `function`, `functiongroup`, `interface`, `package`, `table`, `structure`, `domain`, `dataelement`, `functionmodule`, `function_module` | sent as given; the system refused it `400` | refused: send `CLAS`, `PROG`, `INCL`, `FUNC`, `FUGR`, `INTF`, `DEVC`, `DTAB`, `STRU`, `DOMA`, `DTEL` (or the code) |
-| `view` | sent as given | the dictionary views (`VIEW`); a CDS view is `DDLS` |
+| `class`, `program`, `include`, `function`, `functiongroup`, `interface`, `package`, `table`, `structure`, `domain`, `dataelement`, `functionmodule`, `function_module` | sent as given | read as its code, sent as that code's name: `CLAS`, `PROG`, `INCL`, `FUNC`, `FUGR`, `INTF`, `DEVC`, `DTAB`, `STRU`, `DOMA`, `DTEL`, `FUNC`, `FUNC` |
+| `view` (any case) | sent as given | a CDS view, `DDLS/DF`, sent as `DDLS`; the dictionary views are `VIEW/DV` |
 | a code no list or table holds (`NOPE/XX`) | sent; the system answered no hits | refused |
 
 ## Callers on cloud

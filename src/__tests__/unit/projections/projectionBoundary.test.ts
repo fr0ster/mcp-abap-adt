@@ -211,7 +211,7 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
       name: ['ddls', sent],
       wrong: [
         'NOPE',
-        'object_type "NOPE" is neither a name of this system\'s object types list nor an ADT type code standing for one: it takes the search names',
+        'object_type "NOPE" is neither a name of this system\'s object types list nor an ADT type code or a name standing for one: it takes the search names',
       ],
     },
   ),

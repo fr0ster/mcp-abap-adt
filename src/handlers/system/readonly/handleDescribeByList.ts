@@ -3,7 +3,7 @@ export const TOOL_DEFINITION = {
   name: 'DescribeByList',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    "[read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional, either case: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI); an object of any other type is searched by its name alone.",
+    "[read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional, either case: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI) or a name standing for a code (e.g. class, table, structure); an object of any other type is searched by its name alone.",
   ),
   inputSchema: {
     type: 'object',

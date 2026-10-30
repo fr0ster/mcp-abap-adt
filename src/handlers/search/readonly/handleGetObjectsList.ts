@@ -1,4 +1,4 @@
-import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
@@ -67,7 +67,7 @@ import {
   thrownEntry,
 } from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -408,9 +408,12 @@ export async function handleGetObjectsList(
     const parents: Parent[] = [];
     for (const entry of listed) {
       const text = String(entry.parent_type);
-      const type = typeCodeOf(text);
+      const variant = variantOf(context.connection);
+      const type = tableTypeOf(text, variant);
       if (type === undefined) {
-        return return_error(notATableCode('objects[].parent_type', text));
+        return return_error(
+          notATableType('objects[].parent_type', text, variant),
+        );
       }
       parents.push({ type, name: String(entry.parent_name).toUpperCase() });
     }
@@ -475,9 +478,10 @@ export async function handleGetObjectsList(
   }
 
   const parentName = parent_name.toUpperCase();
-  const parentType = typeCodeOf(parent_type);
+  const variant = variantOf(context.connection);
+  const parentType = tableTypeOf(parent_type, variant);
   if (parentType === undefined) {
-    return return_error(notATableCode('parent_type', parent_type));
+    return return_error(notATableType('parent_type', parent_type, variant));
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's

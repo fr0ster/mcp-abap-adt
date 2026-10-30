@@ -29,8 +29,14 @@ import {
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { UNLOCK_KINDS, type UnlockKind } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   connectionHoldingPackageLock,
@@ -90,31 +96,39 @@ interface UnlockObjectArgs {
   lock_handle: string;
 }
 
-const VALID_TYPES = [
-  'class',
-  'program',
-  'interface',
-  'function_group',
-  'function_module',
-  'table',
-  'structure',
-  'ddl',
-  'domain',
-  'data_element',
-  'package',
-  'behavior_definition',
-  'behavior_implementation',
-  'metadata_extension',
-  'service_definition',
-  'service_binding',
-];
-
+/**
+ * The tool's boundary: `object_type` is one of the kinds the declared
+ * variant serves (`UNLOCK_KINDS`), either case; past it, {@link unlockObject} takes
+ * the kind typed and checks it no more.
+ */
 export async function handleUnlockObject(
   context: HandlerContext,
   args: UnlockObjectArgs,
 ) {
+  if (!args.object_name || !args.object_type || !args.lock_handle) {
+    return return_error(
+      new Error('object_name, object_type and lock_handle are required'),
+    );
+  }
+  const variant = variantOf(context.connection);
+  const kind = acceptedOf(args.object_type, UNLOCK_KINDS[variant]);
+  if (kind === undefined) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${UNLOCK_KINDS[variant].join(', ')}`,
+      ),
+    );
+  }
+  return unlockObject(context, { ...args, object_type: kind });
+}
+
+/** One object of a kind checked at the tool's boundary. */
+export async function unlockObject(
+  context: HandlerContext,
+  args: Omit<UnlockObjectArgs, 'object_type'> & { object_type: UnlockKind },
+) {
   const { connection, logger } = context;
-  const { object_name, object_type, lock_handle } = args as UnlockObjectArgs;
+  const { object_name, object_type, lock_handle } = args;
 
   if (!object_name || !object_type || !lock_handle) {
     return return_error(
@@ -122,14 +136,7 @@ export async function handleUnlockObject(
     );
   }
 
-  const objectType = object_type.toLowerCase();
-  if (!VALID_TYPES.includes(objectType)) {
-    return return_error(
-      new Error(
-        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
-      ),
-    );
-  }
+  const objectType = object_type;
 
   // Request-shape check that stays ahead of the client call, exactly where it
   // lived before this migration: `unlock()`'s config does not itself enforce
@@ -263,9 +270,6 @@ export async function handleUnlockObject(
             .unlock({ bindingName: objectName }, lock_handle, {
               analyse: analyseException,
             });
-        default:
-          // Unreachable: objectType was already checked against VALID_TYPES.
-          throw new Error(`Unsupported object_type: ${object_type}`);
       }
     },
     (value) => terseWrite(value, 200),

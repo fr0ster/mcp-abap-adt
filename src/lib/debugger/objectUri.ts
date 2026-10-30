@@ -1,15 +1,52 @@
+import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtNeed } from '../adtProjections';
+import { acceptedOf } from '../adtTypeCode';
+
 /**
  * The source a line breakpoint names, from what a model knows — a type and a
  * name — and back. adt-clients does not export its URI builders, so the four
  * kinds that hold executable ABAP are spelled here as ADT spells them.
+ *
+ * The debugger's own labels, each with the code of the tables it stands for:
+ * a label outside this union, or a code no table holds, does not compile.
+ * `FUNC` is a function module (`FUGR/FF`, as the releases' quick search names
+ * it), never a group.
  */
+export const BREAKPOINT_OBJECT_CODES = {
+  CLAS: 'CLAS/OC',
+  PROG: 'PROG/P',
+  INCL: 'PROG/I',
+  FUNC: 'FUGR/FF',
+} as const satisfies Readonly<Record<string, AdtTypeCode>>;
+
+/** A label of {@link BREAKPOINT_OBJECT_CODES}: the debugger's one union. */
+export type BreakpointLabel = keyof typeof BREAKPOINT_OBJECT_CODES;
+
+/** The labels, in order: what a breakpoint's `object_type` names. */
 export const BREAKPOINT_OBJECT_TYPES = [
   'CLAS',
   'PROG',
   'INCL',
   'FUNC',
-] as const;
-type Kind = (typeof BREAKPOINT_OBJECT_TYPES)[number];
+] as const satisfies readonly BreakpointLabel[];
+
+/**
+ * What a debug session runs once listening, each with the API whose `run`
+ * it is: a run kind outside the tables' `run` does not compile.
+ */
+export const RUN_KIND_ROUTES = {
+  class: { api: 'class', operation: 'run' },
+  program: { api: 'program', operation: 'run' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** A kind a debug session runs. */
+export type RunKind = keyof typeof RUN_KIND_ROUTES;
+
+/** The run kinds, in order: what `run.kind` names. */
+export const RUN_KINDS = [
+  'class',
+  'program',
+] as const satisfies readonly RunKind[];
 
 export interface BreakpointTarget {
   object_type: string;
@@ -25,22 +62,25 @@ export interface ObjectAddress {
   line?: number;
 }
 
-const ALIASES: Record<string, Kind> = {
-  CLAS: 'CLAS',
-  'CLAS/OC': 'CLAS',
-  PROG: 'PROG',
-  'PROG/P': 'PROG',
-  INCL: 'INCL',
-  'PROG/I': 'INCL',
-  FUNC: 'FUNC',
-  'FUGR/FF': 'FUNC',
-};
+/**
+ * The boundary of a breakpoint's `object_type`: a label, or the code it
+ * stands for, either case; `undefined` for any other text.
+ */
+export function breakpointLabelOf(text: string): BreakpointLabel | undefined {
+  const label = acceptedOf(text.trim(), BREAKPOINT_OBJECT_TYPES);
+  if (label !== undefined) return label;
+  const code = text.trim().toUpperCase();
+  return BREAKPOINT_OBJECT_TYPES.find(
+    (each) => BREAKPOINT_OBJECT_CODES[each] === code,
+  );
+}
+
 const seg = (name: string) => encodeURIComponent(name.trim().toLowerCase());
 const unseg = (s: string) => decodeURIComponent(s).toUpperCase();
 
 /** The ADT URI of the source a target names. Throws for a kind that holds no breakpoint. */
 export function sourceUriOf(target: BreakpointTarget): string {
-  const kind = ALIASES[target.object_type.trim().toUpperCase()];
+  const kind = breakpointLabelOf(target.object_type);
   const name = seg(target.object_name);
   switch (kind) {
     case 'CLAS':

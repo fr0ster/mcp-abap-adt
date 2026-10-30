@@ -10,6 +10,7 @@ import {
   type ProjectionVariant,
   VERSIONED_KINDS,
 } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -18,11 +19,7 @@ import {
   return_response,
 } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
-import {
-  readVersions,
-  resolveVersionedObject,
-  VERSIONED_OBJECT_TYPES,
-} from './resolveVersionedObject';
+import { readVersions, resolveVersionedObject } from './resolveVersionedObject';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersions',
@@ -71,17 +68,17 @@ export async function handleGetObjectVersions(
   const { connection, logger } = context;
   try {
     const { object_name, function_group_name } = args;
-    const object_type = (args.object_type || '').toLowerCase();
-
-    if (!object_type || !object_name) {
+    if (!args.object_type || !object_name) {
       return return_error(
         new Error('object_type and object_name are required'),
       );
     }
-    if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
+    const variant = variantOf(connection);
+    const object_type = acceptedOf(args.object_type, VERSIONED_KINDS[variant]);
+    if (object_type === undefined) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variantOf(connection)].join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variant].join(', ')}`,
         ),
       );
     }
@@ -97,11 +94,6 @@ export async function handleGetObjectVersions(
       );
     } catch (e: any) {
       return return_error(e instanceof Error ? e : new Error(String(e)));
-    }
-    if (!resolved) {
-      return return_error(
-        new Error(`Unsupported object_type: ${args.object_type}`),
-      );
     }
 
     try {

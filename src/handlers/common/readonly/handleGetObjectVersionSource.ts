@@ -10,6 +10,7 @@ import {
   type ProjectionVariant,
   VERSIONED_KINDS,
 } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -21,7 +22,6 @@ import { byVariant } from '../../../lib/variantDefinition';
 import {
   readVersionSource,
   resolveVersionedObject,
-  VERSIONED_OBJECT_TYPES,
 } from './resolveVersionedObject';
 
 export const TOOL_DEFINITION = {
@@ -67,17 +67,17 @@ export async function handleGetObjectVersionSource(
   const { connection, logger } = context;
   try {
     const { content_uri } = args;
-    const object_type = (args.object_type || '').toLowerCase();
-
-    if (!object_type || !content_uri) {
+    if (!args.object_type || !content_uri) {
       return return_error(
         new Error('object_type and content_uri are required'),
       );
     }
-    if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
+    const variant = variantOf(connection);
+    const object_type = acceptedOf(args.object_type, VERSIONED_KINDS[variant]);
+    if (object_type === undefined) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variantOf(connection)].join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variant].join(', ')}`,
         ),
       );
     }
@@ -86,11 +86,6 @@ export async function handleGetObjectVersionSource(
     // content_uri carries the full object identity; a placeholder name is only
     // needed to obtain the right IAdtObject instance.
     const resolved = resolveVersionedObject(client, object_type, 'X', 'X');
-    if (!resolved) {
-      return return_error(
-        new Error(`Unsupported object_type: ${args.object_type}`),
-      );
-    }
 
     try {
       const source = await readVersionSource(resolved, content_uri);

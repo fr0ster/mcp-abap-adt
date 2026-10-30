@@ -1,37 +1,90 @@
 import { answeredObject } from '@mcp-abap-adt/adt-strategies';
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
-import { TYPE_NAMES as TYPE_NAME_CODES } from './adtProjections';
+import {
+  type ProjectionVariant,
+  TABLE_CODES,
+  TYPE_NAME_VALUES,
+  TYPE_NAMES,
+  type TypeName,
+} from './adtProjections';
 
 /**
- * A type-code argument as a code of the ADT type tables: the text, upper-cased
- * once, looked up against the tables (`answeredObject`); `undefined` for any
- * other text — a friendly name, a bare main type, a code no table holds.
+ * A type code an ADT **answer** carries, as a code of the ADT type tables:
+ * the text, upper-cased once, looked up against the tables
+ * (`answeredObject`); `undefined` for a code no table holds.
  *
- * A tool argument comes from outside the type system, so this is where it is
- * checked; past it the code is typed by the tables.
+ * For what SAP sent, not for a tool argument: an argument is checked against
+ * its operation's projection ({@link acceptedOf}, {@link acceptedCodeOf}).
  */
 export function tableCodeOf(text: string): AdtTypeCode | undefined {
   return answeredObject(text.toUpperCase()).type;
 }
 
-/** The fixed words a type argument that is no code of the tables is refused in. */
-export function notATableCode(argument: string, text: string): string {
-  return `${argument} "${text}" is not an ADT type code (such as CLAS/OC or DEVC/K); nothing was sent`;
+/**
+ * The boundary of a tool argument that names a type: `text`, upper-cased
+ * once, as the value of `accepted` it names — `accepted` is the argument's
+ * projection on the declared variant (`adtProjections.ts`), so past this the
+ * value is typed as that projection. `undefined` for any other text; the
+ * tool refuses it ({@link notAccepted}) and sends nothing.
+ *
+ * Either case is taken: a code (`clas/oc`) and a friendly name (`CLASS`)
+ * alike.
+ */
+export function acceptedOf<T extends string>(
+  text: string,
+  accepted: readonly T[],
+): T | undefined {
+  const upper = text.toUpperCase();
+  return accepted.find((value) => value.toUpperCase() === upper);
 }
 
 /**
- * The names the tools have always taken for a type, each with its code
- * (`TYPE_NAMES`, `adtProjections.ts`, where each operation's names are
- * projected from them), read by any name.
+ * The boundary of a type argument that takes a code or a friendly name
+ * standing for one: the code of `codes` it names, else the code of the name
+ * of `names` it names (`TYPE_NAMES`), either case; `undefined` for any other
+ * text.
  */
-const TYPE_NAMES: Readonly<Record<string, AdtTypeCode>> = TYPE_NAME_CODES;
+export function acceptedCodeOf<C extends AdtTypeCode, N extends TypeName>(
+  text: string,
+  codes: readonly C[],
+  names: readonly N[],
+): C | (typeof TYPE_NAMES)[N] | undefined {
+  const code = acceptedOf(text, codes);
+  if (code !== undefined) return code;
+  const name = acceptedOf(text, names);
+  return name === undefined ? undefined : TYPE_NAMES[name];
+}
 
 /**
- * A type argument as a code of the tables: one of the names the tools have
- * always taken ({@link TYPE_NAMES}, either case), else {@link tableCodeOf}.
+ * The fixed words a type argument outside its projection is refused in,
+ * naming what the argument takes on the declared variant.
  */
-export function typeCodeOf(text: string): AdtTypeCode | undefined {
-  return Object.hasOwn(TYPE_NAMES, text.toLowerCase())
-    ? TYPE_NAMES[text.toLowerCase()]
-    : tableCodeOf(text);
+export function notAccepted(
+  argument: string,
+  text: string,
+  accepted: readonly string[],
+): string {
+  return `${argument} "${text}" is not one of: ${accepted.join(', ')}; nothing was sent`;
+}
+
+/**
+ * The boundary of a type argument of a tool whose request names a type but
+ * asks no operation of the tables of it (a node structure, an object
+ * structure, a search filter): a code of `variant`'s table (`TABLE_CODES`)
+ * or a name standing for one (`TYPE_NAMES`), either case.
+ */
+export function tableTypeOf(text: string, variant: ProjectionVariant) {
+  return acceptedCodeOf(text, TABLE_CODES[variant], TYPE_NAME_VALUES[variant]);
+}
+
+/** The refusal of a type argument {@link tableTypeOf} does not take. */
+export function notATableType(
+  argument: string,
+  text: string,
+  variant: ProjectionVariant,
+): string {
+  return notAccepted(argument, text, [
+    ...TABLE_CODES[variant],
+    ...TYPE_NAME_VALUES[variant],
+  ]);
 }

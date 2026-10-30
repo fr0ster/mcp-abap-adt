@@ -86,8 +86,13 @@ import {
   codesWithNames,
   type ProjectionVariant,
   SINGLE_ACTIVATION,
+  SINGLE_ACTIVATION_ROUTES,
 } from '../../../lib/adtProjections';
-import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
+import {
+  acceptedCodeOf,
+  acceptedOf,
+  notAccepted,
+} from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import {
   createAdtClient,
@@ -109,63 +114,14 @@ import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
 
-/** The families whose own `activate()` this dispatcher can reach directly. */
-type ActivationFamily =
-  | 'class'
-  | 'program'
-  | 'interface'
-  | 'function_group'
-  | 'table'
-  | 'structure'
-  | 'ddl'
-  | 'domain'
-  | 'data_element'
-  | 'behavior_definition'
-  | 'metadata_extension';
-
 /**
- * ADT type codes (and this codebase's own friendly names, accepted
- * elsewhere in `common/low`) mapped to the family that serves them. Anything
- * not named here — `FUGR/FF`, a bare code such as `CLAS`, and the table type
- * `TTYP/DA` included — falls back to group activation; see the module doc
- * comment.
+ * The APIs whose own `activate()` this dispatcher reaches directly: those of
+ * `SINGLE_ACTIVATION_ROUTES`, which names each code and friendly name a
+ * single object is activated by (the tables' `activate`). Every other code
+ * goes to group activation; see the module doc comment.
  */
-export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
-  'clas/oc': 'class',
-  class: 'class',
-  'prog/p': 'program',
-  program: 'program',
-  'intf/oi': 'interface',
-  interface: 'interface',
-  'fugr/f': 'function_group',
-  function_group: 'function_group',
-  'tabl/dt': 'table',
-  table: 'table',
-  // ADT names a structure `TABL/DS`. This read `ttyp/st` from 2025-11-08
-  // (a211af39, where `'TTYP/ST' (structure)` was written into the schema):
-  // a code ADT never sends, so a structure went to group activation and a
-  // call naming `TTYP/ST` activated a structure. A table type (`TTYP/DA`)
-  // has no family here and goes to group activation, where adt-clients
-  // refuses it: its `buildObjectUri` has no ADT address for `TTYP/DA` (it
-  // maps `TTYP`, `TTYP/DF` and `TTYP/TT`). The code `TTYP` works.
-  'tabl/ds': 'structure',
-  structure: 'structure',
-  'ddls/df': 'ddl',
-  ddl: 'ddl',
-  // ADT's code, as recorded answers and adt-clients name it.
-  'doma/dd': 'domain',
-  // Not seen in a recorded answer.
-  'doma/dm': 'domain',
-  domain: 'domain',
-  'dtel/de': 'data_element',
-  data_element: 'data_element',
-  // Not seen in a recorded answer.
-  'bdef/bd': 'behavior_definition',
-  'bdef/bdo': 'behavior_definition',
-  behavior_definition: 'behavior_definition',
-  'ddlx/ex': 'metadata_extension',
-  metadata_extension: 'metadata_extension',
-};
+type SingleActivationApi =
+  (typeof SINGLE_ACTIVATION_ROUTES)[keyof typeof SINGLE_ACTIVATION_ROUTES]['api'];
 
 /**
  * What `preaudit` does on `variant`, for both activation tools: the codes and
@@ -244,11 +200,8 @@ function activateObjectSchema(variant: ProjectionVariant) {
 }
 
 /**
- * One object of the tool's argument, as the caller sent it: `type` is an ADT
- * type code or one of {@link TYPE_TO_FAMILY}'s names, either case — text from
- * outside the type system. A single object of a mapped type goes to its
- * family; everything else goes to group activation, which takes codes of the
- * tables only (`groupReferences`).
+ * One object of the tool's argument, as the caller sent it: `type` is text
+ * from outside the type system, checked once by {@link activationPlan}.
  */
 interface ActivationObject {
   name: string;
@@ -258,20 +211,56 @@ interface ActivationObject {
 }
 
 /**
- * The objects of a group activation as references the tables type, or the
- * fixed words naming the first whose `type` is no code of the tables (nothing
- * is sent then).
+ * What an activation does, decided once at the tool's boundary: one object
+ * activated through its own API's `activate()`, or a group activation of
+ * references the tables type.
  */
-function groupReferences(
+export type ActivationPlan =
+  | {
+      readonly single: {
+        readonly api: SingleActivationApi;
+        readonly name: string;
+      };
+    }
+  | { readonly group: IObjectReference[] };
+
+/**
+ * The boundary of `objects[].type` on `variant`: one object of a code or
+ * name of `SINGLE_ACTIVATION` is activated through its API; every other call
+ * is a group activation, each type a code of `ACTIVATION_CODES` or a name of
+ * `ACTIVATION_NAMES` standing for one. Anything else is refused in fixed
+ * words naming what the argument takes there, and nothing is sent.
+ */
+function activationPlan(
   objects: readonly ActivationObject[],
-): IObjectReference[] | string {
+  variant: ProjectionVariant,
+): ActivationPlan | string {
+  const [only] = objects;
+  if (objects.length === 1 && only !== undefined) {
+    const single = acceptedOf(only.type, SINGLE_ACTIVATION[variant]);
+    if (single !== undefined) {
+      return {
+        single: { api: SINGLE_ACTIVATION_ROUTES[single].api, name: only.name },
+      };
+    }
+  }
   const references: IObjectReference[] = [];
   for (const obj of objects) {
-    const type = typeCodeOf(obj.type);
-    if (type === undefined) return notATableCode('objects[].type', obj.type);
+    const type = acceptedCodeOf(
+      obj.type,
+      ACTIVATION_CODES[variant],
+      ACTIVATION_NAMES[variant],
+    );
+    if (type === undefined) {
+      return notAccepted('objects[].type', obj.type, [
+        ...ACTIVATION_CODES[variant],
+        ...ACTIVATION_NAMES[variant],
+        ...(objects.length === 1 ? SINGLE_ACTIVATION[variant] : []),
+      ]);
+    }
     references.push({ ...obj, type });
   }
-  return references;
+  return { group: references };
 }
 
 interface ActivateObjectArgs {
@@ -280,17 +269,13 @@ interface ActivateObjectArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
-function familyFor(typeCode: string): ActivationFamily | undefined {
-  return TYPE_TO_FAMILY[typeCode.toLowerCase()];
-}
-
 function activateFamily(
   context: HandlerContext,
   client: IServerAdtClient,
-  family: ActivationFamily,
+  api: SingleActivationApi,
   name: string,
 ) {
-  switch (family) {
+  switch (api) {
     case 'class':
       return withAdtHeaders(context, 'class.activate', (headers) =>
         client
@@ -319,7 +304,7 @@ function activateFamily(
             { headers, analyse: analyseActivation },
           ),
       );
-    case 'function_group':
+    case 'functionGroup':
       return withAdtHeaders(context, 'functionGroup.activate', (headers) =>
         client
           .getFunctionGroup(resultsFor(functionGroupDocuments))
@@ -361,7 +346,7 @@ function activateFamily(
             { headers, analyse: analyseActivation },
           ),
       );
-    case 'data_element':
+    case 'dataElement':
       return withAdtHeaders(context, 'dataElement.activate', (headers) =>
         client
           .getDataElement(resultsFor(dataElementDocuments))
@@ -370,19 +355,33 @@ function activateFamily(
             { headers, analyse: analyseActivation },
           ),
       );
-    case 'behavior_definition':
+    case 'behaviorDefinition':
       return withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
         client
           .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
           .activate({ name }, { headers, analyse: analyseActivation }),
       );
-    case 'metadata_extension':
+    case 'metadataExtension':
       return withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
         client
           .getMetadataExtension(resultsFor(metadataExtensionDocuments))
           .activate({ name }, { headers, analyse: analyseActivation }),
       );
   }
+}
+
+/** One object activated through its own API's `activate()`: its verdict. */
+function activateSingle(
+  context: HandlerContext,
+  single: { readonly api: SingleActivationApi; readonly name: string },
+  detail: 'terse' | 'full' | 'raw',
+) {
+  const client = createAdtClient(context.connection, context.logger);
+  return answer(
+    { tool: 'ActivateObjectLow', detail },
+    () => activateFamily(context, client, single.api, single.name),
+    project(detail, terseActivation),
+  );
 }
 
 export async function handleActivateObject(
@@ -437,21 +436,12 @@ export async function handleActivateObject(
     ...(obj.parentName ? { parentName: obj.parentName } : {}),
   }));
 
+  const plan = activationPlan(activationObjects, variantOf(connection));
+  if (typeof plan === 'string') return return_error(new Error(plan));
+
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
 
-  const family =
-    activationObjects.length === 1
-      ? familyFor(activationObjects[0].type)
-      : undefined;
-
-  if (family !== undefined) {
-    const objectName = activationObjects[0].name;
-    return answer(
-      { tool: 'ActivateObjectLow', detail },
-      () => activateFamily(context, client, family, objectName),
-      project(detail, terseActivation),
-    );
-  }
+  if ('single' in plan) return activateSingle(context, plan.single, detail);
 
   // Fallback: multiple objects, or a single object of a type this dispatcher
   // does not map to a family client. See the module doc comment: ADT's
@@ -464,9 +454,7 @@ export async function handleActivateObject(
   // errors". `getActivationRun` then says whether the run is still going, and
   // `getActivationResults` carries the `chkl:messages` the single-object
   // endpoint answers inline. See `lib/strategies/activationRun.ts`.
-  const references = groupReferences(activationObjects);
-  if (typeof references === 'string')
-    return return_error(new Error(references));
+  const references = plan.group;
   const utils = client.getUtils(ourUtils);
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
@@ -591,18 +579,25 @@ export async function handleActivateObjectOnce(
     ...(obj.uri ? { uri: obj.uri } : {}),
     ...(obj.parentName ? { parentName: obj.parentName } : {}),
   }));
-  const family =
-    activationObjects.length === 1
-      ? familyFor(activationObjects[0].type)
-      : undefined;
-  if (family !== undefined) {
-    return handleActivateObject(context, params);
-  }
+  const plan = activationPlan(activationObjects, variantOf(connection));
+  if (typeof plan === 'string') return return_error(new Error(plan));
+  return activatePlanOnce(context, plan, args.preaudit);
+}
 
-  const preaudit = args.preaudit !== false; // default true
-  const references = groupReferences(activationObjects);
-  if (typeof references === 'string')
-    return return_error(new Error(references));
+/**
+ * An activation decided at its tool's boundary ({@link ActivationPlan}), in
+ * one request: one object through its own API's `activate()`, answered with
+ * its verdict; a group as one `POST /activation/runs`, answered `{ run_id }`.
+ */
+export async function activatePlanOnce(
+  context: HandlerContext,
+  plan: ActivationPlan,
+  preauditRequested?: boolean,
+) {
+  const { connection, logger } = context;
+  if ('single' in plan) return activateSingle(context, plan.single, 'terse');
+  const preaudit = preauditRequested !== false;
+  const references = plan.group;
   const utils = createAdtClient(connection, logger).getUtils(ourUtils);
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },

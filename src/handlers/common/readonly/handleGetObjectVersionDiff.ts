@@ -18,6 +18,7 @@ import {
   type ProjectionVariant,
   VERSIONED_KINDS,
 } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -25,10 +26,7 @@ import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
-import {
-  resolveVersionedObject,
-  VERSIONED_OBJECT_TYPES,
-} from './resolveVersionedObject';
+import { resolveVersionedObject } from './resolveVersionedObject';
 
 export interface VersionDiffResult {
   diff: string;
@@ -175,19 +173,19 @@ export async function handleGetObjectVersionDiff(
   const { connection, logger } = context;
   try {
     const { content_uri_from, content_uri_to } = args;
-    const object_type = (args.object_type || '').toLowerCase();
-
-    if (!object_type || !content_uri_from || !content_uri_to) {
+    if (!args.object_type || !content_uri_from || !content_uri_to) {
       return return_error(
         new Error(
           'object_type, content_uri_from and content_uri_to are required',
         ),
       );
     }
-    if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
+    const variant = variantOf(connection);
+    const object_type = acceptedOf(args.object_type, VERSIONED_KINDS[variant]);
+    if (object_type === undefined) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variantOf(connection)].join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variant].join(', ')}`,
         ),
       );
     }
@@ -196,11 +194,6 @@ export async function handleGetObjectVersionDiff(
     // object_type only selects the client; each content_uri carries the full
     // object identity (same placeholder pattern as GetObjectVersionSource).
     const resolved = resolveVersionedObject(client, object_type, 'X', 'X');
-    if (!resolved) {
-      return return_error(
-        new Error(`Unsupported object_type: ${args.object_type}`),
-      );
-    }
 
     // Two calls of the same member (one per content_uri), neither needing the
     // other's answer, so `both()` sends them together (a batch records both):

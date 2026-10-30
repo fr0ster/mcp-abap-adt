@@ -60,9 +60,9 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
@@ -182,9 +182,12 @@ async function nodeStructure(
   if (!parent_name) {
     return return_error(new Error('parent_name is required'));
   }
-  const parentType = typeCodeOf(parent_type);
+  const variant = variantOf(connection);
+  const parentType = tableTypeOf(parent_type, variant);
   if (parentType === undefined) {
-    return return_error(new Error(notATableCode('parent_type', parent_type)));
+    return return_error(
+      new Error(notATableType('parent_type', parent_type, variant)),
+    );
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's

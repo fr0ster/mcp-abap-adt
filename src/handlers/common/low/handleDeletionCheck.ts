@@ -11,8 +11,10 @@
 
 import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { COMPACT_DELETION_CHECK, supported } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import {
@@ -21,7 +23,7 @@ import {
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
-import { deletionTargetOf } from './deletionTargets';
+import { DELETION_TARGETS } from './deletionTargets';
 
 type Args = { object_type?: unknown; object_name?: unknown };
 
@@ -32,12 +34,18 @@ export async function handleDeletionCheck(
   args: Args,
 ): Promise<unknown> {
   const objectType = String(args?.object_type ?? '');
-  const target = deletionTargetOf(objectType);
-  if (target === undefined) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_DELETION_CHECK`); past it, the target is typed by it.
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(objectType, COMPACT_DELETION_CHECK[variant]);
+  if (member === undefined) {
     return return_error(
-      new Error(`Unsupported deletion check for object_type: ${objectType}`),
+      new Error(
+        `Unsupported deletion check for object_type: ${objectType}. ${supported(COMPACT_DELETION_CHECK[variant])}`,
+      ),
     );
   }
+  const target = DELETION_TARGETS[member];
   const objectName =
     typeof args.object_name === 'string' ? args.object_name.trim() : '';
   if (objectName === '') {
@@ -45,7 +53,7 @@ export async function handleDeletionCheck(
   }
   let name = objectName.toUpperCase();
   let group: string | undefined;
-  if (objectType === 'FUNCTION_MODULE') {
+  if (member === 'FUNCTION_MODULE') {
     // A function module is named under its group: GROUP|MODULE.
     const [g, m] = name.split('|');
     if (!g || !m) {
@@ -68,7 +76,7 @@ export async function handleDeletionCheck(
             adtOperation(target.objectType, 'checkDeletion'),
             (headers) =>
               target
-                .object(createAdtClient(connection, logger))
+                .checked(createAdtClient(connection, logger))
                 .checkDeletion(
                   target.config({ name, ...(group ? { group } : {}) }),
                   { headers, analyse: analyseDeletion },

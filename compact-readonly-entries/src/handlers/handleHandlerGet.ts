@@ -1,11 +1,13 @@
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
+  acceptedOf,
   byVariant,
   COMPACT_READ,
   compactGetDescription,
   compactGetSchemaFor,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetActivationResults,
   handleGetActivationStatus,
@@ -31,7 +33,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerGetArgs = { object_type: CompactObjectType } & Record<
+type HandlerGetArgs = { object_type?: CompactObjectType } & Record<
   string,
   unknown
 >;
@@ -82,10 +84,10 @@ function routeAddressPart(
  * Answers the arguments with the module and its group apart, or the
  * refusal — tagged, so nothing of the caller's arguments reads as an answer.
  */
-function functionModuleArgs(
-  args: HandlerGetArgs,
+function functionModuleArgs<A extends HandlerGetArgs>(
+  args: A,
 ):
-  | { ok: true; args: HandlerGetArgs }
+  | { ok: true; args: A }
   | { ok: false; refusal: ReturnType<typeof return_error> } {
   const given =
     typeof args.function_module_name === 'string'
@@ -132,8 +134,25 @@ function functionModuleArgs(
 
 export async function handleHandlerGet(
   context: HandlerContext,
-  args: HandlerGetArgs,
+  given: Omit<HandlerGetArgs, 'object_type'> & { object_type?: string },
 ) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_READ`); past it, the type is typed by it.
+  let args: HandlerGetArgs;
+  if (given.object_type) {
+    const variant = variantOf(context.connection);
+    const member = acceptedOf(given.object_type, COMPACT_READ[variant]);
+    if (member === undefined) {
+      return return_error(
+        new Error(
+          `Unsupported read for object_type: ${given.object_type}. ${supported(COMPACT_READ[variant])}`,
+        ),
+      );
+    }
+    args = { ...given, object_type: member };
+  } else {
+    args = { ...given, object_type: undefined };
+  }
   const requested = (args.part as string | undefined) ?? 'source';
   if (ADDRESS_PARTS.includes(requested)) {
     return routeAddressPart(context, requested, args);
@@ -153,12 +172,12 @@ export async function handleHandlerGet(
   }
   const hasSource = hasSourcePart(args.object_type);
 
-  let read = args;
+  let read = { ...args, object_type: args.object_type };
   if (
     args.object_type === 'FUNCTION_MODULE' &&
     (part === 'source' || part === 'metadata')
   ) {
-    const named = functionModuleArgs(args);
+    const named = functionModuleArgs(read);
     if (!named.ok) return named.refusal;
     read = named.args;
   }

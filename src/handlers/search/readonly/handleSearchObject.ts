@@ -1,8 +1,8 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { ISearchObjectsParams } from '@mcp-abap-adt/interfaces-adt';
-import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -111,9 +111,10 @@ export async function handleSearchObject(
     maxResults: maxResults || 100,
   };
   if (object_type) {
-    const objectType = typeCodeOf(object_type);
+    const variant = variantOf(connection);
+    const objectType = tableTypeOf(object_type, variant);
     if (objectType === undefined) {
-      return return_error(notATableCode('object_type', object_type));
+      return return_error(notATableType('object_type', object_type, variant));
     }
     searchParams.objectType = objectType;
   }

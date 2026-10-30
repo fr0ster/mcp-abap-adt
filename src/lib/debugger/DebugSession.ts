@@ -72,6 +72,7 @@ import {
   thrownFailure,
 } from './failures';
 import type { BreakpointConflict, DebuggerIds } from './ids';
+import type { RunKind } from './objectUri';
 import {
   type AttachReading,
   type BreakpointReading,
@@ -96,7 +97,7 @@ export const WAIT_MAX_SECONDS = 30;
 
 export type Debugger = AbapDebugger<typeof abapDebuggerDocuments>;
 export interface RunTarget {
-  kind: 'class' | 'program';
+  kind: RunKind;
   name: string;
 }
 export type RunOutcome =

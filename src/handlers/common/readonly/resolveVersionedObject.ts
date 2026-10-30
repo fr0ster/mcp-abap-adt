@@ -26,7 +26,10 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
-import { VERSIONED_KINDS } from '../../../lib/adtProjections';
+import {
+  VERSIONED_KINDS,
+  type VersionedKind,
+} from '../../../lib/adtProjections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
@@ -56,16 +59,17 @@ export interface ResolvedVersionedObject {
 
 /**
  * Resolve an object_type + name into an IAdtObject instance and its identity
- * config. Returns null for an unknown object_type (caller emits the error).
+ * config. The kind is checked at the tool's boundary against the declared
+ * variant's projection (`VERSIONED_KINDS`), so every kind here is served.
  *
  * @throws Error for a malformed function_module identity (missing group name).
  */
 export function resolveVersionedObject(
   client: IServerAdtClient,
-  objectType: string,
+  objectType: VersionedKind,
   objectName: string,
   functionGroupName?: string,
-): ResolvedVersionedObject | null {
+): ResolvedVersionedObject {
   const name = objectName.toUpperCase();
   switch (objectType) {
     case 'class':
@@ -133,8 +137,6 @@ export function resolveVersionedObject(
         ),
         config: { name },
       };
-    default:
-      return null;
   }
 }
 

@@ -22,16 +22,18 @@
 
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
+  acceptedOf,
   byVariant,
   COMPACT_VALIDATE,
+  COMPACT_VALIDATE_KINDS,
   compactValidateDescription,
   compactValidateSchemaFor,
-  toLowObjectType,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
-  handleValidateObject,
   handleValidateServiceBinding,
+  validateObject,
 } from '@mcp-abap-adt/lib/handlers/read';
 
 export const TOOL_DEFINITION = {
@@ -44,7 +46,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type HandlerValidateArgs = {
-  object_type: CompactObjectType;
+  object_type: string;
   object_name: string;
   package_name?: string;
   description?: string;
@@ -61,7 +63,18 @@ export async function handleHandlerValidate(
   context: HandlerContext,
   args: HandlerValidateArgs,
 ) {
-  if (args.object_type === 'SERVICE_BINDING') {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_VALIDATE`); past it, the kind is typed
+  // (`COMPACT_VALIDATE_KINDS`).
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_VALIDATE[variant]);
+  if (member === undefined) {
+    throw new Error(
+      `Validate is not supported for object_type: ${args.object_type}. ${supported(COMPACT_VALIDATE[variant])}`,
+    );
+  }
+
+  if (member === 'SERVICE_BINDING') {
     return handleValidateServiceBinding(context, {
       service_binding_name: args.object_name,
       service_definition_name: args.service_definition_name,
@@ -71,16 +84,9 @@ export async function handleHandlerValidate(
     });
   }
 
-  const lowType = toLowObjectType(args.object_type);
-  if (!lowType) {
-    throw new Error(
-      `Validate is not supported for object_type: ${args.object_type}`,
-    );
-  }
-
-  return handleValidateObject(context, {
+  return validateObject(context, {
     object_name: args.object_name,
-    object_type: lowType,
+    object_type: COMPACT_VALIDATE_KINDS[member],
     package_name: args.package_name,
     description: args.description,
     super_package: args.super_package,

@@ -30,7 +30,7 @@ import {
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
 } from '../../../lib/adtProjections';
-import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
+import { acceptedCodeOf, notAccepted } from '../../../lib/adtTypeCode';
 import {
   answer,
   answerFailure,
@@ -46,7 +46,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -149,6 +149,29 @@ interface WhereUsedArgs {
 }
 
 /**
+ * The boundary of `object_type` on the variant declared for `connection`: a
+ * where-used code (`WHERE_USED_CODES`) or a name standing for one
+ * (`WHERE_USED_NAMES`), either case; `undefined` for any other text.
+ */
+function whereUsedCodeOf(connection: object, text: string) {
+  const variant = variantOf(connection);
+  return acceptedCodeOf(
+    text,
+    WHERE_USED_CODES[variant],
+    WHERE_USED_NAMES[variant],
+  );
+}
+
+/** The refusal of an `object_type` outside its projection: what it takes. */
+function notWhereUsed(connection: object, text: string): string {
+  const variant = variantOf(connection);
+  return notAccepted('object_type', text, [
+    ...WHERE_USED_CODES[variant],
+    ...WHERE_USED_NAMES[variant],
+  ]);
+}
+
+/**
  * Returns where-used references for ABAP objects using AdtClient utilities.
  */
 async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
@@ -160,9 +183,9 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
   if (!args?.object_type) {
     return return_error('Object type is required');
   }
-  const objectType = typeCodeOf(args.object_type);
+  const objectType = whereUsedCodeOf(connection, args.object_type);
   if (objectType === undefined) {
-    return return_error(notATableCode('object_type', args.object_type));
+    return return_error(notWhereUsed(connection, args.object_type));
   }
 
   const typedArgs = args as WhereUsedArgs;
@@ -302,9 +325,9 @@ async function whereUsedFromAnswers(
   if (!typedArgs?.object_type) {
     return return_error('Object type is required');
   }
-  const objectType = typeCodeOf(typedArgs.object_type);
+  const objectType = whereUsedCodeOf(connection, typedArgs.object_type);
   if (objectType === undefined) {
-    return return_error(notATableCode('object_type', typedArgs.object_type));
+    return return_error(notWhereUsed(connection, typedArgs.object_type));
   }
   logger?.info(
     `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
@@ -414,7 +437,7 @@ async function whereUsedInEnvelopes(
   // sent nothing; `whereUsedFromAnswers` answers it with its refusal.
   const readable = targets.flatMap((target, i) => {
     const code = target.object_name
-      ? typeCodeOf(target.object_type ?? '')
+      ? whereUsedCodeOf(context.connection, target.object_type ?? '')
       : undefined;
     return code === undefined ? [] : [{ target, i, code }];
   });

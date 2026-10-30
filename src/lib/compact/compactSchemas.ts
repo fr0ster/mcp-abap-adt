@@ -1162,7 +1162,13 @@ export function compactActivateSchemaFor<const M extends readonly string[]>(
       ),
       object_name: {
         type: 'string',
-        description: 'Object name (single form).',
+        description:
+          'Object name (single form). A function module is named GROUP|MODULE, its function group first, or the module alone with function_group_name.',
+      },
+      function_group_name: {
+        type: 'string',
+        description:
+          "A function module's function group (single form, FUNCTION_MODULE).",
       },
       object_adt_type: {
         type: 'string',

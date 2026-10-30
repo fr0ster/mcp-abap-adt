@@ -7,7 +7,11 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { notATableCode, typeCodeOf } from '../../../lib/adtTypeCode';
+import {
+  notATableType,
+  tableCodeOf,
+  tableTypeOf,
+} from '../../../lib/adtTypeCode';
 import {
   answer,
   failedPayloadOf,
@@ -17,7 +21,7 @@ import {
   thrownEntry,
 } from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
@@ -375,7 +379,7 @@ async function buildTree(
       for (const o of childLevel.objects) {
         // A subpackage is walked further by its code; a type ADT sent that
         // is no code of the tables stays a leaf.
-        const subType = typeCodeOf(o.type);
+        const subType = tableCodeOf(o.type);
         if (
           subType !== undefined &&
           kindOf(o.type) === 'package' &&
@@ -709,9 +713,12 @@ export async function handleGetObjectInfo(
     objects = [];
     for (const o of listed) {
       const text = String(o.object_type);
-      const type = typeCodeOf(text);
+      const variant = variantOf(context.connection);
+      const type = tableTypeOf(text, variant);
       if (type === undefined) {
-        return return_error(notATableCode('objects[].object_type', text));
+        return return_error(
+          notATableType('objects[].object_type', text, variant),
+        );
       }
       objects.push({ type, name: String(o.object_name) });
     }
@@ -719,9 +726,12 @@ export async function handleGetObjectInfo(
     if (!args?.parent_type || !args?.parent_name) {
       return return_error('parent_type and parent_name are required');
     }
-    const type = typeCodeOf(args.parent_type);
+    const variant = variantOf(context.connection);
+    const type = tableTypeOf(args.parent_type, variant);
     if (type === undefined) {
-      return return_error(notATableCode('parent_type', args.parent_type));
+      return return_error(
+        notATableType('parent_type', args.parent_type, variant),
+      );
     }
     objects = [{ type, name: args.parent_name }];
   }

@@ -7,7 +7,7 @@ import {
   type DebugStartOptions,
   type RunTarget,
 } from './DebugSession';
-import { lineUriOf } from './objectUri';
+import { lineUriOf, RUN_KINDS } from './objectUri';
 
 export const USER_MODE_SENTENCE =
   'In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else.';
@@ -129,7 +129,7 @@ export const RUN_PROPERTY = {
     description:
       'A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.',
     properties: {
-      kind: { type: 'string', enum: ['class', 'program'] },
+      kind: { type: 'string', enum: RUN_KINDS },
       name: { type: 'string' },
     },
     required: ['kind', 'name'],

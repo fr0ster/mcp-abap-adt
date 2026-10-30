@@ -1,10 +1,12 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
+  type INCLUDES_PARENT_ROUTES,
   INCLUDES_PARENTS,
   type ProjectionVariant,
   supported,
 } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import {
   answerCaught,
   failedPayloadOf,
@@ -114,7 +116,22 @@ interface IncludeNode {
 
 const MAX_INCLUDE_DEPTH = 20;
 
-type ParentKind = 'PROG/P' | 'PROG/I' | 'FUGR/F' | 'CLAS/OC';
+/** A parent this tool walks: a code of `INCLUDES_PARENT_ROUTES`. */
+type ParentKind = keyof typeof INCLUDES_PARENT_ROUTES;
+
+/**
+ * The parent the caller named, past the boundary of `object_type`: one of
+ * the declared variant's parents (`INCLUDES_PARENTS`), either case;
+ * `undefined` for any other text, which the tool refuses naming the list.
+ */
+function parentOf(
+  connection: object,
+  objectType: string,
+  objectName: string,
+): { kind: ParentKind; name: string } | undefined {
+  const kind = acceptedOf(objectType, INCLUDES_PARENTS[variantOf(connection)]);
+  return kind === undefined ? undefined : resolveParent(kind, objectName);
+}
 
 /**
  * What the caller asked for, in the four kinds this tool walks. A function
@@ -122,25 +139,10 @@ type ParentKind = 'PROG/P' | 'PROG/I' | 'FUGR/F' | 'CLAS/OC';
  * program and include URIs both answer 404 on premise — so it is walked as the group.
  */
 function resolveParent(
-  objectType: string,
+  kind: ParentKind,
   objectName: string,
-): { kind: ParentKind; name: string } | undefined {
-  const t = objectType.trim().toUpperCase();
+): { kind: ParentKind; name: string } {
   const name = objectName.trim().toUpperCase();
-  const kind: ParentKind | undefined =
-    t === 'PROG/P' || t === 'PROGRAM'
-      ? 'PROG/P'
-      : t === 'PROG/I' || t === 'INCLUDE'
-        ? 'PROG/I'
-        : t === 'FUGR' ||
-            t === 'FUGR/F' ||
-            t === 'FUNCTION_GROUP' ||
-            t === 'FUNCTIONGROUP'
-          ? 'FUGR/F'
-          : t === 'CLAS/OC' || t === 'CLAS' || t === 'CLASS'
-            ? 'CLAS/OC'
-            : undefined;
-  if (!kind) return undefined;
   if (kind === 'PROG/P' && name.startsWith('SAPL') && name.length > 4) {
     return { kind: 'FUGR/F', name: name.slice(4) };
   }
@@ -223,7 +225,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       return return_error('Parameter "object_type" (string) is required.');
     }
 
-    const parent = resolveParent(object_type, object_name);
+    const parent = parentOf(connection, object_type, object_name);
     if (!parent) {
       return return_error(
         `Unsupported object_type "${object_type}": ${supported(INCLUDES_PARENTS[variantOf(connection)])}`,
@@ -813,7 +815,7 @@ export async function handleGetIncludesList(
       typeof args?.object_name === 'string' &&
       args.object_name.trim() !== '' &&
       typeof args?.object_type === 'string'
-        ? resolveParent(args.object_type, args.object_name)
+        ? parentOf(context.connection, args.object_type, args.object_name)
         : undefined;
     // A class is one metadata read: there is nothing to read together.
     if (parent === undefined || parent.kind === 'CLAS/OC') {
@@ -858,7 +860,7 @@ export async function handleGetIncludesList(
           typeof o.object_name === 'string' &&
           o.object_name.trim() !== '' &&
           typeof o.object_type === 'string'
-            ? resolveParent(o.object_type, o.object_name)
+            ? parentOf(context.connection, o.object_type, o.object_name)
             : undefined,
         );
         const read = parents.filter(

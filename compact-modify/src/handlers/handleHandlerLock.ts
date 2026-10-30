@@ -1,13 +1,15 @@
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
+  acceptedOf,
   byVariant,
   COMPACT_LOCK,
+  COMPACT_LOCK_KINDS,
   compactLockDescription,
   compactLockSchemaFor,
-  toLockObjectType,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleLockObject } from '@mcp-abap-adt/lib/handlers/write';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import { lockObject } from '@mcp-abap-adt/lib/handlers/write';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',
@@ -19,7 +21,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type HandlerLockArgs = {
-  object_type: CompactObjectType;
+  object_type: string;
   object_name: string;
   super_package?: string;
 };
@@ -28,24 +30,23 @@ export async function handleHandlerLock(
   context: HandlerContext,
   args: HandlerLockArgs,
 ) {
-  const lowType = toLockObjectType(args.object_type);
-  if (!lowType) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_LOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_LOCK[variant]);
+  if (member === undefined) {
     throw new Error(
-      `Lock is not supported for object_type: ${args.object_type}`,
+      `Lock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_LOCK[variant])}`,
     );
   }
 
-  const answered = (await handleLockObject(context, {
+  const answered = (await lockObject(context, {
     object_name: args.object_name,
-    object_type: lowType,
+    object_type: COMPACT_LOCK_KINDS[member],
     super_package: args.super_package,
   })) as LockAnswer;
   // A package lock over RFC lives in a session of its own.
-  return keptLock(
-    context,
-    answered,
-    args.object_type === 'PACKAGE' ? 'own' : 'main',
-  );
+  return keptLock(context, answered, member === 'PACKAGE' ? 'own' : 'main');
 }
 
 type LockAnswer = {

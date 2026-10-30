@@ -23,9 +23,15 @@ export { handleGetLocalDefinitions } from '../../handlers/class/high/handleGetLo
 export { handleGetLocalMacros } from '../../handlers/class/high/handleGetLocalMacros.js';
 export { handleGetLocalTestClass } from '../../handlers/class/high/handleGetLocalTestClass.js';
 export { handleGetLocalTypes } from '../../handlers/class/high/handleGetLocalTypes.js';
-export { handleCheckObject } from '../../handlers/common/low/handleCheckObject.js';
+export {
+  checkObject,
+  handleCheckObject,
+} from '../../handlers/common/low/handleCheckObject.js';
 export { handleDeletionCheck } from '../../handlers/common/low/handleDeletionCheck.js';
-export { handleValidateObject } from '../../handlers/common/low/handleValidateObject.js';
+export {
+  handleValidateObject,
+  validateObject,
+} from '../../handlers/common/low/handleValidateObject.js';
 // An activation run read by its id, for `HandlerGet` parts
 // `activation_status` and `activation_results`.
 export {

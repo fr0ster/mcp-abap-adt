@@ -30,6 +30,7 @@ import type {
   AdtApiWith,
   AdtOperation,
   AdtTypeCode,
+  AdtTypeCodeOf,
   AdtTypeCodeWith,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { CompactObjectType } from './compact/compactObjectTypes';
@@ -280,7 +281,7 @@ export const WHERE_USED_CODES = projected<
 });
 
 /** Every name of {@link TYPE_NAMES}, in its order. */
-const TYPE_NAME_LIST = [
+export const TYPE_NAME_LIST = [
   'class',
   'program',
   'include',
@@ -315,7 +316,13 @@ const TYPE_NAME_LIST = [
   'xslt',
   'ftg2',
   'devc',
-] as const;
+] as const satisfies readonly TypeName[];
+
+/** {@link TYPE_NAME_LIST} names every name of {@link TYPE_NAMES}. */
+export const TYPE_NAME_VALUES = projected<TypeName, TypeName>()({
+  onprem: TYPE_NAME_LIST,
+  cloud: TYPE_NAME_LIST,
+});
 
 /** The names of {@link TYPE_NAMES} GetWhereUsed takes for a where-used code. */
 export const WHERE_USED_NAMES = projected<
@@ -570,7 +577,9 @@ export const SINGLE_ACTIVATION = projected<
 /**
  * HandlerActivate's `object_type`: each compact name with the code it is
  * activated as — through its family when {@link SINGLE_ACTIVATION} names it,
- * else in a group activation.
+ * else in a group activation. A function module is activated in a group
+ * activation under its function group, which the call names; a behaviour
+ * implementation is a class.
  */
 export const COMPACT_ACTIVATE_ROUTES = {
   CLASS: 'CLAS/OC',
@@ -587,6 +596,8 @@ export const COMPACT_ACTIVATE_ROUTES = {
   PACKAGE: 'DEVC/K',
   SERVICE_DEFINITION: 'SRVD/SRV',
   SERVICE_BINDING: 'SRVB/SVB',
+  FUNCTION_MODULE: 'FUGR/FF',
+  BEHAVIOR_IMPLEMENTATION: 'CLAS/OC',
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtTypeCode>>>;
 
 /** HandlerActivate's `object_type`. */
@@ -609,6 +620,8 @@ export const COMPACT_ACTIVATE = projected<
     'PACKAGE',
     'SERVICE_DEFINITION',
     'SERVICE_BINDING',
+    'FUNCTION_MODULE',
+    'BEHAVIOR_IMPLEMENTATION',
   ],
   cloud: [
     'CLASS',
@@ -624,6 +637,8 @@ export const COMPACT_ACTIVATE = projected<
     'PACKAGE',
     'SERVICE_DEFINITION',
     'SERVICE_BINDING',
+    'FUNCTION_MODULE',
+    'BEHAVIOR_IMPLEMENTATION',
   ],
 });
 
@@ -654,6 +669,7 @@ export const COMPACT_SINGLE_ACTIVATION = projected<
     'DATA_ELEMENT',
     'BEHAVIOR_DEFINITION',
     'METADATA_EXTENSION',
+    'BEHAVIOR_IMPLEMENTATION',
   ],
   cloud: [
     'CLASS',
@@ -666,6 +682,7 @@ export const COMPACT_SINGLE_ACTIVATION = projected<
     'DATA_ELEMENT',
     'BEHAVIOR_DEFINITION',
     'METADATA_EXTENSION',
+    'BEHAVIOR_IMPLEMENTATION',
   ],
 });
 
@@ -710,6 +727,9 @@ export const VERSIONED_ROUTES = {
   behavior_definition: { api: 'behaviorDefinition', operation: 'versions' },
   metadata_extension: { api: 'metadataExtension', operation: 'versions' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** A kind the version tools read. */
+export type VersionedKind = keyof typeof VERSIONED_ROUTES;
 
 /** The generic version tools' `object_type`. */
 export const VERSIONED_KINDS = projected<
@@ -1227,3 +1247,316 @@ export const COMPACT_PROFILE = projected<
   onprem: PROFILE_ONPREM,
   cloud: PROFILE_ONPREM.filter((member) => member !== 'PROGRAM'),
 });
+
+// ---------------------------------------------------------------------------
+// Every code of a variant's table: what a tool whose request names a type,
+// but asks no operation of the tables of it, takes (a node structure, an
+// object structure, a search filter)
+// ---------------------------------------------------------------------------
+
+const TABLE_CODE_LIST = [
+  'CLAS/OC',
+  'INTF/OI',
+  'PROG/P',
+  'PROG/I',
+  'FUGR/F',
+  'FUGR/FF',
+  'FUGR/I',
+  'DEVC/K',
+  'DDLS/DF',
+  'TABL/DT',
+  'TABL/DS',
+  'TTYP/DA',
+  'DOMA/DD',
+  'DTEL/DE',
+  'DCLS/DL',
+  'BDEF/BDO',
+  'DDLX/EX',
+  'SRVD/SRV',
+  'SRVB/SVB',
+  'DSFD/SCF',
+  'DSFI/SFI',
+  'XSLT/VT',
+  'MSAG/N',
+  'MSAG/NN',
+  'FTG2/FT',
+  'AUTH',
+  'ENHO/XHH',
+  'ENHO/XHB',
+  'ENHS/XSB',
+] as const;
+
+/** Every code of each variant's table. */
+export const TABLE_CODES = projected<
+  AdtTypeCodeOf<'onprem'>,
+  AdtTypeCodeOf<'cloud'>
+>()({ onprem: TABLE_CODE_LIST, cloud: TABLE_CODE_LIST });
+
+// ---------------------------------------------------------------------------
+// The kinds the object tools behind the compact lifecycle tools take
+// (CheckObjectLow, LockObjectLow, UnlockObjectLow, ValidateObjectLow)
+// ---------------------------------------------------------------------------
+
+/** The name of route table `R` whose need is of API `A`. */
+type NameOfApi<R, A> = {
+  [K in keyof R]: R[K] extends { readonly api: A } ? K : never;
+}[keyof R] &
+  string;
+
+/**
+ * Each name of compact route table `C` with the name of kind route table
+ * `K` whose need is of the same API: what a compact member is handed on as.
+ */
+export type KindsOf<C, K> = {
+  readonly [M in keyof C]: C[M] extends { readonly api: infer A }
+    ? NameOfApi<K, A>
+    : never;
+};
+
+/** What `CheckObjectLow` checks, by kind. */
+export const CHECK_KIND_ROUTES = {
+  class: { api: 'class', operation: 'check' },
+  program: { api: 'program', operation: 'check' },
+  interface: { api: 'interface', operation: 'check' },
+  function_group: { api: 'functionGroup', operation: 'check' },
+  function_module: { api: 'functionModule', operation: 'check' },
+  table: { api: 'table', operation: 'check' },
+  structure: { api: 'structure', operation: 'check' },
+  ddl: { api: 'ddl', operation: 'check' },
+  domain: { api: 'domain', operation: 'check' },
+  data_element: { api: 'dataElement', operation: 'check' },
+  package: { api: 'package', operation: 'check' },
+  behavior_definition: { api: 'behaviorDefinition', operation: 'check' },
+  metadata_extension: { api: 'metadataExtension', operation: 'check' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** A kind `CheckObjectLow` checks. */
+export type CheckKind = keyof typeof CHECK_KIND_ROUTES;
+
+const CHECK_KIND_LIST = [
+  'class',
+  'program',
+  'interface',
+  'function_group',
+  'function_module',
+  'table',
+  'structure',
+  'ddl',
+  'domain',
+  'data_element',
+  'package',
+  'behavior_definition',
+  'metadata_extension',
+] as const;
+
+/** `CheckObjectLow`'s `object_type`: a program is checked on both variants. */
+export const CHECK_KINDS = projected<
+  ServedName<'onprem', typeof CHECK_KIND_ROUTES>,
+  ServedName<'cloud', typeof CHECK_KIND_ROUTES>
+>()({ onprem: CHECK_KIND_LIST, cloud: CHECK_KIND_LIST });
+
+/** HandlerCheckRun's members, each with the kind it is checked as. */
+export const COMPACT_CHECK_KINDS = {
+  CLASS: 'class',
+  PROGRAM: 'program',
+  INTERFACE: 'interface',
+  FUNCTION_GROUP: 'function_group',
+  FUNCTION_MODULE: 'function_module',
+  TABLE: 'table',
+  STRUCTURE: 'structure',
+  DDL: 'ddl',
+  DOMAIN: 'domain',
+  DATA_ELEMENT: 'data_element',
+  PACKAGE: 'package',
+  BEHAVIOR_DEFINITION: 'behavior_definition',
+  METADATA_EXTENSION: 'metadata_extension',
+} as const satisfies KindsOf<
+  typeof COMPACT_CHECK_ROUTES,
+  typeof CHECK_KIND_ROUTES
+>;
+
+/** What `LockObjectLow` locks, by kind. */
+export const LOCK_KIND_ROUTES = {
+  class: { api: 'class', operation: 'lock' },
+  program: { api: 'program', operation: 'lock' },
+  interface: { api: 'interface', operation: 'lock' },
+  function_group: { api: 'functionGroup', operation: 'lock' },
+  function_module: { api: 'functionModule', operation: 'lock' },
+  table: { api: 'table', operation: 'lock' },
+  structure: { api: 'structure', operation: 'lock' },
+  ddl: { api: 'ddl', operation: 'lock' },
+  domain: { api: 'domain', operation: 'lock' },
+  data_element: { api: 'dataElement', operation: 'lock' },
+  package: { api: 'package', operation: 'lock' },
+  behavior_definition: { api: 'behaviorDefinition', operation: 'lock' },
+  behavior_implementation: { api: 'behaviorImplementation', operation: 'lock' },
+  metadata_extension: { api: 'metadataExtension', operation: 'lock' },
+  service_definition: { api: 'serviceDefinition', operation: 'lock' },
+  service_binding: { api: 'serviceBinding', operation: 'lock' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** What `UnlockObjectLow` unlocks, by kind. */
+export const UNLOCK_KIND_ROUTES = {
+  class: { api: 'class', operation: 'unlock' },
+  program: { api: 'program', operation: 'unlock' },
+  interface: { api: 'interface', operation: 'unlock' },
+  function_group: { api: 'functionGroup', operation: 'unlock' },
+  function_module: { api: 'functionModule', operation: 'unlock' },
+  table: { api: 'table', operation: 'unlock' },
+  structure: { api: 'structure', operation: 'unlock' },
+  ddl: { api: 'ddl', operation: 'unlock' },
+  domain: { api: 'domain', operation: 'unlock' },
+  data_element: { api: 'dataElement', operation: 'unlock' },
+  package: { api: 'package', operation: 'unlock' },
+  behavior_definition: { api: 'behaviorDefinition', operation: 'unlock' },
+  behavior_implementation: {
+    api: 'behaviorImplementation',
+    operation: 'unlock',
+  },
+  metadata_extension: { api: 'metadataExtension', operation: 'unlock' },
+  service_definition: { api: 'serviceDefinition', operation: 'unlock' },
+  service_binding: { api: 'serviceBinding', operation: 'unlock' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** A kind `LockObjectLow` locks. */
+export type LockKind = keyof typeof LOCK_KIND_ROUTES;
+
+/** A kind `UnlockObjectLow` unlocks. */
+export type UnlockKind = keyof typeof UNLOCK_KIND_ROUTES;
+
+const LOCK_KIND_LIST = [
+  'class',
+  'program',
+  'interface',
+  'function_group',
+  'function_module',
+  'table',
+  'structure',
+  'ddl',
+  'domain',
+  'data_element',
+  'package',
+  'behavior_definition',
+  'behavior_implementation',
+  'metadata_extension',
+  'service_definition',
+  'service_binding',
+] as const;
+
+/** `LockObjectLow`'s `object_type`. */
+export const LOCK_KINDS = projected<
+  ServedName<'onprem', typeof LOCK_KIND_ROUTES>,
+  ServedName<'cloud', typeof LOCK_KIND_ROUTES>
+>()({
+  onprem: LOCK_KIND_LIST,
+  cloud: LOCK_KIND_LIST.filter((kind) => kind !== 'program'),
+});
+
+/** `UnlockObjectLow`'s `object_type`. */
+export const UNLOCK_KINDS = projected<
+  ServedName<'onprem', typeof UNLOCK_KIND_ROUTES>,
+  ServedName<'cloud', typeof UNLOCK_KIND_ROUTES>
+>()({
+  onprem: LOCK_KIND_LIST,
+  cloud: LOCK_KIND_LIST.filter((kind) => kind !== 'program'),
+});
+
+/** HandlerLock's members, each with the kind it is locked as. */
+export const COMPACT_LOCK_KINDS = {
+  CLASS: 'class',
+  PROGRAM: 'program',
+  INTERFACE: 'interface',
+  FUNCTION_GROUP: 'function_group',
+  FUNCTION_MODULE: 'function_module',
+  TABLE: 'table',
+  STRUCTURE: 'structure',
+  DDL: 'ddl',
+  DOMAIN: 'domain',
+  DATA_ELEMENT: 'data_element',
+  PACKAGE: 'package',
+  BEHAVIOR_DEFINITION: 'behavior_definition',
+  BEHAVIOR_IMPLEMENTATION: 'behavior_implementation',
+  METADATA_EXTENSION: 'metadata_extension',
+  SERVICE_DEFINITION: 'service_definition',
+  SERVICE_BINDING: 'service_binding',
+} as const satisfies KindsOf<
+  typeof COMPACT_LOCK_ROUTES,
+  typeof LOCK_KIND_ROUTES
+> &
+  KindsOf<typeof COMPACT_UNLOCK_ROUTES, typeof UNLOCK_KIND_ROUTES>;
+
+/** What `ValidateObjectLow` validates, by kind. */
+export const VALIDATE_KIND_ROUTES = {
+  class: { api: 'class', operation: 'validate' },
+  program: { api: 'program', operation: 'validate' },
+  interface: { api: 'interface', operation: 'validate' },
+  function_group: { api: 'functionGroup', operation: 'validate' },
+  function_module: { api: 'functionModule', operation: 'validate' },
+  table: { api: 'table', operation: 'validate' },
+  structure: { api: 'structure', operation: 'validate' },
+  ddl: { api: 'ddl', operation: 'validate' },
+  domain: { api: 'domain', operation: 'validate' },
+  data_element: { api: 'dataElement', operation: 'validate' },
+  package: { api: 'package', operation: 'validate' },
+  behavior_definition: { api: 'behaviorDefinition', operation: 'validate' },
+  behavior_implementation: {
+    api: 'behaviorImplementation',
+    operation: 'validate',
+  },
+  metadata_extension: { api: 'metadataExtension', operation: 'validate' },
+  'ddlx/ex': { api: 'metadataExtension', operation: 'validate' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** A kind `ValidateObjectLow` validates. */
+export type ValidateKind = keyof typeof VALIDATE_KIND_ROUTES;
+
+const VALIDATE_KIND_LIST = [
+  'class',
+  'program',
+  'interface',
+  'function_group',
+  'function_module',
+  'table',
+  'structure',
+  'ddl',
+  'domain',
+  'data_element',
+  'package',
+  'behavior_definition',
+  'behavior_implementation',
+  'metadata_extension',
+  'ddlx/ex',
+] as const;
+
+/** `ValidateObjectLow`'s `object_type`. */
+export const VALIDATE_KINDS = projected<
+  ServedName<'onprem', typeof VALIDATE_KIND_ROUTES>,
+  ServedName<'cloud', typeof VALIDATE_KIND_ROUTES>
+>()({
+  onprem: VALIDATE_KIND_LIST,
+  cloud: VALIDATE_KIND_LIST.filter((kind) => kind !== 'program'),
+});
+
+/**
+ * HandlerValidate's members, each with the kind it is validated as; a
+ * service binding is validated by its own tool.
+ */
+export const COMPACT_VALIDATE_KINDS = {
+  CLASS: 'class',
+  PROGRAM: 'program',
+  INTERFACE: 'interface',
+  FUNCTION_GROUP: 'function_group',
+  FUNCTION_MODULE: 'function_module',
+  TABLE: 'table',
+  STRUCTURE: 'structure',
+  DDL: 'ddl',
+  DOMAIN: 'domain',
+  DATA_ELEMENT: 'data_element',
+  PACKAGE: 'package',
+  BEHAVIOR_DEFINITION: 'behavior_definition',
+  BEHAVIOR_IMPLEMENTATION: 'behavior_implementation',
+  METADATA_EXTENSION: 'metadata_extension',
+} as const satisfies KindsOf<
+  Omit<typeof COMPACT_VALIDATE_ROUTES, 'SERVICE_BINDING'>,
+  typeof VALIDATE_KIND_ROUTES
+>;

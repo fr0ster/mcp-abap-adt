@@ -1,5 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtTypeCode,
   IAdtError,
   IAdtFailure,
   IAdtHeaders,
@@ -11,6 +12,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
+import { tableCodeOf } from '../adtTypeCode';
 import {
   failureEntry,
   isCredentialFailure,
@@ -418,41 +420,40 @@ export interface PackageNode {
   children?: PackageNode[];
 }
 
-const KIND_BY_TYPE: Record<string, PackageItemKind> = {
+/**
+ * The coarse classification of each code of the tables a package listing
+ * names: a key outside the tables does not compile. A code SAP answers that
+ * no table holds has no kind. An include (`PROG/I`) is classified with the
+ * programs, as it always was.
+ */
+const PACKAGE_ITEM_KINDS: Readonly<
+  Partial<Record<AdtTypeCode, PackageItemKind>>
+> = {
   'DEVC/K': 'package',
   'DOMA/DD': 'domain',
   'DTEL/DE': 'dataElement',
   'TABL/DS': 'structure',
-  'STRU/DT': 'structure',
   'TABL/DT': 'table',
-  'TTYP/DF': 'tableType',
-  'TTYP/TT': 'tableType',
+  'TTYP/DA': 'tableType',
   'DDLS/DF': 'view',
   'DDLX/EX': 'metadataExtension',
   'CLAS/OC': 'class',
-  'INTF/IF': 'interface',
   'INTF/OI': 'interface',
   'PROG/P': 'program',
+  'PROG/I': 'program',
   'FUGR/FF': 'functionModule',
   'FUGR/F': 'functionGroup',
-  FUGR: 'functionGroup',
   'SRVD/SRV': 'serviceDefinition',
   'BDEF/BDO': 'behaviorDefinition',
-  'BIMP/BIM': 'behaviorImplementation',
 };
 
-/** The coarse classification, from the ADT type code. */
+/** The coarse classification, from the ADT type code SAP answered. */
 export function kindOf(
   adtType: string | undefined,
 ): PackageItemKind | undefined {
   if (!adtType) return undefined;
-  const type = adtType.toUpperCase();
-  if (KIND_BY_TYPE[type]) return KIND_BY_TYPE[type];
-  if (type.startsWith('CLAS/')) return 'class';
-  if (type.startsWith('INTF/')) return 'interface';
-  if (type.startsWith('PROG/')) return 'program';
-  if (type.startsWith('DEVC')) return 'package';
-  return undefined;
+  const code = tableCodeOf(adtType);
+  return code === undefined ? undefined : PACKAGE_ITEM_KINDS[code];
 }
 
 /** Whether the object's editor content is XML or source. Tree only. */

@@ -15,6 +15,7 @@
  * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
  */
 
+import type { VersionedKind } from '../../../lib/adtProjections';
 import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,
@@ -42,8 +43,8 @@ export interface ObjectVersionToolEntry {
 }
 
 interface VersionedTypeRow {
-  /** object_type key for resolveVersionedObject (same set as VERSIONED_OBJECT_TYPES). */
-  object_type: string;
+  /** The kind resolveVersionedObject reads: one of `VERSIONED_ROUTES`. */
+  object_type: VersionedKind;
   /** PascalCase display matching the existing high-level Get<Display> tool. */
   display: string;
   /** The natural name input param (e.g. class_name) — required on the Versions tool. */
@@ -186,11 +187,6 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
       } catch (e: any) {
         return return_error(e instanceof Error ? e : new Error(String(e)));
       }
-      if (!resolved) {
-        return return_error(
-          new Error(`Unsupported object_type: ${row.object_type}`),
-        );
-      }
 
       try {
         const versions = await readVersions(resolved);
@@ -253,11 +249,6 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
         'X',
         'X',
       );
-      if (!resolved) {
-        return return_error(
-          new Error(`Unsupported object_type: ${row.object_type}`),
-        );
-      }
 
       try {
         const source = await readVersionSource(resolved, String(content_uri));
@@ -318,11 +309,6 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
         'X',
         'X',
       );
-      if (!resolved) {
-        return return_error(
-          new Error(`Unsupported object_type: ${row.object_type}`),
-        );
-      }
 
       try {
         const { diff, identical, notes } = await buildVersionDiff(

@@ -20,14 +20,16 @@
 
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
+  acceptedOf,
   byVariant,
   COMPACT_CHECK,
+  COMPACT_CHECK_KINDS,
   compactCheckRunDescription,
   compactCheckRunSchemaFor,
-  toLowObjectType,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleCheckObject } from '@mcp-abap-adt/lib/handlers/read';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import { checkObject } from '@mcp-abap-adt/lib/handlers/read';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCheckRun',
@@ -39,7 +41,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type HandlerCheckRunArgs = {
-  object_type: CompactObjectType;
+  object_type: string;
   object_name: string;
   version?: 'active' | 'inactive';
   source_code?: string;
@@ -49,16 +51,19 @@ export async function handleHandlerCheckRun(
   context: HandlerContext,
   args: HandlerCheckRunArgs,
 ) {
-  const lowType = toLowObjectType(args.object_type);
-  if (!lowType) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_CHECK`); past it, the kind is typed (`COMPACT_CHECK_KINDS`).
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_CHECK[variant]);
+  if (member === undefined) {
     throw new Error(
-      `CheckRun is not supported for object_type: ${args.object_type}`,
+      `CheckRun is not supported for object_type: ${args.object_type}. ${supported(COMPACT_CHECK[variant])}`,
     );
   }
 
-  return handleCheckObject(context, {
+  return checkObject(context, {
     object_name: args.object_name,
-    object_type: lowType,
+    object_type: COMPACT_CHECK_KINDS[member],
     version: args.version,
     source_code: args.source_code,
   });

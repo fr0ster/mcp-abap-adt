@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Repository (nothing in the published packages)
+
+- **No integration case runs on a legacy system while legacy support is parked.** The test-config template lists `legacy` in no case's `available_in` (`run_atc`'s case names `onprem` and `cloud`), the debugger suite writes its probe only on a system its case names, and the batched-reads timing runs on an on-premise system only. Measured against SAP_BASIS 7.40 SP04: 32 failing tests before, none after.
+
 ## [21.0.0] - 2026-10-30
 
 A major for two breaking changes: `getConfig()` is gone and a stdio destination states its connection type ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)), and `GetTypeInfo` answers every DDIC type a name is ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). Each has its migration note below. 21.0.0 also brings 20.1.1 to npm: 20.1.1 is tagged (`v20.1.1`) but not published, so a consumer on 20.1.0 gets its changes (stdio has no idle bound; the body-parser and fast-uri lockfile versions) with 21.0.0; its entry below says what they are. The eighteen packages are all at 21.0.0, every sibling range at `^21.0.0`.

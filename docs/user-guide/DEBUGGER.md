@@ -224,8 +224,8 @@ leaves a suspended debuggee held) → `stop` → `end`.
 A call of one kind is refused while the instance holds the other. A failure is the method's error
 as it is, with the operation's step (`set breakpoints`, `listen`, `attach`, `detach`, `step`,
 `step to line`, `read stack`, `read events`, …). The refusal of the other kind names `end`. Only
-`end` logs off; a debug state that is never ended closes at the idle bound, the host's stop or the
-instance's close, whose cleanup also stops the listener a listen or a breakpoint left and an AMDP
+`end` logs off; a debug state that is never ended closes at the idle bound (HTTP, SSE; stdio has
+none), the host's stop or the instance's close, whose cleanup also stops the listener a listen or a breakpoint left and an AMDP
 session still running.
 
 ## The debugger batch: several calls at a stop in one envelope
@@ -668,10 +668,12 @@ ends by:
   The listener's stop is still owed then: the state stays held until `DebugStop`,
   the host or the idle bound. A debuggee that ends on its own ends only that
   debuggee; the session listens on.
-- **the idle bound** — the project owner's one exception to "no timeouts": held
-  state ends when **no tool call** has reached its instance for
-  `--state-idle-minutes` (env `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes`;
-  default 30, at least 30, at most 35791). A call in flight pauses it, so waiting
+- **the idle bound** (Streamable HTTP and SSE only) — the project owner's one
+  exception to "no timeouts": held state ends when **no tool call** has reached
+  its instance for `--state-idle-minutes` (env `MCP_STATE_IDLE_MINUTES`, YAML
+  `state-idle-minutes`; default 30, at least 30, at most 35791). stdio has none:
+  the stdio server's life is the client's, so a debug session there lasts until
+  `DebugStop`, the client closing stdin, the system's answer or the shutdown. A call in flight pauses it, so waiting
   for the system is never timed; the listener's own background re-polls are not
   activity. It exists because the listener re-polls by itself, so the system's own
   session timeout never ends an abandoned debug session. On expiry it does the

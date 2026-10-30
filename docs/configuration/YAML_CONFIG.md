@@ -38,7 +38,6 @@ mcp-abap-adt-http --conf=http.yaml --port=8080 --system-type=<onprem|cloud>
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `system-type` | string | — (required, here, as `--system-type` or `SAP_SYSTEM_TYPE`) | `onprem`, `cloud` or `legacy`; never guessed from the credential or the URL |
-| `state-idle-minutes` | number | `30` | See [Held State](#held-state) |
 | `batch.keepRawParts` | boolean | `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. `true` or `false` only; anything else is refused at startup. Also `--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS` |
 | `shutdown-timeout` | number | — | Seconds after which a shutdown is forced, 1-86400; no default: a shutdown logs off every ADT session at once and interrupts the running tools — it waits for no tool —, then waits for the logoffs to be written and (stdio) the session writes. Forced, it waits only for the logoffs' writes and exits `1`; a session write may be lost. See [CLI options: Shutdown](../user-guide/CLI_OPTIONS.md#shutdown) |
 
@@ -76,7 +75,6 @@ renewal: refresh-then-login    # refresh-then-login | refresh-only
 browser-auth-port: 61001
 # login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
 # auth-debug: true             # providers' debug lines on stderr, secrets' first and last four characters; no environment form
-state-idle-minutes: 30
 # shutdown-timeout: 25         # seconds, 1-86400; no default (a shutdown waits)
 ```
 
@@ -100,11 +98,13 @@ state-idle-minutes: 30
 | `login-timeout` | number | — | Seconds after which a browser login is ended, 1-86400; no default (no bound) |
 | `auth-debug` | boolean | `false` | The token providers' debug lines on stderr; a refused token request's line names the first and last four characters of each secret it sent. YAML and `--auth-debug` only: no environment variable |
 
-`state-idle-minutes` here bounds the stdio instance's held state.
+stdio has no idle bound: held state ends by its stop tool, the client closing stdin, the backend's
+answer or the shutdown — never on the server's clock (see [Held State](#held-state)).
 
 Refused in `mcp-abap-adt`'s file: `http` (Streamable HTTP is `mcp-abap-adt-http`'s), `sse`
 (`mcp-abap-adt-sse`'s), `allow-destination-header` (gone: there is no destination header),
-`transport`, `exposition`, and 16.0.0's `auth-broker`.
+`transport`, `exposition`, 16.0.0's `auth-broker`, and `state-idle-minutes` (removed from stdio in
+20.1.1).
 
 ## `mcp-abap-adt-http` (Streamable HTTP)
 
@@ -132,6 +132,7 @@ state-idle-minutes: 30
 | `http.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `http.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set); a non-allowlisted Host/Origin gets HTTP 403 |
 | `http.tls.cert`, `http.tls.key`, `http.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+| `state-idle-minutes` | number | `30` | The idle bound on held state; see [Held State](#held-state) |
 
 `state-idle-minutes` here bounds each pooled instance's held state, reached again by its
 `state_handle`.
@@ -166,6 +167,7 @@ state-idle-minutes: 30
 | `sse.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `sse.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set) |
 | `sse.tls.cert`, `sse.tls.key`, `sse.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+| `state-idle-minutes` | number | `30` | The idle bound on held state; see [Held State](#held-state) |
 
 `state-idle-minutes` here bounds each SSE connection's instance, which holds its state until the
 connection closes.
@@ -176,12 +178,15 @@ The SSE and `POST` paths have no YAML key: `--sse-path`, `--post-path`. Refused 
 
 ## Held State
 
-`state-idle-minutes` (also `--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES`), in every binary's
-file: held state (a debug session) ends after this many minutes without a tool call; a whole
-number, at least 30 and at most 35791 (the longest a timer can hold); default 30. A call in
-flight pauses it; a listener's own background re-poll does not count. On `mcp-abap-adt` it bounds
-the stdio instance's state, on `mcp-abap-adt-http` each pooled instance's, on `mcp-abap-adt-sse`
-each connection's.
+`state-idle-minutes` (also `--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES`), in the HTTP and SSE
+binaries' files: held state (a debug session) ends after this many minutes without a tool call; a
+whole number, at least 30 and at most 35791 (the longest a timer can hold); default 30. A call in
+flight pauses it; a listener's own background re-poll does not count. On `mcp-abap-adt-http` it
+bounds each pooled instance's state, on `mcp-abap-adt-sse` each connection's.
+
+stdio (`mcp-abap-adt` and its compact and `-ro` variants) has no idle bound: the stdio server's
+life and its state are governed only by the client that started it. In its file, on its command
+line or in its environment, `state-idle-minutes` stops the start (removed in 20.1.1).
 
 ## Validation
 

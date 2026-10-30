@@ -28,11 +28,11 @@ names, CLI prefixes, top-level YAML keys, and the env names of a parameter that 
 
 ### The shared rows
 
-In every binary's table: `CONF_ROW` (`--conf` / `--config`), `STATE_IDLE_ROW`
-(`--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, the idle bound on held
-state), `BATCH_KEEP_RAW_PARTS_ROW` (`--batch-keep-raw-parts` / `MCP_BATCH_KEEP_RAW_PARTS` /
+In every binary's table: `CONF_ROW` (`--conf` / `--config`), `BATCH_KEEP_RAW_PARTS_ROW` (`--batch-keep-raw-parts` / `MCP_BATCH_KEEP_RAW_PARTS` /
 `batch.keepRawParts`, a flag, default `false`, read alone by `readBatchKeepRawParts`), and `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`, required), which is
-`@mcp-abap-adt/responsible-rules`' with the rules that read it. In http's and sse's: `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-key` / `--tls-ca`,
+`@mcp-abap-adt/responsible-rules`' with the rules that read it. In http's and sse's: `STATE_IDLE_ROW`
+(`--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, the idle bound on held
+state; stdio has none and refuses every form of it, 20.1.1) and `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-key` / `--tls-ca`,
 `MCP_TLS_*`), read with `tlsConfigOf(values)`.
 
 The shared removed parameters: `transportRemoved('stdio' | 'http' | 'sse')` (`--transport`,
@@ -61,13 +61,14 @@ and the start ends `1`.
 | `mcp-abap-adt-http` | `HTTP_PARAMETERS` (`@mcp-abap-adt/http`) | `readHttpConfig` | `HttpConfig` |
 | `mcp-abap-adt-sse` | `SSE_PARAMETERS` (`@mcp-abap-adt/sse`) | `readSseConfig` | `SseConfig` |
 
-`IServerConfig` holds the shared rows' fields; each package's config extends it.
+`IServerConfig` holds the shared rows' fields; each package's config extends it (core's without
+`stateIdleMinutes`: stdio has no idle bound).
 
 ```typescript
 import { readCoreConfig } from '@mcp-abap-adt/core';
 
 const config = readCoreConfig(process.argv.slice(2), process.env);
-// config.mcpDestination, config.envFile, config.envFileSource, config.stateIdleMinutes, …
+// config.mcpDestination, config.envFile, config.envFileSource, config.systemType, …
 ```
 
 Environment variables and `.env` carry secrets and the session; YAML is configuration only, and

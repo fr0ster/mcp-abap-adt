@@ -10,9 +10,9 @@ The packages are the eighteen of 21.0.0, all at **22.0.0**. Their ADT dependenci
 
 | Package | Was | Now |
 |---|---|---|
-| `@mcp-abap-adt/interfaces-adt` (`lib`, `compact-modify`) | `^20.1.0` | `^23.1.1` — the ADT type tables per system type |
-| `@mcp-abap-adt/adt-clients` (`lib`) | `^37.2.0` | `^38.0.0` — a client per system type; friendly names are no longer read |
-| `@mcp-abap-adt/adt-strategies` (`lib`) | `^0.15.0` | `^0.16.0` — answered types read against the tables |
+| `@mcp-abap-adt/interfaces-adt` (`lib`, `compact-modify`) | `^20.1.0` | `^24.0.1` — the ADT type tables per system type, each code's main type, the search names |
+| `@mcp-abap-adt/adt-clients` (`lib`) | `^37.2.0` | `^39.0.0` — a client per system type; friendly names are no longer read; the search takes search names |
+| `@mcp-abap-adt/adt-strategies` (`lib`) | `^0.15.0` | `^0.17.0` — answered types read against the tables |
 
 ## Every start: state the system type, inspection included
 
@@ -41,7 +41,12 @@ would reach the system is refused `system_type_required`. A member the cloud tab
 For code that imports `@mcp-abap-adt/lib`:
 
 - `createAdtClient()` / `getAdtClient()` answer `IServerAdtClient`, typed by the tables;
-  `createOnPremAdtClient()` the on-premise client, for the members on premise only.
+  `createOnPremAdtClient()` the on-premise client, for the members on premise only. Its
+  `getUtils().search` takes a search name of the system type (`IAdtSearchObjectsParamsOf<V>`:
+  `DEVC`, `STRU`, not `DEVC/K`), and its group members take references that name a function
+  module's group in `parentName` (`IAdtTypedGroupLifecycle`).
+- `ActivationPlan`'s group is `{ variant, references }` (`GroupActivation`), typed by the system
+  type it is sent on: build it with `activationPlan(objects, variant)` from the write barrel.
 - `TYPE_TO_FAMILY` (`@mcp-abap-adt/lib/handlers/write`), `toLowObjectType`, `toLockObjectType` and
   `LowObjectType` (`compact-shared`) are gone: route by `SINGLE_ACTIVATION_ROUTES`,
   `COMPACT_ACTIVATE_ROUTES` and the `COMPACT_*_KINDS` maps of `compact-shared`.
@@ -72,7 +77,29 @@ What changes for a caller on 21.x:
 | a compact `object_type` the tool only refused (`HandlerActivate` `UNIT_TEST`, …) | refused by the handler | not in the enum |
 
 A main type (the part of a code before its slash) stands for its code where exactly one accepted
-code has it; where several share it, the refusal names them.
+code has it; where several share it, the refusal names them. A group activation of a function
+module (`FUGR/FF`) or a function include (`FUGR/I`) names its group in `parentName`, or is refused.
+`VIEW/DV`, a dictionary view, is a where-used and a group-activation code.
+
+## Callers: the search filter is a search name
+
+`SearchObject` and `HandlerSearch` `object_type` take the names of the system type's object types
+list, the quick search's own filter: a main type (`CLAS`, `DEVC`, `TABL`), an alias of one subtype
+(`STRU`, `DTAB`, `FUNC`, `INCL`) or a group (`ABAP_TEST_COCKPIT`). An ADT type code is still taken,
+and sent as the name the search reads it as (`TABL/DS` as `STRU`, `CLAS/OC` as `CLAS`, `ENHO/XHH` as
+`ENHO`): it selects what it selected. Anything else is refused before anything is sent:
+
+```text
+object_type "class" is neither a name of this system's object types list nor an ADT type code standing for one: it takes the search names (e.g. CLAS, DEVC, STRU); nothing was sent
+```
+
+| You sent | 21.x | 22.0 |
+|---|---|---|
+| a search name (`CLAS`, `STRU`, `ABAP_TEST_COCKPIT`, …) | sent as given | sent upper-cased |
+| a code (`CLAS/OC`, `TABL/DS`, `FUGR/FF`, `ENHO/XHH`, …) | sent as given | sent as its name (`CLAS`, `STRU`, `FUNC`, `ENHO`) |
+| `class`, `program`, `include`, `function`, `functiongroup`, `interface`, `package`, `table`, `structure`, `domain`, `dataelement`, `functionmodule`, `function_module` | sent as given; the system refused it `400` | refused: send `CLAS`, `PROG`, `INCL`, `FUNC`, `FUGR`, `INTF`, `DEVC`, `DTAB`, `STRU`, `DOMA`, `DTEL` (or the code) |
+| `view` | sent as given | the dictionary views (`VIEW`); a CDS view is `DDLS` |
+| a code no list or table holds (`NOPE/XX`) | sent; the system answered no hits | refused |
 
 ## Callers on cloud
 

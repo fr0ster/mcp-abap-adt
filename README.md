@@ -316,7 +316,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
-- **[docs/MIGRATION-22.0.md](docs/MIGRATION-22.0.md)** - The system type decides the tools and the object types each argument accepts (the ADT type tables of interfaces-adt 23.1, adt-clients 38); inspection needs the system type; friendly names and main types; RunATC per system type; arguments now required
+- **[docs/MIGRATION-22.0.md](docs/MIGRATION-22.0.md)** - The system type decides the tools and the object types each argument accepts (the ADT type tables of interfaces-adt 24, adt-clients 39); inspection needs the system type; friendly names and main types; the search filter's names; RunATC per system type; arguments now required
 - **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only; Streamable HTTP: held state by the `state_handle` argument, and the long session
 - **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end
 - **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint

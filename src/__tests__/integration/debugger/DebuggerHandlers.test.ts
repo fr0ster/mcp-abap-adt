@@ -96,6 +96,7 @@ import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
 import {
   getSystemType,
   getTimeout,
+  isTestAvailableForSystem,
   loadTestConfig,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
@@ -601,6 +602,10 @@ describe('Debugger handlers (integration)', () => {
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         if (!context.hasConfig) return;
+        // The case's systems decide before anything is created: each test
+        // skips on a system its available_in leaves out, so the probe would
+        // be written for nothing (and on a system that cannot take it, fail).
+        if (!isTestAvailableForSystem(context.testCase?.available_in)) return;
         connection = context.connection as unknown as IAbapConnection;
         const p = context.params ?? {};
         probe = String(p.probe_class ?? '').toUpperCase();

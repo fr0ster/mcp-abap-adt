@@ -536,7 +536,7 @@ shared_dependencies:
         ENDCLASS.
     - name: "ZCL_MCP_SHARED_CLS"
       description: "Shared class for check tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
     - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
       available_in: ["onprem", "cloud"]
@@ -546,7 +546,7 @@ shared_dependencies:
     # writes the test-classes include, has its own class (class_unit_test).
     - name: "ZMCP_BLD_CLSUT_L1"
       description: "Shared container class for unit test integration tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       source: |
         CLASS zmcp_bld_clsut_l1 DEFINITION PUBLIC FINAL CREATE PUBLIC.
         ENDCLASS.
@@ -599,16 +599,16 @@ shared_dependencies:
   function_groups:
     - name: "ZMCP_BLD_SHR_FGR"
       description: "Shared function group for read tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
     - name: "ZMCP_SHR_FGRP"
       description: "Shared FUGR for include/FM tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
 
   function_modules:
     - name: "Z_MCP_BLD_SHR_FM"
       group: "ZMCP_BLD_SHR_FGR"
       description: "Shared function module for read tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       source: |
         FUNCTION Z_MCP_BLD_SHR_FM
             IMPORTING
@@ -620,7 +620,7 @@ shared_dependencies:
     - name: "Z_MCP_SHR_FM"
       group: "ZMCP_SHR_FGRP"
       description: "Shared FM for include/FM tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       source: |
         FUNCTION Z_MCP_SHR_FM
             IMPORTING
@@ -664,7 +664,7 @@ shared_dependencies:
   interfaces:
     - name: "ZIF_MCP_SHARED"
       description: "Shared interface for check tests"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       source: |
         INTERFACE zif_mcp_shared PUBLIC.
           METHODS get_value RETURNING VALUE(rv_value) TYPE string.
@@ -674,7 +674,7 @@ shared_dependencies:
     # Run under the profiler by the runtime suite (on-prem).
     - name: "ZMCP_SHR_PROF_PROG"
       description: "Shared program for profiler runs"
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
       source: |
         REPORT zmcp_shr_prof_prog.
         DATA lv_x TYPE i.
@@ -684,7 +684,7 @@ shared_dependencies:
         WRITE / lv_x.
     - name: "ZMCP_SHR_PROG"
       description: "Shared program for check tests"
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
       source: |
         REPORT zmcp_shr_prog.
         WRITE / 'shared'.
@@ -933,7 +933,7 @@ create_class:
   test_cases:
     - name: "builder_class"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "High-level test for ClassHighHandlers and ClassLocalIncludesHandlers: create → update → get → delete class with local includes"
       params:
         class_name: "ZMCP_BLD_CLSLOC_H1"
@@ -1106,7 +1106,7 @@ create_class_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Class low-level handler full workflow test"
       params:
         class_name: "ZMCP_BLD_CLS_L1"
@@ -1215,7 +1215,7 @@ create_function:
   test_cases:
     - name: "full_workflow_high"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Complete function group and function module workflow for high level tests"
       params:
         # Function Group parameters
@@ -1247,7 +1247,7 @@ create_function:
     # Function Group & Function Module (Low-Level Tests)
     - name: "full_workflow_low"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Complete function group and function module workflow for low level tests"
       params:
         # Function Group parameters
@@ -1285,7 +1285,7 @@ create_interface:
   test_cases:
     - name: "builder_interface"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Interface reserved for InterfaceBuilder tests"
       params:
         interface_name: "ZMCP_BLD_IF_H1"
@@ -1370,7 +1370,7 @@ create_program:
   test_cases:
     - name: "builder_program"
       enabled: true
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
       description: "Program reserved for ProgramBuilder tests"
       params:
         program_name: "ZMCP_BLD_PROG_H1"
@@ -1479,7 +1479,7 @@ create_transport:
   test_cases:
     - name: "builder_transport"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Transport reserved for TransportBuilder tests"
       params:
         description: "TransportBuilder workflow transport"
@@ -1494,7 +1494,7 @@ create_transport:
 # unreleased transport and a transportable package (not $TMP).
 create_transported_object:
   enabled: false                                 # ← CHANGE: set true when transport is ready
-  available_in: ["onprem", "legacy"]
+  available_in: ["onprem"]
   transport_request: "TRLK900201"                # ← CHANGE: dedicated unreleased transport
   package_name: "ZMC_REQUEST_TEST"                # ← CHANGE: transportable package recorded to that transport
   class_name: "ZMCP_BLD_TRCLS"
@@ -1554,15 +1554,15 @@ standard_objects:
   classes:
     - name: "CL_ABAP_CHAR_UTILITIES"
       description: "Character utilities helper (available everywhere)"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
     - name: "CL_ABAP_CORRESPONDING"
       description: "Corresponding-move helper for ABAP"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
 
   interfaces:
     - name: "IF_BUPA_API_MODIFY"
       description: "Interface zum BAdI: BUPA_API_MODIFY"
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
 
   domains:
     - name: "MANDT"
@@ -1596,7 +1596,7 @@ standard_objects:
   packages:
     - name: "$TMP"
       description: "Local package"
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
     - name: "ZLOCAL"
       description: "Placeholder for ABAP Cloud package – replace with existing package"
       available_in: ["cloud"]
@@ -1604,12 +1604,12 @@ standard_objects:
   programs:
     - name: "SAPLSETB"
       description: "Standard SAP settings program"
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
 
   views:
     - name: "H_T000"
       description: "Client table help view"
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
     - name: "I_SapPackage"
       description: "ABAP Cloud: replace with CDS view name existing in tenant"
       available_in: ["cloud"]
@@ -1770,7 +1770,7 @@ list_transports_readonly:
   test_cases:
     - name: "test_list_transports"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "ListTransports handler read-only tests"
       # `params: {}`, not an empty `params:` — YAML reads the latter as null,
       # and the tester fails to start ("Cannot read properties of null").
@@ -1783,7 +1783,7 @@ search_source_readonly:
   test_cases:
     - name: "test_search_source"
       enabled: true
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
       description: "SearchSource integration tests (scans shared package + objects from shared_dependencies)"
       params:
         # Package scanned by the test. Should match shared_dependencies.package so
@@ -2040,6 +2040,7 @@ run_atc:
   test_cases:
     - name: "default_variant"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "RunATC over a shared class with the DEFAULT check variant, then its status and findings"
       params:
         # A shared object: ATC reads it and changes nothing. On premise the DEFAULT
@@ -2081,7 +2082,7 @@ check_class_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Check an existing ABAP class for syntax errors"
       params:
         class_name: "ZCL_MCP_SHARED_CLS"
@@ -2122,7 +2123,7 @@ check_ddl_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Check an existing CDS view for syntax errors"
       params:
         ddl_name: "ZI_MCP_SHR_ROOT"
@@ -2172,7 +2173,7 @@ check_interface_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Check an existing interface for syntax errors"
       params:
         interface_name: "ZIF_MCP_SHARED"
@@ -2182,7 +2183,7 @@ check_package_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Check an existing package for syntax errors"
       params:
         package_name: "ZMCP_SHARED"
@@ -2193,7 +2194,7 @@ check_program_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
       description: "Check an existing program for syntax errors (not available on cloud)"
       params:
         program_name: "ZMCP_SHR_PROG"
@@ -2203,7 +2204,7 @@ check_function_group_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Check an existing function group for syntax errors"
       params:
         function_group_name: "ZMCP_SHR_FGRP"
@@ -2213,7 +2214,7 @@ check_function_module_high:
   test_cases:
     - name: "check_existing"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Check an existing function module for syntax errors"
       params:
         function_group_name: "ZMCP_SHR_FGRP"
@@ -2224,7 +2225,7 @@ read_function_include_readonly:
   test_cases:
     - name: "read_top_include"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Read the TOP include source/metadata of the shared function group"
       params:
         function_group_name: "ZMCP_SHR_FGRP"
@@ -2235,7 +2236,7 @@ list_function_group_includes_readonly:
   test_cases:
     - name: "list_includes"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "List the includes of the shared function group"
       params:
         function_group_name: "ZMCP_SHR_FGRP"
@@ -2245,7 +2246,7 @@ list_function_modules_readonly:
   test_cases:
     - name: "list_modules"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "List the function modules of the shared function group"
       params:
         function_group_name: "ZMCP_SHR_FGRP"
@@ -2255,7 +2256,7 @@ get_structures_list_readonly:
   test_cases:
     - name: "list_embedded_structures"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "List the structures embedded (include) and extending (append) the shared base structure"
       params:
         structure_name: "ZMCP_SHR_STRU"
@@ -2271,7 +2272,7 @@ function_include_high:
   test_cases:
     - name: "full_workflow_high"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Create, update, read-back and delete a custom function group include"
       params:
         # The test's own group (a test object on the test request), never the

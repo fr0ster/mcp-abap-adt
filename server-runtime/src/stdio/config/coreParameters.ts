@@ -19,10 +19,13 @@ import {
   type ParameterTable,
   type ParameterValue,
   parameterSource,
+  type RemovedParameter,
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
-  STATE_IDLE_ROW,
+  STATE_IDLE_CLI,
+  STATE_IDLE_ENV,
+  STATE_IDLE_YAML,
   TLS_OPTIONS_REMOVED,
   transportRemoved,
   type YamlConfig,
@@ -246,6 +249,22 @@ const ALLOW_DESTINATION_HEADER_REMOVED = {
     `${form} is gone: \`mcp-abap-adt\` serves the destination it is started with (--mcp, --env, --env-path); the HTTP and SSE binaries take credentials only from \`x-sap-*\` headers`,
 };
 
+/**
+ * Removed from stdio in 20.1.1: stdio has no idle bound. The server's life and
+ * its held state are the client's — a stop tool, the client closing stdin,
+ * the backend's answer or the process's shutdown ends them, never the
+ * server's clock. Every form stops the start, the environment name included
+ * (a parameter that is gone), so a configuration that states a bound is
+ * never silently ignored. The HTTP and SSE binaries keep the bound.
+ */
+export const STATE_IDLE_REMOVED_FROM_STDIO: RemovedParameter = {
+  cli: [STATE_IDLE_CLI],
+  env: [STATE_IDLE_ENV],
+  yaml: [STATE_IDLE_YAML],
+  words: (form: string) =>
+    `${form} was removed from \`mcp-abap-adt\` in 20.1.1: stdio has no idle bound — held state ends by its stop tool, the client closing stdin, the backend or the shutdown; remove it from the configuration (the HTTP and SSE binaries keep it)`,
+};
+
 /** Removed in 16.0.0: its only purpose was to switch off the working directory's .env. */
 const AUTH_BROKER_REMOVED = {
   cli: ['--auth-broker'],
@@ -275,7 +294,6 @@ export function coreParameters(
       ...MESSAGE_SERVER_ROWS,
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
-      STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
@@ -284,6 +302,7 @@ export function coreParameters(
       transportRemoved('stdio'),
       ALLOW_DESTINATION_HEADER_REMOVED,
       AUTH_BROKER_REMOVED,
+      STATE_IDLE_REMOVED_FROM_STDIO,
       SSE_OPTIONS_REMOVED,
       HTTP_OPTIONS_REMOVED,
       TLS_OPTIONS_REMOVED,
@@ -294,8 +313,11 @@ export function coreParameters(
 /** `mcp-abap-adt`'s table: core's, with the full tool set. */
 export const CORE_PARAMETERS: ParameterTable = coreParameters(fullToolSet);
 
-/** What `mcp-abap-adt` reads: the shared values and the destination's. */
-export interface CoreConfig extends IServerConfig {
+/**
+ * What `mcp-abap-adt` reads: the shared values and the destination's. No idle
+ * bound: stdio states none (`STATE_IDLE_REMOVED_FROM_STDIO`).
+ */
+export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** The env file, resolved (`--env` / `--env-path` / `MCP_ENV_PATH`). */
   envFile?: string;
   /** Alias of `envFile`, kept for configs made by hand. */
@@ -401,7 +423,6 @@ export function readCoreConfig(
     // the environment later, and the launcher resolves the precedence then
     // (effectiveSystemType), as for the connection type.
     systemTypeSource: source('systemType'),
-    stateIdleMinutes: values.stateIdleMinutes as number,
     batchKeepRawParts: values.batchKeepRawParts === true,
     shutdownTimeout: values.shutdownTimeout as number | undefined,
     mcpDestination: str(values.mcpDestination),

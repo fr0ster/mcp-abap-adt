@@ -1,7 +1,8 @@
 /**
  * What every binary's configuration holds: the values of lib's shared rows
- * (`--system-type`, `--conf`, `--state-idle-minutes`). The tools are not
- * among them: the binary fixes its tool set.
+ * (`--system-type`, `--conf`; `--state-idle-minutes` in the HTTP and SSE
+ * binaries only). The tools are not among them: the binary fixes its tool
+ * set.
  *
  * The transport, HTTP, SSE and destination fields are not here: each
  * belongs to the package that reads it — core's `CoreConfig` (the
@@ -54,7 +55,9 @@ export interface IServerConfig {
   /**
    * The idle bound on held state: it ends after this many minutes without a
    * tool call (`--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES`,
-   * `state-idle-minutes`). A whole number, at least 30; default 30.
+   * `state-idle-minutes`). A whole number, at least 30; default 30. The
+   * HTTP and SSE binaries only: stdio has no idle bound (core's `CoreConfig`
+   * leaves this field out).
    */
   stateIdleMinutes?: number;
 

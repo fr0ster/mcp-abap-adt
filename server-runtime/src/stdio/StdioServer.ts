@@ -12,7 +12,11 @@ import {
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
-import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
+import {
+  NO_IDLE_BOUND,
+  type StateLogger,
+  stateLoggerOf,
+} from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -26,8 +30,6 @@ export interface StdioServerOptions {
   name?: string;
   version?: string;
   logger?: Logger;
-  /** The idle bound on held state, in minutes (at least 30, default 30). */
-  stateIdleMinutes?: number;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger;
   /** The server's own sentence beside a chain failure: the factory's `sentenceFor`. */
@@ -79,7 +81,10 @@ export class StdioServer extends BaseMcpServer {
       name: opts?.name ?? 'mcp-abap-adt',
       version: opts?.version ?? RUNTIME_VERSION,
       logger: opts?.logger ?? noopLogger,
-      stateIdleMinutes: opts?.stateIdleMinutes,
+      // No idle bound on stdio: the server's life and its state are the
+      // client's — a stop tool, the client closing stdin, the backend's
+      // answer or the process's shutdown ends them, never the server's clock.
+      stateIdleMinutes: NO_IDLE_BOUND,
       // From the options as given: the silent default above is never the state's.
       stateLogger: stateLoggerOf(opts ?? {}),
       ...(opts?.leftoverSessions !== undefined && {

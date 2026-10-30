@@ -448,6 +448,63 @@ describe('a main type is read where it names one code, refused where it names se
     },
   );
 
+  it.each(functionModuleCases)(
+    '%s on %s: function is the function module, FUGR/FF, not the group',
+    async (_tool, variant, argument) => {
+      const byModule = await run(argument, variant, 'FUGR/FF');
+      const byGroup = await run(argument, variant, 'FUGR/F');
+      const byName = await run(argument, variant, 'function');
+      const byUpper = await run(argument, variant, 'FUNCTION');
+      expect(byModule.requests.length).toBeGreaterThan(0);
+      expect(byName.requests).toEqual(byModule.requests);
+      expect(byUpper.requests).toEqual(byModule.requests);
+      expect(byName.requests).not.toEqual(byGroup.requests);
+    },
+  );
+
+  /** The arguments `functiongroup` is sent through, each with a group's name. */
+  const FUNCTION_GROUP: readonly Argument[] = [
+    {
+      tool: 'GetWhereUsed.object_type',
+      send: (context, value) =>
+        handleGetWhereUsed(context, { object_type: value, object_name: 'ZG' }),
+      one: ['functiongroup', 'FUGR/F'],
+      shared: ['FUGR', 'FUGR/F, FUGR/FF'],
+    },
+    {
+      tool: 'ActivateObjects.objects[].type (group)',
+      send: (context, value) =>
+        handleActivateObjects(context, {
+          objects: [
+            { name: 'ZG', type: value },
+            { name: 'ZH', type: value },
+          ],
+        }),
+      one: ['functiongroup', 'FUGR/F'],
+      shared: ['FUGR', 'FUGR/F, FUGR/FF, FUGR/I'],
+    },
+    ...TABLE_TOOLS,
+  ];
+  const functionGroupCases = VARIANTS.flatMap((variant) =>
+    FUNCTION_GROUP.map(
+      (argument) => [argument.tool, variant, argument] as const,
+    ),
+  );
+
+  it.each(functionGroupCases)(
+    '%s on %s: functiongroup is the function group, FUGR/F, not the module',
+    async (_tool, variant, argument) => {
+      const byGroup = await run(argument, variant, 'FUGR/F');
+      const byModule = await run(argument, variant, 'FUGR/FF');
+      const byName = await run(argument, variant, 'functiongroup');
+      const byUpper = await run(argument, variant, 'FUNCTIONGROUP');
+      expect(byGroup.requests.length).toBeGreaterThan(0);
+      expect(byName.requests).toEqual(byGroup.requests);
+      expect(byUpper.requests).toEqual(byGroup.requests);
+      expect(byName.requests).not.toEqual(byModule.requests);
+    },
+  );
+
   it.each(VARIANTS)(
     'a main type no code of the projection has is refused as any unknown value (%s)',
     async (variant) => {

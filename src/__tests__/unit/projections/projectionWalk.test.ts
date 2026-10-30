@@ -494,6 +494,7 @@ const WALKS: Readonly<Record<string, Walk>> = {
           value === 'FUGR/FF' ||
           value === 'functionmodule' ||
           value === 'function_module' ||
+          value === 'function' ||
           value === 'func'
             ? 'ZFG_A|Z_FM_A'
             : 'ZOBJ_A',

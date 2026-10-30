@@ -82,6 +82,16 @@ export const struDsIsNoName: TypeName = 'stru/ds';
 export const funcIsTheModule: (typeof TYPE_NAMES)['func'] = 'FUGR/FF';
 // @ts-expect-error …not the function group.
 export const funcIsNoGroup: (typeof TYPE_NAMES)['func'] = 'FUGR/F';
+/** `function` is the function module too, as `func` is. */
+export const functionIsTheModule: (typeof TYPE_NAMES)['function'] = 'FUGR/FF';
+// @ts-expect-error …not the function group.
+export const functionIsNoGroup: (typeof TYPE_NAMES)['function'] = 'FUGR/F';
+/** `functiongroup` is the function group. */
+export const functiongroupIsTheGroup: (typeof TYPE_NAMES)['functiongroup'] =
+  'FUGR/F';
+// @ts-expect-error …not the function module.
+export const functiongroupIsNoModule: (typeof TYPE_NAMES)['functiongroup'] =
+  'FUGR/FF';
 
 // --- A tool's names: its routes the table serves ---------------------------
 

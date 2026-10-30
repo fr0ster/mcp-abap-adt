@@ -227,8 +227,9 @@ export type MainTypeOfOne<P extends string> = keyof MainTypeCodes<P> & string;
 /**
  * The names the tools took for a type before adt-clients 38 stopped reading
  * them, each with the code of the tables it addressed: the friendly names of
- * its where-used aliases (adt-clients 37.2.0), `func` for the function module
- * (the releases' quick-search name `FUNC`) and `stru` for the structure. The
+ * its where-used aliases (adt-clients 37.2.0), `function` and `func` for the
+ * function module (`func` the releases' quick-search name `FUNC`),
+ * `functiongroup` for the function group and `stru` for the structure. The
  * tools' arguments name them, so the server reads them now; each code is
  * checked against the tables here. A main type (`CLAS`, `TABL`, …) is no
  * name: it reads as a code only through the argument's projection
@@ -238,7 +239,7 @@ export const TYPE_NAMES = {
   class: 'CLAS/OC',
   program: 'PROG/P',
   include: 'PROG/I',
-  function: 'FUGR/F',
+  function: 'FUGR/FF',
   functiongroup: 'FUGR/F',
   interface: 'INTF/OI',
   package: 'DEVC/K',

@@ -29,7 +29,10 @@ import {
   type ToolSet,
   type ToolSetKind,
 } from '../../../lib/toolSet';
-import { COMPACT_MEMBER_NEEDS } from '../../../lib/variantToolSet';
+import {
+  argumentSchema,
+  PROJECTED_ARGUMENTS,
+} from '../../helpers/projectedArguments';
 
 jest.setTimeout(120_000);
 
@@ -63,18 +66,22 @@ const KINDS: readonly ToolSetKind[] = [
 interface KindSurface {
   /** The tools listed, sorted. */
   tools: string[];
-  /** `<tool>.<argument>` → the members its enum lists, in schema order. */
+  /**
+   * `<tool>.<argument>` → the members its enum lists, in schema order, for
+   * each argument projected from the tables (`PROJECTED_ARGUMENTS`).
+   */
   members: Record<string, string[]>;
+  /** `<tool>.<argument>` → its description, for the same arguments. */
+  argumentDescriptions: Record<string, string>;
+  /** The description of each tool with a projected argument. */
+  descriptions: Record<string, string>;
 }
 
 type Surface = Record<SapEnvironment, Record<ToolSetKind, KindSurface>>;
 
 /** The members `argument` lists in a listed tool's schema, when it has any. */
 function enumOf(inputSchema: unknown, argument: string): string[] | undefined {
-  if (typeof inputSchema !== 'object' || inputSchema === null) return;
-  const properties: unknown = Reflect.get(inputSchema, 'properties');
-  if (typeof properties !== 'object' || properties === null) return;
-  const property: unknown = Reflect.get(properties, argument);
+  const property = argumentSchema(inputSchema, argument);
   if (typeof property !== 'object' || property === null) return;
   const listed: unknown = Reflect.get(property, 'enum');
   if (Array.isArray(listed)) return listed.map(String);
@@ -96,19 +103,33 @@ async function surfaceOf(
   try {
     const { tools } = await client.listTools();
     const members: Record<string, string[]> = {};
+    const argumentDescriptions: Record<string, string> = {};
+    const descriptions: Record<string, string> = {};
     for (const tool of tools) {
-      const gated = COMPACT_MEMBER_NEEDS.get(tool.name);
-      if (gated === undefined) continue;
-      const listed = enumOf(tool.inputSchema, gated.argument);
-      if (listed !== undefined) {
-        members[`${tool.name}.${gated.argument}`] = listed;
+      for (const projected of PROJECTED_ARGUMENTS) {
+        if (projected.tool !== tool.name) continue;
+        const key = `${tool.name}.${projected.argument}`;
+        const listed = enumOf(tool.inputSchema, projected.argument);
+        if (listed !== undefined) members[key] = listed;
+        const described: unknown = Reflect.get(
+          Object(argumentSchema(tool.inputSchema, projected.argument)),
+          'description',
+        );
+        if (typeof described === 'string') {
+          argumentDescriptions[key] = described;
+        }
+        descriptions[tool.name] = tool.description ?? '';
       }
     }
+    const sorted = <T>(record: Record<string, T>): Record<string, T> =>
+      Object.fromEntries(
+        Object.entries(record).sort(([a], [b]) => a.localeCompare(b)),
+      );
     return {
       tools: tools.map((tool) => tool.name).sort(),
-      members: Object.fromEntries(
-        Object.entries(members).sort(([a], [b]) => a.localeCompare(b)),
-      ),
+      members: sorted(members),
+      argumentDescriptions: sorted(argumentDescriptions),
+      descriptions: sorted(descriptions),
     };
   } finally {
     await client.close();

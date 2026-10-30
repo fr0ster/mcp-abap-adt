@@ -259,7 +259,71 @@
         "UpdateUnitTest",
         "ValidateServiceBinding"
       ],
-      "members": {}
+      "members": {
+        "GetIncludesList.object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetIncludesList.objects[].object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetObjectVersionDiff.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersions.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersionSource.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ]
+      },
+      "argumentDescriptions": {
+        "ActivateObjects.objects[].type": "Object type, either case: an ADT type code, or a name standing for one (in brackets after it): CLAS/OC (class, clas), INTF/OI (interface, intf), PROG/P (program, prog), PROG/I (include), FUGR/F (function, functiongroup, fugr, func), FUGR/FF (functionmodule, function_module), FUGR/I, DEVC/K (package, devc), DDLS/DF (view, ddls), TABL/DT (table, tabl), TABL/DS (structure, stru, stru/ds), TTYP/DA (ttyp), DOMA/DD (domain, doma), DTEL/DE (dataelement, dtel), DCLS/DL (dcls), BDEF/BDO (bdef), DDLX/EX (ddlx), SRVD/SRV (srvd), SRVB/SVB (srvb), DSFD/SCF, DSFI/SFI, XSLT/VT (xslt), FTG2/FT (ftg2), AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. One object alone may also be named function_group, ddl, data_element, behavior_definition, metadata_extension.",
+        "ActivateObjects.preaudit": "Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: CLAS/OC, class, PROG/P, program, INTF/OI, interface, FUGR/F, function_group, TABL/DT, table, TABL/DS, structure, DDLS/DF, ddl, DOMA/DD, domain, DTEL/DE, data_element, BDEF/BDO, behavior_definition, DDLX/EX, metadata_extension. Their family's activate() always sends preauditRequested=true.",
+        "GetIncludesList.object_type": "[read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetIncludesList.objects[].object_type": "ADT object type. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetObjectVersionDiff.object_type": "Object type (the same value the version history was read with).",
+        "GetObjectVersions.object_type": "Object type.",
+        "GetObjectVersionSource.object_type": "Object type (the same value the version history was read with).",
+        "GetWhereUsed.object_type": "Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): CLAS/OC (class, clas), INTF/OI (interface, intf), PROG/P (program, prog), PROG/I (include), FUGR/F (function, functiongroup, fugr, func), FUGR/FF (functionmodule, function_module), DEVC/K (package, devc), DDLS/DF (view, ddls), TABL/DT (table, tabl), TABL/DS (structure, stru, stru/ds), TTYP/DA (ttyp), DOMA/DD (domain, doma), DTEL/DE (dataelement, dtel), DCLS/DL (dcls), BDEF/BDO (bdef), DDLX/EX (ddlx), SRVD/SRV (srvd), SRVB/SVB (srvb), DSFD/SCF, DSFI/SFI, XSLT/VT (xslt), MSAG/N, FTG2/FT (ftg2), AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says."
+      },
+      "descriptions": {
+        "ActivateObjects": "Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.",
+        "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
+        "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
+      }
     },
     "core-ro": {
       "tools": [
@@ -338,7 +402,68 @@
         "SearchObject",
         "SearchSource"
       ],
-      "members": {}
+      "members": {
+        "GetIncludesList.object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetIncludesList.objects[].object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetObjectVersionDiff.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersions.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersionSource.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ]
+      },
+      "argumentDescriptions": {
+        "GetIncludesList.object_type": "[read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetIncludesList.objects[].object_type": "ADT object type. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetObjectVersionDiff.object_type": "Object type (the same value the version history was read with).",
+        "GetObjectVersions.object_type": "Object type.",
+        "GetObjectVersionSource.object_type": "Object type (the same value the version history was read with).",
+        "GetWhereUsed.object_type": "Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): CLAS/OC (class, clas), INTF/OI (interface, intf), PROG/P (program, prog), PROG/I (include), FUGR/F (function, functiongroup, fugr, func), FUGR/FF (functionmodule, function_module), DEVC/K (package, devc), DDLS/DF (view, ddls), TABL/DT (table, tabl), TABL/DS (structure, stru, stru/ds), TTYP/DA (ttyp), DOMA/DD (domain, doma), DTEL/DE (dataelement, dtel), DCLS/DL (dcls), BDEF/BDO (bdef), DDLX/EX (ddlx), SRVD/SRV (srvd), SRVB/SVB (srvb), DSFD/SCF, DSFI/SFI, XSLT/VT (xslt), MSAG/N, FTG2/FT (ftg2), AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says."
+      },
+      "descriptions": {
+        "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
+        "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
+      }
     },
     "compact": {
       "tools": [
@@ -385,31 +510,20 @@
       ],
       "members": {
         "HandlerActivate.object_type": [
-          "PACKAGE",
-          "DOMAIN",
-          "DATA_ELEMENT",
-          "TRANSPORT",
-          "TABLE",
-          "STRUCTURE",
-          "DDL",
-          "SERVICE_DEFINITION",
-          "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
-          "LOCAL_TEST_CLASS",
-          "LOCAL_TYPES",
-          "LOCAL_DEFINITIONS",
-          "LOCAL_MACROS",
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_GROUP",
-          "FUNCTION_MODULE",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "DOMAIN",
+          "DATA_ELEMENT",
           "BEHAVIOR_DEFINITION",
-          "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "PACKAGE",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
         ],
         "HandlerCheckRun.object_type": [
           "CLASS",
@@ -437,21 +551,13 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
-          "LOCAL_TEST_CLASS",
-          "LOCAL_TYPES",
-          "LOCAL_DEFINITIONS",
-          "LOCAL_MACROS",
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_GROUP",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "METADATA_EXTENSION"
         ],
         "HandlerDelete.object_type": [
           "PACKAGE",
@@ -500,15 +606,12 @@
           "PACKAGE",
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
           "TABLE",
           "STRUCTURE",
           "DDL",
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
           "LOCAL_TEST_CLASS",
           "LOCAL_TYPES",
           "LOCAL_DEFINITIONS",
@@ -520,8 +623,9 @@
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
+          "TRANSPORT"
         ],
         "HandlerLock.object_type": [
           "CLASS",
@@ -567,28 +671,25 @@
           "PACKAGE",
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
+          "FUNCTION_GROUP",
           "TABLE",
           "STRUCTURE",
           "DDL",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
           "LOCAL_TEST_CLASS",
           "LOCAL_TYPES",
           "LOCAL_DEFINITIONS",
           "LOCAL_MACROS",
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
           "PROGRAM",
           "INTERFACE",
-          "FUNCTION_GROUP",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "SERVICE_BINDING"
         ],
         "HandlerValidate.object_type": [
           "CLASS",
@@ -606,7 +707,49 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_BINDING"
+        ],
+        "HandlerWhereUsed.object_type": [
+          "CLASS",
+          "INTERFACE",
+          "PROGRAM",
+          "INCLUDE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "PACKAGE",
+          "TABLE",
+          "STRUCTURE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "DDL"
         ]
+      },
+      "argumentDescriptions": {
+        "HandlerActivate.object_type": "ABAP object type for routed compact operation. Names the object's type in the single form.",
+        "HandlerCheckRun.object_type": "Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, METADATA_EXTENSION.",
+        "HandlerCreate.object_type": "ABAP object type for routed compact operation.",
+        "HandlerDelete.object_type": "Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST.",
+        "HandlerDeletionCheck.object_type": "Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet.object_type": "ABAP object type for routed compact operation.",
+        "HandlerLock.object_type": "Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.",
+        "HandlerProfileRun.target_type": "Run target kind.",
+        "HandlerUnlock.object_type": "Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.",
+        "HandlerUpdate.object_type": "ABAP object type for routed compact operation.",
+        "HandlerValidate.object_type": "Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.",
+        "HandlerWhereUsed.object_type": "Type of the object whose usages are listed."
+      },
+      "descriptions": {
+        "HandlerActivate": "Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type takes object_adt_type (e.g. \"CLAS/OC\"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION or METADATA_EXTENSION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.",
+        "HandlerCheckRun": "[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks unsaved source given in the call, for CLASS, STRUCTURE and DDL.",
+        "HandlerCreate": "Creates the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the create request for its type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: PACKAGE(package_name*, super_package*), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), PROGRAM(program_name*, package_name*), INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, package_name*), METADATA_EXTENSION(name*, package_name*). Optional for every type: description, transport_request.",
+        "HandlerDelete": "Deletes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the deletion request for its type, and answers SAP's result. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), PROGRAM(program_name*, transport_request), INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). CDS_UNIT_TEST deletes its test class. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS and LOCAL_MACROS (the class's local includes) and UNIT_TEST (its test classes include) the include is written empty under lock_handle, the class's lock handle. transport_request is sent with the request. Over Streamable HTTP an include write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); it is sent only under a lock the instance it reaches holds.",
+        "HandlerDeletionCheck": "[read-only] Asks SAP whether the object named by object_type and object_name can be deleted: sends the deletion check request for its type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet": "[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, messages, document }, the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "HandlerLock": "Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*). Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).",
+        "HandlerProfileRun": "[read-only] Runs a class or a program in one request. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.",
+        "HandlerUnlock": "Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*), INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*); an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the unlock ends the instance's hold on the lock.",
+        "HandlerUpdate": "Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), PROGRAM(program_name*, source_code*, transport_request), INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version). For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.",
+        "HandlerValidate": "[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).",
+        "HandlerWhereUsed": "[read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
       }
     },
     "compact-ro": {
@@ -671,15 +814,12 @@
           "PACKAGE",
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
           "TABLE",
           "STRUCTURE",
           "DDL",
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
           "LOCAL_TEST_CLASS",
           "LOCAL_TYPES",
           "LOCAL_DEFINITIONS",
@@ -691,8 +831,9 @@
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
+          "TRANSPORT"
         ],
         "HandlerValidate.object_type": [
           "CLASS",
@@ -710,7 +851,35 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_BINDING"
+        ],
+        "HandlerWhereUsed.object_type": [
+          "CLASS",
+          "INTERFACE",
+          "PROGRAM",
+          "INCLUDE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "PACKAGE",
+          "TABLE",
+          "STRUCTURE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "DDL"
         ]
+      },
+      "argumentDescriptions": {
+        "HandlerCheckRun.object_type": "Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, METADATA_EXTENSION.",
+        "HandlerDeletionCheck.object_type": "Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet.object_type": "ABAP object type for routed compact operation.",
+        "HandlerValidate.object_type": "Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.",
+        "HandlerWhereUsed.object_type": "Type of the object whose usages are listed."
+      },
+      "descriptions": {
+        "HandlerCheckRun": "[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks unsaved source given in the call, for CLASS, STRUCTURE and DDL.",
+        "HandlerDeletionCheck": "[read-only] Asks SAP whether the object named by object_type and object_name can be deleted: sends the deletion check request for its type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet": "[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, messages, document }, the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "HandlerValidate": "[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).",
+        "HandlerWhereUsed": "[read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
       }
     }
   },
@@ -966,7 +1135,71 @@
         "UpdateUnitTest",
         "ValidateServiceBinding"
       ],
-      "members": {}
+      "members": {
+        "GetIncludesList.object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetIncludesList.objects[].object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetObjectVersionDiff.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersions.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersionSource.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ]
+      },
+      "argumentDescriptions": {
+        "ActivateObjects.objects[].type": "Object type, either case: an ADT type code, or a name standing for one (in brackets after it): CLAS/OC (class, clas), INTF/OI (interface, intf), FUGR/F (function, functiongroup, fugr, func), FUGR/FF (functionmodule, function_module), FUGR/I, DEVC/K (package, devc), DDLS/DF (view, ddls), TABL/DT (table, tabl), TABL/DS (structure, stru, stru/ds), TTYP/DA (ttyp), DOMA/DD (domain, doma), DTEL/DE (dataelement, dtel), DCLS/DL (dcls), BDEF/BDO (bdef), DDLX/EX (ddlx), SRVD/SRV (srvd), SRVB/SVB (srvb), DSFD/SCF, DSFI/SFI, XSLT/VT (xslt), AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. One object alone may also be named function_group, ddl, data_element, behavior_definition, metadata_extension.",
+        "ActivateObjects.preaudit": "Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: CLAS/OC, class, INTF/OI, interface, FUGR/F, function_group, TABL/DT, table, TABL/DS, structure, DDLS/DF, ddl, DOMA/DD, domain, DTEL/DE, data_element, BDEF/BDO, behavior_definition, DDLX/EX, metadata_extension. Their family's activate() always sends preauditRequested=true.",
+        "GetIncludesList.object_type": "[read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetIncludesList.objects[].object_type": "ADT object type. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetObjectVersionDiff.object_type": "Object type (the same value the version history was read with).",
+        "GetObjectVersions.object_type": "Object type.",
+        "GetObjectVersionSource.object_type": "Object type (the same value the version history was read with).",
+        "GetWhereUsed.object_type": "Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): CLAS/OC (class, clas), INTF/OI (interface, intf), PROG/P (program, prog), PROG/I (include), FUGR/F (function, functiongroup, fugr, func), FUGR/FF (functionmodule, function_module), DEVC/K (package, devc), DDLS/DF (view, ddls), TABL/DT (table, tabl), TABL/DS (structure, stru, stru/ds), TTYP/DA (ttyp), DOMA/DD (domain, doma), DTEL/DE (dataelement, dtel), DCLS/DL (dcls), BDEF/BDO (bdef), DDLX/EX (ddlx), SRVD/SRV (srvd), SRVB/SVB (srvb), DSFD/SCF, DSFI/SFI, XSLT/VT (xslt), MSAG/N, FTG2/FT (ftg2), AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says."
+      },
+      "descriptions": {
+        "ActivateObjects": "Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.",
+        "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
+        "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
+      }
     },
     "core-ro": {
       "tools": [
@@ -1043,7 +1276,68 @@
         "SearchObject",
         "SearchSource"
       ],
-      "members": {}
+      "members": {
+        "GetIncludesList.object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetIncludesList.objects[].object_type": [
+          "PROG/P",
+          "PROG/I",
+          "FUGR/F",
+          "CLAS/OC"
+        ],
+        "GetObjectVersionDiff.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersions.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ],
+        "GetObjectVersionSource.object_type": [
+          "class",
+          "program",
+          "interface",
+          "function_module",
+          "table",
+          "structure",
+          "ddl",
+          "behavior_definition",
+          "metadata_extension"
+        ]
+      },
+      "argumentDescriptions": {
+        "GetIncludesList.object_type": "[read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetIncludesList.objects[].object_type": "ADT object type. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC.",
+        "GetObjectVersionDiff.object_type": "Object type (the same value the version history was read with).",
+        "GetObjectVersions.object_type": "Object type.",
+        "GetObjectVersionSource.object_type": "Object type (the same value the version history was read with).",
+        "GetWhereUsed.object_type": "Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): CLAS/OC (class, clas), INTF/OI (interface, intf), PROG/P (program, prog), PROG/I (include), FUGR/F (function, functiongroup, fugr, func), FUGR/FF (functionmodule, function_module), DEVC/K (package, devc), DDLS/DF (view, ddls), TABL/DT (table, tabl), TABL/DS (structure, stru, stru/ds), TTYP/DA (ttyp), DOMA/DD (domain, doma), DTEL/DE (dataelement, dtel), DCLS/DL (dcls), BDEF/BDO (bdef), DDLX/EX (ddlx), SRVD/SRV (srvd), SRVB/SVB (srvb), DSFD/SCF, DSFI/SFI, XSLT/VT (xslt), MSAG/N, FTG2/FT (ftg2), AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says."
+      },
+      "descriptions": {
+        "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
+        "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
+      }
     },
     "compact": {
       "tools": [
@@ -1090,30 +1384,19 @@
       ],
       "members": {
         "HandlerActivate.object_type": [
-          "PACKAGE",
-          "DOMAIN",
-          "DATA_ELEMENT",
-          "TRANSPORT",
+          "CLASS",
+          "INTERFACE",
+          "FUNCTION_GROUP",
           "TABLE",
           "STRUCTURE",
           "DDL",
-          "SERVICE_DEFINITION",
-          "SERVICE_BINDING",
-          "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
-          "LOCAL_TEST_CLASS",
-          "LOCAL_TYPES",
-          "LOCAL_DEFINITIONS",
-          "LOCAL_MACROS",
-          "INTERFACE",
-          "FUNCTION_GROUP",
-          "FUNCTION_MODULE",
+          "DOMAIN",
+          "DATA_ELEMENT",
           "BEHAVIOR_DEFINITION",
-          "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "PACKAGE",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
         ],
         "HandlerCheckRun.object_type": [
           "CLASS",
@@ -1141,20 +1424,12 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
-          "LOCAL_TEST_CLASS",
-          "LOCAL_TYPES",
-          "LOCAL_DEFINITIONS",
-          "LOCAL_MACROS",
           "INTERFACE",
           "FUNCTION_GROUP",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "METADATA_EXTENSION"
         ],
         "HandlerDelete.object_type": [
           "PACKAGE",
@@ -1202,15 +1477,12 @@
           "PACKAGE",
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
           "TABLE",
           "STRUCTURE",
           "DDL",
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
           "LOCAL_TEST_CLASS",
           "LOCAL_TYPES",
           "LOCAL_DEFINITIONS",
@@ -1222,8 +1494,9 @@
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
+          "TRANSPORT"
         ],
         "HandlerLock.object_type": [
           "CLASS",
@@ -1266,27 +1539,24 @@
           "PACKAGE",
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
+          "FUNCTION_GROUP",
           "TABLE",
           "STRUCTURE",
           "DDL",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
           "LOCAL_TEST_CLASS",
           "LOCAL_TYPES",
           "LOCAL_DEFINITIONS",
           "LOCAL_MACROS",
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
           "INTERFACE",
-          "FUNCTION_GROUP",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "SERVICE_BINDING"
         ],
         "HandlerValidate.object_type": [
           "CLASS",
@@ -1303,7 +1573,49 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_BINDING"
+        ],
+        "HandlerWhereUsed.object_type": [
+          "CLASS",
+          "INTERFACE",
+          "PROGRAM",
+          "INCLUDE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "PACKAGE",
+          "TABLE",
+          "STRUCTURE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "DDL"
         ]
+      },
+      "argumentDescriptions": {
+        "HandlerActivate.object_type": "ABAP object type for routed compact operation. Names the object's type in the single form.",
+        "HandlerCheckRun.object_type": "Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, METADATA_EXTENSION.",
+        "HandlerCreate.object_type": "ABAP object type for routed compact operation.",
+        "HandlerDelete.object_type": "Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST.",
+        "HandlerDeletionCheck.object_type": "Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet.object_type": "ABAP object type for routed compact operation.",
+        "HandlerLock.object_type": "Object type. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.",
+        "HandlerProfileRun.target_type": "Run target kind.",
+        "HandlerUnlock.object_type": "Object type. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.",
+        "HandlerUpdate.object_type": "ABAP object type for routed compact operation.",
+        "HandlerValidate.object_type": "Object type to validate before create. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.",
+        "HandlerWhereUsed.object_type": "Type of the object whose usages are listed."
+      },
+      "descriptions": {
+        "HandlerActivate": "Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type takes object_adt_type (e.g. \"CLAS/OC\"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION or METADATA_EXTENSION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.",
+        "HandlerCheckRun": "[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks unsaved source given in the call, for CLASS, STRUCTURE and DDL.",
+        "HandlerCreate": "Creates the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the create request for its type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: PACKAGE(package_name*, super_package*), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), PROGRAM(program_name*, package_name*), INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, package_name*), METADATA_EXTENSION(name*, package_name*). Optional for every type: description, transport_request.",
+        "HandlerDelete": "Deletes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the deletion request for its type, and answers SAP's result. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), PROGRAM(program_name*, transport_request), INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). CDS_UNIT_TEST deletes its test class. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS and LOCAL_MACROS (the class's local includes) and UNIT_TEST (its test classes include) the include is written empty under lock_handle, the class's lock handle. transport_request is sent with the request. Over Streamable HTTP an include write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); it is sent only under a lock the instance it reaches holds.",
+        "HandlerDeletionCheck": "[read-only] Asks SAP whether the object named by object_type and object_name can be deleted: sends the deletion check request for its type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet": "[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, messages, document }, the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "HandlerLock": "Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*). Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).",
+        "HandlerProfileRun": "[read-only] Runs a class or a program in one request. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.",
+        "HandlerUnlock": "Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*), INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*); an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the unlock ends the instance's hold on the lock.",
+        "HandlerUpdate": "Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), PROGRAM(program_name*, source_code*, transport_request), INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version). For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.",
+        "HandlerValidate": "[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).",
+        "HandlerWhereUsed": "[read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
       }
     },
     "compact-ro": {
@@ -1368,15 +1680,12 @@
           "PACKAGE",
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
           "TABLE",
           "STRUCTURE",
           "DDL",
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "CLASS",
-          "UNIT_TEST",
-          "CDS_UNIT_TEST",
           "LOCAL_TEST_CLASS",
           "LOCAL_TYPES",
           "LOCAL_DEFINITIONS",
@@ -1388,8 +1697,9 @@
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
-          "RUNTIME_PROFILE",
-          "RUNTIME_DUMP"
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
+          "TRANSPORT"
         ],
         "HandlerValidate.object_type": [
           "CLASS",
@@ -1406,7 +1716,35 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_BINDING"
+        ],
+        "HandlerWhereUsed.object_type": [
+          "CLASS",
+          "INTERFACE",
+          "PROGRAM",
+          "INCLUDE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "PACKAGE",
+          "TABLE",
+          "STRUCTURE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "DDL"
         ]
+      },
+      "argumentDescriptions": {
+        "HandlerCheckRun.object_type": "Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, METADATA_EXTENSION.",
+        "HandlerDeletionCheck.object_type": "Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet.object_type": "ABAP object type for routed compact operation.",
+        "HandlerValidate.object_type": "Object type to validate before create. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.",
+        "HandlerWhereUsed.object_type": "Type of the object whose usages are listed."
+      },
+      "descriptions": {
+        "HandlerCheckRun": "[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks unsaved source given in the call, for CLASS, STRUCTURE and DDL.",
+        "HandlerDeletionCheck": "[read-only] Asks SAP whether the object named by object_type and object_name can be deleted: sends the deletion check request for its type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.",
+        "HandlerGet": "[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, messages, document }, the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.",
+        "HandlerValidate": "[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).",
+        "HandlerWhereUsed": "[read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on."
       }
     }
   },
@@ -1422,7 +1760,9 @@
         "ListLeftoverSessions",
         "LogoffLeftoverSession"
       ],
-      "members": {}
+      "members": {},
+      "argumentDescriptions": {},
+      "descriptions": {}
     },
     "core-ro": {
       "tools": [
@@ -1432,7 +1772,9 @@
         "ListLeftoverSessions",
         "LogoffLeftoverSession"
       ],
-      "members": {}
+      "members": {},
+      "argumentDescriptions": {},
+      "descriptions": {}
     },
     "compact": {
       "tools": [
@@ -1443,7 +1785,9 @@
         "HandlerLeftoverSessionList",
         "HandlerLeftoverSessionLogoff"
       ],
-      "members": {}
+      "members": {},
+      "argumentDescriptions": {},
+      "descriptions": {}
     },
     "compact-ro": {
       "tools": [
@@ -1451,7 +1795,9 @@
         "HandlerLeftoverSessionList",
         "HandlerLeftoverSessionLogoff"
       ],
-      "members": {}
+      "members": {},
+      "argumentDescriptions": {},
+      "descriptions": {}
     }
   }
 }

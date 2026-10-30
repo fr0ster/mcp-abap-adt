@@ -33,6 +33,7 @@ import {
   handleActivateObject,
   TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject';
+import { SINGLE_ACTIVATION } from '../../lib/adtProjections';
 
 /**
  * Which ADT type code reaches which family's own `activate()`.
@@ -98,8 +99,11 @@ describe('ActivateObject: each type code and where it goes', () => {
     const typeText =
       ActivateObjects.inputSchema.properties.objects.items.properties.type
         .description;
-    expect(typeText).toContain('TTYP (table type)');
-    expect(typeText).toContain('STRU (structure)');
+    // Each code, with the names that stand for it (`ACTIVATION_NAMES`).
+    expect(typeText).toContain('TTYP/DA (ttyp)');
+    expect(typeText).toContain('TABL/DS (structure, stru, stru/ds)');
+    // A bare main type no table lists is not offered.
+    expect(typeText).not.toContain('ENHO (');
   });
 });
 
@@ -131,7 +135,16 @@ describe('the preaudit text names exactly the codes the map routes to a family',
       ActivateObjectLow.inputSchema.properties.preaudit.description,
     ],
   ])('%s', (_tool, text) => {
-    expect(codesIn(text)).toEqual(Object.keys(TYPE_TO_FAMILY).sort());
+    // The projection of the variant (`SINGLE_ACTIVATION`), every value of
+    // which the map routes to a family; the codes no table holds that the map
+    // still reads (`doma/dm`, `bdef/bd`) are not offered.
+    expect(codesIn(text)).toEqual(
+      SINGLE_ACTIVATION.onprem.map((code) => code.toLowerCase()).sort(),
+    );
+    for (const code of codesIn(text)) {
+      expect(TYPE_TO_FAMILY[code]).toBeDefined();
+    }
     expect(codesIn(text)).not.toContain('clas');
+    expect(codesIn(text)).not.toContain('doma/dm');
   });
 });

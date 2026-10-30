@@ -7,10 +7,11 @@
  *   (`TOOLS_WITHOUT_NEED`) — never both, never neither. A new tool has to be
  *   placed, so the gate cannot silently miss it.
  * - Every need is one some table serves (on premise above all: no tool of
- *   that variant is lost by a mistyped need), and the compact members' needs
- *   name members their tools list.
+ *   that variant is lost by a mistyped need).
  * - The gate reads the table: a need a table does not list is not served
- *   there (`variantServes`), and a compact tool loses exactly those members.
+ *   there (`variantServes`), and a tool that states itself per variant
+ *   (`variants`, from the projections) is registered as it states itself on
+ *   the declared one.
  */
 
 import {
@@ -27,7 +28,6 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import {
-  COMPACT_MEMBER_NEEDS,
   servedDefinition,
   TOOL_NEEDS,
   TOOLS_WITHOUT_NEED,
@@ -72,15 +72,6 @@ describe('the needs against the tables', () => {
   it('every tool need is one ADT_TYPES_ONPREM lists', () => {
     const unserved = [...TOOL_NEEDS].filter(
       ([, need]) => !variantServes('onprem', need),
-    );
-    expect(unserved).toEqual([]);
-  });
-
-  it('every compact member need is one ADT_TYPES_ONPREM lists', () => {
-    const unserved = [...COMPACT_MEMBER_NEEDS].flatMap(([tool, needs]) =>
-      Object.entries(needs.members)
-        .filter(([, need]) => !variantServes('onprem', need))
-        .map(([member]) => `${tool}.${member}`),
     );
     expect(unserved).toEqual([]);
   });
@@ -135,35 +126,23 @@ describe('servedDefinition', () => {
     expect(servedDefinition(definition, 'onprem')).toBe(definition);
   });
 
-  it('a compact tool loses the members the table does not serve, nothing else', () => {
-    const schema = {
-      type: 'object',
-      properties: {
-        object_type: {
-          type: 'string',
-          enum: ['CLASS', 'PROGRAM', 'TRANSPORT'],
-        },
-        object_name: { type: 'string' },
+  it('a tool that states itself per variant is registered as it states itself there', () => {
+    const definition = {
+      ...tool('HandlerProfileRun', { type: 'object', properties: {} }),
+      variants: {
+        onprem: { description: 'on premise', inputSchema: { onprem: true } },
+        cloud: { description: 'on cloud', inputSchema: { cloud: true } },
       },
-      required: ['object_type'],
     };
-    const definition = tool('HandlerCreate', schema);
-    expect(servedDefinition(definition, 'onprem')).toBe(definition);
     expect(servedDefinition(definition, 'cloud')).toEqual({
       ...definition,
-      inputSchema: {
-        ...schema,
-        properties: {
-          ...schema.properties,
-          object_type: { type: 'string', enum: ['CLASS', 'TRANSPORT'] },
-        },
-      },
+      description: 'on cloud',
+      inputSchema: { cloud: true },
     });
-    // The shared schema object is not changed.
-    expect(schema.properties.object_type.enum).toEqual([
-      'CLASS',
-      'PROGRAM',
-      'TRANSPORT',
-    ]);
+    expect(servedDefinition(definition, 'onprem')).toEqual({
+      ...definition,
+      description: 'on premise',
+      inputSchema: { onprem: true },
+    });
   });
 });

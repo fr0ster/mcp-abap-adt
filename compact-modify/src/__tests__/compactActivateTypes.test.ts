@@ -1,3 +1,6 @@
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
+import { declareSystemKind } from '../../../src/lib/systemKind';
 import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
 
 /**
@@ -31,7 +34,11 @@ jest.mock('@mcp-abap-adt/lib/handlers/write', () => {
   };
 });
 
-const context = {} as never;
+// The refusal lists what the declared variant activates from object_type
+// alone (`COMPACT_ACTIVATE`), so the connection states its variant.
+const connection = recordingConnection();
+declareSystemKind(connection, 'onprem');
+const context: HandlerContext = { connection };
 const typeSent = () =>
   (sent as { objects: { type: string }[] }).objects[0].type;
 const nameSent = () =>
@@ -95,6 +102,21 @@ describe('HandlerActivate and the type it was given', () => {
         object_type: 'TRANSPORT',
       }),
     ).rejects.toThrow(/object_adt_type/);
+    // The types it names are what the variant's projection offers.
+    await expect(
+      handleHandlerActivate(context, {
+        object_name: 'ZCL_X',
+        object_type: 'TRANSPORT',
+      }),
+    ).rejects.toThrow(/Known without it: CLASS, PROGRAM, INTERFACE/);
+    declareSystemKind(connection, 'cloud');
+    await expect(
+      handleHandlerActivate(context, {
+        object_name: 'ZCL_X',
+        object_type: 'TRANSPORT',
+      }),
+    ).rejects.toThrow(/Known without it: CLASS, INTERFACE/);
+    declareSystemKind(connection, 'onprem');
 
     await expect(
       handleHandlerActivate(context, {

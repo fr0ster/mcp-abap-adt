@@ -94,7 +94,9 @@ describe("lib's read and write handler barrels", () => {
     // 19.0.0: the trace schedule and the class and program runs under a
     // profiler id, one request each, compact's `HandlerProfileSchedule` and
     // `HandlerProfileRun` (88).
-    expect(write).toHaveLength(88);
+    // 21.0.0: what HandlerActivate activates from object_type alone on the
+    // declared variant, the list its refusal names (89).
+    expect(write).toHaveLength(89);
   });
 
   it('share not one symbol', () => {

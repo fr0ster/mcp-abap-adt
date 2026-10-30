@@ -65,7 +65,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'ABAP package for the binding.',
+        description: 'ABAP package for the binding. Required for validation.',
       },
       service_binding_version: {
         type: 'string',
@@ -99,6 +99,12 @@ export async function handleValidateServiceBinding(
   if (!args?.service_definition_name) {
     return return_error(new Error('service_definition_name is required'));
   }
+  // The transport check names the binding's package: without one, adt-clients
+  // fails on it before any request (a TypeError), so it is refused here.
+  const packageName = args.package_name?.trim();
+  if (!packageName) {
+    return return_error(new Error('package_name is required'));
+  }
 
   const bindingName = args.service_binding_name.trim().toUpperCase();
   const detail = detailOf(args);
@@ -111,7 +117,7 @@ export async function handleValidateServiceBinding(
         .validate(
           {
             bindingName,
-            packageName: args.package_name?.trim().toUpperCase(),
+            packageName: packageName.toUpperCase(),
             description: args.description?.trim(),
           },
           { analyse: analyseException },

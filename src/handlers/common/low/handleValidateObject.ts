@@ -166,6 +166,13 @@ export async function handleValidateObject(
   return validateObject(context, { ...args, object_type: kind });
 }
 
+/** The names of `args` left out or empty, in their order. */
+function missingOf(args: Readonly<Record<string, string | undefined>>) {
+  return Object.entries(args)
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+}
+
 /** One object of a kind checked at the tool's boundary. */
 export async function validateObject(
   context: HandlerContext,
@@ -197,9 +204,15 @@ export async function validateObject(
   let normalizedImplementationType: ImplementationType | undefined;
   if (normalizedType === 'behavior_definition') {
     if (!package_name || !description || !root_entity || !implementation_type) {
+      const missing = missingOf({
+        package_name,
+        description,
+        root_entity,
+        implementation_type,
+      });
       return return_error(
         new Error(
-          'Behavior definition validation requires packageName, description, rootEntity, and implementationType parameters',
+          `Behavior definition validation requires package_name, description, root_entity and implementation_type; missing: ${missing.join(', ')}`,
         ),
       );
     }
@@ -217,18 +230,17 @@ export async function validateObject(
   }
   if (normalizedType === 'behavior_implementation' && !package_name) {
     return return_error(
-      new Error(
-        'Behavior implementation validation requires packageName parameter',
-      ),
+      new Error('Behavior implementation validation requires package_name'),
     );
   }
   if (
     (normalizedType === 'metadata_extension' || normalizedType === 'ddlx/ex') &&
     (!package_name || !description)
   ) {
+    const missing = missingOf({ description, package_name });
     return return_error(
       new Error(
-        'Metadata extension validation requires description and packageName parameters',
+        `Metadata extension validation requires description and package_name; missing: ${missing.join(', ')}`,
       ),
     );
   }

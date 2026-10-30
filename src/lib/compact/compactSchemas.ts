@@ -1021,7 +1021,7 @@ export function compactValidateSchemaFor<const M extends readonly string[]>(
       package_name: {
         type: 'string',
         description:
-          'Optional package context for validation (especially for create scenarios).',
+          'Package of the object to validate. Required for BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION and SERVICE_BINDING.',
       },
       super_package: {
         type: 'string',
@@ -1033,22 +1033,23 @@ export function compactValidateSchemaFor<const M extends readonly string[]>(
       },
       description: {
         type: 'string',
-        description: 'Optional object description used during validation.',
+        description:
+          'Object description used during validation. Required for BEHAVIOR_DEFINITION and METADATA_EXTENSION.',
       },
       behavior_definition: {
         type: 'string',
         description:
-          'Optional behavior definition name, used when validating behavior implementation.',
+          'Behavior definition the behavior implementation is for (BEHAVIOR_IMPLEMENTATION).',
       },
       root_entity: {
         type: 'string',
         description:
-          'Optional CDS root entity name, used for behavior-related validation.',
+          'CDS root entity of the behavior definition to validate. Required for BEHAVIOR_DEFINITION.',
       },
       implementation_type: {
         type: 'string',
         description:
-          'Optional implementation type, used for behavior implementation validation.',
+          'Implementation type of the behavior definition to validate (Managed, Unmanaged, Abstract or Projection). Required for BEHAVIOR_DEFINITION.',
       },
       service_definition_name: {
         type: 'string',
@@ -1094,7 +1095,8 @@ export function compactLockSchemaFor<const M extends readonly string[]>(
       ...lifecycleObjectSchema(members),
       super_package: {
         type: 'string',
-        description: 'Super package context when relevant.',
+        description:
+          'Super package of the package to lock. Required for PACKAGE.',
       },
     },
     required: ['object_type', 'object_name'],

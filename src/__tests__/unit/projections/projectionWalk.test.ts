@@ -29,7 +29,10 @@ import {
   TOOL_DEFINITION as HandlerDelete,
   handleHandlerDelete,
 } from '../../../../compact-modify/src/handlers/handleHandlerDelete';
-import { handleHandlerLock } from '../../../../compact-modify/src/handlers/handleHandlerLock';
+import {
+  TOOL_DEFINITION as HandlerLock,
+  handleHandlerLock,
+} from '../../../../compact-modify/src/handlers/handleHandlerLock';
 import { handleHandlerProfileRun } from '../../../../compact-modify/src/handlers/handleHandlerProfileRun';
 import { handleHandlerUnlock } from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
@@ -228,6 +231,7 @@ const VALUES: Readonly<Record<string, string>> = {
   function_module_name: 'Z_FM_A',
   name: 'ZOBJ_A',
   implementation_type: 'Managed',
+  root_entity: 'ZBDEF_A',
   behavior_definition_name: 'ZBDEF_A',
   behavior_implementation_name: 'ZBP_A',
   metadata_extension_name: 'ZDDLX_A',
@@ -269,20 +273,6 @@ const METADATA_ONLY = new Set<string>([
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
 ]);
-
-/**
- * What a validation needs beyond the name, for the types whose validation
- * request carries more (its package, a description, a behavior definition's
- * root entity and implementation type): the descriptions do not name them.
- */
-const VALIDATION_CONTEXT = {
-  package_name: 'ZPKG_A',
-  description: 'A description',
-  root_entity: 'ZBDEF_A',
-  implementation_type: 'Managed',
-  behavior_definition: 'ZBDEF_A',
-  service_definition_name: 'ZSRVD_A',
-};
 
 /** The object name a lifecycle tool takes: a function module's as GROUP|MODULE. */
 const objectNameOf = (member: string): string =>
@@ -407,13 +397,11 @@ const WALKS: Readonly<Record<string, Walk>> = {
   }),
   'HandlerLock.object_type': walk({
     values: COMPACT_LOCK,
-    send: (context, value) =>
+    send: (context, value, variant) =>
       handleHandlerLock(context, {
+        ...compactArguments(stated(HandlerLock, variant), value),
         object_type: value,
         object_name: objectNameOf(value),
-        // A package is locked under its super package; the description does
-        // not name it.
-        super_package: 'ZPKG_SUPER',
       }),
     routes: routesOf(COMPACT_LOCK_ROUTES),
   }),
@@ -429,9 +417,9 @@ const WALKS: Readonly<Record<string, Walk>> = {
   }),
   'HandlerValidate.object_type': walk({
     values: COMPACT_VALIDATE,
-    send: (context, value) =>
+    send: (context, value, variant) =>
       handleHandlerValidate(context, {
-        ...VALIDATION_CONTEXT,
+        ...compactArguments(stated(HandlerValidate, variant), value),
         object_type: value,
         object_name: objectNameOf(value),
       }),

@@ -1799,7 +1799,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Optional description used during validation.
-- `package_name` (string, optional) - ABAP package for the binding.
+- `package_name` (string, optional) - ABAP package for the binding. Required for validation.
 - `service_binding_name` (string, required) - Service binding name to validate.
 - `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
 - `service_definition_name` (string, required) - Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.

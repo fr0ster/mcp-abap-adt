@@ -202,7 +202,7 @@ function objectNamed<M extends string>(
 
 /** HandlerLock's description on `variant`. */
 export function compactLockDescription(variant: ProjectionVariant): string {
-  return `Lock operation. object_type required: ${objectNamed(COMPACT_LOCK[variant], {}, 'object_name*')}. Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).`;
+  return `Lock operation. object_type required: ${objectNamed(COMPACT_LOCK[variant], { PACKAGE: 'PACKAGE(object_name*, super_package*)' }, 'object_name*')}. Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).`;
 }
 
 /** HandlerUnlock's description on `variant`. */
@@ -218,8 +218,14 @@ export function compactValidateDescription(variant: ProjectionVariant): string {
       CLASS: 'CLASS(object_name*, superclass)',
       FUNCTION_MODULE: 'FUNCTION_MODULE(object_name* as GROUP|MODULE)',
       PACKAGE: 'PACKAGE(object_name*, super_package)',
+      BEHAVIOR_DEFINITION:
+        'BEHAVIOR_DEFINITION(object_name*, package_name*, description*, root_entity*, implementation_type*)',
+      BEHAVIOR_IMPLEMENTATION:
+        'BEHAVIOR_IMPLEMENTATION(object_name*, package_name*, behavior_definition)',
+      METADATA_EXTENSION:
+        'METADATA_EXTENSION(object_name*, description*, package_name*)',
       SERVICE_BINDING:
-        'SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*)',
+        'SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*, package_name*)',
     },
     'object_name*',
   )}.`;

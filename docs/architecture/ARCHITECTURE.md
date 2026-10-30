@@ -668,8 +668,8 @@ Each binary reads its own parameter table through lib's machinery (`src/lib/conf
 `CORE_PARAMETERS` (`server-runtime/src/stdio/config/coreParameters.ts`: the destination, browser and login rows),
 `HTTP_PARAMETERS` (`server-runtime/src/http/config/httpParameters.ts`) and `SSE_PARAMETERS`
 (`server-runtime/src/sse/config/sseParameters.ts`), each beside lib's shared rows (`--conf`,
-`--system-type`, `--state-idle-minutes`; the TLS rows in http and sse), and the tool set's removed
-`--exposition`. A table gives:
+`--system-type`; `--state-idle-minutes` and the TLS rows in http and sse — stdio has no idle bound
+and refuses it as a removed parameter), and the tool set's removed `--exposition`. A table gives:
 - CLI arguments, environment variables and YAML keys (`--conf <path>`; configuration only, a secret-looking key is refused); CLI beats env beats YAML
 - the help text, the `--conf` template and the YAML validation
 - the refusal of every other binary's options, and of `--transport` (gone), naming the binary that serves it

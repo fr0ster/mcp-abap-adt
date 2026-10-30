@@ -352,6 +352,8 @@ id is the consumer's explicit choice. The idle bound on waiting for the user
 (not under 30 minutes, the user's exception to "no timeouts") ends a forgotten
 session.
 
+The idle bound applies to HTTP and SSE only; stdio has none: its state ends by an explicit tool, the client closing stdin, the backend, or process shutdown.
+
 In user mode the debugger catches the requests of the connected user or of
 another named by `request_user` (measured end to end on premise, 2026-10-11,
 BASIS 816; it needs the debug authorization on that user). ADT cannot attach to

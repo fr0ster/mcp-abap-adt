@@ -47,7 +47,6 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 |-----|-------------|------|-------|---------|
 | `--conf=<path>` (alias `--config`) | — | — | path | The YAML config file of this binary; a missing file gets the binary's template and the start ends |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type, **required** (no default, never guessed): the tools offered, the connector and how the system's answers are read. stdio: a destination without it does not start; http/sse: the binary does not start (exit `1`, nothing listens). Inspection-only stdio needs none and lists every tool |
-| `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 | `--batch-keep-raw-parts` | `MCP_BATCH_KEEP_RAW_PARTS` | `batch.keepRawParts` | `true`, `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. Default `false`; any other value is refused at startup |
 | `--shutdown-timeout=<seconds>` | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | 1-86400 | Forces a shutdown not finished after this many seconds (default: none); see [Shutdown](#shutdown) |
 | `--help`, `-h` | — | — | — | The binary's help |
@@ -336,8 +335,12 @@ See [Authentication & Destinations](AUTHENTICATION.md) for the supported authent
 
 ### Held state
 
-`--state-idle-minutes` bounds the stdio instance's held state (a debug session); see
-[Held State](#held-state).
+stdio has no idle bound: the stdio server's life and its held state (a debug session, a batch)
+are the client's. They end by their stop tool, the client closing stdin, the backend's answer or
+the process's shutdown — never on the server's clock. `--state-idle-minutes` and the YAML key
+`state-idle-minutes` were removed from `mcp-abap-adt` in 20.1.1: each stops the start, naming the
+form used. `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an
+inherited one changes nothing, and stdio starts with no bound. See [Held State](#held-state).
 
 ### The debugger's ids
 
@@ -369,6 +372,7 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `http.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `http.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
 | `--tls-ca=<path>` | `MCP_TLS_CA` | `http.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
+| `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 
 Per request, the system context comes from the headers `x-sap-responsible`,
 `x-sap-master-system`, `x-sap-language`, and the debugger's `x-sap-debug-terminal-id` /
@@ -438,6 +442,7 @@ answered `400`; a `GET` or `POST` with `x-mcp-destination` is answered `400`.
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `sse.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `sse.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
 | `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
+| `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 
 The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
 `x-sap-debug-breakpoint-conflict` (and the other system
@@ -505,7 +510,8 @@ that must not be possible, run a `-ro` binary. See [Debugger](DEBUGGER.md).
 ## Held State
 
 **--state-idle-minutes=\<minutes\>** (env `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes`), on
-every binary.
+the HTTP and SSE binaries (`mcp-abap-adt-http`, `mcp-abap-adt-sse` and their compact and `-ro`
+variants). stdio has none (see below).
 
 State an instance holds between tool calls — a debug session: breakpoints, the listener, a
 stopped debuggee — ends after this many minutes without a tool call on that instance: a complete
@@ -520,15 +526,22 @@ call and is paused while any call is in flight, so a wait on the SAP system is n
 listener's own background re-polls do not count. It exists because the listener re-polls by
 itself, so SAP's own session timeout never ends an abandoned debug session.
 
-- `mcp-abap-adt`: the stdio instance's held state.
 - `mcp-abap-adt-http`: each pooled instance's held state, reached again with its `state_handle`;
   a long session left open ends here, its SAP session logged off.
 - `mcp-abap-adt-sse`: each SSE connection's instance, until the connection closes.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --state-idle-minutes=60 --system-type=cloud
 mcp-abap-adt-http --state-idle-minutes=60 --system-type=<onprem|cloud>
 ```
+
+**stdio (`mcp-abap-adt` and its compact and `-ro` variants) has no idle bound.** The stdio
+server's life and its state are governed only by the LLM client that started it: held state ends
+by its stop tool (`DebugStop`, `BatchEnd`, …), the client closing stdin (the server then shuts down
+and logs off), the backend's answer, or the process's shutdown — never on the server's clock.
+`--state-idle-minutes` and the YAML key `state-idle-minutes` were removed from the stdio binaries
+in 20.1.1: each stops the start, naming the form used, so a configuration that states a bound is
+never silently ignored. `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an
+inherited one changes nothing, and stdio starts with no bound.
 
 ## Environment Variables
 

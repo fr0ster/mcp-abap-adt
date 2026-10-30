@@ -88,8 +88,8 @@ export const AUTH_DEBUG_WARNING =
   "[MCP] --auth-debug is on: a refused token request's debug line on stderr names the first and last four characters of each secret it sent";
 
 /**
- * The state's lifecycle lines — the idle bound's end of a state, a cleanup
- * that failed — on stderr whatever DEBUG_AUTH_LOG says: they are what an
+ * The state's lifecycle lines — a cleanup that failed, an observer that
+ * threw — on stderr whatever DEBUG_AUTH_LOG says: they are what an
  * operator needs to see, and the transport logger is silent by default.
  */
 export const stateLoggerForTransport: StateLogger = stderrStateLogger;
@@ -110,8 +110,6 @@ ENVIRONMENT VARIABLES:
     MCP_BROWSER_PROGRAM            The program that opens the login URL (excludes MCP_BROWSER)
     MCP_RENEWAL                    refresh-then-login (default) | refresh-only (never a login)
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
-    MCP_STATE_IDLE_MINUTES         Held state (a debug session) ends after this many minutes
-                                   without a tool call: at least 30 (default: 30)
 
   Auth-Broker:
     DEBUG_AUTH_LOG                 Enable debug logging for auth-broker (true|false)
@@ -910,7 +908,6 @@ async function launchStdio(
       batch: new InstanceBatch({
         keepRawParts: config.batchKeepRawParts === true,
       }),
-      stateIdleMinutes: config.stateIdleMinutes,
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
       sentenceFor: (error) => factory.sentenceFor(error),

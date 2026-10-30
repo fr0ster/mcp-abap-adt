@@ -65,12 +65,13 @@ The map stays readable until the next `BatchEnd` replaces it (or the server inst
 so a phase can read the lock handles of the previous one while it is being recorded. A number
 never read is left with its map: when the map is replaced or the instance ends, its call is let
 go, nothing sent for it.
-`BatchAnswers` is served while a batch is open; nothing else of the batch runs on a clock — the
-held state's idle bound (`stateIdleMinutes`, 30 minutes by default) is the one clock that touches
-it.
+`BatchAnswers` is served while a batch is open; nothing else of the batch runs on a clock — over
+Streamable HTTP and SSE the held state's idle bound (`stateIdleMinutes`, 30 minutes by default)
+is the one clock that touches it. stdio has no idle bound: there no clock touches it, and the
+batch lasts until its `BatchEnd`, the client closing stdin, or the process's shutdown.
 
 When the server instance ends with a batch open — the client closes its connection (stdio, an SSE
-stream), the HTTP pool lets the instance go, a long session's `SessionClose`, the process shuts down — or the idle bound ends the
+stream), the HTTP pool lets the instance go, a long session's `SessionClose`, the process shuts down — or (HTTP, SSE) the idle bound ends the
 held state, the open batch is dropped: nothing recorded is sent, and the last batch's map goes
 with it. A `BatchEnd` after the idle bound is refused `batch_mode_off`, and `BatchAnswers` answers
 "no answer with that number".

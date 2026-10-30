@@ -5,7 +5,8 @@
  * or not a number is refused at startup, named in the form it was given.
  *
  * The row itself is lib's shared `STATE_IDLE_ROW` (`authParameters.ts`), in
- * every binary's table; this reads it alone.
+ * the HTTP and SSE binaries' tables (stdio has no idle bound); this reads it
+ * alone.
  */
 
 import {

@@ -108,7 +108,11 @@ describe('SHAPE 1 — a rename, still one call', () => {
     [
       'ValidateServiceBinding',
       handleValidateServiceBinding,
-      { service_binding_name: 'ZSB', service_definition_name: 'ZSD' },
+      {
+        service_binding_name: 'ZSB',
+        service_definition_name: 'ZSD',
+        package_name: 'ZPKG',
+      },
       'validate',
       undefined,
     ],
@@ -150,6 +154,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
     await handleValidateServiceBinding(context as any, {
       service_binding_name: 'ZSB',
       service_definition_name: 'ZSD',
+      package_name: 'ZPKG',
     });
     expect(seen).toEqual([analyseException]);
   });

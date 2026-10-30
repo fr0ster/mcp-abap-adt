@@ -473,13 +473,13 @@ describe('GetIncludesList', () => {
   it.each([
     [{ object_name: 'ZPROG', object_type: 'PROG/P' }],
     [{ object_name: 'ZINC_A', object_type: 'PROG/I' }],
-    [{ object_name: 'ZFG', object_type: 'FUGR' }],
+    [{ object_name: 'ZFG', object_type: 'FUGR/F' }],
     [{ object_name: 'SAPLZFG', object_type: 'PROG/P' }],
     [
       {
         objects: [
           { object_name: 'ZPROG', object_type: 'PROG/P' },
-          { object_name: 'ZFG', object_type: 'FUGR' },
+          { object_name: 'ZFG', object_type: 'FUGR/F' },
           { object_name: 'ZCL', object_type: 'CLAS/OC' },
           { object_name: 'ZNONE', object_type: 'PROG/P' },
         ],
@@ -552,7 +552,7 @@ describe('GetIncludesList', () => {
     await withinTurns(
       handleGetIncludesList(contextOn(fake), {
         object_name: 'ZFG',
-        object_type: 'FUGR',
+        object_type: 'FUGR/F',
       }),
       TURNS,
     );
@@ -730,7 +730,7 @@ describe('GetIncludesList', () => {
     const result = await handleGetIncludesList(contextOn(fake), {
       object_name: 'ZPROG',
       object_type: 'PROG/P',
-      objects: [{ object_name: 'ZFG', object_type: 'FUGR' }],
+      objects: [{ object_name: 'ZFG', object_type: 'FUGR/F' }],
     });
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(fake.envelopes).toHaveLength(0);

@@ -334,7 +334,7 @@
     "SessionOpen": "state_handle"
   },
   "mcp-abap-adt-compact-http": {
-    "HandlerActivate": "object_type, object_name, object_adt_type, objects, preaudit, state_handle",
+    "HandlerActivate": "object_type, object_name, function_group_name, object_adt_type, objects, preaudit, state_handle",
     "HandlerBackgroundRunDiscard": "run_handle*, state_handle",
     "HandlerBackgroundRunGet": "run_handle*, state_handle",
     "HandlerBackgroundRunList": "state_handle",

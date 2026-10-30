@@ -1,6 +1,8 @@
 let toClient: unknown;
 
 jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
   createAdtClient: () => ({
     getUtils: () => ({
       activateObjectsGroup: (objects: unknown) => {

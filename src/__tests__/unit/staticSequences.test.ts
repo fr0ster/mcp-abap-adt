@@ -61,6 +61,8 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 let fakeClient: any;
 let programExecutor: Record<string, unknown>;
 jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
   createAdtClient: () => fakeClient,
   // SHAPE 3's door: `handleRuntimeRunProgram.ts` reaches its members through
   // the on-premise executor (`createOnPremExecutor`, an `AdtExecutor<'onprem'>`).

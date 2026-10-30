@@ -37,7 +37,11 @@ import {
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+}));
 
 const payloadOf = (result: any) => JSON.parse(result.content[0].text);
 

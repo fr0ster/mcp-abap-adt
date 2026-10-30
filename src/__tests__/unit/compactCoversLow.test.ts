@@ -185,7 +185,7 @@ describe('compact covers what the low set did', () => {
       object_type: 'FUNCTION_MODULE',
       object_name: 'FM_A',
     }).catch((error: Error) => ({ text: error.message }));
-    expect(answered.text).toContain('parentName');
+    expect(answered.text).toContain('function_group_name');
     expect(answered.text).not.toMatch(/\w+Low\b/);
   });
 });

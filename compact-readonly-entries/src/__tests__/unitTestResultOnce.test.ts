@@ -30,6 +30,10 @@ import {
   TOOL_DEFINITION as RESULT_TOOL,
 } from '../handlers/handleHandlerUnitTestResult';
 
+// The process declares its system type, as every launcher requires: the
+// type argument is checked against the declared variant's projection.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
 async function settle(): Promise<void> {

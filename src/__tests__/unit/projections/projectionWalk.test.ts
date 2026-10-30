@@ -393,10 +393,11 @@ const WALKS: Readonly<Record<string, Walk>> = {
   }),
   'HandlerActivate.object_type': walk({
     values: COMPACT_ACTIVATE,
+    // A function module is named under its group, as the description says.
     send: (context, value) =>
       handleHandlerActivate(context, {
         object_type: value,
-        object_name: 'ZOBJ_A',
+        object_name: objectNameOf(value),
       }),
     routes: new Map(
       Object.entries(COMPACT_ACTIVATE_ROUTES).map(

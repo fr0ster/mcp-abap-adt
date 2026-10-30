@@ -11,10 +11,25 @@ const activates = (family: string) => () => ({
   },
 });
 
+const families = () => ({
+  getClass: activates('class'),
+  getProgram: activates('program'),
+  getInterface: activates('interface'),
+  getFunctionGroup: activates('functionGroup'),
+  getTable: activates('table'),
+  getStructure: activates('structure'),
+  getDdl: activates('ddl'),
+  getDomain: activates('domain'),
+  getDataElement: activates('dataElement'),
+  getBehaviorDefinition: activates('behaviorDefinition'),
+  getMetadataExtension: activates('metadataExtension'),
+});
+
 jest.mock('../../lib/clients', () => ({
+  variantOf: () => 'onprem',
+  createOnPremAdtClient: () => families(),
   createAdtClient: () => ({
-    getStructure: activates('structure'),
-    getTable: activates('table'),
+    ...families(),
     getUtils: () => ({
       activateObjectsGroup: (objects: unknown) => {
         groupObjects = objects;
@@ -31,9 +46,11 @@ import { TOOL_DEFINITION as ActivateObjects } from '../../handlers/common/high/h
 import {
   TOOL_DEFINITION as ActivateObjectLow,
   handleActivateObject,
-  TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject';
-import { SINGLE_ACTIVATION } from '../../lib/adtProjections';
+import {
+  SINGLE_ACTIVATION,
+  SINGLE_ACTIVATION_ROUTES,
+} from '../../lib/adtProjections';
 
 /**
  * Which ADT type code reaches which family's own `activate()`.
@@ -57,22 +74,45 @@ describe('ActivateObject: each type code and where it goes', () => {
     ['clas/oc', 'class'],
     ['prog/p', 'program'],
     ['intf/oi', 'interface'],
-    ['fugr/f', 'function_group'],
+    ['fugr/f', 'functionGroup'],
     ['tabl/dt', 'table'],
     ['tabl/ds', 'structure'],
     ['ddls/df', 'ddl'],
     ['doma/dd', 'domain'],
-    ['doma/dm', 'domain'],
-    ['dtel/de', 'data_element'],
-    ['bdef/bd', 'behavior_definition'],
-    ['bdef/bdo', 'behavior_definition'],
-    ['ddlx/ex', 'metadata_extension'],
-  ])('%s reaches the %s family', (code, family) => {
-    expect(TYPE_TO_FAMILY[code]).toBe(family);
+    ['dtel/de', 'dataElement'],
+    ['bdef/bdo', 'behaviorDefinition'],
+    ['ddlx/ex', 'metadataExtension'],
+  ])('%s reaches the %s activation', async (code, api) => {
+    await handleActivateObject(context, {
+      objects: [{ name: 'zobj', type: code }],
+    } as never);
+    expect(familyCalls).toHaveLength(1);
+    expect(familyCalls[0]?.startsWith(`${api}:`)).toBe(true);
+    expect(groupObjects).toBeUndefined();
   });
 
-  it.each(['ttyp/da', 'ttyp/st'])('%s has no family', (code) => {
-    expect(TYPE_TO_FAMILY[code]).toBeUndefined();
+  // The served codes (`DOMA/DD`, `BDEF/BDO`) are pinned above; the codes no
+  // release lists that the old map read are refused, nothing sent.
+  it.each(['doma/dm', 'bdef/bd', 'ttyp/st'])(
+    '%s is no code a single activation or a group takes',
+    async (code) => {
+      const answered = (await handleActivateObject(context, {
+        objects: [{ name: 'zobj', type: code }],
+      } as never)) as { isError?: boolean; content: { text: string }[] };
+      expect(answered.isError).toBe(true);
+      expect(answered.content[0]?.text).toContain(
+        `objects[].type "${code}" is not one of: CLAS/OC`,
+      );
+      expect(familyCalls).toEqual([]);
+      expect(groupObjects).toBeUndefined();
+    },
+  );
+
+  it.each(['ttyp/da', 'ttyp'])('%s has no single activation', (code) => {
+    expect(Object.hasOwn(SINGLE_ACTIVATION_ROUTES, code)).toBe(false);
+    expect(Object.hasOwn(SINGLE_ACTIVATION_ROUTES, code.toUpperCase())).toBe(
+      false,
+    );
   });
 
   it("activates a TABL/DS through the structure family's own activate()", async () => {
@@ -136,13 +176,16 @@ describe('the preaudit text names exactly the codes the map routes to a family',
     ],
   ])('%s', (_tool, text) => {
     // The projection of the variant (`SINGLE_ACTIVATION`), every value of
-    // which the map routes to a family; the codes no table holds that the map
-    // still reads (`doma/dm`, `bdef/bd`) are not offered.
+    // which `SINGLE_ACTIVATION_ROUTES` routes to its API's activation; the
+    // codes no table holds (`doma/dm`, `bdef/bd`) are not offered.
     expect(codesIn(text)).toEqual(
       SINGLE_ACTIVATION.onprem.map((code) => code.toLowerCase()).sort(),
     );
+    const routed = Object.keys(SINGLE_ACTIVATION_ROUTES).map((code) =>
+      code.toLowerCase(),
+    );
     for (const code of codesIn(text)) {
-      expect(TYPE_TO_FAMILY[code]).toBeDefined();
+      expect(routed).toContain(code);
     }
     expect(codesIn(text)).not.toContain('clas');
     expect(codesIn(text)).not.toContain('doma/dm');

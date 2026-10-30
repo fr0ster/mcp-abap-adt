@@ -81,7 +81,11 @@ import {
 } from '../helpers/fakeClient';
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+}));
 // The unit-test Get* functions take their runner from `AdtExecutor` (adt-clients
 // 24), not from `createAdtClient`: route that door to the same double.
 jest.mock('../../handlers/unit_test/shared/runTests', () => ({
@@ -491,9 +495,9 @@ describe('resolveVersionedObject', () => {
     ).toThrow(/function_group_name is required/);
   });
 
-  it('answers null for an unknown object_type', () => {
-    expect(resolveVersionedObject(client, 'domain', 'zd')).toBeNull();
-  });
+  // An unknown object_type no longer reaches it: the kind is typed by the
+  // version tools' projection (`VersionedKind`), so a domain does not compile
+  // (`src/__tests__/typecheck/adtBoundary.typecheck.ts`).
 });
 
 describe('the members that accept an analyse strategy, which one is deliberately withheld, and the rest that never had one', () => {

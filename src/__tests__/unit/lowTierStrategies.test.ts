@@ -107,6 +107,8 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 const seen = recordAnalyse();
 let fakeClient: unknown = seen.client;
 jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
   createAdtClient: () => fakeClient,
   createOnPremAdtClient: () => fakeClient,
 }));

@@ -215,9 +215,10 @@ describe('--state-idle-minutes is gone from core', () => {
       'stateIdleMinutes' in
         readCoreConfig([], { MCP_STATE_IDLE_MINUTES: '45' }),
     ).toBe(false);
-    const { stderr, exits, served, servers } = await start([], {
-      MCP_STATE_IDLE_MINUTES: '45',
-    });
+    const { stderr, exits, served, servers } = await start(
+      ['--system-type=onprem'],
+      { MCP_STATE_IDLE_MINUTES: '45' },
+    );
     expect(stderr).not.toContain('MCP_STATE_IDLE_MINUTES');
     expect(exits).toEqual([]);
     expect(served).toBe(1);

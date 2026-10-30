@@ -112,8 +112,9 @@ describe('stdio: the end of stdin ends the process', () => {
         stdin: new EventEmitter(),
       });
       const [, serverSide] = InMemoryTransport.createLinkedPair();
-      // No destination: inspection-only mode, nothing reaches a system.
-      const config = readCoreConfig([], {}, null);
+      // No destination: inspection-only mode, nothing reaches a system; it
+      // lists the tools of the stated system type's table.
+      const config = readCoreConfig(['--system-type=onprem'], {}, null);
       await launch(
         config,
         {

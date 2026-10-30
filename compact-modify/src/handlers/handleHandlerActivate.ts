@@ -1,4 +1,3 @@
-import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import {
   acceptedOf,
   byVariant,
@@ -60,7 +59,12 @@ type HandlerActivateArgs = {
   object_name?: string;
   object_adt_type?: string;
   function_group_name?: string;
-  objects?: Array<IObjectReference & { uri?: string }>;
+  objects?: Array<{
+    name: string;
+    type: string;
+    parentName?: string;
+    uri?: string;
+  }>;
   preaudit?: boolean;
 };
 

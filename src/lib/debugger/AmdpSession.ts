@@ -58,9 +58,12 @@ import {
   leaveBehind,
   thrownFailure,
 } from './failures';
-import { lineUriOf } from './objectUri';
+import { type BreakpointLabel, lineUriOf } from './objectUri';
 import { failureText } from './readings';
 import { Serial } from './serial';
+
+/** An AMDP breakpoint's object: the class whose method is the procedure. */
+const AMDP_LABEL: BreakpointLabel = 'CLAS';
 
 export type AmdpDebuggerT = AmdpDebugger<typeof amdpDebuggerDocuments>;
 export interface AmdpSessionPorts<O = unknown> {
@@ -331,7 +334,7 @@ export class AmdpSession<O = unknown> {
     const breakpoints = list.map((b) => ({
       clientId: randomUUID(),
       uri: lineUriOf(
-        { object_type: 'CLAS', object_name: b.class_name },
+        { object_type: AMDP_LABEL, object_name: b.class_name },
         b.line,
       ),
     }));
@@ -958,7 +961,7 @@ export class AmdpSession<O = unknown> {
       const breakpoints = list.map((b) => ({
         clientId: randomUUID(),
         uri: lineUriOf(
-          { object_type: 'CLAS', object_name: b.class_name },
+          { object_type: AMDP_LABEL, object_name: b.class_name },
           b.line,
         ),
       }));

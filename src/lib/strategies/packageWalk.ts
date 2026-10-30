@@ -12,6 +12,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
+import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
 import {
   failureEntry,
@@ -39,7 +40,7 @@ import { atStep, carryingFailure } from './step';
  */
 export interface NodeStructureSource {
   fetchNodeStructure(
-    parentType: string,
+    parentType: AdtTypeCode,
     parentName: string,
     options?: {
       nodeId?: string;
@@ -59,7 +60,7 @@ type NodeStructureOptions = {
 /** The utilities' `fetchNodeStructure` as adt-clients declares it: it takes its header pair. */
 export interface NodeStructureMembers<R> {
   fetchNodeStructure(
-    parentType: string,
+    parentType: AdtTypeCode,
     parentName: string,
     options: { headers: IAdtHeaders } & NodeStructureOptions,
   ): Promise<R>;
@@ -74,7 +75,7 @@ export function nodeStructureOn<R>(
   utils: NodeStructureMembers<R>,
 ): {
   fetchNodeStructure(
-    parentType: string,
+    parentType: AdtTypeCode,
     parentName: string,
     options?: NodeStructureOptions,
   ): Promise<R>;
@@ -195,7 +196,7 @@ export async function rootByRoot<I, R>(
 
 /** One node structure request of a walk. */
 export interface NodeRequest {
-  parentType: string;
+  parentType: AdtTypeCode;
   parentName: string;
   nodeId?: string;
   withShortDescriptions: boolean;
@@ -408,6 +409,9 @@ export interface PackageItem {
   isPackage: boolean;
 }
 
+/** The code of a package, the root of every tree. */
+const PACKAGE_CODE: AdtCodes<'DEVC/K'> = 'DEVC/K';
+
 /** One node of a tree. */
 export interface PackageNode {
   name: string;
@@ -456,35 +460,39 @@ export function kindOf(
   return code === undefined ? undefined : PACKAGE_ITEM_KINDS[code];
 }
 
-/** Whether the object's editor content is XML or source. Tree only. */
+/**
+ * Each code's editor content: XML (a package, a domain, a data element, a
+ * function group) or source. A code not here has none to name.
+ */
+const CODE_FORMATS: Readonly<Partial<Record<AdtTypeCode, CodeFormat>>> = {
+  'DEVC/K': 'xml',
+  'DOMA/DD': 'xml',
+  'DTEL/DE': 'xml',
+  'FUGR/F': 'xml',
+  'CLAS/OC': 'source',
+  'INTF/OI': 'source',
+  'PROG/P': 'source',
+  'PROG/I': 'source',
+  'DDLS/DF': 'source',
+  'DDLX/EX': 'source',
+  'SRVD/SRV': 'source',
+  'TABL/DT': 'source',
+  'TABL/DS': 'source',
+  'TTYP/DA': 'source',
+  'FUGR/FF': 'source',
+  'BDEF/BDO': 'source',
+};
+
+/**
+ * Whether the object's editor content is XML or source, by the code of the
+ * tables the answer names (`tableCodeOf`). Tree only.
+ */
 export function codeFormatOf(
   adtType: string | undefined,
 ): CodeFormat | undefined {
-  const type = (adtType ?? '').toUpperCase();
-  if (!type) return undefined;
-  if (type === 'DEVC' || type.startsWith('DEVC/')) return 'xml';
-  if (type.startsWith('DOMA/')) return 'xml';
-  if (type.startsWith('DTEL/')) return 'xml';
-  if (type === 'FUGR' || type === 'FUGR/F') return 'xml';
-  for (const prefix of [
-    'CLAS/',
-    'INTF/',
-    'PROG/',
-    'DDLS/',
-    'DDLX/',
-    'SRVD/',
-    'TABL/DT',
-    'TABL/DS',
-    'STRU/',
-    'TTYP/',
-    'FUGR/FF',
-    'BDEF/',
-    'BIMP/',
-    'BIMPL/',
-  ]) {
-    if (type.startsWith(prefix)) return 'source';
-  }
-  return undefined;
+  if (!adtType) return undefined;
+  const code = tableCodeOf(adtType);
+  return code === undefined ? undefined : CODE_FORMATS[code];
 }
 
 const RESTORABLE = new Set<string>([
@@ -912,7 +920,7 @@ export function assembleTree(
 
   return {
     name: rootName,
-    type: 'DEVC/K',
+    type: PACKAGE_CODE,
     kind: 'package',
     isPackage: true,
     codeFormat: 'xml',

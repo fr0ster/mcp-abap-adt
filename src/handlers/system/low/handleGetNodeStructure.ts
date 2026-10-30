@@ -220,7 +220,7 @@ async function nodeStructure(
             return succeededLevel(nodeLevel({ data: rawXml }));
           }
 
-          if (parent_type.toUpperCase() !== 'DEVC/K') {
+          if (parentType !== 'DEVC/K') {
             // Nothing below this node. See the header: measured on a class
             // that exists, so the blank body is the answer, not a refusal.
             return succeededLevel({ objects: [], childNodes: [] });

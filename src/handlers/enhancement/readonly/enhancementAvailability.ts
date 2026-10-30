@@ -1,6 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtCodes } from '../../../lib/adtProjections';
 import { isCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -38,7 +38,7 @@ export function notThroughAdt(name: string, type: string): string | undefined {
 export async function enhancementTypeOf(
   connection: IAbapConnection,
   name: string,
-  objectType: Extract<AdtTypeCode, 'ENHO/XHH' | 'ENHS/XSB'>,
+  objectType: AdtCodes<'ENHO/XHH' | 'ENHS/XSB'>,
 ): Promise<string | undefined> {
   try {
     const searched = await createAdtClient(connection)

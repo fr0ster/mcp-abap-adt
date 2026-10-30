@@ -1,4 +1,10 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type {
+  AdtModernVariant,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { UtilsApi } from '../../../lib/adtClientContract';
 import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   INCLUDES_PARENT_MAIN_TYPES,
@@ -8,7 +14,11 @@ import {
   type ProjectionVariant,
   supported,
 } from '../../../lib/adtProjections';
-import { acceptedCodeOf, sharedMainType } from '../../../lib/adtTypeCode';
+import {
+  acceptedCodeOf,
+  sharedMainType,
+  tableCodeOf,
+} from '../../../lib/adtTypeCode';
 import {
   answerCaught,
   failedPayloadOf,
@@ -255,7 +265,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
 
-    const utils = createAdtClient(connection, logger).getUtils(ourUtils) as any;
+    const utils = createAdtClient(connection, logger).getUtils(ourUtils);
 
     /** What could not be read, and why — reported beside the tree. */
     const unreadable: Record<string, unknown>[] = [];
@@ -284,7 +294,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       return '';
     };
     const readInclude = async (name: string) =>
-      sourceOf(name, utils.getInclude(name));
+      sourceOf(name, utils.getInclude(name, { analyse: analyseException }));
 
     // Two different things, and one `visited` set was calling both a cycle.
     //
@@ -332,7 +342,9 @@ async function includesListOf(context: HandlerContext, args: any) {
       // main), with no name of their own.
       const meta = await sourceOf(
         `class ${parent.name}`,
-        utils.readObjectMetadata('CLAS/OC', parent.name),
+        utils.readObjectMetadata('CLAS/OC', parent.name, undefined, {
+          analyse: analyseException,
+        }),
       );
       children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
         (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
@@ -372,7 +384,13 @@ async function includesListOf(context: HandlerContext, args: any) {
         parent.kind === 'PROG/P'
           ? await sourceOf(
               `program ${parent.name}`,
-              utils.readObjectSource('PROG/P', parent.name),
+              utils.readObjectSource(
+                'PROG/P',
+                parent.name,
+                undefined,
+                undefined,
+                { analyse: analyseException },
+              ),
             )
           : await readInclude(parent.name);
       children = await expand(
@@ -424,19 +442,26 @@ const readKey = (read: IncludeRead): string =>
     ? `group:${read.name}:${read.nodeId ?? ''}`
     : `${read.kind}:${read.name}`;
 
+/** The utilities every read of this tool is sent on. */
+type IncludeUtils = UtilsApi<typeof ourUtils, AdtModernVariant>;
+
 /** `read` sent on `utils`, as the sequential version sends it. */
 function sendRead(
   context: AdtHeadersContext,
-  utils: any,
+  utils: IncludeUtils,
   read: IncludeRead,
 ): Promise<unknown> {
   switch (read.kind) {
     case 'program':
-      return utils.readObjectSource('PROG/P', read.name);
+      return utils.readObjectSource('PROG/P', read.name, undefined, undefined, {
+        analyse: analyseException,
+      });
     case 'include':
-      return utils.getInclude(read.name);
+      return utils.getInclude(read.name, { analyse: analyseException });
     case 'class':
-      return utils.readObjectMetadata('CLAS/OC', read.name);
+      return utils.readObjectMetadata('CLAS/OC', read.name, undefined, {
+        analyse: analyseException,
+      });
     case 'group': {
       // `fetchFunctionGroupChildren`'s two requests: the group's node
       // structure, then its includes node — on the source it reads.
@@ -544,8 +569,9 @@ function includesNodeOf(result: PhaseResult<unknown>): string | undefined {
     IAdtError
   >;
   if (!response.ok) return undefined;
-  return response.getResult().value.childNodes.find((c) => c.type === 'FUGR/I')
-    ?.nodeId;
+  return response
+    .getResult()
+    .value.childNodes.find((c) => tableCodeOf(c.type) === 'FUGR/I')?.nodeId;
 }
 
 /**

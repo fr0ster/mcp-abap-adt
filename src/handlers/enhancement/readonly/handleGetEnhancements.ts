@@ -15,6 +15,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../../../lib/adtHeaders/withAdtHeaders';
+import type { AdtCodes, AdtMainTypeOf } from '../../../lib/adtProjections';
 import {
   type FailureEntry,
   failedPayloadOf,
@@ -48,6 +49,33 @@ import { logger, return_error } from '../../../lib/utils';
  * catch blocks need in order to avoid double-wrapping a message.
  */
 class EnhancementInputError extends Error {}
+
+/**
+ * How a caller may name a host GetEnhancements reads by its type: the code,
+ * its main type, and the tool's own names, each upper-cased.
+ */
+interface HostSpelling {
+  readonly code: AdtTypeCode;
+  readonly main?: AdtMainTypeOf<AdtTypeCode>;
+  readonly names: readonly string[];
+}
+
+/** The hosts GetEnhancements takes a type for, as a caller may name each. */
+const HOST_SPELLINGS = {
+  class: { code: 'CLAS/OC', main: 'CLAS', names: ['CLASS'] },
+  group: {
+    code: 'FUGR/F',
+    main: 'FUGR',
+    names: ['FUNCTION_GROUP', 'FUNCTIONGROUP'],
+  },
+  program: { code: 'PROG/P', main: 'PROG', names: ['PROGRAM'] },
+  include: { code: 'PROG/I', names: ['INCLUDE'] },
+} as const satisfies Readonly<Record<string, HostSpelling>>;
+
+/** Whether `kind`, upper-cased, names `host`. */
+function spelledAs(kind: string, host: HostSpelling): boolean {
+  return kind === host.code || kind === host.main || host.names.includes(kind);
+}
 
 export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
@@ -382,21 +410,16 @@ async function determineObjectTypeAndPath(
   };
 
   // The type the caller named, taken at its word.
-  if (kind === 'CLASS' || kind === 'CLAS' || kind === 'CLAS/OC') {
+  if (spelledAs(kind, HOST_SPELLINGS.class)) {
     return withReport(classPath);
   }
-  if (
-    kind === 'FUNCTION_GROUP' ||
-    kind === 'FUNCTIONGROUP' ||
-    kind === 'FUGR' ||
-    kind === 'FUGR/F'
-  ) {
+  if (spelledAs(kind, HOST_SPELLINGS.group)) {
     return groupPath(saplGroup ?? name);
   }
-  if (kind === 'PROGRAM' || kind === 'PROG' || kind === 'PROG/P') {
+  if (spelledAs(kind, HOST_SPELLINGS.program)) {
     return withReport(saplGroup ? groupPath(saplGroup) : programPath);
   }
-  if (kind === 'INCLUDE' || kind === 'PROG/I') {
+  if (spelledAs(kind, HOST_SPELLINGS.include)) {
     const include = await asInclude();
     if (include) return withReport(include);
     return unresolved(`Include ${objectName} could not be read.`);
@@ -473,7 +496,9 @@ async function getIncludesListInternal(
       (upper.startsWith('SAPL') && upper.length > 4);
     const parentName =
       isGroup && upper.startsWith('SAPL') ? upper.slice(4) : upper;
-    const parentType = isGroup ? 'FUGR/F' : 'PROG/P';
+    const parentType: AdtCodes<'FUGR/F' | 'PROG/P'> = isGroup
+      ? 'FUGR/F'
+      : 'PROG/P';
 
     if (objectType === 'include') {
       logger?.warn(
@@ -1174,21 +1199,16 @@ function pathFromAnswers(
     };
   };
 
-  if (kind === 'CLASS' || kind === 'CLAS' || kind === 'CLAS/OC') {
+  if (spelledAs(kind, HOST_SPELLINGS.class)) {
     return withReport(classPath);
   }
-  if (
-    kind === 'FUNCTION_GROUP' ||
-    kind === 'FUNCTIONGROUP' ||
-    kind === 'FUGR' ||
-    kind === 'FUGR/F'
-  ) {
+  if (spelledAs(kind, HOST_SPELLINGS.group)) {
     return groupPath(saplGroup ?? name);
   }
-  if (kind === 'PROGRAM' || kind === 'PROG' || kind === 'PROG/P') {
+  if (spelledAs(kind, HOST_SPELLINGS.program)) {
     return withReport(saplGroup ? groupPath(saplGroup) : programPath);
   }
-  if (kind === 'INCLUDE' || kind === 'PROG/I') {
+  if (spelledAs(kind, HOST_SPELLINGS.include)) {
     const include = asInclude();
     if (include) return withReport(include);
     return unresolved(`Include ${objectName} could not be read.`);
@@ -1641,19 +1661,12 @@ async function enhancementsInPhases(
   );
 }
 
-/** The object types whose call is one request: the elements, read directly. */
-const ONE_REQUEST_TYPES = new Set([
-  'CLASS',
-  'CLAS',
-  'CLAS/OC',
-  'FUNCTION_GROUP',
-  'FUNCTIONGROUP',
-  'FUGR',
-  'FUGR/F',
-  'PROGRAM',
-  'PROG',
-  'PROG/P',
-]);
+/** The hosts whose call is one request: the elements, read directly. */
+const ONE_REQUEST_HOSTS: readonly HostSpelling[] = [
+  HOST_SPELLINGS.class,
+  HOST_SPELLINGS.group,
+  HOST_SPELLINGS.program,
+];
 
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): unknown {
@@ -1705,7 +1718,10 @@ export async function handleGetEnhancements(
         .trim()
         .toUpperCase();
       // The elements of an object named by its type: one request.
-      if (!options.includeNested && ONE_REQUEST_TYPES.has(kind)) {
+      if (
+        !options.includeNested &&
+        ONE_REQUEST_HOSTS.some((host) => spelledAs(kind, host))
+      ) {
         return await enhancementsOf(context, args);
       }
       return await withSequentialFallback<McpResult>(

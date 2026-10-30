@@ -118,7 +118,11 @@ export interface OrchestratorDeps {
 
 const DEFAULTS = {
   include_subpackages: true,
-  object_types: ['PROG', 'FUGR', 'CLAS'] as const,
+  object_types: [
+    'PROG',
+    'FUGR',
+    'CLAS',
+  ] as const satisfies readonly ScanObjectType[],
   exclude_comments: false,
   max_hits_per_object: 100,
   emit_no_hits: false,

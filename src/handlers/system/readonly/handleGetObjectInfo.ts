@@ -189,7 +189,7 @@ function enrichmentOf(
 /** A node of a tree: an object read with its own type folders. */
 interface InfoNode {
   root: number;
-  type: string;
+  type: AdtTypeCode;
   name: string;
   depth: number;
   children: Array<TreeNode | InfoNode>;
@@ -480,9 +480,12 @@ async function buildTrees(
     const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
     // A function module or include is read at its group: the node it was
     // found under.
-    const functionGroup = node.type.toUpperCase().startsWith('FUGR')
-      ? node.name
-      : undefined;
+    const functionGroup =
+      node.type === 'FUGR/F' ||
+      node.type === 'FUGR/FF' ||
+      node.type === 'FUGR/I'
+        ? node.name
+        : undefined;
     leaves.push({
       root: node.root,
       leaf,
@@ -558,10 +561,15 @@ async function buildTrees(
       const level = settle(node, typeAnswers[i] as (typeof typeAnswers)[0]);
       if (level === undefined) return;
       for (const o of level.objects) {
-        if (kindOf(o.type) === 'package' && node.depth + 1 < limit(node)) {
+        const code = tableCodeOf(o.type);
+        if (
+          code !== undefined &&
+          kindOf(code) === 'package' &&
+          node.depth + 1 < limit(node)
+        ) {
           const sub: InfoNode = {
             root: node.root,
-            type: o.type,
+            type: code,
             name: o.name,
             depth: node.depth + 1,
             children: [],

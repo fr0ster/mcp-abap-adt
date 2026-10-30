@@ -1,5 +1,6 @@
 import { enhancementDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { tableCodeOf } from '../../../lib/adtTypeCode';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -35,8 +36,9 @@ function explainByType(
 ): string | undefined {
   const notExposed = notThroughAdt(name, type);
   if (notExposed) return notExposed;
-  if (type === 'ENHO/XHB') return `${name}: ${NO_SOURCE.enhoxhb}`;
-  if (type === 'ENHO/XHH' && collection !== 'enhoxhh')
+  const code = tableCodeOf(type);
+  if (code === 'ENHO/XHB') return `${name}: ${NO_SOURCE.enhoxhb}`;
+  if (code === 'ENHO/XHH' && collection !== 'enhoxhh')
     return `${name} is a source code plugin (ENHO/XHH): read it with enhancement_spot "enhoxhh".`;
   return undefined;
 }

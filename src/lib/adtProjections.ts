@@ -24,6 +24,7 @@ import type {
   AdtWhereUsedCode,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AbapUnitRunObjectType,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
   AdtApiName,
@@ -32,9 +33,18 @@ import type {
   AdtTypeCode,
   AdtTypeCodeOf,
   AdtTypeCodeWith,
+  AdtUtilityCode,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { CompactObjectType } from './compact/compactObjectTypes';
 import type { AbapSystemKind } from './systemKind';
+
+/**
+ * Codes written out in a type, checked against the tables: `AdtCodes<'FUGR/FF'
+ * | 'FUGR/I'>` is that union, and a code no table holds does not compile. A
+ * code of the type tables, the utility tables' group-only codes, or an ABAP
+ * Unit run's `osl:object` type (`FUNC`, the function module's short type).
+ */
+export type AdtCodes<C extends AdtUtilityCode | AbapUnitRunObjectType> = C;
 
 /** A variant the server serves: the table its tool set is built from. */
 export type ProjectionVariant = AbapSystemKind;
@@ -522,34 +532,48 @@ export const ACTIVATION_NAMES = projected<
 });
 
 /**
+ * The codes a single object of which the activation tools activate through
+ * its family's own `activate()` (`handleActivateObject`), each with the API
+ * whose activation it is.
+ */
+const SINGLE_ACTIVATION_CODE_ROUTES = {
+  'CLAS/OC': { api: 'class', operation: 'activate' },
+  'PROG/P': { api: 'program', operation: 'activate' },
+  'INTF/OI': { api: 'interface', operation: 'activate' },
+  'FUGR/F': { api: 'functionGroup', operation: 'activate' },
+  'TABL/DT': { api: 'table', operation: 'activate' },
+  'TABL/DS': { api: 'structure', operation: 'activate' },
+  'DDLS/DF': { api: 'ddl', operation: 'activate' },
+  'DOMA/DD': { api: 'domain', operation: 'activate' },
+  'DTEL/DE': { api: 'dataElement', operation: 'activate' },
+  'BDEF/BDO': { api: 'behaviorDefinition', operation: 'activate' },
+  'DDLX/EX': { api: 'metadataExtension', operation: 'activate' },
+} as const satisfies Partial<Record<AdtTypeCode, AdtNeed>>;
+
+/** The friendly names of {@link SINGLE_ACTIVATION_CODE_ROUTES}' activations. */
+const SINGLE_ACTIVATION_NAME_ROUTES = {
+  class: { api: 'class', operation: 'activate' },
+  program: { api: 'program', operation: 'activate' },
+  interface: { api: 'interface', operation: 'activate' },
+  function_group: { api: 'functionGroup', operation: 'activate' },
+  table: { api: 'table', operation: 'activate' },
+  structure: { api: 'structure', operation: 'activate' },
+  ddl: { api: 'ddl', operation: 'activate' },
+  domain: { api: 'domain', operation: 'activate' },
+  data_element: { api: 'dataElement', operation: 'activate' },
+  behavior_definition: { api: 'behaviorDefinition', operation: 'activate' },
+  metadata_extension: { api: 'metadataExtension', operation: 'activate' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/**
  * The single objects the activation tools activate through their family's
  * own `activate()` (`handleActivateObject`): each code, and each friendly
  * name, with the API whose activation it is.
  */
 export const SINGLE_ACTIVATION_ROUTES = {
-  'CLAS/OC': { api: 'class', operation: 'activate' },
-  class: { api: 'class', operation: 'activate' },
-  'PROG/P': { api: 'program', operation: 'activate' },
-  program: { api: 'program', operation: 'activate' },
-  'INTF/OI': { api: 'interface', operation: 'activate' },
-  interface: { api: 'interface', operation: 'activate' },
-  'FUGR/F': { api: 'functionGroup', operation: 'activate' },
-  function_group: { api: 'functionGroup', operation: 'activate' },
-  'TABL/DT': { api: 'table', operation: 'activate' },
-  table: { api: 'table', operation: 'activate' },
-  'TABL/DS': { api: 'structure', operation: 'activate' },
-  structure: { api: 'structure', operation: 'activate' },
-  'DDLS/DF': { api: 'ddl', operation: 'activate' },
-  ddl: { api: 'ddl', operation: 'activate' },
-  'DOMA/DD': { api: 'domain', operation: 'activate' },
-  domain: { api: 'domain', operation: 'activate' },
-  'DTEL/DE': { api: 'dataElement', operation: 'activate' },
-  data_element: { api: 'dataElement', operation: 'activate' },
-  'BDEF/BDO': { api: 'behaviorDefinition', operation: 'activate' },
-  behavior_definition: { api: 'behaviorDefinition', operation: 'activate' },
-  'DDLX/EX': { api: 'metadataExtension', operation: 'activate' },
-  metadata_extension: { api: 'metadataExtension', operation: 'activate' },
-} as const satisfies Readonly<Record<string, AdtNeed>>;
+  ...SINGLE_ACTIVATION_CODE_ROUTES,
+  ...SINGLE_ACTIVATION_NAME_ROUTES,
+};
 
 /** The codes and names of a single-object activation on each variant. */
 export const SINGLE_ACTIVATION = projected<
@@ -1324,7 +1348,7 @@ const TABLE_CODE_LIST = [
   'ENHO/XHH',
   'ENHO/XHB',
   'ENHS/XSB',
-] as const;
+] as const satisfies readonly AdtTypeCode[];
 
 /** Every code of each variant's table. */
 export const TABLE_CODES = projected<

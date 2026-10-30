@@ -1,4 +1,5 @@
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtCodes, AdtMainTypeOf } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -10,7 +11,10 @@ import {
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
 
-export type ScanObjectType = 'PROG' | 'FUGR' | 'CLAS';
+/** What a scan reads: programs, function groups and classes, by main type. */
+export type ScanObjectType = AdtMainTypeOf<
+  AdtCodes<'PROG/P' | 'FUGR/F' | 'CLAS/OC'>
+>;
 
 /**
  * The contents item as the walk hands it over.

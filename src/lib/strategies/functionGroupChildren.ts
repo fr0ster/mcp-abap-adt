@@ -1,4 +1,9 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtTypeCode,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { AdtCodes } from '../adtProjections';
 import type { NodeLevel } from './packageWalk';
 
 /**
@@ -15,7 +20,7 @@ import type { NodeLevel } from './packageWalk';
  */
 export interface FunctionGroupNodeSource {
   fetchNodeStructure(
-    parentType: string,
+    parentType: AdtTypeCode,
     parentName: string,
     options?: { nodeId?: string; withShortDescriptions?: boolean },
   ): Promise<IAdtResponse<NodeLevel, IAdtError>>;
@@ -46,7 +51,7 @@ function okObjects(
 export async function fetchFunctionGroupChildren(
   utils: FunctionGroupNodeSource,
   functionGroupName: string,
-  childType: 'FUGR/FF' | 'FUGR/I',
+  childType: AdtCodes<'FUGR/FF' | 'FUGR/I'>,
 ): Promise<IAdtResponse<NodeLevel['objects'], IAdtError>> {
   const root = await utils.fetchNodeStructure('FUGR/F', functionGroupName, {
     withShortDescriptions: true,

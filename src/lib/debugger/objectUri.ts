@@ -121,8 +121,9 @@ export function addressOf(uri: string): ObjectAddress | undefined {
       path,
     );
   if (m) {
+    const label: BreakpointLabel = 'CLAS';
     return {
-      object_type: 'CLAS',
+      object_type: label,
       object_name: unseg(m[1]),
       ...(m[2] ? { include: decodeURIComponent(m[2]) } : {}),
       ...line,
@@ -133,8 +134,9 @@ export function addressOf(uri: string): ObjectAddress | undefined {
       path,
     );
   if (m) {
+    const label: BreakpointLabel = m[1] === 'programs' ? 'PROG' : 'INCL';
     return {
-      object_type: m[1] === 'programs' ? 'PROG' : 'INCL',
+      object_type: label,
       object_name: unseg(m[2]),
       ...line,
     };
@@ -144,8 +146,9 @@ export function addressOf(uri: string): ObjectAddress | undefined {
       path,
     );
   if (m) {
+    const label: BreakpointLabel = 'FUNC';
     return {
-      object_type: 'FUNC',
+      object_type: label,
       object_name: unseg(m[2]),
       parent_name: unseg(m[1]),
       ...line,

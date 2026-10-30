@@ -1,3 +1,4 @@
+import type { AdtCodes, AdtMainTypeOf } from '../../../lib/adtProjections';
 import {
   answerCaught,
   type FailureEntry,
@@ -72,9 +73,25 @@ interface AbapParameterInfo {
   defaultValue?: string;
 }
 
+/**
+ * What a symbol resolved to: a class or an interface by main type, a function
+ * module by its short type (`FUNC`), or a symbol of the source alone.
+ */
+type SymbolObjectType =
+  | AdtMainTypeOf<AdtCodes<'CLAS/OC' | 'INTF/OI'>>
+  | AdtCodes<'FUNC'>
+  | 'LOCAL';
+
+/** A class, by its main type. */
+const CLASS_SYMBOL: AdtMainTypeOf<AdtCodes<'CLAS/OC'>> = 'CLAS';
+/** An interface, by its main type. */
+const INTERFACE_SYMBOL: AdtMainTypeOf<AdtCodes<'INTF/OI'>> = 'INTF';
+/** A function module, by its short type. */
+const FUNCTION_SYMBOL: AdtCodes<'FUNC'> = 'FUNC';
+
 interface AbapSystemInfo {
   exists: boolean;
-  objectType?: string;
+  objectType?: SymbolObjectType;
   description?: string;
   package?: string;
   responsible?: string;
@@ -676,7 +693,7 @@ class AbapSystemSymbolResolver {
         ...symbol,
         systemInfo: {
           exists: true,
-          objectType: 'CLAS',
+          objectType: CLASS_SYMBOL,
           description: classData?.description || `ABAP Class ${symbol.name}`,
           package: classData?.packageName || 'Unknown',
           superClass: classData?.superclass || '',
@@ -727,7 +744,7 @@ class AbapSystemSymbolResolver {
         ...symbol,
         systemInfo: {
           exists: true,
-          objectType: 'FUNC',
+          objectType: FUNCTION_SYMBOL,
           description:
             functionData?.description || `ABAP Function ${symbol.name}`,
           package: functionData?.packageName || 'Unknown',
@@ -790,7 +807,7 @@ class AbapSystemSymbolResolver {
         ...symbol,
         systemInfo: {
           exists: true,
-          objectType: 'INTF',
+          objectType: INTERFACE_SYMBOL,
           description:
             interfaceData?.description || `ABAP Interface ${symbol.name}`,
           package: interfaceData?.packageName || 'Unknown',

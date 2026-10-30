@@ -58,6 +58,18 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     "A function module in the symbols tool's own object-type answer (CLAS, INTF, FUNC or LOCAL): that tool's word for what a symbol resolved to, not an ADT type code.",
   ],
   [
+    'src/handlers/data_element/high/handleCreateDataElement.ts:CHAR',
+    'The ABAP data type a data element defaults to (the DDIC built-in type `CHAR`), not an object type; it is also the search name of characteristics (`CHAR/8B`), which this literal does not mean.',
+  ],
+  [
+    'src/handlers/domain/high/handleCreateDomain.ts:CHAR',
+    'The ABAP data type a domain defaults to (the DDIC built-in type `CHAR`), not an object type; it is also the search name of characteristics (`CHAR/8B`), which this literal does not mean.',
+  ],
+  [
+    'src/handlers/include/readonly/handleGetIncludesList.ts:TYPE',
+    'The ABAP keyword `INCLUDE TYPE` (a structure include in a type definition), compared with the word after `INCLUDE`, not an object type; it is also a search name (`TYPE/DG`), which this literal does not mean.',
+  ],
+  [
     'src/lib/clients.ts:HTTP/SSE',
     'The two HTTP transports named together, not a type code.',
   ],

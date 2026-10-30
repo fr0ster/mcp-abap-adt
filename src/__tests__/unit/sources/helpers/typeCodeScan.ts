@@ -14,15 +14,16 @@
  *   Unit run registry (`ABAP_UNIT_RUN_TYPES`'s keys: `CLAS/OCL`, `FUNC`,
  *   `DDLS`, … — the values a run names, some of which no type table lists).
  *   Everything below that says "codes of the tables" means this one set.
- * - **Main types.** Beside the codes, a literal may be typed by a main type
- *   of the tables' codes (spec 2.4): the part of a code before its slash
- *   (`ENHO`, `FUGR`, `CLAS`). interfaces-adt 23 has no `main` field, so the
- *   set is derived from the codes here, as the server's `AdtMainTypeOf`
- *   derives the type (`adtProjections.ts`); `MainTypeOfOne<P>` is a union of
- *   them. A main-type literal is held as a code literal is: the compiler
- *   cannot tell a hand-written `'ENHO'` from the table's value, so it passes
- *   only where its type says it is one. interfaces-adt 23 has no search type
- *   tables, so no search name is in the set.
+ * - **Main types and search names.** Beside the codes, the tables name two
+ *   vocabularies a literal may be typed by: every `main` of the API tables'
+ *   codes (`ENHO`, `DEVC`, `TABL` — `AdtMainType`, the server's
+ *   `TableMainOf<C>` and `MainTypeOfOne<P>`), and every name of the search
+ *   type tables (`ADT_SEARCH_TYPES_*`'s keys: `DEVC`, `STRU`,
+ *   `ABAP_TEST_COCKPIT` — `AdtSearchType`, `AdtSearchTypeOf<V>`). A literal
+ *   of either is held as a code literal is (interfaces-adt 24.0.0, spec 2.4):
+ *   the compiler cannot tell a hand-written `'ENHO'` from the table's value,
+ *   so it passes only where its type says it is one. Prose may name a search
+ *   name: only a word of the code shape is read there.
  * - **The debugger's labels.** The server's own union of breakpoint labels
  *   (`BreakpointLabel`, the keys of `BREAKPOINT_OBJECT_CODES`: `CLAS`,
  *   `PROG`, `INCL`, `FUNC`), each mapped to its code by a table-typed map, is
@@ -31,12 +32,14 @@
  *   substitutions, whose whole text has the shape of a code — four upper-case
  *   letters or digits, `/`, one to three more — or is a bare code the tables
  *   list (`AUTH`, `FUNC`, or the object type of a listed code: `CLAS`,
- *   `PROG`, `DEVC`, …), a main type or a debugger label, passes only where
- *   the checker's contextual type is made of codes, main types and debugger
- *   labels alone: `AdtTypeCode`, a union of some of its members (a
- *   projection: `AcceptedCode<V, Op>`, `WhereUsedCode<V>`, the element type
- *   a `projected` list or a `satisfies` gives), `AbapUnitRunObjectType`,
- *   `MainTypeOfOne<P>`, `BreakpointLabel`. A literal used as a property name
+ *   `PROG`, `DEVC`, …), a main type, a search name or a debugger label,
+ *   passes only where the checker's contextual type is made of codes, main
+ *   types, search names and debugger labels alone: `AdtTypeCode`, a union of
+ *   some of its members (a projection: `AcceptedCode<V, Op>`,
+ *   `WhereUsedCode<V>`, the element type a `projected` list or a `satisfies`
+ *   gives; `AdtUtilityCode`'s group-only `VIEW/DV` included),
+ *   `AbapUnitRunObjectType`, `TableMainOf<C>`, `MainTypeOfOne<P>`,
+ *   `AdtSearchTypeOf<V>`, `BreakpointLabel`. A literal used as a property name
  *   passes where the object literal's contextual type names codes only as
  *   its keys and has no index signature (`Partial<Record<AdtTypeCode, …>>`,
  *   through `satisfies`). Where the compiler types a literal by something
@@ -64,15 +67,26 @@ import { readdirSync, statSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
 import {
   ABAP_UNIT_RUN_TYPES,
+  ADT_SEARCH_TYPES_BASIS_740,
+  ADT_SEARCH_TYPES_CLOUD,
+  ADT_SEARCH_TYPES_ONPREM,
   ADT_TYPES_BASIS_740,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
   ADT_UTILITY_CODES_BASIS_740,
   ADT_UTILITY_CODES_CLOUD,
   ADT_UTILITY_CODES_ONPREM,
+  type AdtApiTable,
 } from '@mcp-abap-adt/interfaces-adt';
 import * as ts from 'typescript';
 import { BREAKPOINT_OBJECT_CODES } from '../../../../lib/debugger/objectUri';
+
+/** The API tables, read as the entry shape they satisfy. */
+const API_TABLES: readonly AdtApiTable<string>[] = [
+  ADT_TYPES_ONPREM,
+  ADT_TYPES_CLOUD,
+  ADT_TYPES_BASIS_740,
+];
 
 /**
  * Every code any table of interfaces-adt lists: API tables, utility tables,
@@ -92,15 +106,22 @@ export const TABLE_CODES: ReadonlySet<string> = new Set([
   ...Object.keys(ABAP_UNIT_RUN_TYPES),
 ]);
 
-/** The main type of a code: the text before its slash, else the code. */
-function mainTypeOf(code: string): string {
-  const slash = code.indexOf('/');
-  return slash < 0 ? code : code.slice(0, slash);
-}
-
-/** Every main type of the tables' codes (spec 2.4), derived from the codes. */
+/** Every `main` of the API tables' codes: `AdtMainType`. */
 export const MAIN_TYPES: ReadonlySet<string> = new Set(
-  [...TABLE_CODES].map(mainTypeOf),
+  API_TABLES.flatMap((table) =>
+    Object.values(table).flatMap((entry) =>
+      entry ? Object.values(entry.codes).map((facts) => facts.main) : [],
+    ),
+  ),
+);
+
+/** Every name of the search type tables: `AdtSearchType`. */
+export const SEARCH_NAMES: ReadonlySet<string> = new Set(
+  [
+    ADT_SEARCH_TYPES_ONPREM,
+    ADT_SEARCH_TYPES_CLOUD,
+    ADT_SEARCH_TYPES_BASIS_740,
+  ].flatMap((table) => Object.keys(table)),
 );
 
 /** The server's debugger labels: `BreakpointLabel`. */
@@ -108,15 +129,24 @@ export const DEBUGGER_LABELS: ReadonlySet<string> = new Set(
   Object.keys(BREAKPOINT_OBJECT_CODES),
 );
 
-/** What a literal's type may be made of: codes, main types, debugger labels. */
+/**
+ * What a literal's type may be made of: codes, main types, search names and
+ * debugger labels.
+ */
 const TABLE_VALUES: ReadonlySet<string> = new Set([
   ...TABLE_CODES,
   ...MAIN_TYPES,
+  ...SEARCH_NAMES,
   ...DEBUGGER_LABELS,
 ]);
 
 /** The bare codes: a code without `/`, and the object type of every code. */
-export const BARE_CODES: ReadonlySet<string> = MAIN_TYPES;
+export const BARE_CODES: ReadonlySet<string> = new Set(
+  [...TABLE_CODES].map((code) => {
+    const slash = code.indexOf('/');
+    return slash < 0 ? code : code.slice(0, slash);
+  }),
+);
 
 function isCodeCharacter(character: string | undefined): boolean {
   return (
@@ -145,13 +175,14 @@ export function hasCodeShape(text: string): boolean {
 
 /**
  * Whether a literal's whole text is a code: the shape, a bare code, a main
- * type or a debugger label.
+ * type, a search name or a debugger label.
  */
 export function looksLikeCode(text: string): boolean {
   return (
     hasCodeShape(text) ||
     BARE_CODES.has(text) ||
     MAIN_TYPES.has(text) ||
+    SEARCH_NAMES.has(text) ||
     DEBUGGER_LABELS.has(text)
   );
 }
@@ -173,7 +204,10 @@ export function codeShapedWords(
   return words;
 }
 
-/** Whether a type is made of codes, main types and debugger labels alone. */
+/**
+ * Whether a type is made of codes, main types, search names and debugger
+ * labels alone.
+ */
 function codesOnly(type: ts.Type, checker: ts.TypeChecker): boolean {
   const base =
     type.flags & ts.TypeFlags.TypeParameter
@@ -292,17 +326,17 @@ function literalVerdict(
     const other = parent.left === literal ? parent.right : parent.left;
     const compared = checker.getTypeAtLocation(other);
     if (codesOnly(compared, checker)) return undefined;
-    return `compared with ${checker.typeToString(compared)}, which is not made of codes, main types or debugger labels`;
+    return `compared with ${checker.typeToString(compared)}, which is not made of codes, main types, search names or debugger labels`;
   }
   if (parent && ts.isCaseClause(parent) && parent.expression === literal) {
     const switched = checker.getTypeAtLocation(parent.parent.parent.expression);
     if (codesOnly(switched, checker)) return undefined;
-    return `a case of a switch over ${checker.typeToString(switched)}, which is not made of codes, main types or debugger labels`;
+    return `a case of a switch over ${checker.typeToString(switched)}, which is not made of codes, main types, search names or debugger labels`;
   }
   const contextual = checker.getContextualType(literal);
   if (!contextual) return 'no contextual type';
   if (codesOnly(contextual, checker)) return undefined;
-  return `contextual type ${checker.typeToString(contextual)} is not made of codes, main types or debugger labels`;
+  return `contextual type ${checker.typeToString(contextual)} is not made of codes, main types, search names or debugger labels`;
 }
 
 export interface ITypeCodeFinding {

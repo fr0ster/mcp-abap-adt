@@ -332,9 +332,10 @@ See [Authentication & Destinations](AUTHENTICATION.md) for the supported authent
 
 stdio has no idle bound: the stdio server's life and its held state (a debug session, a batch)
 are the client's. They end by their stop tool, the client closing stdin, the backend's answer or
-the process's shutdown — never on the server's clock. `--state-idle-minutes`,
-`MCP_STATE_IDLE_MINUTES` and the YAML key `state-idle-minutes` were removed from `mcp-abap-adt`
-in 20.1.1: each stops the start, naming the form used. See [Held State](#held-state).
+the process's shutdown — never on the server's clock. `--state-idle-minutes` and the YAML key
+`state-idle-minutes` were removed from `mcp-abap-adt` in 20.1.1: each stops the start, naming the
+form used. `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an
+inherited one changes nothing, and stdio starts with no bound. See [Held State](#held-state).
 
 ### The debugger's ids
 
@@ -532,9 +533,10 @@ mcp-abap-adt-http --state-idle-minutes=60 --system-type=<onprem|cloud>
 server's life and its state are governed only by the LLM client that started it: held state ends
 by its stop tool (`DebugStop`, `BatchEnd`, …), the client closing stdin (the server then shuts down
 and logs off), the backend's answer, or the process's shutdown — never on the server's clock.
-`--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES` and the YAML key `state-idle-minutes` were
-removed from the stdio binaries in 20.1.1: each stops the start, naming the form used, so a
-configuration that states a bound is never silently ignored.
+`--state-idle-minutes` and the YAML key `state-idle-minutes` were removed from the stdio binaries
+in 20.1.1: each stops the start, naming the form used, so a configuration that states a bound is
+never silently ignored. `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an
+inherited one changes nothing, and stdio starts with no bound.
 
 ## Environment Variables
 

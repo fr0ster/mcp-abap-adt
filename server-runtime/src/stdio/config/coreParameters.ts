@@ -24,7 +24,6 @@ import {
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_CLI,
-  STATE_IDLE_ENV,
   STATE_IDLE_YAML,
   TLS_OPTIONS_REMOVED,
   transportRemoved,
@@ -253,13 +252,14 @@ const ALLOW_DESTINATION_HEADER_REMOVED = {
  * Removed from stdio in 20.1.1: stdio has no idle bound. The server's life and
  * its held state are the client's — a stop tool, the client closing stdin,
  * the backend's answer or the process's shutdown ends them, never the
- * server's clock. Every form stops the start, the environment name included
- * (a parameter that is gone), so a configuration that states a bound is
- * never silently ignored. The HTTP and SSE binaries keep the bound.
+ * server's clock. The CLI flag and the YAML key, stated to stdio, stop the
+ * start, so a configuration that states a bound is never silently ignored.
+ * `MCP_STATE_IDLE_MINUTES` is not read: it is the HTTP and SSE binaries'
+ * environment variable, and a binary does not read another binary's (an
+ * environment is inherited). The HTTP and SSE binaries keep the bound.
  */
 export const STATE_IDLE_REMOVED_FROM_STDIO: RemovedParameter = {
   cli: [STATE_IDLE_CLI],
-  env: [STATE_IDLE_ENV],
   yaml: [STATE_IDLE_YAML],
   words: (form: string) =>
     `${form} was removed from \`mcp-abap-adt\` in 20.1.1: stdio has no idle bound — held state ends by its stop tool, the client closing stdin, the backend or the shutdown; remove it from the configuration (the HTTP and SSE binaries keep it)`,

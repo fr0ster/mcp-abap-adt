@@ -185,8 +185,8 @@ flight pauses it; a listener's own background re-poll does not count. On `mcp-ab
 bounds each pooled instance's state, on `mcp-abap-adt-sse` each connection's.
 
 stdio (`mcp-abap-adt` and its compact and `-ro` variants) has no idle bound: the stdio server's
-life and its state are governed only by the client that started it. In its file, on its command
-line or in its environment, `state-idle-minutes` stops the start (removed in 20.1.1).
+life and its state are governed only by the client that started it. In its file or on its command
+line, `state-idle-minutes` stops the start (removed in 20.1.1). `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an inherited one changes nothing, and stdio starts with no bound.
 
 ## Validation
 

@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 161
+- Total tools: 158
 
 ## Navigation
 
@@ -63,9 +63,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-high-level-common)
     - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
     - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
-    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
-    - [GetProgramVersions](#getprogramversions-high-level-common)
-    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
     - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
     - [GetStructureVersions](#getstructureversions-high-level-common)
     - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
@@ -614,8 +611,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: CLAS/OC, class, PROG/P, program, INTF/OI, interface, FUGR/F, function_group, TABL/DT, table, TABL/DS, structure, DDLS/DF, ddl, DOMA/DD, DOMA/DM, domain, DTEL/DE, data_element, BDEF/BD, BDEF/BDO, behavior_definition, DDLX/EX, metadata_extension. Their family's activate() always sends preauditRequested=true.
+- See schema reference `activateObjectsSchema` in source file
 
 ---
 
@@ -821,40 +817,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri of a version, from the CDS metadata extension's version history.
-
----
-
-<a id="getprogramversiondiff-high-level-common"></a>
-#### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP program versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP program's version history.
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP program's version history.
-
----
-
-<a id="getprogramversions-high-level-common"></a>
-#### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `program_name` (string, required) - ABAP program name.
-
----
-
-<a id="getprogramversionsource-high-level-common"></a>
-#### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP program's version history.
 
 ---
 
@@ -1686,7 +1648,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. Available on premise.
+**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -1727,7 +1689,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -2340,7 +2302,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -2421,4 +2383,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-10-27*
+*Last updated: 2026-10-30*

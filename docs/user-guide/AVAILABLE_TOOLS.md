@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 266
+- Total tools: 263
 - Read-only tools: 68
-- High-level tools: 161
+- High-level tools: 158
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -174,9 +174,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-high-level-common)
     - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
     - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
-    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
-    - [GetProgramVersions](#getprogramversions-high-level-common)
-    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
     - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
     - [GetStructureVersions](#getstructureversions-high-level-common)
     - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
@@ -453,9 +450,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
-- `object_type` (string, required) - Object type (the same value the version history was read with).
+- See schema reference `objectVersionDiffSchema` in source file
 
 ---
 
@@ -466,9 +461,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
-- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
-- `object_name` (string, required) - Object name.
-- `object_type` (string, required) - Object type.
+- See schema reference `objectVersionsSchema` in source file
 
 ---
 
@@ -479,8 +472,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
-- `object_type` (string, required) - Object type (the same value the version history was read with).
+- See schema reference `objectVersionSourceSchema` in source file
 
 ---
 
@@ -661,11 +653,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
-- `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
-- `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
-- `object_type` (string, optional) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
-- `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- See schema reference `includesListSchema` in source file
 
 ---
 
@@ -758,7 +746,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -1048,18 +1036,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Lists where the object named by object_name and object_type is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
 **Parameters:**
-- `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
-- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
-- `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
-- `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, optional) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
-- `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- See schema reference `whereUsedSchema` in source file
 
 ---
 
@@ -1768,8 +1750,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: CLAS/OC, class, PROG/P, program, INTF/OI, interface, FUGR/F, function_group, TABL/DT, table, TABL/DS, structure, DDLS/DF, ddl, DOMA/DD, DOMA/DM, domain, DTEL/DE, data_element, BDEF/BD, BDEF/BDO, behavior_definition, DDLX/EX, metadata_extension. Their family's activate() always sends preauditRequested=true.
+- See schema reference `activateObjectsSchema` in source file
 
 ---
 
@@ -1975,40 +1956,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri of a version, from the CDS metadata extension's version history.
-
----
-
-<a id="getprogramversiondiff-high-level-common"></a>
-#### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP program versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP program's version history.
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP program's version history.
-
----
-
-<a id="getprogramversions-high-level-common"></a>
-#### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `program_name` (string, required) - ABAP program name.
-
----
-
-<a id="getprogramversionsource-high-level-common"></a>
-#### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP program's version history.
 
 ---
 
@@ -2840,7 +2787,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. Available on premise.
+**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -2881,7 +2828,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -3494,7 +3441,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -4097,4 +4044,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-27*
+*Last updated: 2026-10-30*

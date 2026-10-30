@@ -84,6 +84,7 @@ import {
   ACTIVATION_NAMES,
   COMPACT_ACTIVATE,
   codesWithNames,
+  MAIN_TYPE_SENTENCE,
   type ProjectionVariant,
   SINGLE_ACTIVATION,
   SINGLE_ACTIVATION_ROUTES,
@@ -91,6 +92,7 @@ import {
 import {
   acceptedCodeOf,
   acceptedOf,
+  mainTypeCodeOf,
   notAccepted,
 } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
@@ -143,7 +145,7 @@ export function activationTypeDescription(variant: ProjectionVariant): string {
   const kinds = SINGLE_ACTIVATION[variant].filter(
     (name) => !name.includes('/') && !named.has(name),
   );
-  return `Object type, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}.`;
+  return `Object type, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}. ${MAIN_TYPE_SENTENCE}`;
 }
 
 export const TOOL_DEFINITION = {
@@ -225,16 +227,38 @@ export type ActivationPlan =
   | { readonly group: IObjectReference[] };
 
 /**
+ * `text` as the boundary of `objects[].type` reads it on `variant`: itself
+ * when it is a code or a name of a single-object or a group activation, else
+ * the one code of the group activation's codes whose main type it names
+ * (every single-object code is one of them, `adtBoundary.typecheck.ts`) — the
+ * call then goes on exactly as if that code had been sent. Any other text,
+ * a main type two codes share included, stays as sent and is refused.
+ */
+function activationTextOf(text: string, variant: ProjectionVariant): string {
+  return acceptedOf(text, SINGLE_ACTIVATION[variant]) !== undefined ||
+    acceptedOf(text, ACTIVATION_CODES[variant]) !== undefined ||
+    acceptedOf(text, ACTIVATION_NAMES[variant]) !== undefined
+    ? text
+    : (mainTypeCodeOf(text, ACTIVATION_CODES[variant]) ?? text);
+}
+
+/**
  * The boundary of `objects[].type` on `variant`: one object of a code or
  * name of `SINGLE_ACTIVATION` is activated through its API; every other call
  * is a group activation, each type a code of `ACTIVATION_CODES` or a name of
- * `ACTIVATION_NAMES` standing for one. Anything else is refused in fixed
- * words naming what the argument takes there, and nothing is sent.
+ * `ACTIVATION_NAMES` standing for one. A main type one code has stands for
+ * that code ({@link activationTextOf}). Anything else is refused in fixed
+ * words naming what the argument takes there — for a main type two codes
+ * share, those codes — and nothing is sent.
  */
 function activationPlan(
-  objects: readonly ActivationObject[],
+  sent: readonly ActivationObject[],
   variant: ProjectionVariant,
 ): ActivationPlan | string {
+  const objects = sent.map((obj) => ({
+    ...obj,
+    type: activationTextOf(obj.type, variant),
+  }));
   const [only] = objects;
   if (objects.length === 1 && only !== undefined) {
     const single = acceptedOf(only.type, SINGLE_ACTIVATION[variant]);
@@ -252,11 +276,16 @@ function activationPlan(
       ACTIVATION_NAMES[variant],
     );
     if (type === undefined) {
-      return notAccepted('objects[].type', obj.type, [
-        ...ACTIVATION_CODES[variant],
-        ...ACTIVATION_NAMES[variant],
-        ...(objects.length === 1 ? SINGLE_ACTIVATION[variant] : []),
-      ]);
+      return notAccepted(
+        'objects[].type',
+        obj.type,
+        [
+          ...ACTIVATION_CODES[variant],
+          ...ACTIVATION_NAMES[variant],
+          ...(objects.length === 1 ? SINGLE_ACTIVATION[variant] : []),
+        ],
+        ACTIVATION_CODES[variant],
+      );
     }
     references.push({ ...obj, type });
   }

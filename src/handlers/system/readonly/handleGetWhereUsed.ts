@@ -26,6 +26,7 @@ import type {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   codesWithNames,
+  MAIN_TYPE_SENTENCE,
   type ProjectionVariant,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
@@ -78,7 +79,7 @@ export const TOOL_DEFINITION = {
  * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
  */
 function whereUsedTypeDescription(variant: ProjectionVariant): string {
-  return `Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says.`;
+  return `Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${MAIN_TYPE_SENTENCE}`;
 }
 
 /** GetWhereUsed's input on `variant`. */
@@ -150,8 +151,9 @@ interface WhereUsedArgs {
 
 /**
  * The boundary of `object_type` on the variant declared for `connection`: a
- * where-used code (`WHERE_USED_CODES`) or a name standing for one
- * (`WHERE_USED_NAMES`), either case; `undefined` for any other text.
+ * where-used code (`WHERE_USED_CODES`), a name standing for one
+ * (`WHERE_USED_NAMES`) or a main type one where-used code has, either case;
+ * `undefined` for any other text.
  */
 function whereUsedCodeOf(connection: object, text: string) {
   const variant = variantOf(connection);
@@ -165,10 +167,12 @@ function whereUsedCodeOf(connection: object, text: string) {
 /** The refusal of an `object_type` outside its projection: what it takes. */
 function notWhereUsed(connection: object, text: string): string {
   const variant = variantOf(connection);
-  return notAccepted('object_type', text, [
-    ...WHERE_USED_CODES[variant],
-    ...WHERE_USED_NAMES[variant],
-  ]);
+  return notAccepted(
+    'object_type',
+    text,
+    [...WHERE_USED_CODES[variant], ...WHERE_USED_NAMES[variant]],
+    WHERE_USED_CODES[variant],
+  );
 }
 
 /**

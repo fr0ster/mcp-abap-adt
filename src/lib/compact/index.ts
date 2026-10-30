@@ -18,7 +18,9 @@ export * from '../adtProjections.js';
 export {
   acceptedCodeOf,
   acceptedOf,
+  mainTypeCodeOf,
   notAccepted,
+  sharedMainType,
 } from '../adtTypeCode.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';

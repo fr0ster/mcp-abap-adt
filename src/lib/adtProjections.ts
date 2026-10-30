@@ -154,6 +154,72 @@ export function supported(values: readonly string[]): string {
   return `Supported: ${values.join(', ')}.`;
 }
 
+/**
+ * The sentence a description that lists codes adds for the main types the
+ * argument takes (#329, S4b).
+ */
+export const MAIN_TYPE_SENTENCE =
+  'A main type, the part of a code before its slash, stands for its code when exactly one listed code has it.';
+
+// ---------------------------------------------------------------------------
+// Main types: the TADIR type a code belongs to (spec 2.4)
+// ---------------------------------------------------------------------------
+
+/**
+ * The main type of code `C`, the TADIR object type of `R3TR <type>`: the
+ * text before its slash; a code without one is its own main type (`AUTH`).
+ */
+export type AdtMainTypeOf<C extends string> = C extends `${infer M}/${string}`
+  ? M
+  : C;
+
+/**
+ * The codes of projection `P` that carry a main type of their own: those
+ * with a slash. A code equal to its main type (`AUTH`) is just a code.
+ */
+type CodeWithMainType<P extends string> = Extract<P, `${string}/${string}`>;
+
+/** The codes of projection `P` whose main type is `M`. */
+export type CodesOfMainType<P extends string, M extends string> = {
+  [C in CodeWithMainType<P>]: AdtMainTypeOf<C> extends M ? C : never;
+}[CodeWithMainType<P>];
+
+/** Whether `T` is exactly one member. */
+type IsOne<T, All = T> = [T] extends [never]
+  ? false
+  : T extends unknown
+    ? [All] extends [T]
+      ? true
+      : false
+    : never;
+
+/**
+ * The main types projection `P` reads as a code: each main type exactly one
+ * code of `P` has, mapped to that code.
+ */
+export type MainTypeCodes<P extends string> = {
+  readonly [M in AdtMainTypeOf<CodeWithMainType<P>> as IsOne<
+    CodesOfMainType<P, M>
+  > extends true
+    ? M
+    : never]: CodesOfMainType<P, M>;
+};
+
+/**
+ * The main types projection `P` refuses as ambiguous: each main type two or
+ * more codes of `P` share, mapped to those codes.
+ */
+export type AmbiguousMainTypes<P extends string> = {
+  readonly [M in AdtMainTypeOf<CodeWithMainType<P>> as IsOne<
+    CodesOfMainType<P, M>
+  > extends true
+    ? never
+    : M]: readonly CodesOfMainType<P, M>[];
+};
+
+/** The main types projection `P` reads as a code ({@link MainTypeCodes}). */
+export type MainTypeOfOne<P extends string> = keyof MainTypeCodes<P> & string;
+
 // ---------------------------------------------------------------------------
 // The names the tools have always taken for a code
 // ---------------------------------------------------------------------------
@@ -710,6 +776,16 @@ export const INCLUDES_PARENTS = projected<
   onprem: ['PROG/P', 'PROG/I', 'FUGR/F', 'CLAS/OC'],
   cloud: ['PROG/P', 'PROG/I', 'FUGR/F', 'CLAS/OC'],
 });
+
+/**
+ * The main types GetIncludesList's `object_type` reads as one parent
+ * ({@link MainTypeCodes} of {@link INCLUDES_PARENTS}): its schema enum
+ * lists them beside the codes.
+ */
+export const INCLUDES_PARENT_MAIN_TYPES = projected<
+  MainTypeOfOne<ServedName<'onprem', typeof INCLUDES_PARENT_ROUTES>>,
+  MainTypeOfOne<ServedName<'cloud', typeof INCLUDES_PARENT_ROUTES>>
+>()({ onprem: ['FUGR', 'CLAS'], cloud: ['FUGR', 'CLAS'] });
 
 // ---------------------------------------------------------------------------
 // Versions (GetObjectVersions, GetObjectVersionSource, GetObjectVersionDiff)

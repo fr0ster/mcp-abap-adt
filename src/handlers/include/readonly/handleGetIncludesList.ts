@@ -1,12 +1,14 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
+  INCLUDES_PARENT_MAIN_TYPES,
   type INCLUDES_PARENT_ROUTES,
   INCLUDES_PARENTS,
+  MAIN_TYPE_SENTENCE,
   type ProjectionVariant,
   supported,
 } from '../../../lib/adtProjections';
-import { acceptedOf } from '../../../lib/adtTypeCode';
+import { acceptedCodeOf, sharedMainType } from '../../../lib/adtTypeCode';
 import {
   answerCaught,
   failedPayloadOf,
@@ -60,8 +62,11 @@ function includesListSchema(variant: ProjectionVariant) {
       },
       object_type: {
         type: 'string',
-        enum: INCLUDES_PARENTS[variant],
-        description: `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])}`,
+        enum: [
+          ...INCLUDES_PARENTS[variant],
+          ...INCLUDES_PARENT_MAIN_TYPES[variant],
+        ],
+        description: `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
       },
       objects: {
         type: 'array',
@@ -76,8 +81,11 @@ function includesListSchema(variant: ProjectionVariant) {
             },
             object_type: {
               type: 'string',
-              enum: INCLUDES_PARENTS[variant],
-              description: `ADT object type. ${supported(INCLUDES_PARENTS[variant])}`,
+              enum: [
+                ...INCLUDES_PARENTS[variant],
+                ...INCLUDES_PARENT_MAIN_TYPES[variant],
+              ],
+              description: `ADT object type. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
             },
           },
           required: ['object_name', 'object_type'],
@@ -121,15 +129,21 @@ type ParentKind = keyof typeof INCLUDES_PARENT_ROUTES;
 
 /**
  * The parent the caller named, past the boundary of `object_type`: one of
- * the declared variant's parents (`INCLUDES_PARENTS`), either case;
- * `undefined` for any other text, which the tool refuses naming the list.
+ * the declared variant's parents (`INCLUDES_PARENTS`), or the one parent
+ * whose main type it names, either case; `undefined` for any other text,
+ * which the tool refuses naming the list (or, for a main type two parents
+ * share, those parents).
  */
 function parentOf(
   connection: object,
   objectType: string,
   objectName: string,
 ): { kind: ParentKind; name: string } | undefined {
-  const kind = acceptedOf(objectType, INCLUDES_PARENTS[variantOf(connection)]);
+  const kind = acceptedCodeOf(
+    objectType,
+    INCLUDES_PARENTS[variantOf(connection)],
+    [],
+  );
   return kind === undefined ? undefined : resolveParent(kind, objectName);
 }
 
@@ -227,8 +241,10 @@ async function includesListOf(context: HandlerContext, args: any) {
 
     const parent = parentOf(connection, object_type, object_name);
     if (!parent) {
+      const parents = INCLUDES_PARENTS[variantOf(connection)];
       return return_error(
-        `Unsupported object_type "${object_type}": ${supported(INCLUDES_PARENTS[variantOf(connection)])}`,
+        sharedMainType('object_type', object_type, parents) ??
+          `Unsupported object_type "${object_type}": ${supported(parents)}`,
       );
     }
 

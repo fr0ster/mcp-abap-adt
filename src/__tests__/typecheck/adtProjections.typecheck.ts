@@ -16,6 +16,7 @@ import {
   type AcceptedKind,
   type ActivationCode,
   type AdtCodes,
+  type AtcKindOn,
   type COMPACT_CREATE_ROUTES,
   type INCLUDES_PARENT_ROUTES,
   projected,
@@ -128,3 +129,10 @@ export const parentTooMany = projected<Parents, Parents>()({
 export type FunctionModuleCode = AdtCodes<'FUGR/FF'>;
 // @ts-expect-error …`FUNC`, a run's and the symbols tool's short word, is none.
 export type FunctionShortWord = AdtCodes<'FUNC'>;
+
+// --- RunATC's object kinds per variant -------------------------------------
+
+/** A program is checked by ATC on premise… */
+export const programAtcOnPrem: AtcKindOn<'onprem'> = 'program';
+// @ts-expect-error …and offered on no cloud system, which holds no program of the caller's.
+export const programAtcOnCloud: AtcKindOn<'cloud'> = 'program';

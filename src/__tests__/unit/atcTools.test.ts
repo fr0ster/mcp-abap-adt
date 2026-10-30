@@ -5,7 +5,9 @@ import {
   TOOL_DEFINITION,
 } from '../../handlers/atc/high/handleRunATC';
 import { corpusBody } from '../../lib/adtCorpus';
+import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
+import { declareSystemKind } from '../../lib/systemKind';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 /**
@@ -35,6 +37,8 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 }));
 
 const context = { connection: {} as any, logger: undefined };
+// RunATC reads its object types from the declared variant.
+declareSystemKind(context.connection, 'onprem');
 const payload = (result: any) => JSON.parse(result.content[0].text);
 
 describe('the ATC worklist reading, against the captured document', () => {
@@ -457,6 +461,105 @@ describe('RunATC: the object kinds the client checks', () => {
       expect(String(result.content[0].text)).toContain(field);
     },
   );
+});
+
+/**
+ * The object kinds are the declared variant's (`ATC_OBJECT_TYPES`): ABAP
+ * cloud holds no program or program include of the caller's, so it offers
+ * neither; on premise offers every kind the client checks. The description
+ * names exactly the variant's list, and a kind outside it is refused naming
+ * that list before any call.
+ */
+describe('RunATC: the object kinds of each variant', () => {
+  const ONPREM = [
+    'class',
+    'interface',
+    'function_group',
+    'package',
+    'ddl_source',
+    'table',
+    'behavior_definition',
+    'program',
+    'program_include',
+    'function_include',
+    'class_include',
+  ];
+  const CLOUD = ONPREM.filter(
+    (kind) => kind !== 'program' && kind !== 'program_include',
+  );
+  const stated = (variant: 'onprem' | 'cloud') =>
+    TOOL_DEFINITION.variants[variant];
+  const typeEnum = (variant: 'onprem' | 'cloud') =>
+    (stated(variant).inputSchema.properties.objects.items as any).properties
+      .type.enum;
+
+  it.each([
+    ['onprem', ONPREM],
+    ['cloud', CLOUD],
+  ] as const)('%s offers exactly its kinds', (variant, kinds) => {
+    expect(ATC_OBJECT_TYPES[variant]).toEqual(kinds);
+    expect([...typeEnum(variant)]).toEqual(kinds);
+    const words = stated(variant).description;
+    for (const kind of kinds) expect(words).toContain(kind);
+  });
+
+  it('cloud names no program kind', () => {
+    expect(stated('cloud').description).not.toContain('program');
+    expect(stated('cloud').description).not.toContain('on premise');
+  });
+
+  /** A run of one object of `type` on `variant`: its answer and the calls. */
+  async function runOn(variant: 'onprem' | 'cloud', type: string) {
+    const calls: string[] = [];
+    atc = {
+      createWorklist: async () => {
+        calls.push('createWorklist');
+        return okResponse('WL1');
+      },
+      startRun: async (worklistId: string) => {
+        calls.push('startRun');
+        return okResponse({ waited: false, worklistId, runId: 'RUN1' });
+      },
+    };
+    const connection = {};
+    declareSystemKind(connection, variant);
+    const answered: any = await handleRunATC(
+      { connection, logger: undefined } as any,
+      { objects: [{ name: 'ZOBJ', type }], check_variant: 'V' } as any,
+    );
+    return { answered, calls };
+  }
+
+  it.each(['program', 'program_include', 'PROGRAM'])(
+    'cloud refuses %s naming its kinds, before any call',
+    async (type) => {
+      const { answered, calls } = await runOn('cloud', type);
+      expect(answered.isError).toBe(true);
+      expect(answered.content[0].text).toContain(
+        `objects[].type "${type}" is not one of: ${CLOUD.join(', ')}; nothing was sent`,
+      );
+      expect(calls).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['onprem', 'program'],
+    ['onprem', 'program_include'],
+    ['cloud', 'class'],
+    ['cloud', 'function_group'],
+  ] as const)('%s runs %s', async (variant, type) => {
+    const { answered, calls } = await runOn(variant, type);
+    expect(answered.isError).toBeFalsy();
+    expect(calls).toEqual(['createWorklist', 'startRun']);
+  });
+
+  it('refuses a kind no variant has, before any call', async () => {
+    const { answered, calls } = await runOn('onprem', 'domain');
+    expect(answered.content[0].text).toContain(
+      `objects[].type "domain" is not one of: ${ONPREM.join(', ')}; nothing was sent`,
+    );
+    expect(calls).toEqual([]);
+  });
 });
 
 describe('RunATC: a field the type does not use', () => {

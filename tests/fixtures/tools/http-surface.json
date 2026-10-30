@@ -255,7 +255,7 @@
     "UpdateStructure": "structure_name*, ddl_code*, transport_request, activate, detail, state_handle",
     "UpdateTable": "table_name*, ddl_code*, transport_request, activate, detail, state_handle",
     "UpdateUnitTest": "class_name*, test_class_source*, transport_request, detail, state_handle",
-    "ValidateServiceBinding": "service_binding_name*, description, service_definition_name*, package_name, service_binding_version, detail, state_handle"
+    "ValidateServiceBinding": "service_binding_name*, description, service_definition_name*, package_name*, service_binding_version, detail, state_handle"
   },
   "mcp-abap-adt-http-ro": {
     "BatchAnswers": "number, numbers, state_handle",

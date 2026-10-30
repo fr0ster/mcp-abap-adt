@@ -33,6 +33,7 @@ import type {
   AdtTypeCodeOf,
   AdtTypeCodeWith,
   AdtUtilityCode,
+  AtcObjectType,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { CompactObjectType } from './compact/compactObjectTypes';
 import type { AbapSystemKind } from './systemKind';
@@ -757,6 +758,77 @@ export const COMPACT_SINGLE_ACTIVATION = projected<
     'BEHAVIOR_DEFINITION',
     'METADATA_EXTENSION',
     'BEHAVIOR_IMPLEMENTATION',
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// ATC (RunATC)
+// ---------------------------------------------------------------------------
+
+/**
+ * Each object kind ATC checks (adt-clients' `AtcObjectType`, every one of
+ * them) with the code of the object it checks: an include is checked as the
+ * object that owns it, but a program include and a function include are
+ * objects of their own codes, and a class include is its class's.
+ */
+export const ATC_OBJECT_CODES = {
+  class: 'CLAS/OC',
+  interface: 'INTF/OI',
+  function_group: 'FUGR/F',
+  package: 'DEVC/K',
+  ddl_source: 'DDLS/DF',
+  table: 'TABL/DT',
+  behavior_definition: 'BDEF/BDO',
+  program: 'PROG/P',
+  program_include: 'PROG/I',
+  function_include: 'FUGR/I',
+  class_include: 'CLAS/OC',
+} as const satisfies Readonly<Record<AtcObjectType, AdtTypeCode>>;
+
+/**
+ * The ATC kinds RunATC offers on `V`: those whose object the variant's table
+ * lets the caller create, i.e. hold as development of their own — ATC checks
+ * the caller's development, and ABAP cloud holds no program or program
+ * include of the caller's (`ADT_TYPES_CLOUD` lists neither with `create`;
+ * adt-clients' `AtcObjectType`: "ABAP Cloud refuses to hold either").
+ */
+export type AtcKindOn<V extends ProjectionVariant> = {
+  [K in keyof typeof ATC_OBJECT_CODES]: (typeof ATC_OBJECT_CODES)[K] extends AcceptedCode<
+    V,
+    'create'
+  >
+    ? K
+    : never;
+}[keyof typeof ATC_OBJECT_CODES];
+
+/** RunATC's `objects[].type` on each variant. */
+export const ATC_OBJECT_TYPES = projected<
+  AtcKindOn<'onprem'>,
+  AtcKindOn<'cloud'>
+>()({
+  onprem: [
+    'class',
+    'interface',
+    'function_group',
+    'package',
+    'ddl_source',
+    'table',
+    'behavior_definition',
+    'program',
+    'program_include',
+    'function_include',
+    'class_include',
+  ],
+  cloud: [
+    'class',
+    'interface',
+    'function_group',
+    'package',
+    'ddl_source',
+    'table',
+    'behavior_definition',
+    'function_include',
+    'class_include',
   ],
 });
 

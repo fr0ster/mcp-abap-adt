@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [20.1.1] - 2026-10-30
+
+stdio has no idle bound: the stdio server's life and its held state are the client's.
+
+### Fixed
+
+- **stdio: held state no longer ends after an idle bound; the stdio server's life is the client's.** The stdio server (`mcp-abap-adt` and its compact and `-ro` variants) ended held state — a debug session, an open batch, its connections — after 30 minutes without a tool call, and logged off its SAP connections. On stdio nothing now expires on the server's clock: held state ends by its stop tool, the client closing stdin (the server then shuts down and logs off), the backend's answer, or the process's shutdown. `StdioServer` states `NO_IDLE_BOUND` and its `InstanceState` never arms a timer. Streamable HTTP and SSE keep their idle bound unchanged (`--state-idle-minutes`, default and minimum 30).
+
+### Removed — from the stdio binaries only
+
+- **`--state-idle-minutes` and the YAML key `state-idle-minutes` are gone from `mcp-abap-adt`** (and `-ro`, `-compact`, `-compact-ro`): the row left core's parameter table and its help, and either one stated to stdio stops the start as a removed parameter, naming the form used (`--state-idle-minutes was removed from \`mcp-abap-adt\` in 20.1.1: stdio has no idle bound — …`), so a configuration that states a bound is never silently ignored. Remove it from a stdio configuration; the HTTP and SSE binaries keep it. `MCP_STATE_IDLE_MINUTES` is the HTTP and SSE binaries' variable and is not read by stdio: an inherited one changes nothing, and stdio starts with no bound.
+- **`@mcp-abap-adt/server-runtime` types:** `StdioServerOptions.stateIdleMinutes` and `CoreConfig.stateIdleMinutes` are removed (`CoreConfig` extends `Omit<IServerConfig, 'stateIdleMinutes'>`); a TypeScript caller that passed or read them no longer compiles and drops them.
+
+### Added
+
+- **`NO_IDLE_BOUND` and `StateIdleBound`** (`@mcp-abap-adt/lib/state`): an instance's idle bound is whole minutes or `NO_IDLE_BOUND`, "no bound", stated by type. `InstanceState`'s `idleMinutes` option and `BaseMcpServer`'s `stateIdleMinutes` take it; absent is still the default 30, so an embedder that passes nothing (`EmbeddableMcpServer`) keeps its bound.
+
+### Changed
+
+- **Sibling ranges at `^20.1.1`** in every manifest — `dependencies`, `peerDependencies` and `devDependencies`: server-runtime's stdio server reads lib's `NO_IDLE_BOUND`, and every binary takes the server-runtime that states it.
+
 ## [20.1.0] - 2026-10-23
 
 Both ABAP Unit runners, chosen per call with `runner: 'async' | 'sync'` ([#286](https://github.com/fr0ster/mcp-abap-adt/issues/286), [#313](https://github.com/fr0ster/mcp-abap-adt/pull/313)); a write whose cleanup UNLOCK fails says the object may be left locked, and a save refused by `CTS_WBO_API` 019 / 020 names the request that holds the object ([#314](https://github.com/fr0ster/mcp-abap-adt/issues/314), [#316](https://github.com/fr0ster/mcp-abap-adt/pull/316)); on `@mcp-abap-adt/connection` 19.1.0, which resends a request lost on a dead kept-alive socket once on a new connection (#314's `socket hang up`); the 7-day release age dropped ([#315](https://github.com/fr0ster/mcp-abap-adt/pull/315)). The eighteen packages are all at 20.1.0, every sibling range at `^20.1.0` — `@mcp-abap-adt/compact-modify` needs `@mcp-abap-adt/lib` 20.1.0 for `runner` on `HandlerUnitTestRun`.

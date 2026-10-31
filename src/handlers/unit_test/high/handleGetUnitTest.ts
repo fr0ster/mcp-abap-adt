@@ -5,7 +5,8 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
 import {
-  MAX_STATUS_POLLS,
+  MAX_STATUS_POLLS_PROPERTY,
+  maxStatusPollsOf,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
@@ -15,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.',
+    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its status and result, else finished:false with the last status seen.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -23,6 +24,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Run identifier returned by RunUnitTest.',
       },
+      max_status_polls: MAX_STATUS_POLLS_PROPERTY.max_status_polls,
       ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
@@ -31,6 +33,7 @@ export const TOOL_DEFINITION = {
 
 interface GetUnitTestArgs {
   run_id: string;
+  max_status_polls?: number;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -50,6 +53,8 @@ export async function handleGetUnitTest(
   // `getStatus` and `getResult` take the run and, since adt-clients 23,
   // options with `analyse`; `analyseException` is passed to both.
   const unitTest = testRunner(context, 'class');
+  const maxStatusPolls = maxStatusPollsOf(args);
+  if (maxStatusPolls instanceof Error) return return_error(maxStatusPolls);
   const detail = detailOf(args);
 
   return answer(
@@ -62,6 +67,7 @@ export async function handleGetUnitTest(
           }),
         run_id,
         () => unitTest.getResult(run_id, { analyse: analyseException }),
+        maxStatusPolls,
       ),
     // Task 28 fix round 1: `status` and, once finished, `result` are both
     // `structured` `AdtReading`s (`getResult`'s slot is `structured` in
@@ -89,7 +95,7 @@ export async function handleGetUnitTest(
             finished: false,
             run_status:
               detail === 'raw' ? outcome.status.raw : outcome.status.value,
-            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; call GetUnitTest again to keep polling.`,
+            message: `Run ${run_id} has not finished after ${maxStatusPolls} status checks; call GetUnitTest again to keep polling.`,
           },
   );
 }

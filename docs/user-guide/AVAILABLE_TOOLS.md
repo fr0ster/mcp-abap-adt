@@ -1247,11 +1247,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its result, else finished:false with the last status seen.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
 - `run_id` (string, required) - Run id a unit test run answered.
 
 ---
@@ -3331,23 +3332,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
+**Description:** [read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its status and result, else finished:false with the last status seen. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
 **Parameters:**
+- `max_status_polls` (any, optional) - 
 - `run_id` (string, required) - Run identifier returned by unit test run.
 
 ---
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
+**Description:** [read-only] Retrieve CDS unit test run result for a run_id: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its result, else finished:false with the last status seen. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
 **Parameters:**
 - `format` (string, optional) - Result format: abapunit or junit.
+- `max_status_polls` (any, optional) - 
 - `run_id` (string, required) - Run identifier returned by unit test run.
 - `with_navigation_uris` (boolean, optional (default: false)) - Include navigation URIs in result if supported.
 
@@ -3367,22 +3370,24 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.
+**Description:** [read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its status and result, else finished:false with the last status seen.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
 **Parameters:**
+- `max_status_polls` (any, optional) - 
 - `run_id` (string, required) - Run identifier returned by RunUnitTest.
 
 ---
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its result, else finished:false with the last status seen.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
 - `run_id` (string, required) - Run id a unit test run answered.
 
 ---
@@ -3401,12 +3406,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.
+**Description:** Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
 **Parameters:**
 - `duration` (object, optional) - Durations the run accepts.
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
 - `risk_level` (object, optional) - Risk levels the run accepts.
 - `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
 - `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
@@ -3415,64 +3421,69 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name and returns the result.
+**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name and returns the result: the run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
 
 ---
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
+- `runner` (string, optional (default: async)) - async (default): starts the run, reads its status by up to max_status_polls long polls and returns the result once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
+**Description:** Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
+- `runner` (string, optional (default: async)) - async (default): starts the run, reads its status by up to max_status_polls long polls and returns the result once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Parameters:**
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
 - `program_name` (string, required) - Report whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `runner` (string, optional (default: async)) - async (default): starts the run, reads its status by up to max_status_polls long polls and returns the result once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
+- `runner` (string, optional (default: async)) - async (default): starts the run, reads its status by up to max_status_polls long polls and returns the result once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 
 ---

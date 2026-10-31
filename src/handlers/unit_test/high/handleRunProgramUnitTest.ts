@@ -7,9 +7,11 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
+import { MAX_STATUS_POLLS_PROPERTY } from '../shared/pollRun';
 import {
   RUNNER_PROPERTY,
   runnerOf,
+  runStatusPollsOf,
   SCOPE_PROPERTY,
   scopeOf,
   type UnitTestScopeArgs,
@@ -21,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'RunProgramUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.",
+    "Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +32,7 @@ export const TOOL_DEFINITION = {
         description: 'Report whose tests run.',
       },
       runner: RUNNER_PROPERTY.runner,
+      max_status_polls: MAX_STATUS_POLLS_PROPERTY.max_status_polls,
       scope: SCOPE_PROPERTY.scope,
       ...DETAIL_PROPERTY,
     },
@@ -40,6 +43,7 @@ export const TOOL_DEFINITION = {
 interface RunProgramUnitTestArgs {
   program_name: string;
   runner?: 'async' | 'sync';
+  max_status_polls?: number;
   scope?: UnitTestScopeArgs;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -53,6 +57,8 @@ export async function handleRunProgramUnitTest(
   }
   const runner = runnerOf(args);
   if (runner instanceof Error) return return_error(runner);
+  const maxStatusPolls = runStatusPollsOf(args, runner);
+  if (maxStatusPolls instanceof Error) return return_error(maxStatusPolls);
   const detail = detailOf(args);
   const runOptions = { scope: scopeOf(args.scope) };
   if (runner === 'sync') {
@@ -72,7 +78,14 @@ export async function handleRunProgramUnitTest(
   }
   return answer(
     { tool: 'RunProgramUnitTest', detail },
-    () => runAndWait(context, 'program', args.program_name, runOptions),
-    projectRun(detail),
+    () =>
+      runAndWait(
+        context,
+        'program',
+        args.program_name,
+        maxStatusPolls,
+        runOptions,
+      ),
+    projectRun(detail, maxStatusPolls),
   );
 }

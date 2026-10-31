@@ -1,7 +1,8 @@
 /**
- * Running ABAP Unit tests for a tool: start the run, wait for it within a
- * bound, and answer the result — one call, so a model asking "run the tests"
- * needs no second tool unless the run outlasts the bound.
+ * Running ABAP Unit tests for a tool: start the run, read its status by up
+ * to the call's `max_status_polls` long polls, and answer the result — one
+ * call, so a model asking "run the tests" needs no second tool unless the
+ * run is still going after those polls.
  *
  * The runners are adt-clients 24's, one per object type
  * (`AdtExecutor.get{Class,Program,FunctionGroup,FunctionModule}TestRunner`).
@@ -25,11 +26,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
-import {
-  MAX_STATUS_POLLS,
-  pollUntilFinished,
-  type RunOutcome,
-} from './pollRun';
+import { pollUntilFinished, type RunOutcome } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
 export type TestCarrier =
@@ -89,16 +86,17 @@ export interface RunAndWait extends RunOutcome<AdtReading<unknown>> {
 
 /**
  * Start a run of every test the named object holds, then poll it to the end —
- * `MAX_STATUS_POLLS` long polls at most — and fetch the result.
+ * `maxStatusPolls` long polls at most — and fetch the result.
  */
 export async function runAndWait(
   context: HandlerContext,
   carrier: TestCarrier,
   objectName: string,
+  maxStatusPolls: number,
   runOptions: Omit<IClassUnitTestRunOptions, 'title' | 'context'> = {},
 ): Promise<IAdtResponse<RunAndWait, IAdtError>> {
   const runner = testRunner(context, carrier);
-  return waitForRun(runner, () =>
+  return waitForRun(runner, maxStatusPolls, () =>
     runner.run(objectName.toUpperCase(), {
       ...runOptions,
       // A run SAP did not start is a failure (see adt-clients' migration guide to 23).
@@ -109,11 +107,12 @@ export async function runAndWait(
 
 /**
  * Start a run with `start` — whose answer is the run's id — then poll it to
- * the end with `runner`, `MAX_STATUS_POLLS` long polls at most, and fetch the
+ * the end with `runner`, `maxStatusPolls` long polls at most, and fetch the
  * result.
  */
 export async function waitForRun(
   runner: IUnitTestRunInformation,
+  maxStatusPolls: number,
   start: () => Promise<IAdtResponse<unknown, IAdtError>>,
 ): Promise<IAdtResponse<RunAndWait, IAdtError>> {
   const started = await atStep('run', start)();
@@ -126,6 +125,7 @@ export async function waitForRun(
       runner.getStatus(id, withLongPolling, { analyse: analyseException }),
     runId,
     () => runner.getResult(runId, { analyse: analyseException }),
+    maxStatusPolls,
   );
   if (!outcome.ok) {
     return outcome as unknown as IAdtResponse<RunAndWait, IAdtError>;
@@ -143,7 +143,10 @@ export async function waitForRun(
  * `full` the parse — no fixture proves a further reduction of a test-run result
  * is safe.
  */
-export function projectRun(detail: 'terse' | 'full' | 'raw') {
+export function projectRun(
+  detail: 'terse' | 'full' | 'raw',
+  maxStatusPolls: number,
+) {
   return (run: RunAndWait) =>
     run.finished
       ? {
@@ -157,6 +160,6 @@ export function projectRun(detail: 'terse' | 'full' | 'raw') {
           run_id: run.runId,
           finished: false,
           run_status: detail === 'raw' ? run.status.raw : run.status.value,
-          message: `The run has not finished after ${MAX_STATUS_POLLS} status checks. Fetch its result later with GetUnitTestResult and this run_id.`,
+          message: `The run has not finished after ${maxStatusPolls} status checks. Fetch its result later with GetUnitTestResult and this run_id.`,
         };
 }

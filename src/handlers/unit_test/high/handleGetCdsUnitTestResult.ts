@@ -5,7 +5,8 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
 import {
-  MAX_STATUS_POLLS,
+  MAX_STATUS_POLLS_PROPERTY,
+  maxStatusPollsOf,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
@@ -16,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. ',
+    '[read-only] Retrieve CDS unit test run result for a run_id: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its result, else finished:false with the last status seen. ',
   inputSchema: {
     type: 'object',
     properties: {
@@ -34,6 +35,7 @@ export const TOOL_DEFINITION = {
         description: 'Result format: abapunit or junit.',
         enum: ['abapunit', 'junit'],
       },
+      max_status_polls: MAX_STATUS_POLLS_PROPERTY.max_status_polls,
       ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
@@ -42,6 +44,7 @@ export const TOOL_DEFINITION = {
 
 interface GetCdsUnitTestResultArgs {
   run_id: string;
+  max_status_polls?: number;
   with_navigation_uris?: boolean;
   format?: 'abapunit' | 'junit';
   detail?: 'terse' | 'full' | 'raw';
@@ -58,6 +61,8 @@ export async function handleGetCdsUnitTestResult(
   // — same `pollUntilFinished` reconstruction as `GetUnitTestResult`, for
   // the same reason (no status of its own to poll on this tool's surface).
   const cdsUnitTest = testRunner(context, 'class');
+  const maxStatusPolls = maxStatusPollsOf(args);
+  if (maxStatusPolls instanceof Error) return return_error(maxStatusPolls);
   const detail = detailOf(args);
 
   return answer(
@@ -75,6 +80,7 @@ export async function handleGetCdsUnitTestResult(
             withNavigationUris: with_navigation_uris,
             format,
           }),
+        maxStatusPolls,
       ),
     // Task 28 fix round 1 — same finding, same fix as `GetUnitTestResult`.
     (outcome: RunOutcome<AdtReading<unknown>>) =>
@@ -92,7 +98,7 @@ export async function handleGetCdsUnitTestResult(
             finished: false,
             run_status:
               detail === 'raw' ? outcome.status.raw : outcome.status.value,
-            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
+            message: `Run ${run_id} has not finished after ${maxStatusPolls} status checks; no result to fetch yet.`,
           },
   );
 }

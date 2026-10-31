@@ -435,6 +435,14 @@ describe('the MCP tool surface', () => {
    * binaries serve. Their rows changed only `group`; every other row was
    * checked unchanged.
    */
+  /**
+   * **The eighth deliberate move: the status-poll limit (#329).** The tools
+   * that wait for an ABAP Unit run — `RunUnitTest`, `RunCdsUnitTest`,
+   * `RunProgramUnitTest`, `RunFunctionGroupUnitTest`,
+   * `RunFunctionModuleUnitTest`, `RunAbapUnit` and `GetUnitTestResult` —
+   * take `max_status_polls`, optional, default 5. Their rows gained it in
+   * the snapshot; every other row was checked unchanged.
+   */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(
       (tool) => !read(frozen).has(tool),

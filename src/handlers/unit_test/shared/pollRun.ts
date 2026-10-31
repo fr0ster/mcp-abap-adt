@@ -43,13 +43,49 @@ export function runIsFinished(statusValue: unknown): boolean {
 }
 
 /**
- * Bounded, not unlimited. `getStatus`'s own `withLongPolling` already makes
- * ADT hold each individual request open while the run is in progress, so
- * this is a bound on how many such long-polls this handler will sit through
- * before giving up and telling the caller to ask again — not a guess at how
- * long a run "should" take.
+ * How many status long polls a tool waits through when the call names none
+ * (`max_status_polls`). `getStatus`'s own `withLongPolling` makes ADT hold
+ * each request open while the run is in progress, so this counts such long
+ * polls before the tool answers the run id — not a guess at how long a run
+ * "should" take. The caller chooses another count with `max_status_polls`.
  */
-export const MAX_STATUS_POLLS = 5;
+export const DEFAULT_MAX_STATUS_POLLS = 5;
+
+/** The `max_status_polls` property of a tool that waits for a run. */
+export const MAX_STATUS_POLLS_PROPERTY = {
+  max_status_polls: {
+    type: 'integer',
+    minimum: 1,
+    default: DEFAULT_MAX_STATUS_POLLS,
+    description: `How many status long polls the call waits through before it answers: an integer of 1 or more (default ${DEFAULT_MAX_STATUS_POLLS}). ADT holds each long poll open while the run is in progress.`,
+  },
+} as const;
+
+/**
+ * The call's `max_status_polls`: the default when absent; an error, sent
+ * before any request, for a value that is not an integer of 1 or more. The
+ * arguments come from the caller, outside the type system, so the value is
+ * checked here.
+ */
+export function maxStatusPollsOf(args: unknown): number | Error {
+  const given = givenMaxStatusPolls(args);
+  if (given === undefined) return DEFAULT_MAX_STATUS_POLLS;
+  if (typeof given === 'number' && Number.isInteger(given) && given >= 1) {
+    return given;
+  }
+  return new Error(
+    `max_status_polls must be an integer of 1 or more; got ${JSON.stringify(given)}; nothing was sent`,
+  );
+}
+
+/** The `max_status_polls` the call carries, as given; `undefined` when none. */
+export function givenMaxStatusPolls(args: unknown): unknown {
+  return args !== null &&
+    typeof args === 'object' &&
+    Object.hasOwn(args, 'max_status_polls')
+    ? Object.getOwnPropertyDescriptor(args, 'max_status_polls')?.value
+    : undefined;
+}
 
 export interface RunOutcome<TResult> {
   readonly finished: boolean;
@@ -69,15 +105,15 @@ function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
 }
 
 /**
- * Poll a run's status up to `MAX_STATUS_POLLS` times, and only then — if it
- * finished within that bound — fetch the result via `fetchResult`.
+ * Poll a run's status up to `maxStatusPolls` times, and only then — if it
+ * finished by then — fetch the result via `fetchResult`.
  *
  * A failing `getStatus` call is returned exactly as it came (the caller's
  * `answer()` reports it as the refusal it is — the status this handler
  * already had is not thrown away in favour of a fabricated one). A failing
  * `getResult` call, once the run IS confirmed finished, is likewise returned
  * as-is: never swallowed into a null field under a false `success: true`.
- * A run that has not finished within the bound never reaches `fetchResult`
+ * A run that has not finished after those polls never reaches `fetchResult`
  * at all — this handler does not present whatever an unfinished run's result
  * endpoint happens to answer, because no fixture in the corpus captures that
  * case and guessing would be exactly the kind of invented shape this
@@ -90,9 +126,10 @@ export async function pollUntilFinished<TResult>(
   ) => Promise<IAdtResponse<AdtReading<unknown>>>,
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
+  maxStatusPolls: number,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
   let lastStatus: AdtReading<unknown> | undefined;
-  for (let attempt = 0; attempt < MAX_STATUS_POLLS; attempt += 1) {
+  for (let attempt = 0; attempt < maxStatusPolls; attempt += 1) {
     const statusResponse = await atStep('read status', getStatus)(runId, true);
     if (!statusResponse.ok) {
       return statusResponse as unknown as IAdtResponse<

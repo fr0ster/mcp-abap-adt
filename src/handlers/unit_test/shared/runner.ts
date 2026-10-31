@@ -4,6 +4,8 @@
  * the finished result, `runSync.ts`).
  */
 
+import { givenMaxStatusPolls, maxStatusPollsOf } from './pollRun';
+
 export const UNIT_TEST_RUNNERS = ['async', 'sync'] as const;
 export type UnitTestRunner = (typeof UNIT_TEST_RUNNERS)[number];
 
@@ -14,7 +16,7 @@ export const RUNNER_PROPERTY = {
     enum: ['async', 'sync'],
     default: 'async',
     description:
-      'async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.',
+      'async (default): starts the run, reads its status by up to max_status_polls long polls and returns the result once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.',
   },
 } as const;
 
@@ -34,6 +36,24 @@ export function runnerOf(args: unknown): UnitTestRunner | Error {
   return new Error(
     `runner must be one of ${UNIT_TEST_RUNNERS.join(', ')}; got ${JSON.stringify(given)}`,
   );
+}
+
+/**
+ * The status long polls an async run is waited through (`max_status_polls`,
+ * default 5); with runner sync, a given `max_status_polls` is refused before
+ * anything is sent: that runner is one request answered with the finished
+ * result.
+ */
+export function runStatusPollsOf(
+  args: unknown,
+  runner: UnitTestRunner,
+): number | Error {
+  if (runner === 'sync' && givenMaxStatusPolls(args) !== undefined) {
+    return new Error(
+      'max_status_polls goes with runner async: runner sync is one request that returns the finished result; nothing was sent',
+    );
+  }
+  return maxStatusPollsOf(args);
 }
 
 /** The `scope` argument, as compact `HandlerUnitTestRun` takes it. */

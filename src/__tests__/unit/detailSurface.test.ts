@@ -227,6 +227,7 @@ const JSON_ANSWERING: readonly string[] = [
   'ReadTransportActionLog',
   'ReadTransportObjects',
   'RemoveTransportObject',
+  'RunAbapUnit',
   'RunCdsUnitTest',
   'RunFunctionGroupUnitTest',
   'RunFunctionModuleUnitTest',

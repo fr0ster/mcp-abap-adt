@@ -66,9 +66,9 @@ describe('mcp-abap-adt-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 74 tools (the three batch tools among them), none of a background run', () => {
+  it('serves the read-only set: 75 tools (the three batch tools among them), none of a background run', () => {
     expect(shape(readOnlyToolSet)).toEqual(shape(fullReadOnlyToolSet));
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(74);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(75);
     expect(readOnlyToolSet.backgroundRuns).toBe(false);
   });
 

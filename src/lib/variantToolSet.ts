@@ -328,6 +328,7 @@ export const TOOLS_WITHOUT_NEED: ReadonlySet<string> = new Set([
   'ListFunctionGroupIncludes',
   'ListFunctionModules',
   'RunATC',
+  'RunAbapUnit',
   'GetATCRunStatus',
   'GetATCFindings',
   'ActivateObjects',

@@ -222,6 +222,12 @@
     "available_in": "cloud, onprem"
   },
   {
+    "group": "readonly",
+    "name": "RunAbapUnit",
+    "inputs": "target*, scope, risk_level, duration, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
     "group": "system",
     "name": "RunATC",
     "inputs": "objects*, check_variant, max_findings, wait",

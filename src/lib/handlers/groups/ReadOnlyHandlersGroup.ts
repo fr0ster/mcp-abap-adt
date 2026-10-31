@@ -146,6 +146,10 @@ import {
   TOOL_DEFINITION as GetUnitTestResult_Tool,
   handleGetUnitTestResult,
 } from '../../../handlers/unit_test/high/handleGetUnitTestResult';
+import {
+  handleRunAbapUnit,
+  TOOL_DEFINITION as RunAbapUnit_Tool,
+} from '../../../handlers/unit_test/readonly/handleRunAbapUnit';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 import {
@@ -345,6 +349,12 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetTable_Tool,
         handler: (args: any) => handleGetTable(this.context, args),
+      },
+      // ABAP Unit by a run target: a test run changes no object, so the
+      // read-only binaries serve it too.
+      {
+        toolDefinition: RunAbapUnit_Tool,
+        handler: (args: unknown) => handleRunAbapUnit(this.context, args),
       },
       // Copies of high-level tools: same name, schema and handler. Withheld
       // by getHandlers() when the high group is exposed alongside.

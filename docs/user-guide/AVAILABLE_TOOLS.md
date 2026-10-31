@@ -4,8 +4,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 263
-- Read-only tools: 68
+- Total tools: 264
+- Read-only tools: 69
 - High-level tools: 158
 - Debug tools: 32
 - Session tools: 2
@@ -120,6 +120,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [ReadTransportObjects](#readtransportobjects-read-only-transport)
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
+    - [RunAbapUnit](#runabapunit-read-only-unit-test)
 - [High-Level Group](#high-level-group)
   - [Atc](#high-level-atc)
     - [GetATCFindings](#getatcfindings-high-level-atc)
@@ -1333,6 +1334,20 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `run_id` (string, required) - Run id a unit test run answered.
+
+---
+
+<a id="runabapunit-read-only-unit-test"></a>
+#### RunAbapUnit (Read-Only / Unit Test)
+**Description:** [read-only] Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.
+
+**Source:** `src/handlers/unit_test/readonly/handleRunAbapUnit.ts`
+
+**Parameters:**
+- `duration` (object, optional) - Durations the run accepts.
+- `risk_level` (object, optional) - Risk levels the run accepts.
+- `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
+- `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
 
 ---
 
@@ -4041,4 +4056,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-30*
+*Last updated: 2026-10-31*

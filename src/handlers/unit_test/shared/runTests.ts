@@ -43,11 +43,18 @@ export type TestCarrier =
  * about a run by its id. Declared here because adt-clients 24 exports the
  * runners' result sets from its root but not the runner classes.
  */
-export interface IUnitTestRunner {
+export interface IUnitTestRunner extends IUnitTestRunInformation {
   run(
     objectName: string,
     options: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
   ): Promise<IAdtResponse<unknown, IAdtError>>;
+}
+
+/**
+ * What waiting for a run needs of a runner: ask about the run by its id. Every
+ * runner answers it, the generic one (`getAbapUnitTestRunner`) included.
+ */
+export interface IUnitTestRunInformation {
   getStatus(
     runId: string,
     withLongPolling: boolean | undefined,
@@ -91,13 +98,25 @@ export async function runAndWait(
   runOptions: Omit<IClassUnitTestRunOptions, 'title' | 'context'> = {},
 ): Promise<IAdtResponse<RunAndWait, IAdtError>> {
   const runner = testRunner(context, carrier);
-  const started = await atStep('run', () =>
+  return waitForRun(runner, () =>
     runner.run(objectName.toUpperCase(), {
       ...runOptions,
       // A run SAP did not start is a failure (see adt-clients' migration guide to 23).
       analyse: analyseUnitTestStart,
     }),
-  )();
+  );
+}
+
+/**
+ * Start a run with `start` — whose answer is the run's id — then poll it to
+ * the end with `runner`, `MAX_STATUS_POLLS` long polls at most, and fetch the
+ * result.
+ */
+export async function waitForRun(
+  runner: IUnitTestRunInformation,
+  start: () => Promise<IAdtResponse<unknown, IAdtError>>,
+): Promise<IAdtResponse<RunAndWait, IAdtError>> {
+  const started = await atStep('run', start)();
   if (!started.ok) {
     return started as unknown as IAdtResponse<RunAndWait, IAdtError>;
   }

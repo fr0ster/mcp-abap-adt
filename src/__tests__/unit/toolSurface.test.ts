@@ -84,7 +84,7 @@ describe('the MCP tool surface', () => {
   it('enumerates the whole surface, so the assertions below are not vacuous', () => {
     // A run that listed nothing would satisfy every comparison that follows.
     // 19.0.0: the 112 low tools left the surface, and their rows the
-    // fixture — 264 remain.
+    // fixture — 264 remain; 21.0.0 adds RunAbapUnit, 265.
     expect(frozen.length).toBeGreaterThan(250);
     expect(current.length).toBe(frozen.length);
   });
@@ -418,6 +418,12 @@ describe('the MCP tool surface', () => {
    * and both answered on an SAP BTP ABAP trial (2026-10-21); its row's
    * `available_in` moved from `onprem` to `cloud, onprem`, every other row
    * was checked unchanged.
+   */
+  /**
+   * **The sixth deliberate move: `RunAbapUnit` arrived (#329, read-only
+   * group).** ABAP Unit by a run target, an object of any type of the run
+   * registry or a package, through adt-clients' generic runner. Every other
+   * row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

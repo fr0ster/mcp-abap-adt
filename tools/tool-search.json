@@ -3493,6 +3493,19 @@
     ],
     "semantic": "Run ABAP Test Cockpit (ATC) quality checks over objects or a package."
   },
+  "RunAbapUnit": {
+    "keywords": [
+      "run unit tests",
+      "ABAP Unit",
+      "package tests",
+      "run package tests",
+      "subpackages",
+      "CDS view assigned tests",
+      "foreign tests",
+      "test results"
+    ],
+    "semantic": "Run the ABAP Unit tests of a whole package, or of one object by its ABAP Unit run type such as a CDS view's assigned tests, and see which pass or fail."
+  },
   "RunCdsUnitTest": {
     "keywords": [
       "run CDS tests",

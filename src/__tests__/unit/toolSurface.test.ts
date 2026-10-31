@@ -436,12 +436,12 @@ describe('the MCP tool surface', () => {
    * checked unchanged.
    */
   /**
-   * **The eighth deliberate move: the status-poll limit (#329).** The tools
-   * that wait for an ABAP Unit run — `RunUnitTest`, `RunCdsUnitTest`,
+   * **The eighth deliberate move: `wait` (#329).** The tools that start an
+   * ABAP Unit run and wait for it — `RunUnitTest`, `RunCdsUnitTest`,
    * `RunProgramUnitTest`, `RunFunctionGroupUnitTest`,
-   * `RunFunctionModuleUnitTest`, `RunAbapUnit` and `GetUnitTestResult` —
-   * take `max_status_polls`, optional, default 5. Their rows gained it in
-   * the snapshot; every other row was checked unchanged.
+   * `RunFunctionModuleUnitTest` and `RunAbapUnit` — take `wait`, optional,
+   * default true: `false` answers the run id right after the start. Their
+   * rows gained it in the snapshot; every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

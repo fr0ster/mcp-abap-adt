@@ -3,8 +3,9 @@
  * interfaces-adt): one object of any type the run registry
  * (`ABAP_UNIT_RUN_TYPES`) lists, or one package. Through adt-clients'
  * generic runner (`AdtExecutor.getAbapUnitTestRunner`): the run is started on
- * `POST /abapunit/runs`, its status read by up to `max_status_polls` long polls and its result answered,
- * as the per-object run tools do (`runTests.ts`).
+ * `POST /abapunit/runs` and, with `wait` (the default), read by long polling
+ * until SAP answers it finished and its result answered, as the per-object run
+ * tools do (`runTests.ts`); with `wait: false` the run id is answered at once.
  *
  * The endpoint answers a type it does not run with an empty result, not a
  * refusal (adt-clients' measurements), so the type is checked before anything
@@ -28,8 +29,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { MAX_STATUS_POLLS_PROPERTY, maxStatusPollsOf } from '../shared/pollRun';
-import { scopeOf } from '../shared/runner';
+import { scopeOf, WAIT_PROPERTY, waitOf } from '../shared/runner';
 import {
   fieldOf,
   RUN_TARGET_PROPERTY,
@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
   name: 'RunAbapUnit',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started, its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress), and the result is returned once the run finished, else its run_id, whose status and result are read by run_id.',
+    'Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read by long polling until SAP answers it finished and the result is returned, the call lasting as long as the run; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -104,7 +104,7 @@ export const TOOL_DEFINITION = {
           },
         },
       },
-      max_status_polls: MAX_STATUS_POLLS_PROPERTY.max_status_polls,
+      wait: WAIT_PROPERTY.wait,
       ...DETAIL_PROPERTY,
     },
     required: ['target'],
@@ -124,8 +124,8 @@ export async function handleRunAbapUnit(
   const flags = runFlagsOf(args);
   if (flags instanceof Error) return return_error(flags);
   const { scope, riskLevel, duration } = flags;
-  const maxStatusPolls = maxStatusPollsOf(args);
-  if (maxStatusPolls instanceof Error) return return_error(maxStatusPolls);
+  const wait = waitOf(args);
+  if (wait instanceof Error) return return_error(wait);
   const detail = detailOf(args);
   const runner = new AdtExecutor(
     context.connection,
@@ -134,7 +134,7 @@ export async function handleRunAbapUnit(
   return answer(
     { tool: 'RunAbapUnit', detail },
     () =>
-      waitForRun(runner, maxStatusPolls, () =>
+      waitForRun(runner, wait, () =>
         runner.run(target, {
           scope: scopeOf(scope),
           riskLevel,
@@ -143,6 +143,6 @@ export async function handleRunAbapUnit(
           analyse: analyseUnitTestStart,
         }),
       ),
-    projectRun(detail, maxStatusPolls),
+    projectRun(detail),
   );
 }

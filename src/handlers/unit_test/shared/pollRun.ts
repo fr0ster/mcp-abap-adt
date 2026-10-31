@@ -42,56 +42,10 @@ export function runIsFinished(statusValue: unknown): boolean {
   return runProgressStatus(statusValue) === 'FINISHED';
 }
 
-/**
- * How many status long polls a tool waits through when the call names none
- * (`max_status_polls`). `getStatus`'s own `withLongPolling` makes ADT hold
- * each request open while the run is in progress, so this counts such long
- * polls before the tool answers the run id — not a guess at how long a run
- * "should" take. The caller chooses another count with `max_status_polls`.
- */
-export const DEFAULT_MAX_STATUS_POLLS = 5;
-
-/** The `max_status_polls` property of a tool that waits for a run. */
-export const MAX_STATUS_POLLS_PROPERTY = {
-  max_status_polls: {
-    type: 'integer',
-    minimum: 1,
-    default: DEFAULT_MAX_STATUS_POLLS,
-    description: `How many status long polls the call waits through before it answers: an integer of 1 or more (default ${DEFAULT_MAX_STATUS_POLLS}). ADT holds each long poll open while the run is in progress.`,
-  },
-} as const;
-
-/**
- * The call's `max_status_polls`: the default when absent; an error, sent
- * before any request, for a value that is not an integer of 1 or more. The
- * arguments come from the caller, outside the type system, so the value is
- * checked here.
- */
-export function maxStatusPollsOf(args: unknown): number | Error {
-  const given = givenMaxStatusPolls(args);
-  if (given === undefined) return DEFAULT_MAX_STATUS_POLLS;
-  if (typeof given === 'number' && Number.isInteger(given) && given >= 1) {
-    return given;
-  }
-  return new Error(
-    `max_status_polls must be an integer of 1 or more; got ${JSON.stringify(given)}; nothing was sent`,
-  );
-}
-
-/** The `max_status_polls` the call carries, as given; `undefined` when none. */
-export function givenMaxStatusPolls(args: unknown): unknown {
-  return args !== null &&
-    typeof args === 'object' &&
-    Object.hasOwn(args, 'max_status_polls')
-    ? Object.getOwnPropertyDescriptor(args, 'max_status_polls')?.value
-    : undefined;
-}
-
+/** A run SAP answered finished: its last status, and its result. */
 export interface RunOutcome<TResult> {
-  readonly finished: boolean;
   readonly status: AdtReading<unknown>;
-  /** Present only when `finished` — never fetched otherwise. */
-  readonly result?: TResult;
+  readonly result: TResult;
 }
 
 function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
@@ -105,19 +59,21 @@ function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
 }
 
 /**
- * Poll a run's status up to `maxStatusPolls` times, and only then — if it
- * finished by then — fetch the result via `fetchResult`.
+ * Read a run's status by long polling until SAP answers it `FINISHED`, then
+ * fetch the result via `fetchResult`.
+ *
+ * Each status read asks for long polling (`withLongPolling`), and ADT holds
+ * that request open until the run has finished (measured on premise,
+ * 2026-10-31: one poll held 97 s for a 90 s test and 207 s for a 200 s one,
+ * and returned on no progress step), so a run ends the loop on
+ * the poll that saw it finish. The call lasts as long as the run; a caller
+ * who must not wait starts the run and reads it later by its id.
  *
  * A failing `getStatus` call is returned exactly as it came (the caller's
- * `answer()` reports it as the refusal it is — the status this handler
- * already had is not thrown away in favour of a fabricated one). A failing
- * `getResult` call, once the run IS confirmed finished, is likewise returned
- * as-is: never swallowed into a null field under a false `success: true`.
- * A run that has not finished after those polls never reaches `fetchResult`
- * at all — this handler does not present whatever an unfinished run's result
- * endpoint happens to answer, because no fixture in the corpus captures that
- * case and guessing would be exactly the kind of invented shape this
- * migration exists to remove.
+ * `answer()` reports it as the refusal it is). A failing `getResult` call,
+ * once the run IS confirmed finished, is likewise returned as-is: never
+ * swallowed into a null field under a false `success: true`. The result is
+ * fetched only once the status says `FINISHED`.
  */
 export async function pollUntilFinished<TResult>(
   getStatus: (
@@ -126,10 +82,8 @@ export async function pollUntilFinished<TResult>(
   ) => Promise<IAdtResponse<AdtReading<unknown>>>,
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
-  maxStatusPolls: number,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
-  let lastStatus: AdtReading<unknown> | undefined;
-  for (let attempt = 0; attempt < maxStatusPolls; attempt += 1) {
+  for (;;) {
     const statusResponse = await atStep('read status', getStatus)(runId, true);
     if (!statusResponse.ok) {
       return statusResponse as unknown as IAdtResponse<
@@ -138,7 +92,6 @@ export async function pollUntilFinished<TResult>(
       >;
     }
     const status = statusResponse.getResult().value;
-    lastStatus = status;
     if (runIsFinished(status.value)) {
       const resultResponse = await atStep('read result', fetchResult)();
       if (!resultResponse.ok) {
@@ -148,14 +101,9 @@ export async function pollUntilFinished<TResult>(
         >;
       }
       return okOutcome({
-        finished: true,
         status,
         result: resultResponse.getResult().value,
       });
     }
   }
-  return okOutcome({
-    finished: false,
-    status: lastStatus as AdtReading<unknown>,
-  });
 }

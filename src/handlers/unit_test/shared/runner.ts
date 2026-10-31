@@ -4,7 +4,7 @@
  * the finished result, `runSync.ts`).
  */
 
-import { givenMaxStatusPolls, maxStatusPollsOf } from './pollRun';
+import { fieldOf } from './runTarget';
 
 export const UNIT_TEST_RUNNERS = ['async', 'sync'] as const;
 export type UnitTestRunner = (typeof UNIT_TEST_RUNNERS)[number];
@@ -16,7 +16,7 @@ export const RUNNER_PROPERTY = {
     enum: ['async', 'sync'],
     default: 'async',
     description:
-      'async (default): starts the run, reads its status by up to max_status_polls long polls and returns the result once the run finished, else its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.',
+      'async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.',
   },
 } as const;
 
@@ -38,22 +38,53 @@ export function runnerOf(args: unknown): UnitTestRunner | Error {
   );
 }
 
+/** The `wait` property of a tool that starts an asynchronous run. */
+export const WAIT_PROPERTY = {
+  wait: {
+    type: 'boolean',
+    default: true,
+    description:
+      "true (default): the call reads the run's status by long polling until SAP answers it finished and returns the result; the call lasts as long as the run. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.",
+  },
+} as const;
+
 /**
- * The status long polls an async run is waited through (`max_status_polls`,
- * default 5); with runner sync, a given `max_status_polls` is refused before
- * anything is sent: that runner is one request answered with the finished
- * result.
+ * Whether the call waits for the run (`wait`): `true` when absent; an error,
+ * sent before any request, for a value that is not a boolean. The arguments
+ * come from the caller, outside the type system, so the value is checked
+ * here.
  */
-export function runStatusPollsOf(
+export function waitOf(args: unknown): boolean | Error {
+  const given = givenWait(args);
+  if (given === undefined) return true;
+  if (typeof given === 'boolean') return given;
+  return new Error(
+    `wait must be true or false; got ${JSON.stringify(given)}; nothing was sent`,
+  );
+}
+
+/**
+ * `wait` of a tool with a runner: as `waitOf` for runner async; with runner
+ * sync a given `wait` is refused before anything is sent, since that runner is
+ * one request answered with the finished result.
+ */
+export function runnerWaitOf(
   args: unknown,
   runner: UnitTestRunner,
-): number | Error {
-  if (runner === 'sync' && givenMaxStatusPolls(args) !== undefined) {
+): boolean | Error {
+  if (runner === 'sync' && givenWait(args) !== undefined) {
     return new Error(
-      'max_status_polls goes with runner async: runner sync is one request that returns the finished result; nothing was sent',
+      'wait goes with runner async: runner sync is one request that returns the finished result; nothing was sent',
     );
   }
-  return maxStatusPollsOf(args);
+  return waitOf(args);
+}
+
+/** The `wait` the call carries, as given; `undefined` when none. */
+function givenWait(args: unknown): unknown {
+  return args !== null && typeof args === 'object'
+    ? fieldOf(args, 'wait')
+    : undefined;
 }
 
 /** The `scope` argument, as compact `HandlerUnitTestRun` takes it. */

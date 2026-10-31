@@ -1076,12 +1076,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered: its status is read by up to max_status_polls long polls (default 5; ADT holds each open while the run is in progress); once the run finished, answers its result, else finished:false with the last status seen.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read by long polling until SAP answers the run finished, then its result is answered; the call lasts as long as the run.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
-- `max_status_polls` (integer, optional (default: 5)) - How many status long polls the call waits through before it answers: an integer of 1 or more (default 5). ADT holds each long poll open while the run is in progress.
 - `run_id` (string, required) - Run id a unit test run answered.
 
 ---

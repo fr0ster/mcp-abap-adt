@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'RunFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.',
+    'Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.',
   inputSchema: {
     type: 'object',
     properties: {

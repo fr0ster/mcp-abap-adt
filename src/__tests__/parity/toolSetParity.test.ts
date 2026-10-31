@@ -909,7 +909,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // core-ro: the readonly tools with system and search, the three batch
       // tools (and, on stdio, the list and the logoff; on http SessionOpen
       // and SessionClose); no write, debugger, background run or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 75 : onHttp ? 75 : 73);
+      expect(fullRo.tools).toHaveLength(onStdio ? 74 : onHttp ? 74 : 72);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',
@@ -923,6 +923,15 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'BatchAnswers',
         ]),
       );
+      // The ABAP Unit run tools start runs whose tests can change data:
+      // RunAbapUnit is served where RunUnitTest and its siblings are, on the
+      // full binary, and by no read-only one.
+      expect({
+        full: ['RunUnitTest', 'RunAbapUnit'].map((n) => full.tools.includes(n)),
+        fullRo: ['RunUnitTest', 'RunAbapUnit'].map((n) =>
+          fullRo.tools.includes(n),
+        ),
+      }).toEqual({ full: [true, true], fullRo: [false, false] });
       for (const name of [
         'CreateClass',
         'DebugStartListener',

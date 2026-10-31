@@ -13,12 +13,18 @@ import { ABAP_UNIT_RUN_TYPES } from '@mcp-abap-adt/interfaces-adt';
 import {
   handleRunAbapUnit,
   TOOL_DEFINITION,
-} from '../../handlers/unit_test/readonly/handleRunAbapUnit';
+} from '../../handlers/unit_test/high/handleRunAbapUnit';
 import { corpusBody } from '../../lib/adtCorpus';
 import {
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
+import {
+  SETS,
+  SYSTEM_TYPES,
+  servedCatalog,
+  TRANSPORTS,
+} from './descriptions/catalog';
 
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
@@ -217,5 +223,42 @@ describe('RunAbapUnit: the schema', () => {
     expect(
       TOOL_DEFINITION.inputSchema.properties.target.properties.kind.enum,
     ).toEqual(['object', 'package']);
+  });
+});
+
+describe('RunAbapUnit: where it is served', () => {
+  // A test run executes code that can change data in the system: the tool is
+  // served where RunUnitTest and its siblings are, and by no read-only set.
+  it('is served exactly where RunUnitTest is: the full set, on every transport, on premise and cloud', async () => {
+    const placement: string[] = [];
+    for (const [kind, set] of SETS) {
+      for (const transport of TRANSPORTS) {
+        for (const systemType of SYSTEM_TYPES) {
+          const names = (await servedCatalog(set, transport, systemType)).map(
+            (tool) => tool.name,
+          );
+          const served = ['RunUnitTest', 'RunAbapUnit'].map((name) =>
+            names.includes(name),
+          );
+          placement.push(`${kind}/${transport}/${systemType}: ${served}`);
+        }
+      }
+    }
+    const expected: string[] = [];
+    for (const [kind] of SETS) {
+      for (const transport of TRANSPORTS) {
+        for (const systemType of SYSTEM_TYPES) {
+          const served = kind === 'core' && systemType !== 'legacy';
+          expected.push(
+            `${kind}/${transport}/${systemType}: ${[served, served]}`,
+          );
+        }
+      }
+    }
+    expect(placement).toEqual(expected);
+  });
+
+  it('carries no [read-only] marker', () => {
+    expect(TOOL_DEFINITION.description.startsWith('[read-only]')).toBe(false);
   });
 });

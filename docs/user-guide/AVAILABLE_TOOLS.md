@@ -5,8 +5,8 @@ Generated from code in `src/handlers/**` (not from docs).
 ## Summary
 
 - Total tools: 264
-- Read-only tools: 69
-- High-level tools: 158
+- Read-only tools: 68
+- High-level tools: 159
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -120,7 +120,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [ReadTransportObjects](#readtransportobjects-read-only-transport)
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
-    - [RunAbapUnit](#runabapunit-read-only-unit-test)
 - [High-Level Group](#high-level-group)
   - [Atc](#high-level-atc)
     - [GetATCFindings](#getatcfindings-high-level-atc)
@@ -296,6 +295,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunCdsUnitTest](#runcdsunittest-high-level-unit-test)
     - [RunFunctionGroupUnitTest](#runfunctiongroupunittest-high-level-unit-test)
     - [RunFunctionModuleUnitTest](#runfunctionmoduleunittest-high-level-unit-test)
@@ -1334,20 +1334,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `run_id` (string, required) - Run id a unit test run answered.
-
----
-
-<a id="runabapunit-read-only-unit-test"></a>
-#### RunAbapUnit (Read-Only / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.
-
-**Source:** `src/handlers/unit_test/readonly/handleRunAbapUnit.ts`
-
-**Parameters:**
-- `duration` (object, optional) - Durations the run accepts.
-- `risk_level` (object, optional) - Risk levels the run accepts.
-- `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
-- `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
 
 ---
 
@@ -3413,9 +3399,23 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
+<a id="runabapunit-high-level-unit-test"></a>
+#### RunAbapUnit (High-Level / Unit Test)
+**Description:** Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.
+
+**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
+
+**Parameters:**
+- `duration` (object, optional) - Durations the run accepts.
+- `risk_level` (object, optional) - Risk levels the run accepts.
+- `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
+- `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
+
+---
+
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the CDS view test class named by class_name and returns the result.
+**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name and returns the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -3426,7 +3426,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3439,7 +3439,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
+**Description:** Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -3453,7 +3453,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3466,7 +3466,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 

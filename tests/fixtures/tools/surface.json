@@ -222,12 +222,6 @@
     "available_in": "cloud, onprem"
   },
   {
-    "group": "readonly",
-    "name": "RunAbapUnit",
-    "inputs": "target*, scope, risk_level, duration, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
     "group": "system",
     "name": "RunATC",
     "inputs": "objects*, check_variant, max_findings, wait",
@@ -741,6 +735,12 @@
     "group": "high",
     "name": "RunFunctionModuleUnitTest",
     "inputs": "function_module_name*, function_group_name, runner, scope, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "RunAbapUnit",
+    "inputs": "target*, scope, risk_level, duration, detail",
     "available_in": "cloud, onprem"
   },
   {

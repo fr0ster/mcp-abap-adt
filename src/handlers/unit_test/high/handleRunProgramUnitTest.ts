@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'RunProgramUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.",
+    "Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result. On ABAP Cloud, the programs are SAP's standard programs.",
   inputSchema: {
     type: 'object',
     properties: {

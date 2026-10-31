@@ -518,7 +518,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** [read-only] ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: runner (async | sync, default async), title, context, scope, risk_level, duration. Response: JSON — runner async: { success, run_id }, the status and result read later by run_id, suited to long suites; runner sync: { success, runner, finished, run_result }, the finished result of every test class of each container_class in one request.
+**Description:** ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: runner (async | sync, default async), title, context, scope, risk_level, duration. Response: JSON — runner async: { success, run_id }, the status and result read later by run_id, suited to long suites; runner sync: { success, runner, finished, run_result }, the finished result of every test class of each container_class in one request.
 
 **Available in:** cloud, onprem
 

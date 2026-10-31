@@ -420,10 +420,11 @@ describe('the MCP tool surface', () => {
    * was checked unchanged.
    */
   /**
-   * **The sixth deliberate move: `RunAbapUnit` arrived (#329, read-only
-   * group).** ABAP Unit by a run target, an object of any type of the run
-   * registry or a package, through adt-clients' generic runner. Every other
-   * row was checked unchanged.
+   * **The sixth deliberate move: `RunAbapUnit` arrived (#329, high group,
+   * beside the per-object run tools).** ABAP Unit by a run target, an object
+   * of any type of the run registry or a package, through adt-clients'
+   * generic runner. A test run can change data in the system, so no
+   * read-only binary serves it. Every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

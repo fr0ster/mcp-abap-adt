@@ -16,8 +16,9 @@
  * result lists them as a preview, unexecuted (measured by adt-clients on
  * S/4HANA 2025 and ABAP cloud).
  *
- * Running tests changes no object, so the tool is in the read-only group.
- * SAP_BASIS 7.40 has no `/abapunit/runs`: `available_in` leaves `legacy` out.
+ * A test run executes code that can change data in the system, so the tool
+ * is in the high group with the per-object run tools, and no read-only
+ * binary serves it. SAP_BASIS 7.40 has no `/abapunit/runs`: `available_in` leaves `legacy` out.
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
@@ -54,7 +55,7 @@ export const TOOL_DEFINITION = {
   name: 'RunAbapUnit',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.',
+    'Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.',
   inputSchema: {
     type: 'object',
     properties: {

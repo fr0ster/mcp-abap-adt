@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 75
+- Total tools: 74
 
 ## Navigation
 
@@ -111,7 +111,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [ReadTransportObjects](#readtransportobjects-read-only-transport)
     - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
   - [Unit Test](#read-only-unit-test)
-    - [RunAbapUnit](#runabapunit-read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
 - [Streamable HTTP Binaries](#streamable-http-binaries)
   - [SessionOpen](#sessionopen-streamable-http)
@@ -1168,20 +1167,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="read-only-unit-test"></a>
 ### Read-Only / Unit Test
-
-<a id="runabapunit-read-only-unit-test"></a>
-#### RunAbapUnit (Read-Only / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the run target named by target and returns the result. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started and waited for within a bound; a run that outlasts it returns its run_id, whose status and result are read by run_id.
-
-**Source:** `src/handlers/unit_test/readonly/handleRunAbapUnit.ts`
-
-**Parameters:**
-- `duration` (object, optional) - Durations the run accepts.
-- `risk_level` (object, optional) - Risk levels the run accepts.
-- `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
-- `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
-
----
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)

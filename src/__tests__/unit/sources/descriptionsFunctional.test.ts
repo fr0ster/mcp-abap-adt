@@ -80,8 +80,9 @@ function isNegation(word: string): boolean {
  * sort. They are named by that verb first, with no family prefix, or listed in
  * `CHANGING_BY_NAME`. Every other tool changes no repository object — the
  * meaning of the `-ro` binaries — and carries `[read-only]`: a read, a run of
- * code, a trace schedule, a test run, a debug session's step, a session's
- * logoff, a batch's start, send and answers.
+ * code, a trace schedule, a debug session's step, a session's logoff, a
+ * batch's start, send and answers. An ABAP Unit run (`STARTS_A_TEST_RUN`)
+ * carries no marker: the tests it executes can change data in the system.
  */
 const CHANGING_VERBS = [
   'Create',
@@ -110,6 +111,21 @@ const CHANGING_BY_NAME: ReadonlySet<string> = new Set([
   'HandlerTransportMoveObjects',
 ]);
 
+/**
+ * The tools that start an ABAP Unit run: the tests they execute can change
+ * data in the system, so they are not read-only. The tools that read a run's
+ * status or result keep the marker.
+ */
+const STARTS_A_TEST_RUN: ReadonlySet<string> = new Set([
+  'RunUnitTest',
+  'RunCdsUnitTest',
+  'RunProgramUnitTest',
+  'RunFunctionGroupUnitTest',
+  'RunFunctionModuleUnitTest',
+  'RunAbapUnit',
+  'HandlerUnitTestRun',
+]);
+
 /** Whether `name` begins with the word `word`: the next letter, if any, starts a new word. */
 function startsWithWord(name: string, word: string): boolean {
   if (!name.startsWith(word)) return false;
@@ -125,9 +141,14 @@ function changesRepositoryObject(name: string): boolean {
   );
 }
 
-/** Whether `tool` changes no repository object, and so must carry `[read-only]` (beside its `[runtime]`, `[debug]` or `[session]` marker). */
+/** Whether the tool named `name` must carry `[read-only]`. */
+function readOnlyByName(name: string): boolean {
+  return !changesRepositoryObject(name) && !STARTS_A_TEST_RUN.has(name);
+}
+
+/** Whether `tool` changes no repository object and starts no test run, and so must carry `[read-only]` (beside its `[runtime]`, `[debug]` or `[session]` marker). */
 function mustBeMarkedReadOnly(tool: ServedTool): boolean {
-  return !changesRepositoryObject(tool.name);
+  return readOnlyByName(tool.name);
 }
 
 /** The identifiers of `text`: runs of letters, digits and underscores. */
@@ -247,7 +268,6 @@ describe('tool descriptions are purely functional', () => {
       'RuntimeRunClass',
       'RuntimeCreateProfilerTraceParameters',
       'RunATC',
-      'RunUnitTest',
       'GetUnitTestStatus',
       'DiscardBackgroundRun',
       'LogoffLeftoverSession',
@@ -255,7 +275,6 @@ describe('tool descriptions are purely functional', () => {
       'BatchAnswers',
       'HandlerBatch',
       'HandlerDumpList',
-      'HandlerUnitTestRun',
       'HandlerProfileSchedule',
       'Getaway',
     ]) {
@@ -271,6 +290,9 @@ describe('tool descriptions are purely functional', () => {
       'HandlerUpdate',
       'HandlerLock',
       'HandlerTransportCreate',
+      'RunUnitTest',
+      'RunAbapUnit',
+      'HandlerUnitTestRun',
     ]) {
       expect([name, marked(name)]).toEqual([name, false]);
     }
@@ -356,7 +378,7 @@ function handlerFiles(directory: string): string[] {
   return files;
 }
 
-describe('every declared tool carries [read-only] when it changes no repository object', () => {
+describe('every declared tool carries [read-only] when it changes no repository object and starts no test run', () => {
   it('holds for each TOOL_DEFINITION under src/handlers, the unserved ones too', () => {
     const wrong: string[] = [];
     let seen = 0;
@@ -372,8 +394,8 @@ describe('every declared tool carries [read-only] when it changes no repository 
         continue;
       }
       seen += 1;
-      const changes = changesRepositoryObject(definition.name);
-      if (changes === definition.description.startsWith('[read-only]')) {
+      const marked = readOnlyByName(definition.name);
+      if (marked !== definition.description.startsWith('[read-only]')) {
         wrong.push(definition.name);
       }
     }

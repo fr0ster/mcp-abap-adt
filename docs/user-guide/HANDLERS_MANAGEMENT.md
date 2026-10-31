@@ -29,7 +29,7 @@ run outside batch mode — see
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
 stdio / Streamable HTTP / SSE: core 257 / 257 / 255 (with the 3 batch tools and the debugger
-batch's 2); core-ro 75 / 75 / 73 (each with the 3 batch tools); compact 40 / 39 / 38 (29 + 4
+batch's 2); core-ro 74 / 74 / 72 (each with the 3 batch tools); compact 40 / 39 / 38 (29 + 4
 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 20 / 19 / 18
 (17 + `HandlerBatch`). stdio adds the 2 leftover-session tools, list and logoff; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`

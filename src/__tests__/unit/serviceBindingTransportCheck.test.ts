@@ -15,7 +15,10 @@
  * Real adt-clients over a recording connection; no SAP.
  */
 
-import { handleHandlerServiceBindingValidate } from '../../../compact-readonly-entries/src/handlers/handleHandlerServiceBindingValidate';
+import {
+  TOOL_DEFINITION as HandlerServiceBindingValidate_Tool,
+  handleHandlerServiceBindingValidate,
+} from '../../../compact-readonly-entries/src/handlers/handleHandlerServiceBindingValidate';
 import { handleHandlerValidate } from '../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
 import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import { declareSystemKind } from '../../lib/systemKind';
@@ -188,3 +191,29 @@ describe.each(['onprem', 'cloud'] as const)('on %s', (variant) => {
     });
   });
 });
+
+describe("HandlerServiceBindingValidate states package_name, the binding's package, as required", () => {
+  it('lists package_name among the required arguments in the description', () => {
+    expect(HandlerServiceBindingValidate_Tool.description).toContain(
+      "Required: service_binding_name*, service_definition_name*, package_name* (the binding's package).",
+    );
+  });
+
+  it('refuses a call without package_name before anything is sent', async () => {
+    const connection = recordingConnection([]);
+    const result = await handleHandlerServiceBindingValidate(
+      { connection },
+      fromClient(
+        '{"service_binding_name":"zsrvb_a","service_definition_name":"zsrvd_a"}',
+      ),
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('package_name is required');
+    expect(connection.requests).toEqual([]);
+  });
+});
+
+/** Arguments as a client sends them: parsed JSON, outside the type system. */
+function fromClient(json: string) {
+  return JSON.parse(json);
+}

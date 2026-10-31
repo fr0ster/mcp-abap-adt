@@ -910,7 +910,10 @@ export const compactServiceBindingValidateSchema = {
       type: 'string',
       description: 'Service binding version.',
     },
-    package_name: { type: 'string', description: 'Target package name.' },
+    package_name: {
+      type: 'string',
+      description: "The binding's package, which the validation checks.",
+    },
     description: { type: 'string', description: 'Binding description.' },
   },
   required: ['service_binding_name', 'service_definition_name'],

@@ -132,9 +132,10 @@ describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
     // Two items list the code (`PROG`, `REPO`): the one that is its main type.
     ['program', 'PROG'],
     // A name is read as its code before the list: `view` is a CDS view
-    // (`DDLS/DF`), in either case; the dictionary views are `VIEW/DV`.
+    // (`DDLS/DF`), in lower or mixed case; in upper case `VIEW` is the
+    // search name of the dictionary views (`VIEW/DV`; caseRule.test.ts).
     ['view', 'DDLS'],
-    ['VIEW', 'DDLS'],
+    ['View', 'DDLS'],
     ['VIEW/DV', 'VIEW'],
   ])('a friendly name, %s, reaches the wire as %s', async (value, wire) => {
     const { requests } = await search(variant, value);

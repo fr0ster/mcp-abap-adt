@@ -18,8 +18,11 @@
  * the list. A friendly name of `TYPE_NAMES` the variant serves (`class`,
  * `structure`, `view`, …) is read as its code first, once, and that code as
  * above (`class` → `CLAS/OC` → `CLAS`, `table` → `TABL/DT` → `DTAB`, `view` →
- * `DDLS/DF` → `DDLS`, `dbview` → `VIEW/DV` → `VIEW`), so every name the tools took is still taken. Any other
- * text is refused, and nothing is sent.
+ * `DDLS/DF` → `DDLS`, `dbview` → `VIEW/DV` → `VIEW`), so every name the tools
+ * took is still taken — by the case rule: a value in upper case that is a
+ * search name, a code or a main type (`VIEW`, `STRU`) is that, never a
+ * friendly name; `VIEW` is the dictionary views. Any other text is refused,
+ * and nothing is sent.
  */
 import {
   ADT_SEARCH_TYPES_CLOUD,
@@ -32,7 +35,7 @@ import {
   type ProjectionVariant,
   TYPE_NAMES,
 } from './adtProjections';
-import { acceptedOf, mainOfCode } from './adtTypeCode';
+import { friendlyNameOf, mainOfCode } from './adtTypeCode';
 
 /** A search type table of a release with a list: its names and what each selects. */
 type ListedSearchTypes<N extends string> = {
@@ -74,10 +77,11 @@ const SEARCH_NAMES = {
 } as const satisfies Readonly<Record<ProjectionVariant, unknown>>;
 
 /**
- * The search name of the variant's object types list `text` names, either
- * case, upper-cased once: the code of the friendly name it is
- * (`TYPE_NAMES`), read as that code; else the name itself, or the name a
- * code stands for (see the module comment); `undefined` for any other text.
+ * The search name of the variant's object types list `text` names,
+ * upper-cased once: the code of the friendly name it is (`TYPE_NAMES`;
+ * `friendlyNameOf` — in upper case a word of the tables, `VIEW`, is no
+ * name), read as that code; else the name itself, or the name a code stands
+ * for (see the module comment); `undefined` for any other text.
  */
 export function searchNameOf(
   variant: 'onprem',
@@ -88,7 +92,7 @@ export function searchNameOf(
   text: string,
 ): AdtSearchTypeOf<'cloud'> | undefined;
 export function searchNameOf(variant: ProjectionVariant, text: string) {
-  const friendly = acceptedOf(text, ALL_TYPE_NAMES[variant]);
+  const friendly = friendlyNameOf(text, ALL_TYPE_NAMES[variant]);
   return SEARCH_NAMES[variant](
     friendly === undefined ? text.toUpperCase() : TYPE_NAMES[friendly],
   );
@@ -96,7 +100,7 @@ export function searchNameOf(variant: ProjectionVariant, text: string) {
 
 /** What a search type argument takes, for its description. */
 export const SEARCH_TYPE_DESCRIPTION =
-  "Optional: restrict the search to one type, either case: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), or a name standing for a code (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW).";
+  "Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).";
 
 /** The refusal of a search type argument {@link searchNameOf} does not read. */
 export function notASearchType(argument: string, text: string): string {

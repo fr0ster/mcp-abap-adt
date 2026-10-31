@@ -179,10 +179,19 @@ describe('one object of a friendly name is activated exactly as one object of it
     async (_tool, variant, name, code, route) => {
       const byCode = await requestsOf(route, variant, code);
       const byName = await requestsOf(route, variant, name);
-      const byUpper = await requestsOf(route, variant, name.toUpperCase());
+      const capitalised = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      const byMixed = await requestsOf(route, variant, capitalised);
       expect(byCode.length).toBeGreaterThan(0);
       expect(byName).toEqual(byCode);
-      expect(byUpper).toEqual(byCode);
+      expect(byMixed).toEqual(byCode);
+      // In upper case a name is read as itself only where it is no other
+      // word of the tables: `VIEW` is the dictionary view's search name
+      // (`VIEW/DV`; caseRule.test.ts), `STRU` and `FUNC` list the code
+      // their names stand for.
+      if (name !== 'view') {
+        const byUpper = await requestsOf(route, variant, name.toUpperCase());
+        expect(byUpper).toEqual(byCode);
+      }
     },
   );
 

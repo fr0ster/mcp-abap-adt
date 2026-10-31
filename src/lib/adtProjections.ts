@@ -168,7 +168,15 @@ export function supported(values: readonly string[]): string {
  * argument takes (#329, S4b).
  */
 export const MAIN_TYPE_SENTENCE =
-  'A main type, the part of a code before its slash, stands for its code when exactly one listed code has it.';
+  "A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).";
+
+/**
+ * The sentence a description that lists names standing for codes adds for
+ * how a value's case reads it (#329, the owner's rule): a name in lower
+ * case, a code, main type or search name in upper case.
+ */
+export const NAME_CASE_SENTENCE =
+  "A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class).";
 
 // ---------------------------------------------------------------------------
 // Main types: the TADIR type a code belongs to (spec 2.4)

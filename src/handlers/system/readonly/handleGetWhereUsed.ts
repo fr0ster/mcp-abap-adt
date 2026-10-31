@@ -27,6 +27,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   codesWithNames,
   MAIN_TYPE_SENTENCE,
+  NAME_CASE_SENTENCE,
   type ProjectionVariant,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
@@ -79,7 +80,7 @@ export const TOOL_DEFINITION = {
  * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
  */
 function whereUsedTypeDescription(variant: ProjectionVariant): string {
-  return `Type of the ABAP object, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${MAIN_TYPE_SENTENCE}`;
+  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
 }
 
 /** GetWhereUsed's input on `variant`. */
@@ -152,7 +153,8 @@ interface WhereUsedArgs {
 /**
  * The boundary of `object_type` on the variant declared for `connection`: a
  * where-used code (`WHERE_USED_CODES`), a name standing for one
- * (`WHERE_USED_NAMES`) or a main type one where-used code has, either case;
+ * (`WHERE_USED_NAMES`) or a main type or search name one where-used code
+ * has, by the case rule of {@link acceptedCodeOf};
  * `undefined` for any other text.
  */
 function whereUsedCodeOf(connection: object, text: string) {

@@ -96,6 +96,13 @@ module (`FUGR/FF`) or a function include (`FUGR/I`) names its group in `parentNa
 `VIEW/DV`, a dictionary view, is a where-used and a group-activation code; the new friendly name
 `dbview` stands for it (`view` stays a CDS view, `DDLS/DF`).
 
+A value's case says what it is: in lower case a friendly name, in upper case a code, a main type or
+a search name. `view` (and `View`) is a CDS view, `DDLS/DF`; `VIEW` is the dictionary views, the
+search name whose list item is `VIEW/DV` — where-used and the activation tools read it as
+`VIEW/DV`, the structure tools refuse it. Send `view` or `DDLS/DF` for a DDL source, `VIEW`,
+`dbview` or `VIEW/DV` for a dictionary view. An upper-case value that is no word of the tables
+(`CLASS`, `TABLE`) is still read as its name.
+
 ## Callers: the search filter is a search name
 
 `SearchObject` and `HandlerSearch` `object_type` take the names of the system type's object types
@@ -114,7 +121,8 @@ object_type "NOPE" is neither a name of this system's object types list nor an A
 | a search name (`CLAS`, `STRU`, `ABAP_TEST_COCKPIT`, …) | sent as given | sent upper-cased |
 | a code (`CLAS/OC`, `TABL/DS`, `FUGR/FF`, `ENHO/XHH`, …) | sent as given | sent as its name (`CLAS`, `STRU`, `FUNC`, `ENHO`) |
 | `class`, `program`, `include`, `function`, `functiongroup`, `interface`, `package`, `table`, `structure`, `domain`, `dataelement`, `functionmodule`, `function_module` | sent as given | read as its code, sent as that code's name: `CLAS`, `PROG`, `INCL`, `FUNC`, `FUGR`, `INTF`, `DEVC`, `DTAB`, `STRU`, `DOMA`, `DTEL`, `FUNC`, `FUNC` |
-| `view` (any case) | sent as given | a CDS view, `DDLS/DF`, sent as `DDLS`; the dictionary views are `dbview` / `VIEW/DV`, sent as `VIEW` |
+| `view`, `View` | sent as given | a CDS view, `DDLS/DF`, sent as `DDLS` |
+| `VIEW`, `dbview`, `VIEW/DV` | sent as given | the dictionary views, sent as `VIEW` |
 | a code no list or table holds (`NOPE/XX`) | sent; the system answered no hits | refused |
 
 ## Callers on cloud

@@ -1,8 +1,13 @@
 import { answeredObject } from '@mcp-abap-adt/adt-strategies';
 import {
+  ADT_SEARCH_TYPES_CLOUD,
+  ADT_SEARCH_TYPES_ONPREM,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
+  ADT_UTILITY_CODES_CLOUD,
+  ADT_UTILITY_CODES_ONPREM,
   type AdtApiTable,
+  type AdtListedSearchType,
   type AdtTypeCode,
   type AdtUtilityCode,
   type IAdtCodedReference,
@@ -150,6 +155,84 @@ function oneCodeOfMain<C extends AdtUtilityCode>(
   return more.length === 0 ? one : undefined;
 }
 
+/** The search type lists of the variants the server serves, read as name → item. */
+const SEARCH_LISTS: readonly Readonly<
+  Record<string, AdtListedSearchType<string>>
+>[] = [ADT_SEARCH_TYPES_ONPREM, ADT_SEARCH_TYPES_CLOUD];
+
+/**
+ * Each search name of the lists with the item types it lists (`type`; a
+ * group lists none): what an upper-case search name stands for where an
+ * argument takes codes ({@link acceptedCodeOf}).
+ */
+const SEARCH_ITEM_TYPES: ReadonlyMap<string, ReadonlySet<string>> = (() => {
+  const types = new Map<string, Set<string>>();
+  for (const list of SEARCH_LISTS) {
+    for (const [name, item] of Object.entries(list)) {
+      const listed = types.get(name) ?? new Set<string>();
+      if (item.type !== undefined) listed.add(item.type);
+      types.set(name, listed);
+    }
+  }
+  return types;
+})();
+
+/**
+ * Every word of the tables' type vocabulary: each code of the API and
+ * utility tables, each main type they state, each search name of the
+ * object types lists. All are written in upper case.
+ */
+const TYPE_VOCABULARY: ReadonlySet<string> = new Set([
+  ...MAIN_OF_CODE.keys(),
+  ...MAIN_OF_CODE.values(),
+  ...Object.keys(ADT_UTILITY_CODES_ONPREM),
+  ...Object.keys(ADT_UTILITY_CODES_CLOUD),
+  ...SEARCH_ITEM_TYPES.keys(),
+]);
+
+/**
+ * Whether `text` is written in upper case — it has letters, and none is
+ * lower case. The owner's rule (#329): a value in lower case is a friendly
+ * name; a value in upper case is a code, a main type or a search name.
+ */
+function writtenUpper(text: string): boolean {
+  return text === text.toUpperCase() && text !== text.toLowerCase();
+}
+
+/**
+ * The friendly name of `names` that `text` names, by its case: a value in
+ * upper case that is a word of the tables' vocabulary ({@link
+ * TYPE_VOCABULARY}: `VIEW`, `STRU`, `FUNC`, …) is that word, never a name;
+ * any other value is matched against `names` in either case (`class`,
+ * `Class` and `CLASS` alike, since `CLASS` is no word of the vocabulary;
+ * `View` is `view`). The one place a friendly name is read: every argument
+ * that takes one reads it here.
+ */
+export function friendlyNameOf<N extends string>(
+  text: string,
+  names: readonly N[],
+): N | undefined {
+  const upper = text.toUpperCase();
+  return writtenUpper(text) && TYPE_VOCABULARY.has(upper)
+    ? undefined
+    : valueNamed(upper, names);
+}
+
+/**
+ * The one code of `codes` the search name `upper` stands for: the item
+ * type its list states (`VIEW` → `VIEW/DV`, `STRU` → `TABL/DS`, `FUNC` →
+ * `FUGR/FF`); `undefined` when the name lists none of `codes`, or two.
+ */
+function codeOfSearchName<C extends AdtUtilityCode>(
+  upper: string,
+  codes: readonly C[],
+): C | undefined {
+  const types = SEARCH_ITEM_TYPES.get(upper);
+  if (types === undefined) return undefined;
+  const [one, ...more] = codes.filter((code) => types.has(code));
+  return more.length === 0 ? one : undefined;
+}
+
 /**
  * The boundary of a tool argument that names a type: `text`, upper-cased
  * once, as the value of `accepted` it names — `accepted` is the argument's
@@ -182,10 +265,19 @@ export function mainTypeCodeOf<C extends AdtUtilityCode>(
 
 /**
  * The boundary of a type argument that takes a code or a friendly name
- * standing for one: the code of `codes` it names, else the code of the name
- * of `names` it names (`TYPE_NAMES`), else the one code of `codes` whose
- * main type it names; either case, upper-cased once. `undefined` for any
- * other text, a main type two codes share included.
+ * standing for one, by the value's case (the owner's rule, #329):
+ *
+ * - a code of `codes`, either case, is that code;
+ * - a value in upper case is then a main type — the one code of `codes`
+ *   whose main type it is (a main type two codes share is refused) — else a
+ *   search name, the one code of `codes` its list item states (`VIEW` →
+ *   `VIEW/DV`, `STRU` → `TABL/DS`);
+ * - a friendly name of `names` ({@link friendlyNameOf}: `view` → `DDLS/DF`)
+ *   is its code (`TYPE_NAMES`) — in upper case only when it is no word of
+ *   the tables (`CLASS`), so `VIEW` is never `view`;
+ * - a value not in upper case is then a main type of one code (`clas`).
+ *
+ * `undefined` for any other text.
  */
 export function acceptedCodeOf<C extends AdtUtilityCode, N extends TypeName>(
   text: string,
@@ -195,7 +287,13 @@ export function acceptedCodeOf<C extends AdtUtilityCode, N extends TypeName>(
   const upper = text.toUpperCase();
   const code = valueNamed(upper, codes);
   if (code !== undefined) return code;
-  const name = valueNamed(upper, names);
+  if (writtenUpper(text)) {
+    const [main, ...shared] = codesOfMain(upper, codes);
+    if (main !== undefined) return shared.length === 0 ? main : undefined;
+    const searched = codeOfSearchName(upper, codes);
+    if (searched !== undefined) return searched;
+  }
+  const name = friendlyNameOf(text, names);
   if (name !== undefined) return TYPE_NAMES[name];
   return oneCodeOfMain(upper, codes);
 }

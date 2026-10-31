@@ -89,11 +89,12 @@ import {
   COMPACT_ACTIVATE,
   codesWithNames,
   MAIN_TYPE_SENTENCE,
+  NAME_CASE_SENTENCE,
   type ProjectionVariant,
   SINGLE_ACTIVATION,
   SINGLE_ACTIVATION_NAMES,
   SINGLE_ACTIVATION_ROUTES,
-  TYPE_NAMES,
+  type TYPE_NAMES,
   type TypeName,
 } from '../../../lib/adtProjections';
 import {
@@ -101,7 +102,6 @@ import {
   acceptedOf,
   activationParentDescription,
   type GroupObject,
-  mainTypeCodeOf,
   namesItsParent,
   notAccepted,
 } from '../../../lib/adtTypeCode';
@@ -142,7 +142,7 @@ type SingleActivationApi =
  * (`SINGLE_ACTIVATION_NAMES`).
  */
 export function preauditDescription(variant: ProjectionVariant): string {
-  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These types (case-insensitive) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type standing for one of these codes. Their family's activate() always sends preauditRequested=true.`;
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type or a search name standing for one of these codes. Their family's activate() always sends preauditRequested=true.`;
 }
 
 /**
@@ -156,7 +156,7 @@ export function activationTypeDescription(variant: ProjectionVariant): string {
   const kinds = SINGLE_ACTIVATION[variant].filter(
     (name) => !name.includes('/') && !named.has(name),
   );
-  return `Object type, either case: an ADT type code, or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}. ${MAIN_TYPE_SENTENCE}`;
+  return `Object type: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
 }
 
 export const TOOL_DEFINITION = {
@@ -252,22 +252,23 @@ export type ActivationPlan =
   | { readonly group: GroupActivation };
 
 /**
- * `text` as the boundary of `objects[].type` reads it on `variant`: a name of
- * `ACTIVATION_NAMES` is its code (`TYPE_NAMES`), read once here, so one
- * object of a name is routed exactly as one object of its code; a code or a
- * kind of a single-object or a group activation is itself; else the one code
- * of the group activation's codes whose main type it names (every
- * single-object code is one of them, `adtBoundary.typecheck.ts`) — the call
- * then goes on exactly as if that code had been sent. Any other text, a main
- * type two codes share included, stays as sent and is refused.
+ * `text` as the boundary of `objects[].type` reads it on `variant`: a code
+ * of the group activation, a name standing for one or a main type of one
+ * code is that code ({@link acceptedCodeOf}, the case rule included: `VIEW`
+ * is `VIEW/DV`, `view` is `DDLS/DF`), read once here, so one object of a
+ * name is routed exactly as one object of its code (every single-object
+ * code is a group activation code, `adtBoundary.typecheck.ts`). Any other
+ * text — a kind of a single-object activation, or what is refused — stays
+ * as sent.
  */
 function activationTextOf(text: string, variant: ProjectionVariant): string {
-  const name = acceptedOf(text, ACTIVATION_NAMES[variant]);
-  if (name !== undefined) return TYPE_NAMES[name];
-  return acceptedOf(text, SINGLE_ACTIVATION[variant]) !== undefined ||
-    acceptedOf(text, ACTIVATION_CODES[variant]) !== undefined
-    ? text
-    : (mainTypeCodeOf(text, ACTIVATION_CODES[variant]) ?? text);
+  return (
+    acceptedCodeOf(
+      text,
+      ACTIVATION_CODES[variant],
+      ACTIVATION_NAMES[variant],
+    ) ?? text
+  );
 }
 
 /**

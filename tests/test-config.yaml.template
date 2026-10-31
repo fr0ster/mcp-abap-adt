@@ -1786,9 +1786,10 @@ search_source_readonly:
       available_in: ["onprem"]
       description: "SearchSource integration tests (scans shared package + objects from shared_dependencies)"
       params:
-        # Package scanned by the test. Should match shared_dependencies.package so
-        # the seeded objects (Z_MCP_BLD_SHR_FM etc.) are inside it.
-        scan_package: "ZMCP_SHARED"   # must equal shared_dependencies.package
+        # Package scanned by the test: the shared package (shared_dependencies.package,
+        # created by npm run shared:setup), which holds the seeded objects
+        # (Z_MCP_BLD_SHR_FM etc.), when scan_package is omitted.
+        # scan_package: ""            # a package holding the seeded objects; shared_dependencies.package if omitted
         # Substring known to be present in shared FM source ("Echo:" appears in Z_MCP_BLD_SHR_FM).
         known_query: "Echo:"
         # Second AND-substring known to co-occur with known_query on the same line.

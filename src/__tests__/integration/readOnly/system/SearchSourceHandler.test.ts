@@ -3,15 +3,18 @@
  *
  * On premise and cloud — `available_in: ['onprem', 'cloud']`.
  *
- * The tests scan the package configured under `shared_dependencies.package`
- * (default `ZADT_BLD_PKG03`) and rely on the shared FM `Z_MCP_BLD_SHR_FM`
+ * The tests scan the case's `scan_package`, else the package configured under
+ * `shared_dependencies.package`, and rely on the shared FM `Z_MCP_BLD_SHR_FM`
  * seeded by `shared:setup` to contain known marker substrings.
  *
  * Run: npm test -- --testPathPattern=integration/readOnly/system/SearchSource
  */
 
 import { handleSearchSource } from '../../../../handlers/system/readonly/handleSearchSource';
-import { getTimeout } from '../../helpers/configHelpers';
+import {
+  getSharedDependenciesConfig,
+  getTimeout,
+} from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -33,6 +36,22 @@ interface SearchSourceResult {
   }>;
   scanned: { packages: number; objects: number; sources: number };
   truncated: { by_object_cap: boolean; by_max_objects: boolean };
+}
+
+/**
+ * The package scanned: the case's own `scan_package`, else the shared package
+ * (shared_dependencies.package), which the shared-objects setup creates and
+ * seeds with the objects the queries look for, whatever the configuration
+ * names it.
+ */
+function scanPackageOf(given: unknown): string {
+  const pkg = String(given ?? getSharedDependenciesConfig()?.package ?? '');
+  if (!pkg) {
+    throw new Error(
+      'scan_package (or shared_dependencies.package) is required',
+    );
+  }
+  return pkg;
 }
 
 function parseResult(result: any): SearchSourceResult {
@@ -95,7 +114,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const query = String(params?.known_query ?? 'Echo:');
 
         const args = {
@@ -129,7 +148,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const q = String(params?.known_query ?? 'Echo:');
         const q2 = String(params?.known_and_query ?? 'iv_input');
 
@@ -166,7 +185,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const q = String(params?.known_query ?? 'Echo:');
         const excl = String(params?.known_exclude ?? 'ev_output');
 
@@ -201,7 +220,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const q = String(params?.known_query ?? 'Echo:');
 
         const args = {
@@ -237,7 +256,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const q = String(params?.known_query ?? 'Echo:');
 
         const args = {
@@ -275,7 +294,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
 
         const args = {
           query: 'ABSOLUTELY_UNLIKELY_SUBSTRING_XYZQ_42',
@@ -307,7 +326,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const q = String(params?.known_query ?? 'Echo:');
         const glob = String(
           params?.narrow_object_filter ?? 'Z_MCP_BLD_SHR_FM*',
@@ -348,7 +367,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const query = String(params?.known_query ?? 'Echo:');
         const mask = deriveMaskFromPackage(pkg);
 
@@ -381,7 +400,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const query = String(params?.known_query ?? 'Echo:');
         const mask = deriveMaskFromPackage(pkg);
         const maskRe = maskToRegExp(mask);
@@ -448,7 +467,7 @@ describe('SearchSource Handler Integration', () => {
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
-        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const pkg = scanPackageOf(params?.scan_package);
         const query = String(params?.known_query ?? 'Echo:');
         const mask = deriveMaskFromPackage(pkg);
 

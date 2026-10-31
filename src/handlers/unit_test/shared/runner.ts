@@ -38,11 +38,15 @@ export function runnerOf(args: unknown): UnitTestRunner | Error {
   );
 }
 
-/** The `wait` property of a tool that starts an asynchronous run. */
+/**
+ * The `wait` property of a tool that starts an asynchronous run. It declares
+ * no `default`: the MCP SDK hands a handler the arguments parsed by the zod
+ * shape built from this schema, which fills a declared default in, and a sync
+ * run refuses a `wait` that is present. Absent, `waitOf` answers `true`.
+ */
 export const WAIT_PROPERTY = {
   wait: {
     type: 'boolean',
-    default: true,
     description:
       "true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.",
   },

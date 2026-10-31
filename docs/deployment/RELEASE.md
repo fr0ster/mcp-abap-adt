@@ -134,7 +134,7 @@ so that no package goes out on top of a dependency that is missing.
    block, not your terminal, and leaves the failure in `$?`:
    ```bash
    (
-     version=<version>          # e.g. 22.0.0
+     version=<version>          # e.g. 22.0.1
      bindir=bin; suffix=        # Windows (Git Bash): bindir=.; suffix=.cmd
      failed=
      for pair in "core:mcp-abap-adt compact:mcp-abap-adt-compact" \

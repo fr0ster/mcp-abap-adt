@@ -367,14 +367,14 @@ Static types, no casts; every member gated by `PerformedOn` per table, as `Progr
   regenerated and their diff reviewed: additions only.
 - **`CLAUDE.md`** "Cloud vs On-Prem" (programs only) would gain a line on includes and table
   types; it is the owner's file — the text is proposed in the PR description, not edited.
-- **CHANGELOG** `[22.1.0] - <release day>`: `### Added` — the tools of §4, the compact members of
-  §5 with `HandlerUpdate` `part`, `GetInclude` `part`/`version`, the version kinds; `### Fixed` —
-  whatever Q1 decides for `CreateProgram`'s `include`.
-- **Version kind**: **minor (22.1.0)** if every change is additive — new tools, new enum
-  members, new optional parameters, `GetInclude`'s source answer unchanged. It becomes **major**
-  if any parameter gets stricter (the owner's rule): removing `'include'` from `CreateProgram`'s
-  `program_type` (Q1), or changing `GetInclude`'s source answer (Q5). No migration note for a
-  minor; a major adds `docs/MIGRATION-23.0.md` and **Migrating:** notes.
+- **Version kind: major (23.0.0)** (owner, Q1): `'include'` leaves `CreateProgram`'s
+  `program_type`, a stricter parameter. `docs/MIGRATION-23.0.md` and a **Migrating:** note for
+  each breaking item.
+- **CHANGELOG** `[23.0.0] - <release day>`: `### Changed — breaking for a caller of
+  CreateProgram`: `program_type` no longer offers `include` (it never created one: adt-clients
+  refused it before any request); **Migrating:** create an include with `CreateInclude`.
+  `### Added` — the tools of §4, the compact members of §5 with `HandlerUpdate` `part`,
+  `GetInclude` `part`/`version`, the version kinds.
 
 ## 8. Tests
 
@@ -441,9 +441,8 @@ makes is deleted in its `afterAll`, and the run's last step reads that nothing i
 **Q1 — `CreateProgram`'s `program_type: 'include'`.** Facts: the enum offers it (Code
 `handleCreateProgram.ts:53-66`); adt-clients 39 throws on it before any request, pointing to
 `getInclude()` (Code `adt-clients/dist/core/program/create.js:14-23`); with `CreateInclude` the
-include has its own tool. Removing the value is a stricter parameter → major. Recommendation:
-in this minor, refuse it at `CreateProgram`'s boundary before anything is sent, naming
-`CreateInclude` (Fixed); drop it from the enum at the next major.
+include has its own tool. **Decided (owner): a major — `'include'` leaves the enum now** (the
+schema refuses it before anything is sent); the release is 23.0.0.
 
 **Q2 — Lock, unlock, validate and deletion check in the full set.** Facts: since 19.0.0 no
 object has full-set `Lock*` / `Validate*` / deletion-check tools; they are chain steps there and

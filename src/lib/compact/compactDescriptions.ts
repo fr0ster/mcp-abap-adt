@@ -230,7 +230,7 @@ export function compactValidateDescription(variant: ProjectionVariant): string {
         'SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*, package_name*)',
     },
     'object_name*',
-  )}.`;
+  )}. For SERVICE_BINDING the answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.`;
 }
 
 /** HandlerCheckRun's description on `variant`. */

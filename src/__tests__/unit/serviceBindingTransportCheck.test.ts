@@ -20,7 +20,11 @@ import {
   handleHandlerServiceBindingValidate,
 } from '../../../compact-readonly-entries/src/handlers/handleHandlerServiceBindingValidate';
 import { handleHandlerValidate } from '../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
-import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
+import {
+  handleValidateServiceBinding,
+  TOOL_DEFINITION as ValidateServiceBinding_Tool,
+} from '../../handlers/service_binding/high/handleValidateServiceBinding';
+import { compactValidateDescription } from '../../lib/compact/compactDescriptions';
 import { declareSystemKind } from '../../lib/systemKind';
 import {
   type RecordingConnection,
@@ -196,6 +200,18 @@ describe("HandlerServiceBindingValidate states package_name, the binding's packa
   it('lists package_name among the required arguments in the description', () => {
     expect(HandlerServiceBindingValidate_Tool.description).toContain(
       "Required: service_binding_name*, service_definition_name*, package_name* (the binding's package).",
+    );
+  });
+
+  it('says the answer is the transport check verdict', () => {
+    expect(HandlerServiceBindingValidate_Tool.description).toContain(
+      "The answer is the verdict of SAP's transport check for the binding's name and package",
+    );
+    expect(ValidateServiceBinding_Tool.description).toContain(
+      "The answer is the verdict of SAP's transport check for the binding's name and package",
+    );
+    expect(compactValidateDescription('onprem')).toContain(
+      "For SERVICE_BINDING the answer is the verdict of SAP's transport check",
     );
   });
 

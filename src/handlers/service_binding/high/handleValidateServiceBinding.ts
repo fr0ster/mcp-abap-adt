@@ -57,7 +57,7 @@ export const TOOL_DEFINITION = {
   name: 'ValidateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint.',
+    "[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.",
   inputSchema: {
     type: 'object',
     properties: {

@@ -6,12 +6,12 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "22.0.0",
+  "version": "22.0.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact-sse",
-      "version": "22.0.0",
+      "version": "22.0.1",
       "transport": {
         "type": "sse",
         "url": "http://localhost:{MCP_SSE_PORT}/sse",

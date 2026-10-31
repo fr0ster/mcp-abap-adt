@@ -447,12 +447,11 @@ describe('the schema', () => {
     RunFunctionModuleUnitTest_Tool,
     RunAbapUnit_Tool,
   ])(
-    '$name declares wait: an optional boolean, default true, and says what each value does',
+    '$name declares wait: an optional boolean with no schema default (true when absent), and says what each value does',
     (tool) => {
       const properties: Record<string, unknown> = tool.inputSchema.properties;
       expect(properties.wait).toEqual({
         type: 'boolean',
-        default: true,
         description: expect.stringContaining(
           'A long run under a client with a request time limit is started with false.',
         ),

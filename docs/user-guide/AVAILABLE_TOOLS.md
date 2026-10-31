@@ -3410,7 +3410,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `risk_level` (object, optional) - Risk levels the run accepts.
 - `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
 - `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
-- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+- `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
@@ -3422,7 +3422,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
-- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+- `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
@@ -3436,7 +3436,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `function_group_name` (string, required) - Function group whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
-- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+- `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
@@ -3451,7 +3451,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `function_module_name` (string, required) - Function module whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
-- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+- `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
@@ -3465,7 +3465,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `program_name` (string, required) - Report whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
-- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+- `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
@@ -3479,7 +3479,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `class_name` (string, required) - Class whose tests run.
 - `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
-- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+- `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 

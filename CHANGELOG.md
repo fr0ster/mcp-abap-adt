@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [22.0.1] - 2026-10-31
+
+### Fixed
+
+- **A sync ABAP Unit run without `wait` is no longer refused** (regression in 22.0.0). `RunUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest` and `RunFunctionModuleUnitTest` with `runner: 'sync'` and no `wait` answered `wait goes with runner async … nothing was sent`. The `wait` schema declared `default: true`; the server builds each tool's zod shape from its schema, the MCP SDK hands the handler the parsed arguments, and so every call reached the handler with `wait: true`, as if the client had sent it. `wait` now declares no schema default; absent, it is still `true` for an async run, and a `wait` the client sends with `runner: 'sync'` is still refused before anything is sent. A test calls the four tools through the MCP SDK with the server's own schema conversion. `RunAbapUnit` and `RunCdsUnitTest` take no runner and answered as before.
+
 ## [22.0.0] - 2026-10-31
 
 A major ([#329](https://github.com/fr0ster/mcp-abap-adt/pull/329)): the server takes what each tool offers and accepts from the ADT type tables of the declared system type (`@mcp-abap-adt/interfaces-adt` 24, `@mcp-abap-adt/adt-clients` 39, `@mcp-abap-adt/adt-strategies` 0.17), and fixes the gaps a user reported in 20.1.0 (ATC object types and findings, ATC in the read-only binaries, the activation descriptions). Every breaking item has its **Migrating:** note, and [the 22.0 migration note](docs/MIGRATION-22.0.md) collects them.

@@ -467,7 +467,7 @@ describe('the schema', () => {
         'A long run under a client with a request time limit is started with wait false.',
       );
       expect(tool.description).toContain(
-        'a run SAP answers with another status returns the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus',
+        'a run SAP answers with another status returns the run_id and that status, read on by run_id',
       );
     },
   );
@@ -481,7 +481,7 @@ describe('the schema', () => {
 
   it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {
     expect(GetUnitTestResult_Tool.description).toContain(
-      'a run SAP answers with another status answers the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus',
+      'a run SAP answers with another status answers the run_id and that status, read on by run_id',
     );
   });
 });

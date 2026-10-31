@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve CDS unit test run result for a run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id with GetCdsUnitTestResult or GetCdsUnitTestStatus.',
+    '[read-only] Retrieve CDS unit test run result for a run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.',
   inputSchema: {
     type: 'object',
     properties: {

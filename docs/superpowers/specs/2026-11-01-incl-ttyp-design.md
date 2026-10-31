@@ -220,24 +220,31 @@ sent it. **No `version` parameter**: `GetDomain` takes one and echoes it unread 
 document (row type, access, key, package, description). Returns it under `metadata`, with
 `part: "metadata"`."
 
-**`CreateTableType`**. Parameters: `table_type_name` (required), `package_name` (required),
-`description`, `transport_request`, `master_language`, `detail`. One request: the create alone,
-`POST /sap/bc/adt/ddic/tabletypes[?corrNr=…]` with an empty `ttyp:tableType` (Code
-`adt-clients/dist/core/tabletype/create.js:15-38`, `tableType.create`). Description: "Creates the
-ABAP table type named by table_type_name in the package named by package_name. The table type is
-created inactive with no row type; its definition is written by UpdateTableType." (Q7 asks
-whether the create should take the document too.)
+**`CreateTableType`** (owner, Q7: like `CreateDomain`). Parameters, as `CreateDomain` takes the
+domain's definition (Code `src/handlers/domain/high/handleCreateDomain.ts:55-130`):
+`table_type_name` (required), `package_name` (required), `description`, `transport_request`,
+the row type — `row_type_kind` (`ttyp:rowType/ttyp:typeKind`), `row_type_name`
+(`ttyp:typeName`, a dictionary type), or `data_type`, `length`, `decimals`
+(`ttyp:builtInType`) —, `access_type` (`ttyp:accessType`), `key_definition` and `key_kind`
+(`ttyp:primaryKey/ttyp:definition`, `/ttyp:kind`), `activate` (boolean, default `true`, as
+`CreateDomain`), `detail`. The element names are those of the document `GetTypeInfo` reads
+(Code `src/handlers/system/readonly/handleGetTypeInfo.ts:164-185`, fixture
+`src/__tests__/unit/getTypeInfo.test.ts:84-100`); which values SAP takes for `row_type_kind`,
+`access_type`, `key_definition` and `key_kind`, and which combinations it refuses, is measured
+live before the schema names them (until then each is a string passed as given; Inference).
+Chain, as `CreateDomain`'s: create (`POST /sap/bc/adt/ddic/tabletypes[?corrNr=…]`, the empty
+document) → LOCK (stateful) → read the document SAP created → patch the given properties into it
+(a `patchTableTypeXml` beside `domainPatch`, plain code over the parsed document, no regex) →
+`PUT …?lockHandle=…` (`updateMetadata` with the lock handle: one request) → UNLOCK (stateful, on
+every path out) → check → activate when `activate`. A property not given leaves SAP's value.
 
-**`UpdateTableType`**. Parameters: `table_type_name` (required, "Table type name. The table
-type must already exist."), `metadata` (string, required, "The whole ADT metadata document of
-the table type, as GetTableType returns it, with the changes made; it is sent as given and
-replaces the stored one."), `transport_request`, `activate` (boolean, default false), `detail`.
-Requests: LOCK → `PUT /sap/bc/adt/ddic/tabletypes/{name}?lockHandle=…[&corrNr=…]` with the
-document (`updateMetadata` given `lockHandle`, so adt-clients sends that one PUT, Code
-`adt-clients/dist/core/tabletype/update.js:27-35`; `tableType.updateMetadata`) → UNLOCK, on every
-path out → when `activate`, activation (`tableType.activate`). Unlike `UpdateDomain` (Code
-`src/handlers/domain/high/handleUpdateDomain.ts:190-256`) nothing is read and patched: the
-document is the caller's (goal: "metadata is XML … sent as given").
+**`UpdateTableType`** (like `UpdateDomain`, Code `src/handlers/domain/high/handleUpdateDomain.ts:60-130`).
+Parameters: `table_type_name` (required, "The table type must already exist."), the same
+definition properties as `CreateTableType`, `transport_request`, `activate` (as
+`UpdateDomain`), `detail`. Chain: LOCK → read → patch the given properties → PUT under the lock →
+UNLOCK on every path → check → activate when asked. The whole metadata document, sent as given,
+is written through compact `HandlerUpdate TABLE_TYPE` (`source_code`, as for `DOMAIN`), so what
+`GetTableType` reads can be written back whole.
 
 **`DeleteTableType`**. As `DeleteInclude`: `deleteIfDeletable` with `tableType.checkDeletion`
 and `tableType.delete` (Code `adt-clients/dist/core/tabletype/delete.js`).
@@ -449,12 +456,16 @@ object has full-set `Lock*` / `Validate*` / deletion-check tools; they are chain
 compact members as calls (§3). Recommendation: copy that — the full set gets no such tools; the
 compact members serve each operation alone.
 
+**Decided (owner):** the full set gets no Lock, Unlock, Validate or deletion-check tool for either object — those are steps of its Create, Update and Delete chains, as for every object since 19.0.0; the compact set serves each as its own call (`HandlerLock`, `HandlerUnlock`, `HandlerValidate`, the deletion check).
+
 **Q3 — How the include's metadata is written.** Facts: no tool writes a metadata document as
 given in the full set today (domain and data element patch properties); compact writes one
 through `source_code` for metadata-only types; the include has both a source and a metadata
 document, so one `source_code` cannot say which. Recommendation: full set `UpdateIncludeMetadata`
 (own parameter `metadata`); compact `HandlerUpdate` `part: 'metadata'`, the `HandlerGet`
 vocabulary, accepted for `INCLUDE` only.
+
+**Decided (owner):** as recommended — `UpdateIncludeMetadata` in the full set; compact `HandlerUpdate` `part: 'metadata'`, for `INCLUDE` only.
 
 **Q4 — The table type's `transport` operation.** Facts: the table lists `transport` (the read of
 the request the object is in, `readTransport`); no tool serves that read for any type (no call
@@ -463,25 +474,35 @@ in `src/`); adding an object to or removing it from a request is served by
 `transport_request`. Recommendation: count the transport as served by those; a per-object
 transport read is a tool every type would need, its own task.
 
+**Decided (owner):** as recommended — served by `AddTransportObject` / `RemoveTransportObject`; a per-object transport read is its own task.
+
 **Q5 — `GetInclude`'s source answer.** Facts: today it answers the source text alone (Code
 `handleGetInclude.ts:28-36`); `GetProgram` answers `{ success, program_name, version, part,
 source }`. Aligning is a changed answer → major. Recommendation: keep the source answer as it is,
 add `part` / `version`; `part: 'metadata'` answers the `GetProgram` shape.
+
+**Decided (owner):** as recommended — `GetInclude`'s source answer stays the source text; `part` and `version` are added, `part: 'metadata'` answers the `GetProgram` shape.
 
 **Q6 — `HandlerWhereUsed` and `TABLE_TYPE`.** Facts: `GetWhereUsed` takes `TTYP/DA` on both
 variants; `HandlerWhereUsed` routes members by friendly name (`COMPACT_WHERE_USED_ROUTES`, Code
 `:449-462`) and `TYPE_NAMES` has none for `TTYP/DA`. Recommendation: add `TABLE_TYPE` to
 `HandlerWhereUsed`, routed by the code `TTYP/DA` (no new friendly name).
 
+**Decided (owner):** as recommended — `TABLE_TYPE` in `HandlerWhereUsed`, routed by `TTYP/DA`, no new friendly name.
+
 **Q7 — `CreateTableType` with its definition.** Facts: the create carries no row type (Code
 `tabletype/create.js:15-38`); an empty table type cannot be activated (Inference); `CreateDomain`
 chains create → lock → write → unlock → check → activate. Recommendation: create alone, as
 `CreateProgram` / `CreateInclude`; the definition comes with `UpdateTableType(activate: true)`.
 
+**Decided (owner): like the domain.** `CreateTableType` takes the definition as typed properties and runs `CreateDomain`'s chain; `UpdateTableType` follows `UpdateDomain`, which offers no whole-document write (Code `handleUpdateDomain.ts:60-130`) — the whole document goes through compact `HandlerUpdate TABLE_TYPE`. §4.2 states both.
+
 **Q8 — Single-object activation of `PROG/I` / `TTYP/DA` in `ActivateObjects`.** Facts: one such
 object goes to group activation today and answers the group's shape (CHANGELOG 22.0.0 Fixed);
 routing it through `ActivateInclude` / `ActivateTableType` changes that answer. Recommendation:
 leave `ActivateObjects` as it is; the new `Activate*` tools are the single-object path.
+
+**Decided (owner):** as recommended — `ActivateObjects` unchanged; the new `Activate*` tools are the single-object path.
 
 ## 10. Outside this spec / debts
 

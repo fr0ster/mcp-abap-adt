@@ -234,7 +234,7 @@ the row type — `row_type_kind` (`ttyp:rowType/ttyp:typeKind`), `row_type_name`
 live before the schema names them (until then each is a string passed as given; Inference).
 Chain, as `CreateDomain`'s: create (`POST /sap/bc/adt/ddic/tabletypes[?corrNr=…]`, the empty
 document) → LOCK (stateful) → read the document SAP created → patch the given properties into it
-(a `patchTableTypeXml` beside `domainPatch`, plain code over the parsed document, no regex) →
+(a `patchTableTypeXml` beside `domainPatch`, through the same `xmlPatch.ts` helpers) →
 `PUT …?lockHandle=…` (`updateMetadata` with the lock handle: one request) → UNLOCK (stateful, on
 every path out) → check → activate when `activate`. A property not given leaves SAP's value.
 

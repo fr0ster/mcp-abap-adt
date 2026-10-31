@@ -137,7 +137,7 @@ object_type "NOPE" is neither a name of this system's object types list nor an A
 
 ## Callers: arguments now required
 
-- `ValidateServiceBinding` `package_name` (also `HandlerValidate` `SERVICE_BINDING`).
+- `ValidateServiceBinding` `package_name` (also `HandlerValidate` `SERVICE_BINDING`, and compact `HandlerServiceBindingValidate`, whose schema now marks it required).
 - `HandlerLock` `PACKAGE`: `super_package`.
 - `HandlerValidate` `BEHAVIOR_DEFINITION`: `package_name`, `description`, `root_entity`,
   `implementation_type`; `BEHAVIOR_IMPLEMENTATION`: `package_name`; `METADATA_EXTENSION`:

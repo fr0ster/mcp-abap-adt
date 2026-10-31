@@ -916,7 +916,7 @@ export const compactServiceBindingValidateSchema = {
     },
     description: { type: 'string', description: 'Binding description.' },
   },
-  required: ['service_binding_name', 'service_definition_name'],
+  required: ['service_binding_name', 'service_definition_name', 'package_name'],
 } as const;
 
 export const compactTransportCreateSchema = {

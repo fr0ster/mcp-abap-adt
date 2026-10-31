@@ -199,6 +199,12 @@ describe("HandlerServiceBindingValidate states package_name, the binding's packa
     );
   });
 
+  it('marks package_name required in the schema', () => {
+    expect(HandlerServiceBindingValidate_Tool.inputSchema.required).toContain(
+      'package_name',
+    );
+  });
+
   it('refuses a call without package_name before anything is sent', async () => {
     const connection = recordingConnection([]);
     const result = await handleHandlerServiceBindingValidate(

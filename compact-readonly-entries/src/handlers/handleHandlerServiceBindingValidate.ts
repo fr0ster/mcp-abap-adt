@@ -14,7 +14,7 @@ type HandlerServiceBindingValidateArgs = {
   service_binding_name: string;
   service_definition_name: string;
   service_binding_version?: string;
-  package_name?: string;
+  package_name: string;
   description?: string;
 };
 

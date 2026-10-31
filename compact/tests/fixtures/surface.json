@@ -110,7 +110,7 @@
   {
     "group": "compact",
     "name": "HandlerServiceBindingValidate",
-    "inputs": "service_binding_name*, service_definition_name*, service_binding_version, package_name, description",
+    "inputs": "service_binding_name*, service_definition_name*, service_binding_version, package_name*, description",
     "available_in": "cloud, onprem"
   },
   {

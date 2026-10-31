@@ -307,7 +307,7 @@ per request.
 - `service_binding_name` (required) — Service binding name to validate.
 - `service_definition_name` (required) — Service definition name to pair with binding.
 - `service_binding_version` — Service binding version.
-- `package_name` — The binding's package, which the validation checks.
+- `package_name` (required) — The binding's package, which the validation checks.
 - `description` — Binding description.
 
 ### HandlerCreate

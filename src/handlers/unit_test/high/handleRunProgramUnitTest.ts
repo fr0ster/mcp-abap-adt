@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'RunProgramUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Runs the ABAP Unit tests of the report named by program_name. runner async (default): the run is started; with wait true (default) its status is read by long polling until SAP answers it finished and the result is returned, the call lasting as long as the run; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out. On ABAP Cloud, the programs are SAP's standard programs.",
+    "Runs the ABAP Unit tests of the report named by program_name. runner async (default): the run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out. On ABAP Cloud, the programs are SAP's standard programs.",
   inputSchema: {
     type: 'object',
     properties: {

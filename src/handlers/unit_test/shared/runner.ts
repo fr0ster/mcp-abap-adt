@@ -44,7 +44,7 @@ export const WAIT_PROPERTY = {
     type: 'boolean',
     default: true,
     description:
-      "true (default): the call reads the run's status by long polling until SAP answers it finished and returns the result; the call lasts as long as the run. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.",
+      "true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.",
   },
 } as const;
 

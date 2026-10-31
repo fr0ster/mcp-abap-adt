@@ -912,7 +912,7 @@ describe('the high-tier Get*/List* handlers answer through the adapter and surfa
  * bounded polling, no group-verification gate to defeat — are table-driven
  * below. Three that carry the identity in a POSITIONAL argument rather than
  * a config object (`getStatus`, `getServiceBindingTypes`), and the four
- * whose own `pollUntilFinished` loop needs a fake client that actually
+ * whose own `readRunOnce` read needs a fake client that actually
  * answers a finished run to ever reach its second call, are each their own
  * `it` further down.
  */
@@ -1272,7 +1272,7 @@ describe('two behaviours unpinned before fix round 1', () => {
 /**
  * Fix round 1's main finding: `GetUnitTest`/`GetUnitTestResult`/
  * `GetCdsUnitTest`/`GetCdsUnitTestResult` reconstruct the v18 convenience
- * `.read({runId})` (bounded status polling, only fetching the result once
+ * `.read({runId})` (a long-polled status read, only fetching the result once
  * `<aunit:progress status="FINISHED"/>` is seen) rather than a naive
  * `pair(getStatus, getResult)`. These tests exist to fail if that
  * reconstruction regresses to the naive shape: an empty/refused result
@@ -1285,8 +1285,8 @@ describe('two behaviours unpinned before fix round 1', () => {
  * the status; `--03-results-*`, the result). No fixture in the corpus
  * captures a CDS run or a still-running (non-`FINISHED`) status, so
  * `GetCdsUnitTest*`'s own tests use synthetic markers, named as such rather
- * than presented as corpus evidence. That a reader polls on until the run
- * finished is `runWait.test.ts`'s, over the real adt-clients.
+ * than presented as corpus evidence. What a reader answers for each status
+ * SAP gives — one read each — is `runWait.test.ts`'s, over the real adt-clients.
  */
 describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking a refusal or an unfinished run', () => {
   const passingStatus = corpusBody(
@@ -1388,7 +1388,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
   });
 
   // CDS variants: `AdtCdsUnitTest extends AdtUnitTest` and inherits both
-  // members unchanged, so these exercise the identical `pollUntilFinished`
+  // members unchanged, so these exercise the identical `readRunOnce`
   // path through a different factory — synthetic markers throughout, since
   // no CDS run is captured in the corpus.
   const cdsStatus =

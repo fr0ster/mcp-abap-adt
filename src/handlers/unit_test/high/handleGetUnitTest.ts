@@ -4,14 +4,14 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
-import { pollUntilFinished, type RunOutcome } from '../shared/pollRun';
+import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read by long polling until SAP answers the run finished, then its status and result are answered; the call lasts as long as the run.',
+    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -39,8 +39,8 @@ export async function handleGetUnitTest(
 
   // The pre-migration handler called the v18 convenience `.read({runId})`,
   // which answered status and result together. That method no longer
-  // exists on `AdtUnitTest` in v19. Its work moved here: `pollUntilFinished`
-  // reconstructs it (status long polling until finished, then the result once
+  // exists on `AdtUnitTest` in v19. Its work moved here: `readRunOnce`
+  // reconstructs it (one long-polled status read, then the result once
   // the run is confirmed `FINISHED`) rather than fetching both blindly —
   // see `pollRun.ts`'s own comment for why a naive `pair()` was wrong here.
   // `getStatus` and `getResult` take the run and, since adt-clients 23,
@@ -51,7 +51,7 @@ export async function handleGetUnitTest(
   return answer(
     { tool: 'GetUnitTest', detail },
     () =>
-      pollUntilFinished(
+      readRunOnce(
         (id, withLongPolling) =>
           unitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,
@@ -68,12 +68,17 @@ export async function handleGetUnitTest(
     // is safe (see `GetCdsUnitTestResult`'s own doc comment on the same
     // point) — `detail` is still genuinely different at `raw`, which is
     // what makes the parameter real rather than decorative.
-    (outcome: RunOutcome<AdtReading<unknown>>) => ({
-      success: true,
-      run_id,
-      finished: true,
-      run_status: detail === 'raw' ? outcome.status.raw : outcome.status.value,
-      run_result: detail === 'raw' ? outcome.result.raw : outcome.result.value,
-    }),
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
+      !outcome.finished
+        ? unfinishedRun(run_id, outcome.runStatus)
+        : {
+            success: true,
+            run_id,
+            finished: true,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
+            run_result:
+              detail === 'raw' ? outcome.result.raw : outcome.result.value,
+          },
   );
 }

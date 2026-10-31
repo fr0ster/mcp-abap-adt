@@ -4,14 +4,14 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
-import { pollUntilFinished, type RunOutcome } from '../shared/pollRun';
+import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read by long polling until SAP answers the run finished, then its status and result are answered; the call lasts as long as the run.',
+    '[read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id with GetCdsUnitTestResult or GetCdsUnitTestStatus.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -38,7 +38,7 @@ export async function handleGetCdsUnitTest(
   if (!run_id) return return_error(new Error('run_id is required'));
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getStatus`/
-  // `getResult` unchanged — same `pollUntilFinished` reconstruction and same
+  // `getResult` unchanged — same `readRunOnce` reconstruction and same
   // "neither takes an options object" as `GetUnitTest`. No fixture in the
   // corpus captures a CDS run specifically (only the plain-class
   // `unittest-run-passing`/`refusal-unittest-run-failing` cases are
@@ -50,7 +50,7 @@ export async function handleGetCdsUnitTest(
   return answer(
     { tool: 'GetCdsUnitTest', detail },
     () =>
-      pollUntilFinished(
+      readRunOnce(
         (id, withLongPolling) =>
           cdsUnitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,
@@ -60,12 +60,17 @@ export async function handleGetCdsUnitTest(
       ),
     // Task 28 fix round 1 — same finding, same fix as `GetUnitTest`: both
     // readings behind this answer are `structured`, and `detail` was owed.
-    (outcome: RunOutcome<AdtReading<unknown>>) => ({
-      success: true,
-      run_id,
-      finished: true,
-      run_status: detail === 'raw' ? outcome.status.raw : outcome.status.value,
-      run_result: detail === 'raw' ? outcome.result.raw : outcome.result.value,
-    }),
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
+      !outcome.finished
+        ? unfinishedRun(run_id, outcome.runStatus)
+        : {
+            success: true,
+            run_id,
+            finished: true,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
+            run_result:
+              detail === 'raw' ? outcome.result.raw : outcome.result.value,
+          },
   );
 }

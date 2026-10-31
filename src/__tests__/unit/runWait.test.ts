@@ -3,18 +3,20 @@
  * Against the real adt-clients over a recording connection:
  *
  * - `wait: false` sends the start alone and answers the run id;
- * - `wait: true`, and the default, read the status by long polling
- *   (`?withLongPolling=true`) until SAP answers `FINISHED`, then the result;
+ * - `wait: true`, and the default, read the status once by long polling
+ *   (`?withLongPolling=true`): `FINISHED` reads the result, another status is
+ *   answered with the run id, and a status with no `aunit:progress` is a
+ *   failure carrying SAP's document — one status read each time;
  * - `wait` with `runner: 'sync'` is refused with nothing sent, and a value
  *   that is not a boolean is refused with nothing sent;
  * - the readers (`GetUnitTestResult`, the library's `GetUnitTest`,
- *   `GetCdsUnitTest`, `GetCdsUnitTestResult`) read the status by long polling
- *   until finished, then the result.
+ *   `GetCdsUnitTest`, `GetCdsUnitTestResult`) read the status the same way,
+ *   once.
  *
  * A status long poll is held by ADT until the run has finished (measured on
- * premise, 2026-10-31), so a `RUNNING` answer is rare on the wire; the
- * recordings here answer `RUNNING` several times to prove the loop reads
- * on until `FINISHED`, however many answers that takes.
+ * premise, 2026-10-31), so a `RUNNING` answer is rare on the wire; each
+ * recording queues a `FINISHED` answer after the one under test, so a second
+ * status read would be answered and seen.
  */
 
 import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
@@ -72,6 +74,11 @@ const RESULT = {
 const RUNNING = {
   data: '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING" percentage="40"/></aunit:run>',
 };
+// Synthetic (no fixture): a status document that names no progress.
+const NO_PROGRESS_DOCUMENT =
+  '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" title="no progress here"/>';
+const NO_PROGRESS = { data: NO_PROGRESS_DOCUMENT };
+const STATUS_URL = `/sap/bc/adt/abapunit/runs/${RUN}?withLongPolling=true`;
 
 interface Answer {
   readonly isError?: boolean;
@@ -184,42 +191,67 @@ describe.each(RUN_TOOLS)('$name: wait', (tool) => {
     expect(answerOf(result)).toEqual({ success: true, run_id: RUN });
   });
 
-  it.each([
+  describe.each([
     ['wait true', { wait: true }],
     ['no wait (the default)', {}],
-  ])(
-    '%s long-polls the status until finished, then reads the result',
-    async (_label, wait) => {
+  ])('%s', (_label, wait) => {
+    it('a FINISHED status: one status read, then the result', async () => {
+      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+      const result = await tool.call(connection, wait);
+      expect(result.isError).toBe(false);
+      expect(starts(connection.requests)).toHaveLength(1);
+      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
+        STATUS_URL,
+      ]);
+      expect(resultReads(connection.requests)).toHaveLength(1);
+      expect(connection.requests).toHaveLength(3);
+      const answer = answerOf(result);
+      expect(answer.success).toBe(true);
+      expect(answer.run_id).toBe(RUN);
+      expect(answer.finished).toBe(true);
+      expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
+    });
+
+    it('a RUNNING status: the run id and the status, one status read, no result read', async () => {
       const connection = recordingConnection([
         STARTED,
-        RUNNING,
-        RUNNING,
-        RUNNING,
-        RUNNING,
-        RUNNING,
         RUNNING,
         FINISHED,
         RESULT,
       ]);
       const result = await tool.call(connection, wait);
       expect(result.isError).toBe(false);
-      expect(starts(connection.requests)).toHaveLength(1);
-      const polls = statusReads(connection.requests);
-      expect(polls).toHaveLength(7);
-      for (const poll of polls) {
-        expect(poll.url).toBe(
-          `/sap/bc/adt/abapunit/runs/${RUN}?withLongPolling=true`,
-        );
-      }
-      expect(resultReads(connection.requests)).toHaveLength(1);
-      expect(connection.requests.at(-1)?.url).toContain('/abapunit/results/');
-      const answer = answerOf(result);
-      expect(answer.success).toBe(true);
-      expect(answer.run_id).toBe(RUN);
-      expect(answer.finished).toBe(true);
-      expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
-    },
-  );
+      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
+        STATUS_URL,
+      ]);
+      expect(resultReads(connection.requests)).toEqual([]);
+      expect(connection.requests).toHaveLength(2);
+      expect(answerOf(result)).toEqual({
+        success: true,
+        run_id: RUN,
+        status: 'RUNNING',
+      });
+    });
+
+    it('a status with no progress: a failure carrying the document, one status read', async () => {
+      const connection = recordingConnection([
+        STARTED,
+        NO_PROGRESS,
+        FINISHED,
+        RESULT,
+      ]);
+      const result = await tool.call(connection, wait);
+      expect(result.isError).toBe(true);
+      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
+        STATUS_URL,
+      ]);
+      expect(resultReads(connection.requests)).toEqual([]);
+      expect(connection.requests).toHaveLength(2);
+      const failure = answerOf(result);
+      expect(failure.step).toBe('read status');
+      expect(failure.message).toContain(NO_PROGRESS_DOCUMENT);
+    });
+  });
 });
 
 describe('wait with runner sync', () => {
@@ -368,41 +400,41 @@ describe('a wait that is not a boolean, on each run tool', () => {
   });
 });
 
-describe.each(READERS)('$name reads until the run finished', (reader) => {
-  it('long-polls the status until finished, then reads the result once', async () => {
-    const connection = recordingConnection([
-      RUNNING,
-      RUNNING,
-      RUNNING,
-      RUNNING,
-      RUNNING,
-      RUNNING,
-      FINISHED,
-      RESULT,
-    ]);
+describe.each(READERS)('$name reads the status once', (reader) => {
+  it('a FINISHED status: one status read, then the result', async () => {
+    const connection = recordingConnection([FINISHED, RESULT]);
     const result = await reader.call(connection);
     expect(result.isError).toBe(false);
-    const polls = statusReads(connection.requests);
-    expect(polls).toHaveLength(7);
-    for (const poll of polls) {
-      expect(poll.url).toBe(
-        `/sap/bc/adt/abapunit/runs/${RUN}?withLongPolling=true`,
-      );
-    }
-    expect(resultReads(connection.requests)).toHaveLength(1);
-    expect(connection.requests).toHaveLength(8);
+    expect(connection.requests.map((r) => r.url)).toEqual([
+      STATUS_URL,
+      expect.stringContaining('/abapunit/results/'),
+    ]);
     const answer = answerOf(result);
     expect(answer.finished).toBe(true);
     expect(answer.run_id).toBe(RUN);
+    expect(answer).toHaveProperty('run_result');
   });
 
-  it('reads the result only after the status says finished', async () => {
-    const connection = recordingConnection([FINISHED, RESULT]);
-    await reader.call(connection);
-    expect(connection.requests.map((r) => r.url)).toEqual([
-      `/sap/bc/adt/abapunit/runs/${RUN}?withLongPolling=true`,
-      expect.stringContaining('/abapunit/results/'),
-    ]);
+  it('a RUNNING status: the run id and the status, one status read, no result read', async () => {
+    const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
+    const result = await reader.call(connection);
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map((r) => r.url)).toEqual([STATUS_URL]);
+    expect(answerOf(result)).toEqual({
+      success: true,
+      run_id: RUN,
+      status: 'RUNNING',
+    });
+  });
+
+  it('a status with no progress: a failure carrying the document, one status read', async () => {
+    const connection = recordingConnection([NO_PROGRESS, FINISHED, RESULT]);
+    const result = await reader.call(connection);
+    expect(result.isError).toBe(true);
+    expect(connection.requests.map((r) => r.url)).toEqual([STATUS_URL]);
+    const failure = answerOf(result);
+    expect(failure.step).toBe('read status');
+    expect(failure.message).toContain(NO_PROGRESS_DOCUMENT);
   });
 });
 
@@ -434,6 +466,9 @@ describe('the schema', () => {
       expect(tool.description).toContain(
         'A long run under a client with a request time limit is started with wait false.',
       );
+      expect(tool.description).toContain(
+        'a run SAP answers with another status returns the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus',
+      );
     },
   );
 
@@ -442,5 +477,11 @@ describe('the schema', () => {
       GetUnitTestResult_Tool.inputSchema.properties;
     expect(properties).not.toHaveProperty('wait');
     expect(properties).not.toHaveProperty('max_status_polls');
+  });
+
+  it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {
+    expect(GetUnitTestResult_Tool.description).toContain(
+      'a run SAP answers with another status answers the run_id and that status, read on by run_id with GetUnitTestResult or GetUnitTestStatus',
+    );
   });
 });

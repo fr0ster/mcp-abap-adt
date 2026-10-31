@@ -1,7 +1,8 @@
 /**
  * Running ABAP Unit tests for a tool: start the run and, with `wait` (the
- * default), read its status by long polling until SAP answers it finished and
- * answer the result — one call, as long as the run. With `wait: false` the
+ * default), read its status once by long polling — SAP holds the read until
+ * the run finished — and answer the result of a run SAP answered `FINISHED`,
+ * or the run id and SAP's status for any other answer. With `wait: false` the
  * call answers the run id right after the start, and the run is read by its
  * id: a client with a request time limit shorter than the run would cut the
  * waiting call and lose the id (measured with a 60 s client limit and a
@@ -29,7 +30,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
-import { pollUntilFinished, type RunOutcome } from './pollRun';
+import { type RunOutcome, readRunOnce, unfinishedRun } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
 export type TestCarrier =
@@ -84,17 +85,17 @@ export function testRunner(
 }
 
 /**
- * A started run: its id, and — when the call waited — the finished run's
- * status and result.
+ * A started run: its id, and — when the call waited — what the long-polled
+ * status read found.
  */
 export interface StartedRun {
   readonly runId: string;
-  readonly finished?: RunOutcome<AdtReading<unknown>>;
+  readonly waited?: RunOutcome<AdtReading<unknown>>;
 }
 
 /**
- * Start a run of every test the named object holds; with `wait`, read it by
- * long polling until it finished and fetch the result.
+ * Start a run of every test the named object holds; with `wait`, read its
+ * status once by long polling and fetch the result of a finished run.
  */
 export async function runAndWait(
   context: HandlerContext,
@@ -115,8 +116,8 @@ export async function runAndWait(
 
 /**
  * Start a run with `start` — whose answer is the run's id — and, with `wait`,
- * read it with `runner` by long polling until it finished and fetch the
- * result; without, answer the id alone.
+ * read its status once with `runner` by long polling and fetch the result of
+ * a finished run; without, answer the id alone.
  */
 export async function waitForRun(
   runner: IUnitTestRunInformation,
@@ -129,7 +130,7 @@ export async function waitForRun(
   }
   const runId = String(started.getResult().value);
   const outcome = wait
-    ? await pollUntilFinished(
+    ? await readRunOnce(
         (id, withLongPolling) =>
           runner.getStatus(id, withLongPolling, { analyse: analyseException }),
         runId,
@@ -142,7 +143,7 @@ export async function waitForRun(
   const value: StartedRun =
     outcome === undefined
       ? { runId }
-      : { runId, finished: outcome.getResult().value };
+      : { runId, waited: outcome.getResult().value };
   const answered = outcome ?? started;
   return {
     ...answered,
@@ -151,22 +152,22 @@ export async function waitForRun(
 }
 
 /**
- * What a run tool answers: the result of a run it waited for, the run id
- * alone for one it did not. `raw` answers the wire document, `terse` and
- * `full` the parse — no fixture proves a further reduction of a test-run result
- * is safe.
+ * What a run tool answers: the result of a run SAP answered `FINISHED`; the
+ * run id and SAP's status for a run its long poll answered with another
+ * status; the run id alone for a run it did not wait for. `raw` answers the
+ * wire document, `terse` and `full` the parse — no fixture proves a further
+ * reduction of a test-run result is safe.
  */
 export function projectRun(detail: 'terse' | 'full' | 'raw') {
-  return (run: StartedRun) =>
-    run.finished === undefined
-      ? { success: true, run_id: run.runId }
-      : {
-          success: true,
-          run_id: run.runId,
-          finished: true,
-          run_result:
-            detail === 'raw'
-              ? run.finished.result.raw
-              : run.finished.result.value,
-        };
+  return (run: StartedRun) => {
+    const waited = run.waited;
+    if (waited === undefined) return { success: true, run_id: run.runId };
+    if (!waited.finished) return unfinishedRun(run.runId, waited.runStatus);
+    return {
+      success: true,
+      run_id: run.runId,
+      finished: true,
+      run_result: detail === 'raw' ? waited.result.raw : waited.result.value,
+    };
+  };
 }

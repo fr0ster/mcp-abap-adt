@@ -115,6 +115,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type ActivationRunOutcome,
   type ActivationRunSource,
+  activationVerdict,
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
@@ -601,19 +602,27 @@ export async function handleActivateObject(
       const accepted = outcome.runId !== '';
       const refusals = outcome.messages.filter(isRefusal);
       // `activated` is a verdict now, and `null` only where there genuinely is
-      // none: a run that has not settled within the bounded wait. A settled run
-      // with no error-severity message activated what it was given; the errata
-      // is explicit that only such a message is a failure, and that a run with
-      // nothing to do says nothing at all.
+      // none: a run that has not settled within the bounded wait. A settled
+      // run's verdict is SAP's own: its results' `activationExecuted` (false
+      // for a run SAP cancelled, "Activation was cancelled.", whatever the
+      // messages' severity) and no error-severity message; where the results
+      // state no `activationExecuted`, the messages alone decide — the errata
+      // is explicit that only such a message is a failure.
       const activated = !outcome.settled
         ? null
-        : refusals.length === 0 && outcome.status !== 'failed';
+        : outcome.status !== 'failed' &&
+          activationVerdict(outcome.executed, outcome.messages);
+      // As the single-object answer says it: SAP ran no activation and gave
+      // no message to explain it — nothing to activate.
+      const nothingToActivate =
+        outcome.executed === false && outcome.messages.length === 0;
       return {
         accepted,
         run_id: accepted ? outcome.runId : null,
         run_status: outcome.status || null,
         activated,
         messages: outcome.messages,
+        ...(nothingToActivate ? { nothing_to_activate: true } : {}),
         objects_count: activationObjects.length,
         objects: activationObjects,
         message: !accepted
@@ -630,14 +639,25 @@ export async function handleActivateObject(
                 'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
                 'now": an object can stay listed for scope rather than for failure — activating a ' +
                 "function group clears the regenerated include, not the group's own entry."
-              : `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
-                `${activationObjects.length} object(s): ` +
-                refusals
-                  .map(
-                    (m) =>
-                      `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                  )
-                  .join('; '),
+              : refusals.length > 0
+                ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
+                  `${activationObjects.length} object(s): ` +
+                  refusals
+                    .map(
+                      (m) =>
+                        `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                    )
+                    .join('; ')
+                : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
+                  'object(s): its results say activationExecuted="false"' +
+                  (outcome.messages.length === 0
+                    ? ', with no message: nothing to activate.'
+                    : `: ${outcome.messages
+                        .map(
+                          (m) =>
+                            `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                        )
+                        .join('; ')}`),
       };
     },
   );

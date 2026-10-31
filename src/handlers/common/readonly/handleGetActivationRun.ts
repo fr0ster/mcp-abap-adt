@@ -14,7 +14,9 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
+  activationExecutedOf,
   activationMessagesOf,
+  activationVerdict,
   readingOf,
   runStatusOf,
 } from '../../../lib/strategies/activationRun';
@@ -56,7 +58,7 @@ export async function handleGetActivationStatus(
   );
 }
 
-/** `GET /activation/results/{run_id}`: `{ run_id, part, messages, document }`. */
+/** `GET /activation/results/{run_id}`: `{ run_id, part, activated, messages, document }`. */
 export async function handleGetActivationResults(
   context: HandlerContext,
   args: ActivationRunArgs,
@@ -69,11 +71,23 @@ export async function handleGetActivationResults(
   return answer(
     { tool: 'HandlerGet', detail: 'raw' },
     () => utils.getActivationResults(runId, { analyse: analyseException }),
-    (value: unknown) => ({
-      run_id: runId,
-      part: 'activation_results',
-      messages: activationMessagesOf(value),
-      document: readingOf(value).raw,
-    }),
+    (value: unknown) => {
+      const messages = activationMessagesOf(value);
+      const executed = activationExecutedOf(value);
+      return {
+        run_id: runId,
+        part: 'activation_results',
+        // SAP's verdict as the results state it (`activationExecuted`, and
+        // no error-severity message); `null` where they state none — a run
+        // still going, whose results carry no verdict yet.
+        activated:
+          executed === undefined ? null : activationVerdict(executed, messages),
+        ...(executed === false && messages.length === 0
+          ? { nothing_to_activate: true }
+          : {}),
+        messages,
+        document: readingOf(value).raw,
+      };
+    },
   );
 }

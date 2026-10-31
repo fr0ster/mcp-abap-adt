@@ -40,6 +40,11 @@ export interface ActivationRunOutcome {
   settled: boolean;
   /** Every message the results document carries, in wire order. */
   messages: ActivationMessage[];
+  /**
+   * SAP's own verdict, as the results document states it
+   * (`chkl:properties activationExecuted`); `undefined` where it states none.
+   */
+  executed?: boolean;
   /** The results document, for a caller that wants it verbatim. */
   results?: string;
   /**
@@ -172,6 +177,47 @@ export function activationMessagesOf(value: unknown): ActivationMessage[] {
   return messages;
 }
 
+/**
+ * `activationExecuted` of a results document's `chkl:properties`: SAP's own
+ * statement whether the activation ran (`"false"` for a run SAP cancelled,
+ * "Activation was cancelled.", or one with nothing to activate). `undefined`
+ * where the document states none. Read from the parse, else off the raw
+ * text by plain string search (the attribute of the one `chkl:properties`
+ * element), never from a message's words.
+ */
+export function activationExecutedOf(value: unknown): boolean | undefined {
+  const { parsed, raw } = readingOf(value);
+  const root =
+    (parsed as Record<string, unknown> | undefined)?.['chkl:messages'] ??
+    (parsed as Record<string, unknown> | undefined)?.messages;
+  const properties = (root as Record<string, unknown> | undefined)?.[
+    'chkl:properties'
+  ];
+  const stated = attrs(properties).activationExecuted;
+  if (stated === 'true' || stated === 'false') return stated === 'true';
+  const element = raw.indexOf('<chkl:properties');
+  if (element < 0) return undefined;
+  const end = raw.indexOf('>', element);
+  const tag = raw.slice(element, end < 0 ? undefined : end);
+  if (tag.includes(' activationExecuted="true"')) return true;
+  if (tag.includes(' activationExecuted="false"')) return false;
+  return undefined;
+}
+
+/**
+ * Whether a finished run activated what it was given, by SAP's verdict:
+ * not where its results state `activationExecuted="false"`, and not where a
+ * message is of error severity. Where the results state no
+ * `activationExecuted`, the messages alone decide, as a run that activated
+ * everything says nothing.
+ */
+export function activationVerdict(
+  executed: boolean | undefined,
+  messages: readonly ActivationMessage[],
+): boolean {
+  return executed !== false && !messages.some(isRefusal);
+}
+
 /** An error-severity message, by SAP's own letters. */
 export function isRefusal(message: ActivationMessage): boolean {
   return /^[EAX]$/i.test(message.type) || /^error$/i.test(message.type);
@@ -248,11 +294,13 @@ export async function awaitActivationRun(
     };
   }
   const value = produced.getResult().value;
+  const executed = activationExecutedOf(value);
   return {
     runId,
     status,
     settled: SETTLED.has(status),
     messages: activationMessagesOf(value),
+    ...(executed === undefined ? {} : { executed }),
     results: readingOf(value).raw || undefined,
   };
 }

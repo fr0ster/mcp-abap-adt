@@ -5,6 +5,7 @@
  * and a member the variant does not serve is not named.
  */
 import {
+  ACTIVATION_CODES,
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
   COMPACT_CREATE,
@@ -20,6 +21,7 @@ import {
   COMPACT_WHERE_USED,
   type ProjectionVariant,
 } from '../adtProjections';
+import { parentedCodesOf } from '../adtTypeCode';
 import { withLongToolAdvice } from '../longTools';
 
 /** Each member as the description names it, with the arguments it takes. */
@@ -259,7 +261,7 @@ export function compactActivateDescription(variant: ProjectionVariant): string {
   const byName = COMPACT_ACTIVATE[variant].filter(
     (member) => member !== 'FUNCTION_MODULE',
   );
-  return `Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for ${listed(byName)}; FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*) is activated under its function group; any other type takes object_adt_type (e.g. "CLAS/OC"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of ${either(COMPACT_SINGLE_ACTIVATION[variant])} (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.`;
+  return `Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for ${listed(byName)}; FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*) is activated under its function group; any other type takes object_adt_type (e.g. "CLAS/OC"), with parentName for a part of a function group (${parentedCodesOf(ACTIVATION_CODES[variant]).join(', ')}). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of ${parentedCodesOf(ACTIVATION_CODES[variant]).join(', ')} is listed with objects[].parentName set to its function group. One object of ${either(COMPACT_SINGLE_ACTIVATION[variant])} (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.`;
 }
 
 /** HandlerProfileRun's description on `variant`. */

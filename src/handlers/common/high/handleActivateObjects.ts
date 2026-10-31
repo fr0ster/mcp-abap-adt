@@ -6,6 +6,7 @@
  */
 
 import type { ProjectionVariant } from '../../../lib/adtProjections';
+import { activationParentDescription } from '../../../lib/adtTypeCode';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { byVariant } from '../../../lib/variantDefinition';
 import {
@@ -32,7 +33,7 @@ function activateObjectsSchema(variant: ProjectionVariant) {
       objects: {
         type: 'array',
         description:
-          "Array of objects to activate. Each object must have 'name' and 'type'.",
+          "Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.",
         items: {
           type: 'object',
           properties: {
@@ -43,6 +44,10 @@ function activateObjectsSchema(variant: ProjectionVariant) {
             type: {
               type: 'string',
               description: activationTypeDescription(variant),
+            },
+            parentName: {
+              type: 'string',
+              description: activationParentDescription(variant),
             },
           },
           required: ['name', 'type'],

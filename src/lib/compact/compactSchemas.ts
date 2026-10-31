@@ -12,8 +12,10 @@ import {
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   COMPACT_WHERE_USED,
+  type ProjectionVariant,
   supported,
 } from '../adtProjections';
+import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_PROPERTY } from '../backgroundRuns/tools';
 import { TIMEOUT_PROPERTY } from '../longTools';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
@@ -1157,6 +1159,7 @@ export const compactCheckRunSchema = compactCheckRunSchemaFor(
 
 export function compactActivateSchemaFor<const M extends readonly string[]>(
   members: M,
+  variant: ProjectionVariant,
 ) {
   return {
     type: 'object',
@@ -1180,6 +1183,10 @@ export function compactActivateSchemaFor<const M extends readonly string[]>(
         description:
           'ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).',
       },
+      parentName: {
+        type: 'string',
+        description: `With object_adt_type (single form): ${activationParentDescription(variant)}`,
+      },
       objects: {
         type: 'array',
         description: 'The objects activated together (list form).',
@@ -1191,8 +1198,7 @@ export function compactActivateSchemaFor<const M extends readonly string[]>(
             uri: { type: 'string', description: 'Optional ADT object URI.' },
             parentName: {
               type: 'string',
-              description:
-                "Owning object, for a part of one: a function module's function group.",
+              description: activationParentDescription(variant),
             },
           },
           required: ['name', 'type'],
@@ -1208,6 +1214,7 @@ export function compactActivateSchemaFor<const M extends readonly string[]>(
 
 export const compactActivateSchema = compactActivateSchemaFor(
   COMPACT_ACTIVATE.onprem,
+  'onprem',
 );
 
 /** Object search by name or mask. */

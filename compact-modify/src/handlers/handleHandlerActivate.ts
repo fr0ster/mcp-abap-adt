@@ -49,7 +49,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: compactActivateDescription(variant),
-    inputSchema: compactActivateSchemaFor(COMPACT_ACTIVATE[variant]),
+    inputSchema: compactActivateSchemaFor(COMPACT_ACTIVATE[variant], variant),
   })),
 } as const;
 
@@ -57,6 +57,7 @@ type HandlerActivateArgs = {
   object_type?: string;
   object_name?: string;
   object_adt_type?: string;
+  parentName?: string;
   function_group_name?: string;
   objects?: Array<{
     name: string;
@@ -84,11 +85,18 @@ export async function handleHandlerActivate(
     );
   }
 
-  // An ADT type code given as such is the list form's one object, checked
-  // at that boundary (`objects[].type`).
+  // An ADT type code given as such is the list form's one object, with the
+  // parent the caller named, checked at that boundary (`objects[].type`,
+  // `objects[].parentName`).
   if (args.object_adt_type) {
     return handleActivateObjectOnce(context, {
-      objects: [{ name: args.object_name, type: args.object_adt_type }],
+      objects: [
+        {
+          name: args.object_name,
+          type: args.object_adt_type,
+          ...(args.parentName ? { parentName: args.parentName } : {}),
+        },
+      ],
       preaudit: args.preaudit,
     });
   }

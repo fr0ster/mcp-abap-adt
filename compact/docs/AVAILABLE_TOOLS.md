@@ -432,7 +432,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING and BEHAVIOR_IMPLEMENTATION; FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*) is activated under its function group; any other type takes object_adt_type (e.g. "CLAS/OC"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION or BEHAVIOR_IMPLEMENTATION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.
+**Description:** Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING and BEHAVIOR_IMPLEMENTATION; FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*) is activated under its function group; any other type takes object_adt_type (e.g. "CLAS/OC"), with parentName for a part of a function group (FUGR/FF, FUGR/I). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of FUGR/FF, FUGR/I is listed with objects[].parentName set to its function group. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION or BEHAVIOR_IMPLEMENTATION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.
 
 **Available in:** cloud, onprem
 
@@ -442,6 +442,7 @@ per request.
 - `object_name` — Object name (single form). A function module is named GROUP|MODULE, its function group first, or the module alone with function_group_name.
 - `function_group_name` — A function module's function group (single form, FUNCTION_MODULE).
 - `object_adt_type` — ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).
+- `parentName` — With object_adt_type (single form): The function group the object belongs to; its address is built from it. Required for FUGR/FF (function, functionmodule, function_module, func), FUGR/I.
 - `objects` — The objects activated together (list form).
 - `preaudit` — Run pre-audit checks before activation.
 

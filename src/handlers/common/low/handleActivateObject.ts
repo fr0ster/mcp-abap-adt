@@ -99,6 +99,7 @@ import {
 import {
   acceptedCodeOf,
   acceptedOf,
+  activationParentDescription,
   type GroupObject,
   mainTypeCodeOf,
   namesItsParent,
@@ -188,8 +189,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
             uri: { type: 'string', description: 'Optional ADT URI' },
             parentName: {
               type: 'string',
-              description:
-                "Owning object, for a part of one. A function module's group belongs here: the address is built from it, and without it the group is named after the module.",
+              description: activationParentDescription(variant),
             },
           },
           required: ['name', 'type'],

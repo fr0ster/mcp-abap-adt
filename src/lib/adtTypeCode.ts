@@ -8,6 +8,9 @@ import {
   type IAdtCodedReference,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
+  ACTIVATION_CODES,
+  ACTIVATION_NAMES,
+  codesWithNames,
   type ProjectionVariant,
   TABLE_CODES,
   TYPE_NAME_VALUES,
@@ -80,6 +83,29 @@ const PARENTED_CODES: ReadonlySet<string> = new Set(
     ),
   ),
 );
+
+/**
+ * The codes of `codes` whose reference names its parent
+ * ({@link PARENTED_CODES}): those a tool taking them lets its caller name
+ * the parent for.
+ */
+export function parentedCodesOf<C extends AdtUtilityCode>(
+  codes: readonly C[],
+): C[] {
+  return codes.filter((code) => PARENTED_CODES.has(code));
+}
+
+/**
+ * What a `parentName` argument beside an activation's object type says on
+ * `variant`: the codes of a group activation that need it
+ * ({@link parentedCodesOf}), each with the names standing for it — each a
+ * part of a function group (the tables' `parent`).
+ */
+export function activationParentDescription(
+  variant: ProjectionVariant,
+): string {
+  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parentedCodesOf(ACTIVATION_CODES[variant]), ACTIVATION_NAMES[variant])}.`;
+}
 
 /** One object of a group request, as a tool's argument names it. */
 export interface GroupObject<C extends AdtUtilityCode> {

@@ -1,3 +1,4 @@
+import { RUN_TARGET_PROPERTY } from '../../handlers/unit_test/shared/runTarget';
 import {
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
@@ -587,7 +588,8 @@ export const compactUnitTestRunSchema = {
   properties: {
     tests: {
       type: 'array',
-      description: 'List of test classes to run.',
+      description:
+        'Test classes to run, each named by its global class and its local test class (exactly one of tests and target).',
       items: {
         type: 'object',
         properties: {
@@ -600,12 +602,13 @@ export const compactUnitTestRunSchema = {
         required: ['container_class', 'test_class'],
       },
     },
+    target: RUN_TARGET_PROPERTY.target,
     runner: {
       type: 'string',
       enum: ['async', 'sync'],
       default: 'async',
       description:
-        'async (default): starts the run and returns its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that runs every test class of each container_class and returns the finished result.',
+        'async (default): starts the run and returns its run_id, whose status and result are read by run_id; suited to long suites. sync (tests only): one request that runs every test class of each container_class and returns the finished result. A target run is async.',
     },
     title: {
       type: 'string',
@@ -650,7 +653,6 @@ export const compactUnitTestRunSchema = {
       },
     },
   },
-  required: ['tests'],
 } as const;
 
 export const compactUnitTestStatusSchema = {

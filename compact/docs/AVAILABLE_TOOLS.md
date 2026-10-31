@@ -518,14 +518,15 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** ABAP Unit test run. Required: tests[]{container_class*, test_class*}. Optional: runner (async | sync, default async), title, context, scope, risk_level, duration. Response: JSON — runner async: { success, run_id }, the status and result read later by run_id, suited to long suites; runner sync: { success, runner, finished, run_result }, the finished result of every test class of each container_class in one request.
+**Description:** ABAP Unit test run, for exactly one of tests and target. tests[]{container_class*, test_class*}: chosen local test classes of global classes. target: all tests of one object of any run object type — { kind: object, name, type }, e.g. CLAS/OC a class, PROG/P a report, FUGR/F a function group, DDLS/DF a CDS view (its tests run with scope.foreign_tests true) — or of a package — { kind: package, name, include_subpackages }. Optional: runner (async | sync, default async; sync with tests only), title, context, scope, risk_level, duration. Response: JSON — runner async (tests or target): { success, run_id }, the status and result read later by run_id, suited to long suites; runner sync: { success, runner, finished, run_result }, the finished result of every test class of each container_class in one request.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `tests` (required) — List of test classes to run.
-- `runner` — async (default): starts the run and returns its run_id, whose status and result are read by run_id; suited to long suites. sync: one request that runs every test class of each container_class and returns the finished result.
+- `tests` — Test classes to run, each named by its global class and its local test class (exactly one of tests and target).
+- `target` — What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
+- `runner` — async (default): starts the run and returns its run_id, whose status and result are read by run_id; suited to long suites. sync (tests only): one request that runs every test class of each container_class and returns the finished result. A target run is async.
 - `title` — Run title shown in ABAP Unit test logs; sent by the async runner.
 - `context` — Run context label; sent by the async runner.
 - `scope` — ABAP Unit test scope flags.

@@ -368,7 +368,7 @@
     "HandlerTransportMoveObjects": "transport_number*, target_number*, objects*, state_handle",
     "HandlerTransportSortAndCompress": "transport_number*, state_handle",
     "HandlerUnitTestResult": "run_id*, with_navigation_uris, format, state_handle",
-    "HandlerUnitTestRun": "tests*, runner, title, context, scope, risk_level, duration, state_handle",
+    "HandlerUnitTestRun": "tests, target, runner, title, context, scope, risk_level, duration, state_handle",
     "HandlerUnitTestStatus": "run_id*, with_long_polling, state_handle",
     "HandlerUnlock": "object_type*, object_name*, lock_handle*, state_handle",
     "HandlerUpdate": "object_type*, lock_handle*, transport_request, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, ddl_source, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, service_version, name, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state, state_handle",

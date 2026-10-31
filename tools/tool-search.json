@@ -3238,9 +3238,11 @@
       "ABAP Unit",
       "execute tests",
       "test class",
-      "test results"
+      "test results",
+      "run target",
+      "package tests"
     ],
-    "semantic": "Run ABAP Unit tests of classes or programs."
+    "semantic": "Run ABAP Unit tests of chosen test classes, or of one object of any run type or a package."
   },
   "HandlerUnitTestStatus": {
     "keywords": [

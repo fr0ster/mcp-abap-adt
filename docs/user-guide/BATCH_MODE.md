@@ -119,7 +119,8 @@ and `RunFunctionModuleUnitTest` with `function_group_name`, each with `runner: '
 every test of its group. With the asynchronous runner (`runner: 'async'`, the default) it is three
 phases, each its own batch:
 
-1. start — `HandlerUnitTestRun`, answering the run's `run_id`;
+1. start — `HandlerUnitTestRun`, answering the run's `run_id` (with `tests`, or with `target`: all
+   tests of one object of any run object type, or of a package — a target run takes this runner);
 2. the run's status, as often as you choose — `HandlerUnitTestStatus` (a CDS unit test:
    `HandlerCdsUnitTestStatus`) with that `run_id`, until it says `FINISHED`;
 3. the result — `HandlerUnitTestResult` (`HandlerCdsUnitTestResult`, or `HandlerGet` with

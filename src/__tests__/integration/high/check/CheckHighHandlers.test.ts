@@ -24,7 +24,10 @@ import { handleCheckPackage } from '../../../../handlers/package/high/handleChec
 import { handleCheckProgram } from '../../../../handlers/program/high/handleCheckProgram';
 import { handleCheckStructure } from '../../../../handlers/structure/high/handleCheckStructure';
 import { handleCheckTable } from '../../../../handlers/table/high/handleCheckTable';
-import { getTimeout } from '../../helpers/configHelpers';
+import {
+  getSharedDependenciesConfig,
+  getTimeout,
+} from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -746,7 +749,11 @@ describe('Check High-Level Handlers Integration', () => {
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
           const { connection, params, logger } = context;
-          const objectName = params.package_name;
+          // The case's package, else the shared package the shared-objects
+          // setup creates (shared_dependencies.package): present on every
+          // system that ran it, whatever the configuration names it.
+          const objectName =
+            params.package_name ?? getSharedDependenciesConfig()?.package;
 
           logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-package');

@@ -94,6 +94,7 @@ import {
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
 import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
 import {
+  getSharedDependenciesConfig,
   getSystemType,
   getTimeout,
   isTestAvailableForSystem,
@@ -611,12 +612,19 @@ describe('Debugger handlers (integration)', () => {
         probe = String(p.probe_class ?? '').toUpperCase();
         amdpClass = String(p.amdp_class ?? 'ZMCP_SHR_DBG_AMDP').toUpperCase();
         amdpDdl = String(p.amdp_ddl ?? 'ZMCP_SHR_DBG_TF').toUpperCase();
-        pkg = String(p.package ?? '');
+        // The probe's package: the case's own, else the shared package
+        // (shared_dependencies.package), which the shared-objects setup
+        // creates on every system and which, as the template configures it,
+        // records no changes, so the probe needs no transport. $TMP is
+        // refused on ABAP Cloud (403 ExceptionResourceNoAccess, measured).
+        pkg = String(p.package ?? getSharedDependenciesConfig()?.package ?? '');
         transport = p.transport ? String(p.transport) : undefined;
         repeats = Number(p.timing_repeats) > 0 ? Number(p.timing_repeats) : 5;
         secondUserEnv = String(p.second_user_env ?? '');
         if (!probe || !pkg)
-          throw new Error('probe_class and package are required');
+          throw new Error(
+            'probe_class and package (or shared_dependencies.package) are required',
+          );
         const abapSource = abapProbeSource(probe);
         LINE = markersOf(abapSource, /"BP:(\w+)/);
         const tr = transport ? { transport_request: transport } : {};

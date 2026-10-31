@@ -1868,7 +1868,11 @@ runtime_readonly_handlers:
 # Nothing else may debug for the same SAP user while this runs (an IDE with a
 # breakpoint set holds the user's debugging). The ABAP probe is created, run and
 # deleted by the test; it goes into `package` with no transport, never into
-# the default package's request. The AMDP chain reads and runs the shared AMDP
+# the default package's request. Without `package` it goes into the shared
+# package (shared_dependencies.package), which npm run shared:setup creates on
+# premise and on cloud alike and which records no changes (record_changes:
+# false), so the probe needs no transport ($TMP is refused on ABAP Cloud, and
+# ZLOCAL is a structure package there). The AMDP chain reads and runs the shared AMDP
 # pair (shared_dependencies), created once by npm run shared:setup.
 debugger_handlers:
   test_cases:
@@ -1877,7 +1881,7 @@ debugger_handlers:
       available_in: ["onprem", "cloud"]
       description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on an ABAP probe the test creates and deletes, and the shared AMDP pair"
       params:
-        package: "$TMP"
+        # package: ""                 # a local package; shared_dependencies.package if omitted
         transport: ""
         probe_class: "ZMCP_DBG_PROBE"
         # The shared AMDP pair the AMDP chain reads and runs (shared_dependencies)
@@ -2186,7 +2190,7 @@ check_package_high:
       available_in: ["onprem", "cloud"]
       description: "Check an existing package for syntax errors"
       params:
-        package_name: "ZMCP_SHARED"
+        # package_name: ""            # shared_dependencies.package if omitted (created by shared:setup)
         super_package: ""
 
 # CheckProgram

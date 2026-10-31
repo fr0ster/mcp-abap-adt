@@ -21,7 +21,11 @@ import {
  */
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+}));
 
 const context = { connection: {} as any, logger: undefined };
 const body = (result: any) => JSON.parse(result.content[0].text);

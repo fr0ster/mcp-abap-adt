@@ -2,6 +2,8 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtResponse,
+  IAdtWhereUsedParamsOf,
+  IAdtWhereUsedScopeParamsOf,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   type AdtHeadersContext,
@@ -22,10 +24,9 @@ import { atStep } from './step';
  * names only what the where-used flow passes, and no strategy is part of it.
  */
 export interface WhereUsedSource {
-  getWhereUsedScope(params: {
-    object_name: string;
-    object_type: string;
-  }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  getWhereUsedScope(
+    params: IAdtWhereUsedScopeParamsOf,
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   /** Local — issues no request. */
   modifyWhereUsedScope(
     scopeXml: string,
@@ -36,11 +37,9 @@ export interface WhereUsedSource {
       disable?: string[];
     },
   ): string;
-  getWhereUsed(params: {
-    object_name: string;
-    object_type: string;
-    scopeXml?: string;
-  }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  getWhereUsed(
+    params: IAdtWhereUsedParamsOf,
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 }
 
 /**
@@ -49,12 +48,12 @@ export interface WhereUsedSource {
  */
 export interface WhereUsedMembers {
   getWhereUsedScope(
-    params: { object_name: string; object_type: string },
+    params: IAdtWhereUsedScopeParamsOf,
     options: { headers: IAdtHeaders },
   ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   modifyWhereUsedScope: WhereUsedSource['modifyWhereUsedScope'];
   getWhereUsed(
-    params: { object_name: string; object_type: string; scopeXml?: string },
+    params: IAdtWhereUsedParamsOf,
     options: { headers: IAdtHeaders },
   ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 }
@@ -208,7 +207,7 @@ function noResult<T>(value: T): IAdtResponse<T, IAdtError> {
  */
 export async function fetchWhereUsedReferences(
   utils: WhereUsedSource,
-  params: { object_name: string; object_type: string } & WhereUsedFilter,
+  params: IAdtWhereUsedScopeParamsOf & WhereUsedFilter,
 ): Promise<IAdtResponse<WhereUsedListResult, IAdtError>> {
   let scopeXml: string | undefined;
 

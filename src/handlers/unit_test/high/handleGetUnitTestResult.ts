@@ -4,11 +4,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
-import {
-  MAX_STATUS_POLLS,
-  pollUntilFinished,
-  type RunOutcome,
-} from '../shared/pollRun';
+import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -16,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.',
+    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -48,7 +44,7 @@ export async function handleGetUnitTestResult(
   // this handler called polled status internally before ever answering a
   // result. This tool has no status of its own to poll (`with_long_polling`
   // is not in its surface), so — per the fix ruling — it polls status first
-  // via `pollUntilFinished` rather than guessing what `getResult` answers on
+  // via `readRunOnce` rather than guessing what `getResult` answers on
   // an unfinished run (uncaptured in the corpus). `getResult` takes
   // `analyseException` since adt-clients 23.
   const unitTest = testRunner(context, 'class');
@@ -57,7 +53,7 @@ export async function handleGetUnitTestResult(
   return answer(
     { tool: 'GetUnitTestResult', detail },
     () =>
-      pollUntilFinished(
+      readRunOnce(
         (id, withLongPolling) =>
           unitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,
@@ -77,21 +73,14 @@ export async function handleGetUnitTestResult(
     // safe further reduction of a test-run result — see this tool's own
     // description above), so `raw` is where the parameter genuinely differs.
     (outcome: RunOutcome<AdtReading<unknown>>) =>
-      outcome.finished
-        ? {
+      !outcome.finished
+        ? unfinishedRun(run_id, outcome.runStatus)
+        : {
             success: true,
             run_id,
             finished: true,
             run_result:
-              detail === 'raw' ? outcome.result?.raw : outcome.result?.value,
-          }
-        : {
-            success: true,
-            run_id,
-            finished: false,
-            run_status:
-              detail === 'raw' ? outcome.status.raw : outcome.status.value,
-            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
+              detail === 'raw' ? outcome.result.raw : outcome.result.value,
           },
   );
 }

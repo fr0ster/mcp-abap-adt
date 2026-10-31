@@ -1,3 +1,11 @@
+import {
+  behaviorDefinitionDocuments,
+  classDocuments,
+  ddlDocuments,
+  packageDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+
 /**
  * Shared Dependencies Management — soft mode (direct adt-clients calls)
  *
@@ -12,7 +20,6 @@
  *   npm run shared:check    — validate config consistency (offline)
  */
 
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -20,6 +27,7 @@ import {
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import { withLock } from '../../../lib/strategies/withLock';
@@ -75,7 +83,7 @@ function resolvePackageName(override?: string): string {
  * Skips after first successful verification (in-memory flag).
  */
 export async function ensureSharedPackage(
-  client: AdtClient,
+  client: IServerAdtClient,
   log?: ILogger,
 ): Promise<void> {
   if (_sharedPackageReady) return;
@@ -89,7 +97,7 @@ export async function ensureSharedPackage(
   // (IAdtMetadataReadable, not IAdtReadable) — see IAdtCapabilities.ts.
   try {
     const readResult = await client
-      .getPackage()
+      .getPackage(packageDocuments)
       .readMetadata({ packageName }, { analyse: analyseException });
     if (readResult.ok) {
       log?.info?.(`Shared package ${packageName} already exists`);
@@ -119,7 +127,7 @@ export async function ensureSharedPackage(
     // failure, and the "already exists" case it recognises now reaches it from
     // here — but awaiting without reading logged "Created shared package" over a
     // package that was never created.
-    const createdPackage = await client.getPackage().create(
+    const createdPackage = await client.getPackage(packageDocuments).create(
       {
         packageName,
         description: 'Shared test dependencies package',
@@ -165,7 +173,7 @@ export async function ensureSharedPackage(
  * @returns { existed: boolean, created: boolean }
  */
 export async function ensureSharedDependency(
-  client: AdtClient,
+  client: IServerAdtClient,
   type: string,
   name: string,
   log?: ILogger,
@@ -207,17 +215,17 @@ export async function ensureSharedDependency(
   try {
     if (type === 'tables') {
       const result = await client
-        .getTable()
+        .getTable(tableDocuments)
         .read({ tableName: name }, undefined, { analyse: analyseException });
       exists = result.ok;
     } else if (type === 'views') {
       const result = await client
-        .getDdl()
+        .getDdl(ddlDocuments)
         .read({ ddlName: name }, undefined, { analyse: analyseException });
       exists = result.ok;
     } else if (type === 'behavior_definitions') {
       const result = await client
-        .getBehaviorDefinition()
+        .getBehaviorDefinition(behaviorDefinitionDocuments)
         .read({ name }, undefined, { analyse: analyseException });
       exists = result.ok;
     }
@@ -241,7 +249,7 @@ export async function ensureSharedDependency(
     const activate = !options?.skipActivation;
 
     if (type === 'tables') {
-      const created = await client.getTable().create(
+      const created = await client.getTable(tableDocuments).create(
         {
           tableName: name,
           packageName,
@@ -257,7 +265,7 @@ export async function ensureSharedDependency(
 
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared table ${name}...`);
-        const obj = client.getTable();
+        const obj = client.getTable(tableDocuments);
         const written = await withLock(
           () => obj.lock({ tableName: name }, { analyse: analyseException }),
           (lockHandle) =>
@@ -289,7 +297,7 @@ export async function ensureSharedDependency(
         log?.info?.(`Shared table ${name} activated`);
       }
     } else if (type === 'views') {
-      const created = await client.getDdl().create(
+      const created = await client.getDdl(ddlDocuments).create(
         {
           ddlName: name,
           packageName,
@@ -305,7 +313,7 @@ export async function ensureSharedDependency(
 
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared view ${name}...`);
-        const obj = client.getDdl();
+        const obj = client.getDdl(ddlDocuments);
         const written = await withLock(
           () => obj.lock({ ddlName: name }, { analyse: analyseException }),
           (lockHandle) =>
@@ -337,25 +345,27 @@ export async function ensureSharedDependency(
         log?.info?.(`Shared view ${name} activated`);
       }
     } else if (type === 'behavior_definitions') {
-      const created = await client.getBehaviorDefinition().create(
-        {
-          name,
-          packageName,
-          rootEntity: depConfig.root_entity || name,
-          implementationType: depConfig.implementation_type || 'Managed',
-          description: depConfig.description || 'Shared test BDEF',
-          transportRequest,
-        },
-        {
-          headers: DEFAULT_ADT_HEADERS['behaviorDefinition.create'],
-          analyse: analyseException,
-        },
-      );
+      const created = await client
+        .getBehaviorDefinition(behaviorDefinitionDocuments)
+        .create(
+          {
+            name,
+            packageName,
+            rootEntity: depConfig.root_entity || name,
+            implementationType: depConfig.implementation_type || 'Managed',
+            description: depConfig.description || 'Shared test BDEF',
+            transportRequest,
+          },
+          {
+            headers: DEFAULT_ADT_HEADERS['behaviorDefinition.create'],
+            analyse: analyseException,
+          },
+        );
       if (!created.ok) throw new Error(created.getError().message);
 
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared behavior definition ${name}...`);
-        const obj = client.getBehaviorDefinition();
+        const obj = client.getBehaviorDefinition(behaviorDefinitionDocuments);
         const written = await withLock(
           () => obj.lock({ name }, { analyse: analyseException }),
           (lockHandle) =>
@@ -509,28 +519,28 @@ export async function ensureSharedObjects(
       type: 'tables',
       readFn: (name) =>
         client
-          .getTable()
+          .getTable(tableDocuments)
           .read({ tableName: name }, undefined, { analyse: analyseException }),
     },
     {
       type: 'views',
       readFn: (name) =>
         client
-          .getDdl()
+          .getDdl(ddlDocuments)
           .read({ ddlName: name }, undefined, { analyse: analyseException }),
     },
     {
       type: 'behavior_definitions',
       readFn: (name) =>
         client
-          .getBehaviorDefinition()
+          .getBehaviorDefinition(behaviorDefinitionDocuments)
           .read({ name }, undefined, { analyse: analyseException }),
     },
     {
       type: 'classes',
       readFn: (name) =>
         client
-          .getClass()
+          .getClass(classDocuments)
           .read({ className: name }, undefined, { analyse: analyseException }),
     },
   ];

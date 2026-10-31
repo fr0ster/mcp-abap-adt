@@ -18,8 +18,21 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtWhereUsedCode,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  codesWithNames,
+  MAIN_TYPE_SENTENCE,
+  NAME_CASE_SENTENCE,
+  type ProjectionVariant,
+  WHERE_USED_CODES,
+  WHERE_USED_NAMES,
+} from '../../../lib/adtProjections';
+import { acceptedCodeOf, notAccepted } from '../../../lib/adtTypeCode';
 import {
   answer,
   answerFailure,
@@ -35,7 +48,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -49,14 +62,30 @@ import {
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Lists where the object named by object_name and object_type is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }).',
-  ),
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description: withLongToolAdvice(
+      '[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }).',
+    ),
+    inputSchema: whereUsedSchema(variant),
+  })),
+} as const;
+
+/**
+ * What `object_type` takes on `variant`: a where-used code
+ * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
+ */
+function whereUsedTypeDescription(variant: ProjectionVariant): string {
+  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
+}
+
+/** GetWhereUsed's input on `variant`. */
+function whereUsedSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       timeout: TIMEOUT_PROPERTY,
@@ -67,8 +96,7 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: 'string',
-        description:
-          "Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).",
+        description: whereUsedTypeDescription(variant),
       },
       objects: {
         type: 'array',
@@ -110,8 +138,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: [],
-  },
-} as const;
+  } as const;
+}
 
 interface WhereUsedArgs {
   object_name: string;
@@ -120,6 +148,33 @@ interface WhereUsedArgs {
   enable_all_types?: boolean;
   enable_only_types?: string[];
   disable_types?: string[];
+}
+
+/**
+ * The boundary of `object_type` on the variant declared for `connection`: a
+ * where-used code (`WHERE_USED_CODES`), a name standing for one
+ * (`WHERE_USED_NAMES`) or a main type or search name one where-used code
+ * has, by the case rule of {@link acceptedCodeOf};
+ * `undefined` for any other text.
+ */
+function whereUsedCodeOf(connection: object, text: string) {
+  const variant = variantOf(connection);
+  return acceptedCodeOf(
+    text,
+    WHERE_USED_CODES[variant],
+    WHERE_USED_NAMES[variant],
+  );
+}
+
+/** The refusal of an `object_type` outside its projection: what it takes. */
+function notWhereUsed(connection: object, text: string): string {
+  const variant = variantOf(connection);
+  return notAccepted(
+    'object_type',
+    text,
+    [...WHERE_USED_CODES[variant], ...WHERE_USED_NAMES[variant]],
+    WHERE_USED_CODES[variant],
+  );
 }
 
 /**
@@ -133,6 +188,10 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
   }
   if (!args?.object_type) {
     return return_error('Object type is required');
+  }
+  const objectType = whereUsedCodeOf(connection, args.object_type);
+  if (objectType === undefined) {
+    return return_error(notWhereUsed(connection, args.object_type));
   }
 
   const typedArgs = args as WhereUsedArgs;
@@ -157,7 +216,7 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
         utils.getWhereUsedScope(
           {
             object_name: typedArgs.object_name,
-            object_type: typedArgs.object_type,
+            object_type: objectType,
           },
           { headers, analyse: analyseException },
         ),
@@ -190,7 +249,7 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
     () =>
       fetchWhereUsedReferences(whereUsedOn(context, utils), {
         object_name: typedArgs.object_name,
-        object_type: typedArgs.object_type,
+        object_type: objectType,
         enableAllTypes: typedArgs.enable_all_types,
         enableOnlyTypes: typedArgs.enable_only_types,
         disableTypes: typedArgs.disable_types,
@@ -272,6 +331,10 @@ async function whereUsedFromAnswers(
   if (!typedArgs?.object_type) {
     return return_error('Object type is required');
   }
+  const objectType = whereUsedCodeOf(connection, typedArgs.object_type);
+  if (objectType === undefined) {
+    return return_error(notWhereUsed(connection, typedArgs.object_type));
+  }
   logger?.info(
     `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
   );
@@ -300,7 +363,7 @@ async function whereUsedFromAnswers(
         },
         {
           object_name: typedArgs.object_name,
-          object_type: typedArgs.object_type,
+          object_type: objectType,
           enableAllTypes: typedArgs.enable_all_types,
           enableOnlyTypes: typedArgs.enable_only_types,
           disableTypes: typedArgs.disable_types,
@@ -376,12 +439,20 @@ async function whereUsedInEnvelopes(
   const { logger } = context;
   const utilsOn = (connection: HandlerContext['connection']) =>
     createAdtClient(connection, logger).getUtils(ourUtils);
-  const readable = targets
-    .map((target, i) => ({ target, i }))
-    .filter(({ target }) => target.object_name && target.object_type);
-  const params = (target: WhereUsedArgs) => ({
-    object_name: target.object_name,
-    object_type: target.object_type,
+  // A target without a name, or whose type is no code of the tables, is
+  // sent nothing; `whereUsedFromAnswers` answers it with its refusal.
+  const readable = targets.flatMap((target, i) => {
+    const code = target.object_name
+      ? whereUsedCodeOf(context.connection, target.object_type ?? '')
+      : undefined;
+    return code === undefined ? [] : [{ target, i, code }];
+  });
+  const params = (entry: {
+    target: WhereUsedArgs;
+    code: AdtWhereUsedCode;
+  }) => ({
+    object_name: entry.target.object_name,
+    object_type: entry.code,
   });
   type Answered = PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   const scopes = new Map<number, Answered>();
@@ -421,10 +492,10 @@ async function whereUsedInEnvelopes(
   if (readsScope(filter)) {
     let read: Answered[];
     try {
-      read = (await runPhase(context, readable, ({ target }, batch) => {
+      read = (await runPhase(context, readable, (entry, batch) => {
         if (validatesScope(filter)) {
           return withAdtHeaders(context, 'utils.getWhereUsedScope', (headers) =>
-            utilsOn(batch).getWhereUsedScope(params(target), {
+            utilsOn(batch).getWhereUsedScope(params(entry), {
               headers,
               analyse: analyseException,
             }),
@@ -433,7 +504,7 @@ async function whereUsedInEnvelopes(
         // Sent as `fetchWhereUsedReferences` sends it, through the members
         // it names (`WhereUsedSource`).
         const source: WhereUsedSource = whereUsedOn(context, utilsOn(batch));
-        return source.getWhereUsedScope(params(target));
+        return source.getWhereUsedScope(params(entry));
       })) as Answered[];
     } catch (error) {
       // The sequential version throws a refusal of the validating read and
@@ -459,17 +530,18 @@ async function whereUsedInEnvelopes(
   if (searched.length > 0) {
     let read: Answered[];
     try {
-      read = (await runPhase(context, searched, ({ target, i }, batch) => {
+      read = (await runPhase(context, searched, (entry, batch) => {
+        const { i } = entry;
         // Sent as `fetchWhereUsedReferences` sends it, through the members
         // it names (`WhereUsedSource`).
         const utils: WhereUsedSource = whereUsedOn(context, utilsOn(batch));
         const scope = scopes.get(i);
         const scoped = scope?.ok === true ? scope.value : undefined;
         if (scoped === undefined || !scoped.ok) {
-          return utils.getWhereUsed(params(target));
+          return utils.getWhereUsed(params(entry));
         }
         return utils.getWhereUsed({
-          ...params(target),
+          ...params(entry),
           scopeXml: utils.modifyWhereUsedScope(
             scoped.getResult().value?.raw ?? '',
             {

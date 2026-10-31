@@ -5,21 +5,35 @@
  * Uses the ADT group activation endpoint (/sap/bc/adt/activation).
  */
 
+import type { ProjectionVariant } from '../../../lib/adtProjections';
+import { activationParentDescription } from '../../../lib/adtTypeCode';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { handleActivateObject } from '../low/handleActivateObject';
+import { byVariant } from '../../../lib/variantDefinition';
+import {
+  activationTypeDescription,
+  handleActivateObject,
+  preauditDescription,
+} from '../low/handleActivateObject';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjects',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.',
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.',
+    inputSchema: activateObjectsSchema(variant),
+  })),
+} as const;
+
+/** ActivateObjects' input on `variant`. */
+function activateObjectsSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       objects: {
         type: 'array',
         description:
-          "Array of objects to activate. Each object must have 'name' and 'type'.",
+          "Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.",
         items: {
           type: 'object',
           properties: {
@@ -29,8 +43,11 @@ export const TOOL_DEFINITION = {
             },
             type: {
               type: 'string',
-              description:
-                'Object type code: DOMA (domain), DTEL (data element), TABL (table), STRU (structure), DDLS (CDS view), CLAS (class), INTF (interface), PROG (program), FUGR (function group), FUGR/FF (function module), TTYP (table type), SRVD (service definition), SRVB (service binding), BDEF (behavior definition), DDLX (metadata extension), DCLS (access control), ENHO (enhancement)',
+              description: activationTypeDescription(variant),
+            },
+            parentName: {
+              type: 'string',
+              description: activationParentDescription(variant),
             },
           },
           required: ['name', 'type'],
@@ -38,12 +55,12 @@ export const TOOL_DEFINITION = {
       },
       preaudit: {
         type: 'boolean',
-        description: 'Request pre-audit before activation. Default: true',
+        description: preauditDescription(variant),
       },
     },
     required: ['objects'],
-  },
-} as const;
+  } as const;
+}
 
 export async function handleActivateObjects(
   context: HandlerContext,

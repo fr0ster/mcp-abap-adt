@@ -1,5 +1,24 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type {
+  AdtModernVariant,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { UtilsApi } from '../../../lib/adtClientContract';
 import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  INCLUDES_PARENT_MAIN_TYPES,
+  type INCLUDES_PARENT_ROUTES,
+  INCLUDES_PARENTS,
+  MAIN_TYPE_SENTENCE,
+  type ProjectionVariant,
+  supported,
+} from '../../../lib/adtProjections';
+import {
+  acceptedCodeOf,
+  sharedMainType,
+  tableCodeOf,
+} from '../../../lib/adtTypeCode';
 import {
   answerCaught,
   failedPayloadOf,
@@ -13,7 +32,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
@@ -28,13 +47,21 @@ import {
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }).',
-  ),
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description: withLongToolAdvice(
+      '[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }).',
+    ),
+    inputSchema: includesListSchema(variant),
+  })),
+} as const;
+
+/** GetIncludesList's input on `variant`. */
+function includesListSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       timeout: TIMEOUT_PROPERTY,
@@ -45,9 +72,11 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: 'string',
-        enum: ['PROG/P', 'PROG/I', 'FUGR', 'CLAS/OC'],
-        description:
-          "[read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.",
+        enum: [
+          ...INCLUDES_PARENTS[variant],
+          ...INCLUDES_PARENT_MAIN_TYPES[variant],
+        ],
+        description: `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
       },
       objects: {
         type: 'array',
@@ -62,9 +91,11 @@ export const TOOL_DEFINITION = {
             },
             object_type: {
               type: 'string',
-              enum: ['PROG/P', 'PROG/I', 'FUGR', 'CLAS/OC'],
-              description:
-                "ADT object type: 'PROG/P', 'PROG/I', 'FUGR' or 'CLAS/OC'",
+              enum: [
+                ...INCLUDES_PARENTS[variant],
+                ...INCLUDES_PARENT_MAIN_TYPES[variant],
+              ],
+              description: `ADT object type. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
             },
           },
           required: ['object_name', 'object_type'],
@@ -78,8 +109,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: [],
-  },
-} as const;
+  } as const;
+}
 
 interface IncludeNode {
   name: string;
@@ -103,7 +134,28 @@ interface IncludeNode {
 
 const MAX_INCLUDE_DEPTH = 20;
 
-type ParentKind = 'PROG/P' | 'PROG/I' | 'FUGR/F' | 'CLAS/OC';
+/** A parent this tool walks: a code of `INCLUDES_PARENT_ROUTES`. */
+type ParentKind = keyof typeof INCLUDES_PARENT_ROUTES;
+
+/**
+ * The parent the caller named, past the boundary of `object_type`: one of
+ * the declared variant's parents (`INCLUDES_PARENTS`), or the one parent
+ * whose main type it names, either case; `undefined` for any other text,
+ * which the tool refuses naming the list (or, for a main type two parents
+ * share, those parents).
+ */
+function parentOf(
+  connection: object,
+  objectType: string,
+  objectName: string,
+): { kind: ParentKind; name: string } | undefined {
+  const kind = acceptedCodeOf(
+    objectType,
+    INCLUDES_PARENTS[variantOf(connection)],
+    [],
+  );
+  return kind === undefined ? undefined : resolveParent(kind, objectName);
+}
 
 /**
  * What the caller asked for, in the four kinds this tool walks. A function
@@ -111,25 +163,10 @@ type ParentKind = 'PROG/P' | 'PROG/I' | 'FUGR/F' | 'CLAS/OC';
  * program and include URIs both answer 404 on premise — so it is walked as the group.
  */
 function resolveParent(
-  objectType: string,
+  kind: ParentKind,
   objectName: string,
-): { kind: ParentKind; name: string } | undefined {
-  const t = objectType.trim().toUpperCase();
+): { kind: ParentKind; name: string } {
   const name = objectName.trim().toUpperCase();
-  const kind: ParentKind | undefined =
-    t === 'PROG/P' || t === 'PROGRAM'
-      ? 'PROG/P'
-      : t === 'PROG/I' || t === 'INCLUDE'
-        ? 'PROG/I'
-        : t === 'FUGR' ||
-            t === 'FUGR/F' ||
-            t === 'FUNCTION_GROUP' ||
-            t === 'FUNCTIONGROUP'
-          ? 'FUGR/F'
-          : t === 'CLAS/OC' || t === 'CLAS' || t === 'CLASS'
-            ? 'CLAS/OC'
-            : undefined;
-  if (!kind) return undefined;
   if (kind === 'PROG/P' && name.startsWith('SAPL') && name.length > 4) {
     return { kind: 'FUGR/F', name: name.slice(4) };
   }
@@ -212,10 +249,12 @@ async function includesListOf(context: HandlerContext, args: any) {
       return return_error('Parameter "object_type" (string) is required.');
     }
 
-    const parent = resolveParent(object_type, object_name);
+    const parent = parentOf(connection, object_type, object_name);
     if (!parent) {
+      const parents = INCLUDES_PARENTS[variantOf(connection)];
       return return_error(
-        `Unsupported object_type "${object_type}": use PROG/P, PROG/I, FUGR or CLAS/OC.`,
+        sharedMainType('object_type', object_type, parents) ??
+          `Unsupported object_type "${object_type}": ${supported(parents)}`,
       );
     }
 
@@ -226,7 +265,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
 
-    const utils = createAdtClient(connection, logger).getUtils(ourUtils) as any;
+    const utils = createAdtClient(connection, logger).getUtils(ourUtils);
 
     /** What could not be read, and why — reported beside the tree. */
     const unreadable: Record<string, unknown>[] = [];
@@ -255,7 +294,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       return '';
     };
     const readInclude = async (name: string) =>
-      sourceOf(name, utils.getInclude(name));
+      sourceOf(name, utils.getInclude(name, { analyse: analyseException }));
 
     // Two different things, and one `visited` set was calling both a cycle.
     //
@@ -303,7 +342,9 @@ async function includesListOf(context: HandlerContext, args: any) {
       // main), with no name of their own.
       const meta = await sourceOf(
         `class ${parent.name}`,
-        utils.readObjectMetadata('class', parent.name),
+        utils.readObjectMetadata('CLAS/OC', parent.name, undefined, {
+          analyse: analyseException,
+        }),
       );
       children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
         (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
@@ -343,7 +384,13 @@ async function includesListOf(context: HandlerContext, args: any) {
         parent.kind === 'PROG/P'
           ? await sourceOf(
               `program ${parent.name}`,
-              utils.readObjectSource('program', parent.name),
+              utils.readObjectSource(
+                'PROG/P',
+                parent.name,
+                undefined,
+                undefined,
+                { analyse: analyseException },
+              ),
             )
           : await readInclude(parent.name);
       children = await expand(
@@ -395,19 +442,26 @@ const readKey = (read: IncludeRead): string =>
     ? `group:${read.name}:${read.nodeId ?? ''}`
     : `${read.kind}:${read.name}`;
 
+/** The utilities every read of this tool is sent on. */
+type IncludeUtils = UtilsApi<typeof ourUtils, AdtModernVariant>;
+
 /** `read` sent on `utils`, as the sequential version sends it. */
 function sendRead(
   context: AdtHeadersContext,
-  utils: any,
+  utils: IncludeUtils,
   read: IncludeRead,
 ): Promise<unknown> {
   switch (read.kind) {
     case 'program':
-      return utils.readObjectSource('program', read.name);
+      return utils.readObjectSource('PROG/P', read.name, undefined, undefined, {
+        analyse: analyseException,
+      });
     case 'include':
-      return utils.getInclude(read.name);
+      return utils.getInclude(read.name, { analyse: analyseException });
     case 'class':
-      return utils.readObjectMetadata('class', read.name);
+      return utils.readObjectMetadata('CLAS/OC', read.name, undefined, {
+        analyse: analyseException,
+      });
     case 'group': {
       // `fetchFunctionGroupChildren`'s two requests: the group's node
       // structure, then its includes node — on the source it reads.
@@ -515,8 +569,9 @@ function includesNodeOf(result: PhaseResult<unknown>): string | undefined {
     IAdtError
   >;
   if (!response.ok) return undefined;
-  return response.getResult().value.childNodes.find((c) => c.type === 'FUGR/I')
-    ?.nodeId;
+  return response
+    .getResult()
+    .value.childNodes.find((c) => tableCodeOf(c.type) === 'FUGR/I')?.nodeId;
 }
 
 /**
@@ -802,7 +857,7 @@ export async function handleGetIncludesList(
       typeof args?.object_name === 'string' &&
       args.object_name.trim() !== '' &&
       typeof args?.object_type === 'string'
-        ? resolveParent(args.object_type, args.object_name)
+        ? parentOf(context.connection, args.object_type, args.object_name)
         : undefined;
     // A class is one metadata read: there is nothing to read together.
     if (parent === undefined || parent.kind === 'CLAS/OC') {
@@ -847,7 +902,7 @@ export async function handleGetIncludesList(
           typeof o.object_name === 'string' &&
           o.object_name.trim() !== '' &&
           typeof o.object_type === 'string'
-            ? resolveParent(o.object_type, o.object_name)
+            ? parentOf(context.connection, o.object_type, o.object_name)
             : undefined,
         );
         const read = parents.filter(

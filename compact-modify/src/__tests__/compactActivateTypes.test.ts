@@ -1,3 +1,6 @@
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
+import { declareSystemKind } from '../../../src/lib/systemKind';
 import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
 
 /**
@@ -12,12 +15,13 @@ import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
  * a caller had to pass `object_adt_type`, and therefore passed something that
  * worked.
  *
- * These pin the three outcomes: a name the map knows, a type this repository
- * has a measured code for, and everything else — refused here, naming the
- * field that settles it.
+ * These pin the outcomes: a type its own API activates directly, a type
+ * activated in a group by the code `COMPACT_ACTIVATE_ROUTES` gives it, and
+ * everything else — refused here, naming the field that settles it.
  */
 
 let sent: unknown;
+let planned: unknown;
 // The activate route arrives through lib's write barrel now, so that is the module
 // to intercept: this package imports the handler by package name, not by path.
 jest.mock('@mcp-abap-adt/lib/handlers/write', () => {
@@ -28,10 +32,20 @@ jest.mock('@mcp-abap-adt/lib/handlers/write', () => {
       sent = args;
       return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
     },
+    // object_type is checked at HandlerActivate's boundary and handed on as
+    // a decided activation.
+    activatePlanOnce: (_context: unknown, plan: unknown) => {
+      planned = plan;
+      return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
+    },
   };
 });
 
-const context = {} as never;
+// The refusal lists what the declared variant activates from object_type
+// alone (`COMPACT_ACTIVATE`), so the connection states its variant.
+const connection = recordingConnection();
+declareSystemKind(connection, 'onprem');
+const context: HandlerContext = { connection };
 const typeSent = () =>
   (sent as { objects: { type: string }[] }).objects[0].type;
 const nameSent = () =>
@@ -40,23 +54,29 @@ const parentSent = () =>
   (sent as { objects: { parentName?: string }[] }).objects[0].parentName;
 
 describe('HandlerActivate and the type it was given', () => {
-  it('passes a friendly name the activation map knows, as it always did', async () => {
+  it('activates a type its own API activates directly, by that API', async () => {
     await handleHandlerActivate(context, {
       object_name: 'ZCL_X',
       object_type: 'CLASS',
     });
 
-    expect(typeSent()).toBe('class');
+    expect(planned).toEqual({ single: { api: 'class', name: 'ZCL_X' } });
   });
 
-  it('translates a type the map has no name for but this repository has seen', async () => {
+  it('activates any other type in a group activation, by its code', async () => {
     await handleHandlerActivate(context, {
       object_name: 'ZMCP_PKG',
       object_type: 'PACKAGE',
     });
 
-    // `DEVC/K`, from twenty corpus documents — not a guess made here.
-    expect(typeSent()).toBe('DEVC/K');
+    // `DEVC/K`, the code `COMPACT_ACTIVATE_ROUTES` gives it.
+    // The group is typed by the declared variant.
+    expect(planned).toEqual({
+      group: {
+        variant: 'onprem',
+        references: [{ name: 'ZMCP_PKG', type: 'DEVC/K' }],
+      },
+    });
   });
 
   it('prefers the explicit ADT type when the caller gives one', async () => {
@@ -95,6 +115,21 @@ describe('HandlerActivate and the type it was given', () => {
         object_type: 'TRANSPORT',
       }),
     ).rejects.toThrow(/object_adt_type/);
+    // The types it names are what the variant's projection offers.
+    await expect(
+      handleHandlerActivate(context, {
+        object_name: 'ZCL_X',
+        object_type: 'TRANSPORT',
+      }),
+    ).rejects.toThrow(/Known without it: CLASS, PROGRAM, INTERFACE/);
+    declareSystemKind(connection, 'cloud');
+    await expect(
+      handleHandlerActivate(context, {
+        object_name: 'ZCL_X',
+        object_type: 'TRANSPORT',
+      }),
+    ).rejects.toThrow(/Known without it: CLASS, INTERFACE/);
+    declareSystemKind(connection, 'onprem');
 
     await expect(
       handleHandlerActivate(context, {
@@ -105,24 +140,65 @@ describe('HandlerActivate and the type it was given', () => {
   });
 
   /**
-   * **A right type code is not a right address.** `FUGR/FF` was in the
-   * translation table for one commit — it is the correct type for a function
-   * module — and that was the wrong fix: a module's ADT address is built
-   * under its function GROUP, and this form carries one name. Given only the
-   * module's, group activation would address a group by that name, which is
-   * a confident request for an object that does not exist.
+   * **A right type code is not a right address.** A function module's ADT
+   * address is built under its function GROUP: given only the module's name,
+   * a group activation would address a group by that name, a confident
+   * request for an object that does not exist. So the group is required —
+   * as `GROUP|MODULE` or `function_group_name` — and without it the call is
+   * refused before anything is sent.
    */
-  it('refuses a function module from a name alone, and says what does work', async () => {
+  it('refuses a function module from a name alone, naming what settles it', async () => {
     sent = undefined;
+    planned = undefined;
 
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'Z_AC_FM01',
-        object_type: 'FUNCTION_MODULE',
-      }),
-    ).rejects.toThrow(/addressed under its function group/);
+    const answered = await handleHandlerActivate(context, {
+      object_name: 'Z_AC_FM01',
+      object_type: 'FUNCTION_MODULE',
+    });
 
+    expect(JSON.stringify(answered)).toContain(
+      'FUNCTION_MODULE is named GROUP|MODULE in object_name, or with function_group_name',
+    );
     expect(sent).toBeUndefined();
+    expect(planned).toBeUndefined();
+  });
+
+  it('activates a function module under its group: GROUP|MODULE or function_group_name', async () => {
+    await handleHandlerActivate(context, {
+      object_name: 'zac_fgr01|z_ac_fm01',
+      object_type: 'FUNCTION_MODULE',
+    });
+    expect(planned).toEqual({
+      group: {
+        variant: 'onprem',
+        references: [
+          { name: 'Z_AC_FM01', parentName: 'ZAC_FGR01', type: 'FUGR/FF' },
+        ],
+      },
+    });
+
+    await handleHandlerActivate(context, {
+      object_name: 'Z_AC_FM01',
+      function_group_name: 'ZAC_FGR01',
+      object_type: 'FUNCTION_MODULE',
+    });
+    expect(planned).toEqual({
+      group: {
+        variant: 'onprem',
+        references: [
+          { name: 'Z_AC_FM01', parentName: 'ZAC_FGR01', type: 'FUGR/FF' },
+        ],
+      },
+    });
+  });
+
+  it('activates a behaviour implementation as its class', async () => {
+    await handleHandlerActivate(context, {
+      object_name: 'ZBP_X',
+      object_type: 'BEHAVIOR_IMPLEMENTATION',
+    });
+
+    expect(planned).toEqual({ single: { api: 'class', name: 'ZBP_X' } });
   });
 
   /**
@@ -141,15 +217,6 @@ describe('HandlerActivate and the type it was given', () => {
     expect(typeSent()).toBe('FUGR/FF');
     expect(nameSent()).toBe('Z_AC_FM01');
     expect(parentSent()).toBe('ZAC_FGR01');
-  });
-
-  it('says so in the refusal, so the caller does not have to find out', async () => {
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'Z_AC_FM01',
-        object_type: 'FUNCTION_MODULE',
-      }),
-    ).rejects.toThrow(/parentName/);
   });
 
   it('still takes objects[] untouched', async () => {

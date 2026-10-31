@@ -29,6 +29,8 @@ const mockModifyWhereUsedScope = jest.fn().mockReturnValue('<scope-modified/>');
 const mockGetWhereUsed = jest.fn().mockResolvedValue(okResponse(reading({})));
 
 jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
   createAdtClient: () => ({
     getUtils: () => ({
       getWhereUsedScope: mockGetWhereUsedScope,
@@ -80,7 +82,8 @@ describe('GetWhereUsed type-filter params', () => {
     expect(mockGetWhereUsed).toHaveBeenCalledWith(
       expect.objectContaining({
         object_name: 'ZT',
-        object_type: 'table',
+        // `table` is sent as the code of the tables it names.
+        object_type: 'TABL/DT',
         scopeXml: '<scope-modified/>',
       }),
       { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },

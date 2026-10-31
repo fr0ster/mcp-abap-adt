@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'AmdpDebugStep',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.',
+    '[debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.',
   inputSchema: {
     type: 'object',
     properties: {

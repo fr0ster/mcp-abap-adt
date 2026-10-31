@@ -1,6 +1,7 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { atStep } from '../../../lib/strategies/step';
+import { failedWith } from '../../../lib/strategies/sequence';
+import { atStep, withStep } from '../../../lib/strategies/step';
 
 /**
  * Reconstructing what the v18 convenience read did.
@@ -21,8 +22,8 @@ import { atStep } from '../../../lib/strategies/step';
  * and `refusal-unittest-run-failing--02-runs-*` — both answering
  * `status="FINISHED"` regardless of whether the tests inside passed (a test
  * FAILURE is not an ADT-level refusal; it is `FINISHED` with `alerts` in the
- * result document). Only that attribute decides whether this polls again or
- * fetches the result.
+ * result document). Only that attribute decides whether this fetches the
+ * result.
  */
 
 /** The run's own verdict on itself, read off `<aunit:progress status="..."/>`. */
@@ -43,47 +44,57 @@ export function runIsFinished(statusValue: unknown): boolean {
 }
 
 /**
- * Bounded, not unlimited. `getStatus`'s own `withLongPolling` already makes
- * ADT hold each individual request open while the run is in progress, so
- * this is a bound on how many such long-polls this handler will sit through
- * before giving up and telling the caller to ask again — not a guess at how
- * long a run "should" take.
+ * What one long-polled status read found: a run SAP answered `FINISHED`, with
+ * its status and its result; or a run SAP answered with another status, with
+ * that status as SAP named it and no result.
  */
-export const MAX_STATUS_POLLS = 5;
-
-export interface RunOutcome<TResult> {
-  readonly finished: boolean;
-  readonly status: AdtReading<unknown>;
-  /** Present only when `finished` — never fetched otherwise. */
-  readonly result?: TResult;
-}
+export type RunOutcome<TResult> =
+  | {
+      readonly finished: true;
+      readonly status: AdtReading<unknown>;
+      readonly result: TResult;
+    }
+  | {
+      readonly finished: false;
+      readonly status: AdtReading<unknown>;
+      readonly runStatus: string;
+    };
 
 function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
   return {
     ok: true,
     getResult: () => ({ value }),
     getError: () => {
-      throw new Error('pollUntilFinished: asked for the error of a success');
+      throw new Error('readRunOnce: asked for the error of a success');
     },
   } as unknown as IAdtResponse<T, IAdtError>;
 }
 
+/** The step a status read is named by. */
+export const READ_STATUS = 'read status';
+
 /**
- * Poll a run's status up to `MAX_STATUS_POLLS` times, and only then — if it
- * finished within that bound — fetch the result via `fetchResult`.
+ * Read a run's status once, by long polling, and fetch the result via
+ * `fetchResult` when SAP answers the run `FINISHED`.
+ *
+ * The status read asks for long polling (`withLongPolling`), and ADT holds
+ * that request open until the run has finished (measured on premise,
+ * 2026-10-31: one poll held 97 s for a 90 s test and 207 s for a 200 s one,
+ * and returned on no progress step), so the call lasts as long as the run.
+ * SAP's answer ends the call, whatever it is:
+ *
+ * - `FINISHED`: the result is fetched and answered with the status.
+ * - another status: answered as SAP named it (`finished: false`), and the
+ *   result is not fetched; the caller reads on by the run's id.
+ * - no `aunit:progress` status at all: a failure at the status step, whose
+ *   message carries the status document as SAP sent it.
  *
  * A failing `getStatus` call is returned exactly as it came (the caller's
- * `answer()` reports it as the refusal it is — the status this handler
- * already had is not thrown away in favour of a fabricated one). A failing
- * `getResult` call, once the run IS confirmed finished, is likewise returned
- * as-is: never swallowed into a null field under a false `success: true`.
- * A run that has not finished within the bound never reaches `fetchResult`
- * at all — this handler does not present whatever an unfinished run's result
- * endpoint happens to answer, because no fixture in the corpus captures that
- * case and guessing would be exactly the kind of invented shape this
- * migration exists to remove.
+ * `answer()` reports it as the refusal it is). A failing `getResult` call,
+ * once the run IS confirmed finished, is likewise returned as-is: never
+ * swallowed into a null field under a false `success: true`.
  */
-export async function pollUntilFinished<TResult>(
+export async function readRunOnce<TResult>(
   getStatus: (
     runId: string,
     withLongPolling?: boolean,
@@ -91,34 +102,51 @@ export async function pollUntilFinished<TResult>(
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
-  let lastStatus: AdtReading<unknown> | undefined;
-  for (let attempt = 0; attempt < MAX_STATUS_POLLS; attempt += 1) {
-    const statusResponse = await atStep('read status', getStatus)(runId, true);
-    if (!statusResponse.ok) {
-      return statusResponse as unknown as IAdtResponse<
-        RunOutcome<TResult>,
-        IAdtError
-      >;
-    }
-    const status = statusResponse.getResult().value;
-    lastStatus = status;
-    if (runIsFinished(status.value)) {
-      const resultResponse = await atStep('read result', fetchResult)();
-      if (!resultResponse.ok) {
-        return resultResponse as unknown as IAdtResponse<
-          RunOutcome<TResult>,
-          IAdtError
-        >;
-      }
-      return okOutcome({
-        finished: true,
-        status,
-        result: resultResponse.getResult().value,
-      });
-    }
+  const statusResponse = await atStep(READ_STATUS, getStatus)(runId, true);
+  if (!statusResponse.ok) {
+    return statusResponse as unknown as IAdtResponse<
+      RunOutcome<TResult>,
+      IAdtError
+    >;
   }
-  return okOutcome({
-    finished: false,
-    status: lastStatus as AdtReading<unknown>,
+  const status = statusResponse.getResult().value;
+  const runStatus = runProgressStatus(status.value);
+  if (runStatus === undefined) {
+    return failedWith<RunOutcome<TResult>>(
+      withStep(
+        {
+          origin: 'refusal',
+          message: `SAP answered the status of run ${runId} with no aunit:progress status; the status document as SAP sent it: ${status.raw}`,
+        },
+        READ_STATUS,
+      ),
+    );
+  }
+  if (runStatus !== 'FINISHED') {
+    return okOutcome<RunOutcome<TResult>>({
+      finished: false,
+      status,
+      runStatus,
+    });
+  }
+  const resultResponse = await atStep('read result', fetchResult)();
+  if (!resultResponse.ok) {
+    return resultResponse as unknown as IAdtResponse<
+      RunOutcome<TResult>,
+      IAdtError
+    >;
+  }
+  return okOutcome<RunOutcome<TResult>>({
+    finished: true,
+    status,
+    result: resultResponse.getResult().value,
   });
+}
+
+/**
+ * What a reader answers for a run SAP answered with a status other than
+ * `FINISHED`: the run id and that status, to read on by the id.
+ */
+export function unfinishedRun(runId: string, runStatus: string) {
+  return { success: true, run_id: runId, status: runStatus };
 }

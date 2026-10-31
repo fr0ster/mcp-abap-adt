@@ -4,6 +4,8 @@
  * the finished result, `runSync.ts`).
  */
 
+import { fieldOf } from './runTarget';
+
 export const UNIT_TEST_RUNNERS = ['async', 'sync'] as const;
 export type UnitTestRunner = (typeof UNIT_TEST_RUNNERS)[number];
 
@@ -14,7 +16,7 @@ export const RUNNER_PROPERTY = {
     enum: ['async', 'sync'],
     default: 'async',
     description:
-      'async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.',
+      'async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.',
   },
 } as const;
 
@@ -34,6 +36,55 @@ export function runnerOf(args: unknown): UnitTestRunner | Error {
   return new Error(
     `runner must be one of ${UNIT_TEST_RUNNERS.join(', ')}; got ${JSON.stringify(given)}`,
   );
+}
+
+/** The `wait` property of a tool that starts an asynchronous run. */
+export const WAIT_PROPERTY = {
+  wait: {
+    type: 'boolean',
+    default: true,
+    description:
+      "true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.",
+  },
+} as const;
+
+/**
+ * Whether the call waits for the run (`wait`): `true` when absent; an error,
+ * sent before any request, for a value that is not a boolean. The arguments
+ * come from the caller, outside the type system, so the value is checked
+ * here.
+ */
+export function waitOf(args: unknown): boolean | Error {
+  const given = givenWait(args);
+  if (given === undefined) return true;
+  if (typeof given === 'boolean') return given;
+  return new Error(
+    `wait must be true or false; got ${JSON.stringify(given)}; nothing was sent`,
+  );
+}
+
+/**
+ * `wait` of a tool with a runner: as `waitOf` for runner async; with runner
+ * sync a given `wait` is refused before anything is sent, since that runner is
+ * one request answered with the finished result.
+ */
+export function runnerWaitOf(
+  args: unknown,
+  runner: UnitTestRunner,
+): boolean | Error {
+  if (runner === 'sync' && givenWait(args) !== undefined) {
+    return new Error(
+      'wait goes with runner async: runner sync is one request that returns the finished result; nothing was sent',
+    );
+  }
+  return waitOf(args);
+}
+
+/** The `wait` the call carries, as given; `undefined` when none. */
+function givenWait(args: unknown): unknown {
+  return args !== null && typeof args === 'object'
+    ? fieldOf(args, 'wait')
+    : undefined;
 }
 
 /** The `scope` argument, as compact `HandlerUnitTestRun` takes it. */

@@ -1,3 +1,4 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: no.
  *
@@ -5,9 +6,11 @@
  * says nothing. `carriesAnalyse` reads the TYPE of the value, not the
  * spelling of the key, so this must answer the same as omitting it.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 
 export const call = () =>
-  client.getClass().read({ className: 'X' }, 'active', { analyse: undefined });
+  client
+    .getClass(classDocuments)
+    .read({ className: 'X' }, 'active', { analyse: undefined });

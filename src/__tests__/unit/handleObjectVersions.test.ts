@@ -14,6 +14,8 @@ const mockGetClass = jest.fn();
 const mockGetTable = jest.fn();
 
 jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
   createAdtClient: () => ({
     getClass: mockGetClass,
     getTable: mockGetTable,

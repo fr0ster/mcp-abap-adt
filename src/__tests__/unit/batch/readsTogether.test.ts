@@ -18,6 +18,10 @@ import type { BatchEntryCase } from '../../helpers/batchEntryCases';
 import { runCase, servedTools } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const VERSION_FROM =
   '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
 const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';

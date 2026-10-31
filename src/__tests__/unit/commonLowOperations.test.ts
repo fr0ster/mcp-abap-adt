@@ -23,7 +23,13 @@ import {
 // that reads `seen.last`/`seen.calls` needs this wiring.
 const seen = recordAnalyse();
 let fakeClient: unknown = seen.client;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+  // An on-premise group activation is the on-premise client's.
+  createOnPremAdtClient: () => fakeClient,
+}));
 
 // As in domainLow.test.ts: nothing here asserts that a handler injects
 // `resultsFor(xDocuments)` into `getX(...)` — both test doubles ignore the
@@ -308,7 +314,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
 
     const result: any = await handleActivateObject(context as any, {
-      objects: [{ name: 'zd', type: 'DOMA/DM' }],
+      objects: [{ name: 'zd', type: 'DOMA/DD' }],
     });
 
     expect(result.isError).toBe(false);
@@ -354,7 +360,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = seen.client;
     await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
@@ -384,7 +390,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = finishedRun('<chkl:messages/>');
     const result: any = await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
@@ -399,7 +405,7 @@ describe('ActivateObjectLow', () => {
     fakeClient = finishedRun('<chkl:messages/>');
     const result: any = await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
@@ -442,7 +448,7 @@ describe('ActivateObjectLow', () => {
     });
     const result: any = await handleActivateObject(context as any, {
       objects: [
-        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zd', type: 'DOMA/DD' },
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });

@@ -19,7 +19,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
 
-import { type AbapSystemKind, statedSystemKind } from './systemKind';
+import {
+  type AbapSystemKind,
+  declaredSystemKindOf,
+  statedSystemKind,
+} from './systemKind';
 
 export type { AbapSystemKind } from './systemKind';
 export { statedSystemKind } from './systemKind';
@@ -283,8 +287,9 @@ const records = new WeakMap<object, ConnectionRecord>();
  * recorded when it built it (`resolveSystemKind` then). A connection the
  * factory did not build (an embedder's own) has no settings: the kind the
  * server states for it (`declared`, the server's `systemType` option) wins,
- * then `SAP_SYSTEM_TYPE`; `undefined` when neither states one — the kind is
- * never guessed, not from the URL either. What a missing kind means is the
+ * then the kind declared for it (`declareSystemKind`), then
+ * `SAP_SYSTEM_TYPE`; `undefined` when none states one — the kind is never
+ * guessed, not from the URL either. What a missing kind means is the
  * host's rules'.
  */
 export function systemKindOf(
@@ -294,7 +299,10 @@ export function systemKindOf(
 ): AbapSystemKind | undefined {
   const record = records.get(connection);
   if (record) return record.kind;
-  return statedSystemKind(declared ? declared : env.SAP_SYSTEM_TYPE);
+  if (declared) return statedSystemKind(declared);
+  return (
+    declaredSystemKindOf(connection) ?? statedSystemKind(env.SAP_SYSTEM_TYPE)
+  );
 }
 
 /**

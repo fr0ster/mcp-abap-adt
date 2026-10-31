@@ -128,7 +128,10 @@ const whereUsed =
     const answer = await withAdtHeaders(context, OP, (headers) =>
       new AdtClient(connection)
         .getUtils()
-        .getWhereUsed({ object_name: item, object_type: 'class' }, { headers }),
+        .getWhereUsed(
+          { object_name: item, object_type: 'CLAS/OC' },
+          { headers },
+        ),
     );
     return answer.ok
       ? { ok: true, raw: answer.getResult().value }

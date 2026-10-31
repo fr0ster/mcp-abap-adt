@@ -30,6 +30,10 @@ import {
 } from '../../helpers/batchEnvelope';
 import { withinTurns } from '../../helpers/withinTurns';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 // ---------------------------------------------------------------------------
 // The model, by request label
 // ---------------------------------------------------------------------------
@@ -41,6 +45,8 @@ const CONFIGURATIONS_PATH =
  * A request's label: `configs` (the search configurations), `list:<config>`
  * (a transport search by its configuration's last segment),
  * `qs:<query>:<type>` (a quickSearch; no type: empty), `src:class|intf:<name>`.
+ * A quickSearch's type is the search name the object's code stands for
+ * (`CLAS/OC` → `CLAS`, `PROG/I` → `INCL`; `searchTypes.ts`).
  */
 function labelOf(method: string, url: string, params?: unknown): string {
   const parsed = new URL(url, 'https://system.invalid');
@@ -151,10 +157,10 @@ const REPOSITORY: Record<string, PartAnswer> = {
 
   // Searches: a typed hit; a type the search refuses, found without it; an
   // untyped name.
-  'qs:ZCL_A:CLAS/OC': ok(
+  'qs:ZCL_A:CLAS': ok(
     hitsXml([{ name: 'ZCL_A', type: 'CLAS/OC', description: 'Class A' }]),
   ),
-  'qs:ZPROG_B:WRONG': BAD_REQUEST,
+  'qs:ZPROG_B:INCL': BAD_REQUEST,
   'qs:ZPROG_B:': ok(
     hitsXml([{ name: 'ZPROG_B', type: 'PROG/P', description: 'Program B' }]),
   ),
@@ -548,7 +554,7 @@ describe('ListTransports', () => {
 
 const OBJECTS = [
   { name: 'ZCL_A', type: 'CLAS/OC' },
-  { name: 'ZPROG_B', type: 'WRONG' },
+  { name: 'ZPROG_B', type: 'PROG/I' },
   { name: 'ZT*' },
   { name: 'ZNONE' },
 ];
@@ -576,7 +582,7 @@ describe('DescribeByList', () => {
       TURNS,
     );
     expect(phasesOf(fake)).toEqual([
-      ['qs:ZCL_A:CLAS/OC', 'qs:ZPROG_B:WRONG', 'qs:ZT*:', 'qs:ZNONE:'],
+      ['qs:ZCL_A:CLAS', 'qs:ZPROG_B:INCL', 'qs:ZT*:', 'qs:ZNONE:'],
       ['qs:ZPROG_B:'],
     ]);
     const names = (result as { content: Array<{ text: string }> }).content.map(
@@ -593,7 +599,7 @@ describe('DescribeByList', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([['qs:ZCL_A:CLAS/OC', 'qs:ZT*:']]);
+    expect(phasesOf(fake)).toEqual([['qs:ZCL_A:CLAS', 'qs:ZT*:']]);
   });
 
   it("a part's failure is that object's: the typeless search refused too is its error entry", async () => {
@@ -684,7 +690,7 @@ describe('DescribeByList', () => {
   it('a typed search answered 406 is that object’s error; no typeless search', async () => {
     const fake = system({
       answers: {
-        'qs:ZPROG_B:WRONG': { status: 406, statusText: 'Not Acceptable' },
+        'qs:ZPROG_B:INCL': { status: 406, statusText: 'Not Acceptable' },
       },
     });
     const result = await withinTurns(
@@ -692,7 +698,7 @@ describe('DescribeByList', () => {
       TURNS,
     );
     expect(phasesOf(fake)).toEqual([
-      ['qs:ZCL_A:CLAS/OC', 'qs:ZPROG_B:WRONG', 'qs:ZT*:', 'qs:ZNONE:'],
+      ['qs:ZCL_A:CLAS', 'qs:ZPROG_B:INCL', 'qs:ZT*:', 'qs:ZNONE:'],
     ]);
     const entries = (
       result as { content: Array<{ text: string }> }

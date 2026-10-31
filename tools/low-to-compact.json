@@ -2407,7 +2407,7 @@
         {
           "method": "POST",
           "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
-          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a\" adtcore:name=\"FUGR_A\"/>\n</adtcore:objectReferences>",
+          "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a\" adtcore:name=\"FUGR_A\"/>\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/fugr_a/source/main\" adtcore:type=\"FUGR/I\" adtcore:name=\"SAPLFUGR_A\"/>\n</adtcore:objectReferences>",
           "headers": {
             "Content-Type": "application/xml",
             "Accept": "application/xml"

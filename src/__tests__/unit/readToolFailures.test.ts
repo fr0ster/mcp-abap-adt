@@ -32,8 +32,19 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+  // The declared variant's client, tagged with it (SearchObject's filter is
+  // that variant's search names).
+  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
+}));
 
 const payloadOf = (result: any) => JSON.parse(result.content[0].text);
 

@@ -1,11 +1,28 @@
+import {
+  appendStructureDocuments,
+  behaviorDefinitionDocuments,
+  classDocuments,
+  dataElementDocuments,
+  ddlDocuments,
+  domainDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  interfaceDocuments,
+  metadataExtensionDocuments,
+  programDocuments,
+  serviceDefinitionDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+
 /**
  * What `npm run shared:check` reads: one read per shared name, through its
  * type's read, and the report of what came back. Reads only — nothing here
  * creates, updates, locks, deletes or activates.
  */
 
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
 /** One shared object as `shared_dependencies.<section>` lists it. */
 export interface SharedItem {
@@ -25,7 +42,7 @@ export interface PresenceResult {
   detail?: string;
 }
 
-type Read = (client: AdtClient, item: SharedItem) => Promise<any>;
+type Read = (client: IServerAdtClient, item: SharedItem) => Promise<any>;
 
 const options = { analyse: analyseException };
 
@@ -36,22 +53,29 @@ const options = { analyse: analyseException };
  */
 export const SHARED_READS: Record<string, Read> = {
   tables: (c, i) =>
-    c.getTable().read({ tableName: i.name }, undefined, options),
+    c.getTable(tableDocuments).read({ tableName: i.name }, undefined, options),
   structures: (c, i) =>
-    c.getStructure().read({ structureName: i.name }, undefined, options),
+    c
+      .getStructure(structureDocuments)
+      .read({ structureName: i.name }, undefined, options),
   append_structures: (c, i) =>
     c
-      .getAppendStructure()
+      .getAppendStructure(appendStructureDocuments)
       .read({ appendStructureName: i.name }, undefined, options),
-  views: (c, i) => c.getDdl().read({ ddlName: i.name }, undefined, options),
+  views: (c, i) =>
+    c.getDdl(ddlDocuments).read({ ddlName: i.name }, undefined, options),
   behavior_definitions: (c, i) =>
-    c.getBehaviorDefinition().read({ name: i.name }, undefined, options),
+    c
+      .getBehaviorDefinition(behaviorDefinitionDocuments)
+      .read({ name: i.name }, undefined, options),
   classes: (c, i) =>
-    c.getClass().read({ className: i.name }, undefined, options),
+    c.getClass(classDocuments).read({ className: i.name }, undefined, options),
   function_groups: (c, i) =>
-    c.getFunctionGroup().readMetadata({ functionGroupName: i.name }, options),
+    c
+      .getFunctionGroup(functionGroupDocuments)
+      .readMetadata({ functionGroupName: i.name }, options),
   function_modules: (c, i) =>
-    c.getFunctionModule().read(
+    c.getFunctionModule(functionModuleDocuments).read(
       {
         functionModuleName: i.name,
         functionGroupName: i.group,
@@ -61,18 +85,26 @@ export const SHARED_READS: Record<string, Read> = {
     ),
   service_definitions: (c, i) =>
     c
-      .getServiceDefinition()
+      .getServiceDefinition(serviceDefinitionDocuments)
       .read({ serviceDefinitionName: i.name }, undefined, options),
   domains: (c, i) =>
-    c.getDomain().readMetadata({ domainName: i.name }, options),
+    c.getDomain(domainDocuments).readMetadata({ domainName: i.name }, options),
   data_elements: (c, i) =>
-    c.getDataElement().readMetadata({ dataElementName: i.name }, options),
+    c
+      .getDataElement(dataElementDocuments)
+      .readMetadata({ dataElementName: i.name }, options),
   interfaces: (c, i) =>
-    c.getInterface().read({ interfaceName: i.name }, undefined, options),
+    c
+      .getInterface(interfaceDocuments)
+      .read({ interfaceName: i.name }, undefined, options),
   programs: (c, i) =>
-    c.getProgram().read({ programName: i.name }, undefined, options),
+    c
+      .getProgram(programDocuments)
+      .read({ programName: i.name }, undefined, options),
   metadata_extensions: (c, i) =>
-    c.getMetadataExtension().read({ name: i.name }, undefined, options),
+    c
+      .getMetadataExtension(metadataExtensionDocuments)
+      .read({ name: i.name }, undefined, options),
 };
 
 /** Sections in the order the report lists them */
@@ -147,7 +179,7 @@ export function classifyRead(answer: any): {
  * Reads only: nothing is created either way.
  */
 export async function readShared(
-  client: AdtClient,
+  client: IServerAdtClient,
   sharedConfig: Record<string, unknown>,
   availableHere: (availableIn?: string[]) => boolean,
 ): Promise<PresenceResult[]> {

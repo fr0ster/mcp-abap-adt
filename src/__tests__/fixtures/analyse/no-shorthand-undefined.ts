@@ -1,3 +1,4 @@
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Fixture for analyseOmissions.test.ts — verdict: no.
  *
@@ -7,11 +8,13 @@
  * longhand form and the name itself for the shorthand form — both must
  * resolve to a type that IS `undefined`.
  */
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 
-declare const client: AdtClient;
+declare const client: IServerAdtClient;
 
 export const call = () => {
   const analyse = undefined;
-  return client.getClass().read({ className: 'X' }, 'active', { analyse });
+  return client
+    .getClass(classDocuments)
+    .read({ className: 'X' }, 'active', { analyse });
 };

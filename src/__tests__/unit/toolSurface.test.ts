@@ -84,7 +84,7 @@ describe('the MCP tool surface', () => {
   it('enumerates the whole surface, so the assertions below are not vacuous', () => {
     // A run that listed nothing would satisfy every comparison that follows.
     // 19.0.0: the 112 low tools left the surface, and their rows the
-    // fixture — 264 remain.
+    // fixture — 264 remain; 21.0.0 adds RunAbapUnit, 265.
     expect(frozen.length).toBeGreaterThan(250);
     expect(current.length).toBe(frozen.length);
   });
@@ -213,9 +213,17 @@ describe('the MCP tool surface', () => {
       // breakpoints, and a listener with none of its own catches nothing it
       // asked for. `breakpoints` leaves and `breakpoints*` arrives, which is this
       // one pair per tool and nothing else. It lands in the 18.0.0 major.
+      //
+      // **A second, decided by the owner for the next major (#329).**
+      // `ValidateServiceBinding` requires `package_name`: the transport check
+      // it runs names the binding's package, and every call without one was
+      // refused (before, adt-clients failed on it with a TypeError). The
+      // schema now says what the handler already required: `package_name`
+      // leaves and `package_name*` arrives, this one pair and nothing else.
       const MAY_TIGHTEN_REQUIRED: Record<string, string> = {
         'debug/DebugStartListener': 'breakpoints',
         'debug/DebugTakeOverListener': 'breakpoints',
+        'high/ValidateServiceBinding': 'package_name',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the
@@ -246,8 +254,8 @@ describe('the MCP tool surface', () => {
       const EXTRA_ALLOWED_ADDITIONS: Record<string, string[]> = {
         // Background runs (19.0.0): the run tools take `background`, optional,
         // no default — without it a run waits as before.
-        'system/RuntimeRunClass': ['background'],
-        'system/RuntimeRunProgram': ['background'],
+        'runtime/RuntimeRunClass': ['background'],
+        'runtime/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
@@ -359,7 +367,8 @@ describe('the MCP tool surface', () => {
               ? ['version']
               : relaxed !== undefined
                 ? []
-                : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail'])),
+                : (EXTRA_ALLOWED_ADDITIONS[tool] ??
+                  (tightened !== undefined ? [] : ['detail']))),
         ].sort(),
       });
     }
@@ -409,6 +418,30 @@ describe('the MCP tool surface', () => {
    * and both answered on an SAP BTP ABAP trial (2026-10-21); its row's
    * `available_in` moved from `onprem` to `cloud, onprem`, every other row
    * was checked unchanged.
+   */
+  /**
+   * **The sixth deliberate move: `RunAbapUnit` arrived (#329, high group,
+   * beside the per-object run tools).** ABAP Unit by a run target, an object
+   * of any type of the run registry or a package, through adt-clients'
+   * generic runner. A test run can change data in the system, so no
+   * read-only binary serves it. Every other row was checked unchanged.
+   */
+  /**
+   * **The seventh deliberate move: the run tools left the system group
+   * (#329).** `RuntimeRunClass`, `RuntimeRunProgram` and
+   * `RuntimeCreateProfilerTraceParameters` change the system (the code a run
+   * executes can change data; a trace parameter set is created), so they
+   * moved to `RuntimeRunHandlersGroup` (`runtime`), which only the full
+   * binaries serve. Their rows changed only `group`; every other row was
+   * checked unchanged.
+   */
+  /**
+   * **The eighth deliberate move: `wait` (#329).** The tools that start an
+   * ABAP Unit run and wait for it — `RunUnitTest`, `RunCdsUnitTest`,
+   * `RunProgramUnitTest`, `RunFunctionGroupUnitTest`,
+   * `RunFunctionModuleUnitTest` and `RunAbapUnit` — take `wait`, optional,
+   * default true: `false` answers the run id right after the start. Their
+   * rows gained it in the snapshot; every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

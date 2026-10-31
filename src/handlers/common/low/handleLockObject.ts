@@ -28,8 +28,14 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import { LOCK_KINDS, type LockKind } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
 import {
@@ -89,44 +95,43 @@ interface LockObjectArgs {
   super_package?: string;
 }
 
-const VALID_TYPES = [
-  'class',
-  'program',
-  'interface',
-  'function_group',
-  'function_module',
-  'table',
-  'structure',
-  'ddl',
-  'domain',
-  'data_element',
-  'package',
-  'behavior_definition',
-  'behavior_implementation',
-  'metadata_extension',
-  'service_definition',
-  'service_binding',
-];
-
+/**
+ * The tool's boundary: `object_type` is one of the kinds the declared
+ * variant serves (`LOCK_KINDS`), either case; past it, {@link lockObject} takes
+ * the kind typed and checks it no more.
+ */
 export async function handleLockObject(
   context: HandlerContext,
   args: LockObjectArgs,
 ) {
+  if (!args.object_name || !args.object_type) {
+    return return_error(new Error('object_name and object_type are required'));
+  }
+  const variant = variantOf(context.connection);
+  const kind = acceptedOf(args.object_type, LOCK_KINDS[variant]);
+  if (kind === undefined) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${LOCK_KINDS[variant].join(', ')}`,
+      ),
+    );
+  }
+  return lockObject(context, { ...args, object_type: kind });
+}
+
+/** One object of a kind checked at the tool's boundary. */
+export async function lockObject(
+  context: HandlerContext,
+  args: Omit<LockObjectArgs, 'object_type'> & { object_type: LockKind },
+) {
   const { connection, logger } = context;
-  const { object_name, object_type, super_package } = args as LockObjectArgs;
+  const { object_name, object_type, super_package } = args;
 
   if (!object_name || !object_type) {
     return return_error(new Error('object_name and object_type are required'));
   }
 
-  const objectType = object_type.toLowerCase();
-  if (!VALID_TYPES.includes(objectType)) {
-    return return_error(
-      new Error(
-        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
-      ),
-    );
-  }
+  const objectType = object_type;
 
   // Two request-shape checks that stay ahead of the client call, exactly
   // where they lived before this migration: `lock()`'s config does not
@@ -185,7 +190,8 @@ export async function handleLockObject(
             .getClass(resultsFor(classDocuments))
             .lock({ className: objectName }, { analyse: analyseLock });
         case 'program':
-          return client
+          // A program is locked on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
             .getProgram(resultsFor(programDocuments))
             .lock({ programName: objectName }, { analyse: analyseLock });
         case 'interface':
@@ -237,7 +243,7 @@ export async function handleLockObject(
         case 'behavior_implementation':
           // The implementation class's own lock, as the low tool sent it.
           return client
-            .getBehaviorImplementation()
+            .getBehaviorImplementation(classDocuments)
             .lock({ className: objectName }, { analyse: analyseLock });
         case 'service_definition':
           return client
@@ -258,9 +264,6 @@ export async function handleLockObject(
             );
         case 'package':
           return lockPackage();
-        default:
-          // Unreachable: objectType was already checked against VALID_TYPES.
-          throw new Error(`Unsupported object_type: ${object_type}`);
       }
     },
     (lockHandle: string) => ({

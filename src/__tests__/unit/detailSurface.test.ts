@@ -102,7 +102,7 @@ jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
  *    second row (a `structured` slot, a real parse), always answering the
  *    whole parse regardless of any `detail`.
  *  - `GetUnitTest`/`GetUnitTestResult`/`GetCdsUnitTest`/
- *    `GetCdsUnitTestResult` — each answers through `pollUntilFinished`'s
+ *    `GetCdsUnitTestResult` — each answers through `readRunOnce`'s
  *    `RunOutcome`, whose `status` and (once finished) `result` are BOTH
  *    `structured` `AdtReading`s in their own right; "no single reading
  *    behind a composite" does not excuse these the way it does the two
@@ -227,6 +227,7 @@ const JSON_ANSWERING: readonly string[] = [
   'ReadTransportActionLog',
   'ReadTransportObjects',
   'RemoveTransportObject',
+  'RunAbapUnit',
   'RunCdsUnitTest',
   'RunFunctionGroupUnitTest',
   'RunFunctionModuleUnitTest',

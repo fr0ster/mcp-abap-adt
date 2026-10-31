@@ -12,7 +12,9 @@ mcp-abap-adt --env-path=./mcp.env              # a .env written by mcp-auth, SAP
 
 **The system type is required (19.0.0)** — `--system-type`, `SAP_SYSTEM_TYPE` (the environment or
 the `--env` file) or YAML `system-type`: `onprem`, `cloud` or `legacy`; a destination does not
-start without it. **The server connects at its start**, before the MCP transport opens — the
+start without it, and neither does an inspection start (no destination, 22.0.0). The tools, their
+enums and the object types each argument accepts are that system type's (its ADT type table):
+[MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md). **The server connects at its start**, before the MCP transport opens — the
 browser login included, and the destination's one leftover session of a killed process taken
 up —; any failure ends it with exit `1`. Coming from 18.x:
 [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md).

@@ -23,7 +23,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugStartListener',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. ${START_NEEDS_BREAKPOINTS_SENTENCE} Takes whose requests are caught, the debugging mode and the debugger settings. ${USER_MODE_SENTENCE} ${SHARED_SET_SENTENCE}`,
+  description: `[debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. ${START_NEEDS_BREAKPOINTS_SENTENCE} Takes whose requests are caught, the debugging mode and the debugger settings. ${USER_MODE_SENTENCE} ${SHARED_SET_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

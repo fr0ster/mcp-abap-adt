@@ -13,21 +13,26 @@ import { answersOf, beginDebugBatch, endDebugBatch } from '../../batch/tools';
 import type { ArgsOf, HandlerContext } from '../../handlers/index';
 import { NUMBER_WITHOUT_ANSWERS_WORDS } from '../batch/handleHandlerBatch';
 
-const TAGS = '[read-only] [debug] ';
+const READ_ONLY_TAG = '[read-only] ';
+const DEBUG_TAG = '[debug] ';
 
-/** The full set's sentence, its `[read-only] [debug]` tags left out. */
+/** `text` without its leading `tag`, when it starts with it. */
+const withoutTag = (text: string, tag: string): string =>
+  text.startsWith(tag) ? text.slice(tag.length) : text;
+
+/** The full set's sentence, its `[read-only]` and `[debug]` tags left out. */
 const untagged = (description: string): string =>
-  description.startsWith(TAGS) ? description.slice(TAGS.length) : description;
+  withoutTag(withoutTag(description, READ_ONLY_TAG), DEBUG_TAG);
 
 const ANSWERS_WORDS =
   "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.";
 
 /** `HandlerDebugBatch`'s description: the full set's sentences, one per action. */
-export const HANDLER_DEBUG_BATCH_DESCRIPTION = `[read-only] ${[
+export const HANDLER_DEBUG_BATCH_DESCRIPTION = [
   `action 'begin': ${untagged(DebugBatchBegin_Tool.description)}`,
   `action 'end': ${untagged(DebugBatchEnd_Tool.description)}`,
   `action 'answers' (with number or numbers): ${ANSWERS_WORDS}`,
-].join(' ')}`;
+].join(' ');
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugBatch',

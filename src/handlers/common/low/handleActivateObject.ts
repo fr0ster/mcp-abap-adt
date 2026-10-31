@@ -76,14 +76,46 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtUtilityCode,
+  IAdtError,
+  IAdtGroupActivationReference,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  ACTIVATION_CODES,
+  ACTIVATION_NAMES,
+  COMPACT_ACTIVATE,
+  codesWithNames,
+  MAIN_TYPE_SENTENCE,
+  NAME_CASE_SENTENCE,
+  type ProjectionVariant,
+  SINGLE_ACTIVATION,
+  SINGLE_ACTIVATION_NAMES,
+  SINGLE_ACTIVATION_ROUTES,
+  type TYPE_NAMES,
+  type TypeName,
+} from '../../../lib/adtProjections';
+import {
+  acceptedCodeOf,
+  acceptedOf,
+  activationParentDescription,
+  type GroupObject,
+  namesItsParent,
+  notAccepted,
+} from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type ActivationRunOutcome,
   type ActivationRunSource,
+  activationVerdict,
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
@@ -93,13 +125,54 @@ import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { byVariant } from '../../../lib/variantDefinition';
+
+/**
+ * The APIs whose own `activate()` this dispatcher reaches directly: those of
+ * `SINGLE_ACTIVATION_ROUTES`, which names each code and kind a single object
+ * is activated by (the tables' `activate`). Every other code
+ * goes to group activation; see the module doc comment.
+ */
+type SingleActivationApi =
+  (typeof SINGLE_ACTIVATION_ROUTES)[keyof typeof SINGLE_ACTIVATION_ROUTES]['api'];
+
+/**
+ * What `preaudit` does on `variant`, for both activation tools: the codes and
+ * kinds a single object is activated by through its own type's activation
+ * there (`SINGLE_ACTIVATION`), and the names standing for those codes
+ * (`SINGLE_ACTIVATION_NAMES`).
+ */
+export function preauditDescription(variant: ProjectionVariant): string {
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type or a search name standing for one of these codes. Their family's activate() always sends preauditRequested=true.`;
+}
+
+/**
+ * What `objects[].type` takes on `variant`: a code a group activation takes
+ * (`ACTIVATION_CODES`), or a name standing for one (`ACTIVATION_NAMES`); one
+ * object alone also by the kind its own activation serves
+ * (`SINGLE_ACTIVATION`).
+ */
+export function activationTypeDescription(variant: ProjectionVariant): string {
+  const named = new Set<string>(ACTIVATION_NAMES[variant]);
+  const kinds = SINGLE_ACTIVATION[variant].filter(
+    (name) => !name.includes('/') && !named.has(name),
+  );
+  return `Object type: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
+}
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
+    inputSchema: activateObjectSchema(variant),
+  })),
+} as const;
+
+/** ActivateObjectLow's input on `variant`. */
+function activateObjectSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       objects: {
@@ -112,14 +185,12 @@ export const TOOL_DEFINITION = {
             name: { type: 'string', description: 'Object name in uppercase' },
             type: {
               type: 'string',
-              description:
-                "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')",
+              description: activationTypeDescription(variant),
             },
             uri: { type: 'string', description: 'Optional ADT URI' },
             parentName: {
               type: 'string',
-              description:
-                "Owning object, for a part of one. A function module's group belongs here: the address is built from it, and without it the group is named after the module.",
+              description: activationParentDescription(variant),
             },
           },
           required: ['name', 'type'],
@@ -127,8 +198,7 @@ export const TOOL_DEFINITION = {
       },
       preaudit: {
         type: 'boolean',
-        description:
-          'Request pre-audit before activation. Default: true. Honored only when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family) — the per-object activate() this tool prefers for a single object has no preaudit parameter at all.',
+        description: preauditDescription(variant),
       },
       detail: {
         type: 'string',
@@ -139,11 +209,182 @@ export const TOOL_DEFINITION = {
       },
     },
     required: ['objects'],
-  },
-} as const;
+  } as const;
+}
 
-interface ActivationObject extends IObjectReference {
+/**
+ * One object of the tool's argument, as the caller sent it: `type` is text
+ * from outside the type system, checked once by {@link activationPlan}.
+ */
+export interface ActivationObject {
+  name: string;
+  type: string;
   uri?: string;
+  parentName?: string;
+}
+
+/**
+ * A group activation's references, typed by the variant they are sent on
+ * (`IAdtGroupActivationReference<V>`): the codes a group activation takes
+ * there, each naming its parent where the tables give its code one.
+ */
+export type GroupActivation =
+  | {
+      readonly variant: 'onprem';
+      readonly references: IAdtGroupActivationReference<'onprem'>[];
+    }
+  | {
+      readonly variant: 'cloud';
+      readonly references: IAdtGroupActivationReference<'cloud'>[];
+    };
+
+/**
+ * What an activation does, decided once at the tool's boundary: one object
+ * activated through its own API's `activate()`, or a group activation of
+ * references the tables type.
+ */
+export type ActivationPlan =
+  | {
+      readonly single: {
+        readonly api: SingleActivationApi;
+        readonly name: string;
+      };
+    }
+  | { readonly group: GroupActivation };
+
+/**
+ * `text` as the boundary of `objects[].type` reads it on `variant`: a code
+ * of the group activation, a name standing for one or a main type of one
+ * code is that code ({@link acceptedCodeOf}, the case rule included: `VIEW`
+ * is `VIEW/DV`, `view` is `DDLS/DF`), read once here, so one object of a
+ * name is routed exactly as one object of its code (every single-object
+ * code is a group activation code, `adtBoundary.typecheck.ts`). Any other
+ * text — a kind of a single-object activation, or what is refused — stays
+ * as sent.
+ */
+function activationTextOf(text: string, variant: ProjectionVariant): string {
+  return (
+    acceptedCodeOf(
+      text,
+      ACTIVATION_CODES[variant],
+      ACTIVATION_NAMES[variant],
+    ) ?? text
+  );
+}
+
+/**
+ * The boundary of `objects[].type` on `variant`: one object of a code or
+ * kind of `SINGLE_ACTIVATION`, or of a name standing for such a code, is
+ * activated through its API; every other call is a group activation, each
+ * type a code of `ACTIVATION_CODES` or a name of `ACTIVATION_NAMES` standing
+ * for one. A main type one code has stands for
+ * that code ({@link activationTextOf}). Anything else is refused in fixed
+ * words naming what the argument takes there — for a main type two codes
+ * share, those codes — and nothing is sent.
+ */
+export function activationPlan(
+  sent: readonly ActivationObject[],
+  variant: ProjectionVariant,
+): ActivationPlan | string {
+  const objects = sent.map((obj) => ({
+    ...obj,
+    type: activationTextOf(obj.type, variant),
+  }));
+  const [only] = objects;
+  if (objects.length === 1 && only !== undefined) {
+    const single = acceptedOf(only.type, SINGLE_ACTIVATION[variant]);
+    if (single !== undefined) {
+      return {
+        single: { api: SINGLE_ACTIVATION_ROUTES[single].api, name: only.name },
+      };
+    }
+  }
+  if (variant === 'onprem') {
+    const references = groupReferences(
+      objects,
+      ACTIVATION_CODES.onprem,
+      ACTIVATION_NAMES.onprem,
+      variant,
+    );
+    return typeof references === 'string'
+      ? references
+      : { group: { variant, references } };
+  }
+  const references = groupReferences(
+    objects,
+    ACTIVATION_CODES.cloud,
+    ACTIVATION_NAMES.cloud,
+    variant,
+  );
+  return typeof references === 'string'
+    ? references
+    : { group: { variant, references } };
+}
+
+/**
+ * The group activation's references of `objects` (their types already read
+ * by {@link activationTextOf}): each type a code of `codes` or a name of
+ * `names` standing for one, and each object of a code the tables give a
+ * parent naming it in `parentName`. Anything else is refused in fixed words
+ * and nothing is sent.
+ */
+function groupReferences<C extends AdtUtilityCode, N extends TypeName>(
+  objects: readonly ActivationObject[],
+  codes: readonly C[],
+  names: readonly N[],
+  variant: ProjectionVariant,
+) {
+  const references: GroupObject<C | (typeof TYPE_NAMES)[N]>[] = [];
+  for (const obj of objects) {
+    const type = acceptedCodeOf(obj.type, codes, names);
+    if (type === undefined) {
+      return notAccepted(
+        'objects[].type',
+        obj.type,
+        [
+          ...codes,
+          ...names,
+          ...(objects.length === 1 ? SINGLE_ACTIVATION[variant] : []),
+        ],
+        codes,
+      );
+    }
+    references.push({ ...obj, type });
+  }
+  const addressed = references.filter(namesItsParent);
+  const unaddressed = references.find((obj) => !namesItsParent(obj));
+  return unaddressed === undefined
+    ? addressed
+    : `objects[].parentName is required for ${unaddressed.name} (${unaddressed.type}): the name of the object it belongs to; nothing was sent`;
+}
+
+/**
+ * A group activation's first request, `POST /activation/runs`, on the
+ * variant its references are typed for: the on-premise client for an
+ * on-premise group (it may hold codes only `ADT_TYPES_ONPREM` activates), the
+ * client of what both modern tables serve for a cloud one.
+ */
+function startGroupActivation(
+  context: HandlerContext,
+  group: GroupActivation,
+  preaudit: boolean,
+) {
+  const { connection, logger } = context;
+  return withAdtHeaders(context, 'utils.activateObjectsGroup', (headers) =>
+    group.variant === 'onprem'
+      ? createOnPremAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .activateObjectsGroup(group.references, preaudit, {
+            headers,
+            analyse: analyseException,
+          })
+      : createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .activateObjectsGroup(group.references, preaudit, {
+            headers,
+            analyse: analyseException,
+          }),
+  );
 }
 
 interface ActivateObjectArgs {
@@ -152,63 +393,13 @@ interface ActivateObjectArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
-/** The families whose own `activate()` this dispatcher can reach directly. */
-type ActivationFamily =
-  | 'class'
-  | 'program'
-  | 'interface'
-  | 'function_group'
-  | 'table'
-  | 'structure'
-  | 'ddl'
-  | 'domain'
-  | 'data_element'
-  | 'behavior_definition'
-  | 'metadata_extension';
-
-/**
- * ADT type codes (and this codebase's own friendly names, accepted
- * elsewhere in `common/low`) mapped to the family that serves them. Anything
- * not named here — `FUGR/FF` included — falls back to group activation; see
- * the module doc comment.
- */
-export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
-  'clas/oc': 'class',
-  class: 'class',
-  'prog/p': 'program',
-  program: 'program',
-  'intf/oi': 'interface',
-  interface: 'interface',
-  'fugr/f': 'function_group',
-  function_group: 'function_group',
-  'tabl/dt': 'table',
-  table: 'table',
-  'ttyp/st': 'structure',
-  structure: 'structure',
-  'ddls/df': 'ddl',
-  ddl: 'ddl',
-  'doma/dm': 'domain',
-  domain: 'domain',
-  'dtel/de': 'data_element',
-  data_element: 'data_element',
-  'bdef/bd': 'behavior_definition',
-  'bdef/bdo': 'behavior_definition',
-  behavior_definition: 'behavior_definition',
-  'ddlx/ex': 'metadata_extension',
-  metadata_extension: 'metadata_extension',
-};
-
-function familyFor(typeCode: string): ActivationFamily | undefined {
-  return TYPE_TO_FAMILY[typeCode.toLowerCase()];
-}
-
 function activateFamily(
   context: HandlerContext,
-  client: ReturnType<typeof createAdtClient>,
-  family: ActivationFamily,
+  client: IServerAdtClient,
+  api: SingleActivationApi,
   name: string,
 ) {
-  switch (family) {
+  switch (api) {
     case 'class':
       return withAdtHeaders(context, 'class.activate', (headers) =>
         client
@@ -219,8 +410,9 @@ function activateFamily(
           ),
       );
     case 'program':
+      // A program is activated on premise only (`ADT_TYPES_ONPREM`).
       return withAdtHeaders(context, 'program.activate', (headers) =>
-        client
+        createOnPremAdtClient(context.connection, context.logger)
           .getProgram(resultsFor(programDocuments))
           .activate(
             { programName: name },
@@ -236,7 +428,7 @@ function activateFamily(
             { headers, analyse: analyseActivation },
           ),
       );
-    case 'function_group':
+    case 'functionGroup':
       return withAdtHeaders(context, 'functionGroup.activate', (headers) =>
         client
           .getFunctionGroup(resultsFor(functionGroupDocuments))
@@ -278,7 +470,7 @@ function activateFamily(
             { headers, analyse: analyseActivation },
           ),
       );
-    case 'data_element':
+    case 'dataElement':
       return withAdtHeaders(context, 'dataElement.activate', (headers) =>
         client
           .getDataElement(resultsFor(dataElementDocuments))
@@ -287,19 +479,33 @@ function activateFamily(
             { headers, analyse: analyseActivation },
           ),
       );
-    case 'behavior_definition':
+    case 'behaviorDefinition':
       return withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
         client
           .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
           .activate({ name }, { headers, analyse: analyseActivation }),
       );
-    case 'metadata_extension':
+    case 'metadataExtension':
       return withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
         client
           .getMetadataExtension(resultsFor(metadataExtensionDocuments))
           .activate({ name }, { headers, analyse: analyseActivation }),
       );
   }
+}
+
+/** One object activated through its own API's `activate()`: its verdict. */
+function activateSingle(
+  context: HandlerContext,
+  single: { readonly api: SingleActivationApi; readonly name: string },
+  detail: 'terse' | 'full' | 'raw',
+) {
+  const client = createAdtClient(context.connection, context.logger);
+  return answer(
+    { tool: 'ActivateObjectLow', detail },
+    () => activateFamily(context, client, single.api, single.name),
+    project(detail, terseActivation),
+  );
 }
 
 export async function handleActivateObject(
@@ -354,21 +560,12 @@ export async function handleActivateObject(
     ...(obj.parentName ? { parentName: obj.parentName } : {}),
   }));
 
+  const plan = activationPlan(activationObjects, variantOf(connection));
+  if (typeof plan === 'string') return return_error(new Error(plan));
+
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
 
-  const family =
-    activationObjects.length === 1
-      ? familyFor(activationObjects[0].type)
-      : undefined;
-
-  if (family !== undefined) {
-    const objectName = activationObjects[0].name;
-    return answer(
-      { tool: 'ActivateObjectLow', detail },
-      () => activateFamily(context, client, family, objectName),
-      project(detail, terseActivation),
-    );
-  }
+  if ('single' in plan) return activateSingle(context, plan.single, detail);
 
   // Fallback: multiple objects, or a single object of a type this dispatcher
   // does not map to a family client. See the module doc comment: ADT's
@@ -385,15 +582,7 @@ export async function handleActivateObject(
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
     async () => {
-      const started = await withAdtHeaders(
-        context,
-        'utils.activateObjectsGroup',
-        (headers) =>
-          utils.activateObjectsGroup(activationObjects, preaudit, {
-            headers,
-            analyse: analyseException,
-          }),
-      );
+      const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) return started as never;
       const runId = started.getResult().value;
       const outcome = await awaitActivationRun(
@@ -413,19 +602,27 @@ export async function handleActivateObject(
       const accepted = outcome.runId !== '';
       const refusals = outcome.messages.filter(isRefusal);
       // `activated` is a verdict now, and `null` only where there genuinely is
-      // none: a run that has not settled within the bounded wait. A settled run
-      // with no error-severity message activated what it was given; the errata
-      // is explicit that only such a message is a failure, and that a run with
-      // nothing to do says nothing at all.
+      // none: a run that has not settled within the bounded wait. A settled
+      // run's verdict is SAP's own: its results' `activationExecuted` (false
+      // for a run SAP cancelled, "Activation was cancelled.", whatever the
+      // messages' severity) and no error-severity message; where the results
+      // state no `activationExecuted`, the messages alone decide — the errata
+      // is explicit that only such a message is a failure.
       const activated = !outcome.settled
         ? null
-        : refusals.length === 0 && outcome.status !== 'failed';
+        : outcome.status !== 'failed' &&
+          activationVerdict(outcome.executed, outcome.messages);
+      // As the single-object answer says it: SAP ran no activation and gave
+      // no message to explain it — nothing to activate.
+      const nothingToActivate =
+        outcome.executed === false && outcome.messages.length === 0;
       return {
         accepted,
         run_id: accepted ? outcome.runId : null,
         run_status: outcome.status || null,
         activated,
         messages: outcome.messages,
+        ...(nothingToActivate ? { nothing_to_activate: true } : {}),
         objects_count: activationObjects.length,
         objects: activationObjects,
         message: !accepted
@@ -442,17 +639,37 @@ export async function handleActivateObject(
                 'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
                 'now": an object can stay listed for scope rather than for failure — activating a ' +
                 "function group clears the regenerated include, not the group's own entry."
-              : `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
-                `${activationObjects.length} object(s): ` +
-                refusals
-                  .map(
-                    (m) =>
-                      `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                  )
-                  .join('; '),
+              : refusals.length > 0
+                ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
+                  `${activationObjects.length} object(s): ` +
+                  refusals
+                    .map(
+                      (m) =>
+                        `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                    )
+                    .join('; ')
+                : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
+                  'object(s): its results say activationExecuted="false"' +
+                  (outcome.messages.length === 0
+                    ? ', with no message: nothing to activate.'
+                    : `: ${outcome.messages
+                        .map(
+                          (m) =>
+                            `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                        )
+                        .join('; ')}`),
       };
     },
   );
+}
+
+/**
+ * The compact names `HandlerActivate` activates from `object_type` alone on
+ * the variant declared for `connection` (`COMPACT_ACTIVATE`): what its
+ * refusal lists.
+ */
+export function compactActivatableTypes(connection: object): readonly string[] {
+  return COMPACT_ACTIVATE[variantOf(connection)];
 }
 
 /** The step a run start's failure arose at. */
@@ -496,28 +713,27 @@ export async function handleActivateObjectOnce(
     ...(obj.uri ? { uri: obj.uri } : {}),
     ...(obj.parentName ? { parentName: obj.parentName } : {}),
   }));
-  const family =
-    activationObjects.length === 1
-      ? familyFor(activationObjects[0].type)
-      : undefined;
-  if (family !== undefined) {
-    return handleActivateObject(context, params);
-  }
+  const plan = activationPlan(activationObjects, variantOf(connection));
+  if (typeof plan === 'string') return return_error(new Error(plan));
+  return activatePlanOnce(context, plan, args.preaudit);
+}
 
-  const preaudit = args.preaudit !== false; // default true
-  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+/**
+ * An activation decided at its tool's boundary ({@link ActivationPlan}), in
+ * one request: one object through its own API's `activate()`, answered with
+ * its verdict; a group as one `POST /activation/runs`, answered `{ run_id }`.
+ */
+export async function activatePlanOnce(
+  context: HandlerContext,
+  plan: ActivationPlan,
+  preauditRequested?: boolean,
+) {
+  if ('single' in plan) return activateSingle(context, plan.single, 'terse');
+  const preaudit = preauditRequested !== false;
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
     async () => {
-      const started = await withAdtHeaders(
-        context,
-        'utils.activateObjectsGroup',
-        (headers) =>
-          utils.activateObjectsGroup(activationObjects, preaudit, {
-            headers,
-            analyse: analyseException,
-          }),
-      );
+      const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) {
         return failedWith<string>(
           withStep(started.getError(), START_ACTIVATION_RUN),

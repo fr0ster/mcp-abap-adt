@@ -37,7 +37,7 @@ export async function dispatchCompact(
   context: HandlerContext,
   routes: CompactRouterMap,
   operation: CompactCrudOperation,
-  args: { object_type: CompactObjectType } & Record<string, unknown>,
+  args: { object_type?: CompactObjectType } & Record<string, unknown>,
 ): Promise<unknown> {
   context.logger?.info?.(
     `[compact-router] route operation=${operation} object_type=${args?.object_type ?? 'undefined'}`,

@@ -16,7 +16,7 @@
  * result strategy, so there is no transport envelope to read a status from.
  */
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { handleRuntimeRunClass } from '../../handlers/system/readonly/handleRuntimeRunClass';
+import { handleRuntimeRunClass } from '../../handlers/system/high/handleRuntimeRunClass';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 // A new file, so nothing is in scope from anywhere else — unlike the tasks that

@@ -5,7 +5,7 @@
  * (`@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify`); these five
  * modules do not, because both packages need them and neither may depend on the
  * other: the object types, the CRUD matrix that says which type does what, the
- * input schemas, the lifecycle helpers, and `dispatchCompact` with the route types.
+ * input schemas, the projections of the type tables and their boundary, and `dispatchCompact` with the route types.
  *
  * Nothing here imports a handler, which is what makes it shareable at all — a
  * shared module that pulled a write route would hand one to the read-only package
@@ -14,14 +14,19 @@
 
 import '../instance.js';
 
+export * from '../adtProjections.js';
+export {
+  acceptedCodeOf,
+  acceptedOf,
+  mainTypeCodeOf,
+  notAccepted,
+  sharedMainType,
+} from '../adtTypeCode.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';
 export { DETAIL_PROPERTY } from '../strategies/detail.js';
-export {
-  type LowObjectType,
-  toLockObjectType,
-  toLowObjectType,
-} from './compactLifecycleUtils.js';
+export { byVariant } from '../variantDefinition.js';
+export * from './compactDescriptions.js';
 export {
   COMPACT_CRUD_MATRIX,
   type CompactCrudOperation,

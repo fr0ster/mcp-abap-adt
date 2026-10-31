@@ -170,13 +170,15 @@ async function readTreesBatched(
   );
   const first = await read([
     ...packageNames.map((metadata) => ({ metadata })),
-    ...packageNames.map((name) => ({
-      node: {
-        parentType: 'DEVC/K',
-        parentName: name,
-        withShortDescriptions: false,
-      },
-    })),
+    ...packageNames.map(
+      (name): FirstItem => ({
+        node: {
+          parentType: 'DEVC/K',
+          parentName: name,
+          withShortDescriptions: false,
+        },
+      }),
+    ),
   ]);
   const reads: TreeRead[] = packageNames.map((_, i) => ({
     metadata: first[i] as PhaseResult<Metadata>,

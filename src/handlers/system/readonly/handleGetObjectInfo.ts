@@ -1,10 +1,17 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtTypeCode,
   IAdtError,
   IAdtFailure,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import {
+  notATableType,
+  tableCodeOf,
+  tableTypeOf,
+} from '../../../lib/adtTypeCode';
 import {
   answer,
   failedPayloadOf,
@@ -14,7 +21,7 @@ import {
   thrownEntry,
 } from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
@@ -182,7 +189,7 @@ function enrichmentOf(
 /** A node of a tree: an object read with its own type folders. */
 interface InfoNode {
   root: number;
-  type: string;
+  type: AdtTypeCode;
   name: string;
   depth: number;
   children: Array<TreeNode | InfoNode>;
@@ -259,7 +266,7 @@ async function enrichNodeWithSearchObject(
   }
 }
 
-type NodeSource = ReturnType<ReturnType<typeof createAdtClient>['getUtils']>;
+type NodeSource = ReturnType<IServerAdtClient['getUtils']>;
 
 /**
  * One tree node: the object itself, enriched, plus its children — the
@@ -312,7 +319,7 @@ type NodeSource = ReturnType<ReturnType<typeof createAdtClient>['getUtils']>;
 async function buildTree(
   context: HandlerContext,
   utils: NodeSource,
-  objectType: string,
+  objectType: AdtTypeCode,
   objectName: string,
   depth: number,
   maxDepth: number,
@@ -370,11 +377,18 @@ async function buildTree(
       }
       const childLevel = childResponse.getResult().value as NodeLevel;
       for (const o of childLevel.objects) {
-        if (kindOf(o.type) === 'package' && depth + 1 < maxDepth) {
+        // A subpackage is walked further by its code; a type ADT sent that
+        // is no code of the tables stays a leaf.
+        const subType = tableCodeOf(o.type);
+        if (
+          subType !== undefined &&
+          kindOf(o.type) === 'package' &&
+          depth + 1 < maxDepth
+        ) {
           const subtree = await buildTree(
             context,
             utils,
-            o.type,
+            subType,
             o.name,
             depth + 1,
             maxDepth,
@@ -424,7 +438,11 @@ async function buildTree(
  */
 async function buildTrees(
   context: HandlerContext,
-  objects: ReadonlyArray<{ type: string; name: string; maxDepth: number }>,
+  objects: ReadonlyArray<{
+    type: AdtTypeCode;
+    name: string;
+    maxDepth: number;
+  }>,
   enrich: boolean,
   describe: boolean,
   ended: Ended,
@@ -462,9 +480,12 @@ async function buildTrees(
     const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
     // A function module or include is read at its group: the node it was
     // found under.
-    const functionGroup = node.type.toUpperCase().startsWith('FUGR')
-      ? node.name
-      : undefined;
+    const functionGroup =
+      node.type === 'FUGR/F' ||
+      node.type === 'FUGR/FF' ||
+      node.type === 'FUGR/I'
+        ? node.name
+        : undefined;
     leaves.push({
       root: node.root,
       leaf,
@@ -540,10 +561,15 @@ async function buildTrees(
       const level = settle(node, typeAnswers[i] as (typeof typeAnswers)[0]);
       if (level === undefined) return;
       for (const o of level.objects) {
-        if (kindOf(o.type) === 'package' && node.depth + 1 < limit(node)) {
+        const code = tableCodeOf(o.type);
+        if (
+          code !== undefined &&
+          kindOf(code) === 'package' &&
+          node.depth + 1 < limit(node)
+        ) {
           const sub: InfoNode = {
             root: node.root,
-            type: o.type,
+            type: code,
             name: o.name,
             depth: node.depth + 1,
             children: [],
@@ -611,7 +637,11 @@ async function buildTrees(
  */
 async function buildTreesSequential(
   context: HandlerContext,
-  objects: ReadonlyArray<{ type: string; name: string; maxDepth: number }>,
+  objects: ReadonlyArray<{
+    type: AdtTypeCode;
+    name: string;
+    maxDepth: number;
+  }>,
   enrich: boolean,
   describe: boolean,
   ended: Ended,
@@ -663,7 +693,7 @@ export async function handleGetObjectInfo(
 ) {
   const { logger } = context;
   const listed = args?.objects;
-  let objects: Array<{ type: string; name: string }>;
+  let objects: Array<{ type: AdtTypeCode; name: string }>;
   if (listed !== undefined) {
     if (
       args.parent_type !== undefined ||
@@ -688,15 +718,30 @@ export async function handleGetObjectInfo(
         'Each entry of objects needs object_type and object_name',
       );
     }
-    objects = listed.map((o) => ({
-      type: String(o.object_type),
-      name: String(o.object_name),
-    }));
+    objects = [];
+    for (const o of listed) {
+      const text = String(o.object_type);
+      const variant = variantOf(context.connection);
+      const type = tableTypeOf(text, variant);
+      if (type === undefined) {
+        return return_error(
+          notATableType('objects[].object_type', text, variant),
+        );
+      }
+      objects.push({ type, name: String(o.object_name) });
+    }
   } else {
     if (!args?.parent_type || !args?.parent_name) {
       return return_error('parent_type and parent_name are required');
     }
-    objects = [{ type: args.parent_type, name: args.parent_name }];
+    const variant = variantOf(context.connection);
+    const type = tableTypeOf(args.parent_type, variant);
+    if (type === undefined) {
+      return return_error(
+        notATableType('parent_type', args.parent_type, variant),
+      );
+    }
+    objects = [{ type, name: args.parent_name }];
   }
   logger?.info(
     `Building object info tree for ${objects.map((o) => `${o.type}/${o.name}`).join(', ')}`,

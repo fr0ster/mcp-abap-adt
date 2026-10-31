@@ -23,7 +23,7 @@ import {
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -102,7 +102,7 @@ export async function handleUpdateProgram(
   return answer(
     { tool: 'UpdateProgram', detail },
     async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-      const obj = createAdtClient(connection, logger).getProgram(
+      const obj = createOnPremAdtClient(connection, logger).getProgram(
         resultsFor(programDocuments),
       );
 

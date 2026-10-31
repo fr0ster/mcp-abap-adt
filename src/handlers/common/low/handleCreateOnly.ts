@@ -166,6 +166,16 @@ const CHAIN_CREATES: Readonly<Record<string, string>> = {
   CDS_UNIT_TEST: 'CreateCdsUnitTest',
 };
 
+/**
+ * The refusal of a type whose create is a chain of requests (naming the full
+ * set's tool that creates it), or `undefined` for any other type.
+ */
+export function chainCreateRefusal(objectType: string) {
+  return Object.hasOwn(CHAIN_CREATES, objectType)
+    ? chainRefusal(objectType, CHAIN_CREATES[objectType])
+    : undefined;
+}
+
 /** A type with no create: the words the create route answers it with. */
 function unsupportedCreate(objectType: string) {
   return return_error(

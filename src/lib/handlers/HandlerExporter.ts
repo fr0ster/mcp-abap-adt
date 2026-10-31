@@ -11,6 +11,7 @@ import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.
 import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
+import { RuntimeRunHandlersGroup } from './groups/RuntimeRunHandlersGroup.js';
 import { SearchHandlersGroup } from './groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './groups/SystemHandlersGroup.js';
 import { NoDedupStrategy } from './groups/strategies/index.js';
@@ -170,6 +171,7 @@ export class HandlerExporter {
     this.handlerGroups.push(...overridingGroups);
     if (options?.includeSystem !== false) {
       this.handlerGroups.push(new SystemHandlersGroup(dummyContext));
+      this.handlerGroups.push(new RuntimeRunHandlersGroup(dummyContext));
       // Beside the run tools: their background runs — served by an instance
       // whose host gave a strategy (`backgroundRuns`), refused otherwise.
       this.handlerGroups.push(new BackgroundRunHandlersGroup(dummyContext));

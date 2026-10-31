@@ -18,6 +18,7 @@ import {
   fullReadOnlyToolSet,
   fullToolSet,
   streamableHttpSurface,
+  type ToolSet,
 } from '../../../lib/toolSet';
 
 const generator = require('../../../../tools/generate-tools-docs.js');
@@ -43,16 +44,18 @@ function stdioPart(page: string): string {
 
 describe('the surface a Streamable HTTP binary adds', () => {
   it('the full sets add SessionOpen and SessionClose, declaring state_handle; the leftover-session tools are stdio only', () => {
-    for (const set of [fullToolSet, fullReadOnlyToolSet]) {
+    // The logoff is the full set's alone: it changes the system.
+    const cases: [ToolSet, string[]][] = [
+      [fullToolSet, ['ListLeftoverSessions', 'LogoffLeftoverSession']],
+      [fullReadOnlyToolSet, ['ListLeftoverSessions']],
+    ];
+    for (const [set, stdioOnly] of cases) {
       const surface = streamableHttpSurface(set);
       expect(surface.sessionTools.map((tool) => tool.name)).toEqual([
         'SessionOpen',
         'SessionClose',
       ]);
-      expect([...surface.stdioOnly].sort()).toEqual([
-        'ListLeftoverSessions',
-        'LogoffLeftoverSession',
-      ]);
+      expect([...surface.stdioOnly].sort()).toEqual(stdioOnly);
       expect(surface.stateHandleWords).toBe(STATE_HANDLE_ARGUMENT_WORDS);
       for (const tool of surface.sessionTools) {
         const schema = tool.inputSchema as {

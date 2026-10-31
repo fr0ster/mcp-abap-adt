@@ -1,3 +1,4 @@
+import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Integration tests for a report's ABAP Unit tools: CreateProgramUnitTest,
  * RunProgramUnitTest, UpdateProgramUnitTest. The suite builds its own report and
@@ -14,7 +15,7 @@ import { handleRunProgramUnitTest } from '../../../../handlers/unit_test/high/ha
 import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
-import { createAdtClient } from '../../../../lib/clients';
+import { createOnPremAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
@@ -55,8 +56,8 @@ describe('Unit Test High-Level Handlers (report)', () => {
             typeof (context.connection as any)?.makeAdtRequest === 'function'
               ? context.connection
               : (await createTestConnectionAndSession()).connection;
-          const deleted = await createAdtClient(connection as any)
-            .getInclude()
+          const deleted = await createOnPremAdtClient(connection as any)
+            .getInclude(includeDocuments)
             .delete(
               {
                 includeName: programTestInclude(programName),

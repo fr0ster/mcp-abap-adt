@@ -13,6 +13,7 @@ import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
 import { ServerRefusal } from '../auth/serverRefusal';
+import { createOnPremExecutor } from '../clients';
 import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
@@ -93,17 +94,20 @@ async function run(
   target: RunTarget,
   debuggee?: IDebuggeeIds,
 ): Promise<RunOutcome> {
-  const executor = new AdtExecutor(connection);
   const options = {
     analyse: analyseException,
     ...(debuggee ? { debuggee } : {}),
   };
+  // A program's run is on premise only: only that table lists `run` for
+  // `PROG/P`, so its executor is the on-premise one, and a connection
+  // declared `cloud` is refused (`variant_not_served`) before the run is
+  // sent; the request is the one sent before.
   const answer =
     target.kind === 'class'
-      ? await executor
+      ? await new AdtExecutor(connection)
           .getClassExecutor(ourClassExecutor)
           .run({ className: target.name }, options)
-      : await executor
+      : await createOnPremExecutor(connection)
           .getProgramExecutor(ourProgramExecutor)
           .run({ programName: target.name }, options);
   return answer.ok
@@ -123,7 +127,7 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
       void endConnection(connection);
     },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
-      new AbapDebugger(c, undefined, undefined, { onConflict }),
+      AbapDebugger.create(c, { onConflict }),
     requestUser: async () => requestUserOf(),
     run,
   };
@@ -133,7 +137,7 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
-    amdpDebugger: (c) => new AmdpDebugger(c),
+    amdpDebugger: (c) => AmdpDebugger.create(c),
     requestUser: async () => requestUserOf(),
     run,
   };

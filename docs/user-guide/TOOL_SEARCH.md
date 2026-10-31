@@ -69,9 +69,9 @@ every set (the full set, the `-ro` sets and the compact sets).
   `-ro` binary of the full set (`mcp-abap-adt-ro`) serves; the write
   collection is every other tool of the full set. Each is searched for its own
   top K. This is not the same as splitting by the `[read-only]` marker: some
-  tools that change no repository object (the syntax checks, the version
-  reads, a class's local includes, the ATC status and findings, the unit-test runs, the debugger's
-  tools) are not served by the `-ro` binary, and the `-ro` binary also serves the run tools.
+  tools that change nothing in the system (the syntax checks, the version
+  reads, a class's local includes, the debugger's reads) are not served by
+  the `-ro` binary.
   A tool that scored nothing is never counted as found, whatever its place.
 
 ### Embedding with bge-m3 on a GPU
@@ -113,8 +113,10 @@ The tests:
 
 `descriptionsFunctional.test.ts` holds every `description` to its rules:
 no negation, no other tool of its set named, `[read-only]` on every tool that
-changes no repository object (source, metadata, transports), the meaning of the
-`-ro` binaries — runs of code, test and ATC runs, trace scheduling, session logoffs,
-batch tools and every debugger tool included — (beside a `[runtime]`, `[debug]` or
-`[session]` marker where the tool has one), a first sentence no other tool of its set shares, and no
-vague subject ("an ABAP object") in it.
+changes nothing in the system, the meaning of the `-ro` binaries — reads, checks,
+the ATC run and its readers, the debugger's reads and the batch tools included;
+a repository change, a run of code (a test, class or program run), a trace
+scheduled, a debug session opened, changed or ended and a session logoff carry
+none — (beside a `[runtime]`, `[debug]` or `[session]` marker where the tool has
+one), a first sentence no other tool of its set shares, and no vague subject
+("an ABAP object") in it; and a `-ro` set serves only marked tools.

@@ -1,6 +1,7 @@
 /**
- * Which leftover-session tools a tool set serves: the list and the logoff in
- * every set — a logoff is a system action, not a data change — and no resume
+ * Which leftover-session tools a tool set serves: the list in every set, the
+ * logoff in the full sets only — a logoff releases the session's locks, which
+ * changes the system, and a read-only set changes nothing — and no resume
  * in any: a stdio process is born on the one leftover session of its
  * destination at its start, before any tool call, so a resume tool could
  * only refuse. The leftover-session tools are stdio's only: an http or sse
@@ -22,6 +23,8 @@ import {
 
 const FULL = ['ListLeftoverSessions', 'LogoffLeftoverSession'];
 const COMPACT = ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'];
+const LIST = ['ListLeftoverSessions'];
+const COMPACT_LIST = ['HandlerLeftoverSessionList'];
 
 /** The leftover-session tools among `tools`, a resume of any name included. */
 const leftoverOf = (tools: string[]) =>
@@ -32,23 +35,27 @@ const namesOf = (
 ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
 describe('the object-oriented handler sets an embedder combines', () => {
-  it.each<[HandlerSet[]]>([
-    [['readonly']],
-    [['readonly', 'debug']],
-    [['debug']],
-    [['readonly', 'high']],
-    [['high']],
-  ])('%j serves the list and the logoff, no resume', (exposition) => {
+  it.each<[HandlerSet[], string[]]>([
+    [['readonly'], LIST],
+    [['readonly', 'debug'], LIST],
+    [['debug'], LIST],
+    [['readonly', 'high'], FULL],
+    [['high'], FULL],
+  ])('%j serves %j, no resume', (exposition, expected) => {
     const tools = namesOf(registryForExposition(exposition).getHandlerGroups());
-    expect(leftoverOf(tools)).toEqual(FULL);
+    expect(leftoverOf(tools)).toEqual(expected);
   });
 });
 
 describe('the stdio binaries', () => {
   it.each<[string, ToolSet, string[]]>([
     ['core', fullToolSet, FULL],
-    ['core-ro', fullReadOnlyToolSet, FULL],
-    ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries), COMPACT],
+    ['core-ro', fullReadOnlyToolSet, LIST],
+    [
+      'compact-ro',
+      compactReadOnlyToolSetOf(compactReadOnlyEntries),
+      COMPACT_LIST,
+    ],
     [
       'compact',
       compactToolSetOf({

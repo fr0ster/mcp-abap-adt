@@ -78,10 +78,11 @@ function isNegation(word: string): boolean {
  * The tools that change a repository object (source, metadata, transports):
  * they create, update, delete, activate, lock or unlock, move, add, remove or
  * sort. They are named by that verb first, with no family prefix, or listed in
- * `CHANGING_BY_NAME`. Every other tool changes no repository object — the
- * meaning of the `-ro` binaries — and carries `[read-only]`: a read, a run of
- * code, a trace schedule, a test run, a debug session's step, a session's
- * logoff, a batch's start, send and answers.
+ * `CHANGING_BY_NAME`. A tool that changes the system otherwise is listed in
+ * `CHANGES_THE_SYSTEM`. Every other tool changes nothing in the system — the
+ * meaning of the `-ro` binaries — and carries `[read-only]`: a read, a check,
+ * an ATC run and its readers (the owner's decision), a debug session's reads,
+ * a batch's start, send and answers.
  */
 const CHANGING_VERBS = [
   'Create',
@@ -110,6 +111,62 @@ const CHANGING_BY_NAME: ReadonlySet<string> = new Set([
   'HandlerTransportMoveObjects',
 ]);
 
+/**
+ * The tools that change the system without changing a repository object:
+ * they run code (an ABAP Unit run, a class or program run, a debugger step,
+ * stepping or ending a debuggee), set what a debugger keeps (breakpoints,
+ * watchpoints, settings, a stack position, a variable, a listener, a memory
+ * snapshot), schedule a profiler trace, or log a SAP session off, releasing
+ * its locks. A read-only set guarantees that nothing in the system changes
+ * (the owner's decision), so none carries `[read-only]` and no read-only set
+ * serves one. The tools that read a run's status or result keep the marker.
+ */
+const CHANGES_THE_SYSTEM: ReadonlySet<string> = new Set([
+  // An ABAP Unit run.
+  'RunUnitTest',
+  'RunCdsUnitTest',
+  'RunProgramUnitTest',
+  'RunFunctionGroupUnitTest',
+  'RunFunctionModuleUnitTest',
+  'RunAbapUnit',
+  'HandlerUnitTestRun',
+  // A run of a class or a program, and a profiler trace scheduled.
+  'RuntimeRunClass',
+  'RuntimeRunProgram',
+  'RuntimeCreateProfilerTraceParameters',
+  'HandlerProfileRun',
+  'HandlerProfileSchedule',
+  // A leftover SAP session logged off.
+  'LogoffLeftoverSession',
+  'HandlerLeftoverSessionLogoff',
+  // The debugger: a session opened, changed or ended, a debuggee moved.
+  'AmdpDebugCancel',
+  'AmdpDebugSetBreakpoints',
+  'AmdpDebugStart',
+  'AmdpDebugStep',
+  'AmdpDebugStop',
+  'DebugBatchEnd',
+  'DebugCreateMemorySnapshot',
+  'DebugCreateWatchpoint',
+  'DebugDeleteBreakpoint',
+  'DebugDeleteWatchpoint',
+  'DebugSetBreakpoints',
+  'DebugSetSettings',
+  'DebugSetStackPosition',
+  'DebugSetVariable',
+  'DebugStartListener',
+  'DebugStepToLine',
+  'DebugStep',
+  'DebugStop',
+  'DebugTakeOverListener',
+  'DebugTerminate',
+  'HandlerDebugBatch',
+  'HandlerDebugBreakpoints',
+  'HandlerDebugMaintain',
+  'HandlerDebugSession',
+  'HandlerDebugStep',
+]);
+
 /** Whether `name` begins with the word `word`: the next letter, if any, starts a new word. */
 function startsWithWord(name: string, word: string): boolean {
   if (!name.startsWith(word)) return false;
@@ -125,9 +182,14 @@ function changesRepositoryObject(name: string): boolean {
   );
 }
 
-/** Whether `tool` changes no repository object, and so must carry `[read-only]` (beside its `[runtime]`, `[debug]` or `[session]` marker). */
+/** Whether the tool named `name` must carry `[read-only]`: it changes nothing in the system. */
+function readOnlyByName(name: string): boolean {
+  return !changesRepositoryObject(name) && !CHANGES_THE_SYSTEM.has(name);
+}
+
+/** Whether `tool` changes nothing in the system, and so must carry `[read-only]` (beside its `[runtime]`, `[debug]` or `[session]` marker). */
 function mustBeMarkedReadOnly(tool: ServedTool): boolean {
-  return !changesRepositoryObject(tool.name);
+  return readOnlyByName(tool.name);
 }
 
 /** The identifiers of `text`: runs of letters, digits and underscores. */
@@ -239,24 +301,18 @@ describe('tool descriptions are purely functional', () => {
       'DebugGetStack',
       'MemorySnapshotList',
       'DebugWait',
-      'DebugStep',
-      'DebugSetBreakpoints',
-      'DebugCreateWatchpoint',
-      'DebugDeleteBreakpoint',
-      'HandlerDebugStep',
-      'RuntimeRunClass',
-      'RuntimeCreateProfilerTraceParameters',
+      'DebugBatchBegin',
       'RunATC',
-      'RunUnitTest',
+      'GetATCRunStatus',
+      'GetATCFindings',
       'GetUnitTestStatus',
       'DiscardBackgroundRun',
-      'LogoffLeftoverSession',
+      'ListLeftoverSessions',
       'BatchBegin',
       'BatchAnswers',
       'HandlerBatch',
       'HandlerDumpList',
-      'HandlerUnitTestRun',
-      'HandlerProfileSchedule',
+      'HandlerProfileList',
       'Getaway',
     ]) {
       expect([name, marked(name)]).toEqual([name, true]);
@@ -271,6 +327,23 @@ describe('tool descriptions are purely functional', () => {
       'HandlerUpdate',
       'HandlerLock',
       'HandlerTransportCreate',
+      'RunUnitTest',
+      'RunAbapUnit',
+      'HandlerUnitTestRun',
+      'RuntimeRunClass',
+      'RuntimeRunProgram',
+      'RuntimeCreateProfilerTraceParameters',
+      'HandlerProfileRun',
+      'HandlerProfileSchedule',
+      'LogoffLeftoverSession',
+      'HandlerLeftoverSessionLogoff',
+      'DebugStep',
+      'DebugSetBreakpoints',
+      'DebugCreateWatchpoint',
+      'DebugDeleteBreakpoint',
+      'DebugBatchEnd',
+      'HandlerDebugStep',
+      'HandlerDebugBatch',
     ]) {
       expect([name, marked(name)]).toEqual([name, false]);
     }
@@ -356,7 +429,7 @@ function handlerFiles(directory: string): string[] {
   return files;
 }
 
-describe('every declared tool carries [read-only] when it changes no repository object', () => {
+describe('every declared tool carries [read-only] when it changes nothing in the system', () => {
   it('holds for each TOOL_DEFINITION under src/handlers, the unserved ones too', () => {
     const wrong: string[] = [];
     let seen = 0;
@@ -372,12 +445,93 @@ describe('every declared tool carries [read-only] when it changes no repository 
         continue;
       }
       seen += 1;
-      const changes = changesRepositoryObject(definition.name);
-      if (changes === definition.description.startsWith('[read-only]')) {
+      const marked = readOnlyByName(definition.name);
+      if (marked !== definition.description.startsWith('[read-only]')) {
         wrong.push(definition.name);
       }
     }
     expect(seen).toBeGreaterThan(100);
     expect(wrong).toEqual([]);
+  });
+});
+
+/**
+ * The tools that a read-only set served until the owner decided that a
+ * read-only set guarantees that nothing in the system changes: each runs
+ * code, schedules a trace or logs a SAP session off. The full sets serve
+ * them; no read-only set does.
+ */
+const LEFT_THE_READ_ONLY_SETS: Readonly<Record<string, ToolSetKind>> = {
+  RuntimeRunClass: 'core',
+  RuntimeRunProgram: 'core',
+  RuntimeCreateProfilerTraceParameters: 'core',
+  LogoffLeftoverSession: 'core',
+  HandlerLeftoverSessionLogoff: 'compact',
+};
+
+/** The read-only sets. */
+const READ_ONLY_SETS: readonly ToolSetKind[] = ['core-ro', 'compact-ro'];
+
+/** The tools of a check run the owner keeps read-only. */
+const READ_ONLY_CHECK_RUN = ['RunATC', 'GetATCRunStatus', 'GetATCFindings'];
+
+describe('a read-only set serves only tools that change nothing in the system', () => {
+  it.each(READ_ONLY_SETS)(
+    'every tool %s serves carries [read-only] and changes nothing in the system',
+    async (kind) => {
+      const tools = await everyServed(kind);
+      expect(tools.length).toBeGreaterThan(10);
+      const changing = tools
+        .filter(
+          (tool) =>
+            !readOnlyByName(tool.name) ||
+            !tool.description.startsWith('[read-only]'),
+        )
+        .map((tool) => tool.name);
+      expect({ set: kind, changing }).toEqual({ set: kind, changing: [] });
+    },
+  );
+
+  it('the tools that left the read-only sets carry no [read-only], are served by the full set and by no read-only set', async () => {
+    const served = new Map<ToolSetKind, ServedTool[]>();
+    for (const [kind] of SETS) served.set(kind, await everyServed(kind));
+    const found = Object.entries(LEFT_THE_READ_ONLY_SETS).map(
+      ([name, full]) => {
+        const named = (kind: ToolSetKind) =>
+          (served.get(kind) ?? []).filter((tool) => tool.name === name);
+        return {
+          name,
+          inFull: named(full).length > 0,
+          marked: named(full).some((tool) =>
+            tool.description.startsWith('[read-only]'),
+          ),
+          inCoreRo: named('core-ro').length > 0,
+          inCompactRo: named('compact-ro').length > 0,
+        };
+      },
+    );
+    expect(found).toEqual(
+      Object.keys(LEFT_THE_READ_ONLY_SETS).map((name) => ({
+        name,
+        inFull: true,
+        marked: false,
+        inCoreRo: false,
+        inCompactRo: false,
+      })),
+    );
+  });
+
+  it('the ATC run and its readers stay read-only: core-ro serves them, marked', async () => {
+    const tools = await everyServed('core-ro');
+    expect(
+      READ_ONLY_CHECK_RUN.map((name) => {
+        const named = tools.filter((tool) => tool.name === name);
+        return [
+          name,
+          named.length > 0 &&
+            named.every((tool) => tool.description.startsWith('[read-only]')),
+        ];
+      }),
+    ).toEqual(READ_ONLY_CHECK_RUN.map((name) => [name, true]));
   });
 });

@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugSetSettings',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.',
+    '[debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.',
   inputSchema: {
     type: 'object',
     properties: {

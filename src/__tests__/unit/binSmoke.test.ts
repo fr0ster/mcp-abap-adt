@@ -63,7 +63,9 @@ const serverInfoVersion = (bin: string, cwd: string): string => {
     },
   });
   // stdin closes after the request: the server answers, sees end of input, exits.
-  const stdout = execFileSync(process.execPath, [bin], {
+  // The inspection mode lists the declared variant's tools, so it is started
+  // with one (`--system-type`): without it the start is refused.
+  const stdout = execFileSync(process.execPath, [bin, '--system-type=onprem'], {
     cwd,
     env,
     input: `${initialize}\n`,

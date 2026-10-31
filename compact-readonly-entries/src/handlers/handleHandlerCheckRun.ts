@@ -20,22 +20,28 @@
 
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  compactCheckRunSchema,
-  toLowObjectType,
+  acceptedOf,
+  byVariant,
+  COMPACT_CHECK,
+  COMPACT_CHECK_KINDS,
+  compactCheckRunDescription,
+  compactCheckRunSchemaFor,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleCheckObject } from '@mcp-abap-adt/lib/handlers/read';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import { checkObject } from '@mcp-abap-adt/lib/handlers/read';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCheckRun',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks unsaved source given in the call, for CLASS, STRUCTURE and DDL.',
-  inputSchema: compactCheckRunSchema,
+  ...byVariant((variant) => ({
+    description: compactCheckRunDescription(variant),
+    inputSchema: compactCheckRunSchemaFor(COMPACT_CHECK[variant]),
+  })),
 } as const;
 
 type HandlerCheckRunArgs = {
-  object_type: CompactObjectType;
+  object_type: string;
   object_name: string;
   version?: 'active' | 'inactive';
   source_code?: string;
@@ -45,16 +51,19 @@ export async function handleHandlerCheckRun(
   context: HandlerContext,
   args: HandlerCheckRunArgs,
 ) {
-  const lowType = toLowObjectType(args.object_type);
-  if (!lowType) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_CHECK`); past it, the kind is typed (`COMPACT_CHECK_KINDS`).
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_CHECK[variant]);
+  if (member === undefined) {
     throw new Error(
-      `CheckRun is not supported for object_type: ${args.object_type}`,
+      `CheckRun is not supported for object_type: ${args.object_type}. ${supported(COMPACT_CHECK[variant])}`,
     );
   }
 
-  return handleCheckObject(context, {
+  return checkObject(context, {
     object_name: args.object_name,
-    object_type: lowType,
+    object_type: COMPACT_CHECK_KINDS[member],
     version: args.version,
     source_code: args.source_code,
   });

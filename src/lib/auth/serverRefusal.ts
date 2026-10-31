@@ -25,6 +25,7 @@ export type ServerRefusalCode =
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
+  | 'variant_not_served'
   | 'instance_closed'
   | 'batch_mode_unavailable'
   | 'batch_mode_on'
@@ -151,6 +152,14 @@ export function backgroundRunLimitWords(
 export const SYSTEM_TYPE_REQUIRED_WORDS =
   'the SAP system type is not stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env file) or system-type (YAML) to onprem, cloud or legacy — an embedding host passes systemType; nothing was sent to the system';
 
+/**
+ * A member only the on-premise table (`ADT_TYPES_ONPREM`) lists, asked of a
+ * connection declared `cloud`. Its tools are not registered for that
+ * variant; refused before anything is sent to the system.
+ */
+export const VARIANT_NOT_SERVED_WORDS =
+  'this operation is served on an on-premise system only (system type onprem): the ADT type table of the declared system type does not list it; nothing was sent to the system';
+
 /** The batch tools on an instance whose host gave it no batch owner (`batch`). */
 export const BATCH_MODE_UNAVAILABLE_WORDS =
   'batch mode is not available here: the host gave this server none';
@@ -273,6 +282,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   cloud_without_systeminformation: CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS,
   system_user_unknown: SYSTEM_USER_UNKNOWN_WORDS,
   system_type_required: SYSTEM_TYPE_REQUIRED_WORDS,
+  variant_not_served: VARIANT_NOT_SERVED_WORDS,
   instance_closed: INSTANCE_CLOSED_WORDS,
   batch_mode_unavailable: BATCH_MODE_UNAVAILABLE_WORDS,
   batch_mode_on: BATCH_MODE_ON_WORDS,

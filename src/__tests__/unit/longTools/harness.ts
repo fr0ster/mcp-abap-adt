@@ -20,6 +20,7 @@ import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import type {
@@ -99,6 +100,7 @@ function shippedEntry(tool: string): {
     new ReadOnlyHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new RuntimeRunHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new CompactReadOnlyHandlersGroup(placeholder),
     new CompactModifyHandlersGroup(placeholder),

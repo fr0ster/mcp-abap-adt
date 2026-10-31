@@ -107,7 +107,8 @@ if (availableIn?.length > 0 && currentEnv !== undefined && !availableIn.includes
 **Rules:**
 - If `available_in` is omitted or empty, the tool is registered everywhere (backward compatibility)
 - Tools are filtered at registration time — clients never see unsupported tools
-- The environment is the stated system type (`--system-type`, `SAP_SYSTEM_TYPE`, YAML `system-type`, or an embedder's `systemType`): `onprem`, `cloud` or `legacy`. It is never guessed from the credential or the URL (19.0.0: a `jwt` destination is no longer taken for `cloud`). With none stated — stdio's inspection-only mode, an embedder that states none — nothing is filtered; every binary that connects requires it at start
+- The environment is the stated system type (`--system-type`, `SAP_SYSTEM_TYPE`, YAML `system-type`, or an embedder's `systemType`): `onprem`, `cloud` or `legacy`. It is never guessed from the credential or the URL (19.0.0: a `jwt` destination is no longer taken for `cloud`). Every binary requires it at start, stdio's inspection-only mode (no destination) included, which lists the tools of that system type. With none stated — an embedder that states none — nothing is filtered, and every call that would reach the system is refused `system_type_required`
+- Beside `available_in`, a tool is registered only where the system type's ADT type table (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD` of `@mcp-abap-adt/interfaces-adt`) serves what it needs (`src/lib/variantToolSet.ts`); a tool that differs by system type states its description, enums and type lists per system type (`ToolDefinition.variants`, built from the projections in `src/lib/adtProjections.ts`), and the declared one is registered
 
 **Common patterns:**
 

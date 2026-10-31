@@ -1,3 +1,4 @@
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * UpdateDataElement Handler - Update ABAP Data Element Properties
  *
@@ -152,12 +153,12 @@ export async function handleUpdateDataElement(
       const written = await sequence(
         atStep('read metadata', () =>
           client
-            .getDataElement()
+            .getDataElement(dataElementDocuments)
             .readMetadata({ dataElementName }, { analyse: analyseException }),
         ),
         atStep('update metadata', (current) =>
           withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
-            client.getDataElement().updateMetadata(
+            client.getDataElement(dataElementDocuments).updateMetadata(
               {
                 dataElementName,
                 transportRequest,

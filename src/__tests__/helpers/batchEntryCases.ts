@@ -692,6 +692,7 @@ const WRITES: BatchEntryCase[] = [
     'FUNCTION_GROUP',
     'BEHAVIOR_DEFINITION',
     'METADATA_EXTENSION',
+    'BEHAVIOR_IMPLEMENTATION',
   ].map((object_type) => ({
     tool: 'HandlerActivate',
     args: { object_type, object_name: 'OBJ_A' },
@@ -707,6 +708,19 @@ const WRITES: BatchEntryCase[] = [
   {
     tool: 'HandlerActivate',
     args: { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' },
+  },
+  // A function module: one activation run under its group.
+  {
+    tool: 'HandlerActivate',
+    args: { object_type: 'FUNCTION_MODULE', object_name: 'FUGR_A|FM_A' },
+  },
+  {
+    tool: 'HandlerActivate',
+    args: {
+      object_type: 'FUNCTION_MODULE',
+      object_name: 'FM_A',
+      function_group_name: 'FUGR_A',
+    },
   },
   {
     tool: 'HandlerActivate',
@@ -992,6 +1006,19 @@ const WRITES: BatchEntryCase[] = [
       ...(runner === undefined ? {} : { runner }),
     },
   })),
+  ...[undefined, 'async'].map((runner) => ({
+    tool: 'HandlerUnitTestRun',
+    args: {
+      target: { kind: 'object', name: 'PROG_A', type: 'PROG/P' },
+      ...(runner === undefined ? {} : { runner }),
+    },
+  })),
+  {
+    tool: 'HandlerUnitTestRun',
+    args: {
+      target: { kind: 'package', name: 'PKG_A', include_subpackages: true },
+    },
+  },
   { tool: 'RuntimeListFeeds', args: {} },
   ...['descriptors', 'variants'].map((feed_type) => ({
     tool: 'RuntimeListFeeds',

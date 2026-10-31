@@ -1,3 +1,4 @@
+import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * DeleteMessageClassMessage Handler - Delete a single message from a Message
  * Class (MSAG) via AdtClient.
@@ -121,10 +122,9 @@ export async function handleDeleteMessageClassMessage(
     () =>
       withAdtHeaders(context, 'messageClassMessage.delete', (headers) =>
         (
-          createAdtClient(
-            connection,
-            logger,
-          ).getMessageClassMessage() as unknown as MessageClassMessageWrites
+          createAdtClient(connection, logger).getMessageClassMessage(
+            messageDocuments,
+          ) as unknown as MessageClassMessageWrites
         ).delete(
           {
             className,

@@ -13,6 +13,7 @@ import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
+  RuntimeRunHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../src/lib/handlers/groups/index.js';
@@ -36,6 +37,7 @@ const groups = {
   readonly: new ReadOnlyHandlersGroup(ctx),
   high: new HighLevelHandlersGroup(ctx),
   system: new SystemHandlersGroup(ctx),
+  runtime: new RuntimeRunHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
   debug: new DebugHandlersGroup(ctx),
 };

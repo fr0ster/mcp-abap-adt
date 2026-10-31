@@ -15,6 +15,7 @@ import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/Backgro
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { LeftoverSessionHandlersGroup } from '../../../lib/handlers/groups/LeftoverSessionHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import type {
@@ -86,6 +87,7 @@ describe('no tool takes session_id or session_state', () => {
     new ReadOnlyHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new RuntimeRunHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new BackgroundRunHandlersGroup(placeholder),
     new LeftoverSessionHandlersGroup(placeholder),

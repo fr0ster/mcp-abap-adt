@@ -1,3 +1,4 @@
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Integration tests for ServiceDefinition High-Level Handlers
  *
@@ -36,16 +37,18 @@ async function deleteServiceDefinitionWrapper(
     // report "deleted successfully" over a service definition still on the
     // system — and `analyseDeletion` is what turns ADT's `del:isDeleted="false"`,
     // answered with HTTP 200, into that refusal in the first place.
-    const deleted = await client.getServiceDefinition().delete(
-      {
-        serviceDefinitionName: args.service_definition_name,
-        transportRequest: args.transport_request,
-      },
-      {
-        headers: DEFAULT_ADT_HEADERS['serviceDefinition.delete'],
-        analyse: analyseDeletion,
-      },
-    );
+    const deleted = await client
+      .getServiceDefinition(serviceDefinitionDocuments)
+      .delete(
+        {
+          serviceDefinitionName: args.service_definition_name,
+          transportRequest: args.transport_request,
+        },
+        {
+          headers: DEFAULT_ADT_HEADERS['serviceDefinition.delete'],
+          analyse: analyseDeletion,
+        },
+      );
     if (!deleted.ok) {
       throw new Error(deleted.getError().message);
     }

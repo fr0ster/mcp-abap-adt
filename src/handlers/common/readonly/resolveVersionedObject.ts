@@ -10,7 +10,6 @@
  */
 
 import {
-  type AdtClient,
   behaviorDefinitionDocuments,
   classDocuments,
   ddlDocuments,
@@ -26,6 +25,11 @@ import {
   type IObjectVersion,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import {
+  VERSIONED_KINDS,
+  type VersionedKind,
+} from '../../../lib/adtProjections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
@@ -36,17 +40,7 @@ import { carryingFailure } from '../../../lib/strategies/step';
 // throw "not supported", so exposing them here advertised a capability that
 // never worked. The lock switch (handleLockObject) is intentionally wider:
 // those types ARE lockable, just not versioned.
-export const VERSIONED_OBJECT_TYPES = [
-  'class',
-  'program',
-  'interface',
-  'function_module',
-  'table',
-  'structure',
-  'ddl',
-  'behavior_definition',
-  'metadata_extension',
-] as const;
+export const VERSIONED_OBJECT_TYPES = VERSIONED_KINDS.onprem;
 
 export interface ResolvedVersionedObject {
   /**
@@ -65,16 +59,17 @@ export interface ResolvedVersionedObject {
 
 /**
  * Resolve an object_type + name into an IAdtObject instance and its identity
- * config. Returns null for an unknown object_type (caller emits the error).
+ * config. The kind is checked at the tool's boundary against the declared
+ * variant's projection (`VERSIONED_KINDS`), so every kind here is served.
  *
  * @throws Error for a malformed function_module identity (missing group name).
  */
 export function resolveVersionedObject(
-  client: AdtClient,
-  objectType: string,
+  client: IServerAdtClient,
+  objectType: VersionedKind,
   objectName: string,
   functionGroupName?: string,
-): ResolvedVersionedObject | null {
+): ResolvedVersionedObject {
   const name = objectName.toUpperCase();
   switch (objectType) {
     case 'class':
@@ -142,8 +137,6 @@ export function resolveVersionedObject(
         ),
         config: { name },
       };
-    default:
-      return null;
   }
 }
 

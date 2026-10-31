@@ -18,6 +18,7 @@ import {
   withoutTimeout,
 } from '../../longTools.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
+import { declareSystemKind } from '../../systemKind.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
@@ -121,6 +122,11 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // carries a resolver (and rules) — see
           // src/lib/requestSystemResolution.ts; else nothing is looked up.
           const context = this.context;
+          // The variant of the call's ADT client: the kind the context
+          // states, for a connection the factory did not build.
+          if (context?.connection) {
+            declareSystemKind(context.connection, context.systemType);
+          }
           // Inside the call-transport scope with this call's own
           // `transport_request`: the failure renderer's transport hint.
           const withParameters = <T>(fn: () => Promise<T>) =>

@@ -11,12 +11,13 @@
  * or the system.
  */
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  AdtClient: jest.fn(),
+  AdtClientOnPrem: jest.fn(),
+  AdtClientCloud: jest.fn(),
   AdtClientLegacy: jest.fn(),
   getSystemInformation: jest.fn(),
 }));
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import { runWithRequestContext } from '../../lib/requestContext';
@@ -26,6 +27,10 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const conn = {} as IAbapConnection;
 
 type Options =
@@ -33,14 +38,14 @@ type Options =
   | undefined;
 
 function lastOptions(): Options {
-  const calls = (AdtClient as jest.Mock).mock.calls;
+  const calls = jest.mocked(AdtClientOnPrem).mock.calls;
   return calls.at(-1)?.[2];
 }
 
 describe('responsible and master system are request-scoped', () => {
   beforeEach(() => {
     resetSystemContextCache();
-    (AdtClient as jest.Mock).mockClear();
+    jest.mocked(AdtClientOnPrem).mockClear();
     setSystemContext({
       masterSystem: 'PROC_SYS',
       responsible: 'PROC_USER',

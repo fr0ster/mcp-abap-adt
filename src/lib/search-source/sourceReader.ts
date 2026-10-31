@@ -1,5 +1,12 @@
+import {
+  classDocuments,
+  functionModuleDocuments,
+  includeDocuments,
+  programDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { tableCodeOf } from '../adtTypeCode';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
@@ -86,10 +93,9 @@ function fugrSourceOf(child: FugrChild): FugrSource | undefined {
       return { kind: 'include', name: child.objectname };
     return undefined;
   }
-  if (child.objecttype === 'FUGR/FF')
-    return { kind: 'fm', name: child.objectname };
-  if (child.objecttype === 'FUGR/I')
-    return { kind: 'include', name: child.objectname };
+  const code = tableCodeOf(child.objecttype);
+  if (code === 'FUGR/FF') return { kind: 'fm', name: child.objectname };
+  if (code === 'FUGR/I') return { kind: 'include', name: child.objectname };
   return undefined;
 }
 
@@ -201,20 +207,20 @@ export function createSourceReaderDeps(
     // genuine throw (a connection failure), but a refusal is no longer one.
     async readProgram(programName, version) {
       const r = await client
-        .getProgram()
+        .getProgram(programDocuments)
         .read({ programName }, version, { analyse: analyseException });
       return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read program');
     },
     async readInclude(includeName) {
       // The include endpoint has no version selector: none is sent, as before.
       const r = await client
-        .getInclude()
+        .getInclude(includeDocuments)
         .read({ includeName }, undefined, { analyse: analyseException });
       return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read include');
     },
     async readClassMain(className, version) {
       const r = await client
-        .getClass()
+        .getClass(classDocuments)
         .read({ className }, version, { analyse: analyseException });
       return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read class');
     },
@@ -228,7 +234,7 @@ export function createSourceReaderDeps(
     },
     async readFugrFm(fugrName, fmName) {
       const r = await client
-        .getFunctionModule()
+        .getFunctionModule(functionModuleDocuments)
         .read(
           { functionGroupName: fugrName, functionModuleName: fmName },
           undefined,

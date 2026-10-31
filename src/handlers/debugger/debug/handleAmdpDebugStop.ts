@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'AmdpDebugStop',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.',
+    '[debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

@@ -19,6 +19,7 @@ import { requestKind, type SessionKind } from '../../lib/batch/sessionKind';
 import {
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
+  RuntimeRunHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../lib/handlers/groups';
@@ -175,6 +176,7 @@ export function servedTools(
     new ReadOnlyHandlersGroup(context),
     new SearchHandlersGroup(context),
     new SystemHandlersGroup(context),
+    new RuntimeRunHandlersGroup(context),
     new HighLevelHandlersGroup(context),
     new CompactReadOnlyHandlersGroup(context),
     new CompactModifyHandlersGroup(context),

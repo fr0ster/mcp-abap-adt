@@ -1,3 +1,4 @@
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
@@ -49,6 +50,7 @@ export const TOOL_DEFINITION = {
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtTypeCode,
   IAdtError,
   IAdtFailure,
   IAdtResponse,
@@ -65,7 +67,7 @@ import {
   thrownEntry,
 } from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -132,7 +134,7 @@ function flatObjects(level: NodeLevel): FlatObject[] {
 async function collectValidObjects(
   context: AdtHeadersContext,
   utils: NodeSource,
-  parentType: string,
+  parentType: AdtTypeCode,
   parentName: string,
   nodeId: string,
   withShortDescriptions: boolean,
@@ -181,7 +183,7 @@ async function collectValidObjects(
 
 /** A parent whose node tree is walked. */
 interface Parent {
-  type: string;
+  type: AdtTypeCode;
   name: string;
 }
 
@@ -403,10 +405,18 @@ export async function handleGetObjectsList(
         );
       }
     }
-    const parents = listed.map((entry) => ({
-      type: String(entry.parent_type),
-      name: String(entry.parent_name).toUpperCase(),
-    }));
+    const parents: Parent[] = [];
+    for (const entry of listed) {
+      const text = String(entry.parent_type);
+      const variant = variantOf(context.connection);
+      const type = tableTypeOf(text, variant);
+      if (type === undefined) {
+        return return_error(
+          notATableType('objects[].parent_type', text, variant),
+        );
+      }
+      parents.push({ type, name: String(entry.parent_name).toUpperCase() });
+    }
     let read: ParentWalks = { walks: [] };
     return answer(
       { tool: 'GetObjectsList', detail: 'terse' },
@@ -468,6 +478,11 @@ export async function handleGetObjectsList(
   }
 
   const parentName = parent_name.toUpperCase();
+  const variant = variantOf(context.connection);
+  const parentType = tableTypeOf(parent_type, variant);
+  if (parentType === undefined) {
+    return return_error(notATableType('parent_type', parent_type, variant));
+  }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
   // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
@@ -485,7 +500,7 @@ export async function handleGetObjectsList(
         async () => {
           const read = await walkParentsBatched(
             context,
-            [{ type: parent_type, name: parentName }],
+            [{ type: parentType, name: parentName }],
             withDescriptions,
           );
           const walk = (read.ended ?? read.walks[0]) as ParentWalk;
@@ -496,7 +511,7 @@ export async function handleGetObjectsList(
           collectValidObjects(
             context,
             utilsOf(context),
-            parent_type,
+            parentType,
             parentName,
             '000000',
             withDescriptions,

@@ -43,8 +43,8 @@ import { handleListFunctionModules } from '../../handlers/function_include/reado
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
 import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
+import { handleRuntimeRunProgram } from '../../handlers/system/high/handleRuntimeRunProgram';
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
-import { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram';
 import { createPackageContentsFetcher } from '../../lib/search-source/packageEnumerator';
 import { createPackagePatternResolver } from '../../lib/search-source/packageResolver';
 import {
@@ -54,18 +54,27 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
-let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
 
-// SHAPE 3's door: `handleRuntimeRunProgram.ts` does not go through
-// `createAdtClient` — it writes `new AdtExecutor(connection,
-// logger)` directly and reaches its members through `executor.getProgramExecutor()`,
-// so the `../../lib/clients` mock above does nothing for them. `jest.mock` must sit
+let fakeClient: any;
+let programExecutor: Record<string, unknown>;
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+  // SHAPE 3's door: `handleRuntimeRunProgram.ts` reaches its members through
+  // the on-premise executor (`createOnPremExecutor`, an `AdtExecutor<'onprem'>`).
+  createOnPremExecutor: () => ({ getProgramExecutor: () => programExecutor }),
+}));
+
+// The class executors still come from `new AdtExecutor(connection, logger)`
+// directly, so the `../../lib/clients` mock above does nothing for them. `jest.mock` must sit
 // at module top level (not nested in a `describe`) for babel-plugin-jest-hoist to
 // hoist it above the handlers' own `import { AdtExecutor } from
 // '@mcp-abap-adt/adt-clients'` — nested inside a `describe` callback it runs too
 // late, after those imports already bound the real class.
-let programExecutor: Record<string, unknown>;
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtExecutor: jest.fn(() => ({ getProgramExecutor: () => programExecutor })),
@@ -99,7 +108,11 @@ describe('SHAPE 1 — a rename, still one call', () => {
     [
       'ValidateServiceBinding',
       handleValidateServiceBinding,
-      { service_binding_name: 'ZSB', service_definition_name: 'ZSD' },
+      {
+        service_binding_name: 'ZSB',
+        service_definition_name: 'ZSD',
+        package_name: 'ZPKG',
+      },
       'validate',
       undefined,
     ],
@@ -141,6 +154,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
     await handleValidateServiceBinding(context as any, {
       service_binding_name: 'ZSB',
       service_definition_name: 'ZSD',
+      package_name: 'ZPKG',
     });
     expect(seen).toEqual([analyseException]);
   });

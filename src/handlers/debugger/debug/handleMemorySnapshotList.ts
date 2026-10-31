@@ -32,7 +32,9 @@ export async function handleMemorySnapshotList(
   context: HandlerContext,
   args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const snapshots = new MemorySnapshots(context.connection, context.logger);
+  const snapshots = MemorySnapshots.create(context.connection, {
+    logger: context.logger,
+  });
   return debugAnswer(
     args,
     async () => {

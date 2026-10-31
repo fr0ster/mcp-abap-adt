@@ -1,3 +1,4 @@
+import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * ListFunctionModules Handler
  *
@@ -70,7 +71,7 @@ export async function handleListFunctionModules(
       sequence(
         atStep('read metadata', () =>
           client
-            .getFunctionGroup()
+            .getFunctionGroup(functionGroupDocuments)
             .readMetadata({ functionGroupName }, { analyse: analyseException }),
         ),
         atStep('read node structure', () =>

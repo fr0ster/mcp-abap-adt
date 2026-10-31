@@ -1,4 +1,5 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
@@ -36,7 +37,7 @@ export const TOOL_DEFINITION = {
 
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { NodeLevel } from '../../../lib/strategies/packageWalk';
@@ -178,13 +179,20 @@ export async function handleGetObjectsByType(
   // `NodeLevel` it builds, never keeping the wire text beside it — there is
   // no `.raw` for `detail: 'raw'` to answer without changing that shared
   // strategy.
+  const variant = variantOf(connection);
+  const parentType = tableTypeOf(parent_type, variant);
+  if (parentType === undefined) {
+    return return_error(
+      new Error(notATableType('parent_type', parent_type, variant)),
+    );
+  }
   return answer(
     { tool: 'GetObjectsByType', detail: 'terse' },
     () =>
       withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
         createAdtClient(connection, logger)
           .getUtils(ourUtils)
-          .fetchNodeStructure(parent_type, parentName, {
+          .fetchNodeStructure(parentType, parentName, {
             headers,
             analyse: analyseException,
             nodeId: node_id,

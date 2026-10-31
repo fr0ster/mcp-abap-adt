@@ -1,6 +1,8 @@
+import { structureDocuments, tableDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtCodes } from '../../../lib/adtProjections';
 import {
   type FailureEntry,
   failedPayloadOf,
@@ -225,7 +227,7 @@ async function structuresListOf(
       return return_error(new Error('structure_name is required'));
 
     const client = createAdtClient(connection, logger);
-    const obj = client.getStructure();
+    const obj = client.getStructure(structureDocuments);
     const utils = client.getUtils(ourUtils);
     const rootName = structure_name.toUpperCase();
 
@@ -275,7 +277,7 @@ async function structuresListOf(
       if (structure != null) return { source: structure };
       const table = await attempt('read table', () =>
         client
-          .getTable()
+          .getTable(tableDocuments)
           .read({ tableName: name }, version as 'active' | 'inactive', {
             analyse: analyseException,
           }),
@@ -294,7 +296,7 @@ async function structuresListOf(
     const findExtensions = async (baseName: string): Promise<EmbeddedRef[]> => {
       if (!includeExtensions) return [];
       // Scope the where-used search to append structures only
-      // (enableOnlyTypes: ['TABL/DS']). where-used caps the number of returned
+      // (enableOnlyTypes: [STRUCTURES_ONLY]). where-used caps the number of returned
       // records, so with the default/all-types scope a heavily-used base has
       // its append (structure) records crowded out by other reference types and
       // dropped → 0 appends. Restricting the search to TABL/DS server-side keeps
@@ -309,14 +311,14 @@ async function structuresListOf(
       let references: Array<{ name?: string; type?: string }> = [];
       let resolved = false;
       let lastErr: unknown;
-      for (const objectType of ['structure', 'table'] as const) {
+      for (const objectType of WHERE_USED_TYPES) {
         try {
           const wu = await fetchWhereUsedReferences(
             whereUsedOn(context, utils),
             {
               object_name: baseName,
               object_type: objectType,
-              enableOnlyTypes: ['TABL/DS'],
+              enableOnlyTypes: [STRUCTURES_ONLY],
             },
           );
           if (!wu.ok) {
@@ -472,7 +474,16 @@ async function structuresListOf(
 }
 
 type DdlStep = 'read structure' | 'read table';
-type WhereUsedType = 'structure' | 'table';
+type WhereUsedType = AdtCodes<'TABL/DS' | 'TABL/DT'>;
+
+/** A base's where-used is asked as a structure, then as a table. */
+const WHERE_USED_TYPES = [
+  'TABL/DS',
+  'TABL/DT',
+] as const satisfies readonly WhereUsedType[];
+
+/** The one type a base's where-used is restricted to: the structures. */
+const STRUCTURES_ONLY: AdtCodes<'TABL/DS'> = 'TABL/DS';
 
 /**
  * One endpoint's attempt at a name's DDL, from its answer — the sequential
@@ -513,7 +524,7 @@ type WhereUsedOutcome =
   | { resolved: true; references: Array<{ name?: string; type?: string }> }
   | { resolved: false; lastErr: unknown };
 
-const WHERE_USED_SCOPE = { enableOnlyTypes: ['TABL/DS'] };
+const WHERE_USED_SCOPE = { enableOnlyTypes: [STRUCTURES_ONLY] };
 
 /** A `WhereUsedSource` whose two requests answer `scope` and `whereUsed`. */
 function answeredWhereUsed(
@@ -568,7 +579,7 @@ function structureReads(
     let references: Array<{ name?: string; type?: string }> = [];
     let resolved = false;
     let lastErr: unknown;
-    for (const objectType of ['structure', 'table'] as const) {
+    for (const objectType of WHERE_USED_TYPES) {
       try {
         const key = pairKey(baseName, objectType);
         const wu = await fetchWhereUsedReferences(
@@ -620,7 +631,7 @@ function structureReads(
       if (fresh.length === 0) return;
       const read = await runPhase(context, fresh, (name, connection) =>
         createAdtClient(connection, logger)
-          .getStructure()
+          .getStructure(structureDocuments)
           .read({ structureName: name }, version, {
             analyse: analyseException,
           }),
@@ -638,7 +649,7 @@ function structureReads(
         second.length > 0
           ? await runPhase(context, second, (name, connection) =>
               createAdtClient(connection, logger)
-                .getTable()
+                .getTable(tableDocuments)
                 .read({ tableName: name }, version, {
                   analyse: analyseException,
                 }),
@@ -680,7 +691,7 @@ function structureReads(
       const pairs = [...new Set(bases)]
         .filter((name) => !outcomes.has(name))
         .flatMap((name) =>
-          (['structure', 'table'] as const).map((objectType) => ({
+          WHERE_USED_TYPES.map((objectType) => ({
             name,
             objectType,
             key: pairKey(name, objectType),

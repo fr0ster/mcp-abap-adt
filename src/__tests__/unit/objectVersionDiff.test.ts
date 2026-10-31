@@ -13,6 +13,8 @@ const mockClassGetVersionSource = jest.fn();
 const mockGetClass = jest.fn();
 
 jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
   createAdtClient: () => ({
     getClass: mockGetClass,
   }),
@@ -217,9 +219,10 @@ describe('version diff tools (#30)', () => {
       'onprem',
       'cloud',
     ]);
-    // program diff is onprem-gated (mirrors GetProgram)
+    // program diff mirrors GetProgram: on premise and cloud
     expect(tool('GetProgramVersionDiff').toolDefinition.available_in).toEqual([
       'onprem',
+      'cloud',
     ]);
   });
 });

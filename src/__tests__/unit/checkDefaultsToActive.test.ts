@@ -39,7 +39,11 @@ import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 const DOCUMENT = corpusBody('check-ddlx-active-version--01-checkrun');
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+}));
 
 const context = { connection: {} as any, logger: undefined };
 

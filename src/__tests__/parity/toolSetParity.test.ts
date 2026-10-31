@@ -877,22 +877,19 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         onStdio
           ? {
               full: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
-              fullRo: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
+              fullRo: ['ListLeftoverSessions'],
               compact: [
                 'HandlerLeftoverSessionList',
                 'HandlerLeftoverSessionLogoff',
               ],
-              compactRo: [
-                'HandlerLeftoverSessionList',
-                'HandlerLeftoverSessionLogoff',
-              ],
+              compactRo: ['HandlerLeftoverSessionList'],
             }
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
       // core: the debugger, high, background runs, the three batch tools
       // and the two debugger batch tools, always; on http SessionOpen and
       // SessionClose.
-      expect(full.tools).toHaveLength(onStdio ? 256 : onHttp ? 256 : 254);
+      expect(full.tools).toHaveLength(onStdio ? 257 : onHttp ? 257 : 255);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -907,19 +904,32 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ]),
       );
       // core-ro: the readonly tools with system and search, the three batch
-      // tools (and, on stdio, the list and the logoff; on http SessionOpen
-      // and SessionClose); no write, debugger, background run or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 71 : 69);
+      // tools (and, on stdio, the leftover-session list; on http SessionOpen
+      // and SessionClose); no write, run, debugger, background run, logoff
+      // or resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 70 : onHttp ? 71 : 69);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',
           'GetWhereUsed',
+          'RunATC',
+          'GetATCRunStatus',
+          'GetATCFindings',
           'SearchObject',
           'BatchBegin',
           'BatchEnd',
           'BatchAnswers',
         ]),
       );
+      // The ABAP Unit run tools start runs whose tests can change data:
+      // RunAbapUnit is served where RunUnitTest and its siblings are, on the
+      // full binary, and by no read-only one.
+      expect({
+        full: ['RunUnitTest', 'RunAbapUnit'].map((n) => full.tools.includes(n)),
+        fullRo: ['RunUnitTest', 'RunAbapUnit'].map((n) =>
+          fullRo.tools.includes(n),
+        ),
+      }).toEqual({ full: [true, true], fullRo: [false, false] });
       for (const name of [
         'CreateClass',
         'DebugStartListener',
@@ -927,6 +937,10 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         'ResumeLeftoverSession',
         'DebugBatchBegin',
         'DebugBatchEnd',
+        'RuntimeRunClass',
+        'RuntimeRunProgram',
+        'RuntimeCreateProfilerTraceParameters',
+        'LogoffLeftoverSession',
       ]) {
         expect({ name, served: fullRo.tools.includes(name) }).toEqual({
           name,
@@ -948,9 +962,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ]),
       );
       // compact-ro: the 17 that change nothing, HandlerBatch, and on stdio
-      // the list and the logoff.
+      // the leftover-session list.
       expect(compactRo.tools).toHaveLength(
-        17 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+        17 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
       );
       expect(compactRo.tools).toContain('HandlerGet');
       expect(compactRo.tools).toContain('HandlerDeletionCheck');
@@ -966,6 +980,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ...COMPACT_DEBUG,
         'HandlerBackgroundRunGet',
         'HandlerLeftoverSessionResume',
+        'HandlerLeftoverSessionLogoff',
         'HandlerDebugBatch',
       ]) {
         expect({ name, served: compactRo.tools.includes(name) }).toEqual({
@@ -1109,15 +1124,14 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
 );
 
 /**
- * A `-ro` binary keeps no background run (the owner's decision): its run
- * tools (`RuntimeRunClass` is a system tool; running code changes no code)
- * offer no `background` — not in the schema a client lists, and not read:
- * a call carrying it anyway runs as any run, never refused. The write
- * binary's run tool offers it and starts a run. On each transport, through
- * the binary.
+ * A `-ro` binary changes nothing in the system (the owner's decision): it
+ * serves no run tool — `RuntimeRunClass` runs code, which can change data —
+ * and so no background run. A call of it reaches no system. The write
+ * binary's run tool offers `background` and starts a run. On each
+ * transport, through the binary.
  */
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: a -ro binary serves no background run',
+  '%s: a -ro binary serves no run tool and no background run',
   (transportName) => {
     jest.setTimeout(60_000);
 
@@ -1179,40 +1193,39 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         'background',
       );
       const from = standIn.requests.length;
-      const result = await client.callTool({
-        name: 'RuntimeRunClass',
-        arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
-      });
-      const text = JSON.stringify(result.content);
-      const answer = outcomeOf(result);
+      const text = await client
+        .callTool({
+          name: 'RuntimeRunClass',
+          arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
+        })
+        .then(
+          (result) => JSON.stringify(result.content),
+          (error: unknown) => String(error),
+        );
       const reached = standIn.requests.length - from;
       await client.close();
       await started.stop();
       return {
         listed: listed !== undefined,
         offered,
-        answer,
         reached,
         runHandle: text.includes('run_handle'),
-        unavailable: text.includes('background_runs_unavailable'),
       };
     };
 
-    it('full-ro serves RuntimeRunClass without background, and never refuses it; full offers it and starts a run', async () => {
+    it('full-ro lists no RuntimeRunClass and a call of it reaches no system; full offers background and starts a run', async () => {
       const ro = await backgroundCall('full-ro');
       expect({
         listed: ro.listed,
         offered: ro.offered,
-        unavailable: ro.unavailable,
         runHandle: ro.runHandle,
+        reached: ro.reached,
       }).toEqual({
-        listed: true,
+        listed: false,
         offered: false,
-        unavailable: false,
         runHandle: false,
+        reached: 0,
       });
-      // It ran as any run: the call reached the system.
-      expect(ro.reached).toBeGreaterThan(0);
       const full = await backgroundCall('full');
       expect({
         listed: full.listed,

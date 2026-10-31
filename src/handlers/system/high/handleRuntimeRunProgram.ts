@@ -1,7 +1,8 @@
 /**
  * RuntimeRunProgram Handler - Execute an ABAP program, optionally profiled
  *
- * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
+ * Uses `createOnPremExecutor(connection, logger).getProgramExecutor()` (an
+ * `AdtExecutor<'onprem'>`) from
  * @mcp-abap-adt/adt-clients 19 — not `createAdtClient`, per
  * `AdtExecutor`'s own shape (see `handleRuntimeRunClass.ts`
  * and Task 24's class-profiling pair for the same door).
@@ -25,11 +26,11 @@
  * node-structure members in this migration share.
  */
 
-import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
+import { createOnPremExecutor } from '../../../lib/clients';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
@@ -41,7 +42,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgram',
   available_in: ['onprem'] as const,
   description:
-    '[read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).',
+    '[runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -108,7 +109,9 @@ export async function handleRuntimeRunProgram(
   }
 
   const programName = args.program_name.trim().toUpperCase();
-  const executor = new AdtExecutor(connection, logger);
+  // On premise: the tool is listed only where the declared system type is
+  // `onprem` (`available_in`), and only that table lists a program's `run`.
+  const executor = createOnPremExecutor(connection, logger);
   const programExecutor = executor.getProgramExecutor(ourProgramExecutor);
 
   if (!args.profile) {
@@ -198,7 +201,7 @@ export async function handleRuntimeRunProgramUnderProfiler(
     );
   }
   const programName = args.program_name.trim().toUpperCase();
-  const programExecutor = new AdtExecutor(
+  const programExecutor = createOnPremExecutor(
     connection,
     logger,
   ).getProgramExecutor(ourProgramExecutor);

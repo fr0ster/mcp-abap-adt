@@ -14,7 +14,7 @@ not published anywhere: build the one you need. The full guide is
 |---|---|
 | `Dockerfile` | Installs `@mcp-abap-adt/<VARIANT>` alone (with its dependencies) into `/opt/mcp-abap-adt`, copies it into a clean runtime image, and runs the variant's binary as the entrypoint. Build arguments `VARIANT` (default `core`), `MCP_ABAP_ADT_VERSION` (the variant package's version, default `latest`), `PACKAGE_SOURCE` (`registry`, or `tarballs` with the build context `tarballs` — CI). Streamable HTTP images listen on `0.0.0.0:3000`, SSE images on `0.0.0.0:3001`, each with a `HEALTHCHECK` on `/mcp/health`; stdio images set `AUTH_BROKER_PATH=/app` and run with `docker run -i`. |
 | `docker-compose.yml` | A service per variant, named as the `VARIANT`, each in a profile of its own name: `docker compose up -d http`, `docker compose run --rm -T core --mcp=<name>`. stdio services mount `./service-keys` read-only and `./sessions`. |
-| `Dockerfile.inspect`, `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, no destination: for MCP inspection (Glama). Not for deployment. |
+| `Dockerfile.inspect.onprem`, `Dockerfile.inspect.cloud`, `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, no destination, one image per system type (`--system-type=onprem`, `--system-type=cloud`): for MCP inspection (Glama), which lists the tool set of that system type. `docker-compose.inspect.yml` has a service for each, `inspect-onprem` and `inspect-cloud`. Not for deployment. |
 | `.env.example` | Compose variables: `MCP_ABAP_ADT_VERSION`, `SAP_SYSTEM_TYPE`. Copy to `.env`. |
 | `.dockerignore` | The build context is this directory; only the Dockerfiles are sent. |
 

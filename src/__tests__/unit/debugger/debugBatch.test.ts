@@ -186,8 +186,7 @@ async function stand(set: SetKind): Promise<Stand> {
         openConnection: open,
         closeConnection: async () => undefined,
         dropConnection: () => undefined,
-        abapDebugger: (c, onConflict) =>
-          new AbapDebugger(c, undefined, undefined, { onConflict }),
+        abapDebugger: (c, onConflict) => AbapDebugger.create(c, { onConflict }),
         requestUser: async () => 'TESTUSER',
         run: async () => ({ ok: true, output: '' }),
       },
@@ -196,7 +195,7 @@ async function stand(set: SetKind): Promise<Stand> {
     amdp: new AmdpSession({
       openConnection: open,
       closeConnection: async () => undefined,
-      amdpDebugger: (c) => new AmdpDebugger(c),
+      amdpDebugger: (c) => AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',
       run: async () => ({ ok: true, output: '' }),
     }),

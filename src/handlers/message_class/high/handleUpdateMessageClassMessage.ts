@@ -1,3 +1,4 @@
+import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * UpdateMessageClassMessage Handler - Update (upsert) a single message in a
  * Message Class (MSAG)
@@ -107,17 +108,19 @@ export async function handleUpdateMessageClassMessage(
     { tool: 'UpdateMessageClassMessage', detail: 'terse' },
     () =>
       withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
-        createAdtClient(connection, logger).getMessageClassMessage().update(
-          {
-            className,
-            msgno: args.msgno,
-            msgtext: args.msgtext,
-            selfExplanatory: args.self_explanatory,
-            description: args.description,
-            transportRequest: args.transport_request,
-          },
-          { headers, analyse: analyseException },
-        ),
+        createAdtClient(connection, logger)
+          .getMessageClassMessage(messageDocuments)
+          .update(
+            {
+              className,
+              msgno: args.msgno,
+              msgtext: args.msgtext,
+              selfExplanatory: args.self_explanatory,
+              description: args.description,
+              transportRequest: args.transport_request,
+            },
+            { headers, analyse: analyseException },
+          ),
       ),
     () => ({
       success: true,

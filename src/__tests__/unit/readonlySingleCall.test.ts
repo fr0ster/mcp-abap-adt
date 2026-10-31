@@ -81,7 +81,14 @@ import {
 } from '../helpers/fakeClient';
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+  // The declared variant's client, tagged with it (SearchObject's filter is
+  // that variant's search names).
+  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
+}));
 // The unit-test Get* functions take their runner from `AdtExecutor` (adt-clients
 // 24), not from `createAdtClient`: route that door to the same double.
 jest.mock('../../handlers/unit_test/shared/runTests', () => ({
@@ -294,7 +301,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'getObjectStructure')
       .at(-1);
-    expect(call?.args).toEqual(['class', 'ZCL_X']);
+    expect(call?.args).toEqual(['CLAS/OC', 'ZCL_X']);
   });
 
   it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
@@ -491,9 +498,9 @@ describe('resolveVersionedObject', () => {
     ).toThrow(/function_group_name is required/);
   });
 
-  it('answers null for an unknown object_type', () => {
-    expect(resolveVersionedObject(client, 'domain', 'zd')).toBeNull();
-  });
+  // An unknown object_type no longer reaches it: the kind is typed by the
+  // version tools' projection (`VersionedKind`), so a domain does not compile
+  // (`src/__tests__/typecheck/adtBoundary.typecheck.ts`).
 });
 
 describe('the members that accept an analyse strategy, which one is deliberately withheld, and the rest that never had one', () => {
@@ -905,7 +912,7 @@ describe('the high-tier Get*/List* handlers answer through the adapter and surfa
  * bounded polling, no group-verification gate to defeat — are table-driven
  * below. Three that carry the identity in a POSITIONAL argument rather than
  * a config object (`getStatus`, `getServiceBindingTypes`), and the four
- * whose own `pollUntilFinished` loop needs a fake client that actually
+ * whose own `readRunOnce` read needs a fake client that actually
  * answers a finished run to ever reach its second call, are each their own
  * `it` further down.
  */
@@ -1265,7 +1272,7 @@ describe('two behaviours unpinned before fix round 1', () => {
 /**
  * Fix round 1's main finding: `GetUnitTest`/`GetUnitTestResult`/
  * `GetCdsUnitTest`/`GetCdsUnitTestResult` reconstruct the v18 convenience
- * `.read({runId})` (bounded status polling, only fetching the result once
+ * `.read({runId})` (a long-polled status read, only fetching the result once
  * `<aunit:progress status="FINISHED"/>` is seen) rather than a naive
  * `pair(getStatus, getResult)`. These tests exist to fail if that
  * reconstruction regresses to the naive shape: an empty/refused result
@@ -1277,8 +1284,9 @@ describe('two behaviours unpinned before fix round 1', () => {
  * captured fixtures for a passing run (`unittest-run-passing--02-runs-*`,
  * the status; `--03-results-*`, the result). No fixture in the corpus
  * captures a CDS run or a still-running (non-`FINISHED`) status, so
- * `GetCdsUnitTest*`'s own tests and the "not yet finished" tests below use
- * synthetic markers, named as such rather than presented as corpus evidence.
+ * `GetCdsUnitTest*`'s own tests use synthetic markers, named as such rather
+ * than presented as corpus evidence. What a reader answers for each status
+ * SAP gives — one read each — is `runWait.test.ts`'s, over the real adt-clients.
  */
 describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking a refusal or an unfinished run', () => {
   const passingStatus = corpusBody(
@@ -1287,9 +1295,6 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
   const passingResult = corpusBody(
     'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44',
   );
-  // Synthetic (no fixture): a run ADT has not finished yet.
-  const runningStatus =
-    '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING" percentage="40"/></aunit:run>';
 
   it('GetUnitTest answers a real finished run from the captured status+result fixtures, and calls both members through the class runner', async () => {
     const getStatus = jest.fn(async () =>
@@ -1322,27 +1327,6 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     // double, and destructuring it eagerly captures `undefined` (the value
     // before any factory was ever accessed).
     expect(double.factory).toBe('getClassTestRunner');
-  });
-
-  it('GetUnitTest answers finished:false after MAX_STATUS_POLLS status checks, and never calls getResult on a run that has not finished', async () => {
-    const getStatus = jest.fn(async () =>
-      okResponse(structured({ data: runningStatus, status: 200 } as any)),
-    );
-    const getResult = jest.fn(async () => {
-      throw new Error('must not be called — the run never finished');
-    });
-    fakeClient = fakeClientOf({ getStatus, getResult });
-
-    const result: any = await handleGetUnitTest(context as any, {
-      run_id: 'r1',
-    });
-
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.finished).toBe(false);
-    expect(payload.run_result).toBeUndefined();
-    expect(getStatus).toHaveBeenCalledTimes(5);
-    expect(getResult).not.toHaveBeenCalled();
   });
 
   it('GetUnitTest surfaces a refused result as an error once the run is confirmed finished, not success with an empty result', async () => {
@@ -1403,28 +1387,8 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
   });
 
-  it('GetUnitTestResult answers finished:false with no run_result, rather than guessing, when the run has not finished', async () => {
-    const getStatus = jest.fn(async () =>
-      okResponse(structured({ data: runningStatus, status: 200 } as any)),
-    );
-    const getResult = jest.fn(async () => {
-      throw new Error('must not be called — the run never finished');
-    });
-    fakeClient = fakeClientOf({ getStatus, getResult });
-
-    const result: any = await handleGetUnitTestResult(context as any, {
-      run_id: 'r1',
-    });
-
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.finished).toBe(false);
-    expect(payload.run_result).toBeUndefined();
-    expect(getResult).not.toHaveBeenCalled();
-  });
-
   // CDS variants: `AdtCdsUnitTest extends AdtUnitTest` and inherits both
-  // members unchanged, so these exercise the identical `pollUntilFinished`
+  // members unchanged, so these exercise the identical `readRunOnce`
   // path through a different factory — synthetic markers throughout, since
   // no CDS run is captured in the corpus.
   const cdsStatus =
@@ -1460,26 +1424,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     });
   });
 
-  it('GetCdsUnitTest answers finished:false and never calls getResult when the (synthetic) run has not finished', async () => {
-    const getStatus = jest.fn(async () =>
-      okResponse(structured({ data: runningStatus, status: 200 } as any)),
-    );
-    const getResult = jest.fn(async () => {
-      throw new Error('must not be called — the run never finished');
-    });
-    fakeClient = fakeClientOf({ getStatus, getResult });
-
-    const result: any = await handleGetCdsUnitTest(context as any, {
-      run_id: 'r1',
-    });
-
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.finished).toBe(false);
-    expect(getStatus).toHaveBeenCalledTimes(5);
-    expect(getResult).not.toHaveBeenCalled();
-  });
-
-  it('GetCdsUnitTestResult answers finished:true from a synthetic finished run, and finished:false with no result otherwise', async () => {
+  it('GetCdsUnitTestResult answers finished:true from a synthetic finished run', async () => {
     const getStatusFinished = jest.fn(async () =>
       okResponse(structured({ data: cdsStatus, status: 200 } as any)),
     );
@@ -1495,24 +1440,5 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
       run_id: 'r1',
     });
     expect(JSON.parse(finished.content[0].text).finished).toBe(true);
-
-    const getStatusRunning = jest.fn(async () =>
-      okResponse(structured({ data: runningStatus, status: 200 } as any)),
-    );
-    const getResultNeverCalled = jest.fn(async () => {
-      throw new Error('must not be called — the run never finished');
-    });
-    fakeClient = fakeClientOf({
-      getStatus: getStatusRunning,
-      getResult: getResultNeverCalled,
-    });
-
-    const notFinished: any = await handleGetCdsUnitTestResult(context as any, {
-      run_id: 'r1',
-    });
-    const payload = JSON.parse(notFinished.content[0].text);
-    expect(payload.finished).toBe(false);
-    expect(payload.run_result).toBeUndefined();
-    expect(getResultNeverCalled).not.toHaveBeenCalled();
   });
 });

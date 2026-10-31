@@ -76,8 +76,10 @@ describe("lib's read and write handler barrels", () => {
     // result read once, ABAP and CDS, for compact `HandlerUnitTestResult`,
     // `HandlerCdsUnitTestResult` and `HandlerGet` UNIT_TEST /
     // CDS_UNIT_TEST (51); one page of a runtime feed, for compact
-    // `HandlerDumpList` (52).
-    expect(read).toHaveLength(52);
+    // `HandlerDumpList` (52). 21.0.0: the check and the validation of a kind
+    // checked at the boundary, for compact `HandlerCheckRun` and
+    // `HandlerValidate` (54).
+    expect(read).toHaveLength(54);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
@@ -94,7 +96,16 @@ describe("lib's read and write handler barrels", () => {
     // 19.0.0: the trace schedule and the class and program runs under a
     // profiler id, one request each, compact's `HandlerProfileSchedule` and
     // `HandlerProfileRun` (88).
-    expect(write).toHaveLength(88);
+    // 21.0.0: what HandlerActivate activates from object_type alone on the
+    // declared variant, the list its refusal names (89).
+    // 21.0.0: TYPE_TO_FAMILY left (the projections route activation); an
+    // activation decided at its boundary, the lock and unlock of a kind
+    // checked at the boundary, and the chain-create refusal, for compact's
+    // `HandlerActivate`, `HandlerLock`, `HandlerUnlock` and `HandlerCreate`
+    // (92).
+    // 22.0.0: the boundary of an activation's objects, whose group is typed
+    // by the declared variant, for compact's `HandlerActivate` (93).
+    expect(write).toHaveLength(93);
   });
 
   it('share not one symbol', () => {

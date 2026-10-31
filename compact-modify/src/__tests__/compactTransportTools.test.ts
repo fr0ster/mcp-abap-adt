@@ -23,6 +23,10 @@ import {
   handleHandlerTransportSortAndCompress,
 } from '../handlers/handleHandlerTransportSortAndCompress';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 type Sent = { method: string; url: string; data?: unknown };
 
 /** A connection that records every request and answers `200` with `body`. */

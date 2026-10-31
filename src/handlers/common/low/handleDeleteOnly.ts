@@ -21,10 +21,12 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { COMPACT_DELETE, supported } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
-  type DELETION_CHECK_TYPES,
+  DELETION_CHECK_TYPES,
   EMPTIED_INCLUDE_TYPES,
 } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -39,7 +41,7 @@ import {
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
-import { deletionTargetOf } from './deletionTargets';
+import { DELETION_TARGETS } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
 
 /** The argument naming the object, per type a deletion request removes. */
@@ -83,7 +85,20 @@ export async function handleDeleteOnly(
   const { connection, logger } = context;
   const transportRequest = text(args.transport_request);
 
-  if ((EMPTIED_INCLUDE_TYPES as readonly string[]).includes(objectType)) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_DELETE`); past it, the route is typed by it.
+  const variant = variantOf(connection);
+  const member = acceptedOf(objectType, COMPACT_DELETE[variant]);
+  if (member === undefined) {
+    return return_error(
+      new Error(
+        `Unsupported delete for object_type: ${objectType}. ${supported(COMPACT_DELETE[variant])}`,
+      ),
+    );
+  }
+
+  const emptied = EMPTIED_INCLUDE_TYPES.find((type) => type === member);
+  if (emptied !== undefined) {
     const lockHandle = text(args.lock_handle);
     if (lockHandle === undefined) {
       return return_error(
@@ -99,7 +114,7 @@ export async function handleDeleteOnly(
     if (className === undefined) {
       return return_error(new Error('class_name is required'));
     }
-    const [, includeType, include] = CLASS_INCLUDES[objectType];
+    const [, includeType, include] = CLASS_INCLUDES[emptied];
     return answer(
       ANSWER,
       () =>
@@ -128,21 +143,20 @@ export async function handleDeleteOnly(
     );
   }
 
-  const target = deletionTargetOf(objectType);
-  const nameField = (DELETION_NAME_FIELDS as Readonly<Record<string, string>>)[
-    objectType
-  ];
-  if (target === undefined || nameField === undefined) {
+  const removed = DELETION_CHECK_TYPES.find((type) => type === member);
+  if (removed === undefined) {
     return return_error(
       new Error(`Unsupported delete for object_type: ${objectType}`),
     );
   }
+  const target = DELETION_TARGETS[removed];
+  const nameField = DELETION_NAME_FIELDS[removed];
   const name = text(args[nameField]);
   if (name === undefined) {
     return return_error(new Error(`${nameField} is required`));
   }
   let group: string | undefined;
-  if (objectType === 'FUNCTION_MODULE') {
+  if (removed === 'FUNCTION_MODULE') {
     group = text(args.function_group_name);
     if (group === undefined) {
       return return_error(new Error('function_group_name is required'));
@@ -158,7 +172,7 @@ export async function handleDeleteOnly(
             context,
             adtOperation(target.objectType, 'delete'),
             (headers) =>
-              target.object(createAdtClient(connection, logger)).delete(
+              target.deleted(connection, logger).delete(
                 target.config(
                   {
                     name: name.toUpperCase(),

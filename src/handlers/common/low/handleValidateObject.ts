@@ -34,8 +34,14 @@ import {
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { VALIDATE_KINDS, type ValidateKind } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
@@ -125,24 +131,6 @@ interface ValidateObjectArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
-const VALID_TYPES = [
-  'class',
-  'program',
-  'interface',
-  'function_group',
-  'function_module',
-  'table',
-  'structure',
-  'ddl',
-  'domain',
-  'data_element',
-  'package',
-  'behavior_definition',
-  'behavior_implementation',
-  'metadata_extension',
-  'ddlx/ex',
-];
-
 type ImplementationType = 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
 const VALID_IMPLEMENTATION_TYPES: ImplementationType[] = [
   'Managed',
@@ -154,9 +142,41 @@ const VALID_IMPLEMENTATION_TYPES: ImplementationType[] = [
 /**
  * Main handler for ValidateObject MCP tool
  */
+/**
+ * The tool's boundary: `object_type` is one of the kinds the declared
+ * variant serves (`VALIDATE_KINDS`), either case; past it, {@link validateObject} takes
+ * the kind typed and checks it no more.
+ */
 export async function handleValidateObject(
   context: HandlerContext,
   args: ValidateObjectArgs,
+) {
+  if (!args.object_name || !args.object_type) {
+    return return_error(new Error('object_name and object_type are required'));
+  }
+  const variant = variantOf(context.connection);
+  const kind = acceptedOf(args.object_type, VALIDATE_KINDS[variant]);
+  if (kind === undefined) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${VALIDATE_KINDS[variant].join(', ')}`,
+      ),
+    );
+  }
+  return validateObject(context, { ...args, object_type: kind });
+}
+
+/** The names of `args` left out or empty, in their order. */
+function missingOf(args: Readonly<Record<string, string | undefined>>) {
+  return Object.entries(args)
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+}
+
+/** One object of a kind checked at the tool's boundary. */
+export async function validateObject(
+  context: HandlerContext,
+  args: Omit<ValidateObjectArgs, 'object_type'> & { object_type: ValidateKind },
 ) {
   const { connection, logger } = context;
   const {
@@ -169,20 +189,13 @@ export async function handleValidateObject(
     implementation_type,
     super_package,
     superclass,
-  } = args as ValidateObjectArgs;
+  } = args;
 
   if (!object_name || !object_type) {
     return return_error(new Error('object_name and object_type are required'));
   }
 
-  const normalizedType = object_type.toLowerCase();
-  if (!VALID_TYPES.includes(normalizedType)) {
-    return return_error(
-      new Error(
-        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
-      ),
-    );
-  }
+  const normalizedType = object_type;
 
   // Family-specific required-argument checks. These stay ahead of the client
   // call, exactly where they lived before this migration: `validate()`'s
@@ -191,9 +204,15 @@ export async function handleValidateObject(
   let normalizedImplementationType: ImplementationType | undefined;
   if (normalizedType === 'behavior_definition') {
     if (!package_name || !description || !root_entity || !implementation_type) {
+      const missing = missingOf({
+        package_name,
+        description,
+        root_entity,
+        implementation_type,
+      });
       return return_error(
         new Error(
-          'Behavior definition validation requires packageName, description, rootEntity, and implementationType parameters',
+          `Behavior definition validation requires package_name, description, root_entity and implementation_type; missing: ${missing.join(', ')}`,
         ),
       );
     }
@@ -211,18 +230,17 @@ export async function handleValidateObject(
   }
   if (normalizedType === 'behavior_implementation' && !package_name) {
     return return_error(
-      new Error(
-        'Behavior implementation validation requires packageName parameter',
-      ),
+      new Error('Behavior implementation validation requires package_name'),
     );
   }
   if (
     (normalizedType === 'metadata_extension' || normalizedType === 'ddlx/ex') &&
     (!package_name || !description)
   ) {
+    const missing = missingOf({ description, package_name });
     return return_error(
       new Error(
-        'Metadata extension validation requires description and packageName parameters',
+        `Metadata extension validation requires description and package_name; missing: ${missing.join(', ')}`,
       ),
     );
   }
@@ -257,14 +275,17 @@ export async function handleValidateObject(
     () => {
       switch (normalizedType) {
         case 'program':
-          return client.getProgram(resultsFor(programDocuments)).validate(
-            {
-              programName: objectName,
-              packageName,
-              description: normalizedDescription,
-            },
-            { analyse: analyseException },
-          );
+          // A program is validated on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
+            .getProgram(resultsFor(programDocuments))
+            .validate(
+              {
+                programName: objectName,
+                packageName,
+                description: normalizedDescription,
+              },
+              { analyse: analyseException },
+            );
         case 'class':
           return client.getClass(resultsFor(classDocuments)).validate(
             {
@@ -407,10 +428,6 @@ export async function handleValidateObject(
               },
               { analyse: analyseException },
             );
-        default:
-          // Unreachable: normalizedType was already checked against
-          // VALID_TYPES above.
-          throw new Error(`Unsupported object_type: ${object_type}`);
       }
     },
     project(detail, terseValidation),

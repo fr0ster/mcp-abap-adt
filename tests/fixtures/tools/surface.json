@@ -195,7 +195,7 @@
     "group": "readonly",
     "name": "GetProgram",
     "inputs": "program_name*, part, version",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
@@ -222,19 +222,19 @@
     "available_in": "cloud, onprem"
   },
   {
-    "group": "high",
+    "group": "system",
     "name": "RunATC",
     "inputs": "objects*, check_variant, max_findings, wait",
     "available_in": "cloud, onprem"
   },
   {
-    "group": "high",
+    "group": "system",
     "name": "GetATCRunStatus",
     "inputs": "run_id*",
     "available_in": "cloud, onprem"
   },
   {
-    "group": "high",
+    "group": "system",
     "name": "GetATCFindings",
     "inputs": "worklist_id*, detail",
     "available_in": "cloud, onprem"
@@ -650,7 +650,7 @@
   {
     "group": "high",
     "name": "RunUnitTest",
-    "inputs": "class_name*, runner, scope, detail",
+    "inputs": "class_name*, runner, wait, scope, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -692,7 +692,7 @@
   {
     "group": "high",
     "name": "RunCdsUnitTest",
-    "inputs": "class_name*, detail",
+    "inputs": "class_name*, wait, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -710,8 +710,8 @@
   {
     "group": "high",
     "name": "RunProgramUnitTest",
-    "inputs": "program_name*, runner, scope, detail",
-    "available_in": "onprem"
+    "inputs": "program_name*, runner, wait, scope, detail",
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -728,13 +728,19 @@
   {
     "group": "high",
     "name": "RunFunctionGroupUnitTest",
-    "inputs": "function_group_name*, runner, scope, detail",
+    "inputs": "function_group_name*, runner, wait, scope, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "RunFunctionModuleUnitTest",
-    "inputs": "function_module_name*, function_group_name, runner, scope, detail",
+    "inputs": "function_module_name*, function_group_name, runner, wait, scope, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "RunAbapUnit",
+    "inputs": "target*, scope, risk_level, duration, wait, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -819,7 +825,7 @@
     "group": "high",
     "name": "GetProgram",
     "inputs": "program_name*, version",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1053,7 +1059,7 @@
     "group": "high",
     "name": "CheckProgram",
     "inputs": "program_name*, version",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1095,19 +1101,19 @@
     "group": "high",
     "name": "GetProgramVersions",
     "inputs": "program_name*",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersionSource",
     "inputs": "content_uri*",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1254,7 +1260,7 @@
     "available_in": "cloud, onprem"
   },
   {
-    "group": "system",
+    "group": "runtime",
     "name": "RuntimeCreateProfilerTraceParameters",
     "inputs": "description*, all_misc_abap_statements, all_procedural_units, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing",
     "available_in": "cloud, onprem"
@@ -1278,13 +1284,13 @@
     "available_in": "cloud, onprem"
   },
   {
-    "group": "system",
+    "group": "runtime",
     "name": "RuntimeRunClass",
     "inputs": "class_name*, profile, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing, max_trace_attempts, trace_retry_delay_ms, trace_lookup_uris",
     "available_in": "cloud, onprem"
   },
   {
-    "group": "system",
+    "group": "runtime",
     "name": "RuntimeRunProgram",
     "inputs": "program_name*, profile, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing",
     "available_in": "onprem"

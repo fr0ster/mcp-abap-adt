@@ -1,3 +1,15 @@
+import {
+  behaviorDefinitionDocuments,
+  classDocuments,
+  ddlDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  packageDocuments,
+  serviceDefinitionDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+
 /**
  * Admin script: Teardown ALL shared dependencies from a SAP system.
  *
@@ -7,9 +19,9 @@
  * Run:  npm run shared:teardown
  */
 
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import { getSystemContext } from '../../../lib/systemContext';
@@ -30,7 +42,7 @@ const testsLogger = createTestLogger('shared-teardown');
 
 describe('Admin: Teardown shared dependencies', () => {
   let connection: IAbapConnection;
-  let client: AdtClient;
+  let client: IServerAdtClient;
   // An admin script runs only when asked for (npm run shared:*), so a system
   // it cannot reach is a failure, not a skip: a green run that did nothing
   // reads as "the shared objects are torn down".
@@ -84,7 +96,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `function_module ${item.name}`,
           () =>
-            client.getFunctionModule().delete(
+            client.getFunctionModule(functionModuleDocuments).delete(
               {
                 functionModuleName: item.name,
                 functionGroupName: item.group,
@@ -110,7 +122,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `function_group ${item.name}`,
           () =>
-            client.getFunctionGroup().delete(
+            client.getFunctionGroup(functionGroupDocuments).delete(
               {
                 functionGroupName: item.name,
                 transportRequest,
@@ -135,7 +147,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `class ${item.name}`,
           () =>
-            client.getClass().delete(
+            client.getClass(classDocuments).delete(
               {
                 className: item.name,
                 transportRequest,
@@ -156,7 +168,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `service_definition ${item.name}`,
           () =>
-            client.getServiceDefinition().delete(
+            client.getServiceDefinition(serviceDefinitionDocuments).delete(
               {
                 serviceDefinitionName: item.name,
                 transportRequest,
@@ -181,7 +193,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `behavior_definition ${item.name}`,
           () =>
-            client.getBehaviorDefinition().delete(
+            client.getBehaviorDefinition(behaviorDefinitionDocuments).delete(
               {
                 name: item.name,
                 transportRequest,
@@ -206,7 +218,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `view ${item.name}`,
           () =>
-            client.getDdl().delete(
+            client.getDdl(ddlDocuments).delete(
               {
                 ddlName: item.name,
                 transportRequest,
@@ -230,7 +242,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `structure ${item.name}`,
           () =>
-            client.getStructure().delete(
+            client.getStructure(structureDocuments).delete(
               {
                 structureName: item.name,
                 transportRequest,
@@ -251,7 +263,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `table ${item.name}`,
           () =>
-            client.getTable().delete(
+            client.getTable(tableDocuments).delete(
               {
                 tableName: item.name,
                 transportRequest,
@@ -271,7 +283,7 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `package ${sharedConfig.package}`,
           () =>
-            client.getPackage().delete(
+            client.getPackage(packageDocuments).delete(
               {
                 packageName: sharedConfig.package,
                 transportRequest,

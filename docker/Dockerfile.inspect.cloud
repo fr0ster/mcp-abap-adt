@@ -1,5 +1,8 @@
-# The image Glama builds for inspecting the server: the published package from
-# the registry behind mcp-proxy, with no destination (inspection-only mode).
+# The image Glama builds for inspecting the server's ABAP cloud tool set: the
+# published package from the registry behind mcp-proxy, with no destination
+# (inspection-only mode) and the system type cloud. The tools listed are those of
+# the variant's ADT type table, so inspection names the system type; each
+# variant has its image (Dockerfile.inspect.onprem, Dockerfile.inspect.cloud).
 # Glama keeps its own copy of this Dockerfile on its admin page; this one is the
 # reference to keep it in step with.
 
@@ -11,7 +14,7 @@ FROM node:22-bookworm-slim
 # --ignore-scripts: no install script is needed (mcp-proxy's `tldjs` would
 # refresh its public-suffix list from the network; the packaged one serves),
 # and none runs as root while the image is built.
-ARG CORE_VERSION=21.0.0
+ARG CORE_VERSION=22.0.0
 RUN npm install -g --omit=optional --ignore-scripts --no-audit --no-fund "@mcp-abap-adt/core@${CORE_VERSION}" mcp-proxy@6.7.19 \
  && npm cache clean --force \
  && mcp-abap-adt --version
@@ -19,4 +22,6 @@ RUN npm install -g --omit=optional --ignore-scripts --no-audit --no-fund "@mcp-a
 USER node
 WORKDIR /home/node
 
-CMD ["mcp-proxy", "mcp-abap-adt"]
+# `--` ends mcp-proxy's own options: without it mcp-proxy reads
+# --system-type as an option of its own and the server never gets it.
+CMD ["mcp-proxy", "--", "mcp-abap-adt", "--system-type=cloud"]

@@ -35,6 +35,10 @@ import { handleHandlerGetData } from '../handlers/handleHandlerGetData';
 import { handleHandlerSearch } from '../handlers/handleHandlerSearch';
 import { handleHandlerWhereUsed } from '../handlers/handleHandlerWhereUsed';
 
+// The process declares its system type, as every launcher requires: the
+// type argument is checked against the declared variant's projection.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const context = {
   connection: { getSessionId: () => null },
   logger: undefined,

@@ -10,22 +10,22 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 
 - the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
 - the **system** tools — where-used, type and object information, the ABAP AST and semantic
-  analysis, SQL queries, dumps, profiler traces, and the class and program runs
-  (`RuntimeRunClass`, `RuntimeRunProgram`);
+  analysis, SQL queries, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
+  (`RunATC`, `GetATCRunStatus`, `GetATCFindings`);
 - **search** (`SearchObject`);
-- the **leftover-session list and logoff** (`ListLeftoverSessions`, `LogoffLeftoverSession`): the
-  SAP sessions a killed server process left open, only the caller's own;
+- the **leftover-session list** (`ListLeftoverSessions`): the SAP sessions a killed server
+  process left open, only the caller's own. Their logoff (`LogoffLeftoverSession`) releases every
+  lock a session holds, so it is `mcp-abap-adt`'s;
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-71 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger
+70 tools in all on premise, 69 on cloud: the tools, their enums and the object types each argument accepts are those of `--system-type`'s ADT type table ([MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md)). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger, the leftover-session logoff
 and background runs — those are
 `mcp-abap-adt`'s ([`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)).
 
-**Running code is reading here.** `RuntimeRunClass` and `RuntimeRunProgram` are system tools and
-are served here: "read-only" means the user cannot change code, and running it is allowed, as in
-SAP. What that code does is the code's. They are served **without `background`**: this binary
-keeps no background run, so the parameter is not in their schema and is not read — a call runs
-and waits for its answer.
+**Nothing here changes the system.** No tool of this binary runs code or changes data: the class
+and program runs (`RuntimeRunClass`, `RuntimeRunProgram`) and the profiler trace parameters they run
+under (`RuntimeCreateProfilerTraceParameters`) are `mcp-abap-adt`'s, since the code a run executes can
+change data. The ATC run stays: a check run changes nothing.
 
 ## Running it
 

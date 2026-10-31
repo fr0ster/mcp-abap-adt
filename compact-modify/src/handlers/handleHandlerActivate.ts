@@ -1,86 +1,70 @@
-import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import {
-  COMPACT_OBJECT_TYPES,
+  acceptedOf,
+  byVariant,
+  COMPACT_ACTIVATE,
+  COMPACT_ACTIVATE_ROUTES,
   type CompactObjectType,
-  compactActivateSchema,
+  compactActivateDescription,
+  compactActivateSchemaFor,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
+  activatePlanOnce,
+  activationPlan,
+  compactActivatableTypes,
   handleActivateObjectOnce,
-  TYPE_TO_FAMILY,
 } from '@mcp-abap-adt/lib/handlers/write';
+import { return_error } from '@mcp-abap-adt/lib/utils';
 
 /**
- * ADT type codes for compact types the activation map does not name, taken
- * from documents this repository has actually seen — `DEVC/K` in twenty
- * corpus documents, `SRVD/SRV`, `SRVB/SVB` and `FUGR/FF` in its handlers and
- * captures. A code nobody here has observed is not added: the point of
- * refusing is that a guess reaches SAP looking exactly like knowledge.
+ * A function module is activated in a group activation addressed under its
+ * function group (`FUGR/FF` with the group as `parentName`): the group comes
+ * from `object_name` as `GROUP|MODULE` or from `function_group_name`, as
+ * HandlerGet takes a function module. Without it the call is refused before
+ * anything is sent — a group activation named only by the module addresses a
+ * group of the module's name, which SAP answers about an object nobody meant.
+ * Both may be given when they name the same group.
  */
-const ADT_TYPE_BY_COMPACT_TYPE: Partial<Record<CompactObjectType, string>> = {
-  PACKAGE: 'DEVC/K',
-  SERVICE_DEFINITION: 'SRVD/SRV',
-  SERVICE_BINDING: 'SRVB/SVB',
-};
-
-/**
- * **`FUNCTION_MODULE` is deliberately absent, and a code is not what it
- * lacks.** `FUGR/FF` is the right type, and it was in the table above until
- * this note replaced it — but a function module's ADT address is built under
- * its function GROUP, and the single-object form carries one name. Given only
- * the module's, the group activation addresses a group by that name: a
- * request for an object that does not exist, sent confidently.
- * `handleActivateObject` says the same thing in its own module comment —
- * *"`FUGR/FF` needs a group name this array does not carry"* — which is
- * exactly the sentence the map entry contradicted.
- *
- * So the translation stops here and the refusal says what does work. What
- * that is was established by CALLING the builder the activation path uses —
- * `utils/activationUtils.buildObjectUri` — rather than by reading a function
- * of the same name in `whereUsed.js`, which is a different one with a
- * different convention and cost this file two wrong recommendations:
- *
- *     name 'ZAC_FGR01|Z_AC_FM01'            → groups/zac_fgr01%7cz_ac_fm01/
- *                                             fmodules/zac_fgr01%7cz_ac_fm01
- *     name 'Z_AC_FM01', parentName 'ZAC_FGR01' → groups/zac_fgr01/
- *                                                fmodules/z_ac_fm01
- *     name 'Z_AC_FM01' alone                → groups/z_ac_fm01/fmodules/z_ac_fm01
- *
- * The middle one is the address. The last is the failure this refusal exists
- * to prevent, and note that it does not throw: a group named after the module
- * is a request SAP answers, about an object nobody meant.
- */
-const NEEDS_MORE_THAN_A_NAME: Partial<Record<CompactObjectType, string>> = {
-  FUNCTION_MODULE:
-    'a function module is addressed under its function group, which this form does not take — use objects[] with objects[].parentName set to the group (name stays the module, type FUGR/FF)',
-};
-
-/** What `object_type` alone can be activated as, or undefined. */
-function adtTypeFor(type: CompactObjectType | undefined): string | undefined {
-  if (!type) return undefined;
-  const friendly = type.toLowerCase();
-  if (TYPE_TO_FAMILY[friendly]) return friendly;
-  return ADT_TYPE_BY_COMPACT_TYPE[type];
-}
-
-/** The types a caller may name without reaching for `object_adt_type`. */
-function knownCompactTypes(): string[] {
-  return COMPACT_OBJECT_TYPES.filter((type) => adtTypeFor(type) !== undefined);
+function functionModuleReference(
+  objectName: string,
+  functionGroupName: string | undefined,
+): { name: string; parentName: string } | string {
+  const separate = (functionGroupName ?? '').trim().toUpperCase();
+  const segments = objectName.split('|');
+  const named = segments.length > 1;
+  const [first = '', second = ''] = named ? segments : ['', objectName];
+  const group = named ? first.trim().toUpperCase() : separate;
+  const module = second.trim().toUpperCase();
+  if (segments.length > 2 || !group || !module) {
+    return 'FUNCTION_MODULE is named GROUP|MODULE in object_name, or with function_group_name: the function group and the module are both required; nothing was sent';
+  }
+  if (named && separate && separate !== group) {
+    return `object_name names group ${group}, function_group_name names ${separate}: give the group once; nothing was sent`;
+  }
+  return { name: module, parentName: group };
 }
 
 export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type takes object_adt_type (e.g. "CLAS/OC"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION or METADATA_EXTENSION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.',
-  inputSchema: compactActivateSchema,
+  ...byVariant((variant) => ({
+    description: compactActivateDescription(variant),
+    inputSchema: compactActivateSchemaFor(COMPACT_ACTIVATE[variant], variant),
+  })),
 } as const;
 
 type HandlerActivateArgs = {
-  object_type?: CompactObjectType;
+  object_type?: string;
   object_name?: string;
   object_adt_type?: string;
-  objects?: Array<IObjectReference & { uri?: string }>;
+  parentName?: string;
+  function_group_name?: string;
+  objects?: Array<{
+    name: string;
+    type: string;
+    parentName?: string;
+    uri?: string;
+  }>;
   preaudit?: boolean;
 };
 
@@ -95,47 +79,55 @@ export async function handleHandlerActivate(
     });
   }
 
-  // `handleActivateObject`'s own type map accepts a lowercase friendly name
-  // alongside the raw ADT code — 'program' next to 'prog/p' — and every one
-  // of those names is a `CompactObjectType.toLowerCase()`, because both were
-  // named from the same object list. So `object_type` is enough for the types
-  // that map names.
-  //
-  // **It is not enough for the rest, and handing them on lowercased was
-  // wrong.** The schema admits 25 object types and the map knows eleven
-  // names; a `PACKAGE` lowercased to `package` is not an ADT type code, and
-  // it reached the group-activation request as though it were. That is a
-  // malformed request answered by SAP rather than an argument refused here,
-  // and it is worse than the inconvenience it replaced — before, a caller
-  // had to pass `object_adt_type` and therefore passed a code that worked.
-  //
-  // So: a friendly name the map knows goes through as before; a type this
-  // repository has a MEASURED code for is translated; anything else is
-  // refused, naming the field that settles it. Nothing is guessed — a code
-  // invented here would be the same malformed request with more ceremony.
   if (!args.object_name) {
     throw new Error(
       'Provide either objects[] or object_name + (object_type or object_adt_type) for activation',
     );
   }
 
-  const singleType = args.object_adt_type ?? adtTypeFor(args.object_type);
-
-  if (!singleType) {
-    const why = args.object_type
-      ? NEEDS_MORE_THAN_A_NAME[args.object_type]
-      : undefined;
+  // An ADT type code given as such is the list form's one object, with the
+  // parent the caller named, checked at that boundary (`objects[].type`,
+  // `objects[].parentName`).
+  if (args.object_adt_type) {
+    return handleActivateObjectOnce(context, {
+      objects: [
+        {
+          name: args.object_name,
+          type: args.object_adt_type,
+          ...(args.parentName ? { parentName: args.parentName } : {}),
+        },
+      ],
+      preaudit: args.preaudit,
+    });
+  }
+  if (!args.object_type) {
     throw new Error(
-      why
-        ? `HandlerActivate cannot activate ${args.object_type} from a name alone: ${why}.`
-        : args.object_type
-          ? `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${knownCompactTypes().join(', ')}.`
-          : 'Provide either objects[] or object_name + (object_type or object_adt_type) for activation',
+      'Provide either objects[] or object_name + (object_type or object_adt_type) for activation',
     );
   }
 
-  return handleActivateObjectOnce(context, {
-    objects: [{ name: args.object_name, type: singleType }],
-    preaudit: args.preaudit,
-  });
+  // The boundary of object_type: one of the names the declared variant's
+  // table activates (`COMPACT_ACTIVATE`), each with its code
+  // (`COMPACT_ACTIVATE_ROUTES`). Its code goes on as the list form's one
+  // object (`activationPlan`): one object of a type its own API activates
+  // directly through that API, every other one in a group activation typed
+  // by the declared variant.
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_ACTIVATE[variant]);
+  if (member === undefined) {
+    throw new Error(
+      `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${compactActivatableTypes(context.connection).join(', ')}.`,
+    );
+  }
+  const reference =
+    member === 'FUNCTION_MODULE'
+      ? functionModuleReference(args.object_name, args.function_group_name)
+      : { name: args.object_name.toUpperCase() };
+  if (typeof reference === 'string') return return_error(reference);
+  const plan = activationPlan(
+    [{ ...reference, type: COMPACT_ACTIVATE_ROUTES[member] }],
+    variant,
+  );
+  if (typeof plan === 'string') return return_error(plan);
+  return activatePlanOnce(context, plan, args.preaudit);
 }

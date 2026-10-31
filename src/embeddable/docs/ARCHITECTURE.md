@@ -649,6 +649,6 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
   system type: the `systemType` option, else `SAP_SYSTEM_TYPE` — not required by lib (an
   embedder or `HandlerExporter` constructs without one); the binaries require it
   (`@mcp-abap-adt/responsible-rules`' `SYSTEM_TYPE_ROW`): stdio and the http/sse binaries do not
-  start without one. A base server with none stated (stdio's
-  inspection-only mode, an embedder's own transport host) filters nothing — every tool of its set
-  is listed, no `cloud` default — and refuses every call that would reach the system.
+  start without one, stdio's inspection-only mode included. A base server with none stated (an
+  embedder's own transport host) filters nothing — every tool of its set is listed, no `cloud`
+  default — and refuses every call that would reach the system (`system_type_required`).

@@ -20,11 +20,11 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckProgramLow',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages.',
   inputSchema: {
@@ -61,14 +61,6 @@ export async function handleCheckProgram(
 
   if (!program_name) {
     return return_error(new Error('program_name is required'));
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
-    );
   }
 
   const programName = program_name.toUpperCase();

@@ -1,0 +1,32 @@
+{
+  "case": "system-description-abap-cloud",
+  "step": 4,
+  "stepTag": "system-components",
+  "capturedAt": "2026-10-27T14:57:41.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/system/components",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/system/components",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run client for the system-description cases; it added Authorization, the session cookie and, on the POST, the CSRF token, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/atom+xml;type=feed",
+      "content-length": "2599",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "59161.000000",
+      "connection": "close"
+    },
+    "bodyFile": "system-description-abap-cloud--04-system-components.body.xml"
+  }
+}

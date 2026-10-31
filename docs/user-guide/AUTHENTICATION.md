@@ -61,7 +61,8 @@ A process serves **one default destination**, chosen in this order:
 2. **`--env-path=<path|file>`** (or `MCP_ENV_PATH`), **`--env=<name>`** (resolved to
    `sessions/<name>.env`) — one `.env` file, used as it is.
 
-Without those there is no default destination: stdio runs inspection-only. Destinations are served
+Without those there is no default destination: stdio runs inspection-only, listing the tools of the
+stated system type (`--system-type`, which inspection needs too). Destinations are served
 only by `mcp-abap-adt` (`@mcp-abap-adt/core`, stdio); `mcp-abap-adt-http` and `mcp-abap-adt-sse`
 take credentials only from `x-sap-*` headers (below). **Nothing is looked
 up in the working directory**: a server started inside someone else's project must not take their

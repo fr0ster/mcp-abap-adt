@@ -41,7 +41,7 @@ nothing from it.
 | File | What it is |
 |---|---|
 | `docker/Dockerfile` + `docker-compose.yml` | **Install, then run.** The install stage puts `@mcp-abap-adt/<VARIANT>` (and what it depends on, nothing else) into `/opt/mcp-abap-adt`; the runtime image copies that installation, without npm's cache, and runs the variant's binary as its entrypoint. Build arguments: `VARIANT` (default `core`), `MCP_ABAP_ADT_VERSION` — the variant package's version (default `latest`) —, `PACKAGE_SOURCE` (`registry`, the default; `tarballs` is for CI, below). |
-| `docker/Dockerfile.inspect` + `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, with no destination: the image Glama builds for inspecting the tools. Not for deployment. |
+| `docker/Dockerfile.inspect.onprem`, `docker/Dockerfile.inspect.cloud` + `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, with no destination, one image per system type (`--system-type=onprem`, `--system-type=cloud`): the images Glama builds for inspecting the tools of each. Not for deployment. |
 
 All are `node:22-bookworm-slim` and run as the unprivileged `node` user. The images are not
 published to a registry: build the one you need.
@@ -98,7 +98,8 @@ A destination `.env` works as on a host: mount it and name it, e.g.
 `-v ./trial.env:/app/trial.env:ro … mcp-abap-adt-core --env-path=/app/trial.env`; the server copies
 only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`, `SAP_LANGUAGE` and the RFC message
 server's `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and `SAP_SAPROUTER` from it into the
-process. Without `--mcp` or `--env-path` the server starts in tool-inspection-only mode.
+process. Without `--mcp` or `--env-path` the server starts in tool-inspection-only mode, which needs the
+system type too (`--system-type` or `SAP_SYSTEM_TYPE`) and lists that system type's tools.
 
 ### With compose
 

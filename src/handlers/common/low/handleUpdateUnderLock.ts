@@ -1,4 +1,5 @@
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 /**
  * The compact update: one write under the lock the caller holds (spec §4.6).
  *
@@ -105,7 +106,7 @@ const ANSWER = { tool: 'HandlerUpdate', detail: 'terse' } as const;
 const written = (call: () => Promise<never>) =>
   answer(ANSWER, call, project('terse', terseWrite));
 
-type AdtClient = ReturnType<typeof createAdtClient>;
+type AdtClient = IServerAdtClient;
 export type IncludeWriter = {
   update(
     config: object,

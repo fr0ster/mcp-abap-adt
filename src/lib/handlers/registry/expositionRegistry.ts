@@ -9,8 +9,12 @@ import type { HandlerSet } from '../../config/IServerConfig.js';
 import { BackgroundRunHandlersGroup } from '../groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from '../groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
-import { LeftoverSessionHandlersGroup } from '../groups/LeftoverSessionHandlersGroup.js';
+import {
+  LeftoverSessionHandlersGroup,
+  LeftoverSessionListHandlersGroup,
+} from '../groups/LeftoverSessionHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
+import { RuntimeRunHandlersGroup } from '../groups/RuntimeRunHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
 import type { HandlerContext, IHandlerGroup } from '../interfaces.js';
@@ -56,15 +60,25 @@ export function expositionGroups(
       new ReadOnlyHandlersGroup(baseContext, overridingToolNames),
     );
     handlerGroups.push(new SystemHandlersGroup(baseContext));
-    // Beside the run tools (RuntimeRunClass, RuntimeRunProgram): their
-    // background runs, read, listed and discarded.
+  }
+  if (exposition.includes('high')) {
+    // The run tools (RuntimeRunClass, RuntimeRunProgram) and the trace
+    // parameters they schedule change the system, so `readonly` serves
+    // none of them; beside them, their background runs, read, listed and
+    // discarded.
+    handlerGroups.push(new RuntimeRunHandlersGroup(baseContext));
     handlerGroups.push(new BackgroundRunHandlersGroup(baseContext));
   }
   handlerGroups.push(...overridingGroups);
   handlerGroups.push(new SearchHandlersGroup(baseContext));
-  // Every exposition: the user's own leftover sessions, listed and logged
-  // off.
-  handlerGroups.push(new LeftoverSessionHandlersGroup(baseContext));
+  // Every exposition: the user's own leftover sessions, listed; logged off
+  // with `high` only, since a logoff releases the session's locks and so
+  // changes the system.
+  handlerGroups.push(
+    exposition.includes('high')
+      ? new LeftoverSessionHandlersGroup(baseContext)
+      : new LeftoverSessionListHandlersGroup(baseContext),
+  );
   return handlerGroups;
 }
 

@@ -48,8 +48,8 @@ Every step gates the run; none is `continue-on-error`.
   credentials reaches an ADT stand-in (`scripts/ci/adt-stand-in.mjs`, a container on the check's own
   Docker network) with exactly that credential. A `-ro` image lists no write tool, and its write
   sibling does. The images and containers are removed at the end.
-- `docker/Dockerfile.inspect` (the Glama reference) built and its `mcp-abap-adt --version` run — when
-  its pinned `core` version is on npm; before the release is published the step says so and builds
+- `docker/Dockerfile.inspect.onprem` and `docker/Dockerfile.inspect.cloud` (the Glama references) each
+  built and its `mcp-abap-adt --version` run — when its pinned `core` version is on npm; before the release is published the step says so and builds
   nothing.
 
 ## Release (`release.yml`)

@@ -1,25 +1,48 @@
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
-import { compactUpdateSchema } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import {
+  acceptedOf,
+  byVariant,
+  COMPACT_UPDATE,
+  compactUpdateDescription,
+  compactUpdateSchemaFor,
+  supported,
+} from '@mcp-abap-adt/lib/compact-shared';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import { return_error } from '@mcp-abap-adt/lib/utils';
 import { routeCompactWrite } from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUpdate',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), PROGRAM(program_name*, source_code*, transport_request) [onprem only], INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version). For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.",
-  inputSchema: compactUpdateSchema,
+  ...byVariant((variant) => ({
+    description: compactUpdateDescription(variant),
+    inputSchema: compactUpdateSchemaFor(COMPACT_UPDATE[variant]),
+  })),
 } as const;
 
-type HandlerUpdateArgs = { object_type: CompactObjectType } & Record<
-  string,
-  unknown
->;
+type HandlerUpdateArgs = { object_type: string } & Record<string, unknown>;
 
 /** One request: the type's write under `lock_handle` (`handleUpdateUnderLock`, spec §4.6). */
 export async function handleHandlerUpdate(
   context: HandlerContext,
   args: HandlerUpdateArgs,
 ) {
-  return routeCompactWrite(context, 'update', args);
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_UPDATE`); past it, the route is typed by it.
+  if (!args.object_type) {
+    // The router refuses it, in its own words and through its log.
+    return routeCompactWrite(context, 'update', {
+      ...args,
+      object_type: undefined,
+    });
+  }
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_UPDATE[variant]);
+  if (member === undefined) {
+    return return_error(
+      new Error(
+        `Unsupported update for object_type: ${args.object_type}. ${supported(COMPACT_UPDATE[variant])}`,
+      ),
+    );
+  }
+  return routeCompactWrite(context, 'update', { ...args, object_type: member });
 }

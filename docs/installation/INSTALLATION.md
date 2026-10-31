@@ -135,7 +135,7 @@ SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 # System type, required (no default): cloud, onprem, or legacy
-# Controls tool availability (e.g. Programs require onprem)
+# Decides the tools and the object types they accept (e.g. a program's writes require onprem)
 SAP_SYSTEM_TYPE=onprem
 EOF
 ```
@@ -398,7 +398,7 @@ You can also configure the server using environment variables.
 - `SAP_AUTH_TYPE` - Authentication type: basic|snc|jwt (required)
 - `SAP_GRANT_TYPE` - `authorization_code`; required with jwt
 - `SAP_SNC_PARTNERNAME`, `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` - SNC (RFC only; no user, no password)
-- `SAP_SYSTEM_TYPE` - System type, required (or `--system-type`; no default): `cloud`, `onprem`, or `legacy`. Controls tool availability (e.g. Programs require `onprem`), the connector, and how the system's answers are read
+- `SAP_SYSTEM_TYPE` - System type, required (or `--system-type`; no default): `cloud`, `onprem`, or `legacy`. Decides the tools, their enums and the object types each argument accepts (the system type's ADT type table; e.g. a program's writes require `onprem`), the connector, and how the system's answers are read; inspection (no destination) needs it too
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)

@@ -157,7 +157,7 @@
       "PROG",
       "executable program"
     ],
-    "semantic": "Activate an ABAP program (report) after it was created or changed, so the change is in force."
+    "semantic": "Activate an ABAP program (report) once it was created or changed, so the change is in force."
   },
   "ActivateServiceBinding": {
     "keywords": [
@@ -606,7 +606,8 @@
       "methods",
       "OO",
       "helper class",
-      "test helper class"
+      "test helper class",
+      "class on a transport"
     ],
     "semantic": "Create a new global ABAP class with any name, a test helper class included, in a package and recorded on a transport request."
   },
@@ -3237,9 +3238,11 @@
       "ABAP Unit",
       "execute tests",
       "test class",
-      "test results"
+      "test results",
+      "run target",
+      "package tests"
     ],
-    "semantic": "Run ABAP Unit tests of classes or programs."
+    "semantic": "Run ABAP Unit tests of chosen test classes, or of one object of any run type or a package."
   },
   "HandlerUnitTestStatus": {
     "keywords": [
@@ -3492,6 +3495,19 @@
     ],
     "semantic": "Run ABAP Test Cockpit (ATC) quality checks over objects or a package."
   },
+  "RunAbapUnit": {
+    "keywords": [
+      "run unit tests",
+      "ABAP Unit",
+      "package tests",
+      "run package tests",
+      "subpackages",
+      "CDS view assigned tests",
+      "foreign tests",
+      "test results"
+    ],
+    "semantic": "Run the ABAP Unit tests of a whole package, or of one object by its ABAP Unit run type such as a CDS view's assigned tests, and see which pass or fail."
+  },
   "RunCdsUnitTest": {
     "keywords": [
       "run CDS tests",
@@ -3667,7 +3683,7 @@
       "SE38",
       "run"
     ],
-    "semantic": "Execute an ABAP program (report) and see its output."
+    "semantic": "Execute a report and see the list output it prints."
   },
   "SearchObject": {
     "keywords": [

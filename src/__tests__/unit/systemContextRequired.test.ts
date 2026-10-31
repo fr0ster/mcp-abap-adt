@@ -1,3 +1,9 @@
+import {
+  accessControlDocuments,
+  serviceDefinitionDocuments,
+  transformationDocuments,
+} from '@mcp-abap-adt/adt-clients';
+
 /**
  * The responsible person is sent wherever a create carries it; the master
  * system only when known. A class and a behavior implementation carry none:
@@ -108,6 +114,12 @@ const createClass = async () => {
 };
 
 describe('on-premise', () => {
+  // The process declares its system type, as every launcher requires: the
+  // ADT client is the declared variant's (`variantOf`), never a default.
+  beforeEach(() => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+  });
+
   it('basic: the stated responsible, no master system is sent, nothing is refused', async () => {
     process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();
@@ -216,7 +228,7 @@ describe('on-premise', () => {
     [
       'service definition',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getServiceDefinition().create(
+        c.getServiceDefinition(serviceDefinitionDocuments).create(
           {
             serviceDefinitionName: 'ZSD_PLACEHOLDER',
             packageName: 'ZPACKAGE_PLACEHOLDER',
@@ -228,7 +240,7 @@ describe('on-premise', () => {
     [
       'transformation',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getTransformation().create(
+        c.getTransformation(transformationDocuments).create(
           {
             transformationName: 'ZXSLT_PLACEHOLDER',
             transformationType: 'SimpleTransformation',
@@ -241,7 +253,7 @@ describe('on-premise', () => {
     [
       'access control',
       (c: ReturnType<typeof createAdtClient>) =>
-        c.getAccessControl().create(
+        c.getAccessControl(accessControlDocuments).create(
           {
             accessControlName: 'ZDCL_PLACEHOLDER',
             packageName: 'ZPACKAGE_PLACEHOLDER',

@@ -1,21 +1,27 @@
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  compactLockSchema,
-  toLockObjectType,
+  acceptedOf,
+  byVariant,
+  COMPACT_LOCK,
+  COMPACT_LOCK_KINDS,
+  compactLockDescription,
+  compactLockSchemaFor,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleLockObject } from '@mcp-abap-adt/lib/handlers/write';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import { lockObject } from '@mcp-abap-adt/lib/handlers/write';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*). Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).',
-  inputSchema: compactLockSchema,
+  ...byVariant((variant) => ({
+    description: compactLockDescription(variant),
+    inputSchema: compactLockSchemaFor(COMPACT_LOCK[variant]),
+  })),
 } as const;
 
 type HandlerLockArgs = {
-  object_type: CompactObjectType;
+  object_type: string;
   object_name: string;
   super_package?: string;
 };
@@ -24,24 +30,23 @@ export async function handleHandlerLock(
   context: HandlerContext,
   args: HandlerLockArgs,
 ) {
-  const lowType = toLockObjectType(args.object_type);
-  if (!lowType) {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_LOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_LOCK[variant]);
+  if (member === undefined) {
     throw new Error(
-      `Lock is not supported for object_type: ${args.object_type}`,
+      `Lock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_LOCK[variant])}`,
     );
   }
 
-  const answered = (await handleLockObject(context, {
+  const answered = (await lockObject(context, {
     object_name: args.object_name,
-    object_type: lowType,
+    object_type: COMPACT_LOCK_KINDS[member],
     super_package: args.super_package,
   })) as LockAnswer;
   // A package lock over RFC lives in a session of its own.
-  return keptLock(
-    context,
-    answered,
-    args.object_type === 'PACKAGE' ? 'own' : 'main',
-  );
+  return keptLock(context, answered, member === 'PACKAGE' ? 'own' : 'main');
 }
 
 type LockAnswer = {

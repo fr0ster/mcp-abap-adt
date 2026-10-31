@@ -60,8 +60,9 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
@@ -181,6 +182,13 @@ async function nodeStructure(
   if (!parent_name) {
     return return_error(new Error('parent_name is required'));
   }
+  const variant = variantOf(connection);
+  const parentType = tableTypeOf(parent_type, variant);
+  if (parentType === undefined) {
+    return return_error(
+      new Error(notATableType('parent_type', parent_type, variant)),
+    );
+  }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
   // shape: `nodeLevel` (`lib/strategies/packageWalk.ts`) parses
@@ -199,7 +207,7 @@ async function nodeStructure(
           withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
             client
               .getUtils({ ...ourUtils, node: rawNodeStructureXml })
-              .fetchNodeStructure(parent_type, parent_name, {
+              .fetchNodeStructure(parentType, parent_name, {
                 headers,
                 analyse: analyseException,
                 nodeId: node_id || '000000',
@@ -212,7 +220,7 @@ async function nodeStructure(
             return succeededLevel(nodeLevel({ data: rawXml }));
           }
 
-          if (parent_type.toUpperCase() !== 'DEVC/K') {
+          if (parentType !== 'DEVC/K') {
             // Nothing below this node. See the header: measured on a class
             // that exists, so the blank body is the answer, not a refusal.
             return succeededLevel({ objects: [], childNodes: [] });

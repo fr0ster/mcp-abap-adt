@@ -2,14 +2,18 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
-Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
+Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 71
+- Total tools: 70
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Atc](#read-only-atc)
+    - [RunATC](#runatc-read-only-atc)
+    - [GetATCRunStatus](#getatcrunstatus-read-only-atc)
+    - [GetATCFindings](#getatcfindings-read-only-atc)
   - [Batch](#read-only-batch)
     - [BatchBegin](#batchbegin-read-only-batch)
     - [BatchEnd](#batchend-read-only-batch)
@@ -49,7 +53,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetInterface](#getinterface-read-only-interface)
   - [Leftover Session](#read-only-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-read-only-leftover-session)
-    - [LogoffLeftoverSession](#logoffleftoversession-read-only-leftover-session)
   - [Message Class](#read-only-message-class)
     - [GetMessageClass](#getmessageclass-read-only-message-class)
     - [GetMessageClassMessage](#getmessageclassmessage-read-only-message-class)
@@ -75,12 +78,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetTransaction](#gettransaction-read-only-system)
-    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
-    - [RuntimeRunClass](#runtimerunclass-read-only-system)
-    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
     - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
@@ -116,6 +116,43 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-atc"></a>
+### Read-Only / Atc
+
+<a id="runatc-read-only-atc"></a>
+#### RunATC (Read-Only / Atc)
+**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+
+**Source:** `src/handlers/atc/high/handleRunATC.ts`
+
+**Parameters:**
+- See schema reference `runAtcSchema` in source file
+
+---
+
+<a id="getatcrunstatus-read-only-atc"></a>
+#### GetATCRunStatus (Read-Only / Atc)
+**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
+
+**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
+
+**Parameters:**
+- `run_id` (string, required) - Run identifier an ATC run started with wait=false answered.
+
+---
+
+<a id="getatcfindings-read-only-atc"></a>
+#### GetATCFindings (Read-Only / Atc)
+**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+
+**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
+
+**Parameters:**
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `worklist_id` (string, required) - Worklist identifier an ATC run answered.
+
+---
 
 <a id="read-only-batch"></a>
 ### Read-Only / Batch
@@ -212,9 +249,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
-- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
-- `object_name` (string, required) - Object name.
-- `object_type` (string, required) - Object type.
+- See schema reference `objectVersionsSchema` in source file
 
 ---
 
@@ -225,8 +260,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
-- `object_type` (string, required) - Object type (the same value the version history was read with).
+- See schema reference `objectVersionSourceSchema` in source file
 
 ---
 
@@ -237,9 +271,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
-- `object_type` (string, required) - Object type (the same value the version history was read with).
+- See schema reference `objectVersionDiffSchema` in source file
 
 ---
 
@@ -420,11 +452,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
-- `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
-- `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
-- `object_type` (string, optional) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
-- `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- See schema reference `includesListSchema` in source file
 
 ---
 
@@ -455,17 +483,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - None
-
----
-
-<a id="logoffleftoversession-read-only-leftover-session"></a>
-#### LogoffLeftoverSession (Read-Only / Leftover Session)
-**Description:** [read-only] [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
-
-**Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
-
-**Parameters:**
-- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
 
 ---
 
@@ -542,7 +559,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -558,14 +575,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system's object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
-- `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')
+- `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
@@ -707,30 +724,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
-#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [read-only] [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
 **Description:** [read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
@@ -769,61 +762,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
 - `response_mode` (string, optional (default: both)) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
 - `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
-
----
-
-<a id="runtimerunclass-read-only-system"></a>
-#### RuntimeRunClass (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `class_name` (string, required) - ABAP class name to execute.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
-<a id="runtimerunprogram-read-only-system"></a>
-#### RuntimeRunProgram (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
-- `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -908,18 +846,12 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Lists where the object named by object_name and object_type is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
 **Parameters:**
-- `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
-- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
-- `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
-- `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, optional) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
-- `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- See schema reference `whereUsedSchema` in source file
 
 ---
 
@@ -1023,7 +955,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
@@ -1144,7 +1076,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1156,7 +1088,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 <a id="streamable-http-binaries"></a>
 ## Streamable HTTP Binaries
 
-`mcp-abap-adt-sse-ro` (SSE) serves the tools of `mcp-abap-adt-ro` without `ListLeftoverSessions`, `LogoffLeftoverSession`, which are stdio's only. `mcp-abap-adt-http-ro` (Streamable HTTP) serves the same tools, and beside them:
+`mcp-abap-adt-sse-ro` (SSE) serves the tools of `mcp-abap-adt-ro` without `ListLeftoverSessions`, which are stdio's only. `mcp-abap-adt-http-ro` (Streamable HTTP) serves the same tools, and beside them:
 
 - **The `state_handle` argument.** On `mcp-abap-adt-http-ro` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 - **The long session:** `SessionOpen`, `SessionClose`, served by no stdio or SSE binary. Their parameters below are the ones `mcp-abap-adt-http-ro` registers, `state_handle` included.
@@ -1179,4 +1111,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-10-24*
+*Last updated: 2026-10-31*

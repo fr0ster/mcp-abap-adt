@@ -1,9 +1,15 @@
 import { handleGetATCFindings } from '../../handlers/atc/high/handleGetATCFindings';
 import { handleGetATCRunStatus } from '../../handlers/atc/high/handleGetATCRunStatus';
-import { handleRunATC } from '../../handlers/atc/high/handleRunATC';
+import {
+  handleRunATC,
+  TOOL_DEFINITION,
+} from '../../handlers/atc/high/handleRunATC';
 import { corpusBody } from '../../lib/adtCorpus';
+import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
+import { declareSystemKind } from '../../lib/systemKind';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { recordingConnection } from '../helpers/recordingConnection';
 
 /**
  * The three ATC tools, and the two things about them that are this
@@ -32,6 +38,8 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 }));
 
 const context = { connection: {} as any, logger: undefined };
+// RunATC reads its object types from the declared variant.
+declareSystemKind(context.connection, 'onprem');
 const payload = (result: any) => JSON.parse(result.content[0].text);
 
 describe('the ATC worklist reading, against the captured document', () => {
@@ -98,6 +106,121 @@ describe('the ATC worklist reading, against the captured document', () => {
       findings: [],
       objects_checked: 1,
       by_priority: {},
+    });
+  });
+});
+
+describe('the fields detail=full adds, from the captured document', () => {
+  it('reads the column, the check and message ids, the documentation, the exemption and the quick fixes', () => {
+    const finding = parseAtcWorklist(WORKLIST).findings[0];
+
+    // `#start=9,0`: the line and the column beside it.
+    expect(finding.line).toBe(9);
+    expect(finding.column).toBe(0);
+    expect(finding.check_id).toBe('F8607CD40A0F8B30BDF8590205B306E8');
+    expect(finding.check_class).toBe('CL_CI_TEST_EXTENDED_CHECK');
+    expect(finding.message_id).toBe('1713');
+    expect(finding.documentation_uri).toBe(
+      '/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A64EB9/index/1426',
+    );
+    // As the document carries them: `-` for the approval, an empty kind
+    // left out.
+    expect(finding.exemption_approval).toBe('-');
+    expect(finding.exemption_kind).toBeUndefined();
+    expect(finding.quickfixes).toEqual({
+      manual: false,
+      automatic: false,
+      pseudo: false,
+      ai_based: false,
+      ai_enabled: false,
+    });
+  });
+
+  it('reads a quick fix flag set to true as true', () => {
+    const doc = WORKLIST.replace(
+      'atcfinding:manual="false"',
+      'atcfinding:manual="true"',
+    );
+    expect(parseAtcWorklist(doc).findings[0].quickfixes?.manual).toBe(true);
+  });
+
+  it('answers the fields under full, and terse as before', async () => {
+    atc = { getFindings: async () => okResponse(WORKLIST) };
+    const terse: any = await handleGetATCFindings(context as any, {
+      worklist_id: 'WL1',
+    });
+    expect(Object.keys(payload(terse).findings[0]).sort()).toEqual(
+      [
+        'check',
+        'line',
+        'location',
+        'message',
+        'object',
+        'object_type',
+        'priority',
+      ].sort(),
+    );
+
+    atc = { getFindings: async () => okResponse(WORKLIST) };
+    const full: any = await handleGetATCFindings(context as any, {
+      worklist_id: 'WL1',
+      detail: 'full',
+    });
+    expect(payload(full).findings[0]).toMatchObject({
+      line: 9,
+      column: 0,
+      check_id: 'F8607CD40A0F8B30BDF8590205B306E8',
+      check_class: 'CL_CI_TEST_EXTENDED_CHECK',
+      message_id: '1713',
+      documentation_uri:
+        '/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A64EB9/index/1426',
+      exemption_approval: '-',
+      quickfixes: { manual: false, automatic: false },
+    });
+    expect(payload(full).finding_count).toBe(6);
+  });
+});
+
+describe('the source position, in the fragment shapes ADT records', () => {
+  const at = (location: string) => {
+    const doc = `<atcworklist:worklist><atcworklist:objects><atcobject:object adtcore:name="ZCL_X" adtcore:type="CLAS"><atcobject:findings><atcfinding:finding atcfinding:priority="1" atcfinding:location="${location}"/></atcobject:findings></atcobject:object></atcworklist:objects></atcworklist:worklist>`;
+    const [finding] = parseAtcWorklist(doc).findings;
+    return {
+      location: finding.location,
+      line: finding.line,
+      column: finding.column,
+    };
+  };
+
+  it('reads #start=LINE,COLUMN', () => {
+    expect(at('/sap/bc/adt/oo/classes/zcl_x/source/main#start=9,4')).toEqual({
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line: 9,
+      column: 4,
+    });
+  });
+
+  // The unit-test fixtures' shape: `;`-separated, start then end.
+  it('reads #start=LINE,COLUMN;end=LINE,COLUMN', () => {
+    expect(
+      at('/sap/bc/adt/oo/classes/zcl_x/source/main#start=8,3;end=8,0'),
+    ).toEqual({
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line: 8,
+      column: 3,
+    });
+  });
+
+  // The debugger fixtures' shape: other parts first, a line with no column.
+  it('reads #type=…;name=…;start=LINE', () => {
+    expect(
+      at(
+        '/sap/bc/adt/oo/classes/zcl_x/source/main#type=CLAS%2FOM;name=POST;start=29',
+      ),
+    ).toEqual({
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line: 29,
+      column: undefined,
     });
   });
 });
@@ -232,6 +355,263 @@ describe('RunATC composes the three calls', () => {
     const result: any = await handleRunATC(context as any, { objects: [] });
     expect(result.isError).toBe(true);
   });
+});
+
+describe('RunATC: the object kinds the client checks', () => {
+  const objectSchema = () =>
+    (TOOL_DEFINITION.inputSchema.properties.objects.items as any).properties;
+
+  it('offers every kind the client builds a URI for', () => {
+    expect([...objectSchema().type.enum].sort()).toEqual(
+      [
+        'behavior_definition',
+        'class',
+        'class_include',
+        'ddl_source',
+        'function_group',
+        'function_include',
+        'interface',
+        'package',
+        'program',
+        'program_include',
+        'table',
+      ].sort(),
+    );
+    expect([...objectSchema().include_kind.enum].sort()).toEqual(
+      ['definitions', 'implementations', 'macros', 'testclasses'].sort(),
+    );
+    expect(objectSchema().function_group.type).toBe('string');
+  });
+
+  const capture = () => {
+    const seen: { target?: any } = {};
+    atc = {
+      createWorklist: async () => okResponse('WL1'),
+      startRun: async (worklistId: string, target: any) => {
+        seen.target = target;
+        return okResponse({ waited: false, worklistId, runId: 'RUN1' });
+      },
+    };
+    return seen;
+  };
+
+  it('passes a program and a program include by name', async () => {
+    const seen = capture();
+    const result: any = await handleRunATC(context as any, {
+      objects: [
+        { name: 'zprog', type: 'program' },
+        { name: 'zprog_top', type: 'program_include' },
+      ],
+      check_variant: 'V',
+    });
+    expect(result.isError).toBe(false);
+    expect(seen.target.objects).toEqual([
+      { objectName: 'ZPROG', objectType: 'program' },
+      { objectName: 'ZPROG_TOP', objectType: 'program_include' },
+    ]);
+  });
+
+  it('passes a function include with its group, a class include with its kind', async () => {
+    const seen = capture();
+    const result: any = await handleRunATC(context as any, {
+      objects: [
+        { name: 'lzfg_f01', type: 'function_include', function_group: 'zfg' },
+        {
+          name: 'zcl_x',
+          type: 'class_include',
+          include_kind: 'testclasses',
+        },
+      ],
+      check_variant: 'V',
+    });
+    expect(result.isError).toBe(false);
+    expect(seen.target.objects).toEqual([
+      {
+        objectName: 'LZFG_F01',
+        objectType: 'function_include',
+        functionGroup: 'ZFG',
+      },
+      {
+        objectName: 'ZCL_X',
+        objectType: 'class_include',
+        includeKind: 'testclasses',
+      },
+    ]);
+    expect(payload(result).objects).toEqual([
+      { name: 'LZFG_F01', type: 'function_include', function_group: 'ZFG' },
+      { name: 'ZCL_X', type: 'class_include', include_kind: 'testclasses' },
+    ]);
+  });
+
+  it.each([
+    [{ name: 'LZFG_F01', type: 'function_include' }, 'function_group'],
+    [{ name: 'ZCL_X', type: 'class_include' }, 'include_kind'],
+  ] as const)(
+    'refuses %p without %s before making any call',
+    async (object, field) => {
+      atc = {
+        createWorklist: async () => {
+          throw new Error('should not be called');
+        },
+      };
+      const result: any = await handleRunATC(context as any, {
+        objects: [object],
+        check_variant: 'V',
+      });
+      expect(result.isError).toBe(true);
+      expect(String(result.content[0].text)).toContain(field);
+    },
+  );
+});
+
+/**
+ * The object kinds are the declared variant's (`ATC_OBJECT_TYPES`): ABAP
+ * cloud holds no program or program include of the caller's, so it offers
+ * neither; on premise offers every kind the client checks. The description
+ * names exactly the variant's list, and a kind outside it is refused naming
+ * that list before any call.
+ */
+describe('RunATC: the object kinds of each variant', () => {
+  const ONPREM = [
+    'class',
+    'interface',
+    'function_group',
+    'package',
+    'ddl_source',
+    'table',
+    'behavior_definition',
+    'program',
+    'program_include',
+    'function_include',
+    'class_include',
+  ];
+  const CLOUD = ONPREM.filter(
+    (kind) => kind !== 'program' && kind !== 'program_include',
+  );
+  const stated = (variant: 'onprem' | 'cloud') =>
+    TOOL_DEFINITION.variants[variant];
+  const typeEnum = (variant: 'onprem' | 'cloud') =>
+    stated(variant).inputSchema.properties.objects.items.properties.type.enum;
+
+  it.each([
+    ['onprem', ONPREM],
+    ['cloud', CLOUD],
+  ] as const)('%s offers exactly its kinds', (variant, kinds) => {
+    expect(ATC_OBJECT_TYPES[variant]).toEqual(kinds);
+    expect([...typeEnum(variant)]).toEqual(kinds);
+    const words = stated(variant).description;
+    for (const kind of kinds) expect(words).toContain(kind);
+  });
+
+  it('cloud names no program kind', () => {
+    expect(stated('cloud').description).not.toContain('program');
+    expect(stated('cloud').description).not.toContain('on premise');
+  });
+
+  /** A run of one object of `type` on `variant`: its answer and the calls. */
+  async function runOn(variant: 'onprem' | 'cloud', type: string) {
+    const calls: string[] = [];
+    atc = {
+      createWorklist: async () => {
+        calls.push('createWorklist');
+        return okResponse('WL1');
+      },
+      startRun: async (worklistId: string) => {
+        calls.push('startRun');
+        return okResponse({ waited: false, worklistId, runId: 'RUN1' });
+      },
+    };
+    const connection = recordingConnection();
+    declareSystemKind(connection, variant);
+    const answered = await handleRunATC(
+      { connection },
+      { objects: [{ name: 'ZOBJ', type }], check_variant: 'V' },
+    );
+    return { answered, calls };
+  }
+
+  it.each(['program', 'program_include', 'PROGRAM'])(
+    'cloud refuses %s naming its kinds, before any call',
+    async (type) => {
+      const { answered, calls } = await runOn('cloud', type);
+      expect(answered.isError).toBe(true);
+      expect(answered.content[0].text).toContain(
+        `objects[].type "${type}" is not one of: ${CLOUD.join(', ')}; nothing was sent`,
+      );
+      expect(calls).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['onprem', 'program'],
+    ['onprem', 'program_include'],
+    ['cloud', 'class'],
+    ['cloud', 'function_group'],
+  ] as const)('%s runs %s', async (variant, type) => {
+    const { answered, calls } = await runOn(variant, type);
+    expect(answered.isError).toBeFalsy();
+    expect(calls).toEqual(['createWorklist', 'startRun']);
+  });
+
+  it('refuses a kind no variant has, before any call', async () => {
+    const { answered, calls } = await runOn('onprem', 'domain');
+    expect(answered.content[0].text).toContain(
+      `objects[].type "domain" is not one of: ${ONPREM.join(', ')}; nothing was sent`,
+    );
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('RunATC: a field the type does not use', () => {
+  it.each([
+    [
+      { name: 'ZCL_X', type: 'class', function_group: 'ZFG' },
+      'function_group',
+      'class',
+    ],
+    [
+      { name: 'ZPROG', type: 'program', include_kind: 'macros' },
+      'include_kind',
+      'program',
+    ],
+    [
+      {
+        name: 'LZFG_F01',
+        type: 'function_include',
+        function_group: 'ZFG',
+        include_kind: 'macros',
+      },
+      'include_kind',
+      'function_include',
+    ],
+    [
+      {
+        name: 'ZCL_X',
+        type: 'class_include',
+        include_kind: 'macros',
+        function_group: 'ZFG',
+      },
+      'function_group',
+      'class_include',
+    ],
+  ] as const)(
+    'refuses %p, naming %s and %s, before any call',
+    async (object, field, type) => {
+      atc = {
+        createWorklist: async () => {
+          throw new Error('should not be called');
+        },
+      };
+      const result: any = await handleRunATC(context as any, {
+        objects: [object],
+        check_variant: 'V',
+      });
+      expect(result.isError).toBe(true);
+      const text = String(result.content[0].text);
+      expect(text).toContain(field);
+      expect(text).toContain(`"${type}"`);
+    },
+  );
 });
 
 describe('the two readers', () => {

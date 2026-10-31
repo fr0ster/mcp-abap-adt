@@ -30,6 +30,14 @@
  * `detail` in its schema, found by cross-checking every registered tool that
  * calls the shared `project()` helper against the tools that declare
  * `detail`. Wired the same way as its siblings.
+ *
+ * **The verdict is the transport check's own (#329, D4).** The answer is
+ * SAP's `checkData` document, whose verdict is `RESULT` — not the
+ * `CHECK_RESULT`/`SEVERITY` of the type validations `terseValidation` reads,
+ * which found neither here and answered `admissible: false` with an empty
+ * message for every name, a free one included (measured on ABAP Cloud,
+ * 2026-10-31: `<RESULT>S</RESULT>`, `<MESSAGES/>`). `terseTransportCheck`
+ * reads `RESULT` and SAP's `CTS_MESSAGE`s.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -38,7 +46,10 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseValidation } from '../../../lib/strategies/projections';
+import {
+  project,
+  terseTransportCheck,
+} from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -46,7 +57,7 @@ export const TOOL_DEFINITION = {
   name: 'ValidateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint.',
+    "[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -65,7 +76,8 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'ABAP package for the binding.',
+        description:
+          'ABAP package of the binding, which the validation checks.',
       },
       service_binding_version: {
         type: 'string',
@@ -74,7 +86,11 @@ export const TOOL_DEFINITION = {
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['service_binding_name', 'service_definition_name'],
+    required: [
+      'service_binding_name',
+      'service_definition_name',
+      'package_name',
+    ],
   },
 } as const;
 
@@ -99,6 +115,12 @@ export async function handleValidateServiceBinding(
   if (!args?.service_definition_name) {
     return return_error(new Error('service_definition_name is required'));
   }
+  // The transport check names the binding's package: without one, adt-clients
+  // fails on it before any request (a TypeError), so it is refused here.
+  const packageName = args.package_name?.trim();
+  if (!packageName) {
+    return return_error(new Error('package_name is required'));
+  }
 
   const bindingName = args.service_binding_name.trim().toUpperCase();
   const detail = detailOf(args);
@@ -111,11 +133,11 @@ export async function handleValidateServiceBinding(
         .validate(
           {
             bindingName,
-            packageName: args.package_name?.trim().toUpperCase(),
+            packageName: packageName.toUpperCase(),
             description: args.description?.trim(),
           },
           { analyse: analyseException },
         ),
-    project(detail, terseValidation),
+    project(detail, terseTransportCheck),
   );
 }

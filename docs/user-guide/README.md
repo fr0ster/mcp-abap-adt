@@ -128,7 +128,8 @@ server serves:
   user and time of each session a dead process left; never a cookie, and nothing is sent to SAP.
 - `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
   (every lock in it is released) — one request, the logoff, with no credential and nothing sent
-  before it — and deletes the record.
+  before it — and deletes the record. A logoff changes the system, so only the full binaries serve
+  it; the `-ro` binaries list the sessions.
 
 A record is the server's when it names the destination the server serves (`--mcp=<name>`, or
 `default` for an `--env` file) and points where that destination points (URL, client, system

@@ -139,8 +139,7 @@ function install(
         dropConnection: () => {
           wire.closed += 1;
         },
-        abapDebugger: (c, onConflict) =>
-          new AbapDebugger(c, undefined, undefined, { onConflict }),
+        abapDebugger: (c, onConflict) => AbapDebugger.create(c, { onConflict }),
         requestUser: async () => 'TESTUSER',
         run: async () => ({ ok: true, output: '' }),
       },
@@ -149,7 +148,7 @@ function install(
     amdp: new AmdpSession({
       openConnection: open,
       closeConnection: close,
-      amdpDebugger: (c) => new AmdpDebugger(c),
+      amdpDebugger: (c) => AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',
       run: async () => ({ ok: true, output: '' }),
     }),

@@ -18,6 +18,10 @@ import {
 } from '../handlers/compactPartRoutes';
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
 
+// The process declares its system type, as every launcher requires: the
+// type argument is checked against the declared variant's projection.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 /** The refusal text, out of the answer the tool returns. */
 const refusalOf = async (args: Record<string, unknown>) => {
   const answered = (await handleHandlerGet(
@@ -66,14 +70,14 @@ describe('the parts a compact read can answer', () => {
     );
   });
 
-  it('says "nothing" when the type has no readable part at all', async () => {
-    // Measured, not assumed: the compact read map has no `get` for a runtime
-    // dump — the CRUD matrix gives it nothing — so there is nothing to offer, and
-    // saying that beats listing parts which do not exist either.
+  it('refuses a type with no read at all at the boundary, naming what it reads', async () => {
+    // A runtime dump has no read route (`COMPACT_READ_ROUTES`), so it is no
+    // member of HandlerGet's object_type: refused before any part is asked,
+    // with the members the declared variant reads.
     expect(
       await refusalOf({ object_type: 'RUNTIME_DUMP', part: 'urls' }),
     ).toMatch(
-      /part=urls is not available[\s\S]*RUNTIME_DUMP[\s\S]*offers: nothing/,
+      /Unsupported read for object_type: RUNTIME_DUMP\. Supported: PACKAGE,/,
     );
   });
 
@@ -89,7 +93,7 @@ describe('the parts a compact read can answer', () => {
 
   it('never silently answers a different part', async () => {
     expect(
-      await refusalOf({ object_type: 'RUNTIME_DUMP', part: 'urls' }),
+      await refusalOf({ object_type: 'UNIT_TEST', part: 'urls', run_id: 'X' }),
     ).toMatch(/not available/);
   });
 });

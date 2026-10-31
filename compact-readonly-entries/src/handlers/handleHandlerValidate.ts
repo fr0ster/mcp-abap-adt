@@ -22,25 +22,31 @@
 
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  compactValidateSchema,
-  toLowObjectType,
+  acceptedOf,
+  byVariant,
+  COMPACT_VALIDATE,
+  COMPACT_VALIDATE_KINDS,
+  compactValidateDescription,
+  compactValidateSchemaFor,
+  supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
-  handleValidateObject,
   handleValidateServiceBinding,
+  validateObject,
 } from '@mcp-abap-adt/lib/handlers/read';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerValidate',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).',
-  inputSchema: compactValidateSchema,
+  ...byVariant((variant) => ({
+    description: compactValidateDescription(variant),
+    inputSchema: compactValidateSchemaFor(COMPACT_VALIDATE[variant]),
+  })),
 } as const;
 
 type HandlerValidateArgs = {
-  object_type: CompactObjectType;
+  object_type: string;
   object_name: string;
   package_name?: string;
   description?: string;
@@ -57,7 +63,18 @@ export async function handleHandlerValidate(
   context: HandlerContext,
   args: HandlerValidateArgs,
 ) {
-  if (args.object_type === 'SERVICE_BINDING') {
+  // The boundary of object_type: one of the declared variant's members
+  // (`COMPACT_VALIDATE`); past it, the kind is typed
+  // (`COMPACT_VALIDATE_KINDS`).
+  const variant = variantOf(context.connection);
+  const member = acceptedOf(args.object_type, COMPACT_VALIDATE[variant]);
+  if (member === undefined) {
+    throw new Error(
+      `Validate is not supported for object_type: ${args.object_type}. ${supported(COMPACT_VALIDATE[variant])}`,
+    );
+  }
+
+  if (member === 'SERVICE_BINDING') {
     return handleValidateServiceBinding(context, {
       service_binding_name: args.object_name,
       service_definition_name: args.service_definition_name,
@@ -67,16 +84,9 @@ export async function handleHandlerValidate(
     });
   }
 
-  const lowType = toLowObjectType(args.object_type);
-  if (!lowType) {
-    throw new Error(
-      `Validate is not supported for object_type: ${args.object_type}`,
-    );
-  }
-
-  return handleValidateObject(context, {
+  return validateObject(context, {
     object_name: args.object_name,
-    object_type: lowType,
+    object_type: COMPACT_VALIDATE_KINDS[member],
     package_name: args.package_name,
     description: args.description,
     super_package: args.super_package,

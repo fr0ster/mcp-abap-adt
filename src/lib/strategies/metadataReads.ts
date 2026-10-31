@@ -4,6 +4,7 @@
  * batched walks send for an object's description (spec §11). Both call the
  * same function, so the two requests cannot drift apart.
  */
+
 import {
   accessControlDocuments,
   behaviorDefinitionDocuments,
@@ -11,6 +12,7 @@ import {
   dataElementDocuments,
   ddlDocuments,
   domainDocuments,
+  enhancementDocuments,
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
@@ -25,11 +27,17 @@ import {
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { createAdtClient } from '../clients';
+import type {
+  AdtTypeCode,
+  AdtTypeCodeWith,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../adtClientContract';
+import { tableCodeOf } from '../adtTypeCode';
 import { resultsFor } from './resultSets';
 
-type Client = ReturnType<typeof createAdtClient>;
+type Client = IServerAdtClient;
 
 const analysed = { analyse: analyseException };
 
@@ -163,7 +171,7 @@ export const readEnhancementSpotMetadata = (
   config: { enhancementName: string },
 ) =>
   c
-    .getEnhancement()
+    .getEnhancement(enhancementDocuments)
     .readMetadata({ ...config, enhancementType: 'enhsxsb' as const }, analysed);
 
 /** An access control's metadata (DCL source, `DCLS/DL`). */
@@ -201,7 +209,7 @@ const inGroup =
  * its name, and for a function module or include the group it was found in.
  * A package is read active, as `GetPackage` reads it by default.
  */
-const READS: Record<string, ReadOf> = {
+const READS = {
   'CLAS/OC': (t) => (c) => readClassMetadata(c, { className: t.name }),
   'INTF/OI': (t) => (c) => readInterfaceMetadata(c, { interfaceName: t.name }),
   'PROG/P': (t) => (c) => readProgramMetadata(c, { programName: t.name }),
@@ -240,16 +248,29 @@ const READS: Record<string, ReadOf> = {
     readEnhancementSpotMetadata(c, { enhancementName: t.name }),
   'DCLS/DL': (t) => (c) =>
     readAccessControlMetadata(c, { accessControlName: t.name }),
-};
+} satisfies { readonly [C in MetadataCode]?: ReadOf };
+
+/**
+ * A code whose metadata a table reads (`readMetadata`), on premise or on
+ * ABAP cloud: a key of {@link READS} outside them does not compile.
+ */
+type MetadataCode = AdtTypeCodeWith<'onprem' | 'cloud', 'readMetadata'>;
+
+/** {@link READS}, read by any code of the tables. */
+const READ_BY_CODE: Readonly<Partial<Record<AdtTypeCode, ReadOf>>> = READS;
 
 /** The ADT types whose metadata is read. */
 export const METADATA_READ_TYPES: readonly string[] = Object.keys(READS);
 
-/** `target`'s metadata read; `undefined` for a type with none. */
+/**
+ * `target`'s metadata read; `undefined` for a type with none. The type is
+ * what SAP answered (a package listing), looked up against the tables.
+ */
 export function metadataReadOf(
   target: MetadataTarget,
 ): MetadataRead | undefined {
-  return READS[target.type.toUpperCase()]?.(target);
+  const code = tableCodeOf(target.type);
+  return code === undefined ? undefined : READ_BY_CODE[code]?.(target);
 }
 
 /**

@@ -147,7 +147,7 @@ mcp-abap-adt --env-path=/path/to/.env --system-type=<onprem|cloud>
 
 Destinations are served only by `mcp-abap-adt` (stdio); `mcp-abap-adt-http` and `mcp-abap-adt-sse` refuse
 `--mcp`, `--env` and `--env-path` at start, naming `mcp-abap-adt`. Without any of them, stdio starts in
-inspection-only mode (the tool list answers; a tool call needs a connection).
+inspection-only mode (the tool list of the stated system type answers — inspection needs `--system-type` too; a tool call needs a connection).
 
 ### How It Works
 
@@ -299,11 +299,11 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 | `onprem` | On-premise systems (BASIS ≥ 7.50) |
 | `legacy` | Legacy on-premise systems (BASIS < 7.50) — **not supported at present**, see below; connects as on-premise |
 
-**Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
+**Why this matters:** Different SAP environments support different ADT endpoints. The server takes the tools it registers, their enums and the object types each argument accepts from the ADT type table of the stated system type (`@mcp-abap-adt/interfaces-adt`'s `ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`), and builds the client of that system type. For example, a program is created, changed and activated on `onprem` only; on `cloud` it is read, checked and unit-tested (SAP's programs).
 
 **On `legacy`:** no tool declares that environment, so a server started with `SAP_SYSTEM_TYPE=legacy` offers none. Support for legacy systems is parked on the `parked/legacy-support` branch until it can be tried against a live one — it was declared on 142 tools and had never been run against such a system, which is a claim rather than a fact.
 
-**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` (and their `-ro` and compact binaries) do not start (exit `1` before anything listens; no request header states the kind), A value other than the three is refused the same way. `EmbeddableMcpServer` and `HandlerExporter` require none (see below). Inspection-only stdio (no destination) needs no kind: it filters nothing and lists every tool of its set — there is no `cloud` default.
+**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` (and their `-ro` and compact binaries) do not start (exit `1` before anything listens; no request header states the kind), A value other than the three is refused the same way. `EmbeddableMcpServer` and `HandlerExporter` require none (see below). Inspection-only stdio (no destination) needs it too: it lists the tools of that kind's table, and without it the start is refused (exit `1`) — there is no default.
 
 You can also set this via CLI: `--system-type=onprem`, or YAML `system-type: onprem`. Precedence: the CLI flag, then the environment — which the `--env` / `--env-path` `.env` value joins, never over one already set — then YAML.
 
@@ -321,7 +321,7 @@ new EmbeddableMcpServer({
 
 Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`; neither is required (without both, every tool is listed). That order picks the tools and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL.
+**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`. Without both, every tool is listed, and every call that would reach the system is refused `system_type_required`: an embedder states one. That order picks the tools and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL.
 
 ### System Context for On-Premise Systems
 

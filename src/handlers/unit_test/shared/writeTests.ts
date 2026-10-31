@@ -25,11 +25,12 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../../../lib/adtHeaders/withAdtHeaders';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type ActivationRunSource,
@@ -129,7 +130,9 @@ export async function writeProgramTests(
   source: string,
   options: { create: boolean; transportRequest?: string },
 ): Promise<Answer> {
-  const client = createAdtClient(context.connection, context.logger);
+  // A report's test include is created, changed and activated on premise
+  // only: only that table lists those operations for `PROG/P` and `PROG/I`.
+  const client = createOnPremAdtClient(context.connection, context.logger);
   const program = client.getProgram(resultsFor(programDocuments));
   const include = client.getInclude(resultsFor(includeDocuments));
   const name = programName.toUpperCase();
@@ -334,7 +337,7 @@ const ACTIVATION_POLLS = 6;
  */
 async function activateWithMainProgram(
   context: AdtHeadersContext,
-  client: ReturnType<typeof createAdtClient>,
+  client: IServerAdtClient,
   groupName: string,
   includeName: string,
 ): Promise<Answer> {

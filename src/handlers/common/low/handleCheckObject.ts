@@ -35,8 +35,10 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { CHECK_KINDS, type CheckKind } from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
@@ -99,49 +101,46 @@ interface CheckObjectArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
-const VALID_TYPES = [
-  'class',
-  'program',
-  'interface',
-  'function_group',
-  'function_module',
-  'table',
-  'structure',
-  'ddl',
-  'domain',
-  'data_element',
-  'package',
-  'behavior_definition',
-  'metadata_extension',
-];
-
 /** The types whose check can take source that is not saved. */
 const SOURCE_TYPES = ['class', 'structure', 'ddl'];
 
+/**
+ * The tool's boundary: `object_type` is one of the kinds the declared
+ * variant serves (`CHECK_KINDS`), either case; past it, {@link checkObject} takes
+ * the kind typed and checks it no more.
+ */
 export async function handleCheckObject(
   context: HandlerContext,
   args: CheckObjectArgs,
 ) {
+  if (!args.object_name || !args.object_type) {
+    return return_error(new Error('object_name and object_type are required'));
+  }
+  const variant = variantOf(context.connection);
+  const kind = acceptedOf(args.object_type, CHECK_KINDS[variant]);
+  if (kind === undefined) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${CHECK_KINDS[variant].join(', ')}`,
+      ),
+    );
+  }
+  return checkObject(context, { ...args, object_type: kind });
+}
+
+/** One object of a kind checked at the tool's boundary. */
+export async function checkObject(
+  context: HandlerContext,
+  args: Omit<CheckObjectArgs, 'object_type'> & { object_type: CheckKind },
+) {
   const { connection, logger } = context;
-  const {
-    object_name,
-    object_type,
-    version = 'active',
-    source_code,
-  } = args as CheckObjectArgs;
+  const { object_name, object_type, version = 'active', source_code } = args;
 
   if (!object_name || !object_type) {
     return return_error(new Error('object_name and object_type are required'));
   }
 
-  const objectType = object_type.toLowerCase();
-  if (!VALID_TYPES.includes(objectType)) {
-    return return_error(
-      new Error(
-        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
-      ),
-    );
-  }
+  const objectType = object_type;
 
   const checkVersion = ['active', 'inactive'].includes(version.toLowerCase())
     ? (version.toLowerCase() as 'active' | 'inactive')
@@ -302,9 +301,6 @@ export async function handleCheckObject(
                 analyse: analyseException,
               }),
           );
-        default:
-          // Unreachable: objectType was already checked against VALID_TYPES.
-          throw new Error(`Unsupported object_type: ${object_type}`);
       }
     },
     project(detail, terseCheck),

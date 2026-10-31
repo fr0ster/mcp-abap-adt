@@ -1,7 +1,7 @@
 let toClient: unknown;
 
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({
+jest.mock('../../lib/clients', () => {
+  const client = () => ({
     getUtils: () => ({
       activateObjectsGroup: (objects: unknown) => {
         toClient = objects;
@@ -11,8 +11,15 @@ jest.mock('../../lib/clients', () => ({
         });
       },
     }),
-  }),
-}));
+  });
+  return {
+    // The declared variant the boundary checks a type argument against.
+    variantOf: () => 'onprem',
+    createAdtClient: client,
+    // An on-premise group activation is the on-premise client's.
+    createOnPremAdtClient: client,
+  };
+});
 
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 
@@ -46,6 +53,7 @@ describe('ActivateObjectLow and the address it was given', () => {
           name: 'Z_AC_FM01',
           type: 'FUGR/FF',
           uri: '/sap/bc/adt/functions/groups/zac_fgr01/fmodules/z_ac_fm01',
+          parentName: 'ZAC_FGR01',
         },
       ],
     } as never);
@@ -55,6 +63,7 @@ describe('ActivateObjectLow and the address it was given', () => {
         name: 'Z_AC_FM01',
         type: 'FUGR/FF',
         uri: '/sap/bc/adt/functions/groups/zac_fgr01/fmodules/z_ac_fm01',
+        parentName: 'ZAC_FGR01',
       },
     ]);
   });
@@ -90,11 +99,36 @@ describe('ActivateObjectLow and the address it was given', () => {
     ]);
   });
 
+  /**
+   * A function module's reference names its group (`IAdtCodedReference`,
+   * adt-clients 39): without `parentName` — a `uri` is no address the
+   * group request reads — it is refused before anything is sent.
+   */
+  it('refuses a function module without its group, sending nothing', async () => {
+    const result = await handleActivateObject(context, {
+      objects: [
+        { name: 'Z_AC_FM01', type: 'FUGR/FF', uri: '/sap/bc/adt/x' },
+        { name: 'ZCL_B', type: 'CLAS/OC' },
+      ],
+    } as never);
+
+    expect(toClient).toBeUndefined();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'objects[].parentName is required for Z_AC_FM01 (FUGR/FF): the name of the object it belongs to; nothing was sent',
+    );
+  });
+
   /** The name still goes up, as it always did. */
   it('upper-cases the name on the way', async () => {
     await handleActivateObject(context, {
       objects: [
-        { name: 'z_ac_fm01', type: 'FUGR/FF', uri: '/sap/bc/adt/x' },
+        {
+          name: 'z_ac_fm01',
+          type: 'FUGR/FF',
+          uri: '/sap/bc/adt/x',
+          parentName: 'ZAC_FGR01',
+        },
         { name: 'zcl_b', type: 'CLAS/OC' },
       ],
     } as never);

@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 266
-- Read-only tools: 68
-- High-level tools: 161
+- Total tools: 264
+- Read-only tools: 65
+- High-level tools: 162
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -15,10 +15,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
-- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` (and `-http`, `-sse`). The read-only binaries (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, on stdio the leftover-session list and logoff, and the run tools without `background`
+- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` (and `-http`, `-sse`). The read-only binaries (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group, the system and search tools, and on stdio the leftover-session list — none of the run tools (`RuntimeRunClass`, `RuntimeRunProgram`, `RuntimeCreateProfilerTraceParameters`), the background-run tools or the leftover-session logoff, which change the system
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
-- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
+- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
 - every Streamable HTTP binary (`-http`, `-http-ro`) -> [Streamable HTTP Binaries](#streamable-http-binaries): the optional `state_handle` argument on every tool, and the long session (`SessionOpen`, `SessionClose`). No stdio or SSE binary serves these
 - every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
@@ -100,15 +100,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
     - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
-    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
     - [RuntimeGetGatewayErrorLog](#runtimegetgatewayerrorlog-read-only-system)
     - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
-    - [RuntimeRunClass](#runtimerunclass-read-only-system)
-    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
     - [GetTable](#gettable-read-only-table)
@@ -174,9 +171,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-high-level-common)
     - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
     - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
-    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
-    - [GetProgramVersions](#getprogramversions-high-level-common)
-    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
     - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
     - [GetStructureVersions](#getstructureversions-high-level-common)
     - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
@@ -272,6 +266,9 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [UpdateStructure](#updatestructure-high-level-structure)
   - [System](#high-level-system)
     - [GetPackageTree](#getpackagetree-high-level-system)
+    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-high-level-system)
+    - [RuntimeRunClass](#runtimerunclass-high-level-system)
+    - [RuntimeRunProgram](#runtimerunprogram-high-level-system)
   - [Table](#high-level-table)
     - [CheckTable](#checktable-high-level-table)
     - [CreateTable](#createtable-high-level-table)
@@ -298,6 +295,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunCdsUnitTest](#runcdsunittest-high-level-unit-test)
     - [RunFunctionGroupUnitTest](#runfunctiongroupunittest-high-level-unit-test)
     - [RunFunctionModuleUnitTest](#runfunctionmoduleunittest-high-level-unit-test)
@@ -453,9 +451,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
-- `object_type` (string, required) - Object type (the same value the version history was read with).
+- See schema reference `objectVersionDiffSchema` in source file
 
 ---
 
@@ -466,9 +462,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
-- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
-- `object_name` (string, required) - Object name.
-- `object_type` (string, required) - Object type.
+- See schema reference `objectVersionsSchema` in source file
 
 ---
 
@@ -479,8 +473,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
-- `object_type` (string, required) - Object type (the same value the version history was read with).
+- See schema reference `objectVersionSourceSchema` in source file
 
 ---
 
@@ -661,11 +654,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
-- `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
-- `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
-- `object_type` (string, optional) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
-- `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- See schema reference `includesListSchema` in source file
 
 ---
 
@@ -758,7 +747,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -806,14 +795,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system's object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
-- `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')
+- `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
@@ -886,7 +875,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
@@ -1048,18 +1037,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Lists where the object named by object_name and object_type is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element or CDS DDL source: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
 **Parameters:**
-- `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
-- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
-- `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
-- `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, optional) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
-- `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- See schema reference `whereUsedSchema` in source file
 
 ---
 
@@ -1075,30 +1058,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
 - `view` (string, optional (default: hitlist)) - 
 - `with_system_events` (boolean, optional) - Include system events.
-
----
-
-<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
-#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [read-only] [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -1191,63 +1150,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `max_results` (number, optional) - Maximum number of messages to return.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
 - `user` (string, optional) - Filter by author username.
-
----
-
-<a id="runtimerunclass-read-only-system"></a>
-#### RuntimeRunClass (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `class_name` (string, required) - ABAP class name to execute.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
-<a id="runtimerunprogram-read-only-system"></a>
-#### RuntimeRunProgram (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
-- `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -1345,7 +1247,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1362,7 +1264,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -1385,15 +1287,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
-- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
-- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
-- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
+- See schema reference `runAtcSchema` in source file
 
 ---
 
@@ -1768,8 +1667,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+- See schema reference `activateObjectsSchema` in source file
 
 ---
 
@@ -1975,40 +1873,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri of a version, from the CDS metadata extension's version history.
-
----
-
-<a id="getprogramversiondiff-high-level-common"></a>
-#### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP program versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP program's version history.
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP program's version history.
-
----
-
-<a id="getprogramversions-high-level-common"></a>
-#### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `program_name` (string, required) - ABAP program name.
-
----
-
-<a id="getprogramversionsource-high-level-common"></a>
-#### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP program's version history.
 
 ---
 
@@ -2840,7 +2704,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. Available on premise.
+**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -2881,7 +2745,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -2985,13 +2849,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint.
+**Description:** [read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
 **Parameters:**
 - `description` (string, optional) - Optional description used during validation.
-- `package_name` (string, optional) - ABAP package for the binding.
+- `package_name` (string, required) - ABAP package of the binding, which the validation checks.
 - `service_binding_name` (string, required) - Service binding name to validate.
 - `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
 - `service_definition_name` (string, required) - Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.
@@ -3147,6 +3011,87 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `package_name` (string, optional) - Package name (give this or package_names)
 - `package_names` (array, optional) - Several package names, read together (give this or package_name)
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+---
+
+<a id="runtimecreateprofilertraceparameters-high-level-system"></a>
+#### RuntimeCreateProfilerTraceParameters (High-Level / System)
+**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+
+**Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, required) - Human-readable trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunclass-high-level-system"></a>
+#### RuntimeRunClass (High-Level / System)
+**Description:** [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
+
+**Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `class_name` (string, required) - ABAP class name to execute.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
+- `sql_trace` (boolean, optional) - 
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunprogram-high-level-system"></a>
+#### RuntimeRunProgram (High-Level / System)
+**Description:** [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
+
+**Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
+- `program_name` (string, required) - ABAP program name to execute.
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -3386,7 +3331,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
+**Description:** [read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -3397,7 +3342,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
+**Description:** [read-only] Retrieve CDS unit test run result for a run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -3422,7 +3367,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.
+**Description:** [read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
@@ -3433,7 +3378,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run still running when its start answered. Waits for it within a bound.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3454,67 +3399,87 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
+<a id="runabapunit-high-level-unit-test"></a>
+#### RunAbapUnit (High-Level / Unit Test)
+**Description:** Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+
+**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
+
+**Parameters:**
+- `duration` (object, optional) - Durations the run accepts.
+- `risk_level` (object, optional) - Risk levels the run accepts.
+- `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
+- `target` (object, required) - What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).
+- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
+
+---
+
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the CDS view test class named by class_name and returns the result.
+**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name. The run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
+- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs every ABAP Unit test of the function group named by function_group_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs every ABAP Unit test of the function group named by function_group_name. runner async (default): the run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
+- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the function module named by function_module_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group.
+**Description:** Runs the ABAP Unit tests of the function module named by function_module_name. runner async (default): the run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
+- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the report named by program_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs the ABAP Unit tests of the report named by program_name. runner async (default): the run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Parameters:**
 - `program_name` (string, required) - Report whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
+- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Runs the ABAP Unit tests of the ABAP class named by class_name and returns the result. runner async (default): the run is started and waited for within a bound, and a run that outlasts it returns its run_id, whose status and result are read by run_id; suited to long suites. runner sync: one request that returns the finished result.
+**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name. runner async (default): the run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run, waits for it within a bound and returns the result, or the run_id of a run that outlasts the bound, whose status and result are read by run_id; suited to long suites. sync: one request that returns the finished result.
+- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
+- `wait` (boolean, optional (default: true)) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
@@ -3578,7 +3543,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugcancel-debug-debugger"></a>
 #### AmdpDebugCancel (Debug / Debugger)
-**Description:** [read-only] [debug] Cancels the stopped AMDP debuggee's execution.
+**Description:** [debug] Cancels the stopped AMDP debuggee's execution.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
 
@@ -3604,7 +3569,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
@@ -3617,7 +3582,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [read-only] [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 
@@ -3631,7 +3596,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstep-debug-debugger"></a>
 #### AmdpDebugStep (Debug / Debugger)
-**Description:** [read-only] [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
+**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStep.ts`
 
@@ -3644,7 +3609,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [read-only] [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
@@ -3680,7 +3645,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchend-debug-debugger"></a>
 #### DebugBatchEnd (Debug / Debugger)
-**Description:** [read-only] [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
+**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
 
@@ -3691,7 +3656,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatememorysnapshot-debug-debugger"></a>
 #### DebugCreateMemorySnapshot (Debug / Debugger)
-**Description:** [read-only] [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
+**Description:** [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
@@ -3703,7 +3668,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatewatchpoint-debug-debugger"></a>
 #### DebugCreateWatchpoint (Debug / Debugger)
-**Description:** [read-only] [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
+**Description:** [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
 
@@ -3717,7 +3682,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [read-only] [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
+**Description:** [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
@@ -3730,7 +3695,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletewatchpoint-debug-debugger"></a>
 #### DebugDeleteWatchpoint (Debug / Debugger)
-**Description:** [read-only] [debug] Removes a watchpoint.
+**Description:** [debug] Removes a watchpoint.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
@@ -3805,7 +3770,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
@@ -3818,7 +3783,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetsettings-debug-debugger"></a>
 #### DebugSetSettings (Debug / Debugger)
-**Description:** [read-only] [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
+**Description:** [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
 
@@ -3835,7 +3800,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetstackposition-debug-debugger"></a>
 #### DebugSetStackPosition (Debug / Debugger)
-**Description:** [read-only] [debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.
+**Description:** [debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
 
@@ -3848,7 +3813,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetvariable-debug-debugger"></a>
 #### DebugSetVariable (Debug / Debugger)
-**Description:** [read-only] [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
+**Description:** [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
@@ -3862,7 +3827,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
@@ -3878,7 +3843,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [read-only] [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
+**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
@@ -3891,7 +3856,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsteptoline-debug-debugger"></a>
 #### DebugStepToLine (Debug / Debugger)
-**Description:** [read-only] [debug] Runs or jumps the stopped debuggee to a line.
+**Description:** [debug] Runs or jumps the stopped debuggee to a line.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
@@ -3909,7 +3874,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [read-only] [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
@@ -3921,7 +3886,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
@@ -3937,7 +3902,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugterminate-debug-debugger"></a>
 #### DebugTerminate (Debug / Debugger)
-**Description:** [read-only] [debug] Ends the stopped debuggee and its program where it stands.
+**Description:** [debug] Ends the stopped debuggee and its program where it stands.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
@@ -4022,7 +3987,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="logoffleftoversession-session-leftover-session"></a>
 #### LogoffLeftoverSession (Session / Leftover Session)
-**Description:** [read-only] [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
+**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
 
 **Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
 
@@ -4097,4 +4062,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-24*
+*Last updated: 2026-10-31*

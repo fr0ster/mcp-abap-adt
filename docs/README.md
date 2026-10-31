@@ -44,6 +44,7 @@ Technical documentation about the system architecture, design decisions, and int
 
 - `TOOLS_ARCHITECTURE.md` - MCP tools architecture and handler structure
 - `REQUEST_HEADERS.md` - The request header pairs the server sends, its one-shot `406`/`415` correction kept per system, and `@mcp-abap-adt/lib/adt-headers` for embedders
+- `SYSTEM_DESCRIPTION.md` - What S/4HANA 2025, ABAP cloud and SAP_BASIS 7.40 answer to Eclipse's logon requests, measured from the corpus
 - `README.md` - Architecture documentation index
 
 ### [development/](development/) - For Developers

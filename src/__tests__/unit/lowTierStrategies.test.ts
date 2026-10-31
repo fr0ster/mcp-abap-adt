@@ -61,6 +61,7 @@ import { handleUpdateFunctionModule } from '../../handlers/function/low/handleUp
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
 import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdateInterface';
+import type { HandlerContext } from '../../handlers/interfaces';
 import { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
@@ -94,13 +95,23 @@ import {
   recordAnalyse,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { recordingConnection } from '../helpers/recordingConnection';
+
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.calls` needs this wiring; tests that need a real document
 // swap `fakeClient` to `fakeClientOf(...)` for their own call and restore it.
 const seen = recordAnalyse();
 let fakeClient: unknown = seen.client;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+jest.mock('../../lib/clients', () => ({
+  // The declared variant the boundary checks a type argument against.
+  variantOf: () => 'onprem',
+  createAdtClient: () => fakeClient,
+  createOnPremAdtClient: () => fakeClient,
+}));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -714,7 +725,6 @@ describe('program', () => {
         'activate',
         { program_name: 'Z_X' },
       ],
-      ['CheckProgramLow', handleCheckProgram, 'check', { program_name: 'Z_X' }],
       [
         'UpdateProgramLow',
         handleUpdateProgram,
@@ -746,6 +756,19 @@ describe('program', () => {
         expect(callTo(member)).toBeDefined();
       },
     );
+
+    // A program's check is served on cloud (`ADT_TYPES_CLOUD` lists it), and
+    // `CheckProgram` delegates here: no refusal stands in its way.
+    it('CheckProgramLow reaches its member on a cloud connection', async () => {
+      const typedContext: HandlerContext = {
+        connection: recordingConnection(),
+        logger: undefined,
+      };
+      await sessionContext.run(cloudStore, () =>
+        handleCheckProgram(typedContext, { program_name: 'Z_X' }),
+      );
+      expect(callTo('check')).toBeDefined();
+    });
   });
 });
 

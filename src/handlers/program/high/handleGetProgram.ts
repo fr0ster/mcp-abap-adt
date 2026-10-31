@@ -15,9 +15,9 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetProgram',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP\'s standard programs.',
   inputSchema: {
     type: 'object',
     properties: {

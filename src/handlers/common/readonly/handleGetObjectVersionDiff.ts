@@ -14,16 +14,19 @@ import type {
   IAdtVersionable,
 } from '@mcp-abap-adt/interfaces-adt';
 import { createTwoFilesPatch } from 'diff';
+import {
+  type ProjectionVariant,
+  VERSIONED_KINDS,
+} from '../../../lib/adtProjections';
+import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
-import {
-  resolveVersionedObject,
-  VERSIONED_OBJECT_TYPES,
-} from './resolveVersionedObject';
+import { byVariant } from '../../../lib/variantDefinition';
+import { resolveVersionedObject } from './resolveVersionedObject';
 
 export interface VersionDiffResult {
   diff: string;
@@ -124,16 +127,23 @@ export async function buildVersionDiff(
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionDiff',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
-  inputSchema: {
+  ...byVariant((variant) => ({
+    description:
+      "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+    inputSchema: objectVersionDiffSchema(variant),
+  })),
+} as const;
+
+/** GetObjectVersionDiff's input on `variant`. */
+function objectVersionDiffSchema(variant: ProjectionVariant) {
+  return {
     type: 'object',
     properties: {
       object_type: {
         type: 'string',
         description:
           'Object type (the same value the version history was read with).',
-        enum: [...VERSIONED_OBJECT_TYPES],
+        enum: VERSIONED_KINDS[variant],
       },
       content_uri_from: {
         type: 'string',
@@ -147,8 +157,8 @@ export const TOOL_DEFINITION = {
       },
     },
     required: ['object_type', 'content_uri_from', 'content_uri_to'],
-  },
-} as const;
+  } as const;
+}
 
 interface GetObjectVersionDiffArgs {
   object_type: string;
@@ -163,19 +173,19 @@ export async function handleGetObjectVersionDiff(
   const { connection, logger } = context;
   try {
     const { content_uri_from, content_uri_to } = args;
-    const object_type = (args.object_type || '').toLowerCase();
-
-    if (!object_type || !content_uri_from || !content_uri_to) {
+    if (!args.object_type || !content_uri_from || !content_uri_to) {
       return return_error(
         new Error(
           'object_type, content_uri_from and content_uri_to are required',
         ),
       );
     }
-    if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
+    const variant = variantOf(connection);
+    const object_type = acceptedOf(args.object_type, VERSIONED_KINDS[variant]);
+    if (object_type === undefined) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_OBJECT_TYPES.join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variant].join(', ')}`,
         ),
       );
     }
@@ -184,11 +194,6 @@ export async function handleGetObjectVersionDiff(
     // object_type only selects the client; each content_uri carries the full
     // object identity (same placeholder pattern as GetObjectVersionSource).
     const resolved = resolveVersionedObject(client, object_type, 'X', 'X');
-    if (!resolved) {
-      return return_error(
-        new Error(`Unsupported object_type: ${args.object_type}`),
-      );
-    }
 
     // Two calls of the same member (one per content_uri), neither needing the
     // other's answer, so `both()` sends them together (a batch records both):

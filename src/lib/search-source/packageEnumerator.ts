@@ -1,3 +1,6 @@
+import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtCodes, TableMainOf } from '../adtProjections';
+import { tableCodeOf } from '../adtTypeCode';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import {
@@ -8,7 +11,10 @@ import {
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
 
-export type ScanObjectType = 'PROG' | 'FUGR' | 'CLAS';
+/** What a scan reads: programs, function groups and classes, by main type. */
+export type ScanObjectType = TableMainOf<
+  AdtCodes<'PROG/P' | 'FUGR/F' | 'CLAS/OC'>
+>;
 
 /**
  * The contents item as the walk hands it over.
@@ -40,11 +46,20 @@ export type PackageContentsFetcher = (
   options: { includeSubpackages: boolean },
 ) => Promise<PackageContentItem[]>;
 
-const ADT_TYPE_TO_FAMILY: Record<string, ScanObjectType> = {
+/** The family of each code of the tables a scan reads: keys are table codes. */
+const ADT_TYPE_TO_FAMILY: Readonly<
+  Partial<Record<AdtTypeCode, ScanObjectType>>
+> = {
   'PROG/P': 'PROG',
   'FUGR/F': 'FUGR',
   'CLAS/OC': 'CLAS',
 };
+
+/** The family of a type SAP answered in a package listing, if it is scanned. */
+function familyOf(type: string): ScanObjectType | undefined {
+  const code = tableCodeOf(type);
+  return code === undefined ? undefined : ADT_TYPE_TO_FAMILY[code];
+}
 
 function globToRegExp(glob: string): RegExp {
   let pattern = '';
@@ -73,7 +88,7 @@ export async function enumerateScanTargets(
     });
     for (const item of items) {
       if (item.isPackage) continue;
-      const family = ADT_TYPE_TO_FAMILY[item.type];
+      const family = familyOf(item.type);
       if (!family || !wantedFamilies.has(family)) continue;
       if (filter && !filter.test(item.name)) continue;
       const key = `${item.packageName} ${family} ${item.name}`;

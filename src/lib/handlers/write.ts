@@ -4,9 +4,6 @@
  * The counterpart to `read.ts`, for `@mcp-abap-adt/compact-modify`. See that file
  * for why the barrels are separate; the short version is that a read-only package
  * must not be able to import a write route, and a shared barrel would hand it one.
- *
- * `TYPE_TO_FAMILY` lives here rather than beside the types because it is the
- * activation family map, and activation writes.
  */
 
 import '../instance.js';
@@ -29,14 +26,28 @@ export { handleUpdateLocalMacros } from '../../handlers/class/high/handleUpdateL
 export { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpdateLocalTestClass.js';
 export { handleUpdateLocalTypes } from '../../handlers/class/high/handleUpdateLocalTypes.js';
 export {
+  type ActivationObject,
+  type ActivationPlan,
+  activatePlanOnce,
+  activationPlan,
+  compactActivatableTypes,
+  type GroupActivation,
   handleActivateObject,
   handleActivateObjectOnce,
-  TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject.js';
-export { handleCreateOnly } from '../../handlers/common/low/handleCreateOnly.js';
+export {
+  chainCreateRefusal,
+  handleCreateOnly,
+} from '../../handlers/common/low/handleCreateOnly.js';
 export { handleDeleteOnly } from '../../handlers/common/low/handleDeleteOnly.js';
-export { handleLockObject } from '../../handlers/common/low/handleLockObject.js';
-export { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject.js';
+export {
+  handleLockObject,
+  lockObject,
+} from '../../handlers/common/low/handleLockObject.js';
+export {
+  handleUnlockObject,
+  unlockObject,
+} from '../../handlers/common/low/handleUnlockObject.js';
 export { handleUpdateUnderLock } from '../../handlers/common/low/handleUpdateUnderLock.js';
 export { handleCreateDataElement } from '../../handlers/data_element/high/handleCreateDataElement.js';
 export { handleDeleteDataElement } from '../../handlers/data_element/high/handleDeleteDataElement.js';
@@ -77,15 +88,15 @@ export { handleUpdateStructure } from '../../handlers/structure/high/handleUpdat
 export {
   handleScheduleProfilerTraceOnce,
   type ScheduleProfilerTraceArgs,
-} from '../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.js';
+} from '../../handlers/system/high/handleRuntimeCreateProfilerTraceParameters.js';
 export {
   handleRuntimeRunClass,
   handleRuntimeRunClassUnderProfiler,
-} from '../../handlers/system/readonly/handleRuntimeRunClass.js';
+} from '../../handlers/system/high/handleRuntimeRunClass.js';
 export {
   handleRuntimeRunProgram,
   handleRuntimeRunProgramUnderProfiler,
-} from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
+} from '../../handlers/system/high/handleRuntimeRunProgram.js';
 export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.js';
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';

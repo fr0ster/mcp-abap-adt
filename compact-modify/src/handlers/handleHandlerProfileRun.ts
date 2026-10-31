@@ -1,4 +1,9 @@
-import { compactProfileRunSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  byVariant,
+  COMPACT_PROFILE,
+  compactProfileRunDescription,
+  compactProfileRunSchemaFor,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleRuntimeRunClassUnderProfiler,
@@ -8,9 +13,10 @@ import {
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a class or a program in one request. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — programs exist on premise]. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.',
-  inputSchema: compactProfileRunSchema,
+  ...byVariant((variant) => ({
+    description: compactProfileRunDescription(variant),
+    inputSchema: compactProfileRunSchemaFor(COMPACT_PROFILE[variant]),
+  })),
 } as const;
 
 type HandlerProfileRunArgs = {

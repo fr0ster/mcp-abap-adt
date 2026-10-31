@@ -6,12 +6,13 @@
  * falls back to the process context outside any scope (stdio).
  */
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  AdtClient: jest.fn(),
+  AdtClientOnPrem: jest.fn(),
+  AdtClientCloud: jest.fn(),
   AdtClientLegacy: jest.fn(),
   getSystemInformation: jest.fn(),
 }));
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import { runWithRequestContext } from '../../lib/requestContext';
@@ -20,17 +21,21 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
+
 const conn = {} as IAbapConnection;
 
 function lastOptions(): { masterLanguage?: string } | undefined {
-  const calls = (AdtClient as jest.Mock).mock.calls;
+  const calls = jest.mocked(AdtClientOnPrem).mock.calls;
   return calls.at(-1)?.[2];
 }
 
 describe('masterLanguage does not leak across requests/modes (#110)', () => {
   beforeEach(() => {
     resetSystemContextCache();
-    (AdtClient as jest.Mock).mockClear();
+    jest.mocked(AdtClientOnPrem).mockClear();
     // Process-global context: a stale masterLanguage 'EN' plus a system id.
     setSystemContext({
       masterSystem: 'SYS',

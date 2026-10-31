@@ -21,7 +21,7 @@
  * not is filtered out either way. Duplicates collapse by request number
  * downstream, in `parseTransportListValue`.
  *
- * A bound rather than a principle, in the same spirit as `MAX_STATUS_POLLS`:
+ * A bound rather than a principle:
  * the only system this has been run against holds one configuration
  * (measured 2026-09-16), so no measurement justifies a particular number.
  * Five is enough that a system with a handful is served completely, and small

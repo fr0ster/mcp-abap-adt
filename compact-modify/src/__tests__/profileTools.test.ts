@@ -18,7 +18,7 @@ import {
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
-import { SCHEDULE_WITHOUT_ID } from '../../../src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
+import { SCHEDULE_WITHOUT_ID } from '../../../src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters';
 import {
   handleHandlerProfileRun,
   TOOL_DEFINITION as runTool,
@@ -27,6 +27,10 @@ import {
   handleHandlerProfileSchedule,
   TOOL_DEFINITION as scheduleTool,
 } from '../handlers/handleHandlerProfileSchedule';
+
+// The process declares its system type, as every launcher requires: the ADT
+// client is the declared variant's (`variantOf`), never a default.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 

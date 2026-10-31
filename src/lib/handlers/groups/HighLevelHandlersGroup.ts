@@ -1,15 +1,3 @@
-import {
-  TOOL_DEFINITION as GetATCFindings_Tool,
-  handleGetATCFindings,
-} from '../../../handlers/atc/high/handleGetATCFindings';
-import {
-  TOOL_DEFINITION as GetATCRunStatus_Tool,
-  handleGetATCRunStatus,
-} from '../../../handlers/atc/high/handleGetATCRunStatus';
-import {
-  handleRunATC,
-  TOOL_DEFINITION as RunATC_Tool,
-} from '../../../handlers/atc/high/handleRunATC';
 // Per-type activate handlers (reused from low-level)
 import {
   TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
@@ -535,6 +523,10 @@ import {
   handleGetUnitTestResult,
 } from '../../../handlers/unit_test/high/handleGetUnitTestResult';
 import {
+  handleRunAbapUnit,
+  TOOL_DEFINITION as RunAbapUnit_Tool,
+} from '../../../handlers/unit_test/high/handleRunAbapUnit';
+import {
   handleRunCdsUnitTest,
   TOOL_DEFINITION as RunCdsUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleRunCdsUnitTest';
@@ -595,21 +587,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
     };
 
     const entries: HandlerEntry[] = [
-      // ATC — the run is three calls and the composite is this repository's,
-      // which is what `AdtAtc` says in as many words when it explains why it
-      // stopped being `IAdtRunnable`.
-      {
-        toolDefinition: RunATC_Tool,
-        handler: withContext(handleRunATC),
-      },
-      {
-        toolDefinition: GetATCRunStatus_Tool,
-        handler: withContext(handleGetATCRunStatus),
-      },
-      {
-        toolDefinition: GetATCFindings_Tool,
-        handler: withContext(handleGetATCFindings),
-      },
       // Common — group activation
       {
         toolDefinition: ActivateObjects_Tool,
@@ -1013,6 +990,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RunFunctionModuleUnitTest_Tool,
         handler: withContext(handleRunFunctionModuleUnitTest),
+      },
+      {
+        toolDefinition: RunAbapUnit_Tool,
+        handler: withContext(handleRunAbapUnit),
       },
       {
         toolDefinition: GetLocalTestClass_Tool,

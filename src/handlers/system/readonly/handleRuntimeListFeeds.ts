@@ -1,4 +1,4 @@
-import { AdtRuntimeClient, FeedRepository } from '@mcp-abap-adt/adt-clients';
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   feedEntries,
@@ -288,14 +288,9 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
       return answer(
         ctx,
         () =>
-          new FeedRepository(
-            connection,
-            logger as never,
-            {
-              ...ourFeeds,
-              feeds: feedVariantsOf,
-            } as never,
-          ).list({ analyse: analyseException }) as never,
+          new AdtRuntimeClient(connection, logger)
+            .getFeeds({ ...ourFeeds, feeds: feedVariantsOf })
+            .list({ analyse: analyseException }),
         project,
       );
     case 'dumps': {

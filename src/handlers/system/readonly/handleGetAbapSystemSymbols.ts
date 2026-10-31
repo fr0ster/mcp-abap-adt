@@ -1,3 +1,4 @@
+import type { AdtCodes, TableMainOf } from '../../../lib/adtProjections';
 import {
   answerCaught,
   type FailureEntry,
@@ -72,9 +73,26 @@ interface AbapParameterInfo {
   defaultValue?: string;
 }
 
+/**
+ * What a symbol resolved to: a class or an interface by main type, a function
+ * module by this tool's own word for one (`FUNC`), or a symbol of the source
+ * alone.
+ */
+type SymbolObjectType =
+  | TableMainOf<AdtCodes<'CLAS/OC' | 'INTF/OI'>>
+  | 'FUNC'
+  | 'LOCAL';
+
+/** A class, by its main type. */
+const CLASS_SYMBOL: TableMainOf<AdtCodes<'CLAS/OC'>> = 'CLAS';
+/** An interface, by its main type. */
+const INTERFACE_SYMBOL: TableMainOf<AdtCodes<'INTF/OI'>> = 'INTF';
+/** A function module, by this tool's own word for one. */
+const FUNCTION_SYMBOL: SymbolObjectType = 'FUNC';
+
 interface AbapSystemInfo {
   exists: boolean;
-  objectType?: string;
+  objectType?: SymbolObjectType;
   description?: string;
   package?: string;
   responsible?: string;
@@ -676,7 +694,7 @@ class AbapSystemSymbolResolver {
         ...symbol,
         systemInfo: {
           exists: true,
-          objectType: 'CLAS',
+          objectType: CLASS_SYMBOL,
           description: classData?.description || `ABAP Class ${symbol.name}`,
           package: classData?.packageName || 'Unknown',
           superClass: classData?.superclass || '',
@@ -727,7 +745,7 @@ class AbapSystemSymbolResolver {
         ...symbol,
         systemInfo: {
           exists: true,
-          objectType: 'FUNC',
+          objectType: FUNCTION_SYMBOL,
           description:
             functionData?.description || `ABAP Function ${symbol.name}`,
           package: functionData?.packageName || 'Unknown',
@@ -790,7 +808,7 @@ class AbapSystemSymbolResolver {
         ...symbol,
         systemInfo: {
           exists: true,
-          objectType: 'INTF',
+          objectType: INTERFACE_SYMBOL,
           description:
             interfaceData?.description || `ABAP Interface ${symbol.name}`,
           package: interfaceData?.packageName || 'Unknown',

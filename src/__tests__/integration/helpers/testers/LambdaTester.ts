@@ -573,6 +573,9 @@ export class LambdaTester {
     this.context?.logger?.testSkip(
       `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
     );
+    // Nothing was created, so the cleanup deletes nothing: a delete here
+    // could only reach an object of that name made by someone else.
+    this.testSkipped = true;
     return true;
   }
 

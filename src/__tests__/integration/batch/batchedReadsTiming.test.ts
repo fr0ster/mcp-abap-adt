@@ -48,6 +48,7 @@ import {
 } from '../../../lib/batch/availability';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import {
+  getSystemType,
   getTimeout,
   loadTestConfig,
   resolvePackageName,
@@ -226,8 +227,11 @@ const transport = (connection: IAbapConnection): string =>
 describe('batched reads timed against the sequential path on the system the test config names', () => {
   let connection: IAbapConnection | null = null;
   let packages: Array<{ label: string; name: string }> = [];
+  // Legacy support is parked: a legacy config skips before any logon.
+  const served = getSystemType() !== 'legacy';
 
   beforeAll(async () => {
+    if (!served) return;
     try {
       connection = (await createTestConnectionAndSession()).connection;
       packages = packagesRead();
@@ -241,6 +245,12 @@ describe('batched reads timed against the sequential path on the system the test
       it(
         `${tool.tool} on ${scope}: the same answer, timed on both paths`,
         async () => {
+          if (!served) {
+            testLogger?.info(
+              '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+            );
+            return;
+          }
           if (connection === null) {
             testLogger?.info(
               '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',

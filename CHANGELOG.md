@@ -101,6 +101,10 @@ Every argument that names an ADT object type is checked once, at the tool's boun
 - **The read-only binaries serve `RunATC`, `GetATCRunStatus` and `GetATCFindings`.** Each says "[read-only]", and none of `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` served them. No compact binary has an ATC route. `CreateClass` gained the search keyword "class on a transport", which keeps it in the write collection's top five for "create a class and add it to a transport" with the ATC tools gone from that collection.
 - **`HandlerValidate` `SERVICE_BINDING` and `ValidateServiceBinding` without `package_name`** are refused naming it, where adt-clients failed with a `TypeError`.
 
+### Repository (nothing in the published packages)
+
+- **The test-config template's cases skip a legacy system while legacy support is parked.** The template lists `legacy` in no case's `available_in` (`run_atc`'s case names `onprem` and `cloud`); a case skipped for its system runs no cleanup, so it sends no delete for an object it never created; the debugger suite writes its probe only on a system its case names; the batched-reads timing skips a legacy configuration. Measured against SAP_BASIS 7.40 SP04: 32 failing tests before, none after.
+
 ## [21.0.0] - 2026-10-30
 
 A major for two breaking changes: `getConfig()` is gone and a stdio destination states its connection type ([#320](https://github.com/fr0ster/mcp-abap-adt/issues/320)), and `GetTypeInfo` answers every DDIC type a name is ([#321](https://github.com/fr0ster/mcp-abap-adt/issues/321)). Each has its migration note below. 21.0.0 also brings 20.1.1 to npm: 20.1.1 is tagged (`v20.1.1`) but not published, so a consumer on 20.1.0 gets its changes (stdio has no idle bound; the body-parser and fast-uri lockfile versions) with 21.0.0; its entry below says what they are. The eighteen packages are all at 21.0.0, every sibling range at `^21.0.0`.

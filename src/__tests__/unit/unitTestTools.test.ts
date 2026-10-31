@@ -110,24 +110,25 @@ describe('Run* tools: start, wait, answer the result — one call', () => {
     },
   );
 
-  it('answers the run id and where to ask, when the run outlasts the wait', async () => {
+  it('answers the run id right after the start with wait false', async () => {
     const connection = recordingConnection([
       STARTED,
       ...Array(5).fill(RUNNING),
     ]);
 
-    const result: any = await handleRunUnitTest(ctx(connection) as any, {
-      class_name: 'ZCL_X',
-    });
+    const result = await handleRunUnitTest(
+      { connection },
+      {
+        class_name: 'ZCL_X',
+        wait: false,
+      },
+    );
 
     expect(result.isError).toBe(false);
-    const answer = payload(result);
-    expect(answer.finished).toBe(false);
-    expect(answer.run_id).toBe(RUN);
-    expect(answer.message).toContain('GetUnitTestResult');
-    expect(connection.requests.some((r) => r.url.includes('/results/'))).toBe(
-      false,
-    );
+    expect(connection.requests.map(line)).toEqual([
+      'POST /sap/bc/adt/abapunit/runs',
+    ]);
+    expect(payload(result)).toEqual({ success: true, run_id: RUN });
   });
 
   it('is an error, and asks nothing more, when no run was started', async () => {

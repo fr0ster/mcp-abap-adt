@@ -13,12 +13,12 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
   `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
-- the **leftover-session list and logoff** (`HandlerLeftoverSessionList`,
-  `HandlerLeftoverSessionLogoff`): the SAP sessions a killed server process left open, only the
-  caller's own;
+- the **leftover-session list** (`HandlerLeftoverSessionList`): the SAP sessions a killed server
+  process left open, only the caller's own. Their logoff (`HandlerLeftoverSessionLogoff`)
+  releases every lock a session holds, so it is `mcp-abap-adt-compact`'s;
 - **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode.
 
-20 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run, trace schedule or profiler run
+19 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run, trace schedule, profiler run or leftover-session logoff
 is in the tool list at all, so a client cannot call one; nor the four debugger tools, the
 background-run tools — those are `mcp-abap-adt-compact`'s ([`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact)).
 

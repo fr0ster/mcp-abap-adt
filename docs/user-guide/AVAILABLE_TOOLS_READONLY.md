@@ -2,10 +2,10 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
-Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
+Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 74
+- Total tools: 70
 
 ## Navigation
 
@@ -53,7 +53,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetInterface](#getinterface-read-only-interface)
   - [Leftover Session](#read-only-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-read-only-leftover-session)
-    - [LogoffLeftoverSession](#logoffleftoversession-read-only-leftover-session)
   - [Message Class](#read-only-message-class)
     - [GetMessageClass](#getmessageclass-read-only-message-class)
     - [GetMessageClassMessage](#getmessageclassmessage-read-only-message-class)
@@ -79,12 +78,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetTransaction](#gettransaction-read-only-system)
-    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
-    - [RuntimeRunClass](#runtimerunclass-read-only-system)
-    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
     - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
@@ -490,17 +486,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-<a id="logoffleftoversession-read-only-leftover-session"></a>
-#### LogoffLeftoverSession (Read-Only / Leftover Session)
-**Description:** [read-only] [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
-
-**Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
-
-**Parameters:**
-- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
-
----
-
 <a id="read-only-message-class"></a>
 ### Read-Only / Message Class
 
@@ -739,30 +724,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
-#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [read-only] [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
 **Description:** [read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
@@ -801,61 +762,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
 - `response_mode` (string, optional (default: both)) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
 - `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
-
----
-
-<a id="runtimerunclass-read-only-system"></a>
-#### RuntimeRunClass (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `class_name` (string, required) - ABAP class name to execute.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
-<a id="runtimerunprogram-read-only-system"></a>
-#### RuntimeRunProgram (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
-- `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -1182,7 +1088,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 <a id="streamable-http-binaries"></a>
 ## Streamable HTTP Binaries
 
-`mcp-abap-adt-sse-ro` (SSE) serves the tools of `mcp-abap-adt-ro` without `ListLeftoverSessions`, `LogoffLeftoverSession`, which are stdio's only. `mcp-abap-adt-http-ro` (Streamable HTTP) serves the same tools, and beside them:
+`mcp-abap-adt-sse-ro` (SSE) serves the tools of `mcp-abap-adt-ro` without `ListLeftoverSessions`, which are stdio's only. `mcp-abap-adt-http-ro` (Streamable HTTP) serves the same tools, and beside them:
 
 - **The `state_handle` argument.** On `mcp-abap-adt-http-ro` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 - **The long session:** `SessionOpen`, `SessionClose`, served by no stdio or SSE binary. Their parameters below are the ones `mcp-abap-adt-http-ro` registers, `state_handle` included.

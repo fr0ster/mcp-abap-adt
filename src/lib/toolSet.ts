@@ -50,7 +50,10 @@ import {
   CompactHandlersGroup,
 } from './compact/group';
 import { CompactLongSessionHandlersGroup } from './compact/longSession/group';
-import { CompactLeftoverSessionHandlersGroup } from './compact/session/group';
+import {
+  CompactLeftoverSessionHandlersGroup,
+  CompactLeftoverSessionListHandlersGroup,
+} from './compact/session/group';
 import type { RemovedParameter } from './config/authParameters';
 import {
   BINARIES,
@@ -60,7 +63,10 @@ import {
 } from './config/binaries';
 import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
-import { LeftoverSessionHandlersGroup } from './handlers/groups/LeftoverSessionHandlersGroup.js';
+import {
+  LeftoverSessionHandlersGroup,
+  LeftoverSessionListHandlersGroup,
+} from './handlers/groups/LeftoverSessionHandlersGroup.js';
 import { LongSessionHandlersGroup } from './handlers/groups/LongSessionHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
@@ -307,8 +313,9 @@ export const fullToolSet: ToolSet = {
 /**
  * The read-only object-oriented tool set of `mcp-abap-adt-ro`,
  * `mcp-abap-adt-http-ro` and `mcp-abap-adt-sse-ro`: readonly (with system and
- * search); on stdio the leftover-session list and logoff. No high, no debugger, no
- * background run.
+ * search); on stdio the leftover-session list. Nothing in it changes the
+ * system (the owner's decision): no high, no debugger, no run of a class or
+ * a program, no trace schedule, no leftover-session logoff, no background run.
  */
 export const fullReadOnlyToolSet: ToolSet = {
   kind: 'core-ro',
@@ -321,25 +328,26 @@ export const fullReadOnlyToolSet: ToolSet = {
         READONLY_LINE,
         ...leftoverLine(
           transport,
-          'the leftover SAP sessions of an ended process: list, log off',
+          'the leftover SAP sessions of an ended process: list',
         ),
         BATCH_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
-        ['The write, debugger and background-run tools', 'core'],
+        [
+          'The tools that change the system (write, run, debugger, a session logoff) and background runs',
+          'core',
+        ],
         ['The compact tools that change nothing', 'compact-ro'],
       ],
     ),
   expositionRemoved: (transport) => expositionRemoved('core', transport),
   groups: (context, transport) => [
     new ReadOnlyHandlersGroup(context),
-    // The run tools stay (running code changes no code, as in SAP), without
-    // `background`: this set keeps no background run.
-    new SystemHandlersGroup(context, { background: false }),
+    new SystemHandlersGroup(context),
     new SearchHandlersGroup(context),
     ...(servesLeftoverSessions(transport)
-      ? [new LeftoverSessionHandlersGroup(context)]
+      ? [new LeftoverSessionListHandlersGroup(context)]
       : []),
     new BatchHandlersGroup(context),
     ...(servesLongSession(transport)
@@ -418,8 +426,8 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
  * The read-only compact tool set of `mcp-abap-adt-compact-ro`,
  * `-compact-http-ro` and `-compact-sse-ro`: the half that changes nothing
  * (`compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly-entries`); on
- * stdio the leftover-session list and logoff. No modify half, no debugger, no
- * background run.
+ * stdio the leftover-session list. No modify half, no debugger, no
+ * leftover-session logoff, no background run.
  */
 export function compactReadOnlyToolSetOf(
   readOnly: CompactEntryBuilder,
@@ -435,7 +443,7 @@ export function compactReadOnlyToolSetOf(
           'the compact tools that change nothing, one per operation with the object in object_type: HandlerGet, HandlerSearch, HandlerWhereUsed, ...; no create, update, delete, activate, lock, unlock, unit-test run or profiler run',
           ...leftoverLine(
             transport,
-            'the leftover SAP sessions of an ended process: list, log off',
+            'the leftover SAP sessions of an ended process: list',
           ),
           COMPACT_BATCH_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
@@ -449,7 +457,7 @@ export function compactReadOnlyToolSetOf(
     groups: (context, transport) => [
       new CompactHandlersGroup(context, [readOnly], 'CompactReadOnlyHandlers'),
       ...(servesLeftoverSessions(transport)
-        ? [new CompactLeftoverSessionHandlersGroup(context)]
+        ? [new CompactLeftoverSessionListHandlersGroup(context)]
         : []),
       new CompactBatchHandlersGroup(context),
       ...(servesLongSession(transport)

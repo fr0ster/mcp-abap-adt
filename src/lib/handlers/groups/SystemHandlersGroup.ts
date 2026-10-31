@@ -71,10 +71,6 @@ import {
   TOOL_DEFINITION as RuntimeAnalyzeProfilerTrace_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import {
-  handleRuntimeCreateProfilerTraceParameters,
-  TOOL_DEFINITION as RuntimeCreateProfilerTraceParameters_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
-import {
   handleRuntimeGetDumpById,
   TOOL_DEFINITION as RuntimeGetDumpById_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeGetDumpById';
@@ -98,40 +94,19 @@ import {
   handleRuntimeListSystemMessages,
   TOOL_DEFINITION as RuntimeListSystemMessages_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeListSystemMessages';
-import {
-  handleRuntimeRunClass,
-  TOOL_DEFINITION as RuntimeRunClass_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeRunClass';
-import {
-  handleRuntimeRunProgram,
-  TOOL_DEFINITION as RuntimeRunProgram_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeRunProgram';
-import { withoutBackgroundParameter } from '../../backgroundRuns/tools.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 
-/** Which form of the system tools a binary serves. */
-export interface SystemHandlersOptions {
-  /**
-   * Whether the run tools (`RuntimeRunClass`, `RuntimeRunProgram`) offer
-   * `background`. Default: offered. A read-only binary serves them without
-   * it: it keeps no background run, so the parameter does not exist
-   * there — not offered, not read, not refused.
-   */
-  background?: boolean;
-}
-
 /**
  * Handler group for all system-related handlers
- * Contains handlers for system information, analysis, and metadata operations
+ * Contains handlers for system information, analysis, and metadata operations:
+ * reads and checks that change nothing in the system. The tools that run code
+ * or schedule a trace are `RuntimeRunHandlersGroup`'s.
  */
 export class SystemHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'SystemHandlers';
 
-  constructor(
-    context: HandlerContext,
-    private readonly options: SystemHandlersOptions = {},
-  ) {
+  constructor(context: HandlerContext) {
     super(context);
   }
 
@@ -139,16 +114,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
    * Gets all system handler entries
    */
   getHandlers(): HandlerEntry[] {
-    const entries = this.entries();
-    return this.options.background === false
-      ? entries.map((entry) => ({
-          ...entry,
-          toolDefinition: withoutBackgroundParameter(entry.toolDefinition),
-        }))
-      : entries;
-  }
-
-  private entries(): HandlerEntry[] {
     return [
       {
         toolDefinition: GetServiceBindingPreviewUrl_Tool,
@@ -164,11 +129,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleGetTransaction(this.context, args),
       },
       {
-        toolDefinition: RuntimeCreateProfilerTraceParameters_Tool,
-        handler: (args: any) =>
-          handleRuntimeCreateProfilerTraceParameters(this.context, args),
-      },
-      {
         toolDefinition: RuntimeListProfilerTraceFiles_Tool,
         handler: () => handleRuntimeListProfilerTraceFiles(this.context),
       },
@@ -181,18 +141,10 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         toolDefinition: RuntimeGetDumpById_Tool,
         handler: (args: any) => handleRuntimeGetDumpById(this.context, args),
       },
-      {
-        toolDefinition: RuntimeRunClass_Tool,
-        handler: (args: any) => handleRuntimeRunClass(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunProgram_Tool,
-        handler: (args: any) => handleRuntimeRunProgram(this.context, args),
-      },
       // ATC — the run is three calls and the composite is this repository's,
       // which is what `AdtAtc` says in as many words when it explains why it
-      // stopped being `IAdtRunnable`. Here, beside the run tools: a check run
-      // changes no object, so the read-only binaries serve it too.
+      // stopped being `IAdtRunnable`. A check run changes nothing in the
+      // system (the owner's decision), so the read-only binaries serve it.
       {
         toolDefinition: RunATC_Tool,
         handler: (args: any) => handleRunATC(this.context, args),

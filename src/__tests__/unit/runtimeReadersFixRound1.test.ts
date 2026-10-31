@@ -10,8 +10,8 @@
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree';
+import { handleRuntimeCreateProfilerTraceParameters } from '../../handlers/system/high/handleRuntimeCreateProfilerTraceParameters';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
-import { handleRuntimeCreateProfilerTraceParameters } from '../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
 import { handleRuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetGatewayErrorLog } from '../../handlers/system/readonly/handleRuntimeGetGatewayErrorLog';
 import { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';

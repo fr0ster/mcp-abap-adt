@@ -26,6 +26,7 @@ import type { DestinationSystemContext } from '../../../lib/auth/destinationSyst
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -95,6 +96,7 @@ const placeholderContext = {
 export function shippedGroups(): CompositeHandlersRegistry {
   return new CompositeHandlersRegistry([
     new SystemHandlersGroup(placeholderContext),
+    new RuntimeRunHandlersGroup(placeholderContext),
     new BackgroundRunHandlersGroup(placeholderContext),
     new CompactModifyHandlersGroup(placeholderContext),
     new CompactBackgroundRunHandlersGroup(placeholderContext),

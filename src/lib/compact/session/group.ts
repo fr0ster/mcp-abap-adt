@@ -42,3 +42,23 @@ export class CompactLeftoverSessionHandlersGroup extends BaseHandlerGroup {
     return compactLeftoverSessionEntries();
   }
 }
+
+/**
+ * The compact leftover-session list alone, for the read-only compact sets: a
+ * logoff ends a SAP session and releases every lock it holds, which changes
+ * the system, so only the full compact binaries serve it.
+ */
+export class CompactLeftoverSessionListHandlersGroup extends BaseHandlerGroup {
+  protected groupName = 'CompactLeftoverSessionListHandlers';
+
+  constructor(context: HandlerContext) {
+    super(context);
+  }
+
+  getHandlers(): HandlerEntry[] {
+    return compactLeftoverSessionEntries().filter(
+      (entry) =>
+        entry.toolDefinition.name === HandlerLeftoverSessionList_Tool.name,
+    );
+  }
+}

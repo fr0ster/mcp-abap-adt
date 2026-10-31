@@ -20,8 +20,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugStepToLine',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] Runs or jumps the stopped debuggee to a line.',
+  description: '[debug] Runs or jumps the stopped debuggee to a line.',
   inputSchema: {
     type: 'object',
     properties: {

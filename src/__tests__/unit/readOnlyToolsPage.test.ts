@@ -4,8 +4,9 @@
  * binaries serve: the tools of `fullReadOnlyToolSet`, the set
  * `mcp-abap-adt-ro`, `-http-ro` and `-sse-ro` use — not the readonly folders,
  * which also hold the background-run tools — with the parameters they take
- * there: the run tools without `background`. A page generated from the
- * group, or left stale after the set changed, goes red here.
+ * there. No run tool is there: a read-only set changes nothing in the system.
+ * A page generated from the group, or left stale after the set changed, goes
+ * red here.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -68,10 +69,19 @@ describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', ()
     }
   });
 
-  it('the run tools are listed, and no tool takes background', () => {
+  it('no run tool, no trace schedule, no logoff, and no tool takes background', () => {
     const tools = documented();
-    expect(tools.has('RuntimeRunClass')).toBe(true);
-    expect(tools.has('RuntimeRunProgram')).toBe(true);
+    for (const name of [
+      'RuntimeRunClass',
+      'RuntimeRunProgram',
+      'RuntimeCreateProfilerTraceParameters',
+      'LogoffLeftoverSession',
+    ]) {
+      expect({ name, listed: tools.has(name) }).toEqual({
+        name,
+        listed: false,
+      });
+    }
     const withBackground = [...tools.entries()]
       .filter(([, params]) =>
         params.some((p) => p.startsWith('- `background`')),

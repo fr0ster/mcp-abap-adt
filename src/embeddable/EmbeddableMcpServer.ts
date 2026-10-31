@@ -9,6 +9,7 @@ import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
+import { RuntimeRunHandlersGroup } from '../lib/handlers/groups/RuntimeRunHandlersGroup.js';
 import { SearchHandlersGroup } from '../lib/handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../lib/handlers/groups/SystemHandlersGroup.js';
 import {
@@ -316,6 +317,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     groups.push(...overridingGroups);
     if (exposition.includes('system')) {
       groups.push(new SystemHandlersGroup(dummyContext));
+      groups.push(new RuntimeRunHandlersGroup(dummyContext));
       // Beside the run tools: their background runs (`backgroundRuns`).
       groups.push(new BackgroundRunHandlersGroup(dummyContext));
     }

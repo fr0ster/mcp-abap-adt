@@ -22,6 +22,7 @@ import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
+  RuntimeRunHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../../lib/handlers/groups/index.js';
@@ -41,6 +42,7 @@ const objectOrientedTools = [
   new ReadOnlyHandlersGroup(context),
   new HighLevelHandlersGroup(context),
   new SystemHandlersGroup(context),
+  new RuntimeRunHandlersGroup(context),
   new SearchHandlersGroup(context),
   new DebugHandlersGroup(context),
 ].flatMap((group) => group.getHandlers().map((entry) => entry.toolDefinition));

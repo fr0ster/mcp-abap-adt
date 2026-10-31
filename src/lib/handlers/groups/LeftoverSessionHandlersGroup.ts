@@ -39,3 +39,22 @@ export class LeftoverSessionHandlersGroup extends BaseHandlerGroup {
     return leftoverSessionEntries();
   }
 }
+
+/**
+ * The leftover-session list alone, for the read-only sets: a logoff ends a
+ * SAP session and releases every lock it holds, which changes the system,
+ * so only the full binaries serve it.
+ */
+export class LeftoverSessionListHandlersGroup extends BaseHandlerGroup {
+  protected groupName = 'LeftoverSessionListHandlers';
+
+  constructor(context: HandlerContext) {
+    super(context);
+  }
+
+  getHandlers(): HandlerEntry[] {
+    return leftoverSessionEntries().filter(
+      (entry) => entry.toolDefinition.name === ListLeftoverSessions_Tool.name,
+    );
+  }
+}

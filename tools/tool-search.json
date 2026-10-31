@@ -157,7 +157,7 @@
       "PROG",
       "executable program"
     ],
-    "semantic": "Activate an ABAP program (report) after it was created or changed, so the change is in force."
+    "semantic": "Activate an ABAP program (report) once it was created or changed, so the change is in force."
   },
   "ActivateServiceBinding": {
     "keywords": [
@@ -3683,7 +3683,7 @@
       "SE38",
       "run"
     ],
-    "semantic": "Execute an ABAP program (report) and see its output."
+    "semantic": "Execute a report and see the list output it prints."
   },
   "SearchObject": {
     "keywords": [

@@ -9,13 +9,13 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { handleRuntimeRunClass } from '../../../../handlers/system/high/handleRuntimeRunClass';
+import { handleRuntimeRunProgram } from '../../../../handlers/system/high/handleRuntimeRunProgram';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
 import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
-import { handleRuntimeRunClass } from '../../../../handlers/system/readonly/handleRuntimeRunClass';
-import { handleRuntimeRunProgram } from '../../../../handlers/system/readonly/handleRuntimeRunProgram';
 import { getTimeout, sharedDependencyKind } from '../../helpers/configHelpers';
 import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { createTestLogger } from '../../helpers/loggerHelpers';

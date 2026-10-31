@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugDeleteBreakpoint',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.",
+    "[debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.",
   inputSchema: {
     type: 'object',
     properties: {

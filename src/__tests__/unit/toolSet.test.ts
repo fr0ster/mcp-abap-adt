@@ -45,7 +45,9 @@ import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   LeftoverSessionHandlersGroup,
+  LeftoverSessionListHandlersGroup,
   ReadOnlyHandlersGroup,
+  RuntimeRunHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../lib/handlers';
@@ -109,6 +111,7 @@ describe('the four tool sets', () => {
       shape([
         new ReadOnlyHandlersGroup(context, new Set(namesOf(overriding))),
         new SystemHandlersGroup(context),
+        new RuntimeRunHandlersGroup(context),
         new BackgroundRunHandlersGroup(context),
         ...overriding,
         new SearchHandlersGroup(context),
@@ -119,13 +122,13 @@ describe('the four tool sets', () => {
     );
   });
 
-  it('core-ro: readonly (with system), search, the leftover-session list and logoff, batch mode', () => {
+  it('core-ro: readonly (with system), search, the leftover-session list, batch mode', () => {
     expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
       shape([
         new ReadOnlyHandlersGroup(context),
         new SystemHandlersGroup(context),
         new SearchHandlersGroup(context),
-        new LeftoverSessionHandlersGroup(context),
+        new LeftoverSessionListHandlersGroup(context),
         new BatchHandlersGroup(context),
       ]),
     );
@@ -165,14 +168,14 @@ describe('the four tool sets', () => {
     ]);
   });
 
-  it('compact-ro: the 17 that change nothing, the leftover-session list and logoff, HandlerBatch', () => {
+  it('compact-ro: the 17 that change nothing, the leftover-session list, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
     expect(half).toHaveLength(17);
     expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
       { group: 'CompactReadOnlyHandlers', tools: half },
       {
-        group: 'CompactLeftoverSessionHandlers',
-        tools: ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
+        group: 'CompactLeftoverSessionListHandlers',
+        tools: ['HandlerLeftoverSessionList'],
       },
       { group: 'CompactBatchHandlers', tools: ['HandlerBatch'] },
     ]);
@@ -231,19 +234,16 @@ describe('the leftover-session tools are served on stdio only', () => {
   const leftoverOf = (set: ToolSet, transport: ServedTransport) =>
     toolsOf(set, transport).filter((n) => LEFTOVER.includes(n));
 
-  it('stdio: each set keeps the list and the logoff, and no set a resume', () => {
+  it('stdio: each set keeps the list, a full set the logoff too, and no set a resume', () => {
     expect(SETS.map(([kind, set]) => [kind, leftoverOf(set, 'stdio')])).toEqual(
       [
         ['core', ['ListLeftoverSessions', 'LogoffLeftoverSession']],
-        ['core-ro', ['ListLeftoverSessions', 'LogoffLeftoverSession']],
+        ['core-ro', ['ListLeftoverSessions']],
         [
           'compact',
           ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
         ],
-        [
-          'compact-ro',
-          ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
-        ],
+        ['compact-ro', ['HandlerLeftoverSessionList']],
       ],
     );
     for (const [kind, set] of SETS) {
@@ -409,14 +409,17 @@ describe('the ATC tools', () => {
 });
 
 /**
- * The run tools in a -ro set (the owner's decision: running code changes
- * no code, as in SAP): served, but without `background` — a -ro set keeps no
- * background run, so the parameter, and its pointer to GetBackgroundRun, do
- * not exist there. The write set's run tools keep it; the shared
- * definitions are not changed.
+ * The run tools change the system (the code they run can change data), so
+ * only the full set serves them, with `background` and its pointer to
+ * GetBackgroundRun; a -ro set serves neither them nor the trace parameters
+ * they schedule (the owner's decision: a read-only set changes nothing).
  */
-describe('the run tools of a -ro set offer no background', () => {
-  const RUN_TOOLS = ['RuntimeRunClass', 'RuntimeRunProgram'];
+describe('the run tools are the full set’s alone', () => {
+  const RUN_TOOLS = [
+    'RuntimeCreateProfilerTraceParameters',
+    'RuntimeRunClass',
+    'RuntimeRunProgram',
+  ];
   const runTools = (set: ToolSet) =>
     set
       .groups(context, 'stdio')
@@ -428,21 +431,17 @@ describe('the run tools of a -ro set offer no background', () => {
           (e.toolDefinition.inputSchema as { properties: object }).properties,
           'background',
         ),
-        pointer: JSON.stringify(e.toolDefinition).includes('GetBackgroundRun'),
       }));
 
-  it('core-ro: both run tools, neither with background nor its pointer', () => {
-    expect(runTools(fullReadOnlyToolSet)).toEqual([
-      { name: 'RuntimeRunClass', background: false, pointer: false },
-      { name: 'RuntimeRunProgram', background: false, pointer: false },
-    ]);
+  it('core-ro: none of them', () => {
+    expect(runTools(fullReadOnlyToolSet)).toEqual([]);
   });
 
-  it('core: both run tools with background, still after core-ro was built', () => {
-    runTools(fullReadOnlyToolSet);
+  it('core: all three, the two runs with background', () => {
     expect(runTools(fullToolSet)).toEqual([
-      { name: 'RuntimeRunClass', background: true, pointer: true },
-      { name: 'RuntimeRunProgram', background: true, pointer: true },
+      { name: 'RuntimeCreateProfilerTraceParameters', background: false },
+      { name: 'RuntimeRunClass', background: true },
+      { name: 'RuntimeRunProgram', background: true },
     ]);
   });
 });

@@ -674,19 +674,21 @@ it.each<[string, () => void]>([
   },
 );
 
-it.each<[string, ToolSet]>([
-  ['mcp-abap-adt', fullToolSet],
-  ['mcp-abap-adt-ro', fullReadOnlyToolSet],
+it.each<[string, ToolSet, number]>([
+  ['mcp-abap-adt', fullToolSet, 2],
+  ['mcp-abap-adt-ro', fullReadOnlyToolSet, 1],
 ])(
-  '%s lists no resume tool, and the list and the logoff',
-  async (_bin, toolSet) => {
+  '%s lists no resume tool, and the list (the full set the logoff too)',
+  async (_bin, toolSet, leftover) => {
     const s = await start({ toolSet });
     try {
       const names = (await s.client.listTools()).tools.map((t) => t.name);
       expect(names.filter((n) => n.toLowerCase().includes('resume'))).toEqual(
         [],
       );
-      expect(names.filter((n) => n.includes('Leftover'))).toHaveLength(2);
+      expect(names.filter((n) => n.includes('Leftover'))).toHaveLength(
+        leftover,
+      );
     } finally {
       await s.stop();
     }

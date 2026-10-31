@@ -39,6 +39,7 @@ import {
   BatchHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
+  RuntimeRunHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../lib/handlers/groups';
@@ -131,6 +132,7 @@ function shippedGroup(names: string[]): IHandlerGroup[] {
     new ReadOnlyHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new RuntimeRunHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new CompactReadOnlyHandlersGroup(placeholder),
     new CompactModifyHandlersGroup(placeholder),

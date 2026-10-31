@@ -43,8 +43,8 @@ import { handleListFunctionModules } from '../../handlers/function_include/reado
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
 import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
+import { handleRuntimeRunProgram } from '../../handlers/system/high/handleRuntimeRunProgram';
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
-import { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram';
 import { createPackageContentsFetcher } from '../../lib/search-source/packageEnumerator';
 import { createPackagePatternResolver } from '../../lib/search-source/packageResolver';
 import {

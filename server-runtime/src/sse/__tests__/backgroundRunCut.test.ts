@@ -15,6 +15,7 @@ import {
   type StandInRequest,
 } from '../../../../src/__tests__/helpers/adtStandIn';
 import { BackgroundRunHandlersGroup } from '../../../../src/lib/handlers/groups/BackgroundRunHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../../../src/lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SystemHandlersGroup } from '../../../../src/lib/handlers/groups/SystemHandlersGroup';
 import type { HandlerContext } from '../../../../src/lib/handlers/interfaces';
 import { type SseStand, sseStand, until } from './shutdown/harness';
@@ -43,6 +44,7 @@ beforeEach(async () => {
     server: { backgroundRuns: strategy },
     groups: [
       new SystemHandlersGroup(placeholder),
+      new RuntimeRunHandlersGroup(placeholder),
       new BackgroundRunHandlersGroup(placeholder),
     ],
   });

@@ -1335,13 +1335,13 @@
   {
     "tool": "RuntimeCreateProfilerTraceParameters",
     "set": "full",
-    "handler": "src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts#handleRuntimeCreateProfilerTraceParameters",
+    "handler": "src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts#handleRuntimeCreateProfilerTraceParameters",
     "sends": "POST /sap/bc/adt/runtime/traces/abaptraces/parameters"
   },
   {
     "tool": "RuntimeRunClass",
     "set": "full",
-    "handler": "src/handlers/system/readonly/handleRuntimeRunClass.ts#handleRuntimeRunClass",
+    "handler": "src/handlers/system/high/handleRuntimeRunClass.ts#handleRuntimeRunClass",
     "sends": "POST /sap/bc/adt/oo/classrun/{name} (without profile: with it the trace is also scheduled and listed)",
     "when": [
       {
@@ -1355,7 +1355,7 @@
   {
     "tool": "RuntimeRunProgram",
     "set": "full",
-    "handler": "src/handlers/system/readonly/handleRuntimeRunProgram.ts#handleRuntimeRunProgram",
+    "handler": "src/handlers/system/high/handleRuntimeRunProgram.ts#handleRuntimeRunProgram",
     "sends": "POST /sap/bc/adt/programs/programrun/{name} (without profile: with it the trace is scheduled first)",
     "when": [
       {

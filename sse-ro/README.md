@@ -10,25 +10,23 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
 
 - the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
 - the **system** tools — where-used, type and object information, the ABAP AST and semantic
-  analysis, SQL queries, dumps, profiler traces, the class and program runs
-  (`RuntimeRunClass`, `RuntimeRunProgram`), and the ABAP Test Cockpit (`RunATC`,
-  `GetATCRunStatus`, `GetATCFindings`);
+  analysis, SQL queries, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
+  (`RunATC`, `GetATCRunStatus`, `GetATCFindings`);
 - **search** (`SearchObject`);
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-72 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger and
+69 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and
 background runs — those are
 `mcp-abap-adt-sse`'s ([`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)).
 
-**Running code is reading here.** `RuntimeRunClass` and `RuntimeRunProgram` are system tools and
-are served here: "read-only" means the user cannot change code, and running it is allowed, as in
-SAP. What that code does is the code's. They are served **without `background`**: this binary
-keeps no background run, so the parameter is not in their schema and is not read — a call runs
-and waits for its answer.
+**Nothing here changes the system.** No tool of this binary runs code or changes data: the class
+and program runs (`RuntimeRunClass`, `RuntimeRunProgram`) and the profiler trace parameters they run
+under (`RuntimeCreateProfilerTraceParameters`) are `mcp-abap-adt-sse`'s, since the code a run executes can
+change data. The ATC run stays: a check run changes nothing.
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many
 users, so it writes no runtime session file and serves no leftover-session tool; those are the
-stdio binaries' (they list and log off, and a stdio process takes up its destination's one leftover session at its start). Resuming a SAP session here is yours to do if you hold what it takes;
+stdio binaries' (they list, the full ones log off too, and a stdio process takes up its destination's one leftover session at its start). Resuming a SAP session here is yours to do if you hold what it takes;
 otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 ## Running it

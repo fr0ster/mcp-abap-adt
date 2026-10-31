@@ -21,7 +21,7 @@ background-run tools — those are `mcp-abap-adt-compact-sse`'s ([`@mcp-abap-adt
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many
 users, so it writes no runtime session file and serves no leftover-session tool; those are the
-stdio binaries' (they list and log off, and a stdio process takes up its destination's one leftover session at its start). Resuming a SAP session here is yours to do if you hold what it takes;
+stdio binaries' (they list, the full ones log off too, and a stdio process takes up its destination's one leftover session at its start). Resuming a SAP session here is yours to do if you hold what it takes;
 otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 ## Running it

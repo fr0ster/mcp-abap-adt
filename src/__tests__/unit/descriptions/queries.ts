@@ -140,13 +140,13 @@ export const QUERIES: readonly Query[] = [
   },
   {
     query: 'Run class ZCL_DEMO_RUN and show its console output',
-    roles: BOTH,
+    roles: DEVELOPER,
     required: [['RuntimeRunClass']],
     source: 'own',
   },
   {
     query: 'Execute report ZREP_DEMO',
-    roles: BOTH,
+    roles: DEVELOPER,
     required: [['RuntimeRunProgram']],
     source: 'own',
   },

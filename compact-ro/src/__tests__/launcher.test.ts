@@ -69,11 +69,11 @@ describe('mcp-abap-adt-compact-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 20 tools (HandlerBatch among them), none of a background run', () => {
+  it('serves the read-only set: 19 tools (HandlerBatch among them), none of a background run or a leftover-session logoff', () => {
     expect(shape(readOnlyToolSet)).toEqual(
       shape(compactReadOnlyToolSetOf(compactReadOnlyEntries)),
     );
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(20);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(19);
     expect(readOnlyToolSet.backgroundRuns).toBe(false);
   });
 

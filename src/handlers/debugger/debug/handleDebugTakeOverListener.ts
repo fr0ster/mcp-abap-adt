@@ -24,7 +24,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugTakeOverListener',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. ${TAKE_OVER_SENTENCE} ${START_NEEDS_BREAKPOINTS_SENTENCE} Takes whose requests are caught, the debugging mode and the debugger settings. ${USER_MODE_SENTENCE} ${SHARED_SET_SENTENCE}`,
+  description: `[debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. ${TAKE_OVER_SENTENCE} ${START_NEEDS_BREAKPOINTS_SENTENCE} Takes whose requests are caught, the debugging mode and the debugger settings. ${USER_MODE_SENTENCE} ${SHARED_SET_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

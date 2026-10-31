@@ -4,7 +4,7 @@ import { answerLeftoverLogoff } from '../../leftoverSessions/answers';
 export const TOOL_DEFINITION = {
   name: 'HandlerLeftoverSessionLogoff',
   description:
-    '[read-only] Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, credential-free. Its record is deleted afterwards.',
+    'Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, credential-free. Its record is deleted afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

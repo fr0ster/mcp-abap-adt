@@ -25,7 +25,7 @@ import {
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { createAbapConnection } from '../../../lib/connectionFactory';
-import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   HandlerContext,
@@ -170,7 +170,7 @@ describe('an embedder', () => {
 
 describe('a group registered on its own (no server instance, no strategy)', () => {
   it('refuses background: true instead of running in the foreground', async () => {
-    const group = new SystemHandlersGroup(placeholder);
+    const group = new RuntimeRunHandlersGroup(placeholder);
     const tools = new Map<
       string,
       (args: unknown) => Promise<{ isError?: boolean; content: unknown[] }>
@@ -215,10 +215,10 @@ describe('where the background-run tools are served: beside the run tools', () =
   ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
   it.each<[HandlerSet[], boolean]>([
-    [['readonly'], true],
+    [['readonly'], false],
     [['readonly', 'high'], true],
-    [['readonly', 'debug'], true],
-    [['high'], false],
+    [['readonly', 'debug'], false],
+    [['high'], true],
     [['debug'], false],
   ])('full %j: served %s, as RuntimeRunClass is', (exposition, served) => {
     const tools = namesOf(registryForExposition(exposition).getHandlerGroups());

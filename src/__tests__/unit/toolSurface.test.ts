@@ -254,8 +254,8 @@ describe('the MCP tool surface', () => {
       const EXTRA_ALLOWED_ADDITIONS: Record<string, string[]> = {
         // Background runs (19.0.0): the run tools take `background`, optional,
         // no default — without it a run waits as before.
-        'system/RuntimeRunClass': ['background'],
-        'system/RuntimeRunProgram': ['background'],
+        'runtime/RuntimeRunClass': ['background'],
+        'runtime/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
@@ -425,6 +425,15 @@ describe('the MCP tool surface', () => {
    * of any type of the run registry or a package, through adt-clients'
    * generic runner. A test run can change data in the system, so no
    * read-only binary serves it. Every other row was checked unchanged.
+   */
+  /**
+   * **The seventh deliberate move: the run tools left the system group
+   * (#329).** `RuntimeRunClass`, `RuntimeRunProgram` and
+   * `RuntimeCreateProfilerTraceParameters` change the system (the code a run
+   * executes can change data; a trace parameter set is created), so they
+   * moved to `RuntimeRunHandlersGroup` (`runtime`), which only the full
+   * binaries serve. Their rows changed only `group`; every other row was
+   * checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

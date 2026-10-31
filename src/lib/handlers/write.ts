@@ -88,15 +88,15 @@ export { handleUpdateStructure } from '../../handlers/structure/high/handleUpdat
 export {
   handleScheduleProfilerTraceOnce,
   type ScheduleProfilerTraceArgs,
-} from '../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.js';
+} from '../../handlers/system/high/handleRuntimeCreateProfilerTraceParameters.js';
 export {
   handleRuntimeRunClass,
   handleRuntimeRunClassUnderProfiler,
-} from '../../handlers/system/readonly/handleRuntimeRunClass.js';
+} from '../../handlers/system/high/handleRuntimeRunClass.js';
 export {
   handleRuntimeRunProgram,
   handleRuntimeRunProgramUnderProfiler,
-} from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
+} from '../../handlers/system/high/handleRuntimeRunProgram.js';
 export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.js';
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';

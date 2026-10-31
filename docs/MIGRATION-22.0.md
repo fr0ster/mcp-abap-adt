@@ -52,6 +52,20 @@ For code that imports `@mcp-abap-adt/lib`:
   `COMPACT_ACTIVATE_ROUTES` and the `COMPACT_*_KINDS` maps of `compact-shared`.
 - `RunATC`, `GetATCRunStatus` and `GetATCFindings` are in `SystemHandlersGroup` (they were in
   `HighLevelHandlersGroup`): include it (`includeSystem: true`, the default) to keep them.
+- `RuntimeRunClass`, `RuntimeRunProgram` and `RuntimeCreateProfilerTraceParameters` are in the
+  new `RuntimeRunHandlersGroup` (they were in `SystemHandlersGroup`): add it to a hand-listed
+  composition to keep them. `HandlerExporter` and `EmbeddableMcpServer` add it beside the system
+  group. `expositionGroups(['readonly'])` serves neither them, their background runs nor the
+  leftover-session logoff: add `high`. `SystemHandlersGroup` takes no second argument.
+
+## The read-only binaries: nothing in them changes the system
+
+`mcp-abap-adt-ro`, `-http-ro` and `-sse-ro` no longer serve `RuntimeRunClass`, `RuntimeRunProgram`,
+`RuntimeCreateProfilerTraceParameters` or (stdio) `LogoffLeftoverSession`, and
+`mcp-abap-adt-compact-ro` no longer serves `HandlerLeftoverSessionLogoff`: a run's code can change
+data, a trace parameter set is created, and a logoff releases the session's locks. `RunATC` and its
+readers stay. Use a full binary (`mcp-abap-adt`, `-http`, `-sse`, or `mcp-abap-adt-compact`) for
+them; nothing else about the tools changed.
 
 ## Callers: the object types each argument accepts
 

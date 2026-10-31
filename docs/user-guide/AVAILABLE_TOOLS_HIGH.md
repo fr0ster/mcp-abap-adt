@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 159
+- Total tools: 162
 
 ## Navigation
 
@@ -158,6 +158,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [UpdateStructure](#updatestructure-high-level-structure)
   - [System](#high-level-system)
     - [GetPackageTree](#getpackagetree-high-level-system)
+    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-high-level-system)
+    - [RuntimeRunClass](#runtimerunclass-high-level-system)
+    - [RuntimeRunProgram](#runtimerunprogram-high-level-system)
   - [Table](#high-level-table)
     - [CheckTable](#checktable-high-level-table)
     - [CreateTable](#createtable-high-level-table)
@@ -1953,6 +1956,87 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `package_name` (string, optional) - Package name (give this or package_names)
 - `package_names` (array, optional) - Several package names, read together (give this or package_name)
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+---
+
+<a id="runtimecreateprofilertraceparameters-high-level-system"></a>
+#### RuntimeCreateProfilerTraceParameters (High-Level / System)
+**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+
+**Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, required) - Human-readable trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunclass-high-level-system"></a>
+#### RuntimeRunClass (High-Level / System)
+**Description:** [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
+
+**Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `class_name` (string, required) - ABAP class name to execute.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
+- `sql_trace` (boolean, optional) - 
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunprogram-high-level-system"></a>
+#### RuntimeRunProgram (High-Level / System)
+**Description:** [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
+
+**Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
+- `program_name` (string, required) - ABAP program name to execute.
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 

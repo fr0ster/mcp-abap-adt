@@ -5,8 +5,8 @@ Generated from code in `src/handlers/**` (not from docs).
 ## Summary
 
 - Total tools: 264
-- Read-only tools: 68
-- High-level tools: 159
+- Read-only tools: 65
+- High-level tools: 162
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -15,10 +15,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
-- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` (and `-http`, `-sse`). The read-only binaries (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, on stdio the leftover-session list and logoff, and the run tools without `background`
+- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` (and `-http`, `-sse`). The read-only binaries (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group, the system and search tools, and on stdio the leftover-session list — none of the run tools (`RuntimeRunClass`, `RuntimeRunProgram`, `RuntimeCreateProfilerTraceParameters`), the background-run tools or the leftover-session logoff, which change the system
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
-- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
+- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
 - every Streamable HTTP binary (`-http`, `-http-ro`) -> [Streamable HTTP Binaries](#streamable-http-binaries): the optional `state_handle` argument on every tool, and the long session (`SessionOpen`, `SessionClose`). No stdio or SSE binary serves these
 - every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
@@ -100,15 +100,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
     - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
-    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
     - [RuntimeGetGatewayErrorLog](#runtimegetgatewayerrorlog-read-only-system)
     - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
-    - [RuntimeRunClass](#runtimerunclass-read-only-system)
-    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
     - [GetTable](#gettable-read-only-table)
@@ -269,6 +266,9 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [UpdateStructure](#updatestructure-high-level-structure)
   - [System](#high-level-system)
     - [GetPackageTree](#getpackagetree-high-level-system)
+    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-high-level-system)
+    - [RuntimeRunClass](#runtimerunclass-high-level-system)
+    - [RuntimeRunProgram](#runtimerunprogram-high-level-system)
   - [Table](#high-level-table)
     - [CheckTable](#checktable-high-level-table)
     - [CreateTable](#createtable-high-level-table)
@@ -1061,30 +1061,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
-#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [read-only] [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
 **Description:** [read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
@@ -1174,63 +1150,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `max_results` (number, optional) - Maximum number of messages to return.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
 - `user` (string, optional) - Filter by author username.
-
----
-
-<a id="runtimerunclass-read-only-system"></a>
-#### RuntimeRunClass (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `class_name` (string, required) - ABAP class name to execute.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
-<a id="runtimerunprogram-read-only-system"></a>
-#### RuntimeRunProgram (Read-Only / System)
-**Description:** [read-only] [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
-- `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -3095,6 +3014,87 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
+<a id="runtimecreateprofilertraceparameters-high-level-system"></a>
+#### RuntimeCreateProfilerTraceParameters (High-Level / System)
+**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+
+**Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, required) - Human-readable trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunclass-high-level-system"></a>
+#### RuntimeRunClass (High-Level / System)
+**Description:** [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
+
+**Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `class_name` (string, required) - ABAP class name to execute.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
+- `sql_trace` (boolean, optional) - 
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunprogram-high-level-system"></a>
+#### RuntimeRunProgram (High-Level / System)
+**Description:** [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
+
+**Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
+- `program_name` (string, required) - ABAP program name to execute.
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
 <a id="high-level-table"></a>
 ### High-Level / Table
 
@@ -3537,7 +3537,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugcancel-debug-debugger"></a>
 #### AmdpDebugCancel (Debug / Debugger)
-**Description:** [read-only] [debug] Cancels the stopped AMDP debuggee's execution.
+**Description:** [debug] Cancels the stopped AMDP debuggee's execution.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
 
@@ -3563,7 +3563,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
@@ -3576,7 +3576,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [read-only] [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 
@@ -3590,7 +3590,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstep-debug-debugger"></a>
 #### AmdpDebugStep (Debug / Debugger)
-**Description:** [read-only] [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
+**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStep.ts`
 
@@ -3603,7 +3603,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [read-only] [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
@@ -3639,7 +3639,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchend-debug-debugger"></a>
 #### DebugBatchEnd (Debug / Debugger)
-**Description:** [read-only] [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
+**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
 
@@ -3650,7 +3650,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatememorysnapshot-debug-debugger"></a>
 #### DebugCreateMemorySnapshot (Debug / Debugger)
-**Description:** [read-only] [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
+**Description:** [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
@@ -3662,7 +3662,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatewatchpoint-debug-debugger"></a>
 #### DebugCreateWatchpoint (Debug / Debugger)
-**Description:** [read-only] [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
+**Description:** [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
 
@@ -3676,7 +3676,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [read-only] [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
+**Description:** [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
@@ -3689,7 +3689,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletewatchpoint-debug-debugger"></a>
 #### DebugDeleteWatchpoint (Debug / Debugger)
-**Description:** [read-only] [debug] Removes a watchpoint.
+**Description:** [debug] Removes a watchpoint.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
@@ -3764,7 +3764,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
@@ -3777,7 +3777,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetsettings-debug-debugger"></a>
 #### DebugSetSettings (Debug / Debugger)
-**Description:** [read-only] [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
+**Description:** [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
 
@@ -3794,7 +3794,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetstackposition-debug-debugger"></a>
 #### DebugSetStackPosition (Debug / Debugger)
-**Description:** [read-only] [debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.
+**Description:** [debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
 
@@ -3807,7 +3807,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetvariable-debug-debugger"></a>
 #### DebugSetVariable (Debug / Debugger)
-**Description:** [read-only] [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
+**Description:** [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
@@ -3821,7 +3821,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
@@ -3837,7 +3837,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [read-only] [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
+**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
@@ -3850,7 +3850,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsteptoline-debug-debugger"></a>
 #### DebugStepToLine (Debug / Debugger)
-**Description:** [read-only] [debug] Runs or jumps the stopped debuggee to a line.
+**Description:** [debug] Runs or jumps the stopped debuggee to a line.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
@@ -3868,7 +3868,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [read-only] [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
@@ -3880,7 +3880,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [read-only] [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
@@ -3896,7 +3896,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugterminate-debug-debugger"></a>
 #### DebugTerminate (Debug / Debugger)
-**Description:** [read-only] [debug] Ends the stopped debuggee and its program where it stands.
+**Description:** [debug] Ends the stopped debuggee and its program where it stands.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
@@ -3981,7 +3981,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="logoffleftoversession-session-leftover-session"></a>
 #### LogoffLeftoverSession (Session / Leftover Session)
-**Description:** [read-only] [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
+**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
 
 **Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
 

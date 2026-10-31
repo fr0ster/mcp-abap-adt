@@ -18,7 +18,7 @@ import {
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
-import { SCHEDULE_WITHOUT_ID } from '../../../src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
+import { SCHEDULE_WITHOUT_ID } from '../../../src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters';
 import {
   handleHandlerProfileRun,
   TOOL_DEFINITION as runTool,

@@ -270,7 +270,7 @@ export function compactProfileRunDescription(
   const names = members.map((member) =>
     member === 'CLASS' ? 'class_name* for CLASS' : 'program_name* for PROGRAM',
   );
-  return `[read-only] Runs ${either(
+  return `Runs ${either(
     members.map((member) => (member === 'CLASS' ? 'a class' : 'a program')),
   )} in one request. Required: target_type*(${members.join('|')}) + ${either(names)}. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.`;
 }

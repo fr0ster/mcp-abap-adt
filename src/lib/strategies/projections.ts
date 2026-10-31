@@ -244,6 +244,36 @@ export const terseDeletionCheck: Terse<any> = (value) => {
   };
 };
 
+/**
+ * The CTS transport check (`POST /cts/transportchecks`, SAP's `checkData`
+ * document): `DATA/RESULT` is SAP's verdict and `DATA/MESSAGES/CTS_MESSAGE`
+ * its messages, each with `SEVERITY` and `TEXT`.
+ *
+ * The values recorded: `S` (the check passed, `MESSAGES` empty) and `E` (it
+ * refused, its reason in a `CTS_MESSAGE`). `S` answers `admissible: true`,
+ * `E` `admissible: false`. Any other value is SAP's and has no recording
+ * behind it, so it is answered as `result`, exactly as sent (an absent or
+ * empty one as `''`), with SAP's messages and no `admissible` of ours.
+ */
+export const terseTransportCheck: Terse<any> = (value) => {
+  const data = value?.['asx:abap']?.['asx:values']?.DATA;
+  if (!data) return undefined;
+  const result = text(data.RESULT);
+  const listed = data.MESSAGES?.CTS_MESSAGE;
+  const messages = (
+    Array.isArray(listed) ? listed : listed === undefined ? [] : [listed]
+  )
+    .map((message) => ({
+      type: text(message?.SEVERITY),
+      text: text(message?.TEXT),
+    }))
+    .filter((message) => message.text !== '');
+  const said = messages.length > 0 ? { messages } : {};
+  if (result === 'S') return { admissible: true, ...said };
+  if (result === 'E') return { admissible: false, ...said };
+  return { result, ...said };
+};
+
 /** Validation: `CHECK_RESULT` means admissible, `SEVERITY` carries a verdict. */
 export const terseValidation: Terse<any> = (value) => {
   const data = value?.['asx:abap']?.['asx:values']?.DATA;

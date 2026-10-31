@@ -64,7 +64,8 @@ export interface ViewFixture {
 /**
  * Refuse to create anything under a name ADT does not report as free.
  *
- * `terseValidation` answers `{ admissible }`, and `admissible: false` is how a
+ * `terseValidation` (and, for a service binding, `terseTransportCheck`)
+ * answers `{ admissible }`, and `admissible: false` is how a
  * name that already exists — or is locked, or is not allowed in this package —
  * arrives. A run that ignores it creates half an object and reports the trouble
  * three steps later, where it reads like something else.
@@ -82,10 +83,11 @@ export async function assertNameAvailable(
   const payload = parseHandlerResponse(answer) as {
     admissible?: boolean;
     message?: unknown;
+    messages?: unknown;
   };
   if (payload?.admissible === false) {
     throw new Error(
-      `${label}: the name is NOT available — ${JSON.stringify(payload.message ?? payload)}. ` +
+      `${label}: the name is NOT available — ${JSON.stringify(payload.messages ?? payload.message ?? payload)}. ` +
         'Something was left behind by an earlier run, or the name belongs to another object.',
     );
   }

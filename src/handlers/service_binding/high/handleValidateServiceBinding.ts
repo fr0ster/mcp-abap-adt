@@ -30,6 +30,14 @@
  * `detail` in its schema, found by cross-checking every registered tool that
  * calls the shared `project()` helper against the tools that declare
  * `detail`. Wired the same way as its siblings.
+ *
+ * **The verdict is the transport check's own (#329, D4).** The answer is
+ * SAP's `checkData` document, whose verdict is `RESULT` — not the
+ * `CHECK_RESULT`/`SEVERITY` of the type validations `terseValidation` reads,
+ * which found neither here and answered `admissible: false` with an empty
+ * message for every name, a free one included (measured on ABAP Cloud,
+ * 2026-10-31: `<RESULT>S</RESULT>`, `<MESSAGES/>`). `terseTransportCheck`
+ * reads `RESULT` and SAP's `CTS_MESSAGE`s.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -38,7 +46,10 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseValidation } from '../../../lib/strategies/projections';
+import {
+  project,
+  terseTransportCheck,
+} from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -127,6 +138,6 @@ export async function handleValidateServiceBinding(
           },
           { analyse: analyseException },
         ),
-    project(detail, terseValidation),
+    project(detail, terseTransportCheck),
   );
 }

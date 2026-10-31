@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [22.0.0] - 2026-10-31
 
-A major ([#329](https://github.com/fr0ster/mcp-abap-adt/pull/329)): the server takes what each tool offers and accepts from the ADT type tables of the declared system type (`@mcp-abap-adt/interfaces-adt` 24, `@mcp-abap-adt/adt-clients` 39, `@mcp-abap-adt/adt-strategies` 0.17), and fixes the gaps a user reported in 20.1.0 (ATC object types and findings, ATC in the read-only binaries, the activation descriptions). This heading becomes the version at the release commit. Every breaking item has its **Migrating:** note, and [the 22.0 migration note](docs/MIGRATION-22.0.md) collects them.
+A major ([#329](https://github.com/fr0ster/mcp-abap-adt/pull/329)): the server takes what each tool offers and accepts from the ADT type tables of the declared system type (`@mcp-abap-adt/interfaces-adt` 24, `@mcp-abap-adt/adt-clients` 39, `@mcp-abap-adt/adt-strategies` 0.17), and fixes the gaps a user reported in 20.1.0 (ATC object types and findings, ATC in the read-only binaries, the activation descriptions). Every breaking item has its **Migrating:** note, and [the 22.0 migration note](docs/MIGRATION-22.0.md) collects them.
 
 ### Changed — breaking for every start and every embedder: the system type is declared, and it decides the tools
 

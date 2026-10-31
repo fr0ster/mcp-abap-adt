@@ -151,3 +151,20 @@ One object of `functiongroup`, `dataelement`, `view` or `stru` (or a main type s
 activated through its type's own activation and answers the activation verdict, as its code does;
 in 21.x it started an activation run and answered `{ run_id }`. A caller that read `run_id` for
 these reads the verdict instead.
+
+## Callers: an ABAP Unit run read unfinished
+
+`GetUnitTestResult` (and the library's `GetUnitTest`, `GetCdsUnitTest`, `GetCdsUnitTestResult`)
+reads the run's status once, by long polling: ADT holds the read until the run has finished, so
+the call lasts as long as the run. A run SAP answers `FINISHED` answers its result as before; a run
+SAP answers with another status answers `{ success: true, run_id, status }`, with no result; a status
+document with no `aunit:progress` status is a failure at the step `read status` carrying the
+document. 21.x read the status at most 5 times and answered `finished: false` with `run_status` and
+`message`. The run tools waiting for their run (`wait: true`, the default) answer an unfinished run
+the same way.
+
+- Start a long run with `wait: false` (the run tools: `RunUnitTest`, `RunCdsUnitTest`,
+  `RunProgramUnitTest`, `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest`, `RunAbapUnit`) and
+  read it by `run_id` with `GetUnitTestResult`, or `GetUnitTestStatus` for the status alone.
+- Read an unfinished run from `status` (SAP's status value) in place of `finished: false`, and read
+  on by `run_id`.

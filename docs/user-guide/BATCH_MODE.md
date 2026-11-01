@@ -162,7 +162,8 @@ Compact `HandlerUpdate` is one request for every type, in batch mode and outside
 write of the type under the `lock_handle` the caller passes (required) — the `PUT` of the source,
 of the class include (`LOCAL_*`, `UNIT_TEST`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`) or of
 the metadata document, and for `SERVICE_BINDING` its publication request. For PACKAGE, DOMAIN,
-DATA_ELEMENT and FUNCTION_GROUP, `source_code` is the whole metadata document, sent byte for byte:
+DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`, `source_code`
+is the whole metadata document, sent byte for byte:
 nothing is read before the write or after it. Locking, unlocking and activating are their own
 calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
 `CDS_UNIT_TEST` the lock is the class's — `HandlerLock` with `object_type: CLASS`. A `PACKAGE` update is recorded over HTTP
@@ -181,7 +182,7 @@ activation of its own. `CDS_UNIT_TEST` deletes its test class.
 Compact `HandlerGet` is one request per part, in batch mode and outside it alike: `part: source`
 (the default) the source alone, `part: metadata` the metadata document alone, each answered
 `{ part: 'source', source }` or `{ part: 'metadata', metadata }` beside the object's name. PACKAGE,
-DOMAIN, DATA_ELEMENT and FUNCTION_GROUP have a metadata document and no source: `source` (and an
+DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE have a metadata document and no source: `source` (and an
 absent `part`) is refused before anything is sent, naming the parts the type has. A function module
 is read at the group its arguments name — `function_module_name` as `GROUP|MODULE`, or with
 `function_group_name`. `node_structure` of a package (`DEVC/K`) is one request: SAP answers an

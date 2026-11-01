@@ -586,7 +586,7 @@ graph TD
 4. Handler invocation
    ├── BaseMcpServer resolves tool name → handler function
    ├── Creates HandlerContext { connection: IAbapConnection, logger: ILogger }
-   └── Calls handler(context, args)
+   └── Calls the handler in its form (callInItsForm): handler(context, args), or handler(args) for an args-only one
 
 5. ADT operation execution
    ├── Handler creates AdtClient(connection, logger)

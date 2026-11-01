@@ -27,7 +27,7 @@ describe('DEFAULT_ADT_HEADERS: the corrected pairs', () => {
     expect(keys.filter((key) => key.startsWith('applicationLog.'))).toEqual([]);
   });
 
-  it("sends the include's metadata update as its create (Inference, measured live later)", () => {
+  it("sends the include's metadata update as its create (measured on premise, 2026-11-01)", () => {
     expect(DEFAULT_ADT_HEADERS['include.updateMetadata']).toEqual(
       DEFAULT_ADT_HEADERS['include.create'],
     );

@@ -51,7 +51,7 @@ describe('CreateInclude', () => {
 
   it('sends one POST to the includes collection, stateless, with the include document', async () => {
     const connection = recordingConnection();
-    const result: any = await handleCreateInclude(
+    const result = await handleCreateInclude(
       { connection, logger: undefined },
       {
         include_name: 'ZI_X',
@@ -113,7 +113,7 @@ describe('CreateInclude', () => {
     ['package_name', { include_name: 'ZI_X', package_name: '' }],
   ])('refuses a missing %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
-    const result: any = await handleCreateInclude(
+    const result = await handleCreateInclude(
       { connection, logger: undefined },
       args,
     );
@@ -125,7 +125,7 @@ describe('CreateInclude', () => {
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, 'cloud');
-    const result: any = await handleCreateInclude(
+    const result = await handleCreateInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X', package_name: 'ZP' },
     );
@@ -171,7 +171,7 @@ const REFUSED = {
 describe('UpdateInclude', () => {
   it('locks stateful, writes the source stateless under the handle, unlocks stateful', async () => {
     const connection = sessionRecording();
-    const result: any = await handleUpdateInclude(
+    const result = await handleUpdateInclude(
       { connection, logger: undefined },
       {
         include_name: 'ZI_X',
@@ -206,7 +206,7 @@ describe('UpdateInclude', () => {
 
   it('adds one activation POST after the unlock when activate is true', async () => {
     const connection = sessionRecording();
-    const result: any = await handleUpdateInclude(
+    const result = await handleUpdateInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x', activate: true },
     );
@@ -219,9 +219,40 @@ describe('UpdateInclude', () => {
     expect(connection.sessions[3]).toBe('stateless');
   });
 
+  it("unlocks before the activation, and answers a refused activation as an error with SAP's text", async () => {
+    // SAP's refusal of an activation: 200, activationExecuted="false" and an
+    // error message (the corpus case refusal-activation-fails).
+    const connection = sessionRecording([
+      undefined,
+      undefined,
+      undefined,
+      { data: corpusBody('refusal-activation-fails--01-activation') },
+    ]);
+    const result = await handleUpdateInclude(
+      { connection, logger: undefined },
+      { include_name: 'ZI_X', source_code: 'x', activate: true },
+    );
+    expect(result.isError).toBe(true);
+    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `POST ${LOCK_URL}`,
+      `PUT ${INCLUDES}/zi_x/source/main?lockHandle=${HANDLE}`,
+      `POST ${UNLOCK_URL}`,
+      'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
+    ]);
+    expect(connection.sessions).toEqual([
+      'stateful',
+      'stateless',
+      'stateful',
+      'stateless',
+    ]);
+    const text = result.content.map((item) => item.text ?? '').join('\n');
+    expect(text).toContain('STRONG_BUT_NOT_A_REAL_TYPE');
+    expect(text).toContain('is unknown.');
+  });
+
   it('still unlocks when the write is refused, and answers the refusal', async () => {
     const connection = sessionRecording([undefined, REFUSED]);
-    const result: any = await handleUpdateInclude(
+    const result = await handleUpdateInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x', activate: true },
     );
@@ -242,7 +273,7 @@ describe('UpdateInclude', () => {
     ['source_code', { include_name: 'ZI_X', source_code: '' }],
   ])('refuses a missing %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
-    const result: any = await handleUpdateInclude(
+    const result = await handleUpdateInclude(
       { connection, logger: undefined },
       args,
     );
@@ -254,7 +285,7 @@ describe('UpdateInclude', () => {
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, 'cloud');
-    const result: any = await handleUpdateInclude(
+    const result = await handleUpdateInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x' },
     );
@@ -270,7 +301,7 @@ const DOCUMENT =
 describe('UpdateIncludeMetadata', () => {
   it('locks stateful, puts the document byte for byte stateless, unlocks stateful', async () => {
     const connection = sessionRecording();
-    const result: any = await handleUpdateIncludeMetadata(
+    const result = await handleUpdateIncludeMetadata(
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT, transport_request: 'K1' },
     );
@@ -301,7 +332,7 @@ describe('UpdateIncludeMetadata', () => {
 
   it('still unlocks when the write is refused', async () => {
     const connection = sessionRecording([undefined, REFUSED]);
-    const result: any = await handleUpdateIncludeMetadata(
+    const result = await handleUpdateIncludeMetadata(
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT },
     );
@@ -321,7 +352,7 @@ describe('UpdateIncludeMetadata', () => {
     ['metadata', { include_name: 'ZI_X', metadata: '' }],
   ])('refuses a missing %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
-    const result: any = await handleUpdateIncludeMetadata(
+    const result = await handleUpdateIncludeMetadata(
       { connection, logger: undefined },
       args,
     );
@@ -333,7 +364,7 @@ describe('UpdateIncludeMetadata', () => {
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, 'cloud');
-    const result: any = await handleUpdateIncludeMetadata(
+    const result = await handleUpdateIncludeMetadata(
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT },
     );
@@ -378,7 +409,7 @@ describe('DeleteInclude', () => {
       { data: checkXml() },
       { data: DELETED_XML },
     ]);
-    const result: any = await handleDeleteInclude(
+    const result = await handleDeleteInclude(
       { connection, logger: undefined },
       { include_name: 'zi_x', transport_request: 'K1' },
     );
@@ -414,7 +445,7 @@ describe('DeleteInclude', () => {
     const connection = sessionRecording([
       { data: checkXml('Include is still used') },
     ]);
-    const result: any = await handleDeleteInclude(
+    const result = await handleDeleteInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X' },
     );
@@ -428,7 +459,7 @@ describe('DeleteInclude', () => {
     ['include_name', { include_name: '' }],
   ])('refuses a missing %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
-    const result: any = await handleDeleteInclude(
+    const result = await handleDeleteInclude(
       { connection, logger: undefined },
       args,
     );
@@ -440,7 +471,7 @@ describe('DeleteInclude', () => {
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, 'cloud');
-    const result: any = await handleDeleteInclude(
+    const result = await handleDeleteInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X' },
     );
@@ -455,7 +486,7 @@ describe('ActivateInclude', () => {
     const connection = sessionRecording([
       { data: corpusBody('activation-success-verdict--01-activation') },
     ]);
-    const result: any = await handleActivateInclude(
+    const result = await handleActivateInclude(
       { connection, logger: undefined },
       { include_name: 'zi_x' },
     );
@@ -483,7 +514,7 @@ describe('ActivateInclude', () => {
     ['include_name', { include_name: '' }],
   ])('refuses a missing %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
-    const result: any = await handleActivateInclude(
+    const result = await handleActivateInclude(
       { connection, logger: undefined },
       args,
     );
@@ -495,7 +526,7 @@ describe('ActivateInclude', () => {
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, 'cloud');
-    const result: any = await handleActivateInclude(
+    const result = await handleActivateInclude(
       { connection, logger: undefined },
       { include_name: 'ZI_X' },
     );

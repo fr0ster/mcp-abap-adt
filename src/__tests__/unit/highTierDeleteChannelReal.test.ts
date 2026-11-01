@@ -269,7 +269,10 @@ const deletionServiceCases: DeletionCase[] = [
     name: 'DeleteInclude',
     expectedUri: '/sap/bc/adt/programs/includes/zi_del_x',
     run: (c) =>
-      handleDeleteInclude(ctx(c) as any, { include_name: 'ZI_DEL_X' }),
+      handleDeleteInclude(
+        { connection: c, logger: undefined },
+        { include_name: 'ZI_DEL_X' },
+      ),
   },
   {
     name: 'DeleteTableType',

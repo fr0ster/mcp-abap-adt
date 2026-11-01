@@ -37,13 +37,50 @@ subpath `@mcp-abap-adt/lib/tool-search`:
 ```ts
 import {
   TOOL_SEARCH_META_KEY, // 'mcp-abap-adt/search'
-  toolSearchText, // (name) => { keywords, semantic } | undefined
+  toolSearchText, // (name, offered?) => { keywords, semantic } | undefined
   toolSearchTexts, // () => ReadonlyMap<name, { keywords, semantic }>
 } from '@mcp-abap-adt/lib/tool-search';
 ```
 
 The table is `tools/tool-search.json` in the package: one entry per tool of
 every set (the full set, the `-ro` sets and the compact sets).
+
+## Texts per system type
+
+A compact tool whose `object_type` (or `target_type`) picks the object offers
+on each system type the members that type's ADT table serves (ABAP cloud: no
+`PROGRAM`, no `INCLUDE` for a write). Its search texts follow its enum: a
+server declared `SAP_SYSTEM_TYPE=cloud` lists `HandlerCreate` without the
+keywords `program` and `report`, and its semantic sentence without
+`program`. On premise, and with no system type declared, the texts are the
+table's own.
+
+In the table such an entry groups, under `members`, the keywords that name
+each member, and may write its `semantic` as a list of items, each naming its
+member:
+
+```json
+"HandlerProfileRun": {
+  "keywords": ["run class", "run program", "execute report", "…"],
+  "semantic": {
+    "before": "Run an ABAP ",
+    "items": [
+      { "member": "CLASS", "text": "class" },
+      { "member": "PROGRAM", "text": "program" }
+    ],
+    "join": "or",
+    "after": " and see its output, optionally under the profiler or in the background."
+  },
+  "members": { "CLASS": ["run class"], "PROGRAM": ["run program", "execute report"] }
+}
+```
+
+The sentence reads `before`, the items kept (`A, B or C`; `join` is `or` or
+`and`), then `after`. `toolSearchText(name, offered)` answers the texts for
+the members `offered` names — a keyword grouped under another member and an
+item naming one are left out; `toolSearchText(name)` and `toolSearchTexts()`
+answer the table's own, every word kept. `tools/list` carries the texts of
+the members the tool offers on the server's declared system type.
 
 ## Building the index
 

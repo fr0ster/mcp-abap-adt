@@ -17,6 +17,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactLockDescription(variant),
     inputSchema: compactLockSchemaFor(COMPACT_LOCK[variant]),
+    members: COMPACT_LOCK[variant],
   })),
 } as const;
 

@@ -17,6 +17,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactCreateDescription(variant),
     inputSchema: compactCreateSchemaFor(COMPACT_CREATE[variant]),
+    members: COMPACT_CREATE[variant],
   })),
 } as const;
 

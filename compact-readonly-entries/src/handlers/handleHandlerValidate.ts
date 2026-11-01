@@ -42,6 +42,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactValidateDescription(variant),
     inputSchema: compactValidateSchemaFor(COMPACT_VALIDATE[variant]),
+    members: COMPACT_VALIDATE[variant],
   })),
 } as const;
 

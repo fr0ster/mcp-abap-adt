@@ -16,6 +16,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactUpdateDescription(variant),
     inputSchema: compactUpdateSchemaFor(COMPACT_UPDATE[variant]),
+    members: COMPACT_UPDATE[variant],
   })),
 } as const;
 

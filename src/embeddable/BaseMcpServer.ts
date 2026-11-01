@@ -1389,6 +1389,14 @@ export abstract class BaseMcpServer extends McpServer {
             );
             continue;
           }
+          // The members the declared variant offers, for a tool whose
+          // member picks the object: its search texts name only these.
+          const offered =
+            environment === undefined
+              ? undefined
+              : entry.toolDefinition.variants?.[
+                  variantOfEnvironment(environment)
+                ].members;
           // Wrap handler to inject connection from context
           // Original handler: (context: HandlerContext, args: any) => Promise<any>
           type HandlerFnWithContext = (
@@ -1762,7 +1770,7 @@ export abstract class BaseMcpServer extends McpServer {
                     )
                   : served.description,
               inputSchema: zodSchema,
-              ...searchMeta(entry.toolDefinition.name),
+              ...searchMeta(entry.toolDefinition.name, offered),
             },
             wrappedHandler,
           );
@@ -2865,10 +2873,14 @@ function withSearchMeta(name: unknown, registered: unknown): unknown {
 /**
  * The `_meta` a tool is listed with: its search texts under
  * `mcp-abap-adt/search` (`tools/tool-search.json`), for a consumer's tool
- * search; none for a tool the table does not name.
+ * search — with `offered`, naming only the members its variant offers;
+ * none for a tool the table does not name.
  */
-function searchMeta(name: string): { _meta?: Record<string, unknown> } {
-  const text = toolSearchText(name);
+function searchMeta(
+  name: string,
+  offered?: readonly string[],
+): { _meta?: Record<string, unknown> } {
+  const text = toolSearchText(name, offered);
   if (text === undefined) return {};
   return {
     _meta: {

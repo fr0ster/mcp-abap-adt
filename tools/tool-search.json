@@ -2984,7 +2984,57 @@
       "package",
       "transport"
     ],
-    "semantic": "Activate one object or several objects together after a change."
+    "semantic": "Activate one object or several objects together after a change.",
+    "members": {
+      "CLASS": [
+        "class"
+      ],
+      "PROGRAM": [
+        "program",
+        "report"
+      ],
+      "INTERFACE": [
+        "interface"
+      ],
+      "FUNCTION_GROUP": [
+        "function group"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "STRUCTURE": [
+        "structure"
+      ],
+      "DDL": [
+        "CDS view",
+        "DDL"
+      ],
+      "DOMAIN": [
+        "domain"
+      ],
+      "DATA_ELEMENT": [
+        "data element"
+      ],
+      "BEHAVIOR_DEFINITION": [
+        "behavior definition"
+      ],
+      "METADATA_EXTENSION": [
+        "metadata extension"
+      ],
+      "PACKAGE": [
+        "package"
+      ],
+      "SERVICE_DEFINITION": [
+        "service definition"
+      ],
+      "SERVICE_BINDING": [
+        "service binding"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ]
+    }
   },
   "HandlerBackgroundRunDiscard": {
     "keywords": [
@@ -3069,7 +3119,72 @@
       "package",
       "transport"
     ],
-    "semantic": "Run a syntax check on a class, program, CDS view or other object and see its errors and warnings."
+    "semantic": {
+      "before": "Run a syntax check on ",
+      "items": [
+        {
+          "member": "CLASS",
+          "text": "a class"
+        },
+        {
+          "member": "PROGRAM",
+          "text": "program"
+        },
+        {
+          "member": "DDL",
+          "text": "CDS view"
+        },
+        {
+          "text": "other object"
+        }
+      ],
+      "join": "or",
+      "after": " and see its errors and warnings."
+    },
+    "members": {
+      "CLASS": [
+        "class"
+      ],
+      "PROGRAM": [
+        "program",
+        "report"
+      ],
+      "INTERFACE": [
+        "interface"
+      ],
+      "FUNCTION_GROUP": [
+        "function group"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "STRUCTURE": [
+        "structure"
+      ],
+      "DDL": [
+        "CDS view",
+        "DDL"
+      ],
+      "DOMAIN": [
+        "domain"
+      ],
+      "DATA_ELEMENT": [
+        "data element"
+      ],
+      "PACKAGE": [
+        "package"
+      ],
+      "BEHAVIOR_DEFINITION": [
+        "behavior definition"
+      ],
+      "METADATA_EXTENSION": [
+        "metadata extension"
+      ]
+    }
   },
   "HandlerCreate": {
     "keywords": [
@@ -3098,7 +3213,93 @@
       "package",
       "transport"
     ],
-    "semantic": "Create a new ABAP object: a class, program, CDS view, table, function module, package or another type."
+    "semantic": {
+      "before": "Create a new ABAP object: ",
+      "items": [
+        {
+          "member": "CLASS",
+          "text": "a class"
+        },
+        {
+          "member": "PROGRAM",
+          "text": "program"
+        },
+        {
+          "member": "DDL",
+          "text": "CDS view"
+        },
+        {
+          "member": "TABLE",
+          "text": "table"
+        },
+        {
+          "member": "FUNCTION_MODULE",
+          "text": "function module"
+        },
+        {
+          "member": "PACKAGE",
+          "text": "package"
+        },
+        {
+          "text": "another type"
+        }
+      ],
+      "join": "or",
+      "after": "."
+    },
+    "members": {
+      "PACKAGE": [
+        "package"
+      ],
+      "DOMAIN": [
+        "domain"
+      ],
+      "DATA_ELEMENT": [
+        "data element"
+      ],
+      "TRANSPORT": [
+        "transport"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "STRUCTURE": [
+        "structure"
+      ],
+      "DDL": [
+        "CDS view",
+        "DDL"
+      ],
+      "SERVICE_DEFINITION": [
+        "service definition"
+      ],
+      "SERVICE_BINDING": [
+        "service binding"
+      ],
+      "CLASS": [
+        "class"
+      ],
+      "PROGRAM": [
+        "program",
+        "report"
+      ],
+      "INTERFACE": [
+        "interface"
+      ],
+      "FUNCTION_GROUP": [
+        "function group"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ],
+      "BEHAVIOR_DEFINITION": [
+        "behavior definition"
+      ],
+      "METADATA_EXTENSION": [
+        "metadata extension"
+      ]
+    }
   },
   "HandlerDebugBatch": {
     "keywords": [
@@ -3177,7 +3378,82 @@
       "package",
       "transport"
     ],
-    "semantic": "Delete an ABAP object: a class, program, CDS view, table or another type."
+    "semantic": {
+      "before": "Delete an ABAP object: ",
+      "items": [
+        {
+          "member": "CLASS",
+          "text": "a class"
+        },
+        {
+          "member": "PROGRAM",
+          "text": "program"
+        },
+        {
+          "member": "DDL",
+          "text": "CDS view"
+        },
+        {
+          "member": "TABLE",
+          "text": "table"
+        },
+        {
+          "text": "another type"
+        }
+      ],
+      "join": "or",
+      "after": "."
+    },
+    "members": {
+      "PACKAGE": [
+        "package"
+      ],
+      "DOMAIN": [
+        "domain"
+      ],
+      "DATA_ELEMENT": [
+        "data element"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "STRUCTURE": [
+        "structure"
+      ],
+      "DDL": [
+        "CDS view",
+        "DDL"
+      ],
+      "SERVICE_DEFINITION": [
+        "service definition"
+      ],
+      "SERVICE_BINDING": [
+        "service binding"
+      ],
+      "CLASS": [
+        "class"
+      ],
+      "PROGRAM": [
+        "program",
+        "report"
+      ],
+      "INTERFACE": [
+        "interface"
+      ],
+      "FUNCTION_GROUP": [
+        "function group"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ],
+      "BEHAVIOR_DEFINITION": [
+        "behavior definition"
+      ],
+      "METADATA_EXTENSION": [
+        "metadata extension"
+      ]
+    }
   },
   "HandlerDeletionCheck": {
     "keywords": [
@@ -3245,7 +3521,93 @@
       "package",
       "transport"
     ],
-    "semantic": "Read the source code or metadata of any ABAP object: class, program, CDS view, table, function module, package and more."
+    "semantic": {
+      "before": "Read the source code or metadata of any ABAP object: ",
+      "items": [
+        {
+          "member": "CLASS",
+          "text": "class"
+        },
+        {
+          "member": "PROGRAM",
+          "text": "program"
+        },
+        {
+          "member": "DDL",
+          "text": "CDS view"
+        },
+        {
+          "member": "TABLE",
+          "text": "table"
+        },
+        {
+          "member": "FUNCTION_MODULE",
+          "text": "function module"
+        },
+        {
+          "member": "PACKAGE",
+          "text": "package"
+        },
+        {
+          "text": "more"
+        }
+      ],
+      "join": "and",
+      "after": "."
+    },
+    "members": {
+      "PACKAGE": [
+        "package"
+      ],
+      "DOMAIN": [
+        "domain"
+      ],
+      "DATA_ELEMENT": [
+        "data element"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "STRUCTURE": [
+        "structure"
+      ],
+      "DDL": [
+        "CDS view",
+        "DDL"
+      ],
+      "SERVICE_DEFINITION": [
+        "service definition"
+      ],
+      "SERVICE_BINDING": [
+        "service binding"
+      ],
+      "CLASS": [
+        "class"
+      ],
+      "PROGRAM": [
+        "program",
+        "report"
+      ],
+      "INTERFACE": [
+        "interface"
+      ],
+      "FUNCTION_GROUP": [
+        "function group"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ],
+      "BEHAVIOR_DEFINITION": [
+        "behavior definition"
+      ],
+      "METADATA_EXTENSION": [
+        "metadata extension"
+      ],
+      "TRANSPORT": [
+        "transport"
+      ]
+    }
   },
   "HandlerGetData": {
     "keywords": [
@@ -3311,7 +3673,30 @@
       "background run",
       "output"
     ],
-    "semantic": "Run an ABAP class or program and see its output, optionally under the profiler or in the background."
+    "semantic": {
+      "before": "Run an ABAP ",
+      "items": [
+        {
+          "member": "CLASS",
+          "text": "class"
+        },
+        {
+          "member": "PROGRAM",
+          "text": "program"
+        }
+      ],
+      "join": "or",
+      "after": " and see its output, optionally under the profiler or in the background."
+    },
+    "members": {
+      "CLASS": [
+        "run class"
+      ],
+      "PROGRAM": [
+        "run program",
+        "execute report"
+      ]
+    }
   },
   "HandlerProfileSchedule": {
     "keywords": [
@@ -3475,7 +3860,78 @@
       "package",
       "transport"
     ],
-    "semantic": "Change an existing ABAP object: write the new source code of a class, program, CDS view or another type."
+    "semantic": {
+      "before": "Change an existing ABAP object: write the new source code of ",
+      "items": [
+        {
+          "member": "CLASS",
+          "text": "a class"
+        },
+        {
+          "member": "PROGRAM",
+          "text": "program"
+        },
+        {
+          "member": "DDL",
+          "text": "CDS view"
+        },
+        {
+          "text": "another type"
+        }
+      ],
+      "join": "or",
+      "after": "."
+    },
+    "members": {
+      "PACKAGE": [
+        "package"
+      ],
+      "DOMAIN": [
+        "domain"
+      ],
+      "DATA_ELEMENT": [
+        "data element"
+      ],
+      "FUNCTION_GROUP": [
+        "function group"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "STRUCTURE": [
+        "structure"
+      ],
+      "DDL": [
+        "CDS view",
+        "DDL"
+      ],
+      "SERVICE_DEFINITION": [
+        "service definition"
+      ],
+      "CLASS": [
+        "class"
+      ],
+      "PROGRAM": [
+        "program",
+        "report"
+      ],
+      "INTERFACE": [
+        "interface"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ],
+      "BEHAVIOR_DEFINITION": [
+        "behavior definition"
+      ],
+      "METADATA_EXTENSION": [
+        "metadata extension"
+      ],
+      "SERVICE_BINDING": [
+        "service binding"
+      ]
+    }
   },
   "HandlerValidate": {
     "keywords": [
@@ -3504,7 +3960,22 @@
       "table",
       "CDS view"
     ],
-    "semantic": "Who calls this method or function module (BAPI), and who uses this class, table or CDS view: the where-used list of an object."
+    "semantic": "Who calls this method or function module (BAPI), and who uses this class, table or CDS view: the where-used list of an object.",
+    "members": {
+      "CLASS": [
+        "class"
+      ],
+      "FUNCTION_MODULE": [
+        "function module",
+        "BAPI"
+      ],
+      "TABLE": [
+        "table"
+      ],
+      "DDL": [
+        "CDS view"
+      ]
+    }
   },
   "ListBackgroundRuns": {
     "keywords": [

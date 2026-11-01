@@ -43,6 +43,11 @@ export interface ToolDefinition {
 export interface VariantToolDefinition {
   readonly description: string;
   readonly inputSchema: any;
+  /**
+   * The members its `object_type` (or `target_type`) offers there, for a
+   * tool whose member picks the object: its search texts name only these.
+   */
+  readonly members?: readonly string[];
 }
 
 /**

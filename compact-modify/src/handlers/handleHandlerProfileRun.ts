@@ -16,6 +16,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactProfileRunDescription(variant),
     inputSchema: compactProfileRunSchemaFor(COMPACT_PROFILE[variant]),
+    members: COMPACT_PROFILE[variant],
   })),
 } as const;
 

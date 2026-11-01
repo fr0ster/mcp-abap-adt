@@ -30,6 +30,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactGetDescription(variant),
     inputSchema: compactGetSchemaFor(COMPACT_READ[variant]),
+    members: COMPACT_READ[variant],
   })),
 } as const;
 

@@ -14,6 +14,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactDeleteDescription(variant),
     inputSchema: compactDeleteSchemaFor(COMPACT_DELETE[variant]),
+    members: COMPACT_DELETE[variant],
   })),
 } as const;
 

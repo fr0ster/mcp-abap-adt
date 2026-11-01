@@ -16,6 +16,7 @@ import {
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
+  includeDocuments,
   interfaceDocuments,
   messageClassDocuments,
   metadataExtensionDocuments,
@@ -25,6 +26,7 @@ import {
   serviceDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -57,6 +59,25 @@ export const readProgramMetadata = (
   c: Client,
   config: { programName: string },
 ) => c.getProgram(resultsFor(programDocuments)).readMetadata(config, analysed);
+
+/**
+ * A program include's metadata (`GetInclude`). Not in {@link READS}: the
+ * package walk's answers stay as they are.
+ */
+export const readIncludeMetadata = (
+  c: Client,
+  config: { includeName: string },
+) => c.getInclude(resultsFor(includeDocuments)).readMetadata(config, analysed);
+
+/**
+ * A table type's metadata (`GetTableType`, `GetTypeInfo`). Not in
+ * {@link READS}: the package walk's answers stay as they are.
+ */
+export const readTableTypeMetadata = (
+  c: Client,
+  config: { tableTypeName: string },
+) =>
+  c.getTableType(resultsFor(tableTypeDocuments)).readMetadata(config, analysed);
 
 /** A CDS view's metadata (`GetDdl`). */
 export const readDdlMetadata = (c: Client, config: { ddlName: string }) =>

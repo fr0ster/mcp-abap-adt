@@ -15,8 +15,6 @@
  * cannot recognise. A name no read finds is the call's error.
  */
 
-import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -31,9 +29,9 @@ import {
   readDataElementMetadata,
   readDomainMetadata,
   readStructureMetadata,
+  readTableTypeMetadata,
 } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
@@ -276,13 +274,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         kind: 'table_type',
         step: 'read table type',
         document: 'ttyp:tableType',
-        read: () =>
-          client
-            .getTableType(resultsFor(tableTypeDocuments))
-            .readMetadata(
-              { tableTypeName: typeName },
-              { analyse: analyseException },
-            ),
+        read: () => readTableTypeMetadata(client, { tableTypeName: typeName }),
         parse: parseTableType,
       },
     ];

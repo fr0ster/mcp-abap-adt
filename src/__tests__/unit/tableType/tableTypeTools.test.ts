@@ -135,7 +135,9 @@ const textOf = (result: {
 /**
  * What the server answers a read of an existing table type with: SAP's whole
  * document for STRING_TABLE (the corpus fixture). The handlers address the
- * object by the URL, so the document's own name is not the one asked for.
+ * object by the URL, so the document's own name is not the one asked for:
+ * the fixture stays byte for byte SAP's, so the requests name ZTT_X while the
+ * document says STRING_TABLE.
  */
 const STRING_TABLE = corpusBody(
   'read-metadata-table-type--01-tabletypes-string_table',

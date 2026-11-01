@@ -1426,8 +1426,10 @@ create_table_type:
         access_type: "standard"
         key_definition: "standard"
         key_kind: "nonUnique"
-        # The one property UpdateTableType changes.
-        update_access_type: "sorted"
+        # The one property UpdateTableType changes: hashed, so SAP's own
+        # key rule shows in the stored definition (a hashed access forces a
+        # unique key; measured on premise, 2026-11-01).
+        update_access_type: "hashed"
 
 # Create Table
 

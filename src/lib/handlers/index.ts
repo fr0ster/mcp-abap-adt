@@ -39,6 +39,7 @@ export {
 } from './registry/expositionRegistry.js';
 // The call form of a handler: the one rule every registration path follows
 export {
+  type CallContext,
   callInItsForm,
   type InGroupContext,
   isArgsOnly,

@@ -18,6 +18,7 @@ import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { EmbeddableMcpServer } from '../../embeddable';
 import {
+  type CallContext,
   type ConnectionProvider,
   callInItsForm,
   type HandlerContext,
@@ -140,3 +141,10 @@ export function embeddable(context: HandlerContext): EmbeddableMcpServer {
     handlersRegistry: exporter.createRegistry(),
   });
 }
+
+// The per-call context a registration asks for (in public signatures:
+// BaseHandlerGroup.registerHandlersOnCall, registerAllToolsOnCall)
+export const perCall: CallContext = async () => ({
+  connection: given_connection(),
+});
+declare function given_connection(): HandlerContext['connection'];

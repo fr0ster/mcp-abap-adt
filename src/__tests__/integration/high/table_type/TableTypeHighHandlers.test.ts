@@ -14,6 +14,8 @@
  *   -> UpdateTableType changing the access type: SAP's own key-kind rule shows
  *      in the stored definition (measured on premise, 2026-11-01: a hashed
  *      access forces a unique key, a standard one a non-unique one)
+ *   -> UpdateTableType activate:false (sorted): stored_version inactive;
+ *      GetTableType inactive / workingArea read it, active the active one
  *   -> CheckTableType active and inactive -> GetObjectVersions and one
  *      version's source (recorded: what it answers) -> GetTypeInfo shows the
  *      row type
@@ -25,7 +27,7 @@
  *      read document, HandlerUnlock, HandlerValidate (a free name),
  *      HandlerCheckRun, HandlerDeletionCheck, HandlerActivate, HandlerWhereUsed,
  *      HandlerDelete
- *   -> ActivateObjects TTYP/DA -> DeleteTableType
+ *   -> ActivateObjects TTYP/DA (the sorted version becomes active) -> DeleteTableType
  *   -> afterAll: whatever is left deleted, the package last; SearchObject by
  *      the run's names answers no hit.
  *
@@ -90,14 +92,13 @@ function answerOf(value: unknown): Answer {
   const isError = 'isError' in value && value.isError === true;
   const content = 'content' in value ? value.content : undefined;
   const first: unknown = Array.isArray(content) ? content[0] : undefined;
-  const text =
-    typeof first === 'object' &&
-    first !== null &&
-    'text' in first &&
-    typeof first.text === 'string'
-      ? first.text
-      : '';
-  return { isError, text };
+  if (typeof first !== 'object' || first === null) return { isError, text: '' };
+  // A text item, or a json item (GetTypeInfo) read as its JSON text.
+  if ('text' in first && typeof first.text === 'string') {
+    return { isError, text: first.text };
+  }
+  if ('json' in first) return { isError, text: JSON.stringify(first.json) };
+  return { isError, text: '' };
 }
 
 /** A field of a parsed JSON value, or `undefined`. */
@@ -404,6 +405,49 @@ describe('TableType High-Level Handlers Integration', () => {
         );
         expect(definitionOf(readAfter)).toEqual(updatedStored);
 
+        // UpdateTableType with activate false: the stored definition is the
+        // inactive version; GetTableType reads it at `inactive` and at
+        // `workingArea`, while `active` still answers the active one.
+        const unactivated = await must(
+          `UpdateTableType ${TABLE_TYPE} access_type=sorted activate=false`,
+          () =>
+            handleUpdateTableType(context, {
+              table_type_name: TABLE_TYPE,
+              ...transport(),
+              access_type: 'sorted',
+              activate: false,
+            }),
+        );
+        expect(storedVersionOf(unactivated)).toBe('inactive');
+        expect(storedOf(unactivated)?.access_type).toBe('sorted');
+        const readInactive = await must(
+          `GetTableType ${TABLE_TYPE} version=inactive`,
+          () =>
+            handleGetTableType(context, {
+              table_type_name: TABLE_TYPE,
+              version: 'inactive',
+            }),
+        );
+        expect(definitionOf(readInactive)?.access_type).toBe('sorted');
+        const readWorkingArea = await must(
+          `GetTableType ${TABLE_TYPE} version=workingArea`,
+          () =>
+            handleGetTableType(context, {
+              table_type_name: TABLE_TYPE,
+              version: 'workingArea',
+            }),
+        );
+        expect(definitionOf(readWorkingArea)?.access_type).toBe('sorted');
+        const readActive = await must(
+          `GetTableType ${TABLE_TYPE} version=active`,
+          () =>
+            handleGetTableType(context, {
+              table_type_name: TABLE_TYPE,
+              version: 'active',
+            }),
+        );
+        expect(definitionOf(readActive)).toEqual(updatedStored);
+
         await must(`CheckTableType ${TABLE_TYPE} active`, () =>
           handleCheckTableType(context, { table_type_name: TABLE_TYPE }),
         );
@@ -628,6 +672,12 @@ describe('TableType High-Level Handlers Integration', () => {
             objects: [{ name: TABLE_TYPE, type: 'TTYP/DA' }],
           }),
         );
+        // The inactive version (sorted) is now the active one.
+        const activatedRead = await must(
+          `GetTableType ${TABLE_TYPE} (after ActivateObjects)`,
+          () => handleGetTableType(context, { table_type_name: TABLE_TYPE }),
+        );
+        expect(definitionOf(activatedRead)?.access_type).toBe('sorted');
         await must(`DeleteTableType ${TABLE_TYPE}`, () =>
           handleDeleteTableType(context, {
             table_type_name: TABLE_TYPE,

@@ -291,3 +291,103 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
     expect(objectReads).toEqual([]);
   });
 });
+
+/**
+ * `GetInclude`: its source as text, as it answered before it had a part,
+ * and its metadata document in `GetProgram`'s shape — one request each.
+ */
+describe('GetInclude: the source as text, the metadata as GetProgram answers it', () => {
+  const context = {
+    connection: undefined,
+    logger: silentLogger,
+  } as unknown as HandlerContext;
+  const tools = servedTools(context);
+  const SOURCE = "REPORT zincl.\r\n  WRITE 'x'.\n";
+
+  const run = (
+    args: Record<string, unknown>,
+    mode: Mode,
+    body: string | undefined = SOURCE,
+  ) => runCase(tools, context, { tool: 'GetInclude', args, body }, mode);
+
+  it('declares include_name required, part and version', () => {
+    const schema = tools.get('GetInclude')?.toolDefinition.inputSchema as {
+      type: string;
+      properties: Record<string, { enum?: unknown; default?: unknown }>;
+      required: string[];
+    };
+    expect(schema.type).toBe('object');
+    expect(schema.required).toEqual(['include_name']);
+    expect(schema.properties.part).toMatchObject({
+      enum: ['source', 'metadata'],
+      default: 'source',
+    });
+    expect(schema.properties.version?.enum).toEqual(['active', 'inactive']);
+    expect(schema.properties.version).not.toHaveProperty('default');
+  });
+
+  it.each([
+    ['absent', {}],
+    ['source', { part: 'source' }],
+  ])(
+    'part %s: one request for the source, answered as the text SAP sent',
+    async (_label, part) => {
+      for (const mode of MODES) {
+        const ran = await run({ include_name: 'INCL_A', ...part }, mode);
+        expect(ran.sent).toEqual([
+          'GET /sap/bc/adt/programs/includes/incl_a/source/main',
+        ]);
+        if (mode === 'document') {
+          expect(ran.answer).toEqual({
+            isError: false,
+            content: [{ type: 'text', text: SOURCE }],
+          });
+        }
+        if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
+      }
+    },
+  );
+
+  it.each(['inactive', 'active'])(
+    'version %s: the one source request asks for that version',
+    async (version) => {
+      const ran = await run({ include_name: 'INCL_A', version }, 'document');
+      expect(ran.sent).toEqual([
+        `GET /sap/bc/adt/programs/includes/incl_a/source/main?version=${version}`,
+      ]);
+      expect(ran.answer?.content?.[0]?.text).toBe(SOURCE);
+    },
+  );
+
+  it.each(MODES)(
+    'part metadata (%s): one request for the metadata document, the GetProgram shape',
+    async (mode) => {
+      const DOCUMENT = '<include:abapInclude adtcore:name="INCL_A"/>';
+      const ran = await run(
+        { include_name: 'incl_a', part: 'metadata' },
+        mode,
+        DOCUMENT,
+      );
+      expect(ran.sent).toEqual(['GET /sap/bc/adt/programs/includes/incl_a']);
+      if (mode === 'document') {
+        expect(ran.answer?.isError).toBe(false);
+        expect(payloadOf(ran.answer?.content?.[0]?.text)).toEqual({
+          success: true,
+          include_name: 'INCL_A',
+          part: 'metadata',
+          metadata: DOCUMENT,
+        });
+      }
+      if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
+    },
+  );
+
+  it('another part is refused before any request, naming the two', async () => {
+    const ran = await run({ include_name: 'INCL_A', part: 'urls' }, 'document');
+    expect(ran.sent).toEqual([]);
+    expect(ran.answer?.isError).toBe(true);
+    expect(ran.answer?.content?.[0]?.text).toContain(
+      'part must be "source" or "metadata"',
+    );
+  });
+});

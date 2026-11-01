@@ -191,6 +191,8 @@ const EXCLUDED: Record<string, string> = {
     "the behavior pool's class metadata; the walks list it as its class",
   'enhancement/readonly/handleGetEnhancements.ts':
     "a probe of an include's metadata to tell an include from a program",
+  'include/readonly/handleGetInclude.ts':
+    "a program include's metadata, the shared read; the package walk does not read includes' metadata, so the batch has no read of the type",
   'include/readonly/handleGetIncludesList.ts':
     "a class's metadata, read to find its includes",
   'system/readonly/handleGetTypeInfo.ts':

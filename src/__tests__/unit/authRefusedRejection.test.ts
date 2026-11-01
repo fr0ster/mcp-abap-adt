@@ -285,7 +285,7 @@ describe('a direct request the credential refused ends the call as the credentia
 
   it('GetInclude: the chain answer, not its message as text', async () => {
     fakeClient = fakeClientOf({
-      getInclude: async () => {
+      read: async () => {
         throw refused();
       },
     });

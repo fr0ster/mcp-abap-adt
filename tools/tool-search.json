@@ -2108,9 +2108,10 @@
       "PROG/I",
       "include source",
       "TOP include",
-      "read include"
+      "read include",
+      "include metadata"
     ],
-    "semantic": "Read the source code of an ABAP include program by its name."
+    "semantic": "Read the source code or the metadata of an ABAP include program by its name."
   },
   "GetIncludesList": {
     "keywords": [

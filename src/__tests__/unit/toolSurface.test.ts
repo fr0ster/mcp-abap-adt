@@ -306,6 +306,9 @@ describe('the MCP tool surface', () => {
         'high/GetBehaviorImplementation': ['part'],
         'high/GetMetadataExtension': ['part'],
         'high/GetFunctionModule': ['part'],
+        // The ninth deliberate move (below): GetInclude reads the include's
+        // metadata too, `part` and `version` optional.
+        'readonly/GetInclude': ['part', 'version'],
         'low/UpdateClassLow': ['transport_request'],
         'low/UpdateClassTestClassesLow': ['transport_request'],
         'low/UpdateDdlLow': ['transport_request'],
@@ -450,7 +453,9 @@ describe('the MCP tool surface', () => {
    * `ActivateTableType`, `CheckTableType` and the three table-type version
    * tools arrived** (the server writes program includes and table types). The new full-set
    * tools of that work: the include tools on premise only, the table-type
-   * tools on premise and cloud; every other row was checked unchanged.
+   * tools on premise and cloud. `GetInclude` reads the include's metadata
+   * too: its row gained `part` and `version` (both optional; without them
+   * the source is read as before). Every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

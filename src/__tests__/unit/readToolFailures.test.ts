@@ -117,7 +117,7 @@ describe('GetInclude: through the adt-clients member, answered by answer()', () 
   it("SAP's refusal is the method's error as it is, not its message as text", async () => {
     const analyses: unknown[] = [];
     fakeClient = fakeClientOf({
-      getInclude: async (_name: unknown, options: any) => {
+      read: async (_config: unknown, _version: unknown, options: any) => {
         analyses.push(options?.analyse);
         return forbidden();
       },
@@ -139,7 +139,7 @@ describe('GetInclude: through the adt-clients member, answered by answer()', () 
 
   it('answers the source as it came', async () => {
     fakeClient = fakeClientOf({
-      getInclude: async () => okResponse(reading('DATA a TYPE i.')),
+      read: async () => okResponse(reading('DATA a TYPE i.')),
     });
     const result: any = await handleGetInclude(
       { connection: {} as any, logger: undefined } as any,

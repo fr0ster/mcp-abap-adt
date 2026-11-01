@@ -654,12 +654,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). Reads includes (PROG/I) by name.
+**Description:** [read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
 **Parameters:**
-- None
+- `include_name` (string, required) - Include name.
+- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 

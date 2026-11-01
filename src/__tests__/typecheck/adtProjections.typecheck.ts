@@ -17,6 +17,7 @@ import {
   type ActivationCode,
   type AdtCodes,
   type AtcKindOn,
+  type COMPACT_CHECK,
   type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
   type COMPACT_DELETE,
@@ -25,6 +26,7 @@ import {
   type COMPACT_READ_ROUTES,
   type COMPACT_UNLOCK,
   type COMPACT_UPDATE,
+  type COMPACT_VALIDATE,
   type INCLUDES_PARENT_ROUTES,
   projected,
   type ServedName,
@@ -157,6 +159,18 @@ export const includeInCloudLock: (typeof COMPACT_LOCK.cloud)[number] =
 // @ts-expect-error the unlock follows the lock.
 export const includeInCloudUnlock: (typeof COMPACT_UNLOCK.cloud)[number] =
   'INCLUDE';
+
+/** HandlerValidate validates a table type on ABAP cloud… */
+export const tableTypeInCloudValidate: (typeof COMPACT_VALIDATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and no include, as no program.
+export const includeInCloudValidate: (typeof COMPACT_VALIDATE.cloud)[number] =
+  'INCLUDE';
+/** HandlerCheckRun checks a table type on ABAP cloud… */
+export const tableTypeInCloudCheck: (typeof COMPACT_CHECK.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and an include on neither variant: it has no check.
+export const includeInCheck: (typeof COMPACT_CHECK.onprem)[number] = 'INCLUDE';
 
 // --- A list is exactly its projection --------------------------------------
 

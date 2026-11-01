@@ -32,6 +32,7 @@ import {
   programDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -217,6 +218,15 @@ export async function checkObject(
             client
               .getTable(resultsFor(tableDocuments))
               .check({ tableName: objectName }, checkVersion, {
+                headers,
+                analyse: analyseException,
+              }),
+          );
+        case 'table_type':
+          return withAdtHeaders(context, 'tableType.check', (headers) =>
+            client
+              .getTableType(resultsFor(tableTypeDocuments))
+              .check({ tableTypeName: objectName }, checkVersion, {
                 headers,
                 analyse: analyseException,
               }),

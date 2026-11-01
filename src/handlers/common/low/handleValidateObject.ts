@@ -26,12 +26,14 @@ import {
   domainDocuments,
   functionGroupDocuments,
   functionModuleDocuments,
+  includeDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
   packageDocuments,
   programDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { VALIDATE_KINDS, type ValidateKind } from '../../../lib/adtProjections';
@@ -228,6 +230,15 @@ export async function validateObject(
       );
     }
   }
+  // The include's validation names its package (adt-clients upper-cases
+  // `packageName`): a call without it is refused before anything is sent.
+  if (normalizedType === 'include' && !package_name) {
+    return return_error(
+      new Error(
+        'Include validation requires package_name; missing: package_name',
+      ),
+    );
+  }
   if (normalizedType === 'behavior_implementation' && !package_name) {
     return return_error(
       new Error('Behavior implementation validation requires package_name'),
@@ -286,6 +297,27 @@ export async function validateObject(
               },
               { analyse: analyseException },
             );
+        case 'include':
+          // An include is validated on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
+            .getInclude(resultsFor(includeDocuments))
+            .validate(
+              {
+                includeName: objectName,
+                packageName,
+                description: normalizedDescription,
+              },
+              { analyse: analyseException },
+            );
+        case 'table_type':
+          return client.getTableType(resultsFor(tableTypeDocuments)).validate(
+            {
+              tableTypeName: objectName,
+              packageName,
+              description: normalizedDescription,
+            },
+            { analyse: analyseException },
+          );
         case 'class':
           return client.getClass(resultsFor(classDocuments)).validate(
             {

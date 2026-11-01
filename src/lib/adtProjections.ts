@@ -1339,11 +1339,13 @@ export const COMPACT_UNLOCK = projected<
 export const COMPACT_VALIDATE_ROUTES = {
   CLASS: { api: 'class', operation: 'validate' },
   PROGRAM: { api: 'program', operation: 'validate' },
+  INCLUDE: { api: 'include', operation: 'validate' },
   INTERFACE: { api: 'interface', operation: 'validate' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'validate' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'validate' },
   TABLE: { api: 'table', operation: 'validate' },
   STRUCTURE: { api: 'structure', operation: 'validate' },
+  TABLE_TYPE: { api: 'tableType', operation: 'validate' },
   DDL: { api: 'ddl', operation: 'validate' },
   DOMAIN: { api: 'domain', operation: 'validate' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'validate' },
@@ -1360,11 +1362,13 @@ export const COMPACT_VALIDATE_ROUTES = {
 const VALIDATE_ONPREM = [
   'CLASS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'DOMAIN',
   'DATA_ELEMENT',
@@ -1381,7 +1385,9 @@ export const COMPACT_VALIDATE = projected<
   ServedName<'cloud', typeof COMPACT_VALIDATE_ROUTES>
 >()({
   onprem: VALIDATE_ONPREM,
-  cloud: VALIDATE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: VALIDATE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerCheckRun` checks, each with its API. */
@@ -1393,6 +1399,7 @@ export const COMPACT_CHECK_ROUTES = {
   FUNCTION_MODULE: { api: 'functionModule', operation: 'check' },
   TABLE: { api: 'table', operation: 'check' },
   STRUCTURE: { api: 'structure', operation: 'check' },
+  TABLE_TYPE: { api: 'tableType', operation: 'check' },
   DDL: { api: 'ddl', operation: 'check' },
   DOMAIN: { api: 'domain', operation: 'check' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'check' },
@@ -1409,6 +1416,7 @@ const CHECK_ONPREM = [
   'FUNCTION_MODULE',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'DOMAIN',
   'DATA_ELEMENT',
@@ -1571,6 +1579,7 @@ export const CHECK_KIND_ROUTES = {
   function_module: { api: 'functionModule', operation: 'check' },
   table: { api: 'table', operation: 'check' },
   structure: { api: 'structure', operation: 'check' },
+  table_type: { api: 'tableType', operation: 'check' },
   ddl: { api: 'ddl', operation: 'check' },
   domain: { api: 'domain', operation: 'check' },
   data_element: { api: 'dataElement', operation: 'check' },
@@ -1590,6 +1599,7 @@ const CHECK_KIND_LIST = [
   'function_module',
   'table',
   'structure',
+  'table_type',
   'ddl',
   'domain',
   'data_element',
@@ -1613,6 +1623,7 @@ export const COMPACT_CHECK_KINDS = {
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',
@@ -1750,11 +1761,13 @@ export const COMPACT_LOCK_KINDS = {
 export const VALIDATE_KIND_ROUTES = {
   class: { api: 'class', operation: 'validate' },
   program: { api: 'program', operation: 'validate' },
+  include: { api: 'include', operation: 'validate' },
   interface: { api: 'interface', operation: 'validate' },
   function_group: { api: 'functionGroup', operation: 'validate' },
   function_module: { api: 'functionModule', operation: 'validate' },
   table: { api: 'table', operation: 'validate' },
   structure: { api: 'structure', operation: 'validate' },
+  table_type: { api: 'tableType', operation: 'validate' },
   ddl: { api: 'ddl', operation: 'validate' },
   domain: { api: 'domain', operation: 'validate' },
   data_element: { api: 'dataElement', operation: 'validate' },
@@ -1774,11 +1787,13 @@ export type ValidateKind = keyof typeof VALIDATE_KIND_ROUTES;
 const VALIDATE_KIND_LIST = [
   'class',
   'program',
+  'include',
   'interface',
   'function_group',
   'function_module',
   'table',
   'structure',
+  'table_type',
   'ddl',
   'domain',
   'data_element',
@@ -1795,7 +1810,9 @@ export const VALIDATE_KINDS = projected<
   ServedName<'cloud', typeof VALIDATE_KIND_ROUTES>
 >()({
   onprem: VALIDATE_KIND_LIST,
-  cloud: VALIDATE_KIND_LIST.filter((kind) => kind !== 'program'),
+  cloud: VALIDATE_KIND_LIST.filter(
+    (kind) => kind !== 'program' && kind !== 'include',
+  ),
 });
 
 /**
@@ -1805,11 +1822,13 @@ export const VALIDATE_KINDS = projected<
 export const COMPACT_VALIDATE_KINDS = {
   CLASS: 'class',
   PROGRAM: 'program',
+  INCLUDE: 'include',
   INTERFACE: 'interface',
   FUNCTION_GROUP: 'function_group',
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',

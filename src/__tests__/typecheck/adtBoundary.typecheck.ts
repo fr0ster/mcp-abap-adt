@@ -89,6 +89,7 @@ export const checkKinds = {
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',

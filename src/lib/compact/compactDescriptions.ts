@@ -225,6 +225,8 @@ export function compactValidateDescription(variant: ProjectionVariant): string {
     COMPACT_VALIDATE[variant],
     {
       CLASS: 'CLASS(object_name*, superclass)',
+      INCLUDE: 'INCLUDE(object_name*, package_name*)',
+      TABLE_TYPE: 'TABLE_TYPE(object_name*, description)',
       FUNCTION_MODULE: 'FUNCTION_MODULE(object_name* as GROUP|MODULE)',
       PACKAGE: 'PACKAGE(object_name*, super_package)',
       BEHAVIOR_DEFINITION:

@@ -161,6 +161,26 @@ members that read them are not served; leave them out. The include's new propert
 (`include_name`, `HandlerUpdate`'s `part`) are offered on premise only. On premise nothing else
 changed.
 
+## Callers of `@mcp-abap-adt/lib/compact-shared`
+
+The twelve compact schema builders — `compactCreateSchemaFor`, `compactGetSchemaFor`,
+`compactUpdateSchemaFor`, `compactDeleteSchemaFor`, `compactProfileRunSchemaFor`,
+`compactValidateSchemaFor`, `compactDeletionCheckSchemaFor`, `compactLockSchemaFor`,
+`compactUnlockSchemaFor`, `compactCheckRunSchemaFor`, `compactActivateSchemaFor`,
+`compactWhereUsedSchemaFor` — take `M` as a readonly array of that tool's members, where 22.0.x
+took `readonly string[]`. A plain string array, or a name the tool does not offer, no longer
+compiles. **What you do:** pass the projection itself (`compactCreateSchemaFor(COMPACT_CREATE.cloud)`)
+or an `as const` array of its members.
+
+The projection tables gain the include and the table type: `INCLUDE` and `TABLE_TYPE` in the
+compact member tables, `table_type` in `VERSIONED_KINDS` and `VERSIONED_ROUTES` (the version list);
+the version source and diff take the new `VERSION_SOURCE_KINDS` (`VERSION_SOURCE_ROUTES`,
+`VersionSourceKind`), which has no `table_type`. `COMPACT_WHERE_USED_ROUTES` maps `TABLE_TYPE` to
+the where-used code `TTYP/DA`, not a name of `TYPE_NAMES`. **What you do:** a `switch` or a
+`Record` exhaustive over one of these tables handles the new members; a reader of
+`COMPACT_WHERE_USED_ROUTES` takes a value as a name of `TYPE_NAMES` or a where-used code. The
+type `ReadVersion` (`active`, `inactive`, `workingArea`) is exported beside them.
+
 ## Readers of `tools/tool-search.json`
 
 The search table shipped in the package changed shape for the compact tools: an entry whose

@@ -24,6 +24,7 @@ import type {
   ToolHandler,
 } from './interfaces.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
+import { isArgsOnly } from './utils/handlerCall.js';
 
 /**
  * Options for creating handler exporter
@@ -244,25 +245,24 @@ export class HandlerExporter {
         : fn();
     };
 
-    const original = entry.handler as (...args: unknown[]) => Promise<unknown>;
-    const wrapped =
-      original.length >= 2
-        ? (context: HandlerContext, args: unknown) =>
-            runWithCallTransport(args, () =>
-              resolved(context?.connection, () => original(context, args)),
-            )
-        : // Args-only handlers close over their group's context, which the
-          // embedder swaps before calling — so read it at call time.
-          (...callArgs: unknown[]) =>
-            runWithCallTransport(callArgs[0], () =>
-              resolved(
-                (group as Partial<{ context: HandlerContext }>).context
-                  ?.connection,
-                () => original(...callArgs),
-              ),
-            );
+    const original = entry.handler;
+    const wrapped: ToolHandler = isArgsOnly(original)
+      ? // Args-only handlers close over their group's context, which the
+        // embedder swaps before calling — so read it at call time.
+        (args: unknown) =>
+          runWithCallTransport(args, () =>
+            resolved(
+              (group as Partial<{ context: HandlerContext }>).context
+                ?.connection,
+              () => original(args),
+            ),
+          )
+      : (context: HandlerContext, args: unknown) =>
+          runWithCallTransport(args, () =>
+            resolved(context?.connection, () => original(context, args)),
+          );
     Object.defineProperty(wrapped, 'length', { value: original.length });
-    return { ...entry, handler: wrapped as ToolHandler };
+    return { ...entry, handler: wrapped };
   }
 
   /**

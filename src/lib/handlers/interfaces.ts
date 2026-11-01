@@ -50,12 +50,25 @@ export interface VariantToolDefinition {
   readonly members?: readonly string[];
 }
 
+/** A handler that takes the call's context and its arguments. */
+export type ContextHandler = (
+  context: HandlerContext,
+  args: any,
+) => Promise<any>;
+
 /**
- * Tool handler function type with context injection
- * Context (containing connection and logger) is injected automatically by BaseMcpServer.registerHandlers()
- * and is NOT part of MCP tool signature
+ * A handler that takes its arguments alone and reads its group's context
+ * (`(args) => handleX(this.context, args)`).
  */
-export type ToolHandler = (context: HandlerContext, args: any) => Promise<any>;
+export type ArgsOnlyHandler = (args: any) => Promise<any>;
+
+/**
+ * Tool handler function type, in either form: every registration path calls
+ * it in the form it takes (`callInItsForm`), decided by its parameter count
+ * (`isArgsOnly`). Context (containing connection and logger) is not part of
+ * the MCP tool signature.
+ */
+export type ToolHandler = ContextHandler | ArgsOnlyHandler;
 
 /**
  * Handler registration entry
@@ -87,7 +100,7 @@ export function defineTool<const D extends ToolDefinition>(
     args: ArgsOf<D['inputSchema']>,
   ) => Promise<unknown>,
 ): HandlerEntry {
-  return { toolDefinition, handler: handler as ToolHandler };
+  return { toolDefinition, handler };
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../../../handlers/interfaces.js';
-import type { ToolHandler } from '../interfaces.js';
+import type { ArgsOnlyHandler, ToolHandler } from '../interfaces.js';
 
 /**
  * Runs `call` with the handler's group holding `context`: how an args-only
@@ -13,7 +13,7 @@ export type InGroupContext = (
 
 /**
  * Calls a group's handler in the form it takes, the one rule every
- * registration path follows: a handler declaring two parameters gets
+ * registration path follows (`isArgsOnly`): a handler declaring two parameters gets
  * `(context, args)`; an args-only one gets `args`, called inside
  * `inGroupContext` so its group's context is the call's when it reads it.
  */
@@ -23,11 +23,17 @@ export function callInItsForm(
   args: unknown,
   inGroupContext: InGroupContext,
 ): Promise<unknown> {
-  if (handler.length >= 2) return handler(context, args);
-  // An args-only handler takes its arguments as its first parameter; the
-  // erased `ToolHandler` type of every entry declares only the two-parameter
-  // form, so its `length` (a runtime fact) decides, and this is the one
-  // place the args-only form is named.
-  const argsOnly = handler as (args: unknown) => Promise<unknown>;
-  return inGroupContext(context, () => argsOnly(args));
+  if (isArgsOnly(handler)) {
+    return inGroupContext(context, () => handler(args));
+  }
+  return handler(context, args);
+}
+
+/**
+ * The handler takes its arguments alone: it declares fewer than two
+ * parameters. Its `length` is a runtime fact; the guard narrows the other
+ * branch to exactly `(context, args)`.
+ */
+export function isArgsOnly(handler: ToolHandler): handler is ArgsOnlyHandler {
+  return handler.length < 2;
 }

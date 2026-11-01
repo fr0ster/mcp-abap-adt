@@ -97,6 +97,7 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+Coming from 22.x? See the [23.0 migration note](docs/MIGRATION-23.0.md) — `CreateProgram` no longer offers `include` (create an include with `CreateInclude`); an embedder registering the `./handlers` groups on its own `McpServer` states `systemType` (`SAP_SYSTEM_TYPE` is not read there), and `HandlerExporter` serves no background run and no debugger.
 Coming from 21.x? See the [22.0 migration note](docs/MIGRATION-22.0.md) — the tools, their enums and the object types each argument accepts are the declared system type's (onprem or cloud), inspection needs `--system-type` too, `function` / `func` are the function module, main types stand for their one code, `RunATC` on cloud offers no program, and `ValidateServiceBinding` requires `package_name`.
 Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only; over Streamable HTTP `state_handle` is an argument of every tool, and a long session keeps one SAP session across calls.
 Coming from 18.x? See the [19.0 migration note](docs/MIGRATION-19.0.md) — the server split into a
@@ -242,7 +243,7 @@ A tool that builds a request from an earlier answer is refused in batch mode —
 create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
 the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
-the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP), unlock
+the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`), unlock
 (`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
@@ -268,6 +269,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
 - **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
+- **🧾 Table Type Management**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType`, `GetTableTypeVersions`, `GetTableTypeVersionSource`, `GetTableTypeVersionDiff` - Create, read, change, check, activate and delete ABAP table types (on premise and cloud); the create and the update take the definition (row type, access, key) and answer the definition SAP stored
 - **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
 - **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClass` - Create, retrieve, and update ABAP classes
 - **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs
@@ -276,7 +278,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create and retrieve transport requests
 - **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis
-- **📋 Include Management**: `GetIncludesList` - Recursive include discovery
+- **📋 Include Management**: `GetInclude` (source or metadata), `CreateInclude`, `UpdateInclude`, `UpdateIncludeMetadata`, `DeleteInclude`, `ActivateInclude` - Create, read, change and delete program includes (writes on premise); `GetIncludesList` - Recursive include discovery
 - **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
 - **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
@@ -316,6 +318,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-23.0.md](docs/MIGRATION-23.0.md)** - Includes are created by `CreateInclude`, not `CreateProgram`; the include and table-type tools; a plain `./handlers` registration lists and calls on its stated system type; `ToolHandler` is either call form; `HandlerExporter` without background runs and the debugger; compact cloud schemas; the search table's shape
 - **[docs/MIGRATION-22.0.md](docs/MIGRATION-22.0.md)** - The system type decides the tools and the object types each argument accepts (the ADT type tables of interfaces-adt 24, adt-clients 39); inspection needs the system type; friendly names and main types; the search filter's names; RunATC per system type; arguments now required
 - **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only; Streamable HTTP: held state by the `state_handle` argument, and the long session
 - **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end

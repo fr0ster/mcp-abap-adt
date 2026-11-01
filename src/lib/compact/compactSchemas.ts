@@ -40,7 +40,7 @@ const objectTypeOf = <const M extends readonly string[]>(
  * (`every`), and the ones each member's request reads beside them
  * (`members`; a member reading only `every` has no entry).
  */
-export interface CompactTakes<P extends string, M extends string> {
+interface CompactTakes<P extends string, M extends string> {
   readonly every: readonly P[];
   readonly members: { readonly [K in M]?: readonly P[] };
 }
@@ -69,7 +69,7 @@ type EveryPropertyTaken<P, T> = [Exclude<P, TakenIn<T>>] extends [never]
  * `takesOf<Property, Member>()({ every, members })`. A property no list
  * names does not compile, nor a member outside `M`.
  */
-export function takesOf<P extends string, M extends string>() {
+function takesOf<P extends string, M extends string>() {
   return <const T extends CompactTakes<P, M>>(
     takes: T & EveryPropertyTaken<P, T>,
   ): T => takes;
@@ -1773,7 +1773,6 @@ export const compactSearchSchema = {
   required: ['query'],
 } as const;
 
-/** Where-used list of one object. */
 /** A member of `HandlerWhereUsed`'s `object_type`. */
 type WhereUsedMember = (typeof COMPACT_WHERE_USED.onprem)[number];
 
@@ -1809,6 +1808,7 @@ function whereUsedProperties<const M extends readonly WhereUsedMember[]>(
   } as const;
 }
 
+/** Where-used list of one object. */
 export function compactWhereUsedSchemaFor<
   const M extends readonly WhereUsedMember[],
 >(members: M) {

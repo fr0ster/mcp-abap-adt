@@ -100,7 +100,6 @@ import {
   VERSIONED_ROUTES,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
-  whereUsedRouteCode,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -194,6 +193,15 @@ const codeRoute = (code: string): Route => ({
   collection: (variant) => collectionOfCode(variant, code),
   addressed: true,
 });
+
+/** Whether a where-used route is a name of `TYPE_NAMES`. */
+function isTypeName(route: string): route is keyof typeof TYPE_NAMES {
+  return Object.hasOwn(TYPE_NAMES, route);
+}
+
+/** The code a where-used route stands for: a name's code, or the code. */
+const whereUsedCodeOf = (route: string): string =>
+  isTypeName(route) ? TYPE_NAMES[route] : route;
 
 const routesOf = (
   routes: Readonly<
@@ -489,7 +497,7 @@ const WALKS: Readonly<Record<string, Walk>> = {
       Object.entries(COMPACT_WHERE_USED_ROUTES).map(
         ([name, alias]): [string, Route] => [
           name,
-          codeRoute(whereUsedRouteCode(alias)),
+          codeRoute(whereUsedCodeOf(alias)),
         ],
       ),
     ),

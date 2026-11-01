@@ -1,4 +1,9 @@
+import type {
+  AnySchema,
+  ZodRawShapeCompat,
+} from '@modelcontextprotocol/sdk/server/zod-compat.js';
 import * as z from 'zod';
+import type { ToolDefinition } from '../interfaces.js';
 
 /**
  * Converts JSON Schema to Zod schema object (not z.object(), but object with Zod fields)
@@ -125,7 +130,9 @@ function typeOf(schema: any): z.ZodTypeAny {
  * (`jsonSchemaToZod`), anything else as it is. The one conversion every
  * registration path uses.
  */
-export function registeredSchema(inputSchema: any): any {
+export function registeredSchema(
+  inputSchema: ToolDefinition['inputSchema'],
+): ZodRawShapeCompat | AnySchema {
   return inputSchema &&
     typeof inputSchema === 'object' &&
     inputSchema.type === 'object' &&

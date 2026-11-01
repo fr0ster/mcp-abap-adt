@@ -443,12 +443,6 @@ export function codesWithNames(
 }
 
 /**
- * What a compact member is handed to GetWhereUsed as: a name of
- * {@link TYPE_NAMES}, or a where-used code where no name stands for it.
- */
-type WhereUsedRoute = TypeName | WhereUsedCode<'onprem'>;
-
-/**
  * HandlerWhereUsed's `object_type`: each compact name with the name of
  * {@link TYPE_NAMES} it is handed to GetWhereUsed as, or its code where no
  * name stands for it (a table type, `TTYP/DA`).
@@ -476,16 +470,6 @@ export const COMPACT_WHERE_USED_ROUTES = {
 
 /** The code a where-used route stands for: a name's code, or the code. */
 type WhereUsedRouteCode<R> = R extends TypeName ? (typeof TYPE_NAMES)[R] : R;
-
-/** Whether a where-used route is a name of {@link TYPE_NAMES}. */
-function isTypeName(route: WhereUsedRoute): route is TypeName {
-  return Object.hasOwn(TYPE_NAMES, route);
-}
-
-/** The code a where-used route stands for, at run time. */
-export function whereUsedRouteCode(route: WhereUsedRoute): AdtUtilityCode {
-  return isTypeName(route) ? TYPE_NAMES[route] : route;
-}
 
 /** The compact names whose where-used route stands for a code of `P`. */
 type CompactWhereUsedName<P> = {

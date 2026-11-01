@@ -269,6 +269,10 @@ import {
   handleCreateInclude,
 } from '../../../handlers/include/high/handleCreateInclude';
 import {
+  TOOL_DEFINITION as DeleteInclude_Tool,
+  handleDeleteInclude,
+} from '../../../handlers/include/high/handleDeleteInclude';
+import {
   handleUpdateInclude,
   TOOL_DEFINITION as UpdateInclude_Tool,
 } from '../../../handlers/include/high/handleUpdateInclude';
@@ -276,6 +280,10 @@ import {
   handleUpdateIncludeMetadata,
   TOOL_DEFINITION as UpdateIncludeMetadata_Tool,
 } from '../../../handlers/include/high/handleUpdateIncludeMetadata';
+import {
+  TOOL_DEFINITION as ActivateInclude_Tool,
+  handleActivateInclude,
+} from '../../../handlers/include/low/handleActivateInclude';
 import {
   TOOL_DEFINITION as CheckInterface_Tool,
   handleCheckInterface,
@@ -679,6 +687,15 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          ...ActivateInclude_Tool,
+          name: 'ActivateInclude',
+          description:
+            'Activates the ABAP include named by include_name, so its inactive version is in force.',
+        },
+        handler: withContext(handleActivateInclude),
+      },
+      {
+        toolDefinition: {
           ...ActivateFunctionModule_Tool,
           name: 'ActivateFunctionModule',
           description:
@@ -1066,6 +1083,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: UpdateIncludeMetadata_Tool,
         handler: withContext(handleUpdateIncludeMetadata),
+      },
+      {
+        toolDefinition: DeleteInclude_Tool,
+        handler: withContext(handleDeleteInclude),
       },
       {
         toolDefinition: CreateProgram_Tool,

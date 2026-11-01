@@ -915,6 +915,12 @@
     "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
   },
   {
+    "tool": "ActivateInclude",
+    "set": "full",
+    "handler": "src/handlers/include/low/handleActivateInclude.ts#handleActivateInclude",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
     "tool": "ActivateProgram",
     "set": "full",
     "handler": "src/handlers/program/low/handleActivateProgram.ts#handleActivateProgram",

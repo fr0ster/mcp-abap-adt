@@ -5,8 +5,11 @@
  */
 
 import { handleCreateInclude } from '../../../handlers/include/high/handleCreateInclude';
+import { handleDeleteInclude } from '../../../handlers/include/high/handleDeleteInclude';
 import { handleUpdateInclude } from '../../../handlers/include/high/handleUpdateInclude';
 import { handleUpdateIncludeMetadata } from '../../../handlers/include/high/handleUpdateIncludeMetadata';
+import { handleActivateInclude } from '../../../handlers/include/low/handleActivateInclude';
+import { corpusBody } from '../../../lib/adtCorpus';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -321,6 +324,168 @@ describe('UpdateIncludeMetadata', () => {
     const result: any = await handleUpdateIncludeMetadata(
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('variant_not_served');
+    expect(connection.requests).toHaveLength(0);
+  });
+});
+
+const CHECK_URL = '/sap/bc/adt/deletion/check';
+const DELETE_URL = '/sap/bc/adt/deletion/delete';
+const DELETION_PAIR = {
+  check: {
+    Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
+  },
+  delete: {
+    Accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml',
+  },
+};
+
+function checkXml(refusal?: string): string {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
+    `<del:object del:externalStrongReferences="0" del:externalWeakReferences="0" del:isDeletable="${refusal ? 'false' : 'true'}" adtcore:name="ZI_X" xmlns:adtcore="http://www.sap.com/adt/core">` +
+    (refusal
+      ? `<del:message del:priority="0" del:type="E"><del:text>${refusal}</del:text></del:message>`
+      : '') +
+    '</del:object></del:checkResponse>'
+  );
+}
+
+const DELETED_XML =
+  '<?xml version="1.0" encoding="utf-8"?><del:deletionResult xmlns:del="http://www.sap.com/adt/deletion">' +
+  '<del:object del:isDeleted="true" adtcore:name="ZI_X" xmlns:adtcore="http://www.sap.com/adt/core">' +
+  '<del:message del:priority="0" del:type="S"><del:text/></del:message></del:object></del:deletionResult>';
+
+describe('DeleteInclude', () => {
+  it('sends the check POST, then the delete POST, stateless and without a lock', async () => {
+    const connection = sessionRecording([
+      { data: checkXml() },
+      { data: DELETED_XML },
+    ]);
+    const result: any = await handleDeleteInclude(
+      { connection, logger: undefined },
+      { include_name: 'zi_x', transport_request: 'K1' },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `POST ${CHECK_URL}`,
+      `POST ${DELETE_URL}`,
+    ]);
+    expect(connection.sessions).toEqual(['stateless', 'stateless']);
+    const [check, del] = connection.requests;
+    expect(check?.headers?.Accept).toBe(DELETION_PAIR.check.Accept);
+    expect(check?.headers?.['Content-Type']).toBe(
+      DELETION_PAIR.check['Content-Type'],
+    );
+    expect(del?.headers?.Accept).toBe(DELETION_PAIR.delete.Accept);
+    expect(del?.headers?.['Content-Type']).toBe(
+      DELETION_PAIR.delete['Content-Type'],
+    );
+    expect(String(check?.data)).toContain(
+      'adtcore:uri="/sap/bc/adt/programs/includes/zi_x"',
+    );
+    expect(String(del?.data)).toContain(
+      'adtcore:uri="/sap/bc/adt/programs/includes/zi_x"',
+    );
+    expect(String(del?.data)).toContain('K1');
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      deleted: true,
+      object: 'ZI_X',
+    });
+  });
+
+  it('answers a refused check as it came and sends no delete', async () => {
+    const connection = sessionRecording([
+      { data: checkXml('Include is still used') },
+    ]);
+    const result: any = await handleDeleteInclude(
+      { connection, logger: undefined },
+      { include_name: 'ZI_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Include is still used');
+    expect(connection.requests.map((r) => r.url)).toEqual([CHECK_URL]);
+  });
+
+  it.each([
+    ['include_name', {}],
+    ['include_name', { include_name: '' }],
+  ])('refuses a missing %s, sending nothing', async (name, args) => {
+    const connection = recordingConnection();
+    const result: any = await handleDeleteInclude(
+      { connection, logger: undefined },
+      args,
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe(`${name} is required`);
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'cloud');
+    const result: any = await handleDeleteInclude(
+      { connection, logger: undefined },
+      { include_name: 'ZI_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('variant_not_served');
+    expect(connection.requests).toHaveLength(0);
+  });
+});
+
+describe('ActivateInclude', () => {
+  it('sends one stateless activation POST naming the include', async () => {
+    const connection = sessionRecording([
+      { data: corpusBody('activation-success-verdict--01-activation') },
+    ]);
+    const result: any = await handleActivateInclude(
+      { connection, logger: undefined },
+      { include_name: 'zi_x' },
+    );
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      activated: true,
+    });
+    expect(connection.requests).toHaveLength(1);
+    const [sent] = connection.requests;
+    expect(sent?.method).toBe('POST');
+    expect(sent?.url).toContain(
+      '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+    );
+    expect(String(sent?.data)).toContain('/programs/includes/zi_x');
+    expect(String(sent?.data)).toContain('adtcore:name="ZI_X"');
+    expect(sent?.headers?.Accept).toBe('application/xml');
+    expect(sent?.headers?.['Content-Type']).toBe(
+      'application/vnd.sap.adt.activation+xml',
+    );
+    expect(connection.sessions).toEqual(['stateless']);
+  });
+
+  it.each([
+    ['include_name', {}],
+    ['include_name', { include_name: '' }],
+  ])('refuses a missing %s, sending nothing', async (name, args) => {
+    const connection = recordingConnection();
+    const result: any = await handleActivateInclude(
+      { connection, logger: undefined },
+      args,
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe(`${name} is required`);
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'cloud');
+    const result: any = await handleActivateInclude(
+      { connection, logger: undefined },
+      { include_name: 'ZI_X' },
     );
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('variant_not_served');

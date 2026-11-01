@@ -204,6 +204,8 @@ const TOOL_NEEDS_BY_NAME = {
   CreateInclude: { api: 'include', operation: 'create' },
   UpdateInclude: { api: 'include', operation: 'update' },
   UpdateIncludeMetadata: { api: 'include', operation: 'updateMetadata' },
+  DeleteInclude: { api: 'include', operation: 'delete' },
+  ActivateInclude: { api: 'include', operation: 'activate' },
   CreateProgram: { api: 'program', operation: 'create' },
   UpdateProgram: { api: 'program', operation: 'update' },
   DeleteProgram: { api: 'program', operation: 'delete' },

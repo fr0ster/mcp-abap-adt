@@ -623,6 +623,7 @@ const ACTIVATIONS: Array<[string, Record<string, unknown>]> = [
   ['ActivateClass', { class_name: 'CLAS_A' }],
   ['ActivateInterface', { interface_name: 'INTF_A' }],
   ['ActivateProgram', { program_name: 'PROG_A' }],
+  ['ActivateInclude', { include_name: 'INCL_A' }],
   ['ActivateFunctionGroup', { function_group_name: 'FUGR_A' }],
   [
     'ActivateFunctionModule',

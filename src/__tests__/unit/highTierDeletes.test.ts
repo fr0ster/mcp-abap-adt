@@ -53,6 +53,7 @@ import { handleCheckFunctionModule } from '../../handlers/function/high/handleCh
 import { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleDeleteFunctionInclude } from '../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleDeleteFunctionModule } from '../../handlers/function_module/high/handleDeleteFunctionModule';
+import { handleDeleteInclude } from '../../handlers/include/high/handleDeleteInclude';
 import { handleCheckInterface } from '../../handlers/interface/high/handleCheckInterface';
 import { handleDeleteInterface } from '../../handlers/interface/high/handleDeleteInterface';
 import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
@@ -124,7 +125,7 @@ describe('a refused deletion, masked as a 200 by ADT itself', () => {
   });
 });
 
-describe('the seventeen deletion-service deletes: analyseDeletion, and terseDeletion fields', () => {
+describe('the eighteen deletion-service deletes: analyseDeletion, and terseDeletion fields', () => {
   it.each([
     [
       'DeleteBehaviorDefinition',
@@ -159,6 +160,7 @@ describe('the seventeen deletion-service deletes: analyseDeletion, and terseDele
       handleDeleteFunctionModule,
       { function_module_name: 'Z_FM', function_group_name: 'ZFG' },
     ],
+    ['DeleteInclude', handleDeleteInclude, { include_name: 'ZI_X' }],
     ['DeleteInterface', handleDeleteInterface, { interface_name: 'ZIF_X' }],
     [
       'DeleteMessageClass',

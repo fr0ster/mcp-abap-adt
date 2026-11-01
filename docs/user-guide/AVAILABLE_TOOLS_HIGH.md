@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 165
+- Total tools: 166
 
 ## Navigation
 
@@ -110,6 +110,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Include](#high-level-include)
     - [CreateInclude](#createinclude-high-level-include)
+    - [DeleteInclude](#deleteinclude-high-level-include)
     - [UpdateInclude](#updateinclude-high-level-include)
     - [UpdateIncludeMetadata](#updateincludemetadata-high-level-include)
   - [Interface](#high-level-interface)
@@ -1391,6 +1392,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
+<a id="deleteinclude-high-level-include"></a>
+#### DeleteInclude (High-Level / Include)
+**Description:** Deletes the ABAP include named by include_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+
+**Source:** `src/handlers/include/high/handleDeleteInclude.ts`
+
+**Parameters:**
+- `include_name` (string, required) - Include name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 

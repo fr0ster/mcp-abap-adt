@@ -444,8 +444,8 @@ describe('the MCP tool surface', () => {
    * rows gained it in the snapshot; every other row was checked unchanged.
    */
   /**
-   * **The ninth deliberate move: `CreateInclude`, `UpdateInclude` and
-   * `UpdateIncludeMetadata` arrived** (the server writes program includes
+   * **The ninth deliberate move: `CreateInclude`, `UpdateInclude`,
+   * `UpdateIncludeMetadata`, `DeleteInclude` and `ActivateInclude` arrived** (the server writes program includes
    * and table types). The first of the new full-set tools of that work, on
    * premise only; every other row was checked unchanged.
    */

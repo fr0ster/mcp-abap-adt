@@ -55,6 +55,7 @@ import { handleDeleteDomain } from '../../handlers/domain/high/handleDeleteDomai
 import { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleDeleteFunctionInclude } from '../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleDeleteFunctionModule } from '../../handlers/function_module/high/handleDeleteFunctionModule';
+import { handleDeleteInclude } from '../../handlers/include/high/handleDeleteInclude';
 import { handleDeleteInterface } from '../../handlers/interface/high/handleDeleteInterface';
 import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
 import { handleDeleteMessageClassMessage } from '../../handlers/message_class/high/handleDeleteMessageClassMessage';
@@ -262,6 +263,12 @@ const deletionServiceCases: DeletionCase[] = [
       handleDeleteMessageClass(ctx(c) as any, {
         message_class_name: 'ZMSGC_DEL_X',
       }),
+  },
+  {
+    name: 'DeleteInclude',
+    expectedUri: '/sap/bc/adt/programs/includes/zi_del_x',
+    run: (c) =>
+      handleDeleteInclude(ctx(c) as any, { include_name: 'ZI_DEL_X' }),
   },
   {
     name: 'DeleteProgram',

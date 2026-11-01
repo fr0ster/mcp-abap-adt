@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 267
+- Total tools: 268
 - Read-only tools: 65
-- High-level tools: 165
+- High-level tools: 166
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -218,6 +218,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Include](#high-level-include)
     - [CreateInclude](#createinclude-high-level-include)
+    - [DeleteInclude](#deleteinclude-high-level-include)
     - [UpdateInclude](#updateinclude-high-level-include)
     - [UpdateIncludeMetadata](#updateincludemetadata-high-level-include)
   - [Interface](#high-level-interface)
@@ -2446,6 +2447,18 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
+<a id="deleteinclude-high-level-include"></a>
+#### DeleteInclude (High-Level / Include)
+**Description:** Deletes the ABAP include named by include_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+
+**Source:** `src/handlers/include/high/handleDeleteInclude.ts`
+
+**Parameters:**
+- `include_name` (string, required) - Include name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 

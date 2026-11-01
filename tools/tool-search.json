@@ -145,6 +145,19 @@
     ],
     "semantic": "Activate several objects together in one activation, for example all inactive objects."
   },
+  "ActivateInclude": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "include",
+      "program include",
+      "report include",
+      "INCL"
+    ],
+    "semantic": "Activate an ABAP program include once it was created or changed, so the change is in force."
+  },
   "ActivateProgram": {
     "keywords": [
       "activate",
@@ -1371,6 +1384,19 @@
       "sub-packages"
     ],
     "semantic": "Delete an existing ABAP package from the system."
+  },
+  "DeleteInclude": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "include",
+      "program include",
+      "report include",
+      "INCL"
+    ],
+    "semantic": "Delete an existing ABAP program include from the system."
   },
   "DeleteProgram": {
     "keywords": [

@@ -397,7 +397,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-177 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+178 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -410,6 +410,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `ActivateDomain` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateFunctionGroup` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateFunctionModule` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
+| `ActivateInclude` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateInterface` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateMetadataExtension` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateProgram` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |

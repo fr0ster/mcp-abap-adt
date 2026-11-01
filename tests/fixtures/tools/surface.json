@@ -295,6 +295,12 @@
   },
   {
     "group": "high",
+    "name": "ActivateInclude",
+    "inputs": "include_name*, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
     "name": "ActivateFunctionModule",
     "inputs": "function_module_name*, function_group_name*, detail",
     "available_in": "cloud, onprem"
@@ -831,6 +837,12 @@
     "group": "high",
     "name": "UpdateIncludeMetadata",
     "inputs": "include_name*, metadata*, transport_request, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "DeleteInclude",
+    "inputs": "include_name*, transport_request, detail",
     "available_in": "onprem"
   },
   {

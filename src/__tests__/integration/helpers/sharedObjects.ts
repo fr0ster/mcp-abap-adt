@@ -98,7 +98,10 @@ export async function ensureSharedPackage(
   try {
     const readResult = await client
       .getPackage(packageDocuments)
-      .readMetadata({ packageName }, { analyse: analyseException });
+      .readMetadata(
+        { packageName },
+        { version: 'active', analyse: analyseException },
+      );
     if (readResult.ok) {
       log?.info?.(`Shared package ${packageName} already exists`);
       _sharedPackageReady = true;
@@ -216,17 +219,19 @@ export async function ensureSharedDependency(
     if (type === 'tables') {
       const result = await client
         .getTable(tableDocuments)
-        .read({ tableName: name }, undefined, { analyse: analyseException });
+        .read({ tableName: name }, 'workingArea', {
+          analyse: analyseException,
+        });
       exists = result.ok;
     } else if (type === 'views') {
       const result = await client
         .getDdl(ddlDocuments)
-        .read({ ddlName: name }, undefined, { analyse: analyseException });
+        .read({ ddlName: name }, 'workingArea', { analyse: analyseException });
       exists = result.ok;
     } else if (type === 'behavior_definitions') {
       const result = await client
         .getBehaviorDefinition(behaviorDefinitionDocuments)
-        .read({ name }, undefined, { analyse: analyseException });
+        .read({ name }, 'active', { analyse: analyseException });
       exists = result.ok;
     }
   } catch {
@@ -520,28 +525,32 @@ export async function ensureSharedObjects(
       readFn: (name) =>
         client
           .getTable(tableDocuments)
-          .read({ tableName: name }, undefined, { analyse: analyseException }),
+          .read({ tableName: name }, 'workingArea', {
+            analyse: analyseException,
+          }),
     },
     {
       type: 'views',
       readFn: (name) =>
-        client
-          .getDdl(ddlDocuments)
-          .read({ ddlName: name }, undefined, { analyse: analyseException }),
+        client.getDdl(ddlDocuments).read({ ddlName: name }, 'workingArea', {
+          analyse: analyseException,
+        }),
     },
     {
       type: 'behavior_definitions',
       readFn: (name) =>
         client
           .getBehaviorDefinition(behaviorDefinitionDocuments)
-          .read({ name }, undefined, { analyse: analyseException }),
+          .read({ name }, 'active', { analyse: analyseException }),
     },
     {
       type: 'classes',
       readFn: (name) =>
         client
           .getClass(classDocuments)
-          .read({ className: name }, undefined, { analyse: analyseException }),
+          .read({ className: name }, 'workingArea', {
+            analyse: analyseException,
+          }),
     },
   ];
 

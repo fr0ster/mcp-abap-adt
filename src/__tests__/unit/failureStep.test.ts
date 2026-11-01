@@ -761,10 +761,10 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
       step: 'read function module',
     });
     expect(calls).toEqual([
-      { config: { includeName: 'LZFGU01' }, version: undefined },
+      { config: { includeName: 'LZFGU01' }, version: 'active' },
       {
         config: { functionGroupName: 'ZFG', functionModuleName: 'Z_FM' },
-        version: undefined,
+        version: 'active',
       },
     ]);
   });

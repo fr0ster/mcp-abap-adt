@@ -321,7 +321,11 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
       enum: ['source', 'metadata'],
       default: 'source',
     });
-    expect(schema.properties.version.enum).toEqual(['active', 'inactive']);
+    expect(schema.properties.version.enum).toEqual([
+      'active',
+      'inactive',
+      'workingArea',
+    ]);
     expect(schema.properties.version).not.toHaveProperty('default');
   });
 
@@ -329,12 +333,12 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
     ['absent', {}],
     ['source', { part: 'source' }],
   ])(
-    'part %s: one request for the source, answered as the text SAP sent',
+    'part %s: one request for the active source, answered as the text SAP sent',
     async (_label, part) => {
       for (const mode of MODES) {
         const ran = await run({ include_name: 'INCL_A', ...part }, mode);
         expect(ran.sent).toEqual([
-          'GET /sap/bc/adt/programs/includes/incl_a/source/main',
+          'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
         ]);
         if (mode === 'document') {
           expect(ran.answer).toEqual({
@@ -347,7 +351,7 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
     },
   );
 
-  it.each(['inactive', 'active'])(
+  it.each(['inactive', 'active', 'workingArea'])(
     'version %s: the one source request asks for that version',
     async (version) => {
       const ran = await run({ include_name: 'INCL_A', version }, 'document');
@@ -359,7 +363,7 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
   );
 
   it.each(MODES)(
-    'part metadata (%s): one request for the metadata document, the GetProgram shape',
+    'part metadata (%s): one request for the active metadata document, the GetProgram shape',
     async (mode) => {
       const DOCUMENT = '<include:abapInclude adtcore:name="INCL_A"/>';
       const ran = await run(
@@ -367,7 +371,9 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
         mode,
         DOCUMENT,
       );
-      expect(ran.sent).toEqual(['GET /sap/bc/adt/programs/includes/incl_a']);
+      expect(ran.sent).toEqual([
+        'GET /sap/bc/adt/programs/includes/incl_a?version=active',
+      ]);
       if (mode === 'document') {
         expect(ran.answer?.isError).toBe(false);
         expect(payloadOf(ran.answer?.content?.[0]?.text)).toEqual({

@@ -17,15 +17,9 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_PROPERTY } from '../backgroundRuns/tools';
+import { READ_VERSION_PROPERTY } from '../handlers/readVersion';
 import { TIMEOUT_PROPERTY } from '../longTools';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
-
-const versionSchema = {
-  type: 'string',
-  enum: ['active', 'inactive'],
-  default: 'active',
-  description: 'Object version to read/check.',
-} as const;
 
 /**
  * A compact tool's `object_type`: the members it routes on its variant (a
@@ -433,7 +427,7 @@ const GET_PROPERTIES = {
     enum: ['xml', 'json', 'plain'],
     description: 'Response format for SERVICE_BINDING reads.',
   },
-  version: versionSchema,
+  version: READ_VERSION_PROPERTY,
   object_adt_type: {
     type: 'string',
     description:

@@ -238,6 +238,21 @@ const targetOf = (type: string): MetadataTarget => ({
 });
 
 /** The request the type's `Get<Type>` handler sends, on a plain connection. */
+/**
+ * A direct request's address with its request parameters in the query, as an
+ * envelope part carries them (a service binding's version is a parameter).
+ */
+function withParams(url: string, params: IAbapRequestOptions['params']) {
+  if (typeof params !== 'object' || params === null) return url;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.append(key, String(value));
+  }
+  const text = query.toString();
+  if (text === '') return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${text}`;
+}
+
 async function handlerRequest(type: string) {
   const fake = envelopeConnection(
     () => envelopeResponse([]),
@@ -261,7 +276,7 @@ async function handlerRequest(type: string) {
   const request = fake.directs[0] as IAbapRequestOptions;
   return {
     method: request.method,
-    url: request.url,
+    url: withParams(request.url, request.params),
     headers: lowerHeaders(request.headers),
     body: request.data === undefined ? '' : String(request.data),
   };

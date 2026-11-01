@@ -207,7 +207,10 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
     expect(payloadOf(result)).toEqual({
       origin: 'connection',
       // The first lookup is the data element (`getDataElement().readMetadata`).
-      ...sapRefusal('/sap/bc/adt/ddic/dataelements/zt', 'read data element'),
+      ...sapRefusal(
+        '/sap/bc/adt/ddic/dataelements/zt?version=active',
+        'read data element',
+      ),
     });
     // The refusal is the answer: no further lookup is sent.
     expect(sent).toHaveLength(1);
@@ -232,8 +235,8 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       step: 'read domain',
     });
     expect(sent).toEqual([
-      '/sap/bc/adt/ddic/dataelements/zt',
-      '/sap/bc/adt/ddic/domains/zt',
+      '/sap/bc/adt/ddic/dataelements/zt?version=active',
+      '/sap/bc/adt/ddic/domains/zt?version=active',
     ]);
   });
 });
@@ -369,8 +372,14 @@ describe('GetIncludesList: SAP answered 401 to an include', () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () =>
         okResponse(reading('REPORT z.\nINCLUDE zone.\nINCLUDE ztwo.\n')),
-      getInclude: async (name: unknown) => {
-        read.push(String(name));
+      read: async (config: unknown) => {
+        read.push(
+          typeof config === 'object' &&
+            config !== null &&
+            'includeName' in config
+            ? String(config.includeName)
+            : '',
+        );
         return unauthorized();
       },
     });

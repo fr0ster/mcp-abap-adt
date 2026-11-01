@@ -32,7 +32,7 @@ export const TOOL_DEFINITION = {
   name: 'ListFunctionGroupIncludes',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] List the includes (TOP, custom) of an ABAP function group.',
+    '[read-only] List the includes (TOP, custom) of an ABAP function group, read at its active version.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -66,7 +66,10 @@ export async function handleListFunctionGroupIncludes(
         atStep('read metadata', () =>
           client
             .getFunctionGroup(functionGroupDocuments)
-            .readMetadata({ functionGroupName }, { analyse: analyseException }),
+            .readMetadata(
+              { functionGroupName },
+              { version: 'active', analyse: analyseException },
+            ),
         ),
         atStep('read node structure', () =>
           fetchFunctionGroupChildren(

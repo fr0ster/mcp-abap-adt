@@ -110,11 +110,13 @@ function systemWith(documents: Record<string, string | number>) {
   return { connection, sent };
 }
 
+/** Each lookup's address: the type read active, as the tool reads it. */
 const url = {
-  dataElement: (n: string) => `/sap/bc/adt/ddic/dataelements/${n}`,
-  domain: (n: string) => `/sap/bc/adt/ddic/domains/${n}`,
-  structure: (n: string) => `/sap/bc/adt/ddic/structures/${n}`,
-  tableType: (n: string) => `/sap/bc/adt/ddic/tabletypes/${n}`,
+  dataElement: (n: string) =>
+    `/sap/bc/adt/ddic/dataelements/${n}?version=active`,
+  domain: (n: string) => `/sap/bc/adt/ddic/domains/${n}?version=active`,
+  structure: (n: string) => `/sap/bc/adt/ddic/structures/${n}?version=active`,
+  tableType: (n: string) => `/sap/bc/adt/ddic/tabletypes/${n}?version=active`,
 };
 
 const run = (connection: IAbapConnection, args: Record<string, unknown>) =>

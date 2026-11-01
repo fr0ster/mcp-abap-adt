@@ -90,7 +90,7 @@ export const TOOL_DEFINITION = {
         'Index of the first scan target to read, from `next_start_at` of the previous answer; 0 by default.',
       ),
     version: z
-      .enum(['active', 'inactive'])
+      .enum(['active', 'inactive', 'workingArea'])
       .optional()
       .describe(
         'Source version for PROG and CLAS main include reads. Default active. FUGR subincludes always read the active version.',

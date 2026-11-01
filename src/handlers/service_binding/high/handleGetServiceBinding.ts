@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the OData service binding named by service_binding_name in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
+    '[read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -71,7 +71,7 @@ export async function handleGetServiceBinding(
   if (part === 'metadata') {
     return answer(
       { tool: 'GetServiceBinding', detail: 'terse' },
-      () => readServiceBindingMetadata(client, { bindingName }),
+      () => readServiceBindingMetadata(client, { bindingName }, 'active'),
       (metadata: AdtReading<string>) => ({
         success: true,
         service_binding_name: bindingName,
@@ -83,7 +83,7 @@ export async function handleGetServiceBinding(
   }
   return answer(
     { tool: 'GetServiceBinding', detail: 'terse' },
-    () => obj.read({ bindingName }, undefined, { analyse: analyseException }),
+    () => obj.read({ bindingName }, 'active', { analyse: analyseException }),
     (source: AdtReading<string>) => ({
       success: true,
       service_binding_name: bindingName,

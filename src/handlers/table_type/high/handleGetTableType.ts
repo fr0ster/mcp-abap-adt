@@ -41,7 +41,7 @@ export async function handleGetTableType(
 
   return answer(
     { tool: 'GetTableType', detail: 'terse' },
-    () => readTableTypeMetadata(client, { tableTypeName }),
+    () => readTableTypeMetadata(client, { tableTypeName }, 'active'),
     (metadata: AdtReading<string>) => ({
       success: true,
       table_type_name: tableTypeName,

@@ -1,5 +1,5 @@
 {
-  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so.",
+  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed; since 23.0.0 every read names its version, and the two low metadata reads that sent none — answered from the working area — are recorded with the version their compact call reads by default, active). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so.",
   "rows": [
     {
       "tool": "CreatePackageLow",
@@ -450,7 +450,7 @@
       "low_requests": [
         {
           "method": "GET",
-          "url": "/sap/bc/adt/ddic/domains/dom_a",
+          "url": "/sap/bc/adt/ddic/domains/dom_a?version=active",
           "headers": {
             "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
           }
@@ -704,7 +704,7 @@
       "low_requests": [
         {
           "method": "GET",
-          "url": "/sap/bc/adt/ddic/dataelements/dtel_a",
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=active",
           "headers": {
             "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
           }

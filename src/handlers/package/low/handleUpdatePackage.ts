@@ -133,7 +133,10 @@ export async function handleUpdatePackage(
         atStep('read metadata', () =>
           client
             .getPackage(packageDocuments)
-            .readMetadata({ packageName }, { analyse: analyseException }),
+            .readMetadata(
+              { packageName },
+              { version: 'active', analyse: analyseException },
+            ),
         ),
         atStep('update metadata', (current) =>
           withAdtHeaders(context, 'package.updateMetadata', (headers) =>

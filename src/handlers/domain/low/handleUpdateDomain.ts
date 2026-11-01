@@ -113,7 +113,10 @@ export async function handleUpdateDomain(
         atStep('read metadata', () =>
           client
             .getDomain(domainDocuments)
-            .readMetadata({ domainName }, { analyse: analyseException }),
+            .readMetadata(
+              { domainName },
+              { version: 'workingArea', analyse: analyseException },
+            ),
         ),
         atStep('update metadata', (current) =>
           withAdtHeaders(context, 'domain.updateMetadata', (headers) =>

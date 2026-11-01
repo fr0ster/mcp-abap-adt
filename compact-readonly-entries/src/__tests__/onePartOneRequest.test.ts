@@ -293,11 +293,15 @@ describe('compact HandlerGet: one part, one request', () => {
     const SOURCE = "REPORT zincl.\n  WRITE 'x'.\n";
 
     it.each([
-      ['absent', {}, 'GET /sap/bc/adt/programs/includes/incl_a/source/main'],
+      [
+        'absent',
+        {},
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+      ],
       [
         'source',
         { part: 'source' },
-        'GET /sap/bc/adt/programs/includes/incl_a/source/main',
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
       ],
       [
         'source, inactive',
@@ -305,9 +309,19 @@ describe('compact HandlerGet: one part, one request', () => {
         'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=inactive',
       ],
       [
+        'source, workingArea',
+        { part: 'source', version: 'workingArea' },
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=workingArea',
+      ],
+      [
         'metadata',
         { part: 'metadata' },
-        'GET /sap/bc/adt/programs/includes/incl_a',
+        'GET /sap/bc/adt/programs/includes/incl_a?version=active',
+      ],
+      [
+        'metadata, workingArea',
+        { part: 'metadata', version: 'workingArea' },
+        'GET /sap/bc/adt/programs/includes/incl_a?version=workingArea',
       ],
     ])('part %s: exactly that request', async (_label, part, request) => {
       for (const mode of MODES) {
@@ -370,7 +384,7 @@ describe('compact HandlerGet: one part, one request', () => {
     });
 
     it.each(['source', 'metadata'])(
-      'part %s with another version: refused before any request, naming the two',
+      'part %s with another version: refused before any request, naming the three',
       async (part) => {
         const { sent, answer } = await run('document', {
           object_type: 'INCLUDE',
@@ -381,7 +395,7 @@ describe('compact HandlerGet: one part, one request', () => {
         expect(sent).toEqual([]);
         expect(answer?.isError).toBe(true);
         expect(textOf(answer)).toContain(
-          'version must be "active" or "inactive"',
+          'version must be "active", "inactive" or "workingArea"',
         );
       },
     );
@@ -395,8 +409,11 @@ describe('compact HandlerGet: one part, one request', () => {
       });
 
       it.each([
-        ['source', 'GET /sap/bc/adt/programs/includes/incl_a/source/main'],
-        ['metadata', 'GET /sap/bc/adt/programs/includes/incl_a'],
+        [
+          'source',
+          'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+        ],
+        ['metadata', 'GET /sap/bc/adt/programs/includes/incl_a?version=active'],
       ])('part %s: exactly that request', async (part, request) => {
         for (const mode of MODES) {
           const { sent, answer } = await run(mode, {

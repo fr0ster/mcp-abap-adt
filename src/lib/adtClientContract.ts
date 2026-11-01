@@ -20,8 +20,10 @@
 import type {
   AdtApiName,
   AdtModernVariant,
+  AdtObjectIdentity,
   AdtOperation,
   AdtPerformingVariantsIn,
+  AdtReadVersion,
   AdtServingVariantsIn,
   AdtVariant,
   IAccessControlConfig,
@@ -37,11 +39,10 @@ import type {
   IAdtGroupLifecycle,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
-  IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
   IAdtObjectProperties,
-  IAdtReadable,
+  IAdtOperationOptions,
   IAdtRepositoryStructure,
   IAdtRequest,
   IAdtResponse,
@@ -102,6 +103,7 @@ import type {
   IPackageResults,
   IProgramConfig,
   IProgramResults,
+  IReadOptions,
   IServiceBindingConfig,
   IServiceBindingPublicationConfig,
   IServiceDefinitionConfig,
@@ -119,6 +121,87 @@ import type {
   ITransportResults,
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
+
+/**
+ * `IAdtReadable` as the server calls it: the version stated on every read
+ * (the owner, 2026-11-01). ADT answers a read without a version from the
+ * working area, and adt-clients sends exactly the version it is given, so a
+ * read that names none does not compile here.
+ */
+interface StatedReadable<TConfig, TSource> {
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<TConfig>,
+    version: AdtReadVersion,
+    options: { withLongPolling?: boolean } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<TSource, E>>;
+  read(
+    config: AdtObjectIdentity<TConfig>,
+    version: AdtReadVersion,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<TSource>>;
+}
+
+/** `IAdtMetadataReadable` as the server calls it: the version stated on every read. */
+interface StatedMetadataReadable<TConfig, TMetadata> {
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<TConfig>,
+    options: {
+      withLongPolling?: boolean;
+      version: AdtReadVersion;
+    } & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<TMetadata, E>>;
+  readMetadata(
+    config: AdtObjectIdentity<TConfig>,
+    options: {
+      withLongPolling?: boolean;
+      version: AdtReadVersion;
+    } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<TMetadata>>;
+}
+
+/**
+ * `IAdtObjectAccess` as the server calls it: every source and metadata read,
+ * and the address a source read would use, at a stated version. The include
+ * source read of the library (`getInclude`) takes no version, so the server
+ * reads an include's source through `readObjectSource`.
+ */
+type ObjectAccess<TSource, TMetadata> = Omit<
+  IAdtObjectAccess<TSource, TMetadata, unknown>,
+  | 'readObjectSource'
+  | 'readObjectMetadata'
+  | 'getObjectSourceUri'
+  | 'getInclude'
+> & {
+  readObjectSource<E extends IAdtError>(
+    objectType: Parameters<
+      IAdtObjectAccess<TSource, TMetadata, unknown>['getObjectSourceUri']
+    >[0],
+    objectName: string,
+    functionGroup: string | undefined,
+    version: AdtReadVersion,
+    options: IReadOptions & IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<TSource, E>>;
+  readObjectMetadata<E extends IAdtError>(
+    objectType: Parameters<
+      IAdtObjectAccess<TSource, TMetadata, unknown>['supportsSourceCode']
+    >[0],
+    objectName: string,
+    functionGroup: string | undefined,
+    options: IReadOptions & {
+      version: AdtReadVersion;
+    } & IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<TMetadata, E>>;
+  getObjectSourceUri(
+    objectType: Parameters<
+      IAdtObjectAccess<TSource, TMetadata, unknown>['getObjectSourceUri']
+    >[0],
+    objectName: string,
+    functionGroup: string | undefined,
+    version: AdtReadVersion,
+  ): string;
+};
 
 /**
  * `T` where every variant of `V` is one whose table lists operation `Op`
@@ -148,8 +231,8 @@ export type ClassApi<
   ReturnType<R['enhancementOptions']>
 > &
   IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
-  IAdtReadable<IClassConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IClassConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IClassConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>> &
   Omit<
     IAdtDeletable<
@@ -203,8 +286,8 @@ export type ProgramApi<
     'create',
     IAdtCreatable<IProgramConfig, ReturnType<R['created']>>
   > &
-  IAdtReadable<IProgramConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IProgramConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
   PerformedOn<
     V,
     'program',
@@ -277,8 +360,8 @@ export type IncludeApi<
     'create',
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>
   > &
-  IAdtReadable<IIncludeConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IIncludeConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
   PerformedOn<
     V,
     'include',
@@ -339,8 +422,8 @@ export type InterfaceApi<
   R extends IInterfaceResults,
   V extends AdtVariant,
 > = IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>> &
-  IAdtReadable<IInterfaceConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IInterfaceConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IInterfaceConfig>, ReturnType<R['updated']>> &
   Omit<
     IAdtDeletable<
@@ -378,7 +461,7 @@ export type DomainApi<
   R extends IDomainResults,
   V extends AdtVariant,
 > = IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<IDomainConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<
     Partial<IDomainConfig>,
     ReturnType<R['metadataUpdated']>
@@ -398,7 +481,7 @@ export type DataElementApi<
   R extends IDataElementResults,
   V extends AdtVariant,
 > = IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<
     Partial<IDataElementConfig>,
     ReturnType<R['metadataUpdated']>
@@ -418,8 +501,8 @@ export type StructureApi<
   R extends IStructureResults,
   V extends AdtVariant,
 > = IAdtCreatable<IStructureConfig, ReturnType<R['created']>> &
-  IAdtReadable<IStructureConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IStructureConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IStructureConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IStructureConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IStructureConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IStructureConfig,
@@ -441,8 +524,8 @@ export type TableApi<
   R extends ITableResults,
   V extends AdtVariant,
 > = IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
-  IAdtReadable<ITableConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<ITableConfig, ReturnType<R['metadata']>> &
+  StatedReadable<ITableConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<ITableConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<ITableConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     ITableConfig,
@@ -469,7 +552,7 @@ export type DdicTableTypeApi<
   'create',
   IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>
 > &
-  IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
   PerformedOn<
     V,
     'tableType',
@@ -540,8 +623,8 @@ export type DdlApi<R extends IDdlResults, V extends AdtVariant> = IAdtCreatable<
   IDdlConfig,
   ReturnType<R['created']>
 > &
-  IAdtReadable<IDdlConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IDdlConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IDdlConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IDdlConfig>, ReturnType<R['updated']>> &
   Omit<
     IAdtDeletable<
@@ -614,7 +697,7 @@ export type FunctionGroupApi<
   ReturnType<R['enhancementOptions']>
 > &
   IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
   PerformedOn<
     V,
     'functionGroup',
@@ -658,8 +741,8 @@ export type FunctionModuleApi<
   R extends IFunctionModuleResults,
   V extends AdtVariant,
 > = IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
-  IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IFunctionModuleConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IFunctionModuleConfig>, ReturnType<R['updated']>> &
   Omit<
     IAdtDeletable<
@@ -697,8 +780,8 @@ export type FunctionIncludeApi<
   R extends IFunctionIncludeResults,
   V extends AdtVariant,
 > = IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
-  IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IFunctionIncludeConfig>, ReturnType<R['updated']>> &
   PerformedOn<
     V,
@@ -734,7 +817,7 @@ export type PackageApi<
   R extends IPackageResults,
   V extends AdtVariant,
 > = IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<IPackageConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<
     Partial<IPackageConfig>,
     ReturnType<R['metadataUpdated']>
@@ -753,7 +836,7 @@ export type MessageClassApi<
   R extends IMessageClassResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
   PerformedOn<
     V,
     'messageClass',
@@ -794,7 +877,7 @@ export type MessageClassMessageApi<
   R extends IMessageClassMessageResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
-  IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
+  StatedReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
   IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>;
 
 /** What the server calls on `getAccessControl()`'s answer. */
@@ -802,7 +885,7 @@ export type AccessControlApi<
   R extends IAccessControlResults,
   V extends AdtVariant,
 > = IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>>;
+  StatedMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>>;
 
 /** What the server calls on `getTransformation()`'s answer. */
 export type TransformationApi<
@@ -815,8 +898,8 @@ export type ServiceDefinitionApi<
   R extends IServiceDefinitionResults,
   V extends AdtVariant,
 > = IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IServiceDefinitionConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IServiceDefinitionConfig,
@@ -832,7 +915,7 @@ export type AppendStructureApi<
   R extends IAppendStructureResults,
   V extends AdtVariant,
 > = IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
-  IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>> &
+  StatedReadable<IAppendStructureConfig, ReturnType<R['source']>> &
   IAdtUpdatable<Partial<IAppendStructureConfig>, ReturnType<R['updated']>> &
   IAdtLockable<IAppendStructureConfig>;
 
@@ -841,8 +924,8 @@ export type ServiceBindingApi<
   R extends IServiceResults,
   V extends AdtVariant,
 > = IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>> &
-  IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IServiceBindingConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>> &
   IAdtDeletable<
     IServiceBindingConfig,
@@ -860,8 +943,8 @@ export type BehaviorDefinitionApi<
   R extends IBehaviorDefinitionResults,
   V extends AdtVariant,
 > = IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IBehaviorDefinitionConfig,
@@ -883,8 +966,8 @@ export type BehaviorImplementationApi<
   R extends IClassResults,
   V extends AdtVariant,
 > = IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
-  IAdtReadable<IBehaviorImplementationConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<
+  StatedReadable<IBehaviorImplementationConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<
     IBehaviorImplementationConfig,
     ReturnType<R['metadata']>
   > &
@@ -906,8 +989,8 @@ export type MetadataExtensionApi<
   R extends IMetadataExtensionResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<Partial<IMetadataExtensionConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IMetadataExtensionConfig,
@@ -928,8 +1011,8 @@ export type MetadataExtensionApi<
 export type EnhancementApi<
   R extends IEnhancementResults,
   V extends AdtVariant,
-> = IAdtReadable<IEnhancementConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>;
+> = StatedReadable<IEnhancementConfig, ReturnType<R['source']>> &
+  StatedMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>;
 
 /** What the server calls on `getRequest()`'s answer. */
 export type RequestApi<
@@ -1080,7 +1163,7 @@ export type RequestApi<
 export type LocalTestClassApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = IAdtReadable<ILocalTestClassConfig, ReturnType<R['source']>> &
+> = StatedReadable<ILocalTestClassConfig, ReturnType<R['source']>> &
   IAdtUpdatable<Partial<ILocalTestClassConfig>, ReturnType<R['updated']>> &
   IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig>;
@@ -1089,7 +1172,7 @@ export type LocalTestClassApi<
 export type LocalTypesApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = IAdtReadable<ILocalTypesConfig, ReturnType<R['source']>> &
+> = StatedReadable<ILocalTypesConfig, ReturnType<R['source']>> &
   IAdtUpdatable<Partial<ILocalTypesConfig>, ReturnType<R['updated']>> &
   IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig>;
@@ -1098,7 +1181,7 @@ export type LocalTypesApi<
 export type LocalDefinitionsApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = IAdtReadable<ILocalDefinitionsConfig, ReturnType<R['source']>> &
+> = StatedReadable<ILocalDefinitionsConfig, ReturnType<R['source']>> &
   IAdtUpdatable<Partial<ILocalDefinitionsConfig>, ReturnType<R['updated']>> &
   IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig>;
@@ -1107,7 +1190,7 @@ export type LocalDefinitionsApi<
 export type LocalMacrosApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = IAdtReadable<ILocalMacrosConfig, ReturnType<R['source']>> &
+> = StatedReadable<ILocalMacrosConfig, ReturnType<R['source']>> &
   IAdtUpdatable<Partial<ILocalMacrosConfig>, ReturnType<R['updated']>> &
   IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig>;
@@ -1176,11 +1259,7 @@ export type UtilsApi<
     ReturnType<R['columns']>,
     ReturnType<R['contents']>
   > &
-  IAdtObjectAccess<
-    ReturnType<R['source']>,
-    ReturnType<R['metadata']>,
-    ReturnType<R['include']>
-  > &
+  ObjectAccess<ReturnType<R['source']>, ReturnType<R['metadata']>> &
   IAdtObjectProperties<ReturnType<R['objectProperties']>>;
 
 export type IServerAdtClient<V extends AdtVariant = AdtModernVariant> =

@@ -98,7 +98,10 @@ export async function handleUpdateMessageClass(
       );
 
       const current = await atStep('read metadata', () =>
-        obj.readMetadata({ name }, { analyse: analyseException }),
+        obj.readMetadata(
+          { name },
+          { version: 'workingArea', analyse: analyseException },
+        ),
       )();
       if (!current.ok) return current as never;
       const edited = patchXmlAttribute(

@@ -143,7 +143,7 @@ export async function writeProgramTests(
     const metadata = await atStep('read program metadata', () =>
       program.readMetadata(
         { programName: name },
-        { analyse: analyseException },
+        { version: 'workingArea', analyse: analyseException },
       ),
     )();
     if (!metadata.ok) return metadata as unknown as Answer;

@@ -11,6 +11,7 @@ import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import type { ReadVersion } from '../handlers/readVersion';
 import {
   type FugrChild,
   functionGroupStructure,
@@ -19,7 +20,8 @@ import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure, methodFailureOf } from '../strategies/step';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
-export type SourceVersion = 'active' | 'inactive';
+/** The version a source read names: the call's, active by default. */
+export type SourceVersion = ReadVersion;
 
 export interface SourceUnit {
   include: string;
@@ -212,10 +214,10 @@ export function createSourceReaderDeps(
       return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read program');
     },
     async readInclude(includeName) {
-      // The include endpoint has no version selector: none is sent, as before.
+      // A function group's subinclude: always its active version.
       const r = await client
         .getInclude(includeDocuments)
-        .read({ includeName }, undefined, { analyse: analyseException });
+        .read({ includeName }, 'active', { analyse: analyseException });
       return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read include');
     },
     async readClassMain(className, version) {
@@ -237,7 +239,7 @@ export function createSourceReaderDeps(
         .getFunctionModule(functionModuleDocuments)
         .read(
           { functionGroupName: fugrName, functionModuleName: fmName },
-          undefined,
+          'active',
           { analyse: analyseException },
         );
       return r.ok

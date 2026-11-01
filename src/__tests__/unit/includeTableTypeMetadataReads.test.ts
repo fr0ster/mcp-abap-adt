@@ -54,34 +54,42 @@ function rawOf(
 }
 
 describe('the shared include and table-type metadata reads', () => {
-  it('readIncludeMetadata sends one GET to the include and answers its document as sent', async () => {
+  it('readIncludeMetadata sends one GET to the include, at the version given, and answers its document as sent', async () => {
     const document =
       '<?xml version="1.0"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes"/>';
     const { client, sent } = systemAnswering(document);
 
-    const response = await readIncludeMetadata(client, {
-      includeName: 'ZINCL_X',
-    });
+    const response = await readIncludeMetadata(
+      client,
+      { includeName: 'ZINCL_X' },
+      'active',
+    );
 
     expect(sent).toHaveLength(1);
     expect(sent[0]?.method).toBe('GET');
-    expect(sent[0]?.url).toBe('/sap/bc/adt/programs/includes/zincl_x');
+    expect(sent[0]?.url).toBe(
+      '/sap/bc/adt/programs/includes/zincl_x?version=active',
+    );
     expect(rawOf(response)).toBe(document);
   });
 
-  it('readTableTypeMetadata sends one GET to the table type and answers its document as sent', async () => {
+  it('readTableTypeMetadata sends one GET to the table type, at the version given, and answers its document as sent', async () => {
     const document = corpusBody(
       'read-metadata-table-type--01-tabletypes-string_table',
     );
     const { client, sent } = systemAnswering(document);
 
-    const response = await readTableTypeMetadata(client, {
-      tableTypeName: 'ZTTYP_X',
-    });
+    const response = await readTableTypeMetadata(
+      client,
+      { tableTypeName: 'ZTTYP_X' },
+      'active',
+    );
 
     expect(sent).toHaveLength(1);
     expect(sent[0]?.method).toBe('GET');
-    expect(sent[0]?.url).toBe('/sap/bc/adt/ddic/tabletypes/zttyp_x');
+    expect(sent[0]?.url).toBe(
+      '/sap/bc/adt/ddic/tabletypes/zttyp_x?version=active',
+    );
     expect(rawOf(response)).toBe(document);
   });
 

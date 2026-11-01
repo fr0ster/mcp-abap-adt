@@ -8,6 +8,10 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { readFunctionModuleMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -17,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,13 +34,7 @@ export const TOOL_DEFINITION = {
         description: 'Function group containing the function module.',
       },
       part: READ_PART_PROPERTY,
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
     },
     required: ['function_module_name', 'function_group_name'],
   },
@@ -46,7 +44,7 @@ interface GetFunctionModuleArgs {
   function_module_name: string;
   function_group_name: string;
   part?: ReadPart;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
 }
 
 export async function handleGetFunctionModule(
@@ -77,10 +75,14 @@ export async function handleGetFunctionModule(
     return answer(
       { tool: 'GetFunctionModule', detail: 'terse' },
       () =>
-        readFunctionModuleMetadata(client, {
-          functionModuleName,
-          functionGroupName,
-        }),
+        readFunctionModuleMetadata(
+          client,
+          {
+            functionModuleName,
+            functionGroupName,
+          },
+          version,
+        ),
       (metadata: AdtReading<string>) => ({
         success: true,
         function_module_name: functionModuleName,

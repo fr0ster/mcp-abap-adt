@@ -60,7 +60,7 @@ describe('GetTableType', () => {
     expect(connection.requests).toHaveLength(1);
     const [sent] = connection.requests;
     expect(sent?.method).toBe('GET');
-    expect(sent?.url).toBe('/sap/bc/adt/ddic/tabletypes/ztt_x');
+    expect(sent?.url).toBe('/sap/bc/adt/ddic/tabletypes/ztt_x?version=active');
     const first = result.content[0];
     const answered = JSON.parse(first && 'text' in first ? first.text : '{}');
     expect(answered).toEqual({
@@ -187,10 +187,10 @@ describe('CreateTableType', () => {
       `POST ${TTYP}/validation?objtype=ttypda&objname=ZTT_X&description=A+table+type`,
       `POST ${TTYP}?corrNr=K1`,
       `POST ${LOCK_URL}`,
-      `GET ${TTYP}/ztt_x`,
+      `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}&corrNr=K1`,
       `POST ${UNLOCK_URL}`,
-      `GET ${TTYP}/ztt_x?withLongPolling=true`,
+      `GET ${TTYP}/ztt_x?version=inactive&withLongPolling=true`,
       `POST ${CHECK_URL}`,
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
     ]);
@@ -341,11 +341,11 @@ describe('UpdateTableType', () => {
     expect(result.isError).toBe(false);
     expect(wire(connection)).toEqual([
       `POST ${LOCK_URL}`,
-      `GET ${TTYP}/ztt_x`,
+      `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}&corrNr=K1`,
       `POST ${CHECK_URL}`,
       `POST ${UNLOCK_URL}`,
-      `GET ${TTYP}/ztt_x?withLongPolling=true`,
+      `GET ${TTYP}/ztt_x?version=inactive&withLongPolling=true`,
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
     ]);
     expect(connection.sessions).toEqual([
@@ -395,7 +395,7 @@ describe('UpdateTableType', () => {
     expect(result.isError).toBe(false);
     expect(connection.requests).toHaveLength(6);
     expect(connection.requests[5]?.url).toBe(
-      `${TTYP}/ztt_x?withLongPolling=true`,
+      `${TTYP}/ztt_x?version=inactive&withLongPolling=true`,
     );
   });
 
@@ -408,7 +408,7 @@ describe('UpdateTableType', () => {
     expect(result.isError).toBe(true);
     expect(wire(connection)).toEqual([
       `POST ${LOCK_URL}`,
-      `GET ${TTYP}/ztt_x`,
+      `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
       `POST ${UNLOCK_URL}`,
     ]);
@@ -424,7 +424,7 @@ describe('UpdateTableType', () => {
     expect(result.isError).toBe(true);
     expect(wire(connection)).toEqual([
       `POST ${LOCK_URL}`,
-      `GET ${TTYP}/ztt_x`,
+      `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
       `POST ${CHECK_URL}`,
       `POST ${UNLOCK_URL}`,
@@ -514,7 +514,7 @@ const answerOf = (result: {
 }): Record<string, unknown> => JSON.parse(textOf(result));
 
 describe('the definition SAP stored, read from the wait after the unlock', () => {
-  const WAIT_URL = `${TTYP}/ztt_x?withLongPolling=true`;
+  const WAIT_URL = `${TTYP}/ztt_x?version=inactive&withLongPolling=true`;
   /** Create: the wait is the seventh request. */
   const createdStoring = (
     wait: NonNullable<Parameters<typeof recordingConnection>[0]>[number],

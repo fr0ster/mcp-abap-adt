@@ -60,18 +60,20 @@ export const readTableType: CompactHandler = (context, args) =>
  * An include's read of `part` (`source` here, `metadata` from the metadata
  * route), answered as a program's: the source too beside its name. The
  * arguments arrive from outside the type system: the name is passed on only
- * as a string, and a version only as one of the two the read takes.
+ * as a string, and a version only as one of the three the read takes.
  */
 export const readIncludePart =
   (part: 'source' | 'metadata'): CompactHandler =>
   async (context, args) => {
-    const { version } = args;
-    if (
-      version !== undefined &&
-      version !== 'active' &&
-      version !== 'inactive'
-    ) {
-      return return_error(new Error('version must be "active" or "inactive"'));
+    const given = args.version;
+    const version =
+      given === 'active' || given === 'inactive' || given === 'workingArea'
+        ? given
+        : undefined;
+    if (given !== undefined && version === undefined) {
+      return return_error(
+        new Error('version must be "active", "inactive" or "workingArea"'),
+      );
     }
     return handleGetIncludePart(context, {
       include_name:

@@ -8,6 +8,10 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import {
+  READ_VERSION_PROPERTY_UNDEFAULTED,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { readIncludeMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -17,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetInclude',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -26,12 +30,7 @@ export const TOOL_DEFINITION = {
         description: 'Include name.',
       },
       part: READ_PART_PROPERTY,
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
-      },
+      version: READ_VERSION_PROPERTY_UNDEFAULTED,
     },
     required: ['include_name'],
   },
@@ -41,19 +40,19 @@ interface GetIncludeArgs {
   /** Required by the schema; a call from outside it may leave it out. */
   include_name?: string;
   part?: ReadPart;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
 }
 
 /** How a source read is answered: the read's text, with what was asked. */
 type SourceAnswer = (
   includeName: string,
-  version: 'active' | 'inactive' | undefined,
+  version: ReadVersion | undefined,
   source: string,
 ) => unknown;
 
 /**
- * The one request a call sends: the source (at `version` when given) or the
- * metadata document, answered as `GetProgram` answers it, the source as
+ * The one request a call sends: the source or the metadata document, at
+ * `version` (active when none is given), answered as `GetProgram` answers it, the source as
  * `sourceAnswer` makes it.
  */
 async function readInclude(
@@ -77,7 +76,7 @@ async function readInclude(
   if (part === 'metadata') {
     return answer(
       { tool: 'GetInclude', detail: 'terse' },
-      () => readIncludeMetadata(client, { includeName }),
+      () => readIncludeMetadata(client, { includeName }, version ?? 'active'),
       (metadata: AdtReading<string>) => ({
         success: true,
         include_name: includeName,
@@ -91,7 +90,9 @@ async function readInclude(
     () =>
       client
         .getInclude(resultsFor(includeDocuments))
-        .read({ includeName }, version, { analyse: analyseException }),
+        .read({ includeName }, version ?? 'active', {
+          analyse: analyseException,
+        }),
     (source: AdtReading<string>) =>
       sourceAnswer(includeName, version, source.raw),
   );

@@ -1,6 +1,10 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
@@ -14,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
+    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -22,13 +26,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Package name.',
       },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
       ...DETAIL_PROPERTY,
     },
     required: ['package_name'],
@@ -37,7 +35,7 @@ export const TOOL_DEFINITION = {
 
 interface GetPackageArgs {
   package_name: string;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -55,10 +53,8 @@ export async function handleGetPackage(
 
   // A package is a container: it has no source of its own —
   // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
-  // unlike its siblings there is no `.read()` to call at all. Unlike Domain, DataElement and
-  // FunctionGroup, `AdtPackage` actually honours `version` — it forwards
-  // `options.version` into the query string — so it is passed through here
-  // (task 11 fix round 1).
+  // unlike its siblings there is no `.read()` to call at all. One call, at
+  // the version asked.
   return answer(
     { tool: 'GetPackage', detail },
     () => readPackageMetadata(client, { packageName }, version),

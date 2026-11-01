@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'GetMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.',
+    '[read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request, from the active version of the class. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -72,7 +72,7 @@ export async function handleGetMessageClassMessage(
     () =>
       createAdtClient(connection, logger)
         .getMessageClassMessage(messageDocuments)
-        .read({ className, msgno }, undefined, {
+        .read({ className, msgno }, 'active', {
           analyse: analyseMessageClassMessage(msgno),
         }),
     (document: string) => {

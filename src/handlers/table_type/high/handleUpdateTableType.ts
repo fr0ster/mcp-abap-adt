@@ -136,7 +136,7 @@ export async function handleUpdateTableType(
             atStep('read metadata', () =>
               obj.readMetadata(
                 { tableTypeName },
-                { analyse: analyseException },
+                { version: 'workingArea', analyse: analyseException },
               ),
             ),
             atStep('update metadata', (current) =>
@@ -197,7 +197,11 @@ export async function handleUpdateTableType(
         () =>
           obj.readMetadata(
             { tableTypeName },
-            { withLongPolling: true, analyse: analyseException },
+            {
+              version: 'inactive',
+              withLongPolling: true,
+              analyse: analyseException,
+            },
           ),
         detail,
       );

@@ -63,17 +63,21 @@ export function operationsTheApiLacks() {
   // Served on premise and on ABAP cloud, gated on 7.40.
   onPrem.getDdl(ddl).checkCdsTestDoubles('VIEW');
   cloud.getDdl(ddl).checkCdsTestDoubles('VIEW');
-  legacy.getDdl(ddl).read({ ddlName: 'VIEW' });
+  legacy.getDdl(ddl).read({ ddlName: 'VIEW' }, 'active');
   // @ts-expect-error SAP_BASIS 7.40's DDL source lists no checkCdsTestDoubles
   legacy.getDdl(ddl).checkCdsTestDoubles('VIEW');
 
   // On premise: a domain is read through its metadata; it has no source.
-  onPrem.getDomain(domain).readMetadata({ domainName: 'DOMAIN' });
+  onPrem
+    .getDomain(domain)
+    .readMetadata({ domainName: 'DOMAIN' }, { version: 'active' });
   // @ts-expect-error the on-premise table lists no read for a domain
-  onPrem.getDomain(domain).read({ domainName: 'DOMAIN' });
+  onPrem.getDomain(domain).read({ domainName: 'DOMAIN' }, 'active');
 
   // ABAP cloud: a package's metadata is read; a package is never activated.
-  cloud.getPackage(pkg).readMetadata({ packageName: 'PACKAGE' });
+  cloud
+    .getPackage(pkg)
+    .readMetadata({ packageName: 'PACKAGE' }, { version: 'active' });
   // @ts-expect-error the cloud table lists no activate for a package
   cloud.getPackage(pkg).activate({ packageName: 'PACKAGE' });
 }

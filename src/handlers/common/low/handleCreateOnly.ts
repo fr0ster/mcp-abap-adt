@@ -12,7 +12,8 @@
  * waits for another's answer, so it can be recorded in batch mode.
  *
  * Where the full create already sends that one request and nothing else
- * (PACKAGE, TRANSPORT, TABLE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE),
+ * (PACKAGE, TRANSPORT, TABLE, DDL, CLASS, PROGRAM, INCLUDE, INTERFACE,
+ * FUNCTION_MODULE),
  * it is that handler, so the two cannot drift; the others call the create step
  * of their full create here — a behavior definition without its root entity
  * and a behavior implementation without its behavior definition, which their
@@ -46,6 +47,7 @@ import {
   serviceDefinitionDocuments,
   serviceDocuments,
   structureDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -67,6 +69,7 @@ import { return_error } from '../../../lib/utils';
 import { handleCreateClass } from '../../class/high/handleCreateClass';
 import { handleCreateDdl } from '../../ddl/high/handleCreateDdl';
 import { handleCreateFunctionModule } from '../../function/high/handleCreateFunctionModule';
+import { handleCreateInclude } from '../../include/high/handleCreateInclude';
 import { handleCreateInterface } from '../../interface/high/handleCreateInterface';
 import { handleCreatePackage } from '../../package/high/handleCreatePackage';
 import { handleCreateProgram } from '../../program/high/handleCreateProgram';
@@ -100,6 +103,7 @@ const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
   TRANSPORT: ['transport_type', 'target_system', 'owner'],
   TABLE: ['table_name', 'master_language'],
   STRUCTURE: ['structure_name', 'master_language'],
+  TABLE_TYPE: ['table_type_name', 'master_language'],
   DDL: ['ddl_name', 'master_language'],
   SERVICE_DEFINITION: ['service_definition_name', 'master_language'],
   SERVICE_BINDING: [
@@ -118,6 +122,7 @@ const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
     'master_language',
   ],
   PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
+  INCLUDE: ['include_name', 'master_language'],
   INTERFACE: ['interface_name', 'master_language'],
   FUNCTION_GROUP: ['function_group_name', 'master_language'],
   FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
@@ -254,6 +259,17 @@ export async function handleCreateOnly(
       return handleCreateClass(context, args as never);
     case 'PROGRAM':
       return handleCreateProgram(context, args as never);
+    case 'INCLUDE':
+      // The arguments it reads, each a string or absent: they arrive from
+      // outside the type system.
+      return handleCreateInclude(context, {
+        include_name: text(args.include_name),
+        package_name: text(args.package_name),
+        description: text(args.description),
+        transport_request: transportRequest,
+        master_language: masterLanguage,
+        detail: detailOf(args),
+      });
     case 'INTERFACE':
       return handleCreateInterface(context, args as never);
     case 'FUNCTION_MODULE':
@@ -313,6 +329,27 @@ export async function handleCreateOnly(
               {
                 structureName,
                 description: text(args.description) || structureName,
+                packageName,
+                transportRequest,
+                masterLanguage,
+              },
+              { headers, analyse: analyseException },
+            ),
+        ),
+      );
+    }
+    case 'TABLE_TYPE': {
+      const refused = missing(args, ['table_type_name', 'package_name']);
+      if (refused) return refused;
+      const tableTypeName = String(args.table_type_name).toUpperCase();
+      return createAlone(args, 'CreateTableType', () =>
+        withAdtHeaders(context, 'tableType.create', (headers) =>
+          client()
+            .getTableType(resultsFor(tableTypeDocuments))
+            .create(
+              {
+                tableTypeName,
+                description: text(args.description) || tableTypeName,
                 packageName,
                 transportRequest,
                 masterLanguage,

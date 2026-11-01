@@ -27,6 +27,7 @@ import {
   handleCreateDomain,
   handleCreateFunctionGroup,
   handleCreateFunctionModule,
+  handleCreateInclude,
   handleCreateInterface,
   handleCreateMetadataExtension,
   handleCreatePackage,
@@ -35,6 +36,7 @@ import {
   handleCreateServiceDefinition,
   handleCreateStructure,
   handleCreateTable,
+  handleCreateTableType,
   handleCreateTransport,
 } from '@mcp-abap-adt/lib/handlers/write';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
@@ -204,6 +206,8 @@ const TYPES: Array<[string, Record<string, unknown>]> = [
   ],
   ['BEHAVIOR_IMPLEMENTATION', { class_name: 'ZBP_A', package_name: 'ZPKG_A' }],
   ['METADATA_EXTENSION', { name: 'ZDDLX_A', package_name: 'ZPKG_A' }],
+  ['INCLUDE', { include_name: 'ZINCL_A', package_name: 'ZPKG_A' }],
+  ['TABLE_TYPE', { table_type_name: 'ZTTYP_A', package_name: 'ZPKG_A' }],
 ];
 
 /** The types whose create is a chain: refused, pointing to the full set's tool. */
@@ -258,6 +262,8 @@ const FULL: Record<string, [Full, Record<string, unknown>]> = {
     { behavior_definition: 'ZBDEF_A' },
   ],
   METADATA_EXTENSION: [handleCreateMetadataExtension as Full, {}],
+  INCLUDE: [handleCreateInclude, {}],
+  TABLE_TYPE: [handleCreateTableType, {}],
 };
 
 const fullCreate =
@@ -429,6 +435,8 @@ const CARRIES: Record<string, string[]> = {
   BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
   BEHAVIOR_IMPLEMENTATION: ['class_name'],
   METADATA_EXTENSION: ['name', 'master_language'],
+  INCLUDE: ['include_name', 'master_language'],
+  TABLE_TYPE: ['table_type_name', 'master_language'],
 };
 
 /** Accepted for every type: the common three, and what is not a request argument. */

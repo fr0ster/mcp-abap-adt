@@ -17,6 +17,7 @@ import {
   type ActivationCode,
   type AdtCodes,
   type AtcKindOn,
+  type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
   type INCLUDES_PARENT_ROUTES,
   projected,
@@ -101,6 +102,22 @@ type CreateOnCloud = ServedName<'cloud', typeof COMPACT_CREATE_ROUTES>;
 export const classCreatedOnCloud: CreateOnCloud = 'CLASS';
 // @ts-expect-error HandlerCreate does not offer PROGRAM on ABAP cloud.
 export const programCreatedCompactOnCloud: CreateOnCloud = 'PROGRAM';
+
+/** A table type is created on both variants… */
+export const tableTypeCreatedCompactOnCloud: CreateOnCloud = 'TABLE_TYPE';
+/** …an include on premise… */
+export const includeCreatedCompactOnPrem: ServedName<
+  'onprem',
+  typeof COMPACT_CREATE_ROUTES
+> = 'INCLUDE';
+// @ts-expect-error …and not on ABAP cloud.
+export const includeCreatedCompactOnCloud: CreateOnCloud = 'INCLUDE';
+/** HandlerCreate's cloud list holds the table type… */
+export const tableTypeInCloudCreate: (typeof COMPACT_CREATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
+export const includeInCloudCreate: (typeof COMPACT_CREATE.cloud)[number] =
+  'INCLUDE';
 
 // --- A list is exactly its projection --------------------------------------
 

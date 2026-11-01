@@ -60,6 +60,7 @@ export const compactReadRouterMap: CompactRouterMap = {
   STRUCTURE: {
     get: handleGetStructure as unknown as CompactHandler,
   },
+  TABLE_TYPE: {},
   DDL: {
     get: handleGetDdl as unknown as CompactHandler,
   },
@@ -96,6 +97,7 @@ export const compactReadRouterMap: CompactRouterMap = {
   PROGRAM: {
     get: handleGetProgram as unknown as CompactHandler,
   },
+  INCLUDE: {},
   INTERFACE: {
     get: handleGetInterface as unknown as CompactHandler,
   },

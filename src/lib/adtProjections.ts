@@ -978,9 +978,10 @@ export const VERSIONED_KINDS = projected<
 // The compact tools whose `object_type` (or `target_type`) picks the API
 // ---------------------------------------------------------------------------
 //
-// A cloud list is its on-premise list without `PROGRAM` where ABAP cloud
-// serves no program for the operation: the filter's narrowed element type is
-// what `projected` checks against the cloud projection.
+// A cloud list is its on-premise list without `PROGRAM` (and `INCLUDE`)
+// where ABAP cloud serves no program (or include) for the operation: the
+// filter's narrowed element type is what `projected` checks against the
+// cloud projection.
 
 /** What `HandlerCreate` creates, each with its API. */
 export const COMPACT_CREATE_ROUTES = {
@@ -990,11 +991,13 @@ export const COMPACT_CREATE_ROUTES = {
   TRANSPORT: { api: 'request', operation: 'create' },
   TABLE: { api: 'table', operation: 'create' },
   STRUCTURE: { api: 'structure', operation: 'create' },
+  TABLE_TYPE: { api: 'tableType', operation: 'create' },
   DDL: { api: 'ddl', operation: 'create' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'create' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'create' },
   CLASS: { api: 'class', operation: 'create' },
   PROGRAM: { api: 'program', operation: 'create' },
+  INCLUDE: { api: 'include', operation: 'create' },
   INTERFACE: { api: 'interface', operation: 'create' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'create' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'create' },
@@ -1013,11 +1016,13 @@ const CREATE_ONPREM = [
   'TRANSPORT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1032,7 +1037,9 @@ export const COMPACT_CREATE = projected<
   ServedName<'cloud', typeof COMPACT_CREATE_ROUTES>
 >()({
   onprem: CREATE_ONPREM,
-  cloud: CREATE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: CREATE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerGet` reads, each with its API. */

@@ -244,6 +244,8 @@ const VALUES: Readonly<Record<string, string>> = {
   service_binding_name: 'ZSRVB_A',
   class_name: 'ZCL_A',
   program_name: 'ZPROG_A',
+  include_name: 'ZINCL_A',
+  table_type_name: 'ZTTYP_A',
   interface_name: 'ZIF_A',
   function_group_name: 'ZFG_A',
   function_module_name: 'Z_FM_A',

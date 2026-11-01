@@ -54,6 +54,7 @@ const CREATE_TOKENS: Tokens<(typeof COMPACT_CREATE.onprem)[number]> = {
   TRANSPORT: 'TRANSPORT(description*)',
   TABLE: 'TABLE(table_name*, package_name*)',
   STRUCTURE: 'STRUCTURE(structure_name*, package_name*)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*, package_name*)',
   DDL: 'DDL(ddl_name*, package_name*)',
   SERVICE_DEFINITION:
     'SERVICE_DEFINITION(service_definition_name*, package_name*)',
@@ -61,6 +62,7 @@ const CREATE_TOKENS: Tokens<(typeof COMPACT_CREATE.onprem)[number]> = {
     'SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*)',
   CLASS: 'CLASS(class_name*, package_name*)',
   PROGRAM: 'PROGRAM(program_name*, package_name*)',
+  INCLUDE: 'INCLUDE(include_name*, package_name*)',
   INTERFACE: 'INTERFACE(interface_name*, package_name*)',
   FUNCTION_GROUP: 'FUNCTION_GROUP(function_group_name*, package_name*)',
   FUNCTION_MODULE:

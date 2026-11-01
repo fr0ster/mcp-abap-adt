@@ -1748,7 +1748,8 @@ export abstract class BaseMcpServer extends McpServer {
             }
           }
 
-          // Register wrapped handler via SDK registerTool
+          // Register wrapped handler via SDK registerTool, with the
+          // description the declared variant serves beside its schema.
           // Note: connection is NOT part of MCP tool signature
           this.registerTool(
             entry.toolDefinition.name,
@@ -1756,10 +1757,10 @@ export abstract class BaseMcpServer extends McpServer {
               description:
                 sentenced && !runsBesideBatch(entry.toolDefinition.name)
                   ? withBatchSentence(
-                      entry.toolDefinition.description,
+                      served.description,
                       entry.toolDefinition.name,
                     )
-                  : entry.toolDefinition.description,
+                  : served.description,
               inputSchema: zodSchema,
               ...searchMeta(entry.toolDefinition.name),
             },

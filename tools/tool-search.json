@@ -2774,41 +2774,6 @@
     ],
     "semantic": "Show the definition of an ABAP table type: its row type, access type and key."
   },
-  "GetTableTypeVersionDiff": {
-    "keywords": [
-      "compare versions",
-      "diff",
-      "difference",
-      "changes between versions",
-      "what changed",
-      "compare with previous version",
-      "table type",
-      "TTYP",
-      "row type",
-      "line type",
-      "access type",
-      "primary key",
-      "internal table type"
-    ],
-    "semantic": "Compare two versions of an ABAP table type and see what changed between them."
-  },
-  "GetTableTypeVersionSource": {
-    "keywords": [
-      "old version",
-      "previous version",
-      "earlier version",
-      "version source",
-      "source of a version",
-      "table type",
-      "TTYP",
-      "row type",
-      "line type",
-      "access type",
-      "primary key",
-      "internal table type"
-    ],
-    "semantic": "Read the content of an earlier version of an ABAP table type."
-  },
   "GetTableTypeVersions": {
     "keywords": [
       "version history",

@@ -961,8 +961,12 @@ export const INCLUDES_PARENT_MAIN_TYPES = projected<
 // Versions (GetObjectVersions, GetObjectVersionSource, GetObjectVersionDiff)
 // ---------------------------------------------------------------------------
 
-/** The kinds the generic version tools read, each with its API. */
-export const VERSIONED_ROUTES = {
+/**
+ * The kinds whose version sources SAP serves, each with its API: the
+ * version tools' source and diff (GetObjectVersionSource,
+ * GetObjectVersionDiff, Get<X>VersionSource, Get<X>VersionDiff).
+ */
+export const VERSION_SOURCE_ROUTES = {
   class: { api: 'class', operation: 'versions' },
   program: { api: 'program', operation: 'versions' },
   interface: { api: 'interface', operation: 'versions' },
@@ -972,13 +976,27 @@ export const VERSIONED_ROUTES = {
   ddl: { api: 'ddl', operation: 'versions' },
   behavior_definition: { api: 'behaviorDefinition', operation: 'versions' },
   metadata_extension: { api: 'metadataExtension', operation: 'versions' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/**
+ * The kinds whose version list the version tools read, each with its API:
+ * every kind with a version source, and the table type, whose list SAP
+ * serves and whose version source it refuses (403 "Request version for TTYP
+ * is not supported": measured on premise 2026-11-01, on ABAP cloud
+ * 2026-11-02).
+ */
+export const VERSIONED_ROUTES = {
+  ...VERSION_SOURCE_ROUTES,
   table_type: { api: 'tableType', operation: 'versions' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
-/** A kind the version tools read. */
+/** A kind whose version list the version tools read. */
 export type VersionedKind = keyof typeof VERSIONED_ROUTES;
 
-/** The generic version tools' `object_type`. */
+/** A kind whose version source the version tools read. */
+export type VersionSourceKind = keyof typeof VERSION_SOURCE_ROUTES;
+
+/** GetObjectVersions' `object_type`. */
 export const VERSIONED_KINDS = projected<
   ServedName<'onprem', typeof VERSIONED_ROUTES>,
   ServedName<'cloud', typeof VERSIONED_ROUTES>
@@ -1006,6 +1024,35 @@ export const VERSIONED_KINDS = projected<
     'behavior_definition',
     'metadata_extension',
     'table_type',
+  ],
+});
+
+/** GetObjectVersionSource's and GetObjectVersionDiff's `object_type`. */
+export const VERSION_SOURCE_KINDS = projected<
+  ServedName<'onprem', typeof VERSION_SOURCE_ROUTES>,
+  ServedName<'cloud', typeof VERSION_SOURCE_ROUTES>
+>()({
+  onprem: [
+    'class',
+    'program',
+    'interface',
+    'function_module',
+    'table',
+    'structure',
+    'ddl',
+    'behavior_definition',
+    'metadata_extension',
+  ],
+  cloud: [
+    'class',
+    'program',
+    'interface',
+    'function_module',
+    'table',
+    'structure',
+    'ddl',
+    'behavior_definition',
+    'metadata_extension',
   ],
 });
 

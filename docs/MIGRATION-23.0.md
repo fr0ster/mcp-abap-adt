@@ -78,9 +78,10 @@ Table types, on premise and on ABAP cloud:
   activates (default true).
 - `DeleteTableType`, `CheckTableType` (`version: 'inactive'` for the unsaved version),
   `ActivateTableType`.
-- `GetTableTypeVersions`, `GetTableTypeVersionSource`, `GetTableTypeVersionDiff`; and
-  `GetObjectVersions`, `GetObjectVersionSource`, `GetObjectVersionDiff` take `object_type`
-  `table_type`.
+- `GetTableTypeVersions`, and `GetObjectVersions` takes `object_type` `table_type`: a table
+  type's version list. No version source or diff is offered for a table type: SAP answers its
+  version source `403` "Request version for TTYP is not supported" (measured on premise and on
+  ABAP cloud).
 
 The definition properties of `CreateTableType` / `UpdateTableType` are `row_type_kind`,
 `row_type_name`, `data_type`, `length`, `decimals`, `access_type`, `key_definition` and

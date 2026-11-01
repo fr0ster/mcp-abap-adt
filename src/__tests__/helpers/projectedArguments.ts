@@ -25,6 +25,7 @@ import {
   INCLUDES_PARENTS,
   SINGLE_ACTIVATION,
   type VariantValues,
+  VERSION_SOURCE_KINDS,
   VERSIONED_KINDS,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
@@ -83,8 +84,8 @@ export const PROJECTED_ARGUMENTS: readonly ProjectedArgument[] = [
   each('GetIncludesList', 'object_type', true, INCLUDES_PARENTS),
   each('GetIncludesList', 'objects[].object_type', true, INCLUDES_PARENTS),
   each('GetObjectVersions', 'object_type', true, VERSIONED_KINDS),
-  each('GetObjectVersionSource', 'object_type', true, VERSIONED_KINDS),
-  each('GetObjectVersionDiff', 'object_type', true, VERSIONED_KINDS),
+  each('GetObjectVersionSource', 'object_type', true, VERSION_SOURCE_KINDS),
+  each('GetObjectVersionDiff', 'object_type', true, VERSION_SOURCE_KINDS),
 ];
 
 /** The schema of `argument` in `inputSchema` (see {@link ProjectedArgument}). */

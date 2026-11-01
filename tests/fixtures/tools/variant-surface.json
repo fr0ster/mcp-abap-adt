@@ -197,8 +197,6 @@
         "GetTable",
         "GetTableContents",
         "GetTableType",
-        "GetTableTypeVersionDiff",
-        "GetTableTypeVersionSource",
         "GetTableTypeVersions",
         "GetTableVersionDiff",
         "GetTableVersionSource",
@@ -300,8 +298,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -324,8 +321,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ]
       },
       "argumentDescriptions": {
@@ -483,8 +479,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -507,8 +502,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ]
       },
       "argumentDescriptions": {
@@ -1463,8 +1457,6 @@
         "GetTable",
         "GetTableContents",
         "GetTableType",
-        "GetTableTypeVersionDiff",
-        "GetTableTypeVersionSource",
         "GetTableTypeVersions",
         "GetTableVersionDiff",
         "GetTableVersionSource",
@@ -1560,8 +1552,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -1584,8 +1575,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ]
       },
       "argumentDescriptions": {
@@ -1742,8 +1732,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -1766,8 +1755,7 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension",
-          "table_type"
+          "metadata_extension"
         ]
       },
       "argumentDescriptions": {

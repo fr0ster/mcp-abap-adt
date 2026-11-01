@@ -269,7 +269,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
-- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type (the same value the version history was read with).
+- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`) - Object type (the same value the version history was read with).
 
 ---
 
@@ -282,7 +282,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
 - `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
-- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type (the same value the version history was read with).
+- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`) - Object type (the same value the version history was read with).
 
 ---
 

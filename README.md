@@ -269,7 +269,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
 - **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
-- **🧾 Table Type Management**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType`, `GetTableTypeVersions`, `GetTableTypeVersionSource`, `GetTableTypeVersionDiff` - Create, read, change, check, activate and delete ABAP table types (on premise and cloud); the create and the update take the definition (row type, access, key) and answer the definition SAP stored
+- **🧾 Table Type Management**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType`, `GetTableTypeVersions` - Create, read, change, check, activate and delete ABAP table types (on premise and cloud); the create and the update take the definition (row type, access, key) and answer the definition SAP stored
 - **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
 - **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClass` - Create, retrieve, and update ABAP classes
 - **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs

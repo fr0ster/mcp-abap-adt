@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 188
+- Total tools: 186
 
 ## Navigation
 
@@ -71,9 +71,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
     - [GetStructureVersions](#getstructureversions-high-level-common)
     - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
-    - [GetTableTypeVersionDiff](#gettabletypeversiondiff-high-level-common)
     - [GetTableTypeVersions](#gettabletypeversions-high-level-common)
-    - [GetTableTypeVersionSource](#gettabletypeversionsource-high-level-common)
     - [GetTableVersionDiff](#gettableversiondiff-high-level-common)
     - [GetTableVersions](#gettableversions-high-level-common)
     - [GetTableVersionSource](#gettableversionsource-high-level-common)
@@ -963,18 +961,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 ---
 
-<a id="gettabletypeversiondiff-high-level-common"></a>
-#### GetTableTypeVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP table type versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP table type's version history.
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP table type's version history.
-
----
-
 <a id="gettabletypeversions-high-level-common"></a>
 #### GetTableTypeVersions (High-Level / Common)
 **Description:** [read-only] Lists the version history of the ABAP table type named by table_type_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
@@ -983,17 +969,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `table_type_name` (string, required) - ABAP table type name.
-
----
-
-<a id="gettabletypeversionsource-high-level-common"></a>
-#### GetTableTypeVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP table type version named by content_uri, an entry of the ABAP table type's version history.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP table type's version history.
 
 ---
 

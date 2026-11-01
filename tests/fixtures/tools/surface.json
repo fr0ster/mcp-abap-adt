@@ -1249,18 +1249,6 @@
   },
   {
     "group": "high",
-    "name": "GetTableTypeVersionSource",
-    "inputs": "content_uri*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "GetTableTypeVersionDiff",
-    "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
     "name": "GetStructureVersions",
     "inputs": "structure_name*",
     "available_in": "cloud, onprem"

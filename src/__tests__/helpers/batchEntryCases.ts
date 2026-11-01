@@ -178,7 +178,6 @@ const FULL: BatchEntryCase[] = [
     'GetDdlVersionSource',
     'GetBehaviorDefinitionVersionSource',
     'GetMetadataExtensionVersionSource',
-    'GetTableTypeVersionSource',
   ].map((tool) => ({ tool, args: { content_uri: VERSION_URI } })),
   { tool: 'SearchObject', args: { object_name: 'Z*' } },
   { tool: 'SearchObject', args: { object_name: 'Z*', object_type: 'CLAS' } },
@@ -1106,7 +1105,6 @@ const TOGETHER: BatchEntryCase[] = [
     'Ddl',
     'BehaviorDefinition',
     'MetadataExtension',
-    'TableType',
   ].map((t) => ({
     tool: `Get${t}VersionDiff`,
     args: { content_uri_from: VERSION_FROM, content_uri_to: VERSION_TO },

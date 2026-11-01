@@ -310,8 +310,6 @@ const TOOL_NEEDS_BY_NAME = {
     operation: 'versions',
   },
   GetTableTypeVersions: { api: 'tableType', operation: 'versions' },
-  GetTableTypeVersionSource: { api: 'tableType', operation: 'versions' },
-  GetTableTypeVersionDiff: { api: 'tableType', operation: 'versions' },
   RuntimeRunClass: { api: 'class', operation: 'run' },
   RuntimeRunProgram: { api: 'program', operation: 'run' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;

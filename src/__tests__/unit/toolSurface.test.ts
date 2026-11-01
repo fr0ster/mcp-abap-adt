@@ -454,8 +454,10 @@ describe('the MCP tool surface', () => {
    * **The ninth deliberate move: `CreateInclude`, `UpdateInclude`,
    * `UpdateIncludeMetadata`, `DeleteInclude`, `ActivateInclude`,
    * `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`,
-   * `ActivateTableType`, `CheckTableType` and the three table-type version
-   * tools arrived** (the server writes program includes and table types). The new full-set
+   * `ActivateTableType`, `CheckTableType` and `GetTableTypeVersions`
+   * arrived** (the server writes program includes and table types). A table
+   * type's version list only: SAP refuses its version source (403, measured on
+   * premise and on ABAP cloud), so no source or diff tool came with it. The new full-set
    * tools of that work: the include tools on premise only, the table-type
    * tools on premise and cloud. `GetInclude` reads the include's metadata
    * too: its row gained `part` and `version` (both optional; without them

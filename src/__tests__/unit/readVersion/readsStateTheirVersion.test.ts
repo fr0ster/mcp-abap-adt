@@ -254,11 +254,7 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   GetStructureVersionSource:
     'reads the version list, or a listed version by its own address',
   GetTableContents: 'reads data through the data preview',
-  GetTableTypeVersionDiff:
-    'reads the version list, or a listed version by its own address',
   GetTableTypeVersions:
-    'reads the version list, or a listed version by its own address',
-  GetTableTypeVersionSource:
     'reads the version list, or a listed version by its own address',
   GetTableVersionDiff:
     'reads the version list, or a listed version by its own address',

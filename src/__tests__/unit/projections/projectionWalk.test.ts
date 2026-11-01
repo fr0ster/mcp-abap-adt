@@ -94,6 +94,8 @@ import {
   SINGLE_ACTIVATION_ROUTES,
   TYPE_NAMES,
   type VariantValues,
+  VERSION_SOURCE_KINDS,
+  VERSION_SOURCE_ROUTES,
   VERSIONED_KINDS,
   VERSIONED_ROUTES,
   WHERE_USED_CODES,
@@ -569,23 +571,23 @@ const WALKS: Readonly<Record<string, Walk>> = {
     routes: routesOf(VERSIONED_ROUTES),
   }),
   'GetObjectVersionSource.object_type': walk({
-    values: VERSIONED_KINDS,
+    values: VERSION_SOURCE_KINDS,
     send: (context, value, variant) =>
       handleGetObjectVersionSource(context, {
         object_type: value,
         content_uri: versionContent(value, variant),
       }),
-    routes: routesOf(VERSIONED_ROUTES),
+    routes: routesOf(VERSION_SOURCE_ROUTES),
   }),
   'GetObjectVersionDiff.object_type': walk({
-    values: VERSIONED_KINDS,
+    values: VERSION_SOURCE_KINDS,
     send: (context, value, variant) =>
       handleGetObjectVersionDiff(context, {
         object_type: value,
         content_uri_from: versionContent(value, variant),
         content_uri_to: versionContent(value, variant),
       }),
-    routes: routesOf(VERSIONED_ROUTES),
+    routes: routesOf(VERSION_SOURCE_ROUTES),
   }),
 };
 

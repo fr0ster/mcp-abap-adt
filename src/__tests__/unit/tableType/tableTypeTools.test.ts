@@ -6,7 +6,15 @@
 
 import { readTableType } from '../../../../compact-readonly-entries/src/handlers/compactReadRoutes';
 import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
-import { handleGetObjectVersions } from '../../../handlers/common/readonly/handleGetObjectVersions';
+import { TOOL_DEFINITION as GET_OBJECT_VERSION_DIFF } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
+import {
+  TOOL_DEFINITION as GET_OBJECT_VERSION_SOURCE,
+  handleGetObjectVersionSource,
+} from '../../../handlers/common/readonly/handleGetObjectVersionSource';
+import {
+  TOOL_DEFINITION as GET_OBJECT_VERSIONS,
+  handleGetObjectVersions,
+} from '../../../handlers/common/readonly/handleGetObjectVersions';
 import { handleCheckTableType } from '../../../handlers/table_type/high/handleCheckTableType';
 import {
   TOOL_DEFINITION as CreateTableType_Tool,
@@ -23,6 +31,10 @@ import {
 } from '../../../handlers/table_type/high/handleUpdateTableType';
 import { handleActivateTableType } from '../../../handlers/table_type/low/handleActivateTableType';
 import { corpusBody } from '../../../lib/adtCorpus';
+import {
+  VERSION_SOURCE_KINDS,
+  VERSIONED_KINDS,
+} from '../../../lib/adtProjections';
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
 import { READ_VERSION_PROPERTY } from '../../../lib/handlers/readVersion';
 import {
@@ -1118,16 +1130,46 @@ describe('the table-type version tools', () => {
     return entry;
   };
 
-  it('are the three per-type tools, [read-only], on both variants', () => {
-    for (const name of [
-      'GetTableTypeVersions',
-      'GetTableTypeVersionSource',
-      'GetTableTypeVersionDiff',
-    ]) {
-      const { toolDefinition } = versionTool(name);
-      expect(toolDefinition.description.startsWith('[read-only]')).toBe(true);
-      expect(toolDefinition.available_in).toEqual(['onprem', 'cloud']);
-    }
+  it('is the version list alone, [read-only], on both variants', () => {
+    const { toolDefinition } = versionTool('GetTableTypeVersions');
+    expect(toolDefinition.description.startsWith('[read-only]')).toBe(true);
+    expect(toolDefinition.available_in).toEqual(['onprem', 'cloud']);
+    // SAP refuses a table type's version source: 403 "Request version for
+    // TTYP is not supported" (measured on premise 2026-11-01, on ABAP cloud
+    // 2026-11-02), so no source or diff tool is offered for it.
+    const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
+    expect(names).not.toContain('GetTableTypeVersionSource');
+    expect(names).not.toContain('GetTableTypeVersionDiff');
+  });
+
+  it.each(['onprem', 'cloud'] as const)(
+    'GetObjectVersions takes table_type on %s; GetObjectVersionSource and GetObjectVersionDiff do not',
+    (variant) => {
+      expect(VERSIONED_KINDS[variant]).toContain('table_type');
+      expect(VERSION_SOURCE_KINDS[variant]).not.toContain('table_type');
+      expect(
+        GET_OBJECT_VERSION_SOURCE.variants[variant].inputSchema.properties
+          .object_type.enum,
+      ).not.toContain('table_type');
+      expect(
+        GET_OBJECT_VERSION_DIFF.variants[variant].inputSchema.properties
+          .object_type.enum,
+      ).not.toContain('table_type');
+      expect(
+        GET_OBJECT_VERSIONS.variants[variant].inputSchema.properties.object_type
+          .enum,
+      ).toContain('table_type');
+    },
+  );
+
+  it('GetObjectVersionSource refuses table_type, sending nothing', async () => {
+    const connection = recordingConnection();
+    const result = await handleGetObjectVersionSource(
+      { connection, logger: undefined },
+      { object_type: 'table_type', content_uri: `${TTYP}/ztt_x/versions/0001` },
+    );
+    expect(result.isError).toBe(true);
+    expect(connection.requests).toHaveLength(0);
   });
 
   it('GetTableTypeVersions sends one GET to the versions feed of the table type', async () => {
@@ -1155,27 +1197,7 @@ describe('the table-type version tools', () => {
     expect(wire(connection)).toEqual([`GET ${TTYP}/ztt_x/versions`]);
   });
 
-  it('GetTableTypeVersionSource sends one GET to the content_uri', async () => {
-    const connection = sessionRecording([{ data: 'the version' }]);
-    const uri = `${TTYP}/ztt_x/versions/0001`;
-    const result = await versionTool('GetTableTypeVersionSource').handler(
-      { connection, logger: undefined },
-      { content_uri: uri },
-    );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([`GET ${uri}`]);
-    expect(JSON.parse(textOf(result)).source).toBe('the version');
-  });
-
-  it.each([
-    ['GetTableTypeVersions', {}, 'table_type_name is required'],
-    ['GetTableTypeVersionSource', {}, 'content_uri is required'],
-    [
-      'GetTableTypeVersionDiff',
-      { content_uri_from: 'a' },
-      'content_uri_from and content_uri_to are required',
-    ],
-  ])(
+  it.each([['GetTableTypeVersions', {}, 'table_type_name is required']])(
     '%s refuses missing arguments, sending nothing',
     async (name, args, text) => {
       const connection = recordingConnection();

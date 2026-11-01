@@ -15,7 +15,9 @@ ADT dependencies are unchanged (`@mcp-abap-adt/interfaces-adt` `^24.0.1`,
 `CreateProgram`'s `program_type` no longer offers `include`; the schema refuses it before the
 handler runs. It never created an include — adt-clients refused it before any request
 (`programType 'include' is not a program`) — so nothing that worked stops working. Compact
-`HandlerCreate` `PROGRAM` with `program_type: 'include'` is refused the same way.
+`HandlerCreate` `PROGRAM` takes `program_type` as a free string (no enum): `include` reaches
+adt-clients, whose guard refuses it before any request, and the call answers that refusal, nothing
+sent.
 
 What you do now (on premise; ABAP cloud holds no program include of yours):
 
@@ -118,10 +120,11 @@ already-connected connection you hold). See [Handler Exporter](architecture/HAND
 ## Compact callers on ABAP cloud
 
 A compact write handler's schema lists on cloud only the properties its cloud members take. Gone
-there: `HandlerCreate` `program_name`, `program_type`, `application`, `include_name`;
-`HandlerUpdate` `program_name`, `part`, `include_name`; `HandlerDelete` `program_name`,
-`include_name`; `HandlerProfileRun` `program_name`. None of them was taken on cloud, where the
-members that read them are not served; leave them out. On premise nothing changed.
+there since 22.x: `HandlerCreate` `program_name`, `program_type`, `application`; `HandlerUpdate`,
+`HandlerDelete` and `HandlerProfileRun` `program_name`. None of them was taken on cloud, where the
+members that read them are not served; leave them out. The include's new properties
+(`include_name`, `HandlerUpdate`'s `part`) are offered on premise only. On premise nothing else
+changed.
 
 ## Readers of `tools/tool-search.json`
 

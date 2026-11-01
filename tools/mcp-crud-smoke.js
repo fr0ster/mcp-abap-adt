@@ -172,7 +172,6 @@ function normalizeProgramType(value) {
   if (!raw) return undefined;
   const map = {
     '1': 'executable',
-    i: 'include',
     m: 'module_pool',
     f: 'function_group',
     k: 'class_pool',
@@ -181,7 +180,6 @@ function normalizeProgramType(value) {
   if (map[raw]) return map[raw];
   const allowed = new Set([
     'executable',
-    'include',
     'module_pool',
     'function_group',
     'class_pool',

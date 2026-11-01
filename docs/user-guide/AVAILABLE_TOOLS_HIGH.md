@@ -1776,7 +1776,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
 - `program_name` (string, required) - Program name.
-- `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
+- `program_type` (string, optional) - Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---

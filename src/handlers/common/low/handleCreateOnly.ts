@@ -58,6 +58,7 @@ import type {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { COMPACT_CREATE_TAKES } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -79,57 +80,16 @@ import { handleCreateTransport } from '../../transport/high/handleCreateTranspor
 /** Accepted for every type: they take no part in the request. */
 const ALWAYS = ['object_type', 'detail'] as const;
 
-/** Accepted for every type (the controller's ruling). */
-const COMMON = ['transport_request', 'package_name', 'description'] as const;
-
 /**
- * Per type, the arguments its create request carries — measured: each string
- * argument's value found in the request sent, each boolean or enum read off
- * the adt-clients create that builds it.
+ * Accepted for every type (the controller's ruling), and per type the
+ * arguments its create request carries — measured: each string argument's
+ * value found in the request sent, each boolean or enum read off the
+ * adt-clients create that builds it (`COMPACT_CREATE_TAKES`, the data
+ * `HandlerCreate`'s schema is projected from).
  */
-const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
-  PACKAGE: [
-    'package_name',
-    'super_package',
-    'package_type',
-    'software_component',
-    'transport_layer',
-    'record_changes',
-    'application_component',
-    'master_language',
-  ],
-  DOMAIN: ['domain_name', 'master_language'],
-  DATA_ELEMENT: ['data_element_name', 'master_language'],
-  TRANSPORT: ['transport_type', 'target_system', 'owner'],
-  TABLE: ['table_name', 'master_language'],
-  STRUCTURE: ['structure_name', 'master_language'],
-  TABLE_TYPE: ['table_type_name', 'master_language'],
-  DDL: ['ddl_name', 'master_language'],
-  SERVICE_DEFINITION: ['service_definition_name', 'master_language'],
-  SERVICE_BINDING: [
-    'service_binding_name',
-    'service_definition_name',
-    'service_name',
-    'service_version',
-    'binding_variant',
-    'master_language',
-  ],
-  CLASS: [
-    'class_name',
-    'superclass',
-    'final',
-    'create_protected',
-    'master_language',
-  ],
-  PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
-  INCLUDE: ['include_name', 'master_language'],
-  INTERFACE: ['interface_name', 'master_language'],
-  FUNCTION_GROUP: ['function_group_name', 'master_language'],
-  FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
-  BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
-  BEHAVIOR_IMPLEMENTATION: ['class_name'],
-  METADATA_EXTENSION: ['name', 'master_language'],
-};
+const COMMON: readonly string[] = COMPACT_CREATE_TAKES.every;
+const CREATE_CARRIES: Readonly<Record<string, readonly string[] | undefined>> =
+  COMPACT_CREATE_TAKES.members;
 
 /**
  * The arguments given that the type's create does not send, in the order

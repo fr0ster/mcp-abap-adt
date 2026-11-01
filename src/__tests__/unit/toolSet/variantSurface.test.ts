@@ -1,8 +1,9 @@
 /**
  * The tool set each declared variant registers, read from the server as a
  * client reads it (`tools/list`, stdio over an in-memory transport): for each
- * of the four kinds of binary, the tools listed and, for the compact tools
- * whose members pick the API, the members their enum lists.
+ * of the four kinds of binary, the tools listed and, for the tools whose
+ * members pick the API, the members their enum lists and the properties
+ * their schema lists.
  *
  * The variant is the process's declared system type (`SAP_SYSTEM_TYPE`):
  * `onprem` and `legacy` read `ADT_TYPES_ONPREM`, `cloud` reads
@@ -75,6 +76,8 @@ interface KindSurface {
   argumentDescriptions: Record<string, string>;
   /** The description of each tool with a projected argument. */
   descriptions: Record<string, string>;
+  /** The properties each tool with a projected argument lists, in schema order. */
+  properties: Record<string, string[]>;
 }
 
 type Surface = Record<SapEnvironment, Record<ToolSetKind, KindSurface>>;
@@ -105,6 +108,7 @@ async function surfaceOf(
     const members: Record<string, string[]> = {};
     const argumentDescriptions: Record<string, string> = {};
     const descriptions: Record<string, string> = {};
+    const properties: Record<string, string[]> = {};
     for (const tool of tools) {
       for (const projected of PROJECTED_ARGUMENTS) {
         if (projected.tool !== tool.name) continue;
@@ -119,6 +123,7 @@ async function surfaceOf(
           argumentDescriptions[key] = described;
         }
         descriptions[tool.name] = tool.description ?? '';
+        properties[tool.name] = Object.keys(tool.inputSchema.properties ?? {});
       }
     }
     const sorted = <T>(record: Record<string, T>): Record<string, T> =>
@@ -130,6 +135,7 @@ async function surfaceOf(
       members: sorted(members),
       argumentDescriptions: sorted(argumentDescriptions),
       descriptions: sorted(descriptions),
+      properties: sorted(properties),
     };
   } finally {
     await client.close();

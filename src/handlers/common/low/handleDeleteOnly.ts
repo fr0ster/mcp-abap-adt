@@ -27,6 +27,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   DELETION_CHECK_TYPES,
+  DELETION_NAME_FIELDS,
   EMPTIED_INCLUDE_TYPES,
 } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -43,31 +44,6 @@ import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { DELETION_TARGETS } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
-
-/** The argument naming the object, per type a deletion request removes. */
-export const DELETION_NAME_FIELDS: Readonly<
-  Record<(typeof DELETION_CHECK_TYPES)[number], string>
-> = {
-  PACKAGE: 'package_name',
-  DOMAIN: 'domain_name',
-  DATA_ELEMENT: 'data_element_name',
-  TABLE: 'table_name',
-  STRUCTURE: 'structure_name',
-  TABLE_TYPE: 'table_type_name',
-  DDL: 'ddl_name',
-  SERVICE_DEFINITION: 'service_definition_name',
-  SERVICE_BINDING: 'service_binding_name',
-  CLASS: 'class_name',
-  CDS_UNIT_TEST: 'class_name',
-  PROGRAM: 'program_name',
-  INCLUDE: 'include_name',
-  INTERFACE: 'interface_name',
-  FUNCTION_GROUP: 'function_group_name',
-  FUNCTION_MODULE: 'function_module_name',
-  BEHAVIOR_DEFINITION: 'behavior_definition_name',
-  BEHAVIOR_IMPLEMENTATION: 'behavior_implementation_name',
-  METADATA_EXTENSION: 'metadata_extension_name',
-};
 
 type Args = Record<string, unknown> & {
   object_type?: string;

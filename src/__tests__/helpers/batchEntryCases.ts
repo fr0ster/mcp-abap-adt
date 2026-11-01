@@ -79,6 +79,7 @@ const PART_READS: Array<[string, Record<string, unknown>]> = [
 const FULL: BatchEntryCase[] = [
   { tool: 'GetPackage', args: { package_name: 'PKG_A' } },
   { tool: 'GetDomain', args: { domain_name: 'DOM_A' } },
+  { tool: 'GetTableType', args: { table_type_name: 'TTYP_A' } },
   { tool: 'GetDataElement', args: { data_element_name: 'DTEL_A' } },
   { tool: 'GetTable', args: { table_name: 'TAB_A' } },
   { tool: 'GetStructure', args: { structure_name: 'STRU_A' } },

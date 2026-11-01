@@ -12,6 +12,12 @@
     "sends": "GET /sap/bc/adt/ddic/domains/{name}"
   },
   {
+    "tool": "GetTableType",
+    "set": "full",
+    "handler": "src/handlers/table_type/high/handleGetTableType.ts#handleGetTableType",
+    "sends": "GET /sap/bc/adt/ddic/tabletypes/{name}"
+  },
+  {
     "tool": "GetDataElement",
     "set": "full",
     "handler": "src/handlers/data_element/high/handleGetDataElement.ts#handleGetDataElement",

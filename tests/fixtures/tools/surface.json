@@ -145,6 +145,12 @@
   },
   {
     "group": "readonly",
+    "name": "GetTableType",
+    "inputs": "table_type_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
     "name": "GetFunctionGroup",
     "inputs": "function_group_name*, version",
     "available_in": "cloud, onprem"
@@ -369,6 +375,12 @@
     "group": "high",
     "name": "GetDomain",
     "inputs": "domain_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetTableType",
+    "inputs": "table_type_name*",
     "available_in": "cloud, onprem"
   },
   {

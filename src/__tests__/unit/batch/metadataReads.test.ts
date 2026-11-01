@@ -194,7 +194,9 @@ const EXCLUDED: Record<string, string> = {
   'include/readonly/handleGetIncludesList.ts':
     "a class's metadata, read to find its includes",
   'system/readonly/handleGetTypeInfo.ts':
-    'a type name read as a data element, a domain, a structure and a table type; the table type has no Get handler, so its read is its own',
+    'a type name read as a data element, a domain, a structure and a table type; the table type read is the shared one of GetTableType, which the batch does not use',
+  'table_type/high/handleGetTableType.ts':
+    "a table type's metadata; the package walk does not read table types, so the batch has no read of the type",
 };
 
 const HANDLERS_DIR = join(__dirname, '../../../handlers');

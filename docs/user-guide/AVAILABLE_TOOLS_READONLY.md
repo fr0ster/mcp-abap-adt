@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 70
+- Total tools: 71
 
 ## Navigation
 
@@ -101,6 +101,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
     - [GetTable](#gettable-read-only-table)
+  - [Table Type](#read-only-table-type)
+    - [GetTableType](#gettabletype-read-only-table-type)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
@@ -1017,6 +1019,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+
+---
+
+<a id="read-only-table-type"></a>
+### Read-Only / Table Type
+
+<a id="gettabletype-read-only-table-type"></a>
+#### GetTableType (Read-Only / Table Type)
+**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description). Returns it under `metadata`, with `part: "metadata"`.
+
+**Source:** `src/handlers/table_type/high/handleGetTableType.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - Table type name.
 
 ---
 

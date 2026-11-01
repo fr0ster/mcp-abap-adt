@@ -2685,6 +2685,29 @@
     ],
     "semantic": "Show the rows (data) stored in a database table or returned by a CDS view, like SE16."
   },
+  "GetTableType": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "open",
+      "look at",
+      "definition",
+      "metadata",
+      "package",
+      "description",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Show the definition of an ABAP table type: its row type, access type and key."
+  },
   "GetTableVersionDiff": {
     "keywords": [
       "compare versions",

@@ -111,6 +111,7 @@ const SOURCE_TYPES: SourceType[] = [
 
 const METADATA_ONLY: Array<[string, Record<string, unknown>]> = [
   ['GetDomain', { domain_name: 'DOM_A' }],
+  ['GetTableType', { table_type_name: 'TTYP_A' }],
   ['GetDataElement', { data_element_name: 'DTEL_A' }],
   ['GetFunctionGroup', { function_group_name: 'FUGR_A' }],
   ['GetPackage', { package_name: 'PKG_A' }],

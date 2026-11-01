@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 268
-- Read-only tools: 65
-- High-level tools: 166
+- Total tools: 270
+- Read-only tools: 66
+- High-level tools: 167
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -110,6 +110,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Table](#read-only-table)
     - [GetTable](#gettable-read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
+  - [Table Type](#read-only-table-type)
+    - [GetTableType](#gettabletype-read-only-table-type)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
@@ -280,6 +282,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [DeleteTable](#deletetable-high-level-table)
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
+  - [Table Type](#high-level-table-type)
+    - [GetTableType](#gettabletype-high-level-table-type)
   - [Transport](#high-level-transport)
     - [AddTransportObject](#addtransportobject-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
@@ -1193,6 +1197,20 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - None
+
+---
+
+<a id="read-only-table-type"></a>
+### Read-Only / Table Type
+
+<a id="gettabletype-read-only-table-type"></a>
+#### GetTableType (Read-Only / Table Type)
+**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description). Returns it under `metadata`, with `part: "metadata"`.
+
+**Source:** `src/handlers/table_type/high/handleGetTableType.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - Table type name.
 
 ---
 
@@ -3224,6 +3242,20 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
 - `table_name` (string, required) - Table name. Table must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
+
+---
+
+<a id="high-level-table-type"></a>
+### High-Level / Table Type
+
+<a id="gettabletype-high-level-table-type"></a>
+#### GetTableType (High-Level / Table Type)
+**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description). Returns it under `metadata`, with `part: "metadata"`.
+
+**Source:** `src/handlers/table_type/high/handleGetTableType.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - Table type name.
 
 ---
 

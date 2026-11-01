@@ -79,6 +79,7 @@ const TOOL_NEEDS_BY_NAME = {
   GetDataElement: { api: 'dataElement', operation: 'readMetadata' },
   GetDdl: { api: 'ddl', operation: 'read' },
   GetDomain: { api: 'domain', operation: 'readMetadata' },
+  GetTableType: { api: 'tableType', operation: 'readMetadata' },
   GetFunctionGroup: { api: 'functionGroup', operation: 'read' },
   GetFunctionInclude: { api: 'functionInclude', operation: 'read' },
   GetFunctionModule: { api: 'functionModule', operation: 'read' },

@@ -8,6 +8,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { corpusBody } from '../../lib/adtCorpus';
 import { createAdtClient } from '../../lib/clients';
 import {
   METADATA_READ_TYPES,
@@ -69,8 +70,9 @@ describe('the shared include and table-type metadata reads', () => {
   });
 
   it('readTableTypeMetadata sends one GET to the table type and answers its document as sent', async () => {
-    const document =
-      '<?xml version="1.0"?><ttyp:tableType xmlns:ttyp="http://www.sap.com/dictionary/tabletype"/>';
+    const document = corpusBody(
+      'read-metadata-table-type--01-tabletypes-string_table',
+    );
     const { client, sent } = systemAnswering(document);
 
     const response = await readTableTypeMetadata(client, {

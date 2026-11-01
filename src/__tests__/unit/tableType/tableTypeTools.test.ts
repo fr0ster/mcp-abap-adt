@@ -45,8 +45,9 @@ afterEach(() => {
   else process.env.SAP_SYSTEM_TYPE = previous;
 });
 
-const TABLE_TYPE_XML =
-  '<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcore:name="ZTT_X" xmlns:ttyp="http://www.sap.com/dictionary/tabletype"/>';
+const TABLE_TYPE_XML = corpusBody(
+  'read-metadata-table-type--01-tabletypes-string_table',
+);
 
 describe('GetTableType', () => {
   it('sends one GET to the table type, and answers the document under metadata', async () => {
@@ -131,25 +132,14 @@ const textOf = (result: {
   return first?.text ?? '';
 };
 
-/** What the server answers a read of an existing table type with. */
-const STRING_TABLE = `<?xml version="1.0" encoding="utf-8"?>
-<ttyp:tableType adtcore:name="ZTT_X" adtcore:type="TTYP/DA" adtcore:description="before" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zp" adtcore:type="DEVC/K" adtcore:name="ZP"/>
-  <ttyp:rowType>
-    <ttyp:typeKind>predefinedAbapType</ttyp:typeKind>
-    <ttyp:typeName/>
-    <ttyp:builtInType>
-      <ttyp:dataType>STRING</ttyp:dataType>
-      <ttyp:length>000000</ttyp:length>
-      <ttyp:decimals>000000</ttyp:decimals>
-    </ttyp:builtInType>
-  </ttyp:rowType>
-  <ttyp:accessType>standard</ttyp:accessType>
-  <ttyp:primaryKey ttyp:isVisible="true">
-    <ttyp:definition>standard</ttyp:definition>
-    <ttyp:kind>nonUnique</ttyp:kind>
-  </ttyp:primaryKey>
-</ttyp:tableType>`;
+/**
+ * What the server answers a read of an existing table type with: SAP's whole
+ * document for STRING_TABLE (the corpus fixture). The handlers address the
+ * object by the URL, so the document's own name is not the one asked for.
+ */
+const STRING_TABLE = corpusBody(
+  'read-metadata-table-type--01-tabletypes-string_table',
+);
 
 const TTYP = '/sap/bc/adt/ddic/tabletypes';
 const HANDLE = 'B92E65858E83454C783181344F429D4BFD8E395D';
@@ -230,7 +220,7 @@ describe('CreateTableType', () => {
       )
         .replace('<ttyp:typeName/>', '<ttyp:typeName>MARA</ttyp:typeName>')
         .replace(
-          'adtcore:description="before"',
+          'adtcore:description="Tabelle von Strings"',
           'adtcore:description="A table type"',
         ),
     );

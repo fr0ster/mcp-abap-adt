@@ -6,10 +6,12 @@
  * members', a `404` is the kind's absence, any other refusal is the call's.
  *
  * The documents are E19's own (2026-10-24, SAP-delivered objects), trimmed to
- * the fields read and without their author attributes.
+ * the fields read and without their author attributes, except the table
+ * type's: SAP's whole answer, from the corpus.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
+import { corpusBody } from '../../lib/adtCorpus';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -80,24 +82,10 @@ const SYST_STRUCTURE = `<?xml version="1.0" encoding="utf-8"?>
   <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sabp_types" adtcore:type="DEVC/K" adtcore:name="SABP_TYPES"/>
 </blue:blueSource>`;
 
-const STRING_TABLE = `<?xml version="1.0" encoding="utf-8"?>
-<ttyp:tableType adtcore:name="STRING_TABLE" adtcore:type="TTYP/DA" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" ${ADTCORE}>
-  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sool" adtcore:type="DEVC/K" adtcore:name="SOOL"/>
-  <ttyp:rowType>
-    <ttyp:typeKind>predefinedAbapType</ttyp:typeKind>
-    <ttyp:typeName/>
-    <ttyp:builtInType>
-      <ttyp:dataType>STRING</ttyp:dataType>
-      <ttyp:length>000000</ttyp:length>
-      <ttyp:decimals>000000</ttyp:decimals>
-    </ttyp:builtInType>
-  </ttyp:rowType>
-  <ttyp:accessType>standard</ttyp:accessType>
-  <ttyp:primaryKey ttyp:isVisible="true">
-    <ttyp:definition>standard</ttyp:definition>
-    <ttyp:kind>nonUnique</ttyp:kind>
-  </ttyp:primaryKey>
-</ttyp:tableType>`;
+/** STRING_TABLE as SAP sends it (the corpus fixture), value lists and all. */
+const STRING_TABLE = corpusBody(
+  'read-metadata-table-type--01-tabletypes-string_table',
+);
 
 const failedWith = (status: number) =>
   Object.assign(new Error(`Request failed with status code ${status}`), {
@@ -265,7 +253,7 @@ describe('GetTypeInfo', () => {
       {
         objectType: 'table_type',
         name: 'STRING_TABLE',
-        description: undefined,
+        description: 'Tabelle von Strings',
         package: 'SOOL',
         rowType: {
           typeKind: 'predefinedAbapType',

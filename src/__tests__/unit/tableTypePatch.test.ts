@@ -1,25 +1,15 @@
+import { corpusBody } from '../../lib/adtCorpus';
 import { patchTableTypeXml } from '../../lib/strategies/tableTypePatch';
 import { XmlPatchError } from '../../lib/strategies/xmlPatch';
 
-/** The document ADT answers for a table type, as `getTypeInfo.test.ts` has it. */
-const TABLE_TYPE = `<?xml version="1.0" encoding="utf-8"?>
-<ttyp:tableType adtcore:name="STRING_TABLE" adtcore:type="TTYP/DA" adtcore:description="before" adtcore:masterLanguage="EN" abapLanguageVersion="standard" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sool" adtcore:type="DEVC/K" adtcore:name="SOOL"/>
-  <ttyp:rowType>
-    <ttyp:typeKind>predefinedAbapType</ttyp:typeKind>
-    <ttyp:typeName/>
-    <ttyp:builtInType>
-      <ttyp:dataType>STRING</ttyp:dataType>
-      <ttyp:length>000000</ttyp:length>
-      <ttyp:decimals>000000</ttyp:decimals>
-    </ttyp:builtInType>
-  </ttyp:rowType>
-  <ttyp:accessType>standard</ttyp:accessType>
-  <ttyp:primaryKey ttyp:isVisible="true">
-    <ttyp:definition>standard</ttyp:definition>
-    <ttyp:kind>nonUnique</ttyp:kind>
-  </ttyp:primaryKey>
-</ttyp:tableType>`;
+/**
+ * The document SAP answers for STRING_TABLE, byte for byte (the corpus
+ * fixture): root description, a package reference with a description of its
+ * own, and the value lists every ttyp answer carries.
+ */
+const TABLE_TYPE = corpusBody(
+  'read-metadata-table-type--01-tabletypes-string_table',
+);
 
 /** The document with one exact piece replaced: what a single patch must equal. */
 const changing = (from: string, to: string): string => {
@@ -36,7 +26,7 @@ describe('patching a table type changes what was asked and nothing else', () => 
     [
       'description',
       { description: 'after' },
-      'adtcore:description="before"',
+      'adtcore:description="Tabelle von Strings"',
       'adtcore:description="after"',
     ],
     [
@@ -77,9 +67,9 @@ describe('patching a table type changes what was asked and nothing else', () => 
     ],
     [
       'key_definition',
-      { key_definition: 'componentList' },
+      { key_definition: 'keyComponents' },
       '<ttyp:definition>standard</ttyp:definition>',
-      '<ttyp:definition>componentList</ttyp:definition>',
+      '<ttyp:definition>keyComponents</ttyp:definition>',
     ],
     [
       'key_kind',
@@ -89,6 +79,40 @@ describe('patching a table type changes what was asked and nothing else', () => 
     ],
   ])('%s: only that element changes', (_name, changes, from, to) => {
     expect(patchTableTypeXml(TABLE_TYPE, changes)).toBe(changing(from, to));
+  });
+
+  it('changes the description of the root and of nothing else with a description', () => {
+    const out = patchTableTypeXml(TABLE_TYPE, { description: 'after' });
+    expect(out).toBe(
+      changing(
+        'adtcore:description="Tabelle von Strings"',
+        'adtcore:description="after"',
+      ),
+    );
+    expect(out).toContain(
+      'adtcore:name="SOOL" adtcore:description="Object-Oriented Basis Classes"',
+    );
+    expect(out).toContain('adtcore:descriptionTextLimit="60"');
+    expect(out.match(/ttyp:description=""/g)).toHaveLength(
+      TABLE_TYPE.match(/ttyp:description=""/g)?.length ?? -1,
+    );
+  });
+
+  it.each([
+    ['row_type_kind', { row_type_kind: 'dictionaryType' }],
+    ['row_type_name', { row_type_name: 'MARA' }],
+    ['data_type', { data_type: 'CHAR' }],
+    ['length', { length: 10 }],
+    ['decimals', { decimals: 2 }],
+    ['access_type', { access_type: 'sorted' }],
+    ['key_definition', { key_definition: 'rowType' }],
+    ['key_kind', { key_kind: 'unique' }],
+  ])('%s: the value lists SAP sends are left as they are', (_name, changes) => {
+    const valueHelps = (xml: string) =>
+      xml.slice(xml.indexOf('<ttyp:valueHelps>'));
+    expect(valueHelps(patchTableTypeXml(TABLE_TYPE, changes))).toBe(
+      valueHelps(TABLE_TYPE),
+    );
   });
 
   it('truncates a description to 60 characters', () => {

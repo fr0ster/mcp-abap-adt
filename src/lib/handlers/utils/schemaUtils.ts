@@ -118,3 +118,18 @@ function typeOf(schema: any): z.ZodTypeAny {
       return z.any();
   }
 }
+
+/**
+ * The schema a tool is registered with on the SDK: a JSON Schema object
+ * (`type: 'object'` with `properties`) converted to Zod
+ * (`jsonSchemaToZod`), anything else as it is. The one conversion every
+ * registration path uses.
+ */
+export function registeredSchema(inputSchema: any): any {
+  return inputSchema &&
+    typeof inputSchema === 'object' &&
+    inputSchema.type === 'object' &&
+    inputSchema.properties
+    ? jsonSchemaToZod(inputSchema)
+    : inputSchema;
+}

@@ -81,7 +81,7 @@ import type {
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
-import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import { registeredSchema } from '../lib/handlers/utils/schemaUtils.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
   type ClaimedSession,
@@ -1715,14 +1715,8 @@ export abstract class BaseMcpServer extends McpServer {
             this.trackCall(toolName, (signal) =>
               runCall(declared ? withoutStateHandle(args) : args, signal),
             );
-          // Convert JSON Schema to Zod if needed, otherwise pass as-is
-          const zodSchema =
-            inputSchema &&
-            typeof inputSchema === 'object' &&
-            inputSchema.type === 'object' &&
-            inputSchema.properties
-              ? jsonSchemaToZod(inputSchema)
-              : inputSchema;
+          // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
+          const zodSchema = registeredSchema(inputSchema);
 
           // Register wrapped handler via SDK registerTool, with the
           // description the declared variant serves beside its schema.

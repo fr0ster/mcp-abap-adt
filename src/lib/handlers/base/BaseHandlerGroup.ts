@@ -28,7 +28,7 @@ import type {
   SapEnvironment,
   ToolHandler,
 } from '../interfaces.js';
-import { jsonSchemaToZod } from '../utils/schemaUtils.js';
+import { registeredSchema } from '../utils/schemaUtils.js';
 
 /**
  * Base class for handler groups
@@ -99,14 +99,8 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     handler: ToolHandler,
     search: { _meta?: Record<string, unknown> } = {},
   ): void {
-    // Convert JSON Schema to Zod if needed, otherwise pass as-is
-    const zodSchema =
-      inputSchema &&
-      typeof inputSchema === 'object' &&
-      inputSchema.type === 'object' &&
-      inputSchema.properties
-        ? jsonSchemaToZod(inputSchema)
-        : inputSchema;
+    // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
+    const zodSchema = registeredSchema(inputSchema);
 
     server.registerTool(
       toolName,

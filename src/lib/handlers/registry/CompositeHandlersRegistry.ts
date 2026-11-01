@@ -8,7 +8,7 @@ import type {
   ToolDefinition,
   ToolHandler,
 } from '../interfaces.js';
-import { jsonSchemaToZod } from '../utils/schemaUtils.js';
+import { registeredSchema } from '../utils/schemaUtils.js';
 
 /**
  * Composite handlers registry that accepts multiple handler groups via Dependency Injection
@@ -117,13 +117,8 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     // A JSON Schema is converted to Zod, as a group registers it; the SDK
     // takes nothing else.
     const { inputSchema } = listed;
-    const zodSchema =
-      inputSchema &&
-      typeof inputSchema === 'object' &&
-      inputSchema.type === 'object' &&
-      inputSchema.properties
-        ? jsonSchemaToZod(inputSchema)
-        : inputSchema;
+    // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
+    const zodSchema = registeredSchema(inputSchema);
     server.registerTool(
       toolName,
       {

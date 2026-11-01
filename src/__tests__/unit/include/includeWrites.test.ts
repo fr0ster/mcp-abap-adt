@@ -4,7 +4,10 @@
  * sending anything.
  */
 
-import { handleCreateInclude } from '../../../handlers/include/high/handleCreateInclude';
+import {
+  TOOL_DEFINITION as CREATE_INCLUDE,
+  handleCreateInclude,
+} from '../../../handlers/include/high/handleCreateInclude';
 import { handleDeleteInclude } from '../../../handlers/include/high/handleDeleteInclude';
 import { handleUpdateInclude } from '../../../handlers/include/high/handleUpdateInclude';
 import { handleUpdateIncludeMetadata } from '../../../handlers/include/high/handleUpdateIncludeMetadata';
@@ -40,6 +43,12 @@ const INCLUDES = '/sap/bc/adt/programs/includes';
 const PAIR = 'application/vnd.sap.adt.programs.includes.v2+xml';
 
 describe('CreateInclude', () => {
+  it('says SAP writes its comment header into the new include (measured)', () => {
+    const { description } = CREATE_INCLUDE;
+    expect(description.includes('comment header')).toBe(true);
+    expect(description.toLowerCase().includes('empty')).toBe(false);
+  });
+
   it('sends one POST to the includes collection, stateless, with the include document', async () => {
     const connection = recordingConnection();
     const result: any = await handleCreateInclude(

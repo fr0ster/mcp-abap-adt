@@ -23,14 +23,15 @@ What you do now (on premise; ABAP cloud holds no program include of yours):
 
 | You sent | 23.0 |
 |---|---|
-| `CreateProgram` `{ program_name, program_type: 'include', package_name }` | `CreateInclude` `{ include_name, package_name }` — the include created inactive and empty — then `UpdateInclude` `{ include_name, source_code, activate: true }` |
+| `CreateProgram` `{ program_name, program_type: 'include', package_name }` | `CreateInclude` `{ include_name, package_name }` — the include created inactive, holding the comment header SAP writes into a new include — then `UpdateInclude` `{ include_name, source_code, activate: true }` |
 | compact `HandlerCreate` `{ object_type: 'PROGRAM', program_type: 'include', … }` | `HandlerCreate` `{ object_type: 'INCLUDE', include_name, package_name }`, then `HandlerLock`, `HandlerUpdate` `INCLUDE` with the `lock_handle`, `HandlerUnlock`, `HandlerActivate` |
 
 ## The new tools
 
 Program includes, on premise (the full binaries):
 
-- `CreateInclude` — the create alone, in `package_name`; the include is created inactive and empty.
+- `CreateInclude` — the create alone, in `package_name`; the include is created inactive, holding
+  the comment header SAP writes into a new include (measured on premise).
 - `UpdateInclude` — `source_code` as the whole source: lock, write, unlock, and the activation
   when `activate` is true.
 - `UpdateIncludeMetadata` — a metadata document as the include's whole stored metadata, under the

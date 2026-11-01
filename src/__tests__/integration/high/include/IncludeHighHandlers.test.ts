@@ -257,7 +257,7 @@ describe('Include High-Level Handlers Integration', () => {
         );
         created.push({ kind: 'package', name: PACKAGE });
 
-        // CreateInclude: inactive and empty.
+        // CreateInclude: inactive, with the comment header SAP writes.
         await must(`CreateInclude ${INCLUDE}`, () =>
           handleCreateInclude(context, {
             include_name: INCLUDE,

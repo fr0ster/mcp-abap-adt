@@ -3,7 +3,8 @@
  *
  * One request, the create alone, as `CreateProgram`: `POST` to the includes
  * collection with an `include:abapInclude` document. The include is created
- * inactive and empty; its source is written by a later call. The client is
+ * inactive, and SAP writes a comment header into it (measured on premise,
+ * 2026-11-01); its source is written by a later call. The client is
  * the on-premise one, so a connection declared otherwise is refused
  * `variant_not_served` before anything is sent.
  */
@@ -24,7 +25,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateInclude',
   available_in: ['onprem'] as const,
   description:
-    'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written afterwards.',
+    'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

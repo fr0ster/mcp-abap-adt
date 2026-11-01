@@ -28,10 +28,10 @@ run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-on premise, stdio / Streamable HTTP / SSE: core 271 / 271 / 269 (with the 3 batch tools and the
+on premise, stdio / Streamable HTTP / SSE: core 269 / 269 / 267 (with the 3 batch tools and the
 debugger batch's 2); core-ro 71 / 72 / 70 (each with the 3 batch tools); compact 40 / 39 / 38 (29 +
 4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 19 / 19 / 18
-(17 + `HandlerBatch`). On cloud, stdio: core 258 (the include writes and the program writes are on
+(17 + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
 premise only), core-ro 70, compact 40, compact-ro 19. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`

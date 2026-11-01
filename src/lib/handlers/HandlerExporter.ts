@@ -31,12 +31,6 @@ import {
 } from './utils/handlerCall.js';
 
 /**
- * Why `new HandlerExporter({ includeDebug: true })` is refused.
- */
-export const EXPORTER_NO_DEBUGGER_WORDS =
-  'HandlerExporter serves no debugger tools: they need the debugger and state of a server instance (EmbeddableMcpServer); includeDebug is refused';
-
-/**
  * The run tools as the exporter hands them out: without `background`, since
  * it keeps no background-run store (`withoutBackgroundParameter`).
  */
@@ -91,14 +85,6 @@ export interface HandlerExporterOptions {
    * @default true
    */
   includeSearch?: boolean;
-
-  /**
-   * Refused when `true`: the debugger tools need a server instance's
-   * debugger and state (`EmbeddableMcpServer`), which an exporter does not
-   * keep — `new HandlerExporter({ includeDebug: true })` throws
-   * `EXPORTER_NO_DEBUGGER_WORDS`. The exporter hands out no debugger tool.
-   */
-  includeDebug?: boolean;
 
   /**
    * The SAP system kind the handlers serve, for a connection the factory
@@ -174,10 +160,6 @@ export class HandlerExporter {
     this.systemType = options?.systemType;
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
-    // The debugger tools need a server instance's debugger and state.
-    if (options?.includeDebug === true) {
-      throw new Error(EXPORTER_NO_DEBUGGER_WORDS);
-    }
 
     // Create dummy context for group instantiation. A call's real context
     // is given by the server instance (BaseMcpServer.registerHandlers(), via

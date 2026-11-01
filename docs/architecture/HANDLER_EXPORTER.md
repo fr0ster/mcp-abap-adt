@@ -62,8 +62,8 @@ that would reach a system is refused `system_type_required` before anything is s
 The exporter keeps no background-run store and no debugger, so it hands out neither, on every
 path (`getHandlerEntries()`, `createRegistry()`, `registerOnServer`): no background-run tool
 (`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`), no `background` parameter on
-`RuntimeRunClass` / `RuntimeRunProgram`, and no debugger tool — `includeDebug: true` is refused
-when the exporter is constructed. A server instance (`EmbeddableMcpServer`) serves them.
+`RuntimeRunClass` / `RuntimeRunProgram`, and no debugger tool (its options have no
+`includeDebug`). A server instance (`EmbeddableMcpServer`) serves them.
 
 ## Connection Provider
 

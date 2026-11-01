@@ -4,7 +4,8 @@
  * registered on a plain `McpServer`, `registerOnServer`): it keeps no
  * background-run store and no debugger, so the background-run tools, the
  * debugger tools and the run tools' `background` parameter are not there,
- * and `includeDebug: true` is refused at construction.
+ * and its options have no `includeDebug` (a typecheck case:
+ * src/__tests__/typecheck/handlerExporterGuide.typecheck.ts).
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -12,10 +13,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
-import {
-  EXPORTER_NO_DEBUGGER_WORDS,
-  HandlerExporter,
-} from '../../../lib/handlers/HandlerExporter';
+import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { SapEnvironment } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { countingConnection } from '../../helpers/batchHarness';
@@ -97,21 +95,5 @@ describe('HandlerExporter getToolNames', () => {
     expect(LEFT_OUT).toEqual(
       expect.arrayContaining(['GetBackgroundRun', 'DebugStartListener']),
     );
-  });
-});
-
-describe('HandlerExporter includeDebug', () => {
-  it('true is refused at construction, in fixed words', () => {
-    expect(
-      () => new HandlerExporter({ systemType: 'onprem', includeDebug: true }),
-    ).toThrow(EXPORTER_NO_DEBUGGER_WORDS);
-  });
-
-  it('false constructs, with no debugger tool', () => {
-    expect(
-      new HandlerExporter({ systemType: 'onprem', includeDebug: false })
-        .getToolNames()
-        .filter((name) => LEFT_OUT.includes(name)),
-    ).toEqual([]);
   });
 });

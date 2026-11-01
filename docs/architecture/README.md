@@ -119,7 +119,7 @@ the call's answer (a failure the server's reader knows — a chain failure of th
 `ServerRefusal`, a `401` — as it came; anything else `connection_provider_failed`), and the
 handler does not run. The listing is the plain registration's below. The exporter keeps no
 background-run store and no debugger, so it hands out neither (no background-run tool, no
-`background` parameter, no debugger tool; `includeDebug: true` is refused). An
+`background` parameter, no debugger tool; its options have no `includeDebug`). An
 `EmbeddableMcpServer` (`@mcp-abap-adt/lib/embeddable`, `connection` and
 `handlersRegistry: exporter.createRegistry()`) serves the same registry as a server instance. See
 [the Handler Exporter guide](HANDLER_EXPORTER.md).

@@ -27,7 +27,7 @@ mcp-abap-adt-ro         # no debugger (nor -http-ro, -sse-ro, -compact-ro, -comp
 Where a breakpoint must not be possible, install a `-ro` binary. An embedder adds
 `DebugHandlersGroup` from `@mcp-abap-adt/lib/handlers` to the registry of a server instance
 (`EmbeddableMcpServer`), which keeps the debugger and its state. `HandlerExporter` serves no
-debugger tool: `includeDebug: true` is refused when it is constructed.
+debugger tool, and its options have no `includeDebug`.
 
 ## Scope: what it debugs
 

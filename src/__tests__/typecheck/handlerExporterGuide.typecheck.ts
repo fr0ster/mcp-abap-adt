@@ -187,3 +187,11 @@ declare function heldConnection(): HandlerContext['connection'];
 export const perCall: CallContext = async () => ({
   connection: heldConnection(),
 });
+
+// HandlerExporterOptions has no `includeDebug`: the debugger is served by
+// EmbeddableMcpServer. This line fails the check the moment the option exists again.
+export const noDebugOption = new HandlerExporter({
+  systemType: 'onprem',
+  // @ts-expect-error HandlerExporterOptions has no includeDebug
+  includeDebug: true,
+});

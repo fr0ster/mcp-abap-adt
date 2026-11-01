@@ -520,7 +520,7 @@ export const COMPACT_READ_TAKES = takesOf<
     DATA_ELEMENT: ['data_element_name', 'version'],
     TABLE: ['table_name', 'version'],
     STRUCTURE: ['structure_name', 'version'],
-    TABLE_TYPE: ['table_type_name'],
+    TABLE_TYPE: ['table_type_name', 'version'],
     DDL: ['ddl_name', 'version'],
     SERVICE_DEFINITION: ['service_definition_name', 'version'],
     SERVICE_BINDING: ['service_binding_name', 'response_format'],

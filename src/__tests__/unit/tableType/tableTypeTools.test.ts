@@ -4,6 +4,7 @@
  * sending anything.
  */
 
+import { readTableType } from '../../../../compact-readonly-entries/src/handlers/compactReadRoutes';
 import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
 import { handleGetObjectVersions } from '../../../handlers/common/readonly/handleGetObjectVersions';
 import { handleCheckTableType } from '../../../handlers/table_type/high/handleCheckTableType';
@@ -12,13 +13,18 @@ import {
   handleCreateTableType,
 } from '../../../handlers/table_type/high/handleCreateTableType';
 import { handleDeleteTableType } from '../../../handlers/table_type/high/handleDeleteTableType';
-import { handleGetTableType } from '../../../handlers/table_type/high/handleGetTableType';
+import {
+  TOOL_DEFINITION as GET_TABLE_TYPE,
+  handleGetTableType,
+} from '../../../handlers/table_type/high/handleGetTableType';
 import {
   handleUpdateTableType,
   TOOL_DEFINITION as UpdateTableType_Tool,
 } from '../../../handlers/table_type/high/handleUpdateTableType';
 import { handleActivateTableType } from '../../../handlers/table_type/low/handleActivateTableType';
 import { corpusBody } from '../../../lib/adtCorpus';
+import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
+import { READ_VERSION_PROPERTY } from '../../../lib/handlers/readVersion';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -66,9 +72,51 @@ describe('GetTableType', () => {
     expect(answered).toEqual({
       success: true,
       table_type_name: 'ZTT_X',
+      version: 'active',
       part: 'metadata',
       metadata: TABLE_TYPE_XML,
     });
+  });
+
+  it('declares the shared read version, active by default', () => {
+    expect(GET_TABLE_TYPE.inputSchema.properties.version).toBe(
+      READ_VERSION_PROPERTY,
+    );
+  });
+
+  it.each(READ_VERSION_PROPERTY.enum)(
+    'reads the version given (%s), and answers it',
+    async (version) => {
+      const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
+      const result = await handleGetTableType(
+        { connection, logger: undefined },
+        { table_type_name: 'ztt_x', version },
+      );
+      expect(connection.requests.map((r) => r.url)).toEqual([
+        `/sap/bc/adt/ddic/tabletypes/ztt_x?version=${version}`,
+      ]);
+      const first = result.content[0];
+      const answered = JSON.parse(first && 'text' in first ? first.text : '{}');
+      expect(answered.version).toBe(version);
+    },
+  );
+
+  it.each(READ_VERSION_PROPERTY.enum)(
+    'compact HandlerGet TABLE_TYPE passes its version (%s) to the read',
+    async (version) => {
+      const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
+      await readTableType(
+        { connection, logger: undefined },
+        { table_type_name: 'ztt_x', version },
+      );
+      expect(connection.requests.map((r) => r.url)).toEqual([
+        `/sap/bc/adt/ddic/tabletypes/ztt_x?version=${version}`,
+      ]);
+    },
+  );
+
+  it('compact HandlerGet TABLE_TYPE takes version', () => {
+    expect(COMPACT_READ_TAKES.members.TABLE_TYPE).toContain('version');
   });
 
   it.each([[{}], [{ table_type_name: '' }]])(

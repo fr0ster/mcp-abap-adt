@@ -45,16 +45,36 @@ import {
 import { return_error } from '@mcp-abap-adt/lib/utils';
 
 /**
- * A table type's read: its metadata document, the one part it has. The name
- * arrives from outside the type system, so it is passed on only as a string.
+ * The version a read is asked for, from outside the type system: absent, or
+ * one of the three ADT takes; anything else is an error naming them.
  */
-export const readTableType: CompactHandler = (context, args) =>
-  handleGetTableType(context, {
+function readVersionOf(
+  given: unknown,
+): 'active' | 'inactive' | 'workingArea' | undefined | Error {
+  if (given === undefined) return undefined;
+  if (given === 'active' || given === 'inactive' || given === 'workingArea') {
+    return given;
+  }
+  return new Error('version must be "active", "inactive" or "workingArea"');
+}
+
+/**
+ * A table type's read: its metadata document, the one part it has, at the
+ * version given. The arguments arrive from outside the type system: the name
+ * is passed on only as a string, and a version only as one of the three the
+ * read takes.
+ */
+export const readTableType: CompactHandler = async (context, args) => {
+  const version = readVersionOf(args.version);
+  if (version instanceof Error) return return_error(version);
+  return handleGetTableType(context, {
     table_type_name:
       typeof args.table_type_name === 'string'
         ? args.table_type_name
         : undefined,
+    version,
   });
+};
 
 /**
  * An include's read of `part` (`source` here, `metadata` from the metadata
@@ -65,16 +85,8 @@ export const readTableType: CompactHandler = (context, args) =>
 export const readIncludePart =
   (part: 'source' | 'metadata'): CompactHandler =>
   async (context, args) => {
-    const given = args.version;
-    const version =
-      given === 'active' || given === 'inactive' || given === 'workingArea'
-        ? given
-        : undefined;
-    if (given !== undefined && version === undefined) {
-      return return_error(
-        new Error('version must be "active", "inactive" or "workingArea"'),
-      );
-    }
+    const version = readVersionOf(args.version);
+    if (version instanceof Error) return return_error(version);
     return handleGetIncludePart(context, {
       include_name:
         typeof args.include_name === 'string' ? args.include_name : undefined,

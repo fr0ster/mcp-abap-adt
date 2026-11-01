@@ -309,6 +309,10 @@ describe('the MCP tool surface', () => {
         // The ninth deliberate move (below): GetInclude reads the include's
         // metadata too, `part` and `version` optional.
         'readonly/GetInclude': ['part', 'version'],
+        // The ninth deliberate move too: GetTableType reads at the version
+        // asked, `version` optional (active by default).
+        'readonly/GetTableType': ['version'],
+        'high/GetTableType': ['version'],
         'low/UpdateClassLow': ['transport_request'],
         'low/UpdateClassTestClassesLow': ['transport_request'],
         'low/UpdateDdlLow': ['transport_request'],
@@ -455,7 +459,9 @@ describe('the MCP tool surface', () => {
    * tools of that work: the include tools on premise only, the table-type
    * tools on premise and cloud. `GetInclude` reads the include's metadata
    * too: its row gained `part` and `version` (both optional; without them
-   * the source is read as before). Every other row was checked unchanged.
+   * the source is read as before). `GetTableType` reads at a version: its
+   * row gained `version` (optional, active by default). Every other row was
+   * checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

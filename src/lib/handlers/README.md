@@ -67,8 +67,7 @@ tools through the same code and runs each call on the connection the provider re
 
 With no `systemType` stated, every definition is listed as it is (the on-premise description and
 schema, every member in the search `_meta`), and every call that would reach a system is refused
-`system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says. A connection built
-by `createAbapConnection` keeps the kind it was built for, which is what its calls run on.
+`system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says.
 
 Groups that state different variants are refused at registration, before anything is registered:
 the error names each group and the variant it states (`none` for a group that states none).

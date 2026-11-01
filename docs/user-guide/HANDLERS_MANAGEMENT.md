@@ -347,8 +347,7 @@ as a server instance: the variant's tool set, its descriptions and schemas, and 
 naming only the members it offers; its calls run on that variant. `SAP_SYSTEM_TYPE` is not read
 there, for the listing or for a call. With no `systemType` stated, every definition is listed as it
 is, and every call that would reach a system is refused `system_type_required` before anything is
-sent, whatever `SAP_SYSTEM_TYPE` says (a connection built by `createAbapConnection` keeps the kind
-it was built for). The binaries and `EmbeddableMcpServer` still read `SAP_SYSTEM_TYPE` when no
+sent, whatever `SAP_SYSTEM_TYPE` says. The binaries and `EmbeddableMcpServer` still read `SAP_SYSTEM_TYPE` when no
 `systemType` option is given. Groups that state different variants are refused when they are
 registered, before anything is registered — a variant stated beside none as well; the error names
 each group and what it states (`none` for a group that states none).

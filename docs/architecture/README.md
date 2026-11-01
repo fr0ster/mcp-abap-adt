@@ -82,37 +82,52 @@ A binary is its transport, each reading its own parameter table:
 
 ### Embedding the handlers
 
-For embedding into an existing server (e.g. a CAP/CDS application):
+For embedding into an existing server (e.g. a CAP/CDS application), register the exporter's
+tools on your own SDK `McpServer`; each call runs on the connection your provider returns — one
+you connected and hold:
 
 ```typescript
-import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createConnection } from '@mcp-abap-adt/connection';
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { HandlerExporter } from '@mcp-abap-adt/lib/handlers';
 
 const exporter = new HandlerExporter({
+  systemType: 'onprem',
   includeReadOnly: true,
   includeHighLevel: true,
   includeSystem: true,
   includeSearch: true,
 });
 
-const server = new EmbeddableMcpServer({
-  connection,
-  handlersRegistry: exporter.createRegistry(),
+const connection = createConnection({
+  system: 'onprem',
+  transport: 'http',
+  config: { url: 'https://your-sap-system.com', client: '100', authType: 'basic' },
+  credential: new BasicAuthProvider('user', 'pass'),
 });
+await connection.connect();
+
+const mcpServer = new McpServer({ name: 'my-server', version: '1.0.0' });
+exporter.registerOnServer(mcpServer, () => connection);
 ```
 
-On an SDK `McpServer` of your own, `exporter.registerOnServer(mcpServer, connectionProvider)`
-registers the exporter's tools with a connection per call: the provider (sync or async) is called
-for each call, and the call runs on what it returns; a provider that fails is the call's answer
-(`connection_provider_failed`, or its credential failure as it came), and the handler does not
-run. The listing is the plain registration's below. See
+The provider (sync or async) is called for each call and its connection is used as returned: the
+server never connects or disconnects it — its lifetime (`connect()`, the logoff) is the
+embedder's, who holds one per system and user and picks the request's. A provider that fails is
+the call's answer (a failure the server's reader knows — a chain failure of the credential, a
+`ServerRefusal`, a `401` — as it came; anything else `connection_provider_failed`), and the
+handler does not run. The listing is the plain registration's below. The exporter keeps no
+background-run store and no debugger, so it hands out neither (no background-run tool, no
+`background` parameter, no debugger tool; `includeDebug: true` is refused). An
+`EmbeddableMcpServer` (`@mcp-abap-adt/lib/embeddable`, `connection` and
+`handlersRegistry: exporter.createRegistry()`) serves the same registry as a server instance. See
 [the Handler Exporter guide](HANDLER_EXPORTER.md).
 
 `getHandlerEntries()` and `getToolNames()` give the same handlers without a server. Each handler
 `getHandlerEntries()` hands out runs on the system kind the exporter states (`systemType`), stated on
 the call's connection before it runs; with none stated, a call that would reach a system is refused
-`system_type_required` before anything is sent. `SAP_SYSTEM_TYPE` is not read for it (a connection
-built by `createAbapConnection` keeps the kind it was built for).
+`system_type_required` before anything is sent. `SAP_SYSTEM_TYPE` is not read for it.
 
 Registered on a plain SDK `McpServer` (`registerOnServer`, or a registry's
 `registerAllTools(mcpServer)`), the tools are listed on the variant the exporter states
@@ -121,8 +136,8 @@ and search members, and its calls run on that variant. The exporter's own groups
 (`createRegistry()`) carry no connection, so their calls need `registerOnServer` or a server
 instance. `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call. With no
 `systemType` stated, the definitions are listed as they are and every call that would reach a
-system is refused `system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says
-(a connection built by `createAbapConnection` keeps the kind it was built for). A server instance
+system is refused `system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says.
+A server instance
 (`EmbeddableMcpServer`, the binaries) still reads `SAP_SYSTEM_TYPE` when its `systemType` option
 states none. Groups that state different
 variants — a variant beside none included — are refused when they are registered, before anything

@@ -61,8 +61,14 @@ registry.registerAllTools(mcpServer); // the cloud tools, schemas and descriptio
 
 With no `systemType` stated, every definition is listed as it is (the on-premise description and
 schema, every member in the search `_meta`), and every call that would reach a system is refused
-`system_type_required`. `registerTool` lists a tool on the one variant its registry's groups state;
-groups that state none, or different ones, list it as it is.
+`system_type_required`.
+
+Groups that state different variants are refused at registration, before anything is registered:
+the error names each group and the variant it states (`none` for a group that states none).
+`registerAllTools` takes groups stating one variant beside groups stating none — each group lists
+the variant its own context states. `registerTool`, which belongs to no group, takes only one
+variant stated by every group, or none stated by any (the definition as it is); one group stating
+a variant beside another stating none is refused.
 
 ### Selective Handler Registration
 

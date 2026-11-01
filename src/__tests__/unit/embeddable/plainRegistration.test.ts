@@ -15,6 +15,8 @@ import { compactToolSet } from '../../../../compact/src/launcher';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { noopLogger } from '../../../lib/handlerLogger';
+import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
+import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   IHandlersRegistry,
@@ -183,3 +185,120 @@ describe.each(Object.entries(REGISTRIES))(
     });
   },
 );
+
+/**
+ * Groups that state different variants are refused at registration, before
+ * anything is registered; the error names each group and what it states.
+ * `registerAllTools` takes groups that state one variant beside groups that
+ * state none (each lists as its own context says); `registerTool`, which
+ * belongs to no group, takes only one variant stated by every group, or none
+ * stated by any.
+ */
+describe('a plain registration of groups that state different variants', () => {
+  const searchOn = (systemType?: SapEnvironment) =>
+    new SearchHandlersGroup({
+      ...noConnectionContext(),
+      ...(systemType !== undefined && { systemType }),
+    });
+  const systemOn = (systemType?: SapEnvironment) =>
+    new SystemHandlersGroup({
+      ...noConnectionContext(),
+      ...(systemType !== undefined && { systemType }),
+    });
+
+  /** A server holding one tool of its own, registered first. */
+  const withSentinel = () => {
+    const server = new McpServer({ name: 'sentinel', version: '1.0.0' });
+    server.registerTool('Sentinel', { description: 'Sentinel.' }, async () => ({
+      content: [],
+    }));
+    return server;
+  };
+  const someDefinition = () => {
+    const [entry] = searchOn().getHandlers();
+    if (entry === undefined) throw new Error('the search group has a tool');
+    return entry.toolDefinition;
+  };
+
+  it('registerAllTools refuses cloud beside onprem, naming each group and its variant, and registers nothing', async () => {
+    const registry = new CompositeHandlersRegistry([
+      searchOn('cloud'),
+      systemOn('onprem'),
+    ]);
+    const server = withSentinel();
+    expect(() => registry.registerAllTools(server)).toThrow(
+      'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states onprem',
+    );
+    expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
+      'Sentinel',
+    ]);
+    expect(registry.getRegisteredTools()).toEqual([]);
+  });
+
+  it('registerAllTools takes a group stating a variant beside one stating none', () => {
+    const registry = new CompositeHandlersRegistry([
+      searchOn('cloud'),
+      systemOn(),
+    ]);
+    expect(() => registry.registerAllTools(withSentinel())).not.toThrow();
+  });
+
+  it.each<
+    [string, SapEnvironment | undefined, SapEnvironment | undefined, string]
+  >([
+    [
+      'cloud beside onprem',
+      'cloud',
+      'onprem',
+      'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states onprem',
+    ],
+    [
+      'cloud beside none',
+      'cloud',
+      undefined,
+      'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states none',
+    ],
+  ])(
+    'registerTool refuses %s, naming each group, and registers nothing',
+    async (_label, search, system, words) => {
+      const registry = new CompositeHandlersRegistry([
+        searchOn(search),
+        systemOn(system),
+      ]);
+      const definition = someDefinition();
+      const server = withSentinel();
+      expect(() =>
+        registry.registerTool(
+          server,
+          definition.name,
+          definition,
+          async () => ({
+            content: [],
+          }),
+        ),
+      ).toThrow(words);
+      expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
+        'Sentinel',
+      ]);
+    },
+  );
+
+  it.each<[string, SapEnvironment | undefined]>([
+    ['none stated by any group', undefined],
+    ['cloud stated by every group', 'cloud'],
+  ])('registerTool takes %s', (_label, systemType) => {
+    const registry = new CompositeHandlersRegistry([
+      searchOn(systemType),
+      systemOn(systemType),
+    ]);
+    const definition = someDefinition();
+    expect(() =>
+      registry.registerTool(
+        withSentinel(),
+        definition.name,
+        definition,
+        async () => ({ content: [] }),
+      ),
+    ).not.toThrow();
+  });
+});

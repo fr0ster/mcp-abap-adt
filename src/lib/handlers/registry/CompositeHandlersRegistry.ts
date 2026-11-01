@@ -61,6 +61,15 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * Registers all tools from all handler groups on MCP server
    */
   registerAllTools(server: McpServer): void {
+    // Each group lists the variant its own context states; groups stating
+    // two different ones are refused before anything is registered.
+    this.refuseDifferentVariants(
+      new Set(
+        this.statements().flatMap(({ stated }) =>
+          stated === undefined ? [] : [stated],
+        ),
+      ),
+    );
     this.registeredTools.clear();
 
     for (const group of this.handlerGroups) {
@@ -83,10 +92,11 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   }
 
   /**
-   * Registers a single tool on server, as the variant the registry's groups
-   * state lists it (`listedTool`): left out when that variant does not
-   * serve it. With no group stating a variant, or groups stating different
-   * ones, the definition as it is.
+   * Registers a single tool on server, as the variant every group of the
+   * registry states lists it (`listedTool`): left out when that variant
+   * does not serve it; as it is when no group states one. Groups stating
+   * different variants — one of them none included — are refused before
+   * anything is registered.
    * Note: This method is provided for compatibility, but it's recommended to use handler groups
    */
   registerTool(
@@ -95,7 +105,10 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     toolDefinition: ToolDefinition,
     handler: ToolHandler,
   ): void {
-    const listed = listedTool(toolDefinition, this.statedSystemType());
+    const stated = new Set(this.statements().map(({ stated }) => stated));
+    this.refuseDifferentVariants(stated);
+    const [environment] = stated;
+    const listed = listedTool(toolDefinition, environment);
     if (!listed.listed) return;
     // A JSON Schema is converted to Zod, as a group registers it; the SDK
     // takes nothing else.
@@ -119,19 +132,36 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   }
 
   /**
-   * The one SAP environment the groups state (`BaseHandlerGroup`'s
-   * context); `undefined` when none states one or they state different
-   * ones.
+   * What each group states (`BaseHandlerGroup`'s context); a group of
+   * another kind states none.
    */
-  private statedSystemType(): SapEnvironment | undefined {
-    const stated = new Set<SapEnvironment>();
-    for (const group of this.handlerGroups) {
-      if (!(group instanceof BaseHandlerGroup)) continue;
-      const environment = group.statedSystemType();
-      if (environment !== undefined) stated.add(environment);
-    }
-    const [only, ...others] = stated;
-    return others.length === 0 ? only : undefined;
+  private statements(): Array<{
+    readonly group: string;
+    readonly stated: SapEnvironment | undefined;
+  }> {
+    return this.handlerGroups.map((group) => ({
+      group: group.getName(),
+      stated:
+        group instanceof BaseHandlerGroup
+          ? group.statedSystemType()
+          : undefined,
+    }));
+  }
+
+  /**
+   * Refuses `stated` holding more than one variant, before anything is
+   * registered: the error names each group and what it states.
+   */
+  private refuseDifferentVariants(
+    stated: ReadonlySet<SapEnvironment | undefined>,
+  ): void {
+    if (stated.size <= 1) return;
+    const named = this.statements()
+      .map(({ group, stated }) => `${group} states ${stated ?? 'none'}`)
+      .join(', ');
+    throw new Error(
+      `The handler groups state different system types: ${named}; one registration lists one variant`,
+    );
   }
 
   /**

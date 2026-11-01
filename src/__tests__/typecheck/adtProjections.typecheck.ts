@@ -20,6 +20,7 @@ import {
   type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
   type COMPACT_READ_ROUTES,
+  type COMPACT_UPDATE,
   type INCLUDES_PARENT_ROUTES,
   projected,
   type ServedName,
@@ -125,6 +126,13 @@ export const tableTypeReadCompactOnCloud: ServedName<
   'cloud',
   typeof COMPACT_READ_ROUTES
 > = 'TABLE_TYPE';
+
+/** HandlerUpdate's cloud list holds the table type… */
+export const tableTypeInCloudUpdate: (typeof COMPACT_UPDATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
+export const includeInCloudUpdate: (typeof COMPACT_UPDATE.cloud)[number] =
+  'INCLUDE';
 
 // --- A list is exactly its projection --------------------------------------
 

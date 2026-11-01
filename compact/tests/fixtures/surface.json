@@ -146,7 +146,7 @@
   {
     "group": "compact",
     "name": "HandlerUpdate",
-    "inputs": "object_type*, lock_handle*, transport_request, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, ddl_source, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, service_version, name, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state",
+    "inputs": "object_type*, lock_handle*, transport_request, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, part, ddl_source, table_name, structure_name, data_element_name, interface_name, include_name, table_type_name, service_definition_name, service_binding_name, service_name, service_version, name, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state",
     "available_in": "cloud, onprem"
   },
   {

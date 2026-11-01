@@ -121,6 +121,7 @@ const UPDATE_TOKENS: Tokens<(typeof COMPACT_UPDATE.onprem)[number]> = {
   DOMAIN: 'DOMAIN(domain_name*, source_code*, transport_request)',
   DATA_ELEMENT:
     'DATA_ELEMENT(data_element_name*, source_code*, transport_request)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*, source_code*, transport_request)',
   FUNCTION_GROUP:
     'FUNCTION_GROUP(function_group_name*, source_code*, transport_request)',
   TABLE: 'TABLE(table_name*, ddl_code*, transport_request)',
@@ -139,6 +140,7 @@ const UPDATE_TOKENS: Tokens<(typeof COMPACT_UPDATE.onprem)[number]> = {
   CDS_UNIT_TEST:
     'CDS_UNIT_TEST(class_name*, test_class_source*, transport_request)',
   PROGRAM: 'PROGRAM(program_name*, source_code*, transport_request)',
+  INCLUDE: 'INCLUDE(include_name*, source_code*, part, transport_request)',
   INTERFACE: 'INTERFACE(interface_name*, source_code*, transport_request)',
   FUNCTION_MODULE:
     'FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request)',
@@ -154,7 +156,7 @@ const UPDATE_TOKENS: Tokens<(typeof COMPACT_UPDATE.onprem)[number]> = {
 
 /** HandlerUpdate's description on `variant`. */
 export function compactUpdateDescription(variant: ProjectionVariant): string {
-  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(COMPACT_UPDATE[variant], UPDATE_TOKENS)}. For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
+  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(COMPACT_UPDATE[variant], UPDATE_TOKENS)}. For PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE and INCLUDE with part metadata, source_code is the whole metadata document, sent as given. part is taken by INCLUDE alone: source (when absent) writes its source, metadata its metadata document. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
 }
 
 const DELETE_TOKENS: Tokens<(typeof COMPACT_DELETE.onprem)[number]> = {

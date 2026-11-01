@@ -9,10 +9,12 @@ import type { IServerAdtClient } from '../../../lib/adtClientContract';
  * its one publication request — and answers SAP's result. Locking, unlocking,
  * checking and activating are the consumer's own calls.
  *
- * PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP write their metadata
- * document: `source_code` is that whole document and is sent as given — a
- * replace, so the caller reads it (`HandlerGet` part `metadata`), changes it
- * and passes all of it back.
+ * PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE write their
+ * metadata document, and INCLUDE does with `part: 'metadata'`: `source_code`
+ * is that whole document and is sent as given — a replace, so the caller
+ * reads it (`HandlerGet` part `metadata`), changes it and passes all of it
+ * back. `part` is taken by INCLUDE alone; any other type given one is
+ * refused before anything is sent.
  *
  * Arguments arrive in the compact update's names and are translated here.
  */
@@ -22,9 +24,11 @@ import {
   dataElementDocuments,
   domainDocuments,
   functionGroupDocuments,
+  includeDocuments,
   packageDocuments,
   serviceDefinitionDocuments,
   serviceDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
@@ -40,7 +44,7 @@ import {
 } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import {
@@ -66,6 +70,7 @@ export const UNDER_LOCK_TYPES = [
   'DOMAIN',
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
+  'TABLE_TYPE',
   'TABLE',
   'STRUCTURE',
   'DDL',
@@ -79,12 +84,39 @@ export const UNDER_LOCK_TYPES = [
   'UNIT_TEST',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_MODULE',
   'BEHAVIOR_DEFINITION',
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
 ] as const;
+
+/** The types `part` is taken by: the include, its source or its metadata. */
+export const PART_TYPES = ['INCLUDE'] as const;
+
+/** The parts of an include `HandlerUpdate` writes. */
+const INCLUDE_PARTS = ['source', 'metadata'] as const;
+
+/**
+ * The refusal of a `part` given where it is not taken, or of a part the
+ * include has not; `undefined` when the call's part is one it takes.
+ */
+function partRefusal(args: Args): Error | undefined {
+  if (args.part === undefined) return undefined;
+  const type = String(args.object_type);
+  if (!PART_TYPES.some((taker) => taker === type)) {
+    return new Error(
+      `part is taken only by ${PART_TYPES.join(', ')} (${INCLUDE_PARTS.join(' or ')}); leave it out for ${type}`,
+    );
+  }
+  if (!INCLUDE_PARTS.some((part) => part === args.part)) {
+    return new Error(
+      `part is ${INCLUDE_PARTS.join(' or ')} for ${type}, not ${String(args.part)}`,
+    );
+  }
+  return undefined;
+}
 
 type Args = Record<string, unknown> & {
   object_type?: string;
@@ -164,6 +196,8 @@ export async function handleUpdateUnderLock(
   context: HandlerContext,
   args: Args,
 ): Promise<unknown> {
+  const partRefused = partRefusal(args);
+  if (partRefused) return return_error(partRefused);
   // A service binding's lock may answer no handle (the binding open in an
   // editing session): its publication runs under the empty one.
   const emptyBindingHandle =
@@ -288,6 +322,72 @@ export async function handleUpdateUnderLock(
                 },
               ),
           ) as Promise<never>,
+      );
+    }
+    case 'TABLE_TYPE': {
+      const name = text(args.table_type_name);
+      const document = text(args.source_code);
+      if (name === undefined) {
+        return return_error(new Error('table_type_name is required'));
+      }
+      if (document === undefined) {
+        return return_error(new Error('source_code is required'));
+      }
+      return answer(
+        ANSWER,
+        () =>
+          withAdtHeaders(context, 'tableType.updateMetadata', (headers) =>
+            client()
+              .getTableType(resultsFor(tableTypeDocuments))
+              .updateMetadata(
+                { tableTypeName: name.toUpperCase(), ...transport },
+                {
+                  headers,
+                  source: document,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ),
+        project('terse', terseWrite),
+      );
+    }
+    case 'INCLUDE': {
+      const name = text(args.include_name);
+      const body = text(args.source_code);
+      if (name === undefined) {
+        return return_error(new Error('include_name is required'));
+      }
+      if (body === undefined) {
+        return return_error(new Error('source_code is required'));
+      }
+      // An include is written on premise only (`ADT_TYPES_ONPREM`).
+      const include = () =>
+        createOnPremAdtClient(connection, logger).getInclude(
+          resultsFor(includeDocuments),
+        );
+      const config = { includeName: name.toUpperCase(), ...transport };
+      return answer(
+        ANSWER,
+        () =>
+          args.part === 'metadata'
+            ? withAdtHeaders(context, 'include.updateMetadata', (headers) =>
+                include().updateMetadata(config, {
+                  headers,
+                  source: body,
+                  lockHandle,
+                  analyse: analyseException,
+                }),
+              )
+            : withAdtHeaders(context, 'include.update', (headers) =>
+                include().update(config, {
+                  headers,
+                  source: body,
+                  lockHandle,
+                  analyse: analyseException,
+                }),
+              ),
+        project('terse', terseWrite),
       );
     }
     case 'SERVICE_DEFINITION': {

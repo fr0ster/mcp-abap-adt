@@ -406,7 +406,13 @@ export function compactUpdateSchemaFor<const M extends readonly string[]>(
       source_code: {
         type: 'string',
         description:
-          'The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP the whole metadata document.',
+          'The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE and INCLUDE with part metadata the whole metadata document.',
+      },
+      part: {
+        type: 'string',
+        enum: ['source', 'metadata'],
+        description:
+          'The part of an INCLUDE written: source (when absent) its source, metadata its metadata document. Taken by INCLUDE alone.',
       },
       ddl_source: {
         type: 'string',
@@ -416,6 +422,8 @@ export function compactUpdateSchemaFor<const M extends readonly string[]>(
       structure_name: { type: 'string', description: 'Structure name.' },
       data_element_name: { type: 'string', description: 'Data element name.' },
       interface_name: { type: 'string', description: 'Interface name.' },
+      include_name: { type: 'string', description: 'Include name.' },
+      table_type_name: { type: 'string', description: 'Table type name.' },
       service_definition_name: {
         type: 'string',
         description: 'Service definition name.',

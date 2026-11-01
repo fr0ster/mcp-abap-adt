@@ -1108,6 +1108,7 @@ export const COMPACT_UPDATE_ROUTES = {
   PACKAGE: { api: 'package', operation: 'updateMetadata' },
   DOMAIN: { api: 'domain', operation: 'updateMetadata' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'updateMetadata' },
+  TABLE_TYPE: { api: 'tableType', operation: 'updateMetadata' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'update' },
   TABLE: { api: 'table', operation: 'update' },
   STRUCTURE: { api: 'structure', operation: 'update' },
@@ -1121,6 +1122,7 @@ export const COMPACT_UPDATE_ROUTES = {
   UNIT_TEST: { api: 'localTestClass', operation: 'update' },
   CDS_UNIT_TEST: { api: 'localTestClass', operation: 'update' },
   PROGRAM: { api: 'program', operation: 'update' },
+  INCLUDE: { api: 'include', operation: 'update' },
   INTERFACE: { api: 'interface', operation: 'update' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'update' },
   BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'update' },
@@ -1136,6 +1138,7 @@ const UPDATE_ONPREM = [
   'PACKAGE',
   'DOMAIN',
   'DATA_ELEMENT',
+  'TABLE_TYPE',
   'FUNCTION_GROUP',
   'TABLE',
   'STRUCTURE',
@@ -1149,6 +1152,7 @@ const UPDATE_ONPREM = [
   'UNIT_TEST',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_MODULE',
   'BEHAVIOR_DEFINITION',
@@ -1163,7 +1167,9 @@ export const COMPACT_UPDATE = projected<
   ServedName<'cloud', typeof COMPACT_UPDATE_ROUTES>
 >()({
   onprem: UPDATE_ONPREM,
-  cloud: UPDATE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: UPDATE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /**

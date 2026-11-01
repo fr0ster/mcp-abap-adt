@@ -1006,7 +1006,7 @@ describe('the table-type version tools', () => {
       'GetTableTypeVersionDiff',
     ]) {
       const { toolDefinition } = versionTool(name);
-      expect(toolDefinition.description).toMatch(/^\[read-only\]/);
+      expect(toolDefinition.description.startsWith('[read-only]')).toBe(true);
       expect(toolDefinition.available_in).toEqual(['onprem', 'cloud']);
     }
   });

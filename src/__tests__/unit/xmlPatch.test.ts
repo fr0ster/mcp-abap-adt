@@ -13,12 +13,17 @@ const PATTERNS = ['$&', '$1', '$$', '$`', "$'"];
 const VALUES = PATTERNS.map((p) => `Price ${p} and ${p}`);
 
 /** What the helpers write for a value: XML-escaped, nothing else. */
-const esc = (v: string): string =>
-  v
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+const ESCAPED: Readonly<Record<string, string>> = {
+  '&': '&amp;',
+  '"': '&quot;',
+  '<': '&lt;',
+  '>': '&gt;',
+};
+const esc = (v: string): string => {
+  let out = '';
+  for (const char of v) out += ESCAPED[char] ?? char;
+  return out;
+};
 
 const XML = '<r a="old"><t>old</t><e x="old" y="keep"/><b><i>old</i></b></r>';
 

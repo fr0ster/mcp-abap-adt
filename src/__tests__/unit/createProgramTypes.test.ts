@@ -62,7 +62,9 @@ describe('CreateProgram program_type through the MCP SDK', () => {
 
   it('names no include in the description', () => {
     const { program_type } = TOOL_DEFINITION.inputSchema.properties;
-    expect(program_type.description).not.toMatch(/include/i);
+    expect(program_type.description.toLowerCase().includes('include')).toBe(
+      false,
+    );
     expect(program_type.enum).not.toContain('include');
   });
 });

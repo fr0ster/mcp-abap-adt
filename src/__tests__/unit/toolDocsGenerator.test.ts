@@ -85,3 +85,31 @@ describe('the tool-docs generator lists the built schema', () => {
     );
   });
 });
+
+/**
+ * A tool whose module sits under no level folder is listed under its handler
+ * group's level, from the generator's hand table: a group missing there must
+ * fail here, not only when the generator runs.
+ */
+describe('every handler group the docs read has a page level', () => {
+  const { GROUP_LEVELS, servedEntries } = require(GENERATOR);
+  const {
+    fullToolSet,
+    fullReadOnlyToolSet,
+  } = require('../../../dist/lib/toolSet.js');
+  const groups: string[] = [
+    ...new Set<string>(
+      [fullToolSet, fullReadOnlyToolSet]
+        .flatMap((set) => servedEntries(set))
+        .map((entry: { group: string }) => entry.group),
+    ),
+  ];
+
+  it('reads at least one group', () => {
+    expect(groups.length).toBeGreaterThan(0);
+  });
+
+  it.each(groups)('%s has a level', (group) => {
+    expect(typeof GROUP_LEVELS[group]).toBe('string');
+  });
+});

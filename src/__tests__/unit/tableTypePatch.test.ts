@@ -21,6 +21,10 @@ const changing = (from: string, to: string): string => {
   return TABLE_TYPE.replace(from, to);
 };
 
+/** How many times `piece` stands in `text`. */
+const occurrences = (text: string, piece: string): number =>
+  text.split(piece).length - 1;
+
 describe('patching a table type changes what was asked and nothing else', () => {
   it('returns an equal document for an empty change set', () => {
     expect(patchTableTypeXml(TABLE_TYPE, {})).toBe(TABLE_TYPE);
@@ -97,8 +101,8 @@ describe('patching a table type changes what was asked and nothing else', () => 
       'adtcore:name="SOOL" adtcore:description="Object-Oriented Basis Classes"',
     );
     expect(out).toContain('adtcore:descriptionTextLimit="60"');
-    expect(out.match(/ttyp:description=""/g)).toHaveLength(
-      TABLE_TYPE.match(/ttyp:description=""/g)?.length ?? -1,
+    expect(occurrences(out, 'ttyp:description=""')).toBe(
+      occurrences(TABLE_TYPE, 'ttyp:description=""'),
     );
   });
 

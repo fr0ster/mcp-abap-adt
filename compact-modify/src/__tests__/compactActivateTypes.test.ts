@@ -115,7 +115,7 @@ describe('HandlerActivate and the type it was given', () => {
           object_name: 'ZINCL_X',
           object_type: 'INCLUDE',
         }),
-      ).rejects.toThrow(/object_adt_type/);
+      ).rejects.toThrow('object_adt_type');
       expect(planned).toBeUndefined();
     } finally {
       declareSystemKind(connection, 'onprem');
@@ -164,7 +164,7 @@ describe('HandlerActivate and the type it was given', () => {
         object_name: 'ZCL_X',
         object_type: 'TRANSPORT',
       }),
-    ).rejects.toThrow(/Known without it: CLASS, PROGRAM, INCLUDE, INTERFACE/);
+    ).rejects.toThrow('Known without it: CLASS, PROGRAM, INCLUDE, INTERFACE');
     declareSystemKind(connection, 'cloud');
     await expect(
       handleHandlerActivate(context, {

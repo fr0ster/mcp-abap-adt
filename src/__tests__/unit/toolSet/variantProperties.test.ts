@@ -117,6 +117,46 @@ function takenOn(takes: Takes, members: readonly string[]): Set<string> {
   ]);
 }
 
+const isMemberChar = (char: string): boolean =>
+  char === '_' || (char >= 'A' && char <= 'Z');
+const isNameChar = (char: string): boolean =>
+  char === '_' || char === '*' || (char >= 'a' && char <= 'z');
+
+/** `[MEMBER, inner]` for each `MEMBER(inner)` in the text, left to right. */
+function memberCalls(text: string): Array<[string, string]> {
+  const calls: Array<[string, string]> = [];
+  let from = 0;
+  for (;;) {
+    const open = text.indexOf('(', from);
+    if (open === -1) return calls;
+    let start = open;
+    while (start > from && isMemberChar(text.charAt(start - 1))) start -= 1;
+    if (start === open) {
+      from = open + 1;
+      continue;
+    }
+    const close = text.indexOf(')', open + 1);
+    if (close === -1) return calls;
+    calls.push([text.slice(start, open), text.slice(open + 1, close)]);
+    from = close + 1;
+  }
+}
+
+/** The runs of lower-case letters, underscores and `*` in the text. */
+function nameWords(text: string): string[] {
+  const words: string[] = [];
+  let word = '';
+  for (const char of text) {
+    if (isNameChar(char)) word += char;
+    else if (word !== '') {
+      words.push(word);
+      word = '';
+    }
+  }
+  if (word !== '') words.push(word);
+  return words;
+}
+
 /**
  * `[member, argument]` for each argument a description names as
  * `MEMBER(argument …)`: a word the tool takes, a word with an underscore, or
@@ -128,13 +168,11 @@ function namedArguments(
   properties: ReadonlySet<string>,
 ): Array<[string, string]> {
   const named: Array<[string, string]> = [];
-  for (const match of description.matchAll(/([A-Z_]+)\(([^)]*)\)/g)) {
-    const [, member, inner] = match;
-    if (member === undefined || inner === undefined) continue;
+  for (const [member, inner] of memberCalls(description)) {
     if (!members.includes(member)) continue;
     for (const part of inner.split(',')) {
       const [named0 = ''] = part.split('=');
-      for (const word of named0.split(/[^a-z_*]+/)) {
+      for (const word of nameWords(named0)) {
         const bare = word.endsWith('*') ? word.slice(0, -1) : word;
         if (bare === '') continue;
         if (properties.has(bare) || bare.includes('_') || word.endsWith('*')) {

@@ -8,6 +8,19 @@ import { COMPACT_READ } from '../../lib/adtProjections';
 import { compactGetSchemaFor } from '../../lib/compact/compactSchemas';
 import { isLongRead } from '../../lib/longTools';
 
+/** `word` stands after a space or a colon and before a comma or a period. */
+function namedInList(words: string, word: string): boolean {
+  let at = words.indexOf(word);
+  while (at !== -1) {
+    const before = words.charAt(at - 1);
+    const after = words.charAt(at + word.length);
+    if ((before === ' ' || before === ':') && (after === ',' || after === '.'))
+      return true;
+    at = words.indexOf(word, at + 1);
+  }
+  return false;
+}
+
 describe("HandlerGet's timeout names the reads that take it", () => {
   const words = compactGetSchemaFor(COMPACT_READ.onprem).properties.timeout
     .description;
@@ -16,11 +29,11 @@ describe("HandlerGet's timeout names the reads that take it", () => {
   );
 
   it.each(reads)('names %s', (member) => {
-    expect(words).toMatch(new RegExp(`[ :]${member}[,.]`));
+    expect(namedInList(words, member)).toBe(true);
   });
 
   it('names no run mode', () => {
-    expect(words).not.toMatch(/[ :]UNIT_TEST[,.]/);
-    expect(words).not.toMatch(/CDS_UNIT_TEST/);
+    expect(namedInList(words, 'UNIT_TEST')).toBe(false);
+    expect(words.includes('CDS_UNIT_TEST')).toBe(false);
   });
 });

@@ -147,6 +147,7 @@ const GROUP_LEVELS = {
   DebugHandlersGroup: 'debug',
   DebugBatchHandlersGroup: 'debug',
   LeftoverSessionHandlersGroup: 'session',
+  LeftoverSessionListHandlersGroup: 'session',
   BatchHandlersGroup: 'batch',
 };
 
@@ -774,6 +775,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  GROUP_LEVELS,
+  servedEntries,
   readOnlySetTools,
   renderParams,
   loadToolsFromHandlers,

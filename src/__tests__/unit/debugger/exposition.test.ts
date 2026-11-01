@@ -14,7 +14,12 @@ describe('the debug set', () => {
       .getHandlerEntries()
       .map((e) => e.toolDefinition.name);
     expect(
-      names.some((n: string) => /^(Debug|AmdpDebug|MemorySnapshot)/.test(n)),
+      names.some(
+        (n: string) =>
+          n.startsWith('Debug') ||
+          n.startsWith('AmdpDebug') ||
+          n.startsWith('MemorySnapshot'),
+      ),
     ).toBe(false);
   });
 

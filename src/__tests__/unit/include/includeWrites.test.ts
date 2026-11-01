@@ -62,9 +62,12 @@ describe('CreateInclude', () => {
     expect(body).toContain('<adtcore:packageRef adtcore:name="ZP"/>');
     expect(sent?.headers?.Accept).toBe(PAIR);
     expect(sent?.headers?.['Content-Type']).toBe(PAIR);
-    expect(Object.keys(sent?.headers ?? {}).join(' ')).not.toMatch(
-      /sessiontype/i,
-    );
+    expect(
+      Object.keys(sent?.headers ?? {})
+        .join(' ')
+        .toLowerCase()
+        .includes('sessiontype'),
+    ).toBe(false);
   });
 
   it('puts the transport on corrNr, and only with one', async () => {

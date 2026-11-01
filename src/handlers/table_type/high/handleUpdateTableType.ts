@@ -39,7 +39,13 @@ import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
-import { TABLE_TYPE_DEFINITION_PROPERTIES } from './handleCreateTableType';
+import {
+  type AccessType,
+  type KeyDefinition,
+  type KeyKind,
+  type RowTypeKind,
+  TABLE_TYPE_DEFINITION_PROPERTIES,
+} from './handleCreateTableType';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateTableType',
@@ -81,14 +87,14 @@ interface UpdateTableTypeArgs {
   table_type_name?: string;
   description?: string;
   transport_request?: string;
-  row_type_kind?: string;
+  row_type_kind?: RowTypeKind;
   row_type_name?: string;
   data_type?: string;
   length?: number;
   decimals?: number;
-  access_type?: string;
-  key_definition?: string;
-  key_kind?: string;
+  access_type?: AccessType;
+  key_definition?: KeyDefinition;
+  key_kind?: KeyKind;
   activate?: boolean;
   detail?: 'terse' | 'full' | 'raw';
 }

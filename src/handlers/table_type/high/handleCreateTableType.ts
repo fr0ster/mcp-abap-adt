@@ -42,14 +42,53 @@ import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 /**
+ * The values SAP takes for the four closed definition properties. Measured on
+ * premise, 2026-11-01 (the report names no BASIS release): SAP answers SUCCESS to any other value and
+ * stores something else (or keeps the old one), so this `enum` is the only
+ * guard. `keyComponents` is left out of `key_definition`: SAP refuses to
+ * activate it without key components, which these tools cannot set. The two
+ * range kinds are stored; whether they activate depends on the row type given,
+ * and SAP's answer reaches the model as sent. `row_type_name` and `data_type`
+ * are open (SAP names an unknown data type in its refusal).
+ */
+export const ROW_TYPE_KINDS = [
+  'predefinedAbapType',
+  'dictionaryType',
+  'refToPredefinedAbapType',
+  'refToDictionaryType',
+  'refToClassOrInterfaceType',
+  'rangeTypeOnPredefinedType',
+  'rangeTypeOnDataelement',
+] as const;
+export const ACCESS_TYPES = [
+  'standard',
+  'sorted',
+  'hashed',
+  'index',
+  'notSpecified',
+] as const;
+export const KEY_DEFINITIONS = [
+  'standard',
+  'rowType',
+  'empty',
+  'notSpecified',
+] as const;
+export const KEY_KINDS = ['unique', 'nonUnique', 'notSpecified'] as const;
+
+export type RowTypeKind = (typeof ROW_TYPE_KINDS)[number];
+export type AccessType = (typeof ACCESS_TYPES)[number];
+export type KeyDefinition = (typeof KEY_DEFINITIONS)[number];
+export type KeyKind = (typeof KEY_KINDS)[number];
+
+/**
  * The definition properties a table type takes, shared with `UpdateTableType`
  * so the two tools describe them in the same words. Each is passed as given.
  */
 export const TABLE_TYPE_DEFINITION_PROPERTIES = {
   row_type_kind: {
     type: 'string',
-    description:
-      'Kind of the row type (ttyp:rowType/ttyp:typeKind), passed to SAP as given.',
+    enum: ROW_TYPE_KINDS,
+    description: 'Kind of the row type (ttyp:rowType/ttyp:typeKind).',
   },
   row_type_name: {
     type: 'string',
@@ -73,18 +112,19 @@ export const TABLE_TYPE_DEFINITION_PROPERTIES = {
   },
   access_type: {
     type: 'string',
-    description:
-      'Access type of the table (ttyp:accessType), passed to SAP as given.',
+    enum: ACCESS_TYPES,
+    description: 'Access type of the table (ttyp:accessType).',
   },
   key_definition: {
     type: 'string',
+    enum: KEY_DEFINITIONS,
     description:
-      'Definition of the primary key (ttyp:primaryKey/ttyp:definition), passed to SAP as given.',
+      'Definition of the primary key (ttyp:primaryKey/ttyp:definition).',
   },
   key_kind: {
     type: 'string',
-    description:
-      'Kind of the primary key (ttyp:primaryKey/ttyp:kind), passed to SAP as given.',
+    enum: KEY_KINDS,
+    description: 'Kind of the primary key (ttyp:primaryKey/ttyp:kind).',
   },
 } as const;
 
@@ -133,14 +173,14 @@ interface CreateTableTypeArgs {
   package_name?: string;
   description?: string;
   transport_request?: string;
-  row_type_kind?: string;
+  row_type_kind?: RowTypeKind;
   row_type_name?: string;
   data_type?: string;
   length?: number;
   decimals?: number;
-  access_type?: string;
-  key_definition?: string;
-  key_kind?: string;
+  access_type?: AccessType;
+  key_definition?: KeyDefinition;
+  key_kind?: KeyKind;
   activate?: boolean;
   detail?: 'terse' | 'full' | 'raw';
 }

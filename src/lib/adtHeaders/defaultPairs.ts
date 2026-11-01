@@ -385,6 +385,10 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/vnd.sap.adt.deletion.request.v1+xml',
   ),
   'include.update': pair('text/plain', 'text/plain; charset=utf-8'),
+  'include.updateMetadata': pair(
+    'application/vnd.sap.adt.programs.includes.v2+xml',
+    'application/vnd.sap.adt.programs.includes.v2+xml',
+  ),
   'interface.activate': pair(
     'application/xml',
     'application/vnd.sap.adt.activation+xml',

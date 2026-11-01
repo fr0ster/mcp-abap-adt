@@ -31,6 +31,7 @@ import type {
   IIncludeResults,
   IPackageResults,
   IProgramResults,
+  ITableTypeResults,
   ITransformationResults,
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -44,6 +45,7 @@ declare const ddl: IDdlResults;
 declare const domain: IDomainResults;
 declare const include: IIncludeResults;
 declare const program: IProgramResults;
+declare const tableType: ITableTypeResults;
 declare const pkg: IPackageResults;
 declare const transformation: ITransformationResults;
 
@@ -114,6 +116,60 @@ export function onPremOnlyMembers() {
   void cloud.getInclude(include).read;
   // @ts-expect-error the cloud table lists no update for an include
   void cloud.getInclude(include).update;
+}
+
+/**
+ * An include's metadata update, deletion check and name validation, and every
+ * table-type member, are gated per table: the include's on premise only (the
+ * cloud table lists a deletion check and the reads, nothing that writes), the
+ * table type's on every variant that serves it.
+ */
+export function includeWritesAndTableTypeMembers() {
+  const inc = onPrem.getInclude(include);
+  void inc.updateMetadata;
+  void inc.checkDeletion;
+  void inc.validate;
+  void inc.create;
+  void inc.update;
+  void inc.lock;
+  void inc.activate;
+  void inc.delete;
+
+  const cloudInc = cloud.getInclude(include);
+  void cloudInc.checkDeletion;
+  void cloudInc.read;
+  void cloudInc.readMetadata;
+  // @ts-expect-error the cloud table lists no create for an include
+  void cloudInc.create;
+  // @ts-expect-error the cloud table lists no update for an include
+  void cloudInc.update;
+  // @ts-expect-error the cloud table lists no updateMetadata for an include
+  void cloudInc.updateMetadata;
+  // @ts-expect-error the cloud table lists no lock for an include
+  void cloudInc.lock;
+  // @ts-expect-error the cloud table lists no activate for an include
+  void cloudInc.activate;
+  // @ts-expect-error the cloud table lists no validate for an include
+  void cloudInc.validate;
+  // @ts-expect-error the cloud table lists no delete for an include
+  void cloudInc.delete;
+
+  for (const ttyp of [
+    onPrem.getTableType(tableType),
+    cloud.getTableType(tableType),
+  ]) {
+    void ttyp.create;
+    void ttyp.readMetadata;
+    void ttyp.updateMetadata;
+    void ttyp.delete;
+    void ttyp.checkDeletion;
+    void ttyp.validate;
+    void ttyp.check;
+    void ttyp.activate;
+    void ttyp.lock;
+    void ttyp.unlock;
+    void ttyp.getVersions;
+  }
 }
 
 declare const utilResults: IUtilResults;

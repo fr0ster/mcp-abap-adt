@@ -304,6 +304,34 @@ export type IncludeApi<
     'activate',
     IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>
   > &
+  PerformedOn<
+    V,
+    'include',
+    'updateMetadata',
+    IAdtMetadataUpdatable<
+      Partial<IIncludeConfig>,
+      ReturnType<R['metadataUpdated']>
+    >
+  > &
+  PerformedOn<
+    V,
+    'include',
+    'deletionCheck',
+    Pick<
+      IAdtDeletable<
+        IIncludeConfig,
+        ReturnType<R['deletion']>,
+        ReturnType<R['deletionCheck']>
+      >,
+      'checkDeletion'
+    >
+  > &
+  PerformedOn<
+    V,
+    'include',
+    'validate',
+    IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>>
+  > &
   PerformedOn<V, 'include', 'lock', IAdtLockable<IIncludeConfig>>;
 
 /** What the server calls on `getInterface()`'s answer. */
@@ -435,7 +463,77 @@ export type TableApi<
 export type DdicTableTypeApi<
   R extends ITableTypeResults,
   V extends AdtVariant,
-> = IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>>;
+> = PerformedOn<
+  V,
+  'tableType',
+  'create',
+  IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>
+> &
+  IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
+  PerformedOn<
+    V,
+    'tableType',
+    'updateMetadata',
+    IAdtMetadataUpdatable<
+      Partial<ITableTypeConfig>,
+      ReturnType<R['metadataUpdated']>
+    >
+  > &
+  PerformedOn<
+    V,
+    'tableType',
+    'delete',
+    Omit<
+      IAdtDeletable<
+        ITableTypeConfig,
+        ReturnType<R['deletion']>,
+        ReturnType<R['deletionCheck']>
+      >,
+      'checkDeletion'
+    >
+  > &
+  PerformedOn<
+    V,
+    'tableType',
+    'deletionCheck',
+    Pick<
+      IAdtDeletable<
+        ITableTypeConfig,
+        ReturnType<R['deletion']>,
+        ReturnType<R['deletionCheck']>
+      >,
+      'checkDeletion'
+    >
+  > &
+  PerformedOn<
+    V,
+    'tableType',
+    'validate',
+    IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>>
+  > &
+  PerformedOn<
+    V,
+    'tableType',
+    'check',
+    IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>>
+  > &
+  PerformedOn<
+    V,
+    'tableType',
+    'activate',
+    IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>>
+  > &
+  PerformedOn<V, 'tableType', 'lock', IAdtLockable<ITableTypeConfig>> &
+  PerformedOn<
+    V,
+    'tableType',
+    'versions',
+    IAdtVersionable<
+      ITableTypeConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >
+  >;
 
 /** What the server calls on `getDdl()`'s answer. */
 export type DdlApi<R extends IDdlResults, V extends AdtVariant> = IAdtCreatable<

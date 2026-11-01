@@ -6,6 +6,8 @@
  * the tool's enum offers on premise and not there; on premise the texts are
  * the table's own (`toolSearchText`). The members a tool's entry groups its
  * words under are its own, and each grouped keyword is one of its keywords.
+ * A compact tool's keywords name no object kind (a word the table groups
+ * under a member, in any entry) that none of its members is.
  */
 
 import * as fs from 'node:fs';
@@ -97,6 +99,29 @@ function namesWord(text: string, word: string): boolean {
   return false;
 }
 
+/** `tools/tool-search.json` as the file states it (data from outside the types). */
+function searchTable(): object {
+  const table: unknown = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, '..', '..', '..', '..', 'tools', 'tool-search.json'),
+      'utf8',
+    ),
+  );
+  if (typeof table !== 'object' || table === null) throw new Error('table');
+  return table;
+}
+
+/** The words an entry groups under each member, as the file states them. */
+function groupsOf(entry: unknown): ReadonlyMap<string, readonly string[]> {
+  const groups: unknown = Reflect.get(Object(entry), 'members');
+  return new Map(
+    Object.entries(Object(groups)).map(([member, words]) => [
+      member,
+      Array.isArray(words) ? words.map(String) : [],
+    ]),
+  );
+}
+
 describe('a compact tool’s search texts name only the members its variant offers', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
 
@@ -153,21 +178,7 @@ describe('a compact tool’s search texts name only the members its variant offe
   }
 
   it('groups a tool’s words only under its own members, each grouped keyword one of its keywords', () => {
-    const table: unknown = JSON.parse(
-      fs.readFileSync(
-        path.join(
-          __dirname,
-          '..',
-          '..',
-          '..',
-          '..',
-          'tools',
-          'tool-search.json',
-        ),
-        'utf8',
-      ),
-    );
-    if (typeof table !== 'object' || table === null) throw new Error('table');
+    const table = searchTable();
     const misgrouped: string[] = [];
     let grouped = 0;
     for (const [name, entry] of Object.entries(table)) {
@@ -192,5 +203,46 @@ describe('a compact tool’s search texts name only the members its variant offe
     }
     expect(grouped).toBeGreaterThan(0);
     expect(misgrouped).toEqual([]);
+  });
+
+  it('names in its keywords only the object kinds its members are', () => {
+    const table = searchTable();
+    const compact = new Set(
+      Object.values(SETS).flatMap((set) =>
+        registryOf(set, 'stdio')
+          .getHandlerGroups()
+          .flatMap((group) => group.getHandlers())
+          .map((entry) => entry.toolDefinition.name),
+      ),
+    );
+    // A kind word: one the table groups under a member, in any entry.
+    const kinds = new Map<string, Set<string>>();
+    for (const entry of Object.values(table)) {
+      for (const [member, words] of groupsOf(entry)) {
+        for (const word of words) {
+          const named = kinds.get(word) ?? new Set<string>();
+          named.add(member);
+          kinds.set(word, named);
+        }
+      }
+    }
+    const foreign: string[] = [];
+    let checked = 0;
+    for (const [name, entry] of Object.entries(table)) {
+      const members = membersOf(name);
+      if (!compact.has(name) || members === undefined) continue;
+      checked += 1;
+      const own = new Set([...members.onprem, ...members.cloud]);
+      const keywords: unknown = Reflect.get(Object(entry), 'keywords');
+      for (const keyword of Array.isArray(keywords) ? keywords : []) {
+        const named = kinds.get(String(keyword));
+        if (named === undefined) continue;
+        if (![...named].some((member) => own.has(member))) {
+          foreign.push(`${name}: ${String(keyword)}`);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(8);
+    expect(foreign).toEqual([]);
   });
 });

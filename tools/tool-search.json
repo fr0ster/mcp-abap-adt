@@ -2982,8 +2982,7 @@
       "metadata extension",
       "service definition",
       "service binding",
-      "package",
-      "transport"
+      "package"
     ],
     "semantic": "Activate one object or several objects together after a change.",
     "members": {
@@ -3115,10 +3114,7 @@
       "BAPI",
       "behavior definition",
       "metadata extension",
-      "service definition",
-      "service binding",
-      "package",
-      "transport"
+      "package"
     ],
     "semantic": {
       "before": "Run a syntax check on ",
@@ -3376,8 +3372,7 @@
       "metadata extension",
       "service definition",
       "service binding",
-      "package",
-      "transport"
+      "package"
     ],
     "semantic": {
       "before": "Delete an ABAP object: ",
@@ -3862,8 +3857,7 @@
       "metadata extension",
       "service definition",
       "service binding",
-      "package",
-      "transport"
+      "package"
     ],
     "semantic": {
       "before": "Change an existing ABAP object: write the new source code of ",

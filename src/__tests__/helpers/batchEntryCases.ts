@@ -705,12 +705,16 @@ const WRITES: BatchEntryCase[] = [
     body: ACTIVATED,
   })),
   // An activation run started: the one POST, answered { run_id }.
-  ...['PACKAGE', 'SERVICE_DEFINITION', 'SERVICE_BINDING'].map(
-    (object_type) => ({
-      tool: 'HandlerActivate',
-      args: { object_type, object_name: 'OBJ_A' },
-    }),
-  ),
+  ...[
+    'PACKAGE',
+    'SERVICE_DEFINITION',
+    'SERVICE_BINDING',
+    'INCLUDE',
+    'TABLE_TYPE',
+  ].map((object_type) => ({
+    tool: 'HandlerActivate',
+    args: { object_type, object_name: 'OBJ_A' },
+  })),
   {
     tool: 'HandlerActivate',
     args: { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' },

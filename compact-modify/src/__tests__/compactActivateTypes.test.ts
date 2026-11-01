@@ -79,6 +79,49 @@ describe('HandlerActivate and the type it was given', () => {
     });
   });
 
+  it.each([
+    ['INCLUDE', 'ZINCL_X', 'PROG/I'],
+    ['TABLE_TYPE', 'ZTTYP_X', 'TTYP/DA'],
+  ])(
+    'activates %s alone in a group activation, by its code',
+    async (object_type, object_name, type) => {
+      await handleHandlerActivate(context, { object_name, object_type });
+
+      expect(planned).toEqual({
+        group: {
+          variant: 'onprem',
+          references: [{ name: object_name, type }],
+        },
+      });
+    },
+  );
+
+  it('activates a table type on ABAP cloud, and refuses an include there', async () => {
+    declareSystemKind(connection, 'cloud');
+    try {
+      await handleHandlerActivate(context, {
+        object_name: 'ZTTYP_X',
+        object_type: 'TABLE_TYPE',
+      });
+      expect(planned).toEqual({
+        group: {
+          variant: 'cloud',
+          references: [{ name: 'ZTTYP_X', type: 'TTYP/DA' }],
+        },
+      });
+      planned = undefined;
+      await expect(
+        handleHandlerActivate(context, {
+          object_name: 'ZINCL_X',
+          object_type: 'INCLUDE',
+        }),
+      ).rejects.toThrow(/object_adt_type/);
+      expect(planned).toBeUndefined();
+    } finally {
+      declareSystemKind(connection, 'onprem');
+    }
+  });
+
   it('prefers the explicit ADT type when the caller gives one', async () => {
     await handleHandlerActivate(context, {
       object_name: 'ZCL_X',
@@ -121,7 +164,7 @@ describe('HandlerActivate and the type it was given', () => {
         object_name: 'ZCL_X',
         object_type: 'TRANSPORT',
       }),
-    ).rejects.toThrow(/Known without it: CLASS, PROGRAM, INTERFACE/);
+    ).rejects.toThrow(/Known without it: CLASS, PROGRAM, INCLUDE, INTERFACE/);
     declareSystemKind(connection, 'cloud');
     await expect(
       handleHandlerActivate(context, {

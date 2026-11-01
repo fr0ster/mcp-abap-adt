@@ -1088,7 +1088,9 @@
         "equals": [
           "PACKAGE",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING"
+          "SERVICE_BINDING",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]

@@ -17,6 +17,7 @@ import {
   type ActivationCode,
   type AdtCodes,
   type AtcKindOn,
+  type COMPACT_ACTIVATE,
   type COMPACT_CHECK,
   type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
@@ -171,6 +172,13 @@ export const tableTypeInCloudCheck: (typeof COMPACT_CHECK.cloud)[number] =
   'TABLE_TYPE';
 // @ts-expect-error …and an include on neither variant: it has no check.
 export const includeInCheck: (typeof COMPACT_CHECK.onprem)[number] = 'INCLUDE';
+
+/** HandlerActivate activates a table type on ABAP cloud… */
+export const tableTypeInCloudActivate: (typeof COMPACT_ACTIVATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and no include, activated on premise only.
+export const includeInCloudActivate: (typeof COMPACT_ACTIVATE.cloud)[number] =
+  'INCLUDE';
 
 // --- A list is exactly its projection --------------------------------------
 

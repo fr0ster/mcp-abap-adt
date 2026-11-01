@@ -18,15 +18,22 @@ exists (measured on premise, 2026-11-01) — and adt-clients 40 sends exactly th
 The server now names one on every read:
 
 - A `Get<Type>` with `version` reads both parts at it, `active` by default as its schema declares.
-  In 22.0.x the metadata part sent no version, so an object with an inactive version answered its
-  inactive document. **What you do:** pass `version: 'workingArea'` (or `'inactive'`) for the
+  For a class, interface, program, include, table, structure, CDS view, behavior implementation,
+  function module, metadata extension, domain, data element and function group the metadata part
+  went out without a version in 22.0.x, so an object with an inactive version answered its inactive
+  document (a service definition, behavior definition, function group include and package send
+  what they sent). A metadata extension's source, and an include's source read without `version`,
+  change the same way. **What you do:** pass `version: 'workingArea'` (or `'inactive'`) for the
   document being edited. `version` takes `workingArea` beside `active` and `inactive` everywhere it
   is offered (compact `HandlerGet` and `SearchSource` too); `GetTableType` takes it now.
-- A read tool without `version` reads the active version (`GetMessageClass`,
-  `GetMessageClassMessage`, `GetServiceBinding`, `GetServiceBindingPreviewUrl`,
-  `GetEnhancementSpot`, `GetEnhancements`, `GetIncludesList`, `GetTypeInfo`, `ListFunctionModules`,
-  `ListFunctionGroupIncludes`, `GetPackageTree`'s package metadata and the descriptions the package
-  walks read); most of them read the working area in 22.0.x.
+- A read tool without `version` reads the active version. It changes for `GetMessageClass`,
+  `GetMessageClassMessage`, `GetServiceBinding`, `GetServiceBindingPreviewUrl` (the binding),
+  `GetEnhancementSpot`, `GetEnhancements` (its probes), `GetIncludesList`, `ListFunctionModules`,
+  `ListFunctionGroupIncludes`, `GetObjectNodeFromCache` and `SearchSource`'s function group
+  includes and modules, which read the working area in 22.0.x.
+- `GetTypeInfo` and the descriptions the walks read (`GetObjectInfo`) keep 22.0.x's request, now
+  stated: the working area (`active` for a service definition, behavior definition, function
+  group include, package and access control).
 - `CreateTableType` / `UpdateTableType` name the version of the definition they answer
   (`stored_version`, below).
 
@@ -82,8 +89,10 @@ SAP's value. Both answer the definition SAP stored and the version it was read a
 `stored_definition` and `stored_version` (the terse answer is
 `{ result, stored_definition, stored_version }`), or `stored_definition_not_read` with SAP's
 answer when that read failed. After a successful activation the definition is read once more, at
-`active`; with `activate: false`, or when the check or the activation is refused, it is the
-`inactive` version read after the write.
+`active`; otherwise it is the `inactive` version read after the write — `CreateTableType` with
+`activate: false`, a refused check or a refused activation, `UpdateTableType` with `activate:
+false` or a refused activation (it checks under the lock, before that read: a refused check is
+answered without a stored definition).
 
 The compact tools take `INCLUDE` and `TABLE_TYPE` as members — on cloud `INCLUDE` only in
 `HandlerGet`, `HandlerDeletionCheck` and `HandlerWhereUsed`. `HandlerUpdate` takes `part`

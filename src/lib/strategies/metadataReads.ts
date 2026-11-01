@@ -250,8 +250,16 @@ export const readAccessControlMetadata = (
     .getAccessControl(resultsFor(accessControlDocuments))
     .readMetadata(config, at(version));
 
-/** The version the walks read an object's description at. */
+/**
+ * The versions the walks read an object's description at: the request 22.0.x
+ * sent, now stated. adt-clients 39 sent `active` for a metadata read without
+ * a version of a service definition, a behavior definition, a function group
+ * include, a package and an access control, and none for every other type —
+ * ADT's working area, so an object that exists only inactive keeps its
+ * description.
+ */
 const ACTIVE: ReadVersion = 'active';
+const WORKING_AREA: ReadVersion = 'workingArea';
 
 /** An object whose metadata is read. */
 export interface MetadataTarget {
@@ -277,26 +285,29 @@ const inGroup =
 /**
  * Each ADT type's metadata read, with what the read takes from the object:
  * its name, and for a function module or include the group it was found in.
- * Every object is read active, as its `Get<Type>` reads it by default.
+ * Each is read at the version 22.0.x read it (`ACTIVE`, `WORKING_AREA`).
  */
 const READS = {
-  'CLAS/OC': (t) => (c) => readClassMetadata(c, { className: t.name }, ACTIVE),
+  'CLAS/OC': (t) => (c) =>
+    readClassMetadata(c, { className: t.name }, WORKING_AREA),
   'INTF/OI': (t) => (c) =>
-    readInterfaceMetadata(c, { interfaceName: t.name }, ACTIVE),
+    readInterfaceMetadata(c, { interfaceName: t.name }, WORKING_AREA),
   'PROG/P': (t) => (c) =>
-    readProgramMetadata(c, { programName: t.name }, ACTIVE),
-  'DDLS/DF': (t) => (c) => readDdlMetadata(c, { ddlName: t.name }, ACTIVE),
+    readProgramMetadata(c, { programName: t.name }, WORKING_AREA),
+  'DDLS/DF': (t) => (c) =>
+    readDdlMetadata(c, { ddlName: t.name }, WORKING_AREA),
   'DDLX/EX': (t) => (c) =>
-    readMetadataExtensionMetadata(c, { name: t.name }, ACTIVE),
+    readMetadataExtensionMetadata(c, { name: t.name }, WORKING_AREA),
   'DOMA/DD': (t) => (c) =>
-    readDomainMetadata(c, { domainName: t.name }, ACTIVE),
+    readDomainMetadata(c, { domainName: t.name }, WORKING_AREA),
   'DTEL/DE': (t) => (c) =>
-    readDataElementMetadata(c, { dataElementName: t.name }, ACTIVE),
-  'TABL/DT': (t) => (c) => readTableMetadata(c, { tableName: t.name }, ACTIVE),
+    readDataElementMetadata(c, { dataElementName: t.name }, WORKING_AREA),
+  'TABL/DT': (t) => (c) =>
+    readTableMetadata(c, { tableName: t.name }, WORKING_AREA),
   'TABL/DS': (t) => (c) =>
-    readStructureMetadata(c, { structureName: t.name }, ACTIVE),
+    readStructureMetadata(c, { structureName: t.name }, WORKING_AREA),
   'FUGR/F': (t) => (c) =>
-    readFunctionGroupMetadata(c, { functionGroupName: t.name }, ACTIVE),
+    readFunctionGroupMetadata(c, { functionGroupName: t.name }, WORKING_AREA),
   'FUGR/FF': inGroup(
     (group, t) => (c) =>
       readFunctionModuleMetadata(
@@ -305,7 +316,7 @@ const READS = {
           functionModuleName: t.name,
           functionGroupName: group,
         },
-        ACTIVE,
+        WORKING_AREA,
       ),
   ),
   'FUGR/I': inGroup(
@@ -322,14 +333,15 @@ const READS = {
   'SRVD/SRV': (t) => (c) =>
     readServiceDefinitionMetadata(c, { serviceDefinitionName: t.name }, ACTIVE),
   'SRVB/SVB': (t) => (c) =>
-    readServiceBindingMetadata(c, { bindingName: t.name }, ACTIVE),
+    readServiceBindingMetadata(c, { bindingName: t.name }, WORKING_AREA),
   'BDEF/BDO': (t) => (c) =>
     readBehaviorDefinitionMetadata(c, { name: t.name }, ACTIVE),
   'DEVC/K': (t) => (c) =>
     readPackageMetadata(c, { packageName: t.name }, ACTIVE),
-  'MSAG/N': (t) => (c) => readMessageClassMetadata(c, { name: t.name }, ACTIVE),
+  'MSAG/N': (t) => (c) =>
+    readMessageClassMetadata(c, { name: t.name }, WORKING_AREA),
   'ENHS/XSB': (t) => (c) =>
-    readEnhancementSpotMetadata(c, { enhancementName: t.name }, ACTIVE),
+    readEnhancementSpotMetadata(c, { enhancementName: t.name }, WORKING_AREA),
   'DCLS/DL': (t) => (c) =>
     readAccessControlMetadata(c, { accessControlName: t.name }, ACTIVE),
 } satisfies { readonly [C in MetadataCode]?: ReadOf };

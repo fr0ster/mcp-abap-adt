@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read at its active version.",
+    "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -251,7 +251,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
           readDataElementMetadata(
             client,
             { dataElementName: typeName },
-            'active',
+            'workingArea',
           ),
         parse: parseDataElement,
       },
@@ -260,7 +260,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         step: 'read domain',
         document: 'doma:domain',
         read: () =>
-          readDomainMetadata(client, { domainName: typeName }, 'active'),
+          readDomainMetadata(client, { domainName: typeName }, 'workingArea'),
         parse: parseDomain,
       },
       ...(includeStructure
@@ -273,7 +273,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
                 readStructureMetadata(
                   client,
                   { structureName: typeName },
-                  'active',
+                  'workingArea',
                 ),
               parse: parseStructure,
             },
@@ -284,7 +284,11 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         step: 'read table type',
         document: 'ttyp:tableType',
         read: () =>
-          readTableTypeMetadata(client, { tableTypeName: typeName }, 'active'),
+          readTableTypeMetadata(
+            client,
+            { tableTypeName: typeName },
+            'workingArea',
+          ),
         parse: parseTableType,
       },
     ];

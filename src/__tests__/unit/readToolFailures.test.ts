@@ -208,7 +208,7 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       origin: 'connection',
       // The first lookup is the data element (`getDataElement().readMetadata`).
       ...sapRefusal(
-        '/sap/bc/adt/ddic/dataelements/zt?version=active',
+        '/sap/bc/adt/ddic/dataelements/zt?version=workingArea',
         'read data element',
       ),
     });
@@ -235,8 +235,8 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       step: 'read domain',
     });
     expect(sent).toEqual([
-      '/sap/bc/adt/ddic/dataelements/zt?version=active',
-      '/sap/bc/adt/ddic/domains/zt?version=active',
+      '/sap/bc/adt/ddic/dataelements/zt?version=workingArea',
+      '/sap/bc/adt/ddic/domains/zt?version=workingArea',
     ]);
   });
 });

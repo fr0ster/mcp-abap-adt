@@ -201,6 +201,44 @@ const EXCLUDED: Record<string, string> = {
     "a table type's metadata; the package walk does not read table types, so the batch has no read of the type",
 };
 
+/**
+ * The version each type's description is read at in the walks: the request
+ * 22.0.x sent, now stated. adt-clients 39 sent `active` for a metadata read
+ * without a version of a service definition, a behavior definition, a
+ * function group include, a package and an access control, and no version
+ * for every other type here — ADT's working area.
+ */
+const WALK_VERSION: Readonly<Record<string, 'active' | 'workingArea'>> = {
+  'CLAS/OC': 'workingArea',
+  'INTF/OI': 'workingArea',
+  'PROG/P': 'workingArea',
+  'DDLS/DF': 'workingArea',
+  'DDLX/EX': 'workingArea',
+  'DOMA/DD': 'workingArea',
+  'DTEL/DE': 'workingArea',
+  'TABL/DT': 'workingArea',
+  'TABL/DS': 'workingArea',
+  'FUGR/F': 'workingArea',
+  'FUGR/FF': 'workingArea',
+  'FUGR/I': 'active',
+  'SRVD/SRV': 'active',
+  'SRVB/SVB': 'workingArea',
+  'BDEF/BDO': 'active',
+  'DEVC/K': 'active',
+  'MSAG/N': 'workingArea',
+  'ENHS/XSB': 'workingArea',
+  'DCLS/DL': 'active',
+};
+
+/** `url` with its `version` set to `version`, the rest of its query kept. */
+function atVersion(url: string, version: string): string {
+  const at = url.indexOf('?');
+  const path = at < 0 ? url : url.slice(0, at);
+  const query = new URLSearchParams(at < 0 ? '' : url.slice(at + 1));
+  query.set('version', version);
+  return `${path}?${query.toString()}`;
+}
+
 const HANDLERS_DIR = join(__dirname, '../../../handlers');
 
 /** A call of one of the shared reads (`read<Type>Metadata(`). */
@@ -351,7 +389,7 @@ describe('one metadata read per type, shared by handler and batch', () => {
   );
 
   it.each(Object.keys(HANDLERS))(
-    "%s: the batch part is the handler's request whole",
+    "%s: the batch part is the handler's request whole, at the version 22.0.x read",
     async (type) => {
       const direct = await handlerRequest(type);
       const fake = envelopeConnection((parts) =>
@@ -376,13 +414,17 @@ describe('one metadata read per type, shared by handler and batch', () => {
       const parts = fake.envelopes[0]?.parts ?? [];
       expect(parts).toHaveLength(1);
       const inner = parts[0];
+      const version = WALK_VERSION[type] ?? '';
       expect({
         method: inner?.method,
         url: inner?.url,
         headers: lowerHeaders(inner?.headers),
         // The envelope frames an empty body with its line break.
         body: (inner?.body ?? '').trim(),
-      }).toEqual(direct);
+      }).toEqual({ ...direct, url: atVersion(direct.url, version) });
+      expect(new URLSearchParams(inner?.url.split('?')[1]).get('version')).toBe(
+        version,
+      );
       expect(direct.headers.accept).toBeTruthy();
       expect([...descriptions.values()]).toEqual(['Placeholder']);
     },

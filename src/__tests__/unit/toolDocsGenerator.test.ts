@@ -60,3 +60,44 @@ describe('the tool-docs generator reads properties, not prose', () => {
     expect(parsed.detail.description).toContain('terse, full or raw');
   });
 });
+
+/**
+ * The reference shows what the server registers: every tool's parameters
+ * come from its built definition, so a property a schema spreads in
+ * (`...TABLE_TYPE_DEFINITION_PROPERTIES`, `...DETAIL_PROPERTY`), which the
+ * text reader cannot follow, is listed with its type, enum and words.
+ */
+describe('the tool-docs generator lists the built schema', () => {
+  const {
+    loadToolsFromHandlers,
+    renderParams,
+  } = require('../../../tools/generate-tools-docs.js');
+  const tools: ReadonlyArray<{
+    name: string;
+    level: string;
+    inputSchema: { properties: Record<string, { enum?: readonly string[] }> };
+  }> = loadToolsFromHandlers();
+  const named = (name: string) => {
+    const tool = tools.find((t) => t.name === name && t.level === 'high');
+    if (tool === undefined) throw new Error(`no high tool ${name}`);
+    return tool;
+  };
+
+  it('lists a spread-in property of CreateTableType with its enum', () => {
+    const tool = named('CreateTableType');
+    expect(tool.inputSchema.properties.row_type_kind?.enum).toContain(
+      'dictionaryType',
+    );
+    const text: string = renderParams(tool);
+    expect(text).toContain(
+      '- `row_type_kind` (string, optional, one of: `predefinedAbapType`, `dictionaryType`,',
+    );
+    expect(text).toContain('- `key_kind` (string, optional, one of:');
+  });
+
+  it('lists the spread-in detail property', () => {
+    expect(renderParams(named('CreateTableType'))).toContain(
+      '- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`)',
+    );
+  });
+});

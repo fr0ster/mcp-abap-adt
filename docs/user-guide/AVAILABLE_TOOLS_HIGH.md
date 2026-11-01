@@ -228,6 +228,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
@@ -251,7 +252,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
-- See schema reference `runAtcSchema` in source file
+- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 
 ---
 
@@ -266,7 +270,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `name` (string, required) - BehaviorDefinition name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -279,7 +283,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
-- `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `implementation_type` (string, required, one of: `Managed`, `Unmanaged`, `Abstract`, `Projection`) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
 - `package_name` (string, required) - Package name
@@ -296,6 +301,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -308,8 +314,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -321,6 +327,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
@@ -341,6 +348,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `behavior_definition` (string, required) - Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
 - `class_name` (string, required) - Behavior Implementation class name.
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -354,6 +362,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -366,8 +375,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -381,6 +390,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
 - `behavior_definition` (string, required) - Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
 - `class_name` (string, required) - Behavior Implementation class name. Must exist in the system.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -398,7 +408,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
-- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.
 
 ---
 
@@ -413,6 +423,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `class_name` (string, required) - Class name.
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `final` (boolean, optional) - Mark class as final. Default: false
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name.
@@ -429,6 +440,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -442,6 +454,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
@@ -455,6 +468,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
@@ -468,6 +482,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting test class. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
@@ -481,6 +496,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
@@ -493,8 +509,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -506,7 +522,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -518,7 +534,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -530,7 +546,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -542,7 +558,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -555,6 +571,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `class_name` (string, required) - Class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `source_code` (string, required) - Complete ABAP class source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -570,6 +587,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name.
 - `definitions_code` (string, required) - Updated source code for local definitions.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
@@ -583,6 +601,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `macros_code` (string, required) - Updated source code for local macros.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -597,6 +616,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `test_class_code` (string, required) - Updated source code for the local test class.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -611,6 +631,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `local_types_code` (string, required) - Updated source code for local types.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -626,7 +647,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
-- See schema reference `activateObjectsSchema` in source file
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes. Their family's activate() always sends preauditRequested=true.
 
 ---
 
@@ -948,7 +970,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -963,6 +985,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.
 - `decimals` (number, optional (default: 0)) - Decimal places. Usually inherited from domain.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `heading_label` (string, optional) - Heading field label (max 55 chars). Applied during update step after creation.
 - `length` (number, optional (default: 100)) - Data type length. Usually inherited from domain.
 - `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
@@ -974,7 +997,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `set_get_parameter` (string, optional) - Set/Get parameter ID. Applied during update step after creation.
 - `short_label` (string, optional) - Short field label (max 10 chars). Applied during update step after creation.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-- `type_kind` (string, optional (default: domain)) - Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.
+- `type_kind` (string, optional (default: domain), one of: `domain`, `predefinedAbapType`, `refToPredefinedAbapType`, `refToDictionaryType`, `refToClifType`) - Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.
 - `type_name` (string, optional) - Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')
 
 ---
@@ -987,6 +1010,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -999,7 +1023,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1010,11 +1034,12 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true))) - Activate data element after update (default: true)
+- `activate` (boolean, optional (default: true)) - Activate data element after update (default: true)
 - `data_element_name` (string, required) - Data element name to update
 - `data_type` (string, optional) - Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType
 - `decimals` (number, optional) - Decimals - for predefinedAbapType or refToPredefinedAbapType
 - `description` (string, optional) - New data element description
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `field_label_heading` (string, optional) - Heading field label (max 55 chars)
 - `field_label_long` (string, optional) - Long field label (max 40 chars)
 - `field_label_medium` (string, optional) - Medium field label (max 20 chars)
@@ -1025,7 +1050,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `search_help_parameter` (string, optional) - Search help parameter
 - `set_get_parameter` (string, optional) - Set/Get parameter ID
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
-- `type_kind` (string, optional (default: domain)) - Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType
+- `type_kind` (string, optional (default: domain), one of: `domain`, `predefinedAbapType`, `refToPredefinedAbapType`, `refToDictionaryType`, `refToClifType`) - Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType
 - `type_name` (string, optional) - Type name: domain name, data element name, or class name (depending on type_kind)
 
 ---
@@ -1042,7 +1067,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `ddl_name` (string, required) - CDS view name to check, passed as ddl_name.
 - `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `version` (string, optional) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
 
 ---
 
@@ -1055,6 +1080,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `description` (string, optional) - Optional description (defaults to ddl_name).
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
@@ -1069,6 +1095,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -1081,8 +1108,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1096,6 +1123,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `ddl_name` (string, required) - DDL source name.
 - `ddl_source` (string, required) - Complete DDL source code.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
@@ -1111,7 +1139,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `name` (string, required) - Metadata extension name.
-- `version` (string, optional (default: active)) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
 
 ---
 
@@ -1124,6 +1152,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
@@ -1139,6 +1168,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
@@ -1157,7 +1187,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -1168,11 +1198,12 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true))) - (optional) Activate domain after creation (default: true)
+- `activate` (boolean, optional (default: true)) - (optional) Activate domain after creation (default: true)
 - `conversion_exit` (string, optional) - (optional) Conversion exit routine name (without CONVERSION_EXIT_ prefix)
 - `datatype` (string, optional (default: CHAR)) - (optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional (default: 0)) - (optional) Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - (optional) Domain description. If not provided, domain_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `domain_name` (string, required) - Domain name.
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
@@ -1192,6 +1223,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `domain_name` (string, required) - Domain name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1205,7 +1237,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1216,11 +1248,12 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true))) - Activate domain after update (default: true)
+- `activate` (boolean, optional (default: true)) - Activate domain after update (default: true)
 - `conversion_exit` (string, optional) - Conversion exit routine name (without CONVERSION_EXIT_ prefix)
 - `datatype` (string, optional) - Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional) - Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - New domain description (optional)
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `domain_name` (string, required) - Domain name to update
 - `fixed_values` (array, optional) - Array of fixed values for domain value range
 - `length` (number, optional) - Field length (max depends on datatype)
@@ -1243,7 +1276,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -1256,7 +1289,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: active.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' or 'inactive'. Default: active.
 
 ---
 
@@ -1269,6 +1302,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group name. Up to 26 characters.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
@@ -1284,6 +1318,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the function module
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Parent function group name
 - `function_module_name` (string, required) - Function module name. Up to 30 characters.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1298,6 +1333,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, required) - New description for the function group.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group name. Must exist in the system.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -1311,6 +1347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name. Function module must already exist.
 - `source_code` (string, required) - Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.
@@ -1328,6 +1365,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - FunctionGroup name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1341,7 +1379,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1356,6 +1394,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the include
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Parent function group name
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1369,6 +1408,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -1383,6 +1423,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name. Include must already exist.
 - `source_code` (string, required) - Complete ABAP include source code.
@@ -1400,6 +1441,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - FunctionGroup name containing the function module.
 - `function_module_name` (string, required) - FunctionModule name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -1415,8 +1457,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1431,6 +1473,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Include description. If not provided, include_name is used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_name` (string, required) - Include name.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name.
@@ -1445,6 +1488,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/include/high/handleDeleteInclude.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1458,6 +1502,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate the include after the write. Default: false.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_name` (string, required) - Include name. The include must already exist.
 - `source_code` (string, required) - Complete ABAP source of the include.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1471,6 +1516,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_name` (string, required) - Include name. The include must already exist.
 - `metadata` (string, required) - The whole ADT metadata document of the include, as GetInclude part "metadata" returns it, with the changes made; it is sent as given and replaces the stored one.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1488,7 +1534,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -1500,6 +1546,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `interface_name` (string, required) - Interface name.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
@@ -1514,6 +1561,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `interface_name` (string, required) - Interface name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1527,8 +1575,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1540,6 +1588,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `interface_name` (string, required) - Interface name. Must exist in the system.
 - `source_code` (string, required) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
@@ -1557,6 +1606,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - (optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `message_class_name` (string, required) - Message class name.
 - `package_name` (string, required) - Package name.
@@ -1587,6 +1637,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `message_class_name` (string, required) - Message class name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
@@ -1623,6 +1674,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -1636,6 +1688,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, required) - New short description for the message class.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `message_class_name` (string, required) - Message class name.
 - `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
@@ -1667,6 +1720,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1680,8 +1734,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1718,6 +1772,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 - `package_name` (string, required) - Package name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -1731,8 +1786,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1744,6 +1800,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, required) - New description for the package.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name. Package must already exist.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
@@ -1760,7 +1817,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `program_name` (string, required) - Program name.
-- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -1773,10 +1830,11 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
 - `program_name` (string, required) - Program name.
-- `program_type` (string, optional) - Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
+- `program_type` (string, optional, one of: `executable`, `module_pool`, `function_group`, `class_pool`, `interface_pool`) - Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
@@ -1788,6 +1846,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Program name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1800,9 +1859,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1814,6 +1873,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Program name. Program must already exist.
 - `source_code` (string, required) - Complete ABAP program source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1831,11 +1891,12 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - Activate the service binding after create, then read its service group. Default: true.
-- `binding_variant` (string, optional (default: ODATA_V4_UI)) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
+- `binding_variant` (string, optional (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - ABAP package name.
-- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name.
 - `service_definition_name` (string, required) - Referenced service definition name.
 - `service_name` (string, optional) - Published service name. Default: service_binding_name if omitted.
@@ -1851,7 +1912,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
 - `transport_request` (string, optional) - Optional transport request for deletion transport flow.
 
@@ -1864,8 +1926,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
 ---
@@ -1877,7 +1939,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
 
 ---
 
@@ -1888,9 +1950,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
 **Parameters:**
-- `binding_variant` (string, required (default: ODATA_V4_UI)) - Service binding variant. Determines OData version for publish/unpublish routing.
-- `desired_publication_state` (string, required) - Target publication state.
-- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
+- `binding_variant` (string, required (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. Determines OData version for publish/unpublish routing.
+- `desired_publication_state` (string, required, one of: `published`, `unpublished`, `unchanged`) - Target publication state.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name to update.
 - `service_name` (string, required) - Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.
 - `service_version` (string, optional) - Published service version. Default 0001. Used by an OData V2 publication job together with the service name; ignored for V4.
@@ -1905,6 +1968,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Optional description used during validation.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - ABAP package of the binding, which the validation checks.
 - `service_binding_name` (string, required) - Service binding name to validate.
 - `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
@@ -1924,6 +1988,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
 - `service_definition_name` (string, required) - Service definition name.
@@ -1939,6 +2004,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -1951,9 +2017,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1965,6 +2031,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `service_definition_name` (string, required) - Service definition name. Must exist in the system.
 - `source_code` (string, required) - Complete service definition source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
@@ -1983,7 +2050,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
 
 ---
 
@@ -1996,7 +2063,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
-- `fields` (array, required (default: 0)) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `fields` (array, required) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
 - `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
@@ -2012,6 +2080,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `structure_name` (string, required) - Structure name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -2024,9 +2093,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -2039,6 +2108,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for structure. Example: '@EndUserText.label : \'My Structure\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `structure_name` (string, required) - Structure name. Structure must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -2071,20 +2141,20 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional)
+- `all_db_events` (boolean, optional)
+- `all_dynpro_events` (boolean, optional)
+- `all_internal_table_events` (boolean, optional)
+- `all_misc_abap_statements` (boolean, optional)
+- `all_procedural_units` (boolean, optional)
+- `all_system_kernel_events` (boolean, optional)
+- `amdp_trace` (boolean, optional)
 - `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
+- `explicit_on_off` (boolean, optional)
+- `max_size_for_trace_file` (number, optional)
+- `max_time_for_tracing` (number, optional)
+- `sql_trace` (boolean, optional)
+- `with_rfc_tracing` (boolean, optional)
 
 ---
 
@@ -2095,26 +2165,26 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional)
+- `all_db_events` (boolean, optional)
+- `all_dynpro_events` (boolean, optional)
+- `all_internal_table_events` (boolean, optional)
+- `all_misc_abap_statements` (boolean, optional)
+- `all_procedural_units` (boolean, optional)
+- `all_system_kernel_events` (boolean, optional)
+- `amdp_trace` (boolean, optional)
 - `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `class_name` (string, required) - ABAP class name to execute.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
+- `explicit_on_off` (boolean, optional)
+- `max_size_for_trace_file` (number, optional)
+- `max_time_for_tracing` (number, optional)
 - `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
 - `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
+- `sql_trace` (boolean, optional)
 - `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
 - `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional)
 
 ---
 
@@ -2125,23 +2195,23 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional)
+- `all_db_events` (boolean, optional)
+- `all_dynpro_events` (boolean, optional)
+- `all_internal_table_events` (boolean, optional)
+- `all_misc_abap_statements` (boolean, optional)
+- `all_procedural_units` (boolean, optional)
+- `all_system_kernel_events` (boolean, optional)
+- `amdp_trace` (boolean, optional)
 - `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
+- `explicit_on_off` (boolean, optional)
+- `max_size_for_trace_file` (number, optional)
+- `max_time_for_tracing` (number, optional)
 - `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
 - `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
+- `sql_trace` (boolean, optional)
+- `with_rfc_tracing` (boolean, optional)
 
 ---
 
@@ -2157,7 +2227,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `table_name` (string, required) - Table name.
-- `version` (string, optional) - Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.
+- `version` (string, optional, one of: `active`, `inactive`, `new`) - Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.
 
 ---
 
@@ -2169,6 +2239,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
 - `table_name` (string, required) - Table name.
@@ -2183,6 +2254,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_name` (string, required) - Table name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -2195,9 +2267,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -2210,6 +2282,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_name` (string, required) - Table name. Table must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -2226,7 +2299,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
-- `version` (string, optional) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -2237,9 +2310,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true).)) - Activate the table type after creation (default: true).
+- `access_type` (string, optional, one of: `standard`, `sorted`, `hashed`, `index`, `notSpecified`) - Access type of the table (ttyp:accessType).
+- `activate` (boolean, optional (default: true)) - Activate the table type after creation (default: true).
+- `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
+- `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - Table type description. When left out, table_type_name is used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
+- `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
+- `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
 - `package_name` (string, required) - Package the table type is created in.
+- `row_type_kind` (string, optional, one of: `predefinedAbapType`, `dictionaryType`, `refToPredefinedAbapType`, `refToDictionaryType`, `refToClassOrInterfaceType`, `rangeTypeOnPredefinedType`, `rangeTypeOnDataelement`) - Kind of the row type (ttyp:rowType/ttyp:typeKind).
+- `row_type_name` (string, optional) - Dictionary type used as the row type (ttyp:rowType/ttyp:typeName).
 - `table_type_name` (string, required) - Table type name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -2252,6 +2334,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_type_name` (string, required) - Table type name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -2275,8 +2358,17 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true).)) - Activate the table type after the update (default: true).
+- `access_type` (string, optional, one of: `standard`, `sorted`, `hashed`, `index`, `notSpecified`) - Access type of the table (ttyp:accessType).
+- `activate` (boolean, optional (default: true)) - Activate the table type after the update (default: true).
+- `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
+- `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - New table type description.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
+- `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
+- `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
+- `row_type_kind` (string, optional, one of: `predefinedAbapType`, `dictionaryType`, `refToPredefinedAbapType`, `refToDictionaryType`, `refToClassOrInterfaceType`, `rangeTypeOnPredefinedType`, `rangeTypeOnDataelement`) - Kind of the row type (ttyp:rowType/ttyp:typeKind).
+- `row_type_name` (string, optional) - Dictionary type used as the row type (ttyp:rowType/ttyp:typeName).
 - `table_type_name` (string, required) - Table type name. The table type must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -2292,6 +2384,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
@@ -2307,9 +2400,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `description` (string, required) - Transport request description (mandatory)
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
 - `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
-- `transport_type` (string, optional (default: workbench)) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
+- `transport_type` (string, optional (default: workbench), one of: `workbench`, `customizing`) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
 
 ---
 
@@ -2320,8 +2414,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
-- `task_type` (string, optional (default: S)) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
+- `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
 - `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
 
 ---
@@ -2333,6 +2428,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `objects` (array, required) - The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.
 - `target_number` (string, required) - Number of the transport task the entries move to.
 - `transport_number` (string, required) - Number of the transport task that holds the entries.
@@ -2346,6 +2442,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
@@ -2361,6 +2458,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Number of the transport task to sort and compress.
 
 ---
@@ -2377,6 +2475,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `cds_view_name` (string, required) - CDS view under test (DDL source). Must be active and testable with test doubles.
 - `class_name` (string, required) - Name of the new global class that holds the tests.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package of the new test class.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable package.
@@ -2390,6 +2489,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group that gets the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -2403,6 +2503,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Report that gets the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -2417,6 +2518,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -2430,6 +2532,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
@@ -2442,6 +2545,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
@@ -2500,6 +2604,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `run_id` (string, required) - Run id a unit test run answered.
 
 ---
@@ -2523,6 +2628,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `duration` (object, optional) - Durations the run accepts.
 - `risk_level` (object, optional) - Risk levels the run accepts.
 - `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
@@ -2539,6 +2645,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
@@ -2550,8 +2657,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
+- `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
@@ -2564,9 +2672,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
+- `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
@@ -2579,8 +2688,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Report whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
+- `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
@@ -2594,7 +2704,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
-- `runner` (string, optional (default: async)) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
@@ -2608,6 +2719,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view. Must already exist.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -2620,6 +2732,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group whose tests are replaced. Its test include must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -2633,6 +2746,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Report whose tests are replaced. Its test include must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -2647,6 +2761,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 

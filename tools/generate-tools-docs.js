@@ -660,7 +660,29 @@ function builtProperty(definition, key) {
   return properties ? properties[key] : undefined;
 }
 
-/** Overwrite parsed text with the shipped text, tool by tool and parameter by parameter. */
+/** A built JSON-Schema property as the page lists it: type, default, enum, words. */
+function listedProperty(stated) {
+  const type = Array.isArray(stated.type)
+    ? stated.type.join(' | ')
+    : typeof stated.type === 'string'
+      ? stated.type
+      : 'any';
+  return {
+    type,
+    description:
+      typeof stated.description === 'string' ? stated.description : '',
+    default: stated.default === undefined ? undefined : String(stated.default),
+    enum: Array.isArray(stated.enum) ? stated.enum.map(String) : undefined,
+  };
+}
+
+/**
+ * The tool's parameters as the server registers them: the built definition's
+ * plain JSON schema (properties, required, enums, words), spreads and shared
+ * pieces included, which the text reader cannot follow. A definition whose
+ * schema is not a plain object schema keeps the parsed parameters, their
+ * words taken from the build.
+ */
 function applyBuiltText(tools) {
   const built = builtDefinitions();
   for (const tool of tools) {
@@ -668,14 +690,20 @@ function applyBuiltText(tools) {
     if (!definition) continue;
     if (typeof definition.description === 'string' && definition.description)
       tool.description = definition.description;
-    // The debug tools compose their schemas from shared spreads, which the file
-    // parser cannot follow: their whole (plain JSON) schema is taken from the build.
+    const schema = definition.inputSchema;
     if (
-      tool.level === 'debug' &&
-      definition.inputSchema &&
-      definition.inputSchema.type === 'object'
+      schema &&
+      schema.type === 'object' &&
+      schema.properties &&
+      typeof schema.properties === 'object'
     ) {
-      tool.inputSchema = definition.inputSchema;
+      const properties = {};
+      for (const [key, stated] of Object.entries(schema.properties))
+        properties[key] = listedProperty(stated);
+      tool.inputSchema = {
+        properties,
+        required: Array.isArray(schema.required) ? [...schema.required] : [],
+      };
       continue;
     }
     const props = tool.inputSchema && tool.inputSchema.properties;
@@ -876,7 +904,11 @@ function renderParams(tool) {
     const p = props[key];
     const req = required.has(key) ? 'required' : 'optional';
     const def = p.default !== undefined ? ` (default: ${p.default})` : '';
-    out += `- \`${key}\` (${p.type}, ${req}${def}) - ${p.description}\n`;
+    const values = p.enum
+      ? `, one of: ${p.enum.map((v) => `\`${v}\``).join(', ')}`
+      : '';
+    const words = p.description ? ` - ${p.description}` : '';
+    out += `- \`${key}\` (${p.type}, ${req}${def}${values})${words}\n`;
   }
   return out;
 }
@@ -1255,6 +1287,7 @@ if (require.main === module) {
 
 module.exports = {
   readOnlySetTools,
+  renderParams,
   extractToolDefinition,
   loadToolsFromHandlers,
   parseTopLevelProperties,

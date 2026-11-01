@@ -129,7 +129,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
-- See schema reference `runAtcSchema` in source file
+- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 
 ---
 
@@ -151,6 +154,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
@@ -204,8 +208,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -220,8 +224,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -236,8 +240,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -251,7 +255,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
-- See schema reference `objectVersionsSchema` in source file
+- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type.
 
 ---
 
@@ -262,7 +268,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
 **Parameters:**
-- See schema reference `objectVersionSourceSchema` in source file
+- `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
+- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type (the same value the version history was read with).
 
 ---
 
@@ -273,7 +280,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
 **Parameters:**
-- See schema reference `objectVersionDiffSchema` in source file
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
+- `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type (the same value the version history was read with).
 
 ---
 
@@ -288,7 +297,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -303,8 +312,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -319,7 +328,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -373,7 +382,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -411,8 +420,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the include.
 - `include_name` (string, required) - Include name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -428,8 +437,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -444,8 +453,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `include_name` (string, required) - Include name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional, one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -456,7 +465,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
-- See schema reference `includesListSchema` in source file
+- `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
+- `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
+- `object_type` (string, optional, one of: `PROG/P`, `PROG/I`, `FUGR/F`, `CLAS/OC`, `FUGR`, `CLAS`) - [read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC. A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
+- `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -471,8 +484,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -511,6 +524,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -527,8 +541,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -553,8 +567,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -568,9 +583,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -584,6 +599,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
@@ -603,7 +619,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `parent_tech_name` (string, optional) - [read-only] Parent technical name
 - `parent_type` (string, optional) - [read-only] Parent object type (e.g. PROG/P, FUGR)
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `with_short_descriptions` (boolean, optional (default: true))) - [read-only] Include short descriptions (default: true)
+- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions (default: true)
 
 ---
 
@@ -633,8 +649,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
 ---
@@ -649,9 +665,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -669,7 +685,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `structure_name` (string, optional) - Structure name (or give structure_names).
 - `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -680,9 +696,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -724,6 +740,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transaction_name` (string, required) - Name of the ABAP transaction
 
 ---
@@ -750,7 +767,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `id` (number, optional) - Statement node ID (for statements view).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
-- `view` (string, required) - Trace view to retrieve.
+- `view` (string, required, one of: `hitlist`, `statements`, `db_accesses`) - Trace view to retrieve.
 - `with_details` (boolean, optional) - Include statement details (for statements view).
 - `with_system_events` (boolean, optional) - Include system events.
 
@@ -764,8 +781,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
-- `response_mode` (string, optional (default: both)) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
-- `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
+- `response_mode` (string, optional (default: both), one of: `payload`, `summary`, `both`) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
+- `view` (string, optional (default: default), one of: `default`, `summary`, `formatted`) - Dump view mode: default payload, summary section, or formatted long text.
 
 ---
 
@@ -779,7 +796,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `top` (number, optional) - Number of top rows for summary. Default: 10.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
-- `view` (string, optional (default: hitlist)) - 
+- `view` (string, optional (default: hitlist), one of: `hitlist`, `statements`, `db_accesses`)
 - `with_system_events` (boolean, optional) - Include system events.
 
 ---
@@ -793,7 +810,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `component` (string, optional) - Dumps whose application component contains this text, in any case.
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
-- `feed_type` (string, optional) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
+- `feed_type` (string, optional, one of: `descriptors`, `variants`, `dumps`, `system_messages`, `gateway_errors`) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.
@@ -842,6 +859,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
@@ -855,7 +873,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
 **Parameters:**
-- See schema reference `whereUsedSchema` in source file
+- `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
+- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
+- `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
+- `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
+- `object_type` (string, optional) - Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
+- `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -917,7 +941,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
 **Parameters:**
-- None
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ---
 
@@ -928,6 +952,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
@@ -939,6 +964,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
@@ -964,7 +990,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
 **Parameters:**
-- `objects` (array, required) - [read-only] Object name (required, must be valid ABAP object name or mask)
+- `objects` (array, required)
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
@@ -1018,9 +1044,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
-- `part` (string, optional (default: source)) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1048,8 +1074,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
 **Parameters:**
-- `include_objects` (boolean, optional (default: true))) - Include list of objects in transport (default: true)
-- `include_tasks` (boolean, optional (default: true))) - Include list of tasks in transport (default: true)
+- `include_objects` (boolean, optional (default: true)) - Include list of objects in transport (default: true)
+- `include_tasks` (boolean, optional (default: true)) - Include list of tasks in transport (default: true)
 - `transport_number` (string, required) - Transport request number, not a task
 
 ---
@@ -1061,6 +1087,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `user` (string, optional) - The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
@@ -1074,6 +1101,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
@@ -1085,6 +1113,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
@@ -1099,6 +1128,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `run_id` (string, required) - Run id a unit test run answered.
 
 ---

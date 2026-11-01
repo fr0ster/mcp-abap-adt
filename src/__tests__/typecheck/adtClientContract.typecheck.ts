@@ -25,7 +25,9 @@
  */
 
 import type {
+  IAdtError,
   IAdtHeaders,
+  IAnalyse,
   IDdlResults,
   IDomainResults,
   IIncludeResults,
@@ -177,6 +179,7 @@ export function includeWritesAndTableTypeMembers() {
 }
 
 declare const utilResults: IUtilResults;
+declare const analyse: IAnalyse<IAdtError>;
 declare const headers: IAdtHeaders;
 
 /**
@@ -248,4 +251,40 @@ export function groupMembersTakeTheTypedReferences() {
     { object_name: 'ZI', object_type: 'FUGR/I' },
     { headers },
   );
+}
+
+/**
+ * Every read states its version (the owner, 2026-11-01): ADT answers a read
+ * without one from the working area, and adt-clients sends exactly the
+ * version it is given. A read with no version does not compile.
+ */
+export function everyReadStatesItsVersion() {
+  onPrem.getDdl(ddl).read({ ddlName: 'VIEW' }, 'active');
+  // @ts-expect-error a source read names its version
+  onPrem.getDdl(ddl).read({ ddlName: 'VIEW' });
+  // @ts-expect-error a source read names its version, never undefined
+  onPrem.getDdl(ddl).read({ ddlName: 'VIEW' }, undefined);
+
+  onPrem
+    .getDomain(domain)
+    .readMetadata({ domainName: 'DOMAIN' }, { version: 'workingArea' });
+  // @ts-expect-error a metadata read names its version
+  onPrem.getDomain(domain).readMetadata({ domainName: 'DOMAIN' });
+  // @ts-expect-error a metadata read names its version in its options
+  onPrem.getDomain(domain).readMetadata({ domainName: 'DOMAIN' }, {});
+
+  const readUtils = onPrem.getUtils(utilResults);
+  void readUtils.readObjectSource('PROG/P', 'ZP', undefined, 'inactive', {
+    analyse,
+  });
+  // @ts-expect-error a source read through the utilities names its version
+  void readUtils.readObjectSource('PROG/P', 'ZP', undefined, undefined, {
+    analyse,
+  });
+  void readUtils.readObjectMetadata('CLAS/OC', 'ZCL', undefined, {
+    version: 'active',
+    analyse,
+  });
+  // @ts-expect-error a metadata read through the utilities names its version
+  void readUtils.readObjectMetadata('CLAS/OC', 'ZCL', undefined, { analyse });
 }

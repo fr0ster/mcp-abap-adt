@@ -255,6 +255,7 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A' }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }],
   ['TABLE', { table_name: 'TAB_A' }],
   ['STRUCTURE', { structure_name: 'STRU_A' }],
   ['DDL', { ddl_name: 'DDL_A' }],
@@ -279,6 +280,8 @@ const LOCKED_TYPES: Array<[string, string]> = [
   ['SERVICE_BINDING', 'SRVB_A'],
   ['CLASS', 'CLAS_A'],
   ['PROGRAM', 'PROG_A'],
+  ['INCLUDE', 'INCL_A'],
+  ['TABLE_TYPE', 'TTYP_A'],
   ['INTERFACE', 'INTF_A'],
   ['FUNCTION_GROUP', 'FUGR_A'],
   ['FUNCTION_MODULE', 'FUGR_A|FM_A'],
@@ -300,6 +303,12 @@ const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A', source_code: DOCUMENT }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A', source_code: DOCUMENT }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A', source_code: DOCUMENT }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A', source_code: DOCUMENT }],
+  ['INCLUDE', { include_name: 'INCL_A', source_code: 'source text' }],
+  [
+    'INCLUDE',
+    { include_name: 'INCL_A', part: 'metadata', source_code: DOCUMENT },
+  ],
   ['TABLE', { table_name: 'TAB_A', ddl_code: 'source text' }],
   ['STRUCTURE', { structure_name: 'STRU_A', ddl_code: 'source text' }],
   ['DDL', { ddl_name: 'DDL_A', ddl_source: 'source text' }],
@@ -517,6 +526,8 @@ const DELETIONS: Array<[string, Record<string, unknown>]> = [
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }],
 ];
 
 /** `HandlerDelete` of a class include: its empty write under `lock_handle`. */
@@ -597,6 +608,8 @@ const CREATES: Array<[string, Record<string, unknown>]> = [
   ],
   ['BEHAVIOR_IMPLEMENTATION', { class_name: 'BP_A', package_name: 'PKG_A' }],
   ['METADATA_EXTENSION', { name: 'DDLX_A', package_name: 'PKG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A', package_name: 'PKG_A' }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A', package_name: 'PKG_A' }],
 ];
 
 const CREATE_CASES: BatchEntryCase[] = [

@@ -461,7 +461,8 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -675,7 +676,9 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -718,7 +721,9 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING"
+          "SERVICE_BINDING",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -761,7 +766,9 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING"
+          "SERVICE_BINDING",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -814,7 +821,9 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -863,7 +872,9 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]

@@ -1,13 +1,15 @@
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
-import { runWithCallTransport } from '../callTransport.js';
+import { ServerRefusal } from '../auth/serverRefusal.js';
 import { noopLogger } from '../handlerLogger.js';
 import {
+  isCredentialFailure,
   type SystemContextResolver,
   type SystemContextRules,
-  withResolvedSystemContext,
 } from '../requestSystemResolution.js';
-import { stateSystemKind } from '../systemKind.js';
+import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
@@ -24,7 +26,20 @@ import type {
   ToolHandler,
 } from './interfaces.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
-import { isArgsOnly } from './utils/handlerCall.js';
+import {
+  type CallContext,
+  inStatedScope,
+  isArgsOnly,
+} from './utils/handlerCall.js';
+
+/**
+ * The connection one call of a tool registered with
+ * `HandlerExporter.registerOnServer` runs on: called for each call, sync or
+ * async. What it returns is the call's; its lifetime is the embedder's.
+ */
+export type ConnectionProvider = () =>
+  | IAbapConnection
+  | Promise<IAbapConnection>;
 
 /**
  * Options for creating handler exporter
@@ -105,7 +120,9 @@ export interface HandlerExporterOptions {
  * Handler Exporter - factory for creating handlers registry
  *
  * This class provides a way to create handlers registry with configurable
- * exposition levels. Use with EmbeddableMcpServer for external integration.
+ * exposition levels. Use with EmbeddableMcpServer for external integration,
+ * or register the tools on your own `McpServer` with `registerOnServer`,
+ * each call on the connection your provider returns.
  *
  * Usage:
  * ```typescript
@@ -128,7 +145,7 @@ export interface HandlerExporterOptions {
  */
 export class HandlerExporter {
   private readonly logger: Logger;
-  private readonly handlerGroups: IHandlerGroup[];
+  private readonly handlerGroups: BaseHandlerGroup[];
   private readonly systemContextResolver: SystemContextResolver | null;
   private readonly systemContextRules: SystemContextRules | null;
   private readonly systemType: string | undefined;
@@ -139,8 +156,10 @@ export class HandlerExporter {
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
 
-    // Create dummy context for group instantiation
-    // Real context is provided by BaseMcpServer.registerHandlers() via getConnection()
+    // Create dummy context for group instantiation. A call's real context
+    // is given by the server instance (BaseMcpServer.registerHandlers(), via
+    // getConnection()) or made per call by registerOnServer (its provider's
+    // connection).
     const dummyContext: HandlerContext = {
       connection: null as any,
       logger: this.logger,
@@ -156,7 +175,7 @@ export class HandlerExporter {
     // theirs under the same name is withheld from the readonly group, so a
     // tool appears once and comes from high. No other readonly tool is hidden
     // here (NoDedupStrategy).
-    const overridingGroups: IHandlerGroup[] = [];
+    const overridingGroups: BaseHandlerGroup[] = [];
     if (options?.includeHighLevel !== false) {
       overridingGroups.push(new HighLevelHandlersGroup(dummyContext));
     }
@@ -228,41 +247,89 @@ export class HandlerExporter {
    * resolver is given.
    */
   private wrapEntry(group: IHandlerGroup, entry: HandlerEntry): HandlerEntry {
-    const resolver = this.systemContextResolver;
-    const resolved = <T>(
+    // The scope a plain registration gives a call (`inStatedScope`), on the
+    // call's connection and this exporter's options.
+    const inScope = <T>(
       connection: HandlerContext['connection'] | undefined,
+      args: unknown,
       fn: () => Promise<T>,
-    ): Promise<T> => {
-      if (connection) stateSystemKind(connection, this.systemType);
-      return resolver
-        ? withResolvedSystemContext(
-            connection,
-            fn,
-            resolver,
-            this.systemType,
-            this.systemContextRules,
-          )
-        : fn();
-    };
+    ): Promise<T> => inStatedScope({ ...this.stated(), connection }, args, fn);
 
     const original = entry.handler;
     const wrapped: ToolHandler = isArgsOnly(original)
       ? // Args-only handlers close over their group's context, which the
         // embedder swaps before calling — so read it at call time.
         (args: unknown) =>
-          runWithCallTransport(args, () =>
-            resolved(
-              (group as Partial<{ context: HandlerContext }>).context
-                ?.connection,
-              () => original(args),
-            ),
+          inScope(
+            (group as Partial<{ context: HandlerContext }>).context?.connection,
+            args,
+            () => original(args),
           )
       : (context: HandlerContext, args: unknown) =>
-          runWithCallTransport(args, () =>
-            resolved(context?.connection, () => original(context, args)),
-          );
+          inScope(context?.connection, args, () => original(context, args));
     Object.defineProperty(wrapped, 'length', { value: original.length });
     return { ...entry, handler: wrapped };
+  }
+
+  /**
+   * What this exporter states for every call: its `systemType`, and the
+   * system-context resolver and rules when it has them.
+   */
+  private stated(): Pick<
+    HandlerContext,
+    'systemType' | 'systemContextResolver' | 'systemContextRules'
+  > {
+    return {
+      ...(this.systemType !== undefined && { systemType: this.systemType }),
+      ...(this.systemContextResolver !== null && {
+        systemContextResolver: this.systemContextResolver,
+      }),
+      ...(this.systemContextRules !== null && {
+        systemContextRules: this.systemContextRules,
+      }),
+    };
+  }
+
+  /**
+   * Registers this exporter's tools on an embedder's `McpServer`, each call
+   * on the connection `connectionProvider` returns for it.
+   *
+   * The listing is a plain registration's (`createRegistry().registerAllTools`)
+   * for the stated `systemType`: that variant's tools, descriptions, schemas
+   * and search members; none stated, the definitions as they are. Each call
+   * awaits the provider, then runs the handler on what it returned — in the
+   * form the handler takes (an args-only one reads that context as its
+   * group's for exactly its call, so calls at once each get their own), on
+   * the stated kind (none stated: refused `system_type_required` before
+   * anything is sent; `SAP_SYSTEM_TYPE` is not read), and with the
+   * `systemContextResolver` / `systemContextRules` when given, as
+   * `getHandlerEntries()` applies them.
+   *
+   * A provider that throws or rejects is the call's answer and the handler
+   * does not run: a credential failure (a chain failure, a `401`) as it came,
+   * anything else `connection_provider_failed` in fixed words. Nothing waits
+   * on a clock and nothing is retried. The connection is the provider's: each
+   * call uses what it returns, and a lock held across calls needs the
+   * provider to return the same connection.
+   */
+  registerOnServer(
+    server: McpServer,
+    connectionProvider: ConnectionProvider,
+  ): void {
+    const callContext: CallContext = async () => {
+      let connection: IAbapConnection;
+      try {
+        connection = await connectionProvider();
+      } catch (error) {
+        if (isCredentialFailure(error)) throw error;
+        throw new ServerRefusal('connection_provider_failed');
+      }
+      return { connection, logger: this.logger, ...this.stated() };
+    };
+    new CompositeHandlersRegistry(this.handlerGroups).registerAllToolsOnCall(
+      server,
+      callContext,
+    );
   }
 
   /**

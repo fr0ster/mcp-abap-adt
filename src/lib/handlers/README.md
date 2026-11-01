@@ -60,6 +60,11 @@ const registry = new HandlerExporter({ systemType: "cloud" }).createRegistry();
 registry.registerAllTools(mcpServer); // the cloud tools, schemas and descriptions
 ```
 
+The exporter's groups are built on a context with no connection: listed this way, their calls
+have none to run on. `exporter.registerOnServer(mcpServer, connectionProvider)` lists the same
+tools through the same code and runs each call on the connection the provider returns for it
+(see [the Handler Exporter guide](../../../docs/architecture/HANDLER_EXPORTER.md)).
+
 With no `systemType` stated, every definition is listed as it is (the on-premise description and
 schema, every member in the search `_meta`), and every call that would reach a system is refused
 `system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says. A connection built

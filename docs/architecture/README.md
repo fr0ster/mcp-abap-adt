@@ -101,16 +101,25 @@ const server = new EmbeddableMcpServer({
 });
 ```
 
+On an SDK `McpServer` of your own, `exporter.registerOnServer(mcpServer, connectionProvider)`
+registers the exporter's tools with a connection per call: the provider (sync or async) is called
+for each call, and the call runs on what it returns; a provider that fails is the call's answer
+(`connection_provider_failed`, or its credential failure as it came), and the handler does not
+run. The listing is the plain registration's below. See
+[the Handler Exporter guide](HANDLER_EXPORTER.md).
+
 `getHandlerEntries()` and `getToolNames()` give the same handlers without a server. Each handler
 `getHandlerEntries()` hands out runs on the system kind the exporter states (`systemType`), stated on
 the call's connection before it runs; with none stated, a call that would reach a system is refused
 `system_type_required` before anything is sent. `SAP_SYSTEM_TYPE` is not read for it (a connection
 built by `createAbapConnection` keeps the kind it was built for).
 
-Registered on a plain SDK `McpServer` instead (`exporter.createRegistry().registerAllTools(mcpServer)`),
-the tools are listed on the variant the exporter states (`systemType`), as a server instance lists
-them: that variant's tool set, descriptions, schemas and search members, and its calls run on that
-variant. `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call. With no
+Registered on a plain SDK `McpServer` (`registerOnServer`, or a registry's
+`registerAllTools(mcpServer)`), the tools are listed on the variant the exporter states
+(`systemType`), as a server instance lists them: that variant's tool set, descriptions, schemas
+and search members, and its calls run on that variant. The exporter's own groups
+(`createRegistry()`) carry no connection, so their calls need `registerOnServer` or a server
+instance. `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call. With no
 `systemType` stated, the definitions are listed as they are and every call that would reach a
 system is refused `system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says
 (a connection built by `createAbapConnection` keeps the kind it was built for). A server instance

@@ -8,15 +8,19 @@ import type {
   ToolDefinition,
   ToolHandler,
 } from '../interfaces.js';
+import type { CallContext } from '../utils/handlerCall.js';
 import { registeredSchema } from '../utils/schemaUtils.js';
 
 /**
  * Composite handlers registry that accepts multiple handler groups via Dependency Injection
  * Allows flexible composition of handler sets based on requirements
  */
-export class CompositeHandlersRegistry implements IHandlersRegistry {
+export class CompositeHandlersRegistry<
+  Group extends IHandlerGroup = IHandlerGroup,
+> implements IHandlersRegistry
+{
   private registeredTools: Set<string> = new Set();
-  private handlerGroups: IHandlerGroup[];
+  private handlerGroups: Group[];
   private readonly failOnDuplicate: boolean;
 
   /**
@@ -24,10 +28,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * @param handlerGroups - Array of handler groups to register
    * @param failOnDuplicate - When true, throws on duplicate tool names (useful in dev)
    */
-  constructor(
-    handlerGroups: IHandlerGroup[] = [],
-    failOnDuplicate: boolean = true,
-  ) {
+  constructor(handlerGroups: Group[] = [], failOnDuplicate: boolean = true) {
     this.handlerGroups = handlerGroups;
     this.failOnDuplicate = failOnDuplicate;
   }
@@ -36,7 +37,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * Adds a handler group to the registry
    * @param group - Handler group to add
    */
-  addHandlerGroup(group: IHandlerGroup): void {
+  addHandlerGroup(group: Group): void {
     this.handlerGroups.push(group);
   }
 
@@ -53,7 +54,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   /**
    * Gets all handler groups in this registry
    */
-  getHandlerGroups(): IHandlerGroup[] {
+  getHandlerGroups(): Group[] {
     return [...this.handlerGroups];
   }
 
@@ -63,6 +64,31 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * one of them none included — are refused before anything is registered.
    */
   registerAllTools(server: McpServer): void {
+    this.registerGroups((group) => group.registerHandlers(server));
+  }
+
+  /**
+   * Registers all tools as `registerAllTools` does — the same listing, the
+   * same refusals — each call running in the context `callContext` gives it
+   * when the call comes (`BaseHandlerGroup.registerHandlersOnCall`). Only a
+   * registry of `BaseHandlerGroup`s takes it.
+   */
+  registerAllToolsOnCall(
+    this: CompositeHandlersRegistry<BaseHandlerGroup>,
+    server: McpServer,
+    callContext: CallContext,
+  ): void {
+    this.registerGroups((group) =>
+      group.registerHandlersOnCall(server, callContext),
+    );
+  }
+
+  /**
+   * The registration every path shares: groups stating different variants
+   * refused, the listed tools counted and checked for duplicates, then each
+   * group registered by `register`.
+   */
+  private registerGroups(register: (group: Group) => void): void {
     // Each group lists the variant its own context states; groups stating
     // different ones — one of them none included — are refused before
     // anything is registered.
@@ -88,7 +114,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
         this.registeredTools.add(name);
       }
       // Use group's own registration logic (preserves schema conversions)
-      group.registerHandlers(server);
+      register(group);
     }
   }
 

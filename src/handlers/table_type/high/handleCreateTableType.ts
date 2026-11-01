@@ -43,8 +43,8 @@ import { return_error } from '../../../lib/utils';
 
 /**
  * The values SAP takes for the four closed definition properties. Measured on
- * premise, 2026-11-01 (the report names no BASIS release): SAP answers SUCCESS to any other value and
- * stores something else (or keeps the old one), so this `enum` is the only
+ * premise, 2026-11-01: SAP answers SUCCESS to any other value and stores
+ * another value, so this `enum` is the only
  * guard. `keyComponents` is left out of `key_definition`: SAP refuses to
  * activate it without key components, which these tools cannot set. The two
  * range kinds are stored; whether they activate depends on the row type given,

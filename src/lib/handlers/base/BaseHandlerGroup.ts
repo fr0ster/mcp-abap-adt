@@ -153,6 +153,25 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             }
             args = withoutBackground(given);
           }
+          // The argument refusals come before the call's context: a refused
+          // call asks for none (no provider is called).
+          const listed = isLongTool(toolName);
+          const read = listed && isLongRead(toolName, args);
+          if (listed && !read && readTimeout(args) !== undefined) {
+            // A listed tool's run mode takes no `timeout`.
+            return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
+              isError: true;
+              content: { type: 'text'; text: string }[];
+            };
+          }
+          // A long read's `timeout`, cutting the read.
+          const timeoutSeconds = read ? readTimeout(args) : undefined;
+          if (timeoutSeconds === null) {
+            return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
+              isError: true;
+              content: { type: 'text'; text: string }[];
+            };
+          }
           // The call's context, asked for now: the group's own, or one made
           // for this call (its provider's connection). Its rejection is
           // this call's answer (the catch below); the handler does not run.
@@ -177,25 +196,9 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const withParameters = <T>(fn: () => Promise<T>) =>
             inStatedScope(context, args, fn);
           let result: any;
-          const listed = isLongTool(toolName);
-          const read = listed && isLongRead(toolName, args);
-          if (listed && !read && readTimeout(args) !== undefined) {
-            // A listed tool's run mode takes no `timeout`.
-            return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
-              isError: true;
-              content: { type: 'text'; text: string }[];
-            };
-          }
           if (read) {
             // A listed long tool: a read on a connection of its
             // own, its `timeout` cutting the read.
-            const timeoutSeconds = readTimeout(args);
-            if (timeoutSeconds === null) {
-              return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
-                isError: true;
-                content: { type: 'text'; text: string }[];
-              };
-            }
             result = await withParameters(() =>
               runLongCall({
                 name: toolName,

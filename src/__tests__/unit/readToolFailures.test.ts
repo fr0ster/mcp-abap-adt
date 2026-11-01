@@ -10,7 +10,11 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtObjectIdentity,
+  IAdtError,
+  IIncludeConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
@@ -375,14 +379,8 @@ describe('GetIncludesList: SAP answered 401 to an include', () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () =>
         okResponse(reading('REPORT z.\nINCLUDE zone.\nINCLUDE ztwo.\n')),
-      read: async (config: unknown) => {
-        read.push(
-          typeof config === 'object' &&
-            config !== null &&
-            'includeName' in config
-            ? String(config.includeName)
-            : '',
-        );
+      read: async (config: AdtObjectIdentity<IIncludeConfig>) => {
+        read.push(config.includeName ?? '');
         return unauthorized();
       },
     });

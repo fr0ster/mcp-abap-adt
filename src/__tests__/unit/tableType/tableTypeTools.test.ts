@@ -314,14 +314,33 @@ describe('CreateTableType', () => {
     expect(body).toContain('<ttyp:kind>unique</ttyp:kind>');
   });
 
-  it("leaves SAP's value for every property not given: the PUT body is the read document", async () => {
+  it("leaves SAP's value for every definition property not given; the description is the name, as the create sent it", async () => {
     const connection = created();
     await handleCreateTableType(
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
     expect(connection.requests[4]?.method).toBe('PUT');
-    expect(connection.requests[4]?.data).toBe(STRING_TABLE);
+    expect(connection.requests[4]?.data).toBe(
+      STRING_TABLE.replace(
+        'adtcore:description="Tabelle von Strings"',
+        'adtcore:description="ZTT_X"',
+      ),
+    );
+  });
+
+  it('writes the name as the description when the description given is empty, as validate and create send it', async () => {
+    const connection = created();
+    await handleCreateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', package_name: 'ZP', description: '' },
+    );
+    expect(String(connection.requests[1]?.data)).toContain(
+      'adtcore:description="ZTT_X"',
+    );
+    const put = String(connection.requests[4]?.data);
+    expect(put).toContain('adtcore:description="ZTT_X"');
+    expect(put.includes('adtcore:description=""')).toBe(false);
   });
 
   it('declares a schema default on activate and the shared detail alone', () => {

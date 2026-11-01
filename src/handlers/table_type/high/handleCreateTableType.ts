@@ -270,7 +270,7 @@ export async function handleCreateTableType(
                               `table type ${tableTypeName}`,
                             ),
                             {
-                              description: args.description,
+                              description,
                               row_type_kind: args.row_type_kind,
                               row_type_name: args.row_type_name,
                               data_type: args.data_type,

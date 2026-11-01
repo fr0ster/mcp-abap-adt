@@ -34,3 +34,9 @@ export {
   noConnectionContext,
   registryForExposition,
 } from './registry/expositionRegistry.js';
+// The call form of a handler: the one rule every registration path follows
+export {
+  callInItsForm,
+  type InGroupContext,
+  isArgsOnly,
+} from './utils/handlerCall.js';

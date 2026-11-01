@@ -1,5 +1,5 @@
 {
-  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed; since 23.0.0 every read names its version, and the two low metadata reads that sent none — answered from the working area — are recorded with the version their compact call reads by default, active). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so.",
+  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so; an `accepted` with `since` was accepted after MIGRATION-19.0's release and is not rendered into it.",
   "rows": [
     {
       "tool": "CreatePackageLow",
@@ -419,6 +419,11 @@
     {
       "tool": "UpdateDomainLow",
       "group": "LowLevelHandlersGroup",
+      "accepted": {
+        "kind": "version-stated",
+        "reason": "Since 23.0.0 every read names its version: the compact HandlerGet part metadata reads /sap/bc/adt/ddic/domains/dom_a?version=active (its default); the low tool's read sent no version, which ADT answers from the working area.",
+        "since": "23.0.0"
+      },
       "handler": "src/handlers/domain/low/handleUpdateDomain.ts",
       "low_call": {
         "domain_name": "DOM_A",
@@ -450,7 +455,7 @@
       "low_requests": [
         {
           "method": "GET",
-          "url": "/sap/bc/adt/ddic/domains/dom_a?version=active",
+          "url": "/sap/bc/adt/ddic/domains/dom_a",
           "headers": {
             "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
           }
@@ -673,6 +678,11 @@
     {
       "tool": "UpdateDataElementLow",
       "group": "LowLevelHandlersGroup",
+      "accepted": {
+        "kind": "version-stated",
+        "reason": "Since 23.0.0 every read names its version: the compact HandlerGet part metadata reads /sap/bc/adt/ddic/dataelements/dtel_a?version=active (its default); the low tool's read sent no version, which ADT answers from the working area.",
+        "since": "23.0.0"
+      },
       "handler": "src/handlers/data_element/low/handleUpdateDataElement.ts",
       "low_call": {
         "data_element_name": "DTEL_A",
@@ -704,7 +714,7 @@
       "low_requests": [
         {
           "method": "GET",
-          "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=active",
+          "url": "/sap/bc/adt/ddic/dataelements/dtel_a",
           "headers": {
             "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
           }

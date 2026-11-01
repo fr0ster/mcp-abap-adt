@@ -8,6 +8,7 @@
  * takes no configuration from the environment.
  */
 
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,7 +18,10 @@ import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
 import { variantOf } from '../../../lib/clients';
-import { systemKindOf } from '../../../lib/connectionFactory';
+import {
+  createAbapConnection,
+  systemKindOf,
+} from '../../../lib/connectionFactory';
 import { noopLogger } from '../../../lib/handlerLogger';
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
@@ -37,7 +41,9 @@ import {
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { callInItsForm } from '../../../lib/handlers/utils/handlerCall';
+import { isLongTool } from '../../../lib/longTools';
 
+import { adtStandIn } from '../../helpers/adtStandIn';
 import { type Counting, countingConnection } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
 
@@ -558,7 +564,7 @@ describe('a handler getHandlerEntries hands out', () => {
       },
     ).then(
       (result) => JSON.stringify(result),
-      (error: Error) => error.message,
+      (error) => String(error),
     );
     return {
       answer,
@@ -606,4 +612,87 @@ describe('a handler getHandlerEntries hands out', () => {
       expect(runs.kind).toBe(systemType);
     },
   );
+});
+
+/**
+ * A listed long tool's read on the plain path runs on a connection of its
+ * own (`runLongCall`), and its handler is called in the form it takes there
+ * too (`callInItsForm`): an args-only handler answers as through a
+ * `BaseMcpServer` on the same group, on a connection the factory built.
+ */
+describe('a long read on the plain path', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  /** `SearchObject` (args-only, listed long) on `register`'s server. */
+  async function searched(
+    register: (context: HandlerContext) => McpServer,
+  ): Promise<{ answer: string; requests: string[] }> {
+    const standIn = await adtStandIn();
+    try {
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
+      const connection = createAbapConnection(
+        { url: standIn.url, client: '100', authType: 'basic' },
+        new BasicAuthProvider('LONG_USER', 'long-password'),
+      );
+      await connection.connect();
+      const before = standIn.requests.length;
+      const server = register({
+        connection,
+        logger: silentLogger,
+        systemType: 'onprem',
+      });
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'plain-long', version: '1.0.0' });
+      await Promise.all([
+        server.connect(serverSide),
+        client.connect(clientSide),
+      ]);
+      try {
+        const answer = await client.callTool({
+          name: 'SearchObject',
+          arguments: { object_name: 'ZPLACEHOLDER*' },
+        });
+        return {
+          answer: JSON.stringify(answer),
+          requests: standIn.requests
+            .slice(before)
+            .map((request) => `${request.method} ${request.url}`)
+            .filter((line) => line.includes('/repository/informationsystem/')),
+        };
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await standIn.close();
+    }
+  }
+
+  it('an args-only handler answers as through a BaseMcpServer', async () => {
+    expect(isLongTool('SearchObject')).toBe(true);
+    const plain = await searched((context) => {
+      const server = new McpServer({ name: 'plain-long', version: '1.0.0' });
+      new CompositeHandlersRegistry([
+        new SearchHandlersGroup(context),
+      ]).registerAllTools(server);
+      return server;
+    });
+    const served = await searched(
+      (context) =>
+        new EmbeddableMcpServer({
+          connection: context.connection,
+          systemType: 'onprem',
+          logger: noopLogger,
+          handlersRegistry: new CompositeHandlersRegistry([
+            new SearchHandlersGroup(context),
+          ]),
+        }),
+    );
+    expect(plain).toEqual(served);
+    expect(plain.requests.length).toBeGreaterThan(0);
+    expect(plain.answer).not.toContain('Cannot read properties');
+  });
 });

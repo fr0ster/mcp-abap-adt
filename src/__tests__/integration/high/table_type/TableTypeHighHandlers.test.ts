@@ -10,7 +10,7 @@
  *
  * Lifecycle, one run, every object of its own:
  *   CreateTableType with a definition (activated): the stored definition it
- *   answers is what GetTableType reads
+ *   answers, read active after the activation, is what GetTableType reads
  *   -> UpdateTableType changing the access type: SAP's own key-kind rule shows
  *      in the stored definition (measured on premise, 2026-11-01: a hashed
  *      access forces a unique key, a standard one a non-unique one)
@@ -19,7 +19,8 @@
  *      row type
  *   -> a definition SAP stores and refuses to activate (an empty key under a
  *      sorted access: "Empty keys are only allowed in standard tables",
- *      measured on premise 2026-11-01): the refusal carries the stored definition
+ *      measured on premise 2026-11-01): the refusal carries the stored definition,
+ *      the inactive version
  *   -> compact: HandlerCreate, HandlerGet, HandlerLock, HandlerUpdate with the
  *      read document, HandlerUnlock, HandlerValidate (a free name),
  *      HandlerCheckRun, HandlerDeletionCheck, HandlerActivate, HandlerWhereUsed,
@@ -135,6 +136,11 @@ function storedOf(answer: Answer): StoredTableTypeDefinition | undefined {
     if (typeof value === 'string') read[key] = value;
   }
   return read;
+}
+
+/** The version the stored definition was read at, as the answer names it. */
+function storedVersionOf(answer: Answer): unknown {
+  return field(parsed(answer.text), 'stored_version');
 }
 
 /** The definition a metadata read answers (GetTableType, HandlerGet). */
@@ -370,6 +376,8 @@ describe('TableType High-Level Handlers Integration', () => {
         created.push({ kind: 'table_type', name: TABLE_TYPE });
         const createdStored = storedOf(createdAnswer);
         expect(createdStored).toMatchObject(definition);
+        // Activated: read after the activation, at the active version.
+        expect(storedVersionOf(createdAnswer)).toBe('active');
         const read = await must(`GetTableType ${TABLE_TYPE}`, () =>
           handleGetTableType(context, { table_type_name: TABLE_TYPE }),
         );
@@ -386,6 +394,7 @@ describe('TableType High-Level Handlers Integration', () => {
             }),
         );
         const updatedStored = storedOf(updated);
+        expect(storedVersionOf(updated)).toBe('active');
         expect(updatedStored?.access_type).toBe(updateAccess);
         expect(updatedStored?.key_kind).toBe(
           storedKeyKind(updateAccess, definition.key_kind),
@@ -467,6 +476,8 @@ describe('TableType High-Level Handlers Integration', () => {
           access_type: 'sorted',
           key_definition: 'empty',
         });
+        // The activation refused: the inactive version the wait read.
+        expect(storedVersionOf(refused)).toBe('inactive');
         await must(`DeleteTableType ${REFUSED_TABLE_TYPE}`, () =>
           handleDeleteTableType(context, {
             table_type_name: REFUSED_TABLE_TYPE,

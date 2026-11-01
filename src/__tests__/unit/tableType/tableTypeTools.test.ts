@@ -241,6 +241,7 @@ describe('CreateTableType', () => {
       `GET ${TTYP}/ztt_x?version=inactive&withLongPolling=true`,
       `POST ${CHECK_URL}`,
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
+      `GET ${TTYP}/ztt_x?version=active`,
     ]);
     expect(connection.sessions).toEqual([
       'stateless',
@@ -249,6 +250,7 @@ describe('CreateTableType', () => {
       'stateless',
       'stateless',
       'stateful',
+      'stateless',
       'stateless',
       'stateless',
       'stateless',
@@ -367,7 +369,7 @@ describe('CreateTableType', () => {
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
     expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(9);
+    expect(connection.requests).toHaveLength(10);
   });
 });
 
@@ -395,6 +397,7 @@ describe('UpdateTableType', () => {
       `POST ${UNLOCK_URL}`,
       `GET ${TTYP}/ztt_x?version=inactive&withLongPolling=true`,
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
+      `GET ${TTYP}/ztt_x?version=active`,
     ]);
     expect(connection.sessions).toEqual([
       'stateful',
@@ -402,6 +405,7 @@ describe('UpdateTableType', () => {
       'stateless',
       'stateless',
       'stateful',
+      'stateless',
       'stateless',
       'stateless',
     ]);
@@ -502,7 +506,7 @@ describe('UpdateTableType', () => {
       { table_type_name: 'ZTT_X' },
     );
     expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(7);
+    expect(connection.requests).toHaveLength(8);
   });
 });
 
@@ -561,12 +565,16 @@ const answerOf = (result: {
   content: ReadonlyArray<{ type: string; text?: string }>;
 }): Record<string, unknown> => JSON.parse(textOf(result));
 
-describe('the definition SAP stored, read from the wait after the unlock', () => {
+describe('the definition SAP stored, read at a stated version', () => {
   const WAIT_URL = `${TTYP}/ztt_x?version=inactive&withLongPolling=true`;
-  /** Create: the wait is the seventh request. */
-  const createdStoring = (
-    wait: NonNullable<Parameters<typeof recordingConnection>[0]>[number],
-  ) =>
+  /** The read after the activation: the active version, one GET. */
+  const ACTIVE_URL = `${TTYP}/ztt_x?version=active`;
+  type Answer = NonNullable<Parameters<typeof recordingConnection>[0]>[number];
+  /**
+   * Create: the wait is the seventh request, the check the eighth, the
+   * activation the ninth, the read after it the tenth.
+   */
+  const created = (wait: Answer, afterActivation?: Answer) =>
     sessionRecording([
       undefined,
       undefined,
@@ -575,11 +583,15 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
       undefined,
       undefined,
       wait,
+      undefined,
+      undefined,
+      afterActivation,
     ]);
-  /** Update: the wait is the sixth request. */
-  const existingStoring = (
-    wait: NonNullable<Parameters<typeof recordingConnection>[0]>[number],
-  ) =>
+  /**
+   * Update: the wait is the sixth request, the activation the seventh, the
+   * read after it the eighth.
+   */
+  const existing = (wait: Answer, afterActivation?: Answer) =>
     sessionRecording([
       undefined,
       { data: STRING_TABLE },
@@ -587,12 +599,14 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
       undefined,
       undefined,
       wait,
+      undefined,
+      afterActivation,
     ]);
 
   it.each(DETAILS)(
-    "CreateTableType answers SAP's stored values beside the result (detail %s), with no request of its own",
+    'CreateTableType, activated: reads the active version after the activation and answers it (detail %s)',
     async (detail) => {
-      const connection = createdStoring({ data: STORED_HASHED });
+      const connection = created(undefined, { data: STORED_HASHED });
       const result = await handleCreateTableType(
         { connection, logger: undefined },
         {
@@ -604,30 +618,38 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
         },
       );
       expect(result.isError).toBe(false);
-      expect(connection.requests).toHaveLength(9);
-      expect(connection.requests[6]?.url).toBe(WAIT_URL);
-      expect(answerOf(result).stored_definition).toEqual(
-        STORED_HASHED_DEFINITION,
-      );
+      expect(wire(connection).slice(6)).toEqual([
+        `GET ${WAIT_URL}`,
+        `POST ${CHECK_URL}`,
+        `POST ${ACTIVATE_URL}`,
+        `GET ${ACTIVE_URL}`,
+      ]);
+      expect(answerOf(result)).toMatchObject({
+        stored_definition: STORED_HASHED_DEFINITION,
+        stored_version: 'active',
+      });
     },
   );
 
-  it('CreateTableType keeps the terse result beside the stored definition', async () => {
-    const connection = createdStoring({ data: STORED_HASHED });
+  it('CreateTableType, activate false: the wait reads the inactive version, and the answer names it', async () => {
+    const connection = created({ data: STORED_HASHED });
     const result = await handleCreateTableType(
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', activate: false },
     );
+    expect(connection.requests).toHaveLength(8);
+    expect(connection.requests[6]?.url).toBe(WAIT_URL);
     expect(answerOf(result)).toEqual({
       result: 'SUCCESS',
       stored_definition: STORED_HASHED_DEFINITION,
+      stored_version: 'inactive',
     });
   });
 
   it.each(DETAILS)(
-    "UpdateTableType answers SAP's stored values beside the result (detail %s), with no request of its own",
+    'UpdateTableType, activated: reads the active version after the activation and answers it (detail %s)',
     async (detail) => {
-      const connection = existingStoring({ data: STORED_HASHED });
+      const connection = existing(undefined, { data: STORED_HASHED });
       const result = await handleUpdateTableType(
         { connection, logger: undefined },
         {
@@ -638,36 +660,35 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
         },
       );
       expect(result.isError).toBe(false);
-      expect(connection.requests).toHaveLength(7);
-      expect(connection.requests[5]?.url).toBe(WAIT_URL);
-      expect(answerOf(result).stored_definition).toEqual(
-        STORED_HASHED_DEFINITION,
-      );
+      expect(wire(connection).slice(5)).toEqual([
+        `GET ${WAIT_URL}`,
+        `POST ${ACTIVATE_URL}`,
+        `GET ${ACTIVE_URL}`,
+      ]);
+      expect(answerOf(result)).toMatchObject({
+        stored_definition: STORED_HASHED_DEFINITION,
+        stored_version: 'active',
+      });
     },
   );
 
-  it('UpdateTableType keeps the terse result beside the stored definition', async () => {
-    const connection = existingStoring({ data: STORED_HASHED });
+  it('UpdateTableType, activate false: the wait reads the inactive version, and the answer names it', async () => {
+    const connection = existing({ data: STORED_HASHED });
     const result = await handleUpdateTableType(
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', activate: false },
     );
+    expect(connection.requests).toHaveLength(6);
+    expect(connection.requests[5]?.url).toBe(WAIT_URL);
     expect(answerOf(result)).toEqual({
       result: 'SUCCESS',
       stored_definition: STORED_HASHED_DEFINITION,
+      stored_version: 'inactive',
     });
   });
 
-  it("CreateTableType answers a refused activation after the write with SAP's refusal and the stored definition", async () => {
-    const connection = sessionRecording([
-      undefined,
-      undefined,
-      undefined,
-      { data: STRING_TABLE },
-      undefined,
-      undefined,
-      { data: STORED_HASHED },
-    ]);
+  it("CreateTableType answers a refused activation with SAP's refusal and the inactive definition the wait read", async () => {
+    const connection = created({ data: STORED_HASHED });
     const result = await handleCreateTableType(
       { connection: throwingAt(connection, ACTIVATE_URL), logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
@@ -679,10 +700,11 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
       raw_body: REFUSED.data,
       step: 'activate',
       stored_definition: STORED_HASHED_DEFINITION,
+      stored_version: 'inactive',
     });
   });
 
-  it("CreateTableType answers a refused check after the write with SAP's refusal and the stored definition", async () => {
+  it("CreateTableType answers a refused check with SAP's refusal and the inactive definition the wait read", async () => {
     const connection = sessionRecording([
       undefined,
       undefined,
@@ -704,18 +726,12 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
       status: 403,
       step: 'check',
       stored_definition: STORED_HASHED_DEFINITION,
+      stored_version: 'inactive',
     });
   });
 
-  it("UpdateTableType answers a refused activation after the write with SAP's refusal and the stored definition", async () => {
-    const connection = sessionRecording([
-      undefined,
-      { data: STRING_TABLE },
-      undefined,
-      undefined,
-      undefined,
-      { data: STORED_HASHED },
-    ]);
+  it("UpdateTableType answers a refused activation with SAP's refusal and the inactive definition the wait read", async () => {
+    const connection = existing({ data: STORED_HASHED });
     const result = await handleUpdateTableType(
       { connection: throwingAt(connection, ACTIVATE_URL), logger: undefined },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
@@ -727,6 +743,7 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
       raw_body: REFUSED.data,
       step: 'activate',
       stored_definition: STORED_HASHED_DEFINITION,
+      stored_version: 'inactive',
     });
   });
 
@@ -746,30 +763,49 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
     expect(answered.message).toBe('refused');
     expect(answered).not.toHaveProperty('stored_definition');
     expect(answered).not.toHaveProperty('stored_definition_not_read');
+    expect(answered).not.toHaveProperty('stored_version');
   });
 
-  it("says the stored definition was not read when the wait's read is refused, with SAP's answer", async () => {
-    const connection = existingStoring(REFUSED);
+  it("says the stored definition was not read when the read after the activation is refused, with SAP's answer", async () => {
+    const connection = existing({ data: STORED_HASHED }, REFUSED);
     const result = await handleUpdateTableType(
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
     expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(7);
+    expect(connection.requests).toHaveLength(8);
     const answered = answerOf(result);
     expect(answered.stored_definition).toBeUndefined();
+    expect(answered.stored_version).toBe('active');
     expect(answered.stored_definition_not_read).toMatchObject({
       status: 403,
       raw_body: REFUSED.data,
     });
   });
 
-  it("says the stored definition was not read when the wait's read throws, with SAP's answer", async () => {
-    const inner = createdStoring(undefined);
+  it("says the stored definition was not read when the wait's read is refused with activate false", async () => {
+    const connection = existing(REFUSED);
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', activate: false },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(6);
+    const answered = answerOf(result);
+    expect(answered.stored_definition).toBeUndefined();
+    expect(answered.stored_version).toBe('inactive');
+    expect(answered.stored_definition_not_read).toMatchObject({
+      status: 403,
+      raw_body: REFUSED.data,
+    });
+  });
+
+  it("says the stored definition was not read when the read after the activation throws, with SAP's answer", async () => {
+    const inner = created(undefined);
     const connection: typeof inner = {
       ...inner,
       async makeAdtRequest(options) {
-        if (options.url === WAIT_URL) {
+        if (options.url === ACTIVE_URL) {
           inner.requests.push({ method: options.method, url: options.url });
           throw Object.assign(
             new Error('Request failed with status code 403'),
@@ -793,8 +829,8 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
     });
   });
 
-  it('says the stored definition was not read when the wait answers no table type document, with its status and body', async () => {
-    const connection = createdStoring({ data: '' });
+  it('says the stored definition was not read when the read after the activation answers no table type document', async () => {
+    const connection = created(undefined, { data: '' });
     const result = await handleCreateTableType(
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },

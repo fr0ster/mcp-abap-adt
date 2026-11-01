@@ -210,12 +210,17 @@ describe('reading the definition a table type document states', () => {
   });
 });
 
-describe('reading the stored definition from the wait', () => {
-  it("says it was not read when the read throws, with the throw's answer", async () => {
-    const said = await readStoredDefinition(async () => {
-      throw new Error('socket hang up');
-    }, 'terse');
+describe('reading the stored definition', () => {
+  it("says it was not read when the read throws, with the throw's answer and the version", async () => {
+    const said = await readStoredDefinition(
+      async () => {
+        throw new Error('socket hang up');
+      },
+      'active',
+      'terse',
+    );
     expect(said).toEqual({
+      stored_version: 'active',
       stored_definition_not_read: {
         error: 'client_threw',
         message: 'socket hang up',

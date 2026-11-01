@@ -17,8 +17,10 @@
  *
  * The wait is `readMetadata({withLongPolling: true})` (see
  * `handleCreateDomain.ts` and `xmlPatch.ts`): it sits right before `check`,
- * the first call that reads the write back. Its document is the definition
- * SAP stored, answered beside the result (`tableTypeStored.ts`).
+ * the first call that reads the write back. Its document, the inactive
+ * version, is the definition SAP stored, answered beside the result; after
+ * a successful activation one read of the active version answers it instead
+ * (`tableTypeStored.ts`).
  */
 
 import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
@@ -136,7 +138,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, read after the write, beside a success and a failure after the write alike; a definition whose read failed is answered with SAP's answer to that read.",
+    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, beside a success and a failure after the write alike, with the version it was read at (stored_version): the active version, read after a successful activation, else the inactive version, read after the write; a definition whose read failed is answered with SAP's answer to that read.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -293,9 +295,10 @@ export async function handleCreateTableType(
             { type: 'TABLE_TYPE', name: tableTypeName },
           ),
         // Wait for the write to be visible right before the first call that
-        // reads it back, as `CreateDomain` does; its document is the
-        // definition SAP stored, answered beside the result (a failed read
-        // is said so, and the chain goes on; a credential failure ends it).
+        // reads it back, as `CreateDomain` does; its document, the inactive
+        // version, is the definition SAP stored until an activation succeeds
+        // (a failed read is said so, and the chain goes on; a credential
+        // failure ends it).
         atStep('check', async () => {
           stored = await readStoredDefinition(
             () =>
@@ -307,6 +310,7 @@ export async function handleCreateTableType(
                   analyse: analyseException,
                 },
               ),
+            'inactive',
             detail,
           );
           return withAdtHeaders(context, 'tableType.check', (headers) =>
@@ -320,7 +324,7 @@ export async function handleCreateTableType(
 
       if (!checked.ok || !shouldActivate) return checked;
 
-      return carryCleanup(
+      const activated = await carryCleanup(
         checked,
         atStep('activate', () =>
           withAdtHeaders(context, 'tableType.activate', (headers) =>
@@ -331,6 +335,21 @@ export async function handleCreateTableType(
           ),
         ),
       );
+      // Activated: the definition SAP stored is the active version's, read
+      // once after the activation (a failed read is said so; a credential
+      // failure ends the call).
+      if (activated.ok) {
+        stored = await readStoredDefinition(
+          () =>
+            obj.readMetadata(
+              { tableTypeName },
+              { version: 'active', analyse: analyseException },
+            ),
+          'active',
+          detail,
+        );
+      }
+      return activated;
     },
     project(detail, terseWrite),
   );

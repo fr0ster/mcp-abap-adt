@@ -11,8 +11,9 @@
  * runs inside the lock, as the domain's does; a refusal there stops the
  * answer exactly as a refused write would. The wait is the long-polling
  * `readMetadata({withLongPolling: true})` (see `handleUpdateDomain.ts` and
- * `xmlPatch.ts`); its document is the definition SAP stored, answered
- * beside the result (`tableTypeStored.ts`).
+ * `xmlPatch.ts`); its document, the inactive version, is the definition SAP
+ * stored, answered beside the result; after a successful activation one read
+ * of the active version answers it instead (`tableTypeStored.ts`).
  *
  * Only the properties the caller gave are patched into the document read
  * under the lock; every other one keeps SAP's value. No schema default but
@@ -56,7 +57,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, read after the write, beside a success and a failure after the write alike; a definition whose read failed is answered with SAP's answer to that read.",
+    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, beside a success and a failure after the write alike, with the version it was read at (stored_version): the active version, read after a successful activation, else the inactive version, read after the write; a definition whose read failed is answered with SAP's answer to that read.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -190,9 +191,9 @@ export async function handleUpdateTableType(
       if (!written.ok) return written;
 
       // Wait for the write to be visible before activating, as
-      // `UpdateDomain` does; its document is the definition SAP stored,
-      // answered beside the result (a failed read is said so, and the call
-      // goes on; a credential failure ends it).
+      // `UpdateDomain` does; its document, the inactive version, is the
+      // definition SAP stored until an activation succeeds (a failed read is
+      // said so, and the call goes on; a credential failure ends it).
       stored = await readStoredDefinition(
         () =>
           obj.readMetadata(
@@ -203,12 +204,13 @@ export async function handleUpdateTableType(
               analyse: analyseException,
             },
           ),
+        'inactive',
         detail,
       );
 
       if (!shouldActivate) return written;
 
-      return carryCleanup(
+      const activated = await carryCleanup(
         written,
         atStep('activate', () =>
           withAdtHeaders(context, 'tableType.activate', (headers) =>
@@ -219,6 +221,21 @@ export async function handleUpdateTableType(
           ),
         ),
       );
+      // Activated: the definition SAP stored is the active version's, read
+      // once after the activation (a failed read is said so; a credential
+      // failure ends the call).
+      if (activated.ok) {
+        stored = await readStoredDefinition(
+          () =>
+            obj.readMetadata(
+              { tableTypeName },
+              { version: 'active', analyse: analyseException },
+            ),
+          'active',
+          detail,
+        );
+      }
+      return activated;
     },
     project(detail, terseWrite),
   );

@@ -95,7 +95,6 @@ const REGISTRIES: Readonly<
 > = {
   'HandlerExporter (./handlers)': (systemType) => {
     const exporter = new HandlerExporter({
-      includeDebug: true,
       ...(systemType !== undefined && { systemType }),
     });
     return {
@@ -582,17 +581,6 @@ describe('a handler getHandlerEntries hands out', () => {
     expect(sent).toEqual([]);
   });
 
-  it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, a context-taking handler leaves its connection with no kind', async () => {
-    process.env.SAP_SYSTEM_TYPE = 'cloud';
-    const { kind, sent } = await embedderCall(
-      undefined,
-      'ListBackgroundRuns',
-      {},
-    );
-    expect(kind).toBeUndefined();
-    expect(sent).toEqual([]);
-  });
-
   it.each<[SapEnvironment, string]>([
     ['cloud', 'onprem'],
     ['onprem', 'cloud'],
@@ -608,8 +596,6 @@ describe('a handler getHandlerEntries hands out', () => {
       expect(program.sent).toEqual([
         'GET /sap/bc/adt/programs/programs/zplaceholder/source/main?version=active',
       ]);
-      const runs = await embedderCall(systemType, 'ListBackgroundRuns', {});
-      expect(runs.kind).toBe(systemType);
     },
   );
 });

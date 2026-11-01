@@ -635,10 +635,20 @@ function builtDefinitions() {
     includeHighLevel: true,
     includeSystem: true,
     includeSearch: true,
-    includeDebug: true,
   }).getHandlerEntries();
+  // What the exporter leaves out (it keeps no background-run store and no
+  // debugger) is served by the binaries: the groups' own definitions, the
+  // run tools with their `background`.
+  const groupsDir = path.dirname(distEntry);
+  const context = { connection: null };
+  const served = ['RuntimeRun', 'BackgroundRun', 'Debug'].flatMap((name) => {
+    const group = require(
+      path.join(groupsDir, 'groups', `${name}HandlersGroup.js`),
+    )[`${name}HandlersGroup`];
+    return new group(context).getHandlers();
+  });
   const byName = new Map();
-  for (const entry of entries)
+  for (const entry of [...entries, ...served])
     byName.set(entry.toolDefinition.name, entry.toolDefinition);
   return byName;
 }

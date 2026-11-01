@@ -102,7 +102,6 @@ export const customized = new HandlerExporter({
   includeHighLevel: true,
   includeSystem: true,
   includeSearch: true,
-  includeDebug: false,
 });
 export const readOnly = new HandlerExporter({
   systemType: 'cloud',

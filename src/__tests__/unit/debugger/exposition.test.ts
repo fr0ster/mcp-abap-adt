@@ -1,5 +1,8 @@
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
-import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
+import {
+  EXPORTER_NO_DEBUGGER_WORDS,
+  HandlerExporter,
+} from '../../../lib/handlers/HandlerExporter';
 import { fullReadOnlyToolSet, fullToolSet } from '../../../lib/toolSet';
 
 describe('the debug set', () => {
@@ -9,17 +12,16 @@ describe('the debug set', () => {
     ).toBe('DebugHandlers');
   });
 
-  it('HandlerExporter leaves it out unless asked, and gives it when asked', () => {
-    const names = (o: any) =>
-      new HandlerExporter({ systemType: 'onprem', ...o })
-        .getHandlerEntries()
-        .map((e) => e.toolDefinition.name);
+  it('HandlerExporter leaves it out, and refuses includeDebug', () => {
+    const names = new HandlerExporter({ systemType: 'onprem' })
+      .getHandlerEntries()
+      .map((e) => e.toolDefinition.name);
     expect(
-      names({}).some((n: string) =>
-        /^(Debug|AmdpDebug|MemorySnapshot)/.test(n),
-      ),
+      names.some((n: string) => /^(Debug|AmdpDebug|MemorySnapshot)/.test(n)),
     ).toBe(false);
-    expect(names({ includeDebug: true })).toContain('DebugStartListener');
+    expect(
+      () => new HandlerExporter({ systemType: 'onprem', includeDebug: true }),
+    ).toThrow(EXPORTER_NO_DEBUGGER_WORDS);
   });
 
   // The binary fixes its set: always in core, never in core-ro.

@@ -3,6 +3,7 @@ import type { Logger } from '@mcp-abap-adt/logger';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import { ServerRefusal } from '../auth/serverRefusal.js';
+import { withoutBackgroundParameter } from '../backgroundRuns/tools.js';
 import { noopLogger } from '../handlerLogger.js';
 import {
   isCredentialFailure,
@@ -10,8 +11,6 @@ import {
   type SystemContextRules,
 } from '../requestSystemResolution.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
-import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.js';
-import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
 import { RuntimeRunHandlersGroup } from './groups/RuntimeRunHandlersGroup.js';
@@ -31,6 +30,25 @@ import {
   inStatedScope,
   isArgsOnly,
 } from './utils/handlerCall.js';
+
+/**
+ * Why `new HandlerExporter({ includeDebug: true })` is refused.
+ */
+export const EXPORTER_NO_DEBUGGER_WORDS =
+  'HandlerExporter serves no debugger tools: they need the debugger and state of a server instance (EmbeddableMcpServer); includeDebug is refused';
+
+/**
+ * The run tools as the exporter hands them out: without `background`, since
+ * it keeps no background-run store (`withoutBackgroundParameter`).
+ */
+class ExportedRuntimeRunHandlersGroup extends RuntimeRunHandlersGroup {
+  override getHandlers(): HandlerEntry[] {
+    return super.getHandlers().map((entry) => ({
+      ...entry,
+      toolDefinition: withoutBackgroundParameter(entry.toolDefinition),
+    }));
+  }
+}
 
 /**
  * The connection one call of a tool registered with
@@ -76,8 +94,10 @@ export interface HandlerExporterOptions {
   includeSearch?: boolean;
 
   /**
-   * Debugger tools (default false): opt-in; they catch every request of the SAP user
-   * @default false
+   * Refused when `true`: the debugger tools need a server instance's
+   * debugger and state (`EmbeddableMcpServer`), which an exporter does not
+   * keep — `new HandlerExporter({ includeDebug: true })` throws
+   * `EXPORTER_NO_DEBUGGER_WORDS`. The exporter hands out no debugger tool.
    */
   includeDebug?: boolean;
 
@@ -155,6 +175,10 @@ export class HandlerExporter {
     this.systemType = options?.systemType;
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
+    // The debugger tools need a server instance's debugger and state.
+    if (options?.includeDebug === true) {
+      throw new Error(EXPORTER_NO_DEBUGGER_WORDS);
+    }
 
     // Create dummy context for group instantiation. A call's real context
     // is given by the server instance (BaseMcpServer.registerHandlers(), via
@@ -198,16 +222,15 @@ export class HandlerExporter {
     this.handlerGroups.push(...overridingGroups);
     if (options?.includeSystem !== false) {
       this.handlerGroups.push(new SystemHandlersGroup(dummyContext));
-      this.handlerGroups.push(new RuntimeRunHandlersGroup(dummyContext));
-      // Beside the run tools: their background runs — served by an instance
-      // whose host gave a strategy (`backgroundRuns`), refused otherwise.
-      this.handlerGroups.push(new BackgroundRunHandlersGroup(dummyContext));
+      // The run tools without `background`: the exporter keeps no
+      // background-run store, so it hands out neither the parameter nor the
+      // background-run tools.
+      this.handlerGroups.push(
+        new ExportedRuntimeRunHandlersGroup(dummyContext),
+      );
     }
     if (options?.includeSearch !== false) {
       this.handlerGroups.push(new SearchHandlersGroup(dummyContext));
-    }
-    if (options?.includeDebug === true) {
-      this.handlerGroups.push(new DebugHandlersGroup(dummyContext));
     }
   }
 

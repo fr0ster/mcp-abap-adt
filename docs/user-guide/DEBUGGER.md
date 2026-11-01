@@ -24,9 +24,10 @@ mcp-abap-adt-compact    # compact (and -compact-http, -compact-sse): four debugg
 mcp-abap-adt-ro         # no debugger (nor -http-ro, -sse-ro, -compact-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
-Where a breakpoint must not be possible, install a `-ro` binary. An embedder passes
-`includeDebug: true` to `HandlerExporter`, or adds `DebugHandlersGroup` from
-`@mcp-abap-adt/lib/handlers` to its own registry.
+Where a breakpoint must not be possible, install a `-ro` binary. An embedder adds
+`DebugHandlersGroup` from `@mcp-abap-adt/lib/handlers` to the registry of a server instance
+(`EmbeddableMcpServer`), which keeps the debugger and its state. `HandlerExporter` serves no
+debugger tool: `includeDebug: true` is refused when it is constructed.
 
 ## Scope: what it debugs
 

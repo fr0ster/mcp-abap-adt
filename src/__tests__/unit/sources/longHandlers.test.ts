@@ -13,11 +13,15 @@ import * as path from 'node:path';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
+import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   HandlerContext,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
+import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { LONG_TOOL_ADVICE, LONG_TOOLS } from '../../../lib/longTools';
 
 const REPO = path.resolve(__dirname, '../../../..');
@@ -47,10 +51,15 @@ function shippedDefinitions(): ToolDefinition[] {
       includeHighLevel: true,
       includeSystem: true,
       includeSearch: true,
-      includeDebug: true,
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
+    // What the exporter leaves out (no store, no debugger): the groups' own.
+    ...[
+      new RuntimeRunHandlersGroup(noConnectionContext()),
+      new BackgroundRunHandlersGroup(noConnectionContext()),
+      new DebugHandlersGroup(noConnectionContext()),
+    ].flatMap((group) => group.getHandlers().map((e) => e.toolDefinition)),
     ...new CompactReadOnlyHandlersGroup(placeholder)
       .getHandlers()
       .map((e) => e.toolDefinition),

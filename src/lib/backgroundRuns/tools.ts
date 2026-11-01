@@ -10,6 +10,8 @@
  * the list with it, fails.
  */
 
+import type { ToolDefinition } from '../handlers/interfaces.js';
+
 /** The tools that take `background`, with the names of the tools that read and discard their runs. */
 export const BACKGROUND_TOOLS: Readonly<
   Record<string, { readonly get: string; readonly discard: string }>
@@ -36,6 +38,40 @@ export const BACKGROUND_PROPERTY = {
   description:
     'When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.',
 } as const;
+
+/**
+ * `definition` without its `background` parameter, on every variant it
+ * states: a run tool as a host with no background-run store hands it out
+ * (`HandlerExporter`), so the parameter is not offered at all.
+ */
+export function withoutBackgroundParameter(
+  definition: ToolDefinition,
+): ToolDefinition {
+  const { variants } = definition;
+  return {
+    ...definition,
+    inputSchema: schemaWithoutBackground(definition.inputSchema),
+    ...(variants !== undefined && {
+      variants: {
+        onprem: {
+          ...variants.onprem,
+          inputSchema: schemaWithoutBackground(variants.onprem.inputSchema),
+        },
+        cloud: {
+          ...variants.cloud,
+          inputSchema: schemaWithoutBackground(variants.cloud.inputSchema),
+        },
+      },
+    }),
+  };
+}
+
+function schemaWithoutBackground(
+  schema: ToolDefinition['inputSchema'],
+): ToolDefinition['inputSchema'] {
+  const { background: _left, ...properties } = schema.properties ?? {};
+  return { ...schema, properties };
+}
 
 /** The `background` property of compact's run tool. */
 export const COMPACT_BACKGROUND_PROPERTY = {

@@ -85,9 +85,13 @@ Each call:
    set to the call's for exactly that call, so calls at once each run on their own connection.
 
 A listed long tool's read runs on a connection of its own, opened from the call's, as on a plain
-registration. What needs state a server instance owns is not available here: `background: true`
-and the background-run tools answer `background_runs_unavailable`, and the debugger tools answer
-that debugging is not served by this server.
+registration.
+
+The exporter keeps no background-run store and no debugger, so it hands out neither, on every
+path (`getHandlerEntries()`, `createRegistry()`, `registerOnServer`): no background-run tool
+(`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`), no `background` parameter on
+`RuntimeRunClass` / `RuntimeRunProgram`, and no debugger tool — `includeDebug: true` is refused
+when the exporter is constructed. A server instance (`EmbeddableMcpServer`) serves them.
 
 ### Async Connection Provider
 
@@ -150,16 +154,15 @@ stay with you.
 
 ## Handler Groups
 
-By default, every handler group but the debugger's is included. You can customize this:
+By default, every handler group the exporter serves is included. You can customize this:
 
 ```typescript
 const exporter = new HandlerExporter({
   systemType: "cloud",
   includeReadOnly: true,   // getProgram, getClass, getTable, etc.
   includeHighLevel: true,  // createProgram, updateClass, etc.
-  includeSystem: true,     // system, runtime-run and background-run tools
+  includeSystem: true,     // system and runtime-run tools
   includeSearch: true,     // search and where-used tools
-  includeDebug: false,     // the debugger tools (opt-in)
 });
 ```
 

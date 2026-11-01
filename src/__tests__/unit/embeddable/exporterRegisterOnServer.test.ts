@@ -42,7 +42,6 @@ type Listed = Awaited<ReturnType<Client['listTools']>>['tools'];
 
 const exporterFor = (systemType?: SapEnvironment) =>
   new HandlerExporter({
-    includeDebug: true,
     logger: silentLogger,
     ...(systemType !== undefined && { systemType }),
   });
@@ -284,8 +283,9 @@ describe('HandlerExporter.registerOnServer calls', () => {
 
 /**
  * Each tool answers as it does through an `EmbeddableMcpServer` holding the
- * same exporter's registry on the same kind of connection: an args-only
- * handler (`(args) => handleX(this.context, args)`) and a context-taking one.
+ * same exporter's registry on the same kind of connection: args-only
+ * handlers (`(args) => handleX(this.context, args)`) — every tool the
+ * exporter hands out takes that form — and a long read.
  */
 describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', () => {
   async function onExporter(name: string, args: Record<string, unknown>) {
@@ -316,15 +316,12 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
       'DeleteClass',
       { class_name: 'ZCL_PLACEHOLDER', transport_request: 'E19K900001' },
     ],
-    ['a context-taking tool', 'ListBackgroundRuns', {}],
   ])('%s', async (_label, name, args) => {
     const exported = await onExporter(name, args);
     const embedded = await onEmbeddable(name, args);
     expect(exported).toEqual(embedded);
     expect(exported.answer).not.toContain('Cannot read properties');
-    if (name !== 'ListBackgroundRuns') {
-      expect(exported.sent.length).toBeGreaterThan(0);
-    }
+    expect(exported.sent.length).toBeGreaterThan(0);
   });
 
   it('a long read, on a connection of its own made from the call’s', async () => {

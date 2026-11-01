@@ -9,7 +9,10 @@
  * route cannot go missing by landing in neither file.
  */
 
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
+import type {
+  CompactObjectType,
+  ReadVersion,
+} from '@mcp-abap-adt/lib/compact-shared';
 import {
   type CompactHandler,
   type CompactRouterMap,
@@ -48,9 +51,7 @@ import { return_error } from '@mcp-abap-adt/lib/utils';
  * The version a read is asked for, from outside the type system: absent, or
  * one of the three ADT takes; anything else is an error naming them.
  */
-function readVersionOf(
-  given: unknown,
-): 'active' | 'inactive' | 'workingArea' | undefined | Error {
+function readVersionOf(given: unknown): ReadVersion | undefined | Error {
   if (given === undefined) return undefined;
   if (given === 'active' || given === 'inactive' || given === 'workingArea') {
     return given;

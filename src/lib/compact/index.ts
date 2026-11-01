@@ -22,6 +22,7 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export type { ReadVersion } from '../handlers/readVersion.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';
 export { DETAIL_PROPERTY } from '../strategies/detail.js';

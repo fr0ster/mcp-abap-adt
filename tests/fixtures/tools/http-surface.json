@@ -361,7 +361,7 @@
     "HandlerDebugMaintain": "state_handle*, kind*, operation*, names, parents, variable_name, value, debuggee_id, query, row_number, detail",
     "HandlerDebugSession": "state_handle, kind*, operation*, hold_seconds, take_over, debuggee_id, server, settings, request_user, debugging_mode, detail",
     "HandlerDebugStep": "state_handle*, kind*, operation*, object_type, object_name, line, include, parent_name, position, debuggee_id, detail",
-    "HandlerDelete": "object_type*, lock_handle, package_name, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, state_handle",
+    "HandlerDelete": "object_type*, lock_handle, package_name, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, include_name, table_type_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, state_handle",
     "HandlerDeletionCheck": "object_type*, object_name*, state_handle",
     "HandlerDumpList": "timeout, feed_type, user, runtime_error, exception, object_name, package, component, top, from, to, state_handle",
     "HandlerDumpView": "dump_id*, view, state_handle",

@@ -19,6 +19,8 @@ import {
   type AtcKindOn,
   type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
+  type COMPACT_DELETE,
+  type COMPACT_DELETION_CHECK,
   type COMPACT_READ_ROUTES,
   type COMPACT_UPDATE,
   type INCLUDES_PARENT_ROUTES,
@@ -132,6 +134,16 @@ export const tableTypeInCloudUpdate: (typeof COMPACT_UPDATE.cloud)[number] =
   'TABLE_TYPE';
 // @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
 export const includeInCloudUpdate: (typeof COMPACT_UPDATE.cloud)[number] =
+  'INCLUDE';
+
+/** HandlerDelete's cloud list holds the table type… */
+export const tableTypeInCloudDelete: (typeof COMPACT_DELETE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
+export const includeInCloudDelete: (typeof COMPACT_DELETE.cloud)[number] =
+  'INCLUDE';
+/** HandlerDeletionCheck asks about an include on ABAP cloud too. */
+export const includeInCloudDeletionCheck: (typeof COMPACT_DELETION_CHECK.cloud)[number] =
   'INCLUDE';
 
 // --- A list is exactly its projection --------------------------------------

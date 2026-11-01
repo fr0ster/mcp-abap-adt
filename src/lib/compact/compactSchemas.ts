@@ -567,6 +567,8 @@ export function compactDeleteSchemaFor<const M extends readonly string[]>(
       structure_name: { type: 'string', description: 'Structure name.' },
       data_element_name: { type: 'string', description: 'Data element name.' },
       interface_name: { type: 'string', description: 'Interface name.' },
+      include_name: { type: 'string', description: 'Include name.' },
+      table_type_name: { type: 'string', description: 'Table type name.' },
       service_definition_name: {
         type: 'string',
         description: 'Service definition name.',

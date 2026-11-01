@@ -135,6 +135,8 @@ const TYPES: Array<[string, string, string]> = [
   ],
   ['BEHAVIOR_IMPLEMENTATION', 'ZBP_A', '/sap/bc/adt/oo/classes/zbp_a'],
   ['METADATA_EXTENSION', 'ZDDLX_A', '/sap/bc/adt/ddic/ddlx/sources/zddlx_a'],
+  ['INCLUDE', 'ZINCL_A', '/sap/bc/adt/programs/includes/zincl_a'],
+  ['TABLE_TYPE', 'ZTTYP_A', '/sap/bc/adt/ddic/tabletypes/zttyp_a'],
 ];
 
 describe('HandlerDeletionCheck is the one deletion check', () => {
@@ -222,6 +224,14 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
 
   it('names no other tool', () => {
     expect(TOOL_DEFINITION.description).not.toMatch(/Handler[A-Z]/);
+  });
+
+  it('asks about an include and a table type on ABAP cloud too', () => {
+    const cloud = TOOL_DEFINITION.variants.cloud;
+    expect(cloud.inputSchema.properties.object_type.enum).toEqual(
+      expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']),
+    );
+    expect(cloud.description).toContain('INCLUDE');
   });
 });
 

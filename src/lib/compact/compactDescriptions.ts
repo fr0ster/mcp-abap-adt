@@ -165,6 +165,7 @@ const DELETE_TOKENS: Tokens<(typeof COMPACT_DELETE.onprem)[number]> = {
   DATA_ELEMENT: 'DATA_ELEMENT(data_element_name*, transport_request)',
   TABLE: 'TABLE(table_name*, transport_request)',
   STRUCTURE: 'STRUCTURE(structure_name*, transport_request)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*, transport_request)',
   DDL: 'DDL(ddl_name*, transport_request)',
   SERVICE_DEFINITION:
     'SERVICE_DEFINITION(service_definition_name*, transport_request)',
@@ -172,6 +173,7 @@ const DELETE_TOKENS: Tokens<(typeof COMPACT_DELETE.onprem)[number]> = {
   CLASS: 'CLASS(class_name*, transport_request)',
   CDS_UNIT_TEST: 'CDS_UNIT_TEST(class_name*, transport_request)',
   PROGRAM: 'PROGRAM(program_name*, transport_request)',
+  INCLUDE: 'INCLUDE(include_name*, transport_request)',
   INTERFACE: 'INTERFACE(interface_name*, transport_request)',
   FUNCTION_GROUP: 'FUNCTION_GROUP(function_group_name*, transport_request)',
   FUNCTION_MODULE:

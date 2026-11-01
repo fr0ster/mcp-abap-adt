@@ -1183,12 +1183,14 @@ export const COMPACT_DELETE_ROUTES = {
   DATA_ELEMENT: { api: 'dataElement', operation: 'delete' },
   TABLE: { api: 'table', operation: 'delete' },
   STRUCTURE: { api: 'structure', operation: 'delete' },
+  TABLE_TYPE: { api: 'tableType', operation: 'delete' },
   DDL: { api: 'ddl', operation: 'delete' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'delete' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'delete' },
   CLASS: { api: 'class', operation: 'delete' },
   CDS_UNIT_TEST: { api: 'class', operation: 'delete' },
   PROGRAM: { api: 'program', operation: 'delete' },
+  INCLUDE: { api: 'include', operation: 'delete' },
   INTERFACE: { api: 'interface', operation: 'delete' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'delete' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'delete' },
@@ -1211,12 +1213,14 @@ const DELETE_ONPREM = [
   'DATA_ELEMENT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1236,7 +1240,9 @@ export const COMPACT_DELETE = projected<
   ServedName<'cloud', typeof COMPACT_DELETE_ROUTES>
 >()({
   onprem: DELETE_ONPREM,
-  cloud: DELETE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: DELETE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerLock` locks, each with its API. */
@@ -1414,12 +1420,14 @@ export const COMPACT_DELETION_CHECK_ROUTES = {
   DATA_ELEMENT: { api: 'dataElement', operation: 'deletionCheck' },
   TABLE: { api: 'table', operation: 'deletionCheck' },
   STRUCTURE: { api: 'structure', operation: 'deletionCheck' },
+  TABLE_TYPE: { api: 'tableType', operation: 'deletionCheck' },
   DDL: { api: 'ddl', operation: 'deletionCheck' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'deletionCheck' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'deletionCheck' },
   CLASS: { api: 'class', operation: 'deletionCheck' },
   CDS_UNIT_TEST: { api: 'class', operation: 'deletionCheck' },
   PROGRAM: { api: 'program', operation: 'deletionCheck' },
+  INCLUDE: { api: 'include', operation: 'deletionCheck' },
   INTERFACE: { api: 'interface', operation: 'deletionCheck' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'deletionCheck' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'deletionCheck' },
@@ -1440,12 +1448,14 @@ const DELETION_CHECK_ONPREM = [
   'DATA_ELEMENT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1454,7 +1464,7 @@ const DELETION_CHECK_ONPREM = [
   'METADATA_EXTENSION',
 ] as const;
 
-/** HandlerDeletionCheck's `object_type`: a program's on both variants. */
+/** HandlerDeletionCheck's `object_type`: a program's and an include's on both variants. */
 export const COMPACT_DELETION_CHECK = projected<
   ServedName<'onprem', typeof COMPACT_DELETION_CHECK_ROUTES>,
   ServedName<'cloud', typeof COMPACT_DELETION_CHECK_ROUTES>

@@ -74,6 +74,7 @@ export const compactWriteRouterMap: CompactRouterMap = {
   TABLE_TYPE: {
     create,
     update,
+    delete: remove,
   },
   DDL: {
     create,
@@ -129,6 +130,7 @@ export const compactWriteRouterMap: CompactRouterMap = {
   INCLUDE: {
     create,
     update,
+    delete: remove,
   },
   INTERFACE: {
     create,

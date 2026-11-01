@@ -152,7 +152,7 @@
   {
     "group": "compact",
     "name": "HandlerDelete",
-    "inputs": "object_type*, lock_handle, package_name, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name",
+    "inputs": "object_type*, lock_handle, package_name, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, include_name, table_type_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name",
     "available_in": "cloud, onprem"
   },
   {

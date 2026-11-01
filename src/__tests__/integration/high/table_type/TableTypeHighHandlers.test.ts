@@ -25,7 +25,8 @@
  *      the inactive version
  *   -> compact: HandlerCreate, HandlerGet, HandlerLock, HandlerUpdate with the
  *      read document, HandlerUnlock, HandlerValidate (a free name),
- *      HandlerCheckRun, HandlerDeletionCheck, HandlerActivate, HandlerWhereUsed,
+ *      HandlerCheckRun, HandlerDeletionCheck, HandlerActivate (its run read by
+ *      HandlerGet activation_status until it ends), HandlerWhereUsed,
  *      HandlerDelete
  *   -> ActivateObjects TTYP/DA (the sorted version becomes active) -> DeleteTableType
  *   -> afterAll: whatever is left deleted, the package last; SearchObject by
@@ -630,12 +631,37 @@ describe('TableType High-Level Handlers Integration', () => {
               object_name: COMPACT_TABLE_TYPE,
             }),
         );
-        await must(`HandlerActivate TABLE_TYPE ${COMPACT_TABLE_TYPE}`, () =>
-          handleHandlerActivate(context, {
-            object_type: 'TABLE_TYPE',
-            object_name: COMPACT_TABLE_TYPE,
-          }),
+        const activation = await must(
+          `HandlerActivate TABLE_TYPE ${COMPACT_TABLE_TYPE}`,
+          () =>
+            handleHandlerActivate(context, {
+              object_type: 'TABLE_TYPE',
+              object_name: COMPACT_TABLE_TYPE,
+            }),
         );
+        // HandlerActivate answers the id of an activation run that goes on in
+        // the background. The delete waits for its end: deleting while it
+        // runs is refused "You are already editing <name>" (measured on ABAP
+        // cloud, 2026-11-02).
+        const runId = field(parsed(activation.text), 'run_id');
+        if (typeof runId !== 'string' || runId === '') {
+          throw new Error('HandlerActivate answered no run_id');
+        }
+        const RUN_ENDS = ['finished', 'error', 'failed'];
+        let runStatus: unknown;
+        for (let read = 1; !RUN_ENDS.includes(String(runStatus)); read++) {
+          if (read > 1) await settle();
+          const status = await must(
+            `HandlerGet activation_status ${runId} (read ${read})`,
+            () =>
+              handleHandlerGet(context, {
+                part: 'activation_status',
+                run_id: runId,
+              }),
+          );
+          runStatus = field(parsed(status.text), 'status');
+        }
+        expect(runStatus).toBe('finished');
         const compactRead = await must(
           `HandlerGet TABLE_TYPE ${COMPACT_TABLE_TYPE} metadata (after)`,
           () =>

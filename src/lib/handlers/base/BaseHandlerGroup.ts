@@ -28,6 +28,7 @@ import type {
   SapEnvironment,
   ToolHandler,
 } from '../interfaces.js';
+import { callInItsForm, type InGroupContext } from '../utils/handlerCall.js';
 import { registeredSchema } from '../utils/schemaUtils.js';
 
 /**
@@ -146,6 +147,16 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           }
           // Inside the call-transport scope with this call's own
           // `transport_request`: the failure renderer's transport hint.
+          // An args-only handler reads its group's context when it is
+          // called: the call's own, for exactly that synchronous call.
+          const inGroupContext: InGroupContext = (callContext, call) => {
+            this.context = callContext;
+            try {
+              return call();
+            } finally {
+              this.context = context;
+            }
+          };
           const withParameters = <T>(fn: () => Promise<T>) =>
             runWithCallTransport(args, () =>
               withResolvedSystemContext(
@@ -188,24 +199,19 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
                     ...context,
                     connection: own,
                   } as HandlerContext;
-                  if (handler.length >= 2) {
-                    return handler(ownContext, withoutTimeout(args));
-                  }
-                  // An args-only handler reads its group's context when it is
-                  // called: the call's own, for exactly that synchronous call.
-                  this.context = ownContext;
-                  try {
-                    return (handler as (args: unknown) => Promise<unknown>)(
-                      withoutTimeout(args),
-                    );
-                  } finally {
-                    this.context = context;
-                  }
+                  return callInItsForm(
+                    handler,
+                    ownContext,
+                    withoutTimeout(args),
+                    inGroupContext,
+                  );
                 },
               }),
             );
           } else {
-            result = await withParameters(() => handler(context, args));
+            result = await withParameters(() =>
+              callInItsForm(handler, context, args, inGroupContext),
+            );
           }
 
           // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.

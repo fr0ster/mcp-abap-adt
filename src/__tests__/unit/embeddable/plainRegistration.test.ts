@@ -13,11 +13,14 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
+import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
 import { variantOf } from '../../../lib/clients';
 import { noopLogger } from '../../../lib/handlerLogger';
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
+import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
@@ -25,6 +28,7 @@ import {
   defineTool,
   type HandlerContext,
   type HandlerEntry,
+  type IHandlerGroup,
   type IHandlersRegistry,
   type SapEnvironment,
   type ToolDefinition,
@@ -32,7 +36,7 @@ import {
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 
-import { countingConnection } from '../../helpers/batchHarness';
+import { type Counting, countingConnection } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
 
 jest.setTimeout(120_000);
@@ -346,7 +350,8 @@ describe('a call on the plain path', () => {
             description: 'Answers the variant of the call.',
             inputSchema: { type: 'object', properties: {} },
           },
-          async (context) => ({
+          // Both parameters declared: the form decides how it is called.
+          async (context, _args) => ({
             content: [{ type: 'text', text: variantOf(context.connection) }],
           }),
         ),
@@ -400,4 +405,84 @@ describe('a call on the plain path', () => {
       });
     },
   );
+});
+
+/**
+ * The plain path calls each handler in the form it takes, as a server
+ * instance does (`callInItsForm`): a handler declaring `(context, args)` gets
+ * both, an args-only one (`(args) => handleX(this.context, args)`, every
+ * compact and readonly tool) gets its arguments with its group's context set
+ * for the call. Each tool answers on a plain `McpServer` as it answers
+ * through a `BaseMcpServer` (`EmbeddableMcpServer`) on the same groups.
+ */
+describe('a plain registration calls each handler in the form it takes', () => {
+  const groupsOn = (context: HandlerContext): IHandlerGroup[] => [
+    ...compactToolSet.groups(context, 'stdio'),
+    new ReadOnlyHandlersGroup(context),
+    new BackgroundRunHandlersGroup(context),
+  ];
+  const contextOn = (counting: Counting): HandlerContext => ({
+    connection: counting.connection,
+    logger: silentLogger,
+    systemType: 'onprem',
+  });
+
+  async function called(
+    server: McpServer,
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'plain-form', version: '1.0.0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    try {
+      return JSON.stringify(await client.callTool({ name, arguments: args }));
+    } finally {
+      await client.close();
+    }
+  }
+
+  async function onPlain(name: string, args: Record<string, unknown>) {
+    const counting = countingConnection('document', undefined);
+    const server = new McpServer({ name: 'plain-form', version: '1.0.0' });
+    new CompositeHandlersRegistry(
+      groupsOn(contextOn(counting)),
+    ).registerAllTools(server);
+    return { answer: await called(server, name, args), sent: counting.sent };
+  }
+
+  async function onServer(name: string, args: Record<string, unknown>) {
+    const counting = countingConnection('document', undefined);
+    const embedded = new EmbeddableMcpServer({
+      connection: counting.connection,
+      systemType: 'onprem',
+      logger: noopLogger,
+      handlersRegistry: new CompositeHandlersRegistry(
+        groupsOn(contextOn(counting)),
+      ),
+    });
+    return {
+      answer: await called(embedded, name, args),
+      sent: counting.sent,
+    };
+  }
+
+  it.each<[string, string, Record<string, unknown>]>([
+    [
+      'a compact tool (args-only)',
+      'HandlerCheckRun',
+      { object_type: 'CLASS', object_name: 'ZCL_PLACEHOLDER' },
+    ],
+    [
+      'a readonly tool (args-only)',
+      'GetProgram',
+      { program_name: 'ZPLACEHOLDER' },
+    ],
+    ['a context-taking tool', 'ListBackgroundRuns', {}],
+  ])('%s answers as through a BaseMcpServer', async (_label, name, args) => {
+    const plain = await onPlain(name, args);
+    const served = await onServer(name, args);
+    expect(plain).toEqual(served);
+    expect(plain.answer).not.toContain('Cannot read properties');
+  });
 });

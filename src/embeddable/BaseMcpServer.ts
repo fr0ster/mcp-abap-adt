@@ -79,8 +79,13 @@ import {
 import type {
   IHandlersRegistry,
   SapEnvironment,
+  ToolHandler,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import {
+  callInItsForm,
+  type InGroupContext,
+} from '../lib/handlers/utils/handlerCall.js';
 import { registeredSchema } from '../lib/handlers/utils/schemaUtils.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
@@ -1388,14 +1393,6 @@ export abstract class BaseMcpServer extends McpServer {
             );
             continue;
           }
-          // Wrap handler to inject connection from context
-          // Original handler: (context: HandlerContext, args: any) => Promise<any>
-          type HandlerFnWithContext = (
-            context: HandlerContext,
-            args: unknown,
-          ) => Promise<unknown>;
-          type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
-
           const runCall = async (args: unknown, signal: AbortSignal) => {
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
@@ -1622,26 +1619,14 @@ export abstract class BaseMcpServer extends McpServer {
                       ),
                   }),
                 );
-              } else if ((entry.handler as HandlerFnWithContext).length >= 2) {
-                handlerPromise = resolved(() =>
-                  (entry.handler as HandlerFnWithContext)(context, handlerArgs),
-                );
               } else {
-                try {
-                  const contextAwareGroup = group as Partial<{
-                    setContext: (ctx: HandlerContext) => void;
-                    context: HandlerContext;
-                  }>;
-                  if (typeof contextAwareGroup.setContext === 'function') {
-                    contextAwareGroup.setContext(context);
-                  } else {
-                    contextAwareGroup.context = context;
-                  }
-                } catch {
-                  // ignore if group doesn't expose context setter
-                }
                 handlerPromise = resolved(() =>
-                  (entry.handler as HandlerFnArgsOnly)(handlerArgs),
+                  callInItsForm(
+                    entry.handler,
+                    context,
+                    handlerArgs,
+                    inGroupContextOf(group),
+                  ),
                 );
               }
 
@@ -1810,7 +1795,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async recordCall(call: {
     tool: string;
-    handler: unknown;
+    handler: ToolHandler;
     group: unknown;
     context: HandlerContext;
     args: unknown;
@@ -1871,7 +1856,7 @@ export abstract class BaseMcpServer extends McpServer {
   private async runRecorded(
     call: {
       tool: string;
-      handler: unknown;
+      handler: ToolHandler;
       group: unknown;
       context: HandlerContext;
       args: unknown;
@@ -2026,7 +2011,7 @@ export abstract class BaseMcpServer extends McpServer {
    * reader, else `return_error`.
    */
   private async runConnectionless(
-    handler: unknown,
+    handler: ToolHandler,
     group: unknown,
     args: unknown,
     signal: AbortSignal,
@@ -2115,7 +2100,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async startBackground(
     tool: string,
-    handler: unknown,
+    handler: ToolHandler,
     group: unknown,
     context: HandlerContext,
     args: unknown,
@@ -2192,7 +2177,7 @@ export abstract class BaseMcpServer extends McpServer {
    * call that started it ends long before, and nothing of it reaches here.
    */
   private async backgroundAnswer(
-    handler: unknown,
+    handler: ToolHandler,
     group: unknown,
     context: HandlerContext,
     args: unknown,
@@ -2638,7 +2623,7 @@ export abstract class BaseMcpServer extends McpServer {
  * directly, an older one that reads its group's context after it was set.
  */
 function callHandler(
-  handler: unknown,
+  handler: ToolHandler,
   group: unknown,
   context: HandlerContext,
   args: unknown,
@@ -2646,35 +2631,32 @@ function callHandler(
   // The call's own transport request, for the failure renderer's transport
   // hint (`callTransport.ts`).
   return runWithCallTransport(args, () =>
-    invokeHandler(handler, group, context, args),
+    callInItsForm(handler, context, args, inGroupContextOf(group)),
   );
 }
 
-function invokeHandler(
-  handler: unknown,
-  group: unknown,
-  context: HandlerContext,
-  args: unknown,
-): Promise<unknown> {
-  const withContext = handler as (
-    context: HandlerContext,
-    args: unknown,
-  ) => Promise<unknown>;
-  if (withContext.length >= 2) return withContext(context, args);
-  const contextAwareGroup = group as Partial<{
-    setContext: (ctx: HandlerContext) => void;
-    context: HandlerContext;
-  }>;
-  try {
-    if (typeof contextAwareGroup.setContext === 'function') {
-      contextAwareGroup.setContext(context);
-    } else {
-      contextAwareGroup.context = context;
+/**
+ * How a server instance gives an args-only handler the call's context: its
+ * group's context set before the call (`setContext` when the group has one),
+ * left as the call set it.
+ */
+function inGroupContextOf(group: unknown): InGroupContext {
+  return (context, call) => {
+    const contextAwareGroup = group as Partial<{
+      setContext: (ctx: HandlerContext) => void;
+      context: HandlerContext;
+    }>;
+    try {
+      if (typeof contextAwareGroup.setContext === 'function') {
+        contextAwareGroup.setContext(context);
+      } else {
+        contextAwareGroup.context = context;
+      }
+    } catch {
+      // ignore if group doesn't expose context setter
     }
-  } catch {
-    // ignore if group doesn't expose context setter
-  }
-  return (handler as (args: unknown) => Promise<unknown>)(args);
+    return call();
+  };
 }
 
 /**

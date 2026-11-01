@@ -299,6 +299,7 @@ const WHERE_USED_WORDS: Tokens<(typeof COMPACT_WHERE_USED.onprem)[number]> = {
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data element',
   DDL: 'CDS DDL source',
+  TABLE_TYPE: 'table type',
 };
 
 /** HandlerWhereUsed's description on `variant`. */

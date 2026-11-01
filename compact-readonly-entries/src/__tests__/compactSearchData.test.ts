@@ -84,6 +84,17 @@ describe('HandlerWhereUsed', () => {
     });
   });
 
+  it('names a table type by its code, which no name stands for', async () => {
+    await handleHandlerWhereUsed(context, {
+      object_type: 'TABLE_TYPE',
+      object_name: 'ZTTYP_A',
+    });
+    expect(calls[0]).toEqual({
+      tool: 'GetWhereUsed',
+      args: { object_name: 'ZTTYP_A', object_type: 'TTYP/DA' },
+    });
+  });
+
   it('addresses a function module under its group', async () => {
     await handleHandlerWhereUsed(context, {
       object_type: 'FUNCTION_MODULE',

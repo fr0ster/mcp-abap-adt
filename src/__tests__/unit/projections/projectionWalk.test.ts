@@ -98,6 +98,7 @@ import {
   VERSIONED_ROUTES,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
+  whereUsedRouteCode,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -486,7 +487,7 @@ const WALKS: Readonly<Record<string, Walk>> = {
       Object.entries(COMPACT_WHERE_USED_ROUTES).map(
         ([name, alias]): [string, Route] => [
           name,
-          codeRoute(TYPE_NAMES[alias]),
+          codeRoute(whereUsedRouteCode(alias)),
         ],
       ),
     ),

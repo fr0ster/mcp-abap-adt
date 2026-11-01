@@ -28,6 +28,8 @@ import {
   type COMPACT_UNLOCK,
   type COMPACT_UPDATE,
   type COMPACT_VALIDATE,
+  type COMPACT_WHERE_USED,
+  type COMPACT_WHERE_USED_ROUTES,
   type INCLUDES_PARENT_ROUTES,
   projected,
   type ServedName,
@@ -179,6 +181,12 @@ export const tableTypeInCloudActivate: (typeof COMPACT_ACTIVATE.cloud)[number] =
 // @ts-expect-error …and no include, activated on premise only.
 export const includeInCloudActivate: (typeof COMPACT_ACTIVATE.cloud)[number] =
   'INCLUDE';
+
+/** HandlerWhereUsed takes a table type on both variants, by its code. */
+export const tableTypeInCloudWhereUsed: (typeof COMPACT_WHERE_USED.cloud)[number] =
+  'TABLE_TYPE';
+export const tableTypeWhereUsedRoute: (typeof COMPACT_WHERE_USED_ROUTES)['TABLE_TYPE'] =
+  'TTYP/DA';
 
 // --- A list is exactly its projection --------------------------------------
 

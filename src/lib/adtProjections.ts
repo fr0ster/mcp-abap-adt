@@ -443,27 +443,55 @@ export function codesWithNames(
 }
 
 /**
+ * What a compact member is handed to GetWhereUsed as: a name of
+ * {@link TYPE_NAMES}, or a where-used code where no name stands for it.
+ */
+type WhereUsedRoute = TypeName | WhereUsedCode<'onprem'>;
+
+/**
  * HandlerWhereUsed's `object_type`: each compact name with the name of
- * {@link TYPE_NAMES} it is handed to GetWhereUsed as.
+ * {@link TYPE_NAMES} it is handed to GetWhereUsed as, or its code where no
+ * name stands for it (a table type, `TTYP/DA`).
  */
 export const COMPACT_WHERE_USED_ROUTES = {
-  CLASS: 'class',
-  INTERFACE: 'interface',
-  PROGRAM: 'program',
-  INCLUDE: 'include',
-  FUNCTION_GROUP: 'functiongroup',
-  FUNCTION_MODULE: 'functionmodule',
-  PACKAGE: 'package',
-  TABLE: 'table',
-  STRUCTURE: 'structure',
-  DOMAIN: 'domain',
-  DATA_ELEMENT: 'dataelement',
-  DDL: 'view',
-} as const satisfies Readonly<Record<string, TypeName>>;
+  ...({
+    CLASS: 'class',
+    INTERFACE: 'interface',
+    PROGRAM: 'program',
+    INCLUDE: 'include',
+    FUNCTION_GROUP: 'functiongroup',
+    FUNCTION_MODULE: 'functionmodule',
+    PACKAGE: 'package',
+    TABLE: 'table',
+    STRUCTURE: 'structure',
+    DOMAIN: 'domain',
+    DATA_ELEMENT: 'dataelement',
+    DDL: 'view',
+  } as const satisfies Readonly<Record<string, TypeName>>),
+  // A code where no name stands for it.
+  ...({
+    TABLE_TYPE: 'TTYP/DA',
+  } as const satisfies Readonly<Record<string, WhereUsedCode<'onprem'>>>),
+} as const;
 
-/** The compact names whose where-used name stands for a code of `P`. */
+/** The code a where-used route stands for: a name's code, or the code. */
+type WhereUsedRouteCode<R> = R extends TypeName ? (typeof TYPE_NAMES)[R] : R;
+
+/** Whether a where-used route is a name of {@link TYPE_NAMES}. */
+function isTypeName(route: WhereUsedRoute): route is TypeName {
+  return Object.hasOwn(TYPE_NAMES, route);
+}
+
+/** The code a where-used route stands for, at run time. */
+export function whereUsedRouteCode(route: WhereUsedRoute): AdtUtilityCode {
+  return isTypeName(route) ? TYPE_NAMES[route] : route;
+}
+
+/** The compact names whose where-used route stands for a code of `P`. */
 type CompactWhereUsedName<P> = {
-  [K in keyof typeof COMPACT_WHERE_USED_ROUTES]: (typeof TYPE_NAMES)[(typeof COMPACT_WHERE_USED_ROUTES)[K]] extends P
+  [K in keyof typeof COMPACT_WHERE_USED_ROUTES]: WhereUsedRouteCode<
+    (typeof COMPACT_WHERE_USED_ROUTES)[K]
+  > extends P
     ? K
     : never;
 }[keyof typeof COMPACT_WHERE_USED_ROUTES];
@@ -486,6 +514,7 @@ export const COMPACT_WHERE_USED = projected<
     'DOMAIN',
     'DATA_ELEMENT',
     'DDL',
+    'TABLE_TYPE',
   ],
   cloud: [
     'CLASS',
@@ -500,6 +529,7 @@ export const COMPACT_WHERE_USED = projected<
     'DOMAIN',
     'DATA_ELEMENT',
     'DDL',
+    'TABLE_TYPE',
   ],
 });
 

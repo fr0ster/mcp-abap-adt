@@ -15,10 +15,10 @@
  * an absent property untouched. The values are passed as given — which ones
  * SAP takes is SAP's answer.
  *
- * The wait is `readMetadata({withLongPolling: true})`, discarded for its
- * result but not for what it does (see `handleCreateDomain.ts` and
- * `xmlPatch.ts`): it sits right before `check`, the first call that reads
- * the write back.
+ * The wait is `readMetadata({withLongPolling: true})` (see
+ * `handleCreateDomain.ts` and `xmlPatch.ts`): it sits right before `check`,
+ * the first call that reads the write back. Its document is the definition
+ * SAP stored, answered beside the result (`tableTypeStored.ts`).
  */
 
 import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
@@ -27,7 +27,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer, unlessCredentialFailure } from '../../../lib/answer';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -37,6 +37,11 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
+import {
+  besideStoredDefinition,
+  readStoredDefinition,
+  type StoredDefinitionAnswer,
+} from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -132,7 +137,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.",
+    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, read after the write.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -203,6 +208,8 @@ export async function handleCreateTableType(
   const description = args.description || tableTypeName;
   const shouldActivate = args.activate !== false;
   const detail = detailOf(args);
+  // What the wait after the unlock read of the stored definition.
+  let stored: StoredDefinitionAnswer | undefined;
 
   return answer(
     { tool: 'CreateTableType', detail },
@@ -284,16 +291,19 @@ export async function handleCreateTableType(
               }),
             { type: 'TABLE_TYPE', name: tableTypeName },
           ),
-        // Best-effort (a credential failure ends the call): wait for the
-        // write to be visible right before the first call that reads it
-        // back, as `CreateDomain` does.
+        // Wait for the write to be visible right before the first call that
+        // reads it back, as `CreateDomain` does; its document is the
+        // definition SAP stored, answered beside the result (a failed read
+        // is said so, and the chain goes on; a credential failure ends it).
         atStep('check', async () => {
-          await obj
-            .readMetadata(
-              { tableTypeName },
-              { withLongPolling: true, analyse: analyseException },
-            )
-            .catch(unlessCredentialFailure);
+          stored = await readStoredDefinition(
+            () =>
+              obj.readMetadata(
+                { tableTypeName },
+                { withLongPolling: true, analyse: analyseException },
+              ),
+            detail,
+          );
           return withAdtHeaders(context, 'tableType.check', (headers) =>
             obj.check({ tableTypeName }, undefined, {
               headers,
@@ -317,6 +327,6 @@ export async function handleCreateTableType(
         ),
       );
     },
-    project(detail, terseWrite),
+    besideStoredDefinition(project(detail, terseWrite), () => stored),
   );
 }

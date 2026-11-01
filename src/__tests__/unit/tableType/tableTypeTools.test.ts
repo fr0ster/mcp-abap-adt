@@ -458,6 +458,194 @@ describe('UpdateTableType', () => {
   });
 });
 
+/**
+ * What SAP stores when it takes other values than those sent (measured on
+ * E19, 2026-11-01: `hashed` forces a unique key): STRING_TABLE with a hashed
+ * access and a unique key, answered by the wait's read after the unlock.
+ */
+const STORED_HASHED = STRING_TABLE.replace(
+  '<ttyp:accessType>standard</ttyp:accessType>',
+  '<ttyp:accessType>hashed</ttyp:accessType>',
+).replace('<ttyp:kind>nonUnique</ttyp:kind>', '<ttyp:kind>unique</ttyp:kind>');
+
+/** STORED_HASHED's definition, as SAP wrote each element. */
+const STORED_HASHED_DEFINITION = {
+  row_type_kind: 'predefinedAbapType',
+  row_type_name: '',
+  data_type: 'STRING',
+  length: '000000',
+  decimals: '000000',
+  access_type: 'hashed',
+  key_definition: 'standard',
+  key_kind: 'unique',
+};
+
+/** The two details that parse SAP's answer. */
+const DETAILS: ReadonlyArray<'terse' | 'full'> = ['terse', 'full'];
+
+/** The JSON a tool answered. */
+const answerOf = (result: {
+  content: ReadonlyArray<{ type: string; text?: string }>;
+}): Record<string, unknown> => JSON.parse(textOf(result));
+
+describe('the definition SAP stored, read from the wait after the unlock', () => {
+  const WAIT_URL = `${TTYP}/ztt_x?withLongPolling=true`;
+  /** Create: the wait is the seventh request. */
+  const createdStoring = (
+    wait: NonNullable<Parameters<typeof recordingConnection>[0]>[number],
+  ) =>
+    sessionRecording([
+      undefined,
+      undefined,
+      undefined,
+      { data: STRING_TABLE },
+      undefined,
+      undefined,
+      wait,
+    ]);
+  /** Update: the wait is the sixth request. */
+  const existingStoring = (
+    wait: NonNullable<Parameters<typeof recordingConnection>[0]>[number],
+  ) =>
+    sessionRecording([
+      undefined,
+      { data: STRING_TABLE },
+      undefined,
+      undefined,
+      undefined,
+      wait,
+    ]);
+
+  it.each(DETAILS)(
+    "CreateTableType answers SAP's stored values beside the result (detail %s), with no request of its own",
+    async (detail) => {
+      const connection = createdStoring({ data: STORED_HASHED });
+      const result = await handleCreateTableType(
+        { connection, logger: undefined },
+        {
+          table_type_name: 'ZTT_X',
+          package_name: 'ZP',
+          access_type: 'hashed',
+          key_kind: 'nonUnique',
+          detail,
+        },
+      );
+      expect(result.isError).toBe(false);
+      expect(connection.requests).toHaveLength(9);
+      expect(connection.requests[6]?.url).toBe(WAIT_URL);
+      expect(answerOf(result).stored_definition).toEqual(
+        STORED_HASHED_DEFINITION,
+      );
+    },
+  );
+
+  it('CreateTableType keeps the terse result beside the stored definition', async () => {
+    const connection = createdStoring({ data: STORED_HASHED });
+    const result = await handleCreateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', package_name: 'ZP', activate: false },
+    );
+    expect(answerOf(result)).toEqual({
+      result: 'SUCCESS',
+      stored_definition: STORED_HASHED_DEFINITION,
+    });
+  });
+
+  it.each(DETAILS)(
+    "UpdateTableType answers SAP's stored values beside the result (detail %s), with no request of its own",
+    async (detail) => {
+      const connection = existingStoring({ data: STORED_HASHED });
+      const result = await handleUpdateTableType(
+        { connection, logger: undefined },
+        {
+          table_type_name: 'ZTT_X',
+          access_type: 'hashed',
+          key_kind: 'nonUnique',
+          detail,
+        },
+      );
+      expect(result.isError).toBe(false);
+      expect(connection.requests).toHaveLength(7);
+      expect(connection.requests[5]?.url).toBe(WAIT_URL);
+      expect(answerOf(result).stored_definition).toEqual(
+        STORED_HASHED_DEFINITION,
+      );
+    },
+  );
+
+  it('UpdateTableType keeps the terse result beside the stored definition', async () => {
+    const connection = existingStoring({ data: STORED_HASHED });
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', activate: false },
+    );
+    expect(answerOf(result)).toEqual({
+      result: 'SUCCESS',
+      stored_definition: STORED_HASHED_DEFINITION,
+    });
+  });
+
+  it("says the stored definition was not read when the wait's read is refused, with SAP's answer", async () => {
+    const connection = existingStoring(REFUSED);
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', access_type: 'hashed' },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(7);
+    const answered = answerOf(result);
+    expect(answered.stored_definition).toBeUndefined();
+    expect(answered.stored_definition_not_read).toMatchObject({
+      status: 403,
+      raw_body: REFUSED.data,
+    });
+  });
+
+  it("says the stored definition was not read when the wait's read throws, with SAP's answer", async () => {
+    const inner = createdStoring(undefined);
+    const connection: typeof inner = {
+      ...inner,
+      async makeAdtRequest(options) {
+        if (options.url === WAIT_URL) {
+          inner.requests.push({ method: options.method, url: options.url });
+          throw Object.assign(
+            new Error('Request failed with status code 403'),
+            { response: { ...REFUSED, headers: {} } },
+          );
+        }
+        return inner.makeAdtRequest(options);
+      },
+    };
+    const result = await handleCreateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', package_name: 'ZP' },
+    );
+    expect(result.isError).toBe(false);
+    const answered = answerOf(result);
+    expect(answered.stored_definition).toBeUndefined();
+    expect(answered.stored_definition_not_read).toMatchObject({
+      step: 'read stored definition',
+      status: 403,
+      raw_body: REFUSED.data,
+    });
+  });
+
+  it('says the stored definition was not read when the wait answers no table type document, with its status and body', async () => {
+    const connection = createdStoring({ data: '' });
+    const result = await handleCreateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', package_name: 'ZP' },
+    );
+    expect(result.isError).toBe(false);
+    const answered = answerOf(result);
+    expect(answered.stored_definition).toBeUndefined();
+    expect(answered.stored_definition_not_read).toMatchObject({
+      status: 200,
+      raw_body: '',
+    });
+  });
+});
+
 const DELETION_CHECK_URL = '/sap/bc/adt/deletion/check';
 const DELETION_URL = '/sap/bc/adt/deletion/delete';
 

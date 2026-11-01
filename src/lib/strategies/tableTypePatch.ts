@@ -1,3 +1,4 @@
+import { parseStructure } from './reading';
 import { patchIf, patchXmlAttribute, patchXmlElement } from './xmlPatch';
 
 /**
@@ -59,4 +60,71 @@ export function patchTableTypeXml(
   xml = patchIf(xml, changes.key_definition, element('ttyp:definition'));
   xml = patchIf(xml, changes.key_kind, element('ttyp:kind'));
   return xml;
+}
+
+/**
+ * The definition a table type's document states: the elements
+ * `patchTableTypeXml` writes, each as SAP wrote it (its text, verbatim — a
+ * length is `000010`, as SAP answers it). An element the document does not
+ * hold is not named.
+ */
+export interface StoredTableTypeDefinition {
+  row_type_kind?: string;
+  row_type_name?: string;
+  data_type?: string;
+  length?: string;
+  decimals?: string;
+  access_type?: string;
+  key_definition?: string;
+  key_kind?: string;
+}
+
+/** `node`'s child `name`, when `node` is a parsed element that holds one. */
+function childOf(node: unknown, name: string): unknown {
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) return;
+  return Reflect.get(node, name);
+}
+
+/** A parsed element's text: a bare string, or `#text` beside its attributes. */
+function textOfElement(node: unknown): string | undefined {
+  if (typeof node === 'string') return node;
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) return;
+  const text: unknown = Reflect.get(node, '#text');
+  if (typeof text === 'string') return text;
+  // An element with attributes and no text (`<ttyp:x a="1"/>`): empty.
+  return Object.keys(node).every((key) => key === '@') ? '' : undefined;
+}
+
+/**
+ * Read the definition a table type's document states (`ttyp:tableType`, as a
+ * read of the object answers it). The document is SAP's, from outside the
+ * type system: `undefined` when it is not a table type document; an element
+ * that is absent, or not a single element with text, is left out.
+ */
+export function readTableTypeDefinition(
+  document: string,
+): StoredTableTypeDefinition | undefined {
+  const root = childOf(parseStructure(document), 'ttyp:tableType');
+  if (typeof root !== 'object' || root === null || Array.isArray(root)) return;
+  const rowType = childOf(root, 'ttyp:rowType');
+  const builtIn = childOf(rowType, 'ttyp:builtInType');
+  const primaryKey = childOf(root, 'ttyp:primaryKey');
+  const read: ReadonlyArray<
+    readonly [keyof StoredTableTypeDefinition, unknown]
+  > = [
+    ['row_type_kind', childOf(rowType, 'ttyp:typeKind')],
+    ['row_type_name', childOf(rowType, 'ttyp:typeName')],
+    ['data_type', childOf(builtIn, 'ttyp:dataType')],
+    ['length', childOf(builtIn, 'ttyp:length')],
+    ['decimals', childOf(builtIn, 'ttyp:decimals')],
+    ['access_type', childOf(root, 'ttyp:accessType')],
+    ['key_definition', childOf(primaryKey, 'ttyp:definition')],
+    ['key_kind', childOf(primaryKey, 'ttyp:kind')],
+  ];
+  const stored: StoredTableTypeDefinition = {};
+  for (const [field, node] of read) {
+    const text = textOfElement(node);
+    if (text !== undefined) stored[field] = text;
+  }
+  return stored;
 }

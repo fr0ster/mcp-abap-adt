@@ -10,8 +10,9 @@
  * write to be visible) -> (activate unless `activate` is false). The check
  * runs inside the lock, as the domain's does; a refusal there stops the
  * answer exactly as a refused write would. The wait is the long-polling
- * `readMetadata({withLongPolling: true})`, discarded for its result (see
- * `handleUpdateDomain.ts` and `xmlPatch.ts`).
+ * `readMetadata({withLongPolling: true})` (see `handleUpdateDomain.ts` and
+ * `xmlPatch.ts`); its document is the definition SAP stored, answered
+ * beside the result (`tableTypeStored.ts`).
  *
  * Only the properties the caller gave are patched into the document read
  * under the lock; every other one keeps SAP's value. No schema default but
@@ -26,7 +27,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer, unlessCredentialFailure } from '../../../lib/answer';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -36,6 +37,11 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
+import {
+  besideStoredDefinition,
+  readStoredDefinition,
+  type StoredDefinitionAnswer,
+} from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -51,7 +57,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.",
+    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, read after the write.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -112,6 +118,8 @@ export async function handleUpdateTableType(
   const tableTypeName = args.table_type_name.toUpperCase();
   const shouldActivate = args.activate !== false;
   const detail = detailOf(args);
+  // What the wait after the unlock read of the stored definition.
+  let stored: StoredDefinitionAnswer | undefined;
 
   return answer(
     { tool: 'UpdateTableType', detail },
@@ -180,14 +188,18 @@ export async function handleUpdateTableType(
 
       if (!written.ok) return written;
 
-      // Best-effort (a credential failure ends the call): wait for the write
-      // to be visible before activating, as `UpdateDomain` does.
-      await obj
-        .readMetadata(
-          { tableTypeName },
-          { withLongPolling: true, analyse: analyseException },
-        )
-        .catch(unlessCredentialFailure);
+      // Wait for the write to be visible before activating, as
+      // `UpdateDomain` does; its document is the definition SAP stored,
+      // answered beside the result (a failed read is said so, and the call
+      // goes on; a credential failure ends it).
+      stored = await readStoredDefinition(
+        () =>
+          obj.readMetadata(
+            { tableTypeName },
+            { withLongPolling: true, analyse: analyseException },
+          ),
+        detail,
+      );
 
       if (!shouldActivate) return written;
 
@@ -203,6 +215,6 @@ export async function handleUpdateTableType(
         ),
       );
     },
-    project(detail, terseWrite),
+    besideStoredDefinition(project(detail, terseWrite), () => stored),
   );
 }

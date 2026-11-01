@@ -73,8 +73,12 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     this.registeredTools.clear();
 
     for (const group of this.handlerGroups) {
+      // The tools the group lists on the variant it states: one the
+      // variant leaves out is not registered, so it is not counted.
+      const environment = statedBy(group);
       const handlers = group.getHandlers();
       for (const entry of handlers) {
+        if (!listedTool(entry.toolDefinition, environment).listed) continue;
         const name = entry.toolDefinition.name;
         if (this.registeredTools.has(name)) {
           const msg = `Duplicate tool registration detected: "${name}" in group "${group.getName()}"`;
@@ -141,10 +145,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   }> {
     return this.handlerGroups.map((group) => ({
       group: group.getName(),
-      stated:
-        group instanceof BaseHandlerGroup
-          ? group.statedSystemType()
-          : undefined,
+      stated: statedBy(group),
     }));
   }
 
@@ -177,4 +178,14 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   getHandlerGroupNames(): string[] {
     return this.handlerGroups.map((g) => g.getName());
   }
+}
+
+/**
+ * What `group` states (`BaseHandlerGroup`'s context); a group of another
+ * kind states none.
+ */
+function statedBy(group: IHandlerGroup): SapEnvironment | undefined {
+  return group instanceof BaseHandlerGroup
+    ? group.statedSystemType()
+    : undefined;
 }

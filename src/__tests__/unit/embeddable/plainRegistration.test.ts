@@ -185,6 +185,17 @@ describe.each(Object.entries(REGISTRIES))(
       },
     );
 
+    it.each<SapEnvironment | undefined>(['cloud', 'onprem', undefined])(
+      'getRegisteredTools names exactly the tools listed where %s is stated',
+      async (systemType) => {
+        const { registry } = registeredFor(systemType);
+        const listed = await plainListing(registry);
+        expect(
+          [...registry.getRegisteredTools()].sort((a, b) => a.localeCompare(b)),
+        ).toEqual(listed.map((tool) => tool.name));
+      },
+    );
+
     it('SAP_SYSTEM_TYPE changes nothing on the plain path', async () => {
       const unstated = await plainListing(registryFor());
       const stated = await plainListing(registryFor('onprem'));

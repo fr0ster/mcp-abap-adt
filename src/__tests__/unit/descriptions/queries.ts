@@ -360,4 +360,16 @@ export const QUERIES: readonly Query[] = [
     required: [['CreateFunctionModule']],
     source: 'own',
   },
+  {
+    query: "Change a report's include ZREP_DEMO_TOP",
+    roles: DEVELOPER,
+    required: [['UpdateInclude']],
+    source: 'own',
+  },
+  {
+    query: 'Create a table type ZTT_ORDERS with the row type ZTAB_ORDERS',
+    roles: DEVELOPER,
+    required: [['CreateTableType']],
+    source: 'own',
+  },
 ];

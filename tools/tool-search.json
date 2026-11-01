@@ -4611,7 +4611,7 @@
       "PROG/I",
       "report include"
     ],
-    "semantic": "Change the source code of an existing ABAP include, replacing it whole, and activate it when asked."
+    "semantic": "Change the code of a report's include program (an ABAP include) and save its whole new source."
   },
   "UpdateIncludeMetadata": {
     "keywords": [

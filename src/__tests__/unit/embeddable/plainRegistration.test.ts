@@ -17,6 +17,7 @@ import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
 import { variantOf } from '../../../lib/clients';
+import { systemKindOf } from '../../../lib/connectionFactory';
 import { noopLogger } from '../../../lib/handlerLogger';
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
@@ -35,6 +36,7 @@ import {
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
+import { callInItsForm } from '../../../lib/handlers/utils/handlerCall';
 
 import { type Counting, countingConnection } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
@@ -485,4 +487,107 @@ describe('a plain registration calls each handler in the form it takes', () => {
     expect(plain).toEqual(served);
     expect(plain.answer).not.toContain('Cannot read properties');
   });
+});
+
+/**
+ * A handler `HandlerExporter.getHandlerEntries()` hands out runs on the
+ * system kind the exporter states (`systemType`), stated on the call's
+ * connection before it runs; with none stated, none — `SAP_SYSTEM_TYPE` is
+ * not read on this path. The embedder calls each handler in its form
+ * (`callInItsForm`), setting an args-only handler's group context for the
+ * call, as a server instance does.
+ */
+describe('a handler getHandlerEntries hands out', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  /** The embedder's call of `name`, on a counting connection of its own. */
+  async function embedderCall(
+    systemType: SapEnvironment | undefined,
+    name: string,
+    args: Record<string, unknown>,
+  ) {
+    const exporter = new HandlerExporter({
+      ...(systemType !== undefined && { systemType }),
+    });
+    const registry = exporter.createRegistry();
+    if (!(registry instanceof CompositeHandlersRegistry)) {
+      throw new Error('the exporter builds a CompositeHandlersRegistry');
+    }
+    const group = registry
+      .getHandlerGroups()
+      .find((g) => g.getHandlers().some((e) => e.toolDefinition.name === name));
+    const entry = exporter
+      .getHandlerEntries()
+      .find((e) => e.toolDefinition.name === name);
+    if (group === undefined || entry === undefined) {
+      throw new Error(`the exporter hands out ${name}`);
+    }
+    const counting = countingConnection('document', undefined);
+    const context: HandlerContext = {
+      connection: counting.connection,
+      logger: silentLogger,
+    };
+    // A handed-out handler answers its result, or throws its refusal.
+    const answer = await callInItsForm(
+      entry.handler,
+      context,
+      args,
+      (callContext, call) => {
+        Object.assign(group, { context: callContext });
+        return call();
+      },
+    ).then(
+      (result) => JSON.stringify(result),
+      (error: Error) => error.message,
+    );
+    return {
+      answer,
+      kind: systemKindOf(counting.connection),
+      sent: counting.sent,
+    };
+  }
+
+  it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, an args-only handler is refused system_type_required, nothing sent', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
+    const { answer, sent } = await embedderCall(undefined, 'GetProgram', {
+      program_name: 'ZPLACEHOLDER',
+    });
+    expect(answer).toContain(SYSTEM_TYPE_REQUIRED_WORDS);
+    expect(sent).toEqual([]);
+  });
+
+  it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, a context-taking handler leaves its connection with no kind', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
+    const { kind, sent } = await embedderCall(
+      undefined,
+      'ListBackgroundRuns',
+      {},
+    );
+    expect(kind).toBeUndefined();
+    expect(sent).toEqual([]);
+  });
+
+  it.each<[SapEnvironment, string]>([
+    ['cloud', 'onprem'],
+    ['onprem', 'cloud'],
+  ])(
+    'with systemType %s stated, runs on it whatever SAP_SYSTEM_TYPE (%s) says',
+    async (systemType, environment) => {
+      process.env.SAP_SYSTEM_TYPE = environment;
+      // The kind the call's ADT client is built for (`variantOf` reads it).
+      const program = await embedderCall(systemType, 'GetProgram', {
+        program_name: 'ZPLACEHOLDER',
+      });
+      expect(program.kind).toBe(systemType);
+      expect(program.sent).toEqual([
+        'GET /sap/bc/adt/programs/programs/zplaceholder/source/main?version=active',
+      ]);
+      const runs = await embedderCall(systemType, 'ListBackgroundRuns', {});
+      expect(runs.kind).toBe(systemType);
+    },
+  );
 });

@@ -133,11 +133,23 @@ for (const entry of entries) {
 
 ### What `getHandlerEntries()` hands back
 
-With a `systemContextResolver` (none by default since 19.0.0) each entry's
-`handler` is wrapped, so that the connection's parameters — the responsible and
-master system, made once by the `systemContextRules` you pass
-(`@mcp-abap-adt/responsible-rules`), else the system's information — are filled
-before the handler runs. Two things follow for an embedder:
+Each entry's `handler` is wrapped. The wrapper, before the handler runs:
+
+- states the exporter's `systemType` on the call's connection — the
+  connection of the `context` it is called with, or, for an args-only handler,
+  of its group's context at call time. The handler runs on that kind; with no
+  `systemType` stated, the connection has none, and a call that would reach a
+  system is refused `system_type_required` before anything is sent.
+  `SAP_SYSTEM_TYPE` is not read for it. A connection built by
+  `createAbapConnection` keeps the kind it was built for;
+- runs it in the call-transport scope with its call's own
+  `transport_request` (the failure renderer's transport hint);
+- with a `systemContextResolver` (none by default since 19.0.0), fills the
+  connection's parameters — the responsible and master system, made once by
+  the `systemContextRules` you pass (`@mcp-abap-adt/responsible-rules`), else
+  the system's information.
+
+Two things follow for an embedder:
 
 - The wrapper preserves the handler's arity, because embedders branch on it to
   choose between `handler(context, args)` and `handler(args)`. A wrapped
@@ -145,11 +157,9 @@ before the handler runs. Two things follow for an embedder:
 - The wrapper is built per call, so two calls to `getHandlerEntries()` return
   functions that are not identity-equal. Compare tool names, not functions.
 
-Without a resolver (the default) `getHandlerEntries()` hands the groups'
-handlers out unwrapped. The options reach `getHandlerEntries()`;
-`createRegistry()` returns the groups themselves, and a group registered that way
-looks nothing up unless its `HandlerContext` carries `systemContextResolver`
-(and `systemContextRules`).
+The options reach `getHandlerEntries()`; `createRegistry()` returns the groups
+themselves, and a group registered that way looks nothing up unless its
+`HandlerContext` carries `systemContextResolver` (and `systemContextRules`).
 
 ## Creating Registry for v2 Servers
 

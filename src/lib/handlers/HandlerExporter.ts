@@ -7,6 +7,7 @@ import {
   type SystemContextRules,
   withResolvedSystemContext,
 } from '../requestSystemResolution.js';
+import { stateSystemKind } from '../systemKind.js';
 import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
@@ -67,14 +68,15 @@ export interface HandlerExporterOptions {
   /**
    * The SAP system kind the handlers serve, for a connection the factory
    * did not build: the rules (`systemContextRules`) read a lookup by it.
-   * Never guessed. Overrides `SAP_SYSTEM_TYPE`. Not required: without it
-   * and `SAP_SYSTEM_TYPE` the kind is unknown, and what that means is the
-   * rules'. It is also the variant a plain registration
+   * Never guessed. On a server instance it overrides `SAP_SYSTEM_TYPE`;
+   * not required there: without it and `SAP_SYSTEM_TYPE` the kind is
+   * unknown, and what that means is the rules'. It is also the variant a plain registration
    * (`createRegistry().registerAllTools(mcpServer)`) lists and calls on:
-   * that variant's tools, descriptions and schemas. Without it the
+   * that variant's tools, descriptions and schemas — and the kind every
+   * handler `getHandlerEntries()` hands out runs on. Without it the
    * definitions are listed as they are and every call that would reach a
    * system is refused `system_type_required`; `SAP_SYSTEM_TYPE` is not read
-   * on that path.
+   * on either path.
    */
   systemType?: SapEnvironment;
 
@@ -193,9 +195,11 @@ export class HandlerExporter {
    * Get all handler entries
    * Useful for inspection or custom registration logic
    *
-   * Embedders call these handlers themselves, so with a resolver each one
-   * is wrapped to fill the responsible person and master system from the
-   * connection's parameters (see `systemContextResolver`,
+   * Embedders call these handlers themselves, so each one is wrapped: it
+   * runs on the kind this exporter states (`systemType`, stated on the
+   * call's connection; none stated, none — `SAP_SYSTEM_TYPE` is not read),
+   * and with a resolver the responsible person and master system are filled
+   * from the connection's parameters (see `systemContextResolver`,
    * `systemContextRules`) before it runs — a credential failure or a
    * refusal of the rules is thrown, and the handler does not run. The
    * wrapper keeps the original's `length`,
@@ -213,17 +217,23 @@ export class HandlerExporter {
   }
 
   /**
-   * Every handed-out handler runs in the call-transport scope with its own
-   * call's `transport_request` (`callTransport.ts`, the failure renderer's
-   * transport hint), and with the system lookup when a resolver is given.
+   * Every handed-out handler runs on the system kind this exporter states
+   * (`systemType`), stated on the call's connection before it runs — or
+   * none, when it states none: `SAP_SYSTEM_TYPE` is not read for that
+   * connection (`stateSystemKind`); a connection `createAbapConnection`
+   * built keeps the kind it was built for. It runs in the call-transport
+   * scope with its own call's `transport_request` (`callTransport.ts`, the
+   * failure renderer's transport hint), and with the system lookup when a
+   * resolver is given.
    */
   private wrapEntry(group: IHandlerGroup, entry: HandlerEntry): HandlerEntry {
     const resolver = this.systemContextResolver;
     const resolved = <T>(
       connection: HandlerContext['connection'] | undefined,
       fn: () => Promise<T>,
-    ): Promise<T> =>
-      resolver
+    ): Promise<T> => {
+      if (connection) stateSystemKind(connection, this.systemType);
+      return resolver
         ? withResolvedSystemContext(
             connection,
             fn,
@@ -232,6 +242,7 @@ export class HandlerExporter {
             this.systemContextRules,
           )
         : fn();
+    };
 
     const original = entry.handler as (...args: unknown[]) => Promise<unknown>;
     const wrapped =

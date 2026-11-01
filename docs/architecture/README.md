@@ -101,7 +101,11 @@ const server = new EmbeddableMcpServer({
 });
 ```
 
-`getHandlerEntries()` and `getToolNames()` give the same handlers without a server.
+`getHandlerEntries()` and `getToolNames()` give the same handlers without a server. Each handler
+`getHandlerEntries()` hands out runs on the system kind the exporter states (`systemType`), stated on
+the call's connection before it runs; with none stated, a call that would reach a system is refused
+`system_type_required` before anything is sent. `SAP_SYSTEM_TYPE` is not read for it (a connection
+built by `createAbapConnection` keeps the kind it was built for).
 
 Registered on a plain SDK `McpServer` instead (`exporter.createRegistry().registerAllTools(mcpServer)`),
 the tools are listed on the variant the exporter states (`systemType`), as a server instance lists

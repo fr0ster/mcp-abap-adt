@@ -6,6 +6,9 @@
  * caller's, and the include writes are not offered there. Elsewhere — a cloud
  * system, or no integration configuration at all — the case skips and says
  * why (LambdaTester: "not available on cloud", "No configuration found").
+ * The second describe is its cloud counterpart (`include_cloud_read`, cloud
+ * only): `tools/list` without an include write, and the reads of a delivered
+ * include the configuration names.
  *
  * Lifecycle, one run, every object of its own:
  *   CreatePackage ($ZMCP_I<run>, local, no transport)
@@ -29,6 +32,10 @@
  * Run: MCP_TEST_CONFIG=<config> npm test -- src/__tests__/integration/high/include/IncludeHighHandlers.test.ts
  */
 
+import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
 import { handleHandlerDelete } from '../../../../../compact-modify/src/handlers/handleHandlerDelete';
@@ -38,6 +45,7 @@ import { handleHandlerUpdate } from '../../../../../compact-modify/src/handlers/
 import { handleHandlerDeletionCheck } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerDeletionCheck';
 import { handleHandlerGet } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleHandlerValidate } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
+import { EmbeddableMcpServer } from '../../../../embeddable/EmbeddableMcpServer';
 import { handleActivateObjects } from '../../../../handlers/common/high/handleActivateObjects';
 import { handleCreateInclude } from '../../../../handlers/include/high/handleCreateInclude';
 import { handleDeleteInclude } from '../../../../handlers/include/high/handleDeleteInclude';
@@ -49,9 +57,11 @@ import { handleCreatePackage } from '../../../../handlers/package/high/handleCre
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 import { handleSearchObject } from '../../../../handlers/search/readonly/handleSearchObject';
 import { handleGetInactiveObjects } from '../../../../handlers/system/readonly/handleGetInactiveObjects';
+import { CompactHandlersGroup } from '../../../../lib/compact/group';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { patchXmlAttribute } from '../../../../lib/strategies/xmlPatch';
-import { getTimeout } from '../../helpers/configHelpers';
+import { getSystemType, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -527,6 +537,204 @@ describe('Include High-Level Handlers Integration', () => {
           }),
         );
         forget(COMPACT_INCLUDE);
+      });
+    },
+    getTimeout('long'),
+  );
+});
+
+/** The tools a server instance lists through the MCP protocol (`tools/list`). */
+async function listedTools(
+  server: EmbeddableMcpServer,
+): Promise<Array<{ name: string; inputSchema: unknown }>> {
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: 'incl-cloud', version: '1.0.0' });
+  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+  try {
+    const { tools } = await client.listTools();
+    return tools.map((tool) => ({
+      name: tool.name,
+      inputSchema: tool.inputSchema,
+    }));
+  } finally {
+    await client.close();
+  }
+}
+
+/** The `object_type` enum a listed compact tool declares. */
+function objectTypesOf(
+  tools: ReadonlyArray<{ name: string; inputSchema: unknown }>,
+  name: string,
+): unknown {
+  const tool = tools.find((entry) => entry.name === name);
+  return field(
+    field(field(tool?.inputSchema, 'properties'), 'object_type'),
+    'enum',
+  );
+}
+
+/**
+ * **Where it runs: ABAP cloud only** (`include_cloud_read`,
+ * `available_in: ["cloud"]`). On cloud the include is read-only: the server
+ * lists no include write, `HandlerCreate` offers no `INCLUDE`, and the reads
+ * (`GetInclude` both parts, `HandlerGet INCLUDE`, `HandlerDeletionCheck
+ * INCLUDE`) run on the delivered include the configuration names
+ * (`include_name`). An empty `include_name` skips the reads and says so;
+ * elsewhere the case skips (LambdaTester: "not available on onprem",
+ * "No configuration found"). Nothing is written.
+ */
+describe('Include on ABAP cloud: listed read-only, read', () => {
+  let tester: LambdaTester;
+  let handlerContext: HandlerContext | undefined;
+  const record = (label: string, answer: Answer) =>
+    logger?.info(
+      `[answer] ${label}: ${answer.isError ? 'isError ' : ''}${answer.text}`,
+    );
+
+  beforeAll(async () => {
+    tester = new LambdaTester(
+      'include_cloud_read',
+      'read_delivered_include',
+      'incl-cloud',
+    );
+    await tester.beforeAll(
+      async (context: LambdaTesterContext) => {
+        if (context.hasConfig) {
+          handlerContext = createHandlerContext({
+            connection: context.connection,
+            logger: context.logger,
+          });
+        }
+      },
+      // Nothing is written, so nothing is deleted.
+      async () => {},
+    );
+  });
+
+  afterEach(async () => {
+    await tester.afterEach();
+  });
+
+  afterAll(async () => {
+    await tester.afterAll(async () => {});
+  });
+
+  it(
+    'lists no include write, and HandlerCreate offers no INCLUDE',
+    async () => {
+      await tester.run(async (ctx: LambdaTesterContext) => {
+        expect(getSystemType()).toBe('cloud');
+        // The core set (readonly + high, low included), as cloud lists it.
+        const core = await listedTools(
+          new EmbeddableMcpServer({
+            connection: ctx.connection,
+            exposition: ['readonly', 'high'],
+            systemType: 'cloud',
+          }),
+        );
+        const coreNames = core.map((tool) => tool.name);
+        logger?.info(
+          `[answer] tools/list core (cloud): ${coreNames.length} tools; include tools: ${coreNames.filter((name) => name.includes('Include')).join(', ')}`,
+        );
+        for (const write of [
+          'CreateInclude',
+          'UpdateInclude',
+          'UpdateIncludeMetadata',
+          'DeleteInclude',
+          'ActivateIncludeLow',
+        ]) {
+          expect(coreNames).not.toContain(write);
+        }
+        expect(coreNames).toContain('GetInclude');
+
+        // The compact set, as cloud lists it.
+        const compactContext = createHandlerContext({
+          connection: ctx.connection,
+          logger: ctx.logger,
+        });
+        const compact = await listedTools(
+          new EmbeddableMcpServer({
+            connection: ctx.connection,
+            systemType: 'cloud',
+            handlersRegistry: new CompositeHandlersRegistry([
+              new CompactHandlersGroup(compactContext, [
+                compactReadOnlyEntries,
+                compactModifyEntries,
+              ]),
+            ]),
+          }),
+        );
+        const enumOf = (name: string) => {
+          const members = objectTypesOf(compact, name);
+          logger?.info(
+            `[answer] tools/list ${name} object_type (cloud): ${JSON.stringify(members)}`,
+          );
+          return members;
+        };
+        expect(enumOf('HandlerCreate')).not.toContain('INCLUDE');
+        expect(enumOf('HandlerUpdate')).not.toContain('INCLUDE');
+        expect(enumOf('HandlerDelete')).not.toContain('INCLUDE');
+        expect(enumOf('HandlerGet')).toContain('INCLUDE');
+        expect(enumOf('HandlerDeletionCheck')).toContain('INCLUDE');
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'reads a delivered include: GetInclude both parts, HandlerGet, HandlerDeletionCheck',
+    async () => {
+      await tester.run(async (ctx: LambdaTesterContext) => {
+        const context = handlerContext;
+        if (context === undefined) throw new Error('No handler context');
+        const includeName: string = ctx.params.include_name ?? '';
+        if (includeName === '') {
+          throw new Error(
+            'SKIP: include_cloud_read.include_name is empty: the configuration names no delivered include to read',
+          );
+        }
+        const must = async (label: string, call: () => Promise<unknown>) => {
+          const answer = answerOf(await call());
+          record(label, answer);
+          if (answer.isError) {
+            throw new Error(`${label} was refused: ${answer.text}`);
+          }
+          return answer;
+        };
+        const source = await must(`GetInclude ${includeName} source`, () =>
+          handleGetInclude(context, { include_name: includeName }),
+        );
+        expect(source.text).not.toBe('');
+        const metadata = await must(`GetInclude ${includeName} metadata`, () =>
+          handleGetInclude(context, {
+            include_name: includeName,
+            part: 'metadata',
+          }),
+        );
+        expect(typeof field(parsed(metadata.text), 'metadata')).toBe('string');
+        await must(`HandlerGet INCLUDE ${includeName}`, () =>
+          handleHandlerGet(context, {
+            object_type: 'INCLUDE',
+            include_name: includeName,
+          }),
+        );
+        await must(`HandlerGet INCLUDE ${includeName} metadata`, () =>
+          handleHandlerGet(context, {
+            object_type: 'INCLUDE',
+            include_name: includeName,
+            part: 'metadata',
+          }),
+        );
+        // SAP's verdict on a delivered include, recorded as answered.
+        record(
+          `HandlerDeletionCheck INCLUDE ${includeName}`,
+          answerOf(
+            await handleHandlerDeletionCheck(context, {
+              object_type: 'INCLUDE',
+              object_name: includeName,
+            }),
+          ),
+        );
       });
     },
     getTimeout('long'),

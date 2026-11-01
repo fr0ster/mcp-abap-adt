@@ -107,3 +107,21 @@ export async function handleGetInclude(
 ) {
   return readInclude(context, args, (_name, _version, source) => source);
 }
+
+/**
+ * Both parts as `GetProgram` answers them: the source too, as
+ * `{ success, include_name, version, part: 'source', source }` (compact
+ * `HandlerGet`), `version` present when the call gave one.
+ */
+export async function handleGetIncludePart(
+  context: HandlerContext,
+  args: GetIncludeArgs,
+) {
+  return readInclude(context, args, (includeName, version, source) => ({
+    success: true,
+    include_name: includeName,
+    ...(version === undefined ? {} : { version }),
+    part: 'source',
+    source,
+  }));
+}

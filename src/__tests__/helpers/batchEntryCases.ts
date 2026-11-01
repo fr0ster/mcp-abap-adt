@@ -238,6 +238,7 @@ const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
   ['LOCAL_DEFINITIONS', { class_name: 'CLAS_A' }],
   ['LOCAL_MACROS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   [
     'FUNCTION_MODULE',
@@ -263,6 +264,7 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['SERVICE_BINDING', { service_binding_name: 'SRVB_A' }],
   ['CLASS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   [
     'FUNCTION_MODULE',

@@ -58,6 +58,7 @@ describe('the parts a compact read can answer', () => {
       'urls',
     ]);
     expect(partsFor('CLASS' as never, true)).toEqual(['source', 'metadata']);
+    expect(partsFor('INCLUDE', true)).toEqual(['source', 'metadata']);
     expect(partsFor('TRANSPORT' as never, true)).toEqual(['source']);
   });
 

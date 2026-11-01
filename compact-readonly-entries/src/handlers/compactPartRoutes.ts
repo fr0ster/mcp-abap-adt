@@ -40,7 +40,11 @@ import {
   handleGetTable,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import { compactReadRouterMap, readTableType } from './compactReadRoutes';
+import {
+  compactReadRouterMap,
+  readIncludePart,
+  readTableType,
+} from './compactReadRoutes';
 
 /**
  * `part: 'metadata'` — the ADT metadata document, for the types that have one:
@@ -61,6 +65,7 @@ export const compactMetadataRoutes: Partial<
   SERVICE_BINDING: handleGetServiceBinding as unknown as CompactHandler,
   CLASS: handleGetClass as unknown as CompactHandler,
   PROGRAM: handleGetProgram as unknown as CompactHandler,
+  INCLUDE: readIncludePart('metadata'),
   INTERFACE: handleGetInterface as unknown as CompactHandler,
   FUNCTION_GROUP: handleGetFunctionGroup as unknown as CompactHandler,
   FUNCTION_MODULE: handleGetFunctionModule as unknown as CompactHandler,

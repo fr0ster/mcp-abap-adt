@@ -25,6 +25,7 @@ import {
   handleGetDomain,
   handleGetFunctionGroup,
   handleGetFunctionModule,
+  handleGetIncludePart,
   handleGetInterface,
   handleGetLocalDefinitions,
   handleGetLocalMacros,
@@ -41,6 +42,7 @@ import {
   handleGetUnitTestResultOnce,
   handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
+import { return_error } from '@mcp-abap-adt/lib/utils';
 
 /**
  * A table type's read: its metadata document, the one part it has. The name
@@ -53,6 +55,31 @@ export const readTableType: CompactHandler = (context, args) =>
         ? args.table_type_name
         : undefined,
   });
+
+/**
+ * An include's read of `part` (`source` here, `metadata` from the metadata
+ * route), answered as a program's: the source too beside its name. The
+ * arguments arrive from outside the type system: the name is passed on only
+ * as a string, and a version only as one of the two the read takes.
+ */
+export const readIncludePart =
+  (part: 'source' | 'metadata'): CompactHandler =>
+  async (context, args) => {
+    const { version } = args;
+    if (
+      version !== undefined &&
+      version !== 'active' &&
+      version !== 'inactive'
+    ) {
+      return return_error(new Error('version must be "active" or "inactive"'));
+    }
+    return handleGetIncludePart(context, {
+      include_name:
+        typeof args.include_name === 'string' ? args.include_name : undefined,
+      part,
+      version,
+    });
+  };
 
 export const compactReadRouterMap: CompactRouterMap = {
   PACKAGE: {
@@ -112,7 +139,9 @@ export const compactReadRouterMap: CompactRouterMap = {
   PROGRAM: {
     get: handleGetProgram as unknown as CompactHandler,
   },
-  INCLUDE: {},
+  INCLUDE: {
+    get: readIncludePart('source'),
+  },
   INTERFACE: {
     get: handleGetInterface as unknown as CompactHandler,
   },

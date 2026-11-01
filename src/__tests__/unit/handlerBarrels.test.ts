@@ -79,8 +79,9 @@ describe("lib's read and write handler barrels", () => {
     // `HandlerDumpList` (52). 21.0.0: the check and the validation of a kind
     // checked at the boundary, for compact `HandlerCheckRun` and
     // `HandlerValidate` (54). The table type's read, for `HandlerGet`
-    // TABLE_TYPE (55).
-    expect(read).toHaveLength(55);
+    // TABLE_TYPE (55). An include's read of either part, for `HandlerGet`
+    // INCLUDE (56).
+    expect(read).toHaveLength(56);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

@@ -96,6 +96,7 @@ const READ_TOKENS: Tokens<(typeof COMPACT_READ.onprem)[number]> = {
   LOCAL_DEFINITIONS: 'LOCAL_DEFINITIONS(class_name*)',
   LOCAL_MACROS: 'LOCAL_MACROS(class_name*)',
   PROGRAM: 'PROGRAM(program_name*)',
+  INCLUDE: 'INCLUDE(include_name*)',
   INTERFACE: 'INTERFACE(interface_name*)',
   FUNCTION_GROUP: 'FUNCTION_GROUP(function_group_name*)',
   FUNCTION_MODULE:

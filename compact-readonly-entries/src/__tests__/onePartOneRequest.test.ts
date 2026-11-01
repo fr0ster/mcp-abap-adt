@@ -84,6 +84,7 @@ const BOTH: Array<[string, Record<string, unknown>]> = [
   ['SERVICE_BINDING', { service_binding_name: 'SRVB_A' }],
   ['CLASS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
@@ -285,6 +286,131 @@ describe('compact HandlerGet: one part, one request', () => {
       expect(sent).toEqual([]);
       expect(answer?.isError).toBe(true);
       expect(textOf(answer)).toContain(words);
+    });
+  });
+
+  describe('INCLUDE: the source and the metadata document, one request each', () => {
+    const SOURCE = "REPORT zincl.\n  WRITE 'x'.\n";
+
+    it.each([
+      ['absent', {}, 'GET /sap/bc/adt/programs/includes/incl_a/source/main'],
+      [
+        'source',
+        { part: 'source' },
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main',
+      ],
+      [
+        'source, inactive',
+        { part: 'source', version: 'inactive' },
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=inactive',
+      ],
+      [
+        'metadata',
+        { part: 'metadata' },
+        'GET /sap/bc/adt/programs/includes/incl_a',
+      ],
+    ])('part %s: exactly that request', async (_label, part, request) => {
+      for (const mode of MODES) {
+        const { sent } = await run(mode, {
+          object_type: 'INCLUDE',
+          include_name: 'INCL_A',
+          ...part,
+        });
+        expect(sent).toEqual([request]);
+      }
+    });
+
+    it('source answers { part: "source", source } beside the name', async () => {
+      const { answer } = await run(
+        'document',
+        { object_type: 'INCLUDE', include_name: 'incl_a' },
+        SOURCE,
+      );
+      expect(answer?.isError).not.toBe(true);
+      expect(jsonOf(answer)).toEqual({
+        success: true,
+        include_name: 'INCL_A',
+        part: 'source',
+        source: SOURCE,
+      });
+    });
+
+    it('source with a version answers it beside the source', async () => {
+      const { answer } = await run(
+        'document',
+        {
+          object_type: 'INCLUDE',
+          include_name: 'INCL_A',
+          version: 'inactive',
+        },
+        SOURCE,
+      );
+      expect(jsonOf(answer)).toEqual({
+        success: true,
+        include_name: 'INCL_A',
+        version: 'inactive',
+        part: 'source',
+        source: SOURCE,
+      });
+    });
+
+    it('metadata answers { part: "metadata", metadata } beside the name', async () => {
+      const DOCUMENT = '<include:abapInclude adtcore:name="INCL_A"/>';
+      const { answer } = await run(
+        'document',
+        { object_type: 'INCLUDE', include_name: 'INCL_A', part: 'metadata' },
+        DOCUMENT,
+      );
+      expect(jsonOf(answer)).toEqual({
+        success: true,
+        include_name: 'INCL_A',
+        part: 'metadata',
+        metadata: DOCUMENT,
+      });
+    });
+
+    it.each(['source', 'metadata'])(
+      'part %s with another version: refused before any request, naming the two',
+      async (part) => {
+        const { sent, answer } = await run('document', {
+          object_type: 'INCLUDE',
+          include_name: 'INCL_A',
+          part,
+          version: 'latest',
+        });
+        expect(sent).toEqual([]);
+        expect(answer?.isError).toBe(true);
+        expect(textOf(answer)).toContain(
+          'version must be "active" or "inactive"',
+        );
+      },
+    );
+
+    describe('on ABAP cloud', () => {
+      beforeAll(() => {
+        process.env.SAP_SYSTEM_TYPE = 'cloud';
+      });
+      afterAll(() => {
+        process.env.SAP_SYSTEM_TYPE = 'onprem';
+      });
+
+      it.each([
+        ['source', 'GET /sap/bc/adt/programs/includes/incl_a/source/main'],
+        ['metadata', 'GET /sap/bc/adt/programs/includes/incl_a'],
+      ])('part %s: exactly that request', async (part, request) => {
+        for (const mode of MODES) {
+          const { sent, answer } = await run(mode, {
+            object_type: 'INCLUDE',
+            include_name: 'INCL_A',
+            part,
+          });
+          expect(sent).toEqual([request]);
+          if (mode === 'document') {
+            expect(answer?.isError).not.toBe(true);
+            expect(jsonOf(answer).part).toBe(part);
+          }
+        }
+      });
     });
   });
 

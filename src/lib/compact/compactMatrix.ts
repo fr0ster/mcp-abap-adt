@@ -24,7 +24,7 @@ export const COMPACT_CRUD_MATRIX: Record<
   LOCAL_DEFINITIONS: ['get', 'update', 'delete'],
   LOCAL_MACROS: ['get', 'update', 'delete'],
   PROGRAM: ['create', 'get', 'update', 'delete'],
-  INCLUDE: ['create', 'update', 'delete'],
+  INCLUDE: ['create', 'get', 'update', 'delete'],
   INTERFACE: ['create', 'get', 'update', 'delete'],
   FUNCTION_GROUP: ['create', 'get', 'update', 'delete'],
   FUNCTION_MODULE: ['create', 'get', 'update', 'delete'],

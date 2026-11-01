@@ -1094,6 +1094,7 @@ export const COMPACT_READ_ROUTES = {
   LOCAL_DEFINITIONS: { api: 'localDefinitions', operation: 'read' },
   LOCAL_MACROS: { api: 'localMacros', operation: 'read' },
   PROGRAM: { api: 'program', operation: 'read' },
+  INCLUDE: { api: 'include', operation: 'read' },
   INTERFACE: { api: 'interface', operation: 'read' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'read' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'read' },
@@ -1121,6 +1122,7 @@ const READ_ONPREM = [
   'LOCAL_DEFINITIONS',
   'LOCAL_MACROS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1132,7 +1134,7 @@ const READ_ONPREM = [
   'TRANSPORT',
 ] as const;
 
-/** HandlerGet's `object_type`: a program is read on both variants. */
+/** HandlerGet's `object_type`: a program and an include are read on both variants. */
 export const COMPACT_READ = projected<
   ServedName<'onprem', typeof COMPACT_READ_ROUTES>,
   ServedName<'cloud', typeof COMPACT_READ_ROUTES>

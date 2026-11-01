@@ -128,6 +128,11 @@ exporter.registerOnServer(mcpServer, () => connection);
 - **Your groups state different system types** (or some one and some none): the registration is
   refused before anything is registered, naming each group and what it states. State the same
   `systemType` in every group of one registration, or none in any.
+- **You call `registry.registerTool(server, name, definition, handler)`:** it registers a tool of
+  one of the registry's groups, through that group's path as `registerAllTools` does — `handler`
+  called in its form (an args-only one reading the group's context), on the stated system type.
+  A name no group of the registry holds is refused (`registerTool registers a tool of one of the
+  registry's handler groups: …`): add the tool to a group of the registry.
 
 ## Embedders: `ToolHandler` is either call form
 

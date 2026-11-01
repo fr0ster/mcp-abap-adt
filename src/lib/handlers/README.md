@@ -75,6 +75,11 @@ the error names each group and the variant it states (`none` for a group that st
 by any (the definitions as they are); one group stating a variant beside another stating none is
 refused.
 
+`registerTool(server, name, definition, handler)` registers a tool of one of the registry's groups
+through that group's path, as `registerAllTools` registers it: the handler called in its form, an
+args-only one reading the group's context, on the stated variant. A name no group of the registry
+holds is refused at registration: its call would have no context to run on.
+
 ### Selective Handler Registration
 
 ```typescript

@@ -24,6 +24,7 @@ import type {
   HandlerEntry,
   IHandlerGroup,
   SapEnvironment,
+  ToolDefinition,
   ToolHandler,
 } from '../interfaces.js';
 import {
@@ -96,20 +97,43 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
    * and the handler does not run.
    */
   registerHandlersOnCall(server: McpServer, callContext: CallContext): void {
-    const environment = this.statedSystemType();
     for (const entry of this.getHandlers()) {
-      const listed = listedTool(entry.toolDefinition, environment);
-      if (!listed.listed) continue;
-      this.registerToolOnServer(
+      this.registerOneTool(
         server,
         entry.toolDefinition.name,
-        listed.description,
-        listed.inputSchema,
+        entry.toolDefinition,
         entry.handler,
-        listed.search,
         callContext,
       );
     }
+  }
+
+  /**
+   * Registers one tool as `registerHandlers` registers each of the group's:
+   * listed on the variant the group states (left out when it does not serve
+   * it), each call in the group's path — the handler's call form, the
+   * group's context for an args-only handler, the stated kind — in the
+   * context `callContext` gives (the group's own by default). The path
+   * `CompositeHandlersRegistry.registerTool` registers a tool of the group by.
+   */
+  registerOneTool(
+    server: McpServer,
+    toolName: string,
+    toolDefinition: ToolDefinition,
+    handler: ToolHandler,
+    callContext: CallContext = () => Promise.resolve(this.context),
+  ): void {
+    const listed = listedTool(toolDefinition, this.statedSystemType());
+    if (!listed.listed) return;
+    this.registerToolOnServer(
+      server,
+      toolName,
+      listed.description,
+      listed.inputSchema,
+      handler,
+      listed.search,
+      callContext,
+    );
   }
 
   /**

@@ -38,7 +38,10 @@ import {
   type SapEnvironment,
   type ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import {
+  CompositeHandlersRegistry,
+  REGISTER_TOOL_UNHELD_WORDS,
+} from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { callInItsForm } from '../../../lib/handlers/utils/handlerCall';
 import { isLongTool } from '../../../lib/longTools';
@@ -680,5 +683,135 @@ describe('a long read on the plain path', () => {
     expect(plain).toEqual(served);
     expect(plain.requests.length).toBeGreaterThan(0);
     expect(plain.answer).not.toContain('Cannot read properties');
+  });
+});
+
+/**
+ * `registerTool` calls a tool as `registerAllTools` does: through the path
+ * of the group that holds it — its call form (`callInItsForm`), the group's
+ * context for an args-only handler, the stated kind (`inStatedScope`) — so
+ * groups stating cloud run the call as cloud whatever `SAP_SYSTEM_TYPE`
+ * says. A tool no group of the registry holds has no context to run on and
+ * is refused.
+ */
+describe('registerTool calls a tool as registerAllTools does', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  /** Two probes answering the variant of their call: one in each form. */
+  class FormProbeGroup extends BaseHandlerGroup {
+    protected groupName = 'FormProbe';
+    getHandlers(): HandlerEntry[] {
+      const definition = (name: string): ToolDefinition => ({
+        name,
+        description: 'Answers the variant of the call.',
+        inputSchema: { type: 'object', properties: {} },
+      });
+      return [
+        defineTool(definition('ContextProbe'), async (context, _args) => ({
+          content: [{ type: 'text', text: variantOf(context.connection) }],
+        })),
+        {
+          toolDefinition: definition('ArgsProbe'),
+          handler: async (_args: unknown) => ({
+            content: [
+              { type: 'text', text: variantOf(this.context.connection) },
+            ],
+          }),
+        },
+      ];
+    }
+  }
+
+  type Register = (
+    registry: CompositeHandlersRegistry,
+    server: McpServer,
+    name: string,
+  ) => void;
+  const viaAll: Register = (registry, server) =>
+    registry.registerAllTools(server);
+  const viaOne: Register = (registry, server, name) => {
+    const entry = registry
+      .getHandlerGroups()
+      .flatMap((group) => group.getHandlers())
+      .find((e) => e.toolDefinition.name === name);
+    if (entry === undefined) throw new Error(`a group holds ${name}`);
+    registry.registerTool(server, name, entry.toolDefinition, entry.handler);
+  };
+
+  async function answered(
+    register: Register,
+    groupsOn: (context: HandlerContext) => IHandlerGroup[],
+    name: string,
+    args: Record<string, unknown>,
+  ) {
+    const counting = countingConnection('document', undefined);
+    const registry = new CompositeHandlersRegistry(
+      groupsOn({
+        connection: counting.connection,
+        logger: silentLogger,
+        systemType: 'cloud',
+      }),
+    );
+    const server = new McpServer({ name: 'register-tool', version: '1.0.0' });
+    register(registry, server, name);
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'register-tool', version: '1.0.0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    try {
+      const answer = JSON.stringify(
+        await client.callTool({ name, arguments: args }),
+      );
+      return { answer, sent: counting.sent };
+    } finally {
+      await client.close();
+    }
+  }
+
+  const probes = (context: HandlerContext) => [new FormProbeGroup(context)];
+
+  it.each(['ContextProbe', 'ArgsProbe'])(
+    'groups stating cloud, SAP_SYSTEM_TYPE=onprem: %s runs as cloud, as registerAllTools runs it',
+    async (name) => {
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
+      const one = await answered(viaOne, probes, name, {});
+      expect(JSON.parse(one.answer)).toEqual({
+        content: [{ type: 'text', text: 'cloud' }],
+      });
+      expect(one).toEqual(await answered(viaAll, probes, name, {}));
+    },
+  );
+
+  it('a shipped args-only tool answers and sends as registerAllTools', async () => {
+    const readonly = (context: HandlerContext) => [
+      new ReadOnlyHandlersGroup(context),
+    ];
+    const args = { program_name: 'ZPLACEHOLDER' };
+    const one = await answered(viaOne, readonly, 'GetProgram', args);
+    expect(one).toEqual(await answered(viaAll, readonly, 'GetProgram', args));
+    expect(one.sent).toEqual([
+      'GET /sap/bc/adt/programs/programs/zplaceholder/source/main?version=active',
+    ]);
+  });
+
+  it('a tool no group of the registry holds is refused, naming it', () => {
+    const registry = new CompositeHandlersRegistry(
+      probes({ ...noConnectionContext(), systemType: 'cloud' }),
+    );
+    expect(() =>
+      registry.registerTool(
+        new McpServer({ name: 'register-tool', version: '1.0.0' }),
+        'Elsewhere',
+        {
+          name: 'Elsewhere',
+          description: 'Held by no group.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        async () => ({ content: [] }),
+      ),
+    ).toThrow(REGISTER_TOOL_UNHELD_WORDS('Elsewhere'));
   });
 });

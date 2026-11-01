@@ -9,7 +9,13 @@ import type {
   ToolHandler,
 } from '../interfaces.js';
 import type { CallContext } from '../utils/handlerCall.js';
-import { registeredSchema } from '../utils/schemaUtils.js';
+
+/**
+ * Why `registerTool` refuses a tool: no `BaseHandlerGroup` of the registry
+ * holds a tool of that name, so its call has no group context to run on.
+ */
+export const REGISTER_TOOL_UNHELD_WORDS = (toolName: string): string =>
+  `registerTool registers a tool of one of the registry's handler groups: no group of this registry holds "${toolName}", so its call has no context to run on`;
 
 /**
  * Composite handlers registry that accepts multiple handler groups via Dependency Injection
@@ -119,11 +125,15 @@ export class CompositeHandlersRegistry<
   }
 
   /**
-   * Registers a single tool on server, as the variant every group of the
-   * registry states lists it (`listedTool`): left out when that variant
-   * does not serve it; as it is when no group states one. Groups stating
-   * different variants — one of them none included — are refused before
-   * anything is registered.
+   * Registers a single tool of one of the registry's groups, as
+   * `registerAllTools` registers it: on the variant every group states
+   * (`listedTool`; left out when that variant does not serve it), each call
+   * through the path of the group that holds a tool of that name
+   * (`BaseHandlerGroup.registerOneTool`) — `handler` called in its form, an
+   * args-only one reading that group's context, on the stated kind. Groups
+   * stating different variants — one of them none included — are refused
+   * before anything is registered; so is a tool no `BaseHandlerGroup` of the
+   * registry holds, which has no context to run on.
    * Note: This method is provided for compatibility, but it's recommended to use handler groups
    */
   registerTool(
@@ -132,23 +142,16 @@ export class CompositeHandlersRegistry<
     toolDefinition: ToolDefinition,
     handler: ToolHandler,
   ): void {
-    const environment = this.refuseDifferentVariants();
-    const listed = listedTool(toolDefinition, environment);
-    if (!listed.listed) return;
-    // A JSON Schema is converted to Zod, as a group registers it; the SDK
-    // takes nothing else.
-    const { inputSchema } = listed;
-    // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
-    const zodSchema = registeredSchema(inputSchema);
-    server.registerTool(
-      toolName,
-      {
-        description: listed.description,
-        inputSchema: zodSchema,
-        ...listed.search,
-      },
-      handler as any,
+    this.refuseDifferentVariants();
+    const holder = this.handlerGroups.find((group) =>
+      group
+        .getHandlers()
+        .some((entry) => entry.toolDefinition.name === toolName),
     );
+    if (!(holder instanceof BaseHandlerGroup)) {
+      throw new Error(REGISTER_TOOL_UNHELD_WORDS(toolName));
+    }
+    holder.registerOneTool(server, toolName, toolDefinition, handler);
   }
 
   /**

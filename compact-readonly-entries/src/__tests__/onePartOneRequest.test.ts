@@ -7,7 +7,7 @@
  *   answered with a document and answered `404` alike; the answer carries the
  *   part read, `{ part: 'source', source }` or `{ part: 'metadata', metadata }`,
  *   the same keys for every type;
- * - DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and PACKAGE have no source: `source`
+ * - DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE and PACKAGE have no source: `source`
  *   is refused before any request, naming the parts the type has;
  * - FUNCTION_MODULE takes its group in the arguments (`GROUP|MODULE`, or
  *   `function_group_name`): its source is one request at that group;
@@ -104,6 +104,7 @@ const SOURCELESS: Array<[string, Record<string, unknown>, string]> = [
   ['DOMAIN', { domain_name: 'DOM_A' }, 'metadata'],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }, 'metadata'],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }, 'metadata'],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }, 'metadata'],
   ['PACKAGE', { package_name: 'PKG_A' }, 'metadata, contents'],
 ];
 

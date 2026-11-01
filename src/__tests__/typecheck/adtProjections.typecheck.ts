@@ -19,6 +19,7 @@ import {
   type AtcKindOn,
   type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
+  type COMPACT_READ_ROUTES,
   type INCLUDES_PARENT_ROUTES,
   projected,
   type ServedName,
@@ -118,6 +119,12 @@ export const tableTypeInCloudCreate: (typeof COMPACT_CREATE.cloud)[number] =
 // @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
 export const includeInCloudCreate: (typeof COMPACT_CREATE.cloud)[number] =
   'INCLUDE';
+
+/** HandlerGet reads a table type's metadata on ABAP cloud. */
+export const tableTypeReadCompactOnCloud: ServedName<
+  'cloud',
+  typeof COMPACT_READ_ROUTES
+> = 'TABLE_TYPE';
 
 // --- A list is exactly its projection --------------------------------------
 

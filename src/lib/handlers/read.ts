@@ -76,6 +76,7 @@ export {
 export { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles.js';
 export { handleGetTable } from '../../handlers/table/high/handleGetTable.js';
 export { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
+export { handleGetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
 export { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 export { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest.js';
 export {

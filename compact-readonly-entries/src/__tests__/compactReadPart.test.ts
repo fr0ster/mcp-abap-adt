@@ -81,6 +81,18 @@ describe('the parts a compact read can answer', () => {
     );
   });
 
+  it('refuses the source of a table type, naming its metadata', async () => {
+    expect(
+      await refusalOf({
+        object_type: 'TABLE_TYPE',
+        part: 'source',
+        table_type_name: 'X',
+      }),
+    ).toBe(
+      'part=source is not available for object_type=TABLE_TYPE. It offers: metadata.',
+    );
+  });
+
   it('refuses metadata where there is none', async () => {
     expect(
       await refusalOf({

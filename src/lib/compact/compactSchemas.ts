@@ -233,7 +233,7 @@ export function compactGetSchemaFor<const M extends readonly string[]>(
     properties: {
       timeout: {
         ...TIMEOUT_PROPERTY,
-        description: `${TIMEOUT_PROPERTY.description} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
+        description: `${TIMEOUT_PROPERTY.description} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
       },
       object_type: objectTypeOf(members),
       part: readPartSchema,
@@ -263,6 +263,7 @@ export function compactGetSchemaFor<const M extends readonly string[]>(
       data_element_name: { type: 'string', description: 'Data element name.' },
       table_name: { type: 'string', description: 'Table name.' },
       structure_name: { type: 'string', description: 'Structure name.' },
+      table_type_name: { type: 'string', description: 'Table type name.' },
       ddl_name: { type: 'string', description: 'DDL source name.' },
       function_module_name: {
         type: 'string',

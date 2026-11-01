@@ -40,7 +40,7 @@ import {
   handleGetTable,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import { compactReadRouterMap } from './compactReadRoutes';
+import { compactReadRouterMap, readTableType } from './compactReadRoutes';
 
 /**
  * `part: 'metadata'` — the ADT metadata document, for the types that have one:
@@ -55,6 +55,7 @@ export const compactMetadataRoutes: Partial<
   DATA_ELEMENT: handleGetDataElement as unknown as CompactHandler,
   TABLE: handleGetTable as unknown as CompactHandler,
   STRUCTURE: handleGetStructure as unknown as CompactHandler,
+  TABLE_TYPE: readTableType,
   DDL: handleGetDdl as unknown as CompactHandler,
   SERVICE_DEFINITION: handleGetServiceDefinition as unknown as CompactHandler,
   SERVICE_BINDING: handleGetServiceBinding as unknown as CompactHandler,
@@ -183,6 +184,7 @@ const SOURCELESS: ReadonlySet<CompactObjectType> = new Set([
   'DOMAIN',
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
+  'TABLE_TYPE',
 ] as CompactObjectType[]);
 
 /** Whether `part: 'source'` reads something for this type. */

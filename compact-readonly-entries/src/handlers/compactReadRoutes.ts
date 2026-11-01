@@ -37,9 +37,22 @@ import {
   handleGetServiceDefinition,
   handleGetStructure,
   handleGetTable,
+  handleGetTableType,
   handleGetUnitTestResultOnce,
   handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
+
+/**
+ * A table type's read: its metadata document, the one part it has. The name
+ * arrives from outside the type system, so it is passed on only as a string.
+ */
+export const readTableType: CompactHandler = (context, args) =>
+  handleGetTableType(context, {
+    table_type_name:
+      typeof args.table_type_name === 'string'
+        ? args.table_type_name
+        : undefined,
+  });
 
 export const compactReadRouterMap: CompactRouterMap = {
   PACKAGE: {
@@ -60,7 +73,9 @@ export const compactReadRouterMap: CompactRouterMap = {
   STRUCTURE: {
     get: handleGetStructure as unknown as CompactHandler,
   },
-  TABLE_TYPE: {},
+  TABLE_TYPE: {
+    get: readTableType,
+  },
   DDL: {
     get: handleGetDdl as unknown as CompactHandler,
   },

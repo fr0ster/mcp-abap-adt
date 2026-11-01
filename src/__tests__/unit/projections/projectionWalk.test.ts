@@ -292,6 +292,7 @@ const METADATA_ONLY = new Set<string>([
   'DOMAIN',
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
+  'TABLE_TYPE',
 ]);
 
 /** The object name a lifecycle tool takes: a function module's as GROUP|MODULE. */

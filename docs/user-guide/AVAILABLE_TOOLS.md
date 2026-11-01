@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 271
+- Total tools: 272
 - Read-only tools: 66
-- High-level tools: 168
+- High-level tools: 169
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -285,6 +285,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Table Type](#high-level-table-type)
     - [CreateTableType](#createtabletype-high-level-table-type)
     - [GetTableType](#gettabletype-high-level-table-type)
+    - [UpdateTableType](#updatetabletype-high-level-table-type)
   - [Transport](#high-level-transport)
     - [AddTransportObject](#addtransportobject-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
@@ -3272,6 +3273,20 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
+
+---
+
+<a id="updatetabletype-high-level-table-type"></a>
+#### UpdateTableType (High-Level / Table Type)
+**Description:** Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.
+
+**Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
+
+**Parameters:**
+- `activate` (boolean, optional (default: true).)) - Activate the table type after the update (default: true).
+- `description` (string, optional) - New table type description.
+- `table_type_name` (string, required) - Table type name. The table type must already exist.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 

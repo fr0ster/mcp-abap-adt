@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 168
+- Total tools: 169
 
 ## Navigation
 
@@ -175,6 +175,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
   - [Table Type](#high-level-table-type)
     - [CreateTableType](#createtabletype-high-level-table-type)
     - [GetTableType](#gettabletype-high-level-table-type)
+    - [UpdateTableType](#updatetabletype-high-level-table-type)
   - [Transport](#high-level-transport)
     - [AddTransportObject](#addtransportobject-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
@@ -2201,6 +2202,20 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
+
+---
+
+<a id="updatetabletype-high-level-table-type"></a>
+#### UpdateTableType (High-Level / Table Type)
+**Description:** Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.
+
+**Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
+
+**Parameters:**
+- `activate` (boolean, optional (default: true).)) - Activate the table type after the update (default: true).
+- `description` (string, optional) - New table type description.
+- `table_type_name` (string, required) - Table type name. The table type must already exist.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 

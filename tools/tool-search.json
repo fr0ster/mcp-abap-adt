@@ -4303,6 +4303,22 @@
     ],
     "semantic": "Add or change a field of an ABAP database table: write its new definition."
   },
+  "UpdateTableType": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Change an existing ABAP table type: its row type, access type, key or description."
+  },
   "UpdateUnitTest": {
     "keywords": [
       "change unit tests",

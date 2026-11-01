@@ -499,6 +499,10 @@ import {
   handleGetTableType,
 } from '../../../handlers/table_type/high/handleGetTableType';
 import {
+  handleUpdateTableType,
+  TOOL_DEFINITION as UpdateTableType_Tool,
+} from '../../../handlers/table_type/high/handleUpdateTableType';
+import {
   TOOL_DEFINITION as AddTransportObject_Tool,
   handleAddTransportObject,
 } from '../../../handlers/transport/high/handleAddTransportObject';
@@ -787,6 +791,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: CreateTableType_Tool,
         handler: withContext(handleCreateTableType),
+      },
+      {
+        toolDefinition: UpdateTableType_Tool,
+        handler: withContext(handleUpdateTableType),
       },
       {
         toolDefinition: UpdateDomainHigh_Tool,

@@ -10,6 +10,10 @@ import {
 } from '../../../handlers/table_type/high/handleCreateTableType';
 import { handleGetTableType } from '../../../handlers/table_type/high/handleGetTableType';
 import {
+  handleUpdateTableType,
+  TOOL_DEFINITION as UpdateTableType_Tool,
+} from '../../../handlers/table_type/high/handleUpdateTableType';
+import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
@@ -318,5 +322,140 @@ describe('CreateTableType', () => {
     );
     expect(result.isError).toBe(false);
     expect(connection.requests).toHaveLength(9);
+  });
+});
+
+describe('UpdateTableType', () => {
+  /** LOCK, read: the read is the second request. */
+  const existing = (more: Parameters<typeof recordingConnection>[0] = []) =>
+    sessionRecording([undefined, { data: STRING_TABLE }, ...more]);
+
+  it('locks, reads, writes the patch under the handle, checks, unlocks, waits, activates', async () => {
+    const connection = existing();
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      {
+        table_type_name: 'ztt_x',
+        access_type: 'hashed',
+        transport_request: 'K1',
+      },
+    );
+    expect(result.isError).toBe(false);
+    expect(wire(connection)).toEqual([
+      `POST ${LOCK_URL}`,
+      `GET ${TTYP}/ztt_x`,
+      `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}&corrNr=K1`,
+      `POST ${CHECK_URL}`,
+      `POST ${UNLOCK_URL}`,
+      `GET ${TTYP}/ztt_x?withLongPolling=true`,
+      'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
+    ]);
+    expect(connection.sessions).toEqual([
+      'stateful',
+      'stateless',
+      'stateless',
+      'stateless',
+      'stateful',
+      'stateless',
+      'stateless',
+    ]);
+    const put = connection.requests[2];
+    expect(put?.headers?.['Content-Type']).toBe(PAIR);
+    expect(put?.data).toBe(
+      STRING_TABLE.replace(
+        '<ttyp:accessType>standard</ttyp:accessType>',
+        '<ttyp:accessType>hashed</ttyp:accessType>',
+      ),
+    );
+  });
+
+  it("leaves SAP's value for every property not given: the PUT body is the read document", async () => {
+    const connection = existing();
+    await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(connection.requests[2]?.method).toBe('PUT');
+    expect(connection.requests[2]?.data).toBe(STRING_TABLE);
+  });
+
+  it('declares a schema default on activate and the shared detail alone, and takes no package', () => {
+    const { properties } = UpdateTableType_Tool.inputSchema;
+    const defaulted = Object.entries(properties)
+      .filter(([, schema]) => 'default' in schema)
+      .map(([name]) => name);
+    expect(defaulted).toEqual(['activate', 'detail']);
+    expect(Object.keys(properties)).not.toContain('package_name');
+  });
+
+  it('sends no activation with activate false', async () => {
+    const connection = existing();
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', activate: false },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(6);
+    expect(connection.requests[5]?.url).toBe(
+      `${TTYP}/ztt_x?withLongPolling=true`,
+    );
+  });
+
+  it('still unlocks when the write is refused, and sends nothing after the unlock', async () => {
+    const connection = existing([REFUSED]);
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(wire(connection)).toEqual([
+      `POST ${LOCK_URL}`,
+      `GET ${TTYP}/ztt_x`,
+      `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
+      `POST ${UNLOCK_URL}`,
+    ]);
+    expect(connection.sessions[3]).toBe('stateful');
+  });
+
+  it('still unlocks when the check is refused, and sends nothing after the unlock', async () => {
+    const connection = existing([undefined, REFUSED]);
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(wire(connection)).toEqual([
+      `POST ${LOCK_URL}`,
+      `GET ${TTYP}/ztt_x`,
+      `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
+      `POST ${CHECK_URL}`,
+      `POST ${UNLOCK_URL}`,
+    ]);
+    expect(connection.sessions[4]).toBe('stateful');
+  });
+
+  it.each([[{}], [{ table_type_name: '' }]])(
+    'refuses a missing table_type_name, sending nothing',
+    async (args) => {
+      const connection = recordingConnection();
+      const result = await handleUpdateTableType(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe('table_type_name is required');
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
+
+  it('is served on a connection declared cloud', async () => {
+    const connection = existing();
+    declareSystemKind(connection, 'cloud');
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(7);
   });
 });

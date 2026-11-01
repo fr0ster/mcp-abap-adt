@@ -264,6 +264,7 @@
         "UpdateServiceDefinition",
         "UpdateStructure",
         "UpdateTable",
+        "UpdateTableType",
         "UpdateUnitTest",
         "ValidateServiceBinding"
       ],
@@ -1149,6 +1150,7 @@
         "UpdateServiceDefinition",
         "UpdateStructure",
         "UpdateTable",
+        "UpdateTableType",
         "UpdateUnitTest",
         "ValidateServiceBinding"
       ],

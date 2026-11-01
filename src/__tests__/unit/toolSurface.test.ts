@@ -446,9 +446,10 @@ describe('the MCP tool surface', () => {
   /**
    * **The ninth deliberate move: `CreateInclude`, `UpdateInclude`,
    * `UpdateIncludeMetadata`, `DeleteInclude`, `ActivateInclude`,
-   * `GetTableType` and `CreateTableType` arrived** (the server writes
-   * program includes and table types). The first of the new full-set tools of that work, on
-   * premise only; every other row was checked unchanged.
+   * `GetTableType`, `CreateTableType` and `UpdateTableType` arrived** (the
+   * server writes program includes and table types). The new full-set
+   * tools of that work: the include tools on premise only, the table-type
+   * tools on premise and cloud; every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

@@ -77,11 +77,32 @@ function membersOf(tool: string): {
   return { any: new Set([...onprem, ...cloud]), on: { onprem, cloud } };
 }
 
-/** The words of `description` written as a member is (`NAME(`). */
+/** Whether `char` continues a member's name (`A`–`Z`, `a`–`z`, digits, `_`). */
+function nameChar(char: string | undefined): boolean {
+  if (char === undefined || char.length === 0) return false;
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    char === '_'
+  );
+}
+
+/** The members `description` names as a whole word anywhere in its text. */
 function membersNamed(description: string, any: ReadonlySet<string>): string[] {
   const named: string[] = [];
   for (const member of any) {
-    if (description.includes(`${member}(`)) named.push(member);
+    let from = description.indexOf(member);
+    while (from !== -1) {
+      const before = description[from - 1];
+      const after = description[from + member.length];
+      if (!nameChar(before) && !nameChar(after)) {
+        named.push(member);
+        break;
+      }
+      from = description.indexOf(member, from + 1);
+    }
   }
   return named;
 }

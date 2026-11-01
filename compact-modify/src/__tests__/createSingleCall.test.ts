@@ -363,6 +363,29 @@ describe('HandlerCreate is one POST', () => {
     expect(textOf(answered.answer)).toContain('has not been created');
   });
 
+  // An include is its own resource (`HandlerCreate INCLUDE`): a program
+  // create with program_type include is refused before any request — today
+  // by adt-clients' guard, whose words reach the answer.
+  it('PROGRAM with program_type include: no request, an error', async () => {
+    for (const mode of ['pending', 'answered'] as const) {
+      const answered = await run(
+        mode,
+        create('PROGRAM', {
+          program_name: 'ZPROG_A',
+          package_name: 'ZPKG_A',
+          program_type: 'include',
+        }),
+      );
+      expect(answered.sent).toEqual([]);
+      if (mode === 'answered') {
+        expect(answered.answer?.isError).toBe(true);
+        expect(textOf(answered.answer)).toContain(
+          "programType 'include' is not a program",
+        );
+      }
+    }
+  });
+
   it.each(CHAINS)(
     '%s: its create is a chain — refused before any request, pointing to %s',
     async (objectType, fullTool, fields) => {

@@ -476,7 +476,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetFunctionModuleVersions` | every call | GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions |
 | `GetFunctionModuleVersionSource` | every call | GET the content_uri given |
 | `GetInactiveObjects` | every call | GET /sap/bc/adt/activation/inactiveobjects |
-| `GetInclude` | every call | GET /sap/bc/adt/programs/includes/{name}/source/main |
+| `GetInclude` | every call | one request: GET /sap/bc/adt/programs/includes/{name}/source/main (part source, the default; ?version= the version given), or GET /sap/bc/adt/programs/includes/{name} (part metadata) |
 | `GetInterface` | every call | one request: GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/interfaces/{name} (part metadata) |
 | `GetInterfaceVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetInterfaceVersions` | every call | GET /sap/bc/adt/oo/interfaces/{name}/source/main/versions |

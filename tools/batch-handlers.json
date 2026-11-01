@@ -153,7 +153,7 @@
     "tool": "GetInclude",
     "set": "full",
     "handler": "src/handlers/include/readonly/handleGetInclude.ts#handleGetInclude",
-    "sends": "GET /sap/bc/adt/programs/includes/{name}/source/main"
+    "sends": "one request: GET /sap/bc/adt/programs/includes/{name}/source/main (part source, the default; ?version= the version given), or GET /sap/bc/adt/programs/includes/{name} (part metadata)"
   },
   {
     "tool": "GetTransport",

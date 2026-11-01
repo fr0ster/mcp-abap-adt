@@ -15,7 +15,7 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
 - **search** (`SearchObject`);
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-69 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and
+70 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and
 background runs — those are
 `mcp-abap-adt-sse`'s ([`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)).
 

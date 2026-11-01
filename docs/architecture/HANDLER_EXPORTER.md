@@ -241,7 +241,7 @@ const server = new EmbeddableMcpServer({
 Pass a logger (`Logger` from `@mcp-abap-adt/logger`):
 
 ```typescript
-const exporter = new HandlerExporter({ logger });
+const exporter = new HandlerExporter({ systemType: "onprem", logger });
 ```
 
 ## See Also

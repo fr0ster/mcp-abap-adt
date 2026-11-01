@@ -702,6 +702,12 @@ class CustomHandlerGroup extends BaseHandlerGroup {
 registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 ```
 
+A handler takes the call's context and its arguments, `(context, args)`, or its arguments alone,
+`(args) => handleX(this.context, args)`: `ToolHandler` is the union of the two forms
+(`ContextHandler | ArgsOnlyHandler`). Every registration path tells them apart by the handler's
+parameter count, `isArgsOnly(handler)`, and calls it in its form with `callInItsForm` (both from
+`@mcp-abap-adt/lib/handlers`); code that calls a `HandlerEntry`'s handler itself does the same.
+
 ### 5.5 Architectural Guarantees
 
 - **Interface stability** -- every contract package follows semver; breaking changes require major version bumps, and a consumer takes them one domain at a time rather than inheriting every package's history through an umbrella

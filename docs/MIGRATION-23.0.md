@@ -3,12 +3,32 @@
 23.0.0 writes program includes (on premise) and table types (on premise and on ABAP cloud)
 ([#336](https://github.com/fr0ster/mcp-abap-adt/pull/336)), and with it `CreateProgram` stops
 offering `include`. An embedder that registers the `./handlers` groups on an `McpServer` of its own
-now gets the system type its groups state, for the listing and for every call. Go through the
+now gets the system type its groups state, for the listing and for every call, and every read the
+server sends states which version it reads. Go through the
 section that fits how you use the server; the [CHANGELOG](../CHANGELOG.md) has every item.
 
 The packages are the eighteen of 22.0.x, all at **23.0.0**, every sibling range at `^23.0.0`. The
-ADT dependencies are unchanged (`@mcp-abap-adt/interfaces-adt` `^24.0.1`,
-`@mcp-abap-adt/adt-clients` `^39.0.0`).
+ADT dependencies move to `@mcp-abap-adt/interfaces-adt` `^25.0.0`, `@mcp-abap-adt/adt-clients`
+`^40.0.0` and `@mcp-abap-adt/adt-strategies` `^0.18.0`.
+
+## Readers of a document or source: every read states its version
+
+ADT answers a read that names no version from the working area — the inactive version where one
+exists (measured on premise, 2026-11-01) — and adt-clients 40 sends exactly the version it is given.
+The server now names one on every read:
+
+- A `Get<Type>` with `version` reads both parts at it, `active` by default as its schema declares.
+  In 22.0.x the metadata part sent no version, so an object with an inactive version answered its
+  inactive document. **What you do:** pass `version: 'workingArea'` (or `'inactive'`) for the
+  document being edited. `version` takes `workingArea` beside `active` and `inactive` everywhere it
+  is offered (compact `HandlerGet` and `SearchSource` too); `GetTableType` takes it now.
+- A read tool without `version` reads the active version (`GetMessageClass`,
+  `GetMessageClassMessage`, `GetServiceBinding`, `GetServiceBindingPreviewUrl`,
+  `GetEnhancementSpot`, `GetEnhancements`, `GetIncludesList`, `GetTypeInfo`, `ListFunctionModules`,
+  `ListFunctionGroupIncludes`, `GetPackageTree`'s package metadata and the descriptions the package
+  walks read); most of them read the working area in 22.0.x.
+- `CreateTableType` / `UpdateTableType` name the version of the definition they answer
+  (`stored_version`, below).
 
 ## Callers of `CreateProgram`: an include is created by `CreateInclude`
 
@@ -39,11 +59,12 @@ Program includes, on premise (the full binaries):
 - `DeleteInclude` — the deletion check, then the deletion.
 - `ActivateInclude`.
 - `GetInclude` (on cloud too) takes `part` (`source`, the default, or `metadata`) and `version`
-  (`active`, the default, or `inactive`).
+  (`active`, the default, `inactive` or `workingArea`).
 
 Table types, on premise and on ABAP cloud:
 
-- `GetTableType` — the metadata document (core-ro serves it too).
+- `GetTableType` — the metadata document, at `version` (`active`, the default, `inactive` or
+  `workingArea`; core-ro serves it too).
 - `CreateTableType` — creates, writes the definition you give, checks, and activates when
   `activate` is true (the default).
 - `UpdateTableType` — writes the properties you give into the stored document, checks, and
@@ -57,9 +78,12 @@ Table types, on premise and on ABAP cloud:
 The definition properties of `CreateTableType` / `UpdateTableType` are `row_type_kind`,
 `row_type_name`, `data_type`, `length`, `decimals`, `access_type`, `key_definition` and
 `key_kind`; each closed one takes only the values SAP takes (its enum). A property left out keeps
-SAP's value. Both answer the definition SAP stored: `stored_definition` (the terse answer is
-`{ result, stored_definition }`), or `stored_definition_not_read` with SAP's answer when that read
-failed.
+SAP's value. Both answer the definition SAP stored and the version it was read at:
+`stored_definition` and `stored_version` (the terse answer is
+`{ result, stored_definition, stored_version }`), or `stored_definition_not_read` with SAP's
+answer when that read failed. After a successful activation the definition is read once more, at
+`active`; with `activate: false`, or when the check or the activation is refused, it is the
+`inactive` version read after the write.
 
 The compact tools take `INCLUDE` and `TABLE_TYPE` as members — on cloud `INCLUDE` only in
 `HandlerGet`, `HandlerDeletionCheck` and `HandlerWhereUsed`. `HandlerUpdate` takes `part`

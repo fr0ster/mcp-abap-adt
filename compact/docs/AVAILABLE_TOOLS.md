@@ -58,7 +58,7 @@ per request.
 - `transport_number` — Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.
 - `run_id` — Run id: a unit test run (UNIT_TEST, CDS_UNIT_TEST) or an activation run (parts activation_status, activation_results).
 - `response_format` — Response format for SERVICE_BINDING reads.
-- `version` — Object version to read/check.
+- `version` — The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 - `object_adt_type` — ADT type code of the object (object_structure) or of the parent node (node_structure).
 - `object_name` — Object name (object_structure) or parent name (node_structure).
 - `node_id` — Node id to expand (node_structure); the root when absent.

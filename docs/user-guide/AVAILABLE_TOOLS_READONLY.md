@@ -202,14 +202,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getbehaviordefinition-read-only-behavior-definition"></a>
 #### GetBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -218,14 +218,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
 #### GetBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -234,14 +234,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getclass-read-only-class"></a>
 #### GetClass (Read-Only / Class)
-**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -291,13 +291,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getdataelement-read-only-data-element"></a>
 #### GetDataElement (Read-Only / Data Element)
-**Description:** [read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -306,14 +306,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getddl-read-only-ddl"></a>
 #### GetDdl (Read-Only / Ddl)
-**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -322,13 +322,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getdomain-read-only-domain"></a>
 #### GetDomain (Read-Only / Domain)
-**Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -337,7 +337,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
-**Description:** [read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).
+**Description:** [read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type, read at its active version. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
@@ -350,7 +350,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getenhancementspot-read-only-enhancement"></a>
 #### GetEnhancementSpot (Read-Only / Enhancement)
-**Description:** [read-only] Retrieve metadata and list of implementations for a specific enhancement spot.
+**Description:** [read-only] Retrieve metadata and list of implementations for a specific enhancement spot, at its active version.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementSpot.ts`
 
@@ -361,7 +361,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getenhancementimpl-read-only-enhancement"></a>
 #### GetEnhancementImpl (Read-Only / Enhancement)
-**Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
+**Description:** [read-only] Retrieve the active source code of a specific enhancement implementation by its name and enhancement spot.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
 
@@ -376,13 +376,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctiongroup-read-only-function-group"></a>
 #### GetFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -391,7 +391,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group.
+**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group, read at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
@@ -402,7 +402,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctionmodules-read-only-function-include"></a>
 #### ListFunctionModules (Read-Only / Function Include)
-**Description:** [read-only] List the function modules of an ABAP function group.
+**Description:** [read-only] List the function modules of an ABAP function group, read at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
@@ -413,7 +413,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata"). Returns the part read.
+**Description:** [read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata"), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
@@ -421,7 +421,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `function_group_name` (string, required) - Function group containing the include.
 - `include_name` (string, required) - Include name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -430,7 +430,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctionmodule-read-only-function-module"></a>
 #### GetFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -438,7 +438,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -447,14 +447,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
 **Parameters:**
 - `include_name` (string, required) - Include name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional, one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional, one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -478,14 +478,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getinterface-read-only-interface"></a>
 #### GetInterface (Read-Only / Interface)
-**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -508,7 +508,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmessageclass-read-only-message-class"></a>
 #### GetMessageClass (Read-Only / Message Class)
-**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -519,7 +519,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmessageclassmessage-read-only-message-class"></a>
 #### GetMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
+**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request, from the active version of the class. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -535,14 +535,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmetadataextension-read-only-metadata-extension"></a>
 #### GetMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -567,14 +567,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
+**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -583,14 +583,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -649,7 +649,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicebinding-read-only-service-binding"></a>
 #### GetServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Reads the OData service binding named by service_binding_name in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
+**Description:** [read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -665,14 +665,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicedefinition-read-only-service-definition"></a>
 #### GetServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -690,20 +690,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `structure_name` (string, optional) - Structure name (or give structure_names).
 - `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
 <a id="getstructure-read-only-structure"></a>
 #### GetStructure (Read-Only / Structure)
-**Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -712,7 +712,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -728,7 +728,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettypeinfo-read-only-system"></a>
 #### GetTypeInfo (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key.
+**Description:** [read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read at its active version.
 
 **Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
 
@@ -1002,7 +1002,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackagetree-read-only-system"></a>
 #### GetPackageTree (Read-Only / System)
-**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -1038,7 +1038,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `start_at` (integer, optional) - Index of the first scan target to read, from `next_start_at` of the previous answer; 0 by default.
 - `time_budget_ms` (integer, optional) - Internal scan deadline in ms. When exceeded, returns the hits of the objects before `next_start_at` with truncated.by_timeout=true and next_start_at; when next_start_at equals start_at, the deadline passed before the first object was answered: raise time_budget_ms or lower max_objects. Set this BELOW your client/transport timeout (e.g. 540000 for a 600s client) so you get a partial result instead of a hard cutoff.
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `version` (string, optional, one of: `active`, `inactive`) - Source version for PROG and CLAS main include reads. Default active. FUGR subincludes always read the active version.
+- `version` (string, optional, one of: `active`, `inactive`, `workingArea`) - Source version for PROG and CLAS main include reads. Default active. FUGR subincludes always read the active version.
 
 ---
 
@@ -1061,14 +1061,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
-**Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+**Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active), one of: `active`, `inactive`) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -1077,12 +1077,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettabletype-read-only-table-type"></a>
 #### GetTableType (Read-Only / Table Type)
-**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 

@@ -281,7 +281,10 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject(
-      sapRefusal('/sap/bc/adt/programs/programs/zprog', 'read OBJECT_URI'),
+      sapRefusal(
+        '/sap/bc/adt/programs/programs/zprog?version=active',
+        'read OBJECT_URI',
+      ),
     );
     // Nothing of the failure was cached as the node's content.
     expect(

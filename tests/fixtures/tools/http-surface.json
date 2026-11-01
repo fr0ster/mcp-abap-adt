@@ -63,6 +63,7 @@
     "CreateServiceDefinition": "service_definition_name*, description, package_name*, transport_request, source_code, activate, master_language, detail, state_handle",
     "CreateStructure": "structure_name*, description, package_name*, transport_request, fields*, includes, activate, master_language, detail, state_handle",
     "CreateTable": "table_name*, description, package_name*, transport_request, master_language, detail, state_handle",
+    "CreateTableType": "table_type_name*, package_name*, description, transport_request, row_type_kind, row_type_name, data_type, length, decimals, access_type, key_definition, key_kind, activate, detail, state_handle",
     "CreateTransport": "transport_type, description*, target_system, owner, detail, state_handle",
     "CreateTransportTask": "transport_number*, target_user*, task_type, detail, state_handle",
     "CreateUnitTest": "class_name*, test_class_source*, transport_request, detail, state_handle",

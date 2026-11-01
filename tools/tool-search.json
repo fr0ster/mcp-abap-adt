@@ -894,6 +894,22 @@
     ],
     "semantic": "Create a new ABAP database table with its fields (columns) and key, in a package and recorded on a transport request."
   },
+  "CreateTableType": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Create a new ABAP table type with its row type, access type and key, in a package and recorded on a transport request."
+  },
   "CreateTransport": {
     "keywords": [
       "new transport request",

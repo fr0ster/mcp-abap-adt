@@ -491,6 +491,10 @@ import {
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
 import {
+  TOOL_DEFINITION as CreateTableType_Tool,
+  handleCreateTableType,
+} from '../../../handlers/table_type/high/handleCreateTableType';
+import {
   TOOL_DEFINITION as GetTableType_Tool,
   handleGetTableType,
 } from '../../../handlers/table_type/high/handleGetTableType';
@@ -779,6 +783,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetTableType_Tool,
         handler: withContext(handleGetTableType),
+      },
+      {
+        toolDefinition: CreateTableType_Tool,
+        handler: withContext(handleCreateTableType),
       },
       {
         toolDefinition: UpdateDomainHigh_Tool,

@@ -107,8 +107,8 @@ describe("lib's read and write handler barrels", () => {
     // by the declared variant, for compact's `HandlerActivate` (93).
     // the server writes program includes: `CreateInclude` (94),
     // `UpdateInclude` and `UpdateIncludeMetadata` (96),
-    // `DeleteInclude` (97).
-    expect(write).toHaveLength(97);
+    // `DeleteInclude` (97); and table types: `CreateTableType` (98).
+    expect(write).toHaveLength(98);
   });
 
   it('share not one symbol', () => {

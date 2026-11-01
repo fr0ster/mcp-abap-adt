@@ -164,6 +164,7 @@ const JSON_ANSWERING: readonly string[] = [
   'CreateServiceDefinition',
   'CreateStructure',
   'CreateTable',
+  'CreateTableType',
   'CreateTransport',
   'CreateTransportTask',
   'CreateUnitTest',

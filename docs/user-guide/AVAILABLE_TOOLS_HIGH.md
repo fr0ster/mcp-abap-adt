@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 167
+- Total tools: 168
 
 ## Navigation
 
@@ -173,6 +173,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
   - [Table Type](#high-level-table-type)
+    - [CreateTableType](#createtabletype-high-level-table-type)
     - [GetTableType](#gettabletype-high-level-table-type)
   - [Transport](#high-level-transport)
     - [AddTransportObject](#addtransportobject-high-level-transport)
@@ -2176,6 +2177,21 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-table-type"></a>
 ### High-Level / Table Type
+
+<a id="createtabletype-high-level-table-type"></a>
+#### CreateTableType (High-Level / Table Type)
+**Description:** Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.
+
+**Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
+
+**Parameters:**
+- `activate` (boolean, optional (default: true).)) - Activate the table type after creation (default: true).
+- `description` (string, optional) - Table type description. When left out, table_type_name is used.
+- `package_name` (string, required) - Package the table type is created in.
+- `table_type_name` (string, required) - Table type name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)

@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 270
+- Total tools: 271
 - Read-only tools: 66
-- High-level tools: 167
+- High-level tools: 168
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -283,6 +283,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
   - [Table Type](#high-level-table-type)
+    - [CreateTableType](#createtabletype-high-level-table-type)
     - [GetTableType](#gettabletype-high-level-table-type)
   - [Transport](#high-level-transport)
     - [AddTransportObject](#addtransportobject-high-level-transport)
@@ -3247,6 +3248,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="high-level-table-type"></a>
 ### High-Level / Table Type
+
+<a id="createtabletype-high-level-table-type"></a>
+#### CreateTableType (High-Level / Table Type)
+**Description:** Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.
+
+**Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
+
+**Parameters:**
+- `activate` (boolean, optional (default: true).)) - Activate the table type after creation (default: true).
+- `description` (string, optional) - Table type description. When left out, table_type_name is used.
+- `package_name` (string, required) - Package the table type is created in.
+- `table_type_name` (string, required) - Table type name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)

@@ -385,6 +385,12 @@
   },
   {
     "group": "high",
+    "name": "CreateTableType",
+    "inputs": "table_type_name*, package_name*, description, transport_request, row_type_kind, row_type_name, data_type, length, decimals, access_type, key_definition, key_kind, activate, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "UpdateDomain",
     "inputs": "domain_name*, description, package_name*, transport_request, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, activate, fixed_values, detail",
     "available_in": "cloud, onprem"

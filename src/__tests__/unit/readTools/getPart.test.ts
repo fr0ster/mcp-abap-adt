@@ -11,6 +11,7 @@
 
 import { compactModifyEntries } from '../../../../compact-modify/src';
 import { compactReadOnlyEntries } from '../../../../compact-readonly-entries/src';
+import { TOOL_DEFINITION as GET_INCLUDE } from '../../../handlers/include/readonly/handleGetInclude';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -297,10 +298,10 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
  * and its metadata document in `GetProgram`'s shape — one request each.
  */
 describe('GetInclude: the source as text, the metadata as GetProgram answers it', () => {
-  const context = {
-    connection: undefined,
+  const context: HandlerContext = {
+    ...noConnectionContext(),
     logger: silentLogger,
-  } as unknown as HandlerContext;
+  };
   const tools = servedTools(context);
   const SOURCE = "REPORT zincl.\r\n  WRITE 'x'.\n";
 
@@ -311,18 +312,16 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
   ) => runCase(tools, context, { tool: 'GetInclude', args, body }, mode);
 
   it('declares include_name required, part and version', () => {
-    const schema = tools.get('GetInclude')?.toolDefinition.inputSchema as {
-      type: string;
-      properties: Record<string, { enum?: unknown; default?: unknown }>;
-      required: string[];
-    };
+    // The served definition is the handler's own, read by its declared type.
+    expect(tools.get('GetInclude')?.toolDefinition).toBe(GET_INCLUDE);
+    const schema = GET_INCLUDE.inputSchema;
     expect(schema.type).toBe('object');
     expect(schema.required).toEqual(['include_name']);
     expect(schema.properties.part).toMatchObject({
       enum: ['source', 'metadata'],
       default: 'source',
     });
-    expect(schema.properties.version?.enum).toEqual(['active', 'inactive']);
+    expect(schema.properties.version.enum).toEqual(['active', 'inactive']);
     expect(schema.properties.version).not.toHaveProperty('default');
   });
 

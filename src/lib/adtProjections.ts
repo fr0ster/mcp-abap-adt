@@ -1249,11 +1249,13 @@ export const COMPACT_DELETE = projected<
 export const COMPACT_LOCK_ROUTES = {
   CLASS: { api: 'class', operation: 'lock' },
   PROGRAM: { api: 'program', operation: 'lock' },
+  INCLUDE: { api: 'include', operation: 'lock' },
   INTERFACE: { api: 'interface', operation: 'lock' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'lock' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'lock' },
   TABLE: { api: 'table', operation: 'lock' },
   STRUCTURE: { api: 'structure', operation: 'lock' },
+  TABLE_TYPE: { api: 'tableType', operation: 'lock' },
   DDL: { api: 'ddl', operation: 'lock' },
   DOMAIN: { api: 'domain', operation: 'lock' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'lock' },
@@ -1269,11 +1271,13 @@ export const COMPACT_LOCK_ROUTES = {
 export const COMPACT_UNLOCK_ROUTES = {
   CLASS: { api: 'class', operation: 'unlock' },
   PROGRAM: { api: 'program', operation: 'unlock' },
+  INCLUDE: { api: 'include', operation: 'unlock' },
   INTERFACE: { api: 'interface', operation: 'unlock' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'unlock' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'unlock' },
   TABLE: { api: 'table', operation: 'unlock' },
   STRUCTURE: { api: 'structure', operation: 'unlock' },
+  TABLE_TYPE: { api: 'tableType', operation: 'unlock' },
   DDL: { api: 'ddl', operation: 'unlock' },
   DOMAIN: { api: 'domain', operation: 'unlock' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'unlock' },
@@ -1291,11 +1295,13 @@ export const COMPACT_UNLOCK_ROUTES = {
 const LOCK_ONPREM = [
   'CLASS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'DOMAIN',
   'DATA_ELEMENT',
@@ -1313,7 +1319,9 @@ export const COMPACT_LOCK = projected<
   ServedName<'cloud', typeof COMPACT_LOCK_ROUTES>
 >()({
   onprem: LOCK_ONPREM,
-  cloud: LOCK_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: LOCK_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** HandlerUnlock's `object_type`. */
@@ -1322,7 +1330,9 @@ export const COMPACT_UNLOCK = projected<
   ServedName<'cloud', typeof COMPACT_UNLOCK_ROUTES>
 >()({
   onprem: LOCK_ONPREM,
-  cloud: LOCK_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: LOCK_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerValidate` validates, each with its API. */
@@ -1618,11 +1628,13 @@ export const COMPACT_CHECK_KINDS = {
 export const LOCK_KIND_ROUTES = {
   class: { api: 'class', operation: 'lock' },
   program: { api: 'program', operation: 'lock' },
+  include: { api: 'include', operation: 'lock' },
   interface: { api: 'interface', operation: 'lock' },
   function_group: { api: 'functionGroup', operation: 'lock' },
   function_module: { api: 'functionModule', operation: 'lock' },
   table: { api: 'table', operation: 'lock' },
   structure: { api: 'structure', operation: 'lock' },
+  table_type: { api: 'tableType', operation: 'lock' },
   ddl: { api: 'ddl', operation: 'lock' },
   domain: { api: 'domain', operation: 'lock' },
   data_element: { api: 'dataElement', operation: 'lock' },
@@ -1638,11 +1650,13 @@ export const LOCK_KIND_ROUTES = {
 export const UNLOCK_KIND_ROUTES = {
   class: { api: 'class', operation: 'unlock' },
   program: { api: 'program', operation: 'unlock' },
+  include: { api: 'include', operation: 'unlock' },
   interface: { api: 'interface', operation: 'unlock' },
   function_group: { api: 'functionGroup', operation: 'unlock' },
   function_module: { api: 'functionModule', operation: 'unlock' },
   table: { api: 'table', operation: 'unlock' },
   structure: { api: 'structure', operation: 'unlock' },
+  table_type: { api: 'tableType', operation: 'unlock' },
   ddl: { api: 'ddl', operation: 'unlock' },
   domain: { api: 'domain', operation: 'unlock' },
   data_element: { api: 'dataElement', operation: 'unlock' },
@@ -1666,11 +1680,13 @@ export type UnlockKind = keyof typeof UNLOCK_KIND_ROUTES;
 const LOCK_KIND_LIST = [
   'class',
   'program',
+  'include',
   'interface',
   'function_group',
   'function_module',
   'table',
   'structure',
+  'table_type',
   'ddl',
   'domain',
   'data_element',
@@ -1688,7 +1704,9 @@ export const LOCK_KINDS = projected<
   ServedName<'cloud', typeof LOCK_KIND_ROUTES>
 >()({
   onprem: LOCK_KIND_LIST,
-  cloud: LOCK_KIND_LIST.filter((kind) => kind !== 'program'),
+  cloud: LOCK_KIND_LIST.filter(
+    (kind) => kind !== 'program' && kind !== 'include',
+  ),
 });
 
 /** `UnlockObjectLow`'s `object_type`. */
@@ -1697,18 +1715,22 @@ export const UNLOCK_KINDS = projected<
   ServedName<'cloud', typeof UNLOCK_KIND_ROUTES>
 >()({
   onprem: LOCK_KIND_LIST,
-  cloud: LOCK_KIND_LIST.filter((kind) => kind !== 'program'),
+  cloud: LOCK_KIND_LIST.filter(
+    (kind) => kind !== 'program' && kind !== 'include',
+  ),
 });
 
 /** HandlerLock's members, each with the kind it is locked as. */
 export const COMPACT_LOCK_KINDS = {
   CLASS: 'class',
   PROGRAM: 'program',
+  INCLUDE: 'include',
   INTERFACE: 'interface',
   FUNCTION_GROUP: 'function_group',
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',

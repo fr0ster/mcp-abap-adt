@@ -31,8 +31,14 @@ import {
   setSystemContext,
 } from '../../../src/lib/systemContext';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
-import { handleHandlerLock } from '../handlers/handleHandlerLock';
-import { handleHandlerUnlock } from '../handlers/handleHandlerUnlock';
+import {
+  TOOL_DEFINITION as HandlerLock,
+  handleHandlerLock,
+} from '../handlers/handleHandlerLock';
+import {
+  TOOL_DEFINITION as HandlerUnlock,
+  handleHandlerUnlock,
+} from '../handlers/handleHandlerUnlock';
 import {
   handleHandlerUpdate,
   TOOL_DEFINITION,
@@ -552,6 +558,51 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
       );
     }
   });
+
+  it.each([
+    ['INCLUDE', 'ZINCL_A', '/sap/bc/adt/programs/includes/zincl_a'],
+    ['TABLE_TYPE', 'ZTTYP_A', '/sap/bc/adt/ddic/tabletypes/zttyp_a'],
+  ])(
+    '%s: the lock is one LOCK, the unlock one UNLOCK',
+    async (object_type, object_name, uri) => {
+      const locked = await run('answered', (context) =>
+        handleHandlerLock(context, { object_type, object_name }),
+      );
+      expect(locked.sent).toHaveLength(1);
+      expect(locked.sent[0].url.toLowerCase()).toContain(uri);
+      expect(locked.sent[0].url).toContain('_action=LOCK');
+      expect(locked.answer?.isError).not.toBe(true);
+      expect(textOf(locked.answer)).toContain('lock_handle');
+
+      const unlocked = await run('answered', (context) =>
+        handleHandlerUnlock(context, {
+          object_type,
+          object_name,
+          lock_handle: LOCK,
+        }),
+      );
+      expect(unlocked.sent).toHaveLength(1);
+      expect(unlocked.sent[0].url.toLowerCase()).toContain(uri);
+      expect(unlocked.sent[0].url).toContain('_action=UNLOCK');
+      expect(unlocked.answer?.isError).not.toBe(true);
+    },
+  );
+
+  it.each([
+    ['HandlerLock', HandlerLock.variants],
+    ['HandlerUnlock', HandlerUnlock.variants],
+  ])(
+    '%s locks a table type on both variants, an include on premise only',
+    (_tool, variants) => {
+      const onprem: readonly string[] =
+        variants.onprem.inputSchema.properties.object_type.enum;
+      const cloud: readonly string[] =
+        variants.cloud.inputSchema.properties.object_type.enum;
+      expect(onprem).toEqual(expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']));
+      expect(cloud).toContain('TABLE_TYPE');
+      expect(cloud).not.toContain('INCLUDE');
+    },
+  );
 
   it('HandlerUpdate’s schema names every type it writes', () => {
     const named = (

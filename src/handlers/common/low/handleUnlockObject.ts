@@ -19,6 +19,7 @@ import {
   domainDocuments,
   functionGroupDocuments,
   functionModuleDocuments,
+  includeDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
   packageDocuments,
@@ -27,6 +28,7 @@ import {
   serviceDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { UNLOCK_KINDS, type UnlockKind } from '../../../lib/adtProjections';
@@ -172,6 +174,19 @@ export async function unlockObject(
           return createOnPremAdtClient(connection, logger)
             .getProgram(resultsFor(programDocuments))
             .unlock({ programName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'include':
+          // An include is unlocked on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
+            .getInclude(resultsFor(includeDocuments))
+            .unlock({ includeName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'table_type':
+          return client
+            .getTableType(resultsFor(tableTypeDocuments))
+            .unlock({ tableTypeName: objectName }, lock_handle, {
               analyse: analyseException,
             });
         case 'interface':

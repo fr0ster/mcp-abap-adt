@@ -14,17 +14,26 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
+import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
+import { variantOf } from '../../../lib/clients';
 import { noopLogger } from '../../../lib/handlerLogger';
+import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
-import type {
-  IHandlersRegistry,
-  SapEnvironment,
-  ToolDefinition,
+import {
+  defineTool,
+  type HandlerContext,
+  type HandlerEntry,
+  type IHandlersRegistry,
+  type SapEnvironment,
+  type ToolDefinition,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
+
+import { countingConnection } from '../../helpers/batchHarness';
+import { silentLogger } from '../../helpers/lowToCompact';
 
 jest.setTimeout(120_000);
 
@@ -301,4 +310,83 @@ describe('a plain registration of groups that state different variants', () => {
       ),
     ).not.toThrow();
   });
+});
+
+/**
+ * A call on the plain path takes its variant only from the groups' stated
+ * `systemType`: with none stated it is refused `system_type_required`
+ * whatever `SAP_SYSTEM_TYPE` says, before anything is sent.
+ */
+describe('a call on the plain path', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  /** Answers the variant its call's ADT client is built for (`variantOf`). */
+  class VariantProbeGroup extends BaseHandlerGroup {
+    protected groupName = 'VariantProbe';
+    getHandlers(): HandlerEntry[] {
+      return [
+        defineTool(
+          {
+            name: 'VariantProbe',
+            description: 'Answers the variant of the call.',
+            inputSchema: { type: 'object', properties: {} },
+          },
+          async (context) => ({
+            content: [{ type: 'text', text: variantOf(context.connection) }],
+          }),
+        ),
+      ];
+    }
+  }
+
+  async function probe(systemType: SapEnvironment | undefined) {
+    const counting = countingConnection('document', undefined);
+    const context: HandlerContext = {
+      connection: counting.connection,
+      logger: silentLogger,
+      ...(systemType !== undefined && { systemType }),
+    };
+    const server = new McpServer({ name: 'plain-call', version: '1.0.0' });
+    new CompositeHandlersRegistry([
+      new VariantProbeGroup(context),
+    ]).registerAllTools(server);
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'plain-call', version: '1.0.0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    try {
+      const answer = await client.callTool({
+        name: 'VariantProbe',
+        arguments: {},
+      });
+      return { answer: JSON.stringify(answer), sent: counting.sent };
+    } finally {
+      await client.close();
+    }
+  }
+
+  it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, is refused system_type_required, nothing sent', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
+    const { answer, sent } = await probe(undefined);
+    expect(answer).toContain(SYSTEM_TYPE_REQUIRED_WORDS);
+    expect(answer).toContain('"isError":true');
+    expect(sent).toEqual([]);
+  });
+
+  it.each<[SapEnvironment, string]>([
+    ['cloud', 'onprem'],
+    ['onprem', 'cloud'],
+  ])(
+    'with systemType %s stated, runs on it whatever SAP_SYSTEM_TYPE (%s) says',
+    async (systemType, environment) => {
+      process.env.SAP_SYSTEM_TYPE = environment;
+      const { answer } = await probe(systemType);
+      expect(JSON.parse(answer)).toEqual({
+        content: [{ type: 'text', text: systemType }],
+      });
+    },
+  );
 });

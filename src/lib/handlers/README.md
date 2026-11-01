@@ -51,8 +51,9 @@ built with, `HandlerExporter`'s `systemType` option. It is the rule a server ins
 (`BaseMcpServer`) applies: a tool the variant's ADT type table does not serve, or whose
 `available_in` leaves the environment out, is not listed; the others carry that variant's
 description and schema, and their search `_meta` (`mcp-abap-adt/search`) names only the members
-the variant offers. `SAP_SYSTEM_TYPE` is not read on this path: an embedded library takes no
-configuration from the environment.
+the variant offers. Its calls run on the same variant. `SAP_SYSTEM_TYPE` is not read on this
+path, for the listing or for a call: an embedded library takes no configuration from the
+environment.
 
 ```typescript
 const registry = new HandlerExporter({ systemType: "cloud" }).createRegistry();
@@ -61,7 +62,8 @@ registry.registerAllTools(mcpServer); // the cloud tools, schemas and descriptio
 
 With no `systemType` stated, every definition is listed as it is (the on-premise description and
 schema, every member in the search `_meta`), and every call that would reach a system is refused
-`system_type_required`.
+`system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says. A connection built
+by `createAbapConnection` keeps the kind it was built for, which is what its calls run on.
 
 Groups that state different variants are refused at registration, before anything is registered:
 the error names each group and the variant it states (`none` for a group that states none).

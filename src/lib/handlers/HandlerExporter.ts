@@ -69,9 +69,12 @@ export interface HandlerExporterOptions {
    * did not build: the rules (`systemContextRules`) read a lookup by it.
    * Never guessed. Overrides `SAP_SYSTEM_TYPE`. Not required: without it
    * and `SAP_SYSTEM_TYPE` the kind is unknown, and what that means is the
-   * rules'. It is also the variant a plain registration lists
-   * (`createRegistry().registerAllTools(mcpServer)`): that variant's tools,
-   * descriptions and schemas; without it, the definitions as they are.
+   * rules'. It is also the variant a plain registration
+   * (`createRegistry().registerAllTools(mcpServer)`) lists and calls on:
+   * that variant's tools, descriptions and schemas. Without it the
+   * definitions are listed as they are and every call that would reach a
+   * system is refused `system_type_required`; `SAP_SYSTEM_TYPE` is not read
+   * on that path.
    */
   systemType?: SapEnvironment;
 

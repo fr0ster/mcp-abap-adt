@@ -19,7 +19,7 @@ import {
   withoutTimeout,
 } from '../../longTools.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
-import { declareSystemKind } from '../../systemKind.js';
+import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
@@ -145,8 +145,10 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const context = this.context;
           // The variant of the call's ADT client: the kind the context
           // states, for a connection the factory did not build.
+          // Only the stated one: with none stated the call has no kind, and
+          // SAP_SYSTEM_TYPE is not read (`stateSystemKind`).
           if (context?.connection) {
-            declareSystemKind(context.connection, context.systemType);
+            stateSystemKind(context.connection, context.systemType);
           }
           // Inside the call-transport scope with this call's own
           // `transport_request`: the failure renderer's transport hint.
@@ -187,6 +189,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
                 logger: context.logger,
                 timeoutSeconds,
                 run: (own) => {
+                  stateSystemKind(own, context.systemType);
                   const ownContext = {
                     ...context,
                     connection: own,

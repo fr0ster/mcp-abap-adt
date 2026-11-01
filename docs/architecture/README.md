@@ -105,9 +105,13 @@ const server = new EmbeddableMcpServer({
 
 Registered on a plain SDK `McpServer` instead (`exporter.createRegistry().registerAllTools(mcpServer)`),
 the tools are listed on the variant the exporter states (`systemType`), as a server instance lists
-them: that variant's tool set, descriptions, schemas and search members. `SAP_SYSTEM_TYPE` is not
-read on this path. With no `systemType` stated, the definitions are listed as they are and every
-call that would reach a system is refused `system_type_required`. Groups that state different
+them: that variant's tool set, descriptions, schemas and search members, and its calls run on that
+variant. `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call. With no
+`systemType` stated, the definitions are listed as they are and every call that would reach a
+system is refused `system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says
+(a connection built by `createAbapConnection` keeps the kind it was built for). A server instance
+(`EmbeddableMcpServer`, the binaries) still reads `SAP_SYSTEM_TYPE` when its `systemType` option
+states none. Groups that state different
 variants are refused when they are registered, before anything is registered (see
 [the handlers README](../../src/lib/handlers/README.md#which-variant-a-plain-registration-lists)).
 

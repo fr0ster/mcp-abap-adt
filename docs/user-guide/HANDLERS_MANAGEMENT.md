@@ -344,9 +344,12 @@ A registry registered on a plain SDK `McpServer` (`registry.registerAllTools(mcp
 example from `HandlerExporter` in `@mcp-abap-adt/lib/handlers`) lists the variant its groups state
 (`systemType` of their `HandlerContext`, `HandlerExporter`'s `systemType` option), by the same rule
 as a server instance: the variant's tool set, its descriptions and schemas, and search `_meta`
-naming only the members it offers. `SAP_SYSTEM_TYPE` is not read there. With no `systemType`
-stated, every definition is listed as it is, and every call that would reach a system is refused
-`system_type_required`. Groups that state different variants are refused when they are
+naming only the members it offers; its calls run on that variant. `SAP_SYSTEM_TYPE` is not read
+there, for the listing or for a call. With no `systemType` stated, every definition is listed as it
+is, and every call that would reach a system is refused `system_type_required` before anything is
+sent, whatever `SAP_SYSTEM_TYPE` says (a connection built by `createAbapConnection` keeps the kind
+it was built for). The binaries and `EmbeddableMcpServer` still read `SAP_SYSTEM_TYPE` when no
+`systemType` option is given. Groups that state different variants are refused when they are
 registered, before anything is registered; the error names each group and what it states
 (`registerTool` refuses a variant stated beside none as well).
 

@@ -116,7 +116,8 @@ system is refused `system_type_required` before anything is sent, whatever `SAP_
 (a connection built by `createAbapConnection` keeps the kind it was built for). A server instance
 (`EmbeddableMcpServer`, the binaries) still reads `SAP_SYSTEM_TYPE` when its `systemType` option
 states none. Groups that state different
-variants are refused when they are registered, before anything is registered (see
+variants — a variant beside none included — are refused when they are registered, before anything
+is registered (see
 [the handlers README](../../src/lib/handlers/README.md#which-variant-a-plain-registration-lists)).
 
 ### Handler groups

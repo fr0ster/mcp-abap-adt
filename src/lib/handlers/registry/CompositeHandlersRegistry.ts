@@ -58,18 +58,15 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   }
 
   /**
-   * Registers all tools from all handler groups on MCP server
+   * Registers all tools from all handler groups on MCP server, each group
+   * on the variant its context states. Groups stating different variants —
+   * one of them none included — are refused before anything is registered.
    */
   registerAllTools(server: McpServer): void {
     // Each group lists the variant its own context states; groups stating
-    // two different ones are refused before anything is registered.
-    this.refuseDifferentVariants(
-      new Set(
-        this.statements().flatMap(({ stated }) =>
-          stated === undefined ? [] : [stated],
-        ),
-      ),
-    );
+    // different ones — one of them none included — are refused before
+    // anything is registered.
+    this.refuseDifferentVariants();
     this.registeredTools.clear();
 
     for (const group of this.handlerGroups) {
@@ -109,9 +106,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     toolDefinition: ToolDefinition,
     handler: ToolHandler,
   ): void {
-    const stated = new Set(this.statements().map(({ stated }) => stated));
-    this.refuseDifferentVariants(stated);
-    const [environment] = stated;
+    const environment = this.refuseDifferentVariants();
     const listed = listedTool(toolDefinition, environment);
     if (!listed.listed) return;
     // A JSON Schema is converted to Zod, as a group registers it; the SDK
@@ -145,14 +140,17 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
   }
 
   /**
-   * Refuses `stated` holding more than one variant, before anything is
-   * registered: the error names each group and what it states.
+   * The one variant every group states (`undefined`: none stated by any).
+   * Groups stating different ones — a variant beside none included — are
+   * refused before anything is registered: the error names each group and
+   * what it states.
    */
-  private refuseDifferentVariants(
-    stated: ReadonlySet<SapEnvironment | undefined>,
-  ): void {
-    if (stated.size <= 1) return;
-    const named = this.statements()
+  private refuseDifferentVariants(): SapEnvironment | undefined {
+    const statements = this.statements();
+    const stated = new Set(statements.map(({ stated }) => stated));
+    const [environment] = stated;
+    if (stated.size <= 1) return environment;
+    const named = statements
       .map(({ group, stated }) => `${group} states ${stated ?? 'none'}`)
       .join(', ');
     throw new Error(

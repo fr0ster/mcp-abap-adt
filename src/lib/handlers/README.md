@@ -67,10 +67,9 @@ by `createAbapConnection` keeps the kind it was built for, which is what its cal
 
 Groups that state different variants are refused at registration, before anything is registered:
 the error names each group and the variant it states (`none` for a group that states none).
-`registerAllTools` takes groups stating one variant beside groups stating none — each group lists
-the variant its own context states. `registerTool`, which belongs to no group, takes only one
-variant stated by every group, or none stated by any (the definition as it is); one group stating
-a variant beside another stating none is refused.
+`registerAllTools` and `registerTool` take only one variant stated by every group, or none stated
+by any (the definitions as they are); one group stating a variant beside another stating none is
+refused.
 
 ### Selective Handler Registration
 

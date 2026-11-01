@@ -350,8 +350,8 @@ is, and every call that would reach a system is refused `system_type_required` b
 sent, whatever `SAP_SYSTEM_TYPE` says (a connection built by `createAbapConnection` keeps the kind
 it was built for). The binaries and `EmbeddableMcpServer` still read `SAP_SYSTEM_TYPE` when no
 `systemType` option is given. Groups that state different variants are refused when they are
-registered, before anything is registered; the error names each group and what it states
-(`registerTool` refuses a variant stated beside none as well).
+registered, before anything is registered — a variant stated beside none as well; the error names
+each group and what it states (`none` for a group that states none).
 
 ## Adding New Handlers
 

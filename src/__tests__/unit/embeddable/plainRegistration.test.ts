@@ -215,10 +215,8 @@ describe.each(Object.entries(REGISTRIES))(
 /**
  * Groups that state different variants are refused at registration, before
  * anything is registered; the error names each group and what it states.
- * `registerAllTools` takes groups that state one variant beside groups that
- * state none (each lists as its own context says); `registerTool`, which
- * belongs to no group, takes only one variant stated by every group, or none
- * stated by any.
+ * `registerAllTools` and `registerTool` take only one variant stated by every
+ * group, or none stated by any.
  */
 describe('a plain registration of groups that state different variants', () => {
   const searchOn = (systemType?: SapEnvironment) =>
@@ -261,10 +259,28 @@ describe('a plain registration of groups that state different variants', () => {
     expect(registry.getRegisteredTools()).toEqual([]);
   });
 
-  it('registerAllTools takes a group stating a variant beside one stating none', () => {
+  it('registerAllTools refuses cloud beside none, naming each group and its variant, and registers nothing', async () => {
     const registry = new CompositeHandlersRegistry([
       searchOn('cloud'),
       systemOn(),
+    ]);
+    const server = withSentinel();
+    expect(() => registry.registerAllTools(server)).toThrow(
+      'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states none',
+    );
+    expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
+      'Sentinel',
+    ]);
+    expect(registry.getRegisteredTools()).toEqual([]);
+  });
+
+  it.each<[string, SapEnvironment | undefined]>([
+    ['none stated by any group', undefined],
+    ['cloud stated by every group', 'cloud'],
+  ])('registerAllTools takes %s', (_label, systemType) => {
+    const registry = new CompositeHandlersRegistry([
+      searchOn(systemType),
+      systemOn(systemType),
     ]);
     expect(() => registry.registerAllTools(withSentinel())).not.toThrow();
   });

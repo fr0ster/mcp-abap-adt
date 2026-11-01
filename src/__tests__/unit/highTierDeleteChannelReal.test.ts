@@ -275,7 +275,10 @@ const deletionServiceCases: DeletionCase[] = [
     name: 'DeleteTableType',
     expectedUri: '/sap/bc/adt/ddic/tabletypes/ztt_del_x',
     run: (c) =>
-      handleDeleteTableType(ctx(c) as any, { table_type_name: 'ZTT_DEL_X' }),
+      handleDeleteTableType(
+        { connection: c, logger: undefined },
+        { table_type_name: 'ZTT_DEL_X' },
+      ),
   },
   {
     name: 'DeleteProgram',

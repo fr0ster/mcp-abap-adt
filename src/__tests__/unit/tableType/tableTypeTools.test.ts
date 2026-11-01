@@ -633,6 +633,7 @@ describe('CheckTableType', () => {
     const [sent] = connection.requests;
     expect(String(sent?.data)).toContain(`${TTYP}/ztt_x`);
     expect(String(sent?.data)).toContain('chkrun:version="active"');
+    expect(JSON.parse(textOf(result)).object_name).toBe('ZTT_X');
   });
 
   it('checks the inactive version when asked', async () => {
@@ -647,13 +648,18 @@ describe('CheckTableType', () => {
   });
 
   it("answers SAP's refusal text", async () => {
-    const connection = sessionRecording([REFUSED]);
+    const connection = sessionRecording([
+      {
+        ...REFUSED,
+        data: REFUSED.data.replace('refused', 'no authority for CHECKTT'),
+      },
+    ]);
     const result = await handleCheckTableType(
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('refused');
+    expect(textOf(result)).toContain('no authority for CHECKTT');
   });
 
   it.each([[{}], [{ table_type_name: '' }]])(
@@ -768,4 +774,27 @@ describe('the table-type version tools', () => {
       expect(connection.requests).toHaveLength(0);
     },
   );
+
+  it("answers SAP's body when the connection throws on a 403, as the real transports do", async () => {
+    const connection = recordingConnection();
+    const refusing: typeof connection = {
+      ...connection,
+      async makeAdtRequest() {
+        throw Object.assign(new Error('Request failed with status code 403'), {
+          response: {
+            status: 403,
+            statusText: 'Forbidden',
+            headers: {},
+            data: '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceNoAccess"/><message>no authority for VERSIONTT</message></exc:exception>',
+          },
+        });
+      },
+    };
+    const result = await versionTool('GetTableTypeVersions').handler(
+      { connection: refusing, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('no authority for VERSIONTT');
+  });
 });

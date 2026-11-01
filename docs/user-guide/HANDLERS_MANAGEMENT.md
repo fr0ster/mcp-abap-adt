@@ -338,6 +338,16 @@ import { fullReadOnlyToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
 const registry = registryOf(fullReadOnlyToolSet); // a CompositeHandlersRegistry
 ```
 
+### The variant a plain registration lists
+
+A registry registered on a plain SDK `McpServer` (`registry.registerAllTools(mcpServer)`, for
+example from `HandlerExporter` in `@mcp-abap-adt/lib/handlers`) lists the variant its groups state
+(`systemType` of their `HandlerContext`, `HandlerExporter`'s `systemType` option), by the same rule
+as a server instance: the variant's tool set, its descriptions and schemas, and search `_meta`
+naming only the members it offers. `SAP_SYSTEM_TYPE` is not read there. With no `systemType`
+stated, every definition is listed as it is, and every call that would reach a system is refused
+`system_type_required`.
+
 ## Adding New Handlers
 
 To add handlers to a specific set:

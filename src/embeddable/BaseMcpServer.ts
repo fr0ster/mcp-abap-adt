@@ -94,6 +94,11 @@ import {
   type LogoffOutcome,
   sapAnswerOf,
 } from '../lib/leftoverSessions/port.js';
+import {
+  listedTool,
+  searchMeta,
+  statedEnvironment,
+} from '../lib/listedTool.js';
 import { runLongCall } from '../lib/longCall.js';
 import {
   isLongRead,
@@ -153,15 +158,7 @@ import {
   normalizeToolContent,
   type ToolResultLike,
 } from '../lib/toolResult.js';
-import {
-  TOOL_SEARCH_META_KEY,
-  toolSearchText,
-} from '../lib/toolSearch/index.js';
 import { return_error } from '../lib/utils.js';
-import {
-  servedDefinition,
-  variantOfEnvironment,
-} from '../lib/variantToolSet.js';
 import type {
   ConnectionContext,
   ResolvedConnection,
@@ -1369,34 +1366,28 @@ export abstract class BaseMcpServer extends McpServer {
       for (const group of groups) {
         const handlers = group.getHandlers();
         for (const entry of handlers) {
-          // The tool as the declared variant's ADT type table serves it
-          // (`servedDefinition`): not at all when the table lists no
-          // operation it needs, a compact tool without the members the
-          // table does not serve. No variant stated: as it is.
+          // The tool as the declared variant lists it (`listedTool`, the
+          // rule a plain registration of the groups applies too): not at
+          // all when the variant's ADT type table lists no operation it
+          // needs, or its `available_in` leaves the environment out; else
+          // with the variant's description, schema and search members. The
+          // kind is never guessed: with none stated (stdio's inspection-only
+          // mode, which has no system; an embedder's own transport host that
+          // states none) nothing is filtered — every tool of the set is
+          // listed as it is, and a call that would reach a system is refused
+          // `system_type_required` before anything is sent.
           const environment = statedEnvironment(
             this.systemType ?? process.env.SAP_SYSTEM_TYPE,
           );
-          const served =
-            environment === undefined
-              ? entry.toolDefinition
-              : servedDefinition(
-                  entry.toolDefinition,
-                  variantOfEnvironment(environment),
-                );
-          if (served === undefined) {
+          const listed = listedTool(entry.toolDefinition, environment);
+          if (!listed.listed) {
             this.logger.debug(
-              `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: the ADT type table of ${environment} does not serve it`,
+              listed.reason === 'not-served'
+                ? `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: the ADT type table of ${environment} does not serve it`
+                : `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(entry.toolDefinition.available_in)}, currentEnv=${environment}, source=${this.systemType ? 'option' : 'env'}, SAP_SYSTEM_TYPE=${process.env.SAP_SYSTEM_TYPE || '(not set)'}`,
             );
             continue;
           }
-          // The members the declared variant offers, for a tool whose
-          // member picks the object: its search texts name only these.
-          const offered =
-            environment === undefined
-              ? undefined
-              : entry.toolDefinition.variants?.[
-                  variantOfEnvironment(environment)
-                ].members;
           // Wrap handler to inject connection from context
           // Original handler: (context: HandlerContext, args: any) => Promise<any>
           type HandlerFnWithContext = (
@@ -1712,10 +1703,10 @@ export abstract class BaseMcpServer extends McpServer {
           // its arguments reach the handler as they came.
           const withHandle = this.stateHandleArgument
             ? (withStateHandle(
-                served.inputSchema,
+                listed.inputSchema,
               ) as typeof entry.toolDefinition.inputSchema)
-            : served.inputSchema;
-          const declared = withHandle !== served.inputSchema;
+            : listed.inputSchema;
+          const declared = withHandle !== listed.inputSchema;
           const inputSchema = withHandle;
 
           // Tracked from its entry, with its own request signal (`trackCall`).
@@ -1733,29 +1724,6 @@ export abstract class BaseMcpServer extends McpServer {
               ? jsonSchemaToZod(inputSchema)
               : inputSchema;
 
-          // Skip tools not available in the stated SAP environment. The
-          // kind is never guessed: with none stated (stdio's inspection-only
-          // mode, which has no system; an embedder's own transport host that
-          // states none) nothing is filtered — every tool of the set is
-          // listed, and a call that would reach a system is refused
-          // `system_type_required` before anything is sent.
-          const availableIn = entry.toolDefinition.available_in;
-          const currentEnv = statedEnvironment(
-            this.systemType ?? process.env.SAP_SYSTEM_TYPE,
-          );
-          if (
-            availableIn &&
-            availableIn.length > 0 &&
-            currentEnv !== undefined
-          ) {
-            if (!availableIn.includes(currentEnv)) {
-              this.logger.debug(
-                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, source=${this.systemType ? 'option' : 'env'}, SAP_SYSTEM_TYPE=${process.env.SAP_SYSTEM_TYPE || '(not set)'}`,
-              );
-              continue;
-            }
-          }
-
           // Register wrapped handler via SDK registerTool, with the
           // description the declared variant serves beside its schema.
           // Note: connection is NOT part of MCP tool signature
@@ -1765,12 +1733,12 @@ export abstract class BaseMcpServer extends McpServer {
               description:
                 sentenced && !runsBesideBatch(entry.toolDefinition.name)
                   ? withBatchSentence(
-                      served.description,
+                      listed.description,
                       entry.toolDefinition.name,
                     )
-                  : served.description,
+                  : listed.description,
               inputSchema: zodSchema,
-              ...searchMeta(entry.toolDefinition.name, offered),
+              ...listed.search,
             },
             wrappedHandler,
           );
@@ -2838,20 +2806,6 @@ const stderrLogger: Logger = {
 };
 
 /**
- * The SAP environment a stated system type names (`onprem`, `cloud`,
- * `legacy`, any case); `undefined` for none or any other value — never a
- * default.
- */
-function statedEnvironment(
-  value: string | undefined,
-): SapEnvironment | undefined {
-  const declared = value?.trim().toLowerCase();
-  return declared === 'onprem' || declared === 'cloud' || declared === 'legacy'
-    ? declared
-    : undefined;
-}
-
-/**
  * A registry's own registered tool, given the `_meta` its name has in the
  * search table (merged into what it carries); a tool the table does not name,
  * or a registration that answered no updatable tool, is left as it is.
@@ -2868,26 +2822,4 @@ function withSearchMeta(name: unknown, registered: unknown): unknown {
   if (typeof tool.update !== 'function') return registered;
   tool.update({ _meta: { ...tool._meta, ...search } });
   return registered;
-}
-
-/**
- * The `_meta` a tool is listed with: its search texts under
- * `mcp-abap-adt/search` (`tools/tool-search.json`), for a consumer's tool
- * search — with `offered`, naming only the members its variant offers;
- * none for a tool the table does not name.
- */
-function searchMeta(
-  name: string,
-  offered?: readonly string[],
-): { _meta?: Record<string, unknown> } {
-  const text = toolSearchText(name, offered);
-  if (text === undefined) return {};
-  return {
-    _meta: {
-      [TOOL_SEARCH_META_KEY]: {
-        keywords: [...text.keywords],
-        semantic: text.semantic,
-      },
-    },
-  };
 }

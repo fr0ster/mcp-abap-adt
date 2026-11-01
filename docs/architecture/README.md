@@ -103,6 +103,12 @@ const server = new EmbeddableMcpServer({
 
 `getHandlerEntries()` and `getToolNames()` give the same handlers without a server.
 
+Registered on a plain SDK `McpServer` instead (`exporter.createRegistry().registerAllTools(mcpServer)`),
+the tools are listed on the variant the exporter states (`systemType`), as a server instance lists
+them: that variant's tool set, descriptions, schemas and search members. `SAP_SYSTEM_TYPE` is not
+read on this path. With no `systemType` stated, the definitions are listed as they are and every
+call that would reach a system is refused `system_type_required`.
+
 ### Handler groups
 
 - **ReadOnlyHandlersGroup** — read-only operations

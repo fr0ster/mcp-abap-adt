@@ -8,6 +8,7 @@ import {
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
 import { runWithCallTransport } from '../../callTransport.js';
+import { listedTool, statedEnvironment } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import {
   isLongRead,
@@ -24,6 +25,7 @@ import { return_error } from '../../utils.js';
 import type {
   HandlerEntry,
   IHandlerGroup,
+  SapEnvironment,
   ToolHandler,
 } from '../interfaces.js';
 import { jsonSchemaToZod } from '../utils/schemaUtils.js';
@@ -53,17 +55,33 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
   abstract getHandlers(): HandlerEntry[];
 
   /**
-   * Registers all handlers from this group on the MCP server
+   * The SAP environment this group's context states (`systemType`), the
+   * variant its tools are listed and called on; `undefined` when it states
+   * none. Read from the context only, never from the environment.
+   */
+  statedSystemType(): SapEnvironment | undefined {
+    return statedEnvironment(this.context.systemType);
+  }
+
+  /**
+   * Registers all handlers from this group on the MCP server, as the
+   * variant the group's context states lists them (`listedTool`, the rule
+   * a server instance applies): a tool that variant does not serve is left
+   * out, the others carry its description, schema and search members. With
+   * none stated, every definition as it is.
    */
   registerHandlers(server: McpServer): void {
-    const handlers = this.getHandlers();
-    for (const entry of handlers) {
+    const environment = this.statedSystemType();
+    for (const entry of this.getHandlers()) {
+      const listed = listedTool(entry.toolDefinition, environment);
+      if (!listed.listed) continue;
       this.registerToolOnServer(
         server,
         entry.toolDefinition.name,
-        entry.toolDefinition.description,
-        entry.toolDefinition.inputSchema,
+        listed.description,
+        listed.inputSchema,
         entry.handler,
+        listed.search,
       );
     }
   }
@@ -71,6 +89,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
   /**
    * Helper function to register a tool on McpServer
    * Wraps handler to convert our response format to MCP format
+   * `search`: the tool's search `_meta` (`listedTool`), when it has one.
    */
   protected registerToolOnServer(
     server: McpServer,
@@ -78,6 +97,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     description: string,
     inputSchema: any,
     handler: ToolHandler,
+    search: { _meta?: Record<string, unknown> } = {},
   ): void {
     // Convert JSON Schema to Zod if needed, otherwise pass as-is
     const zodSchema =
@@ -93,6 +113,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       {
         description,
         inputSchema: zodSchema,
+        ...search,
       },
       async (given: any) => {
         try {

@@ -43,6 +43,27 @@ const mcpServer = new McpServer({ name: "mcp-abap-adt", version: "1.0.0" });
 handlersRegistry.registerAllTools(mcpServer);
 ```
 
+### Which variant a plain registration lists
+
+`registerAllTools(mcpServer)` (and `registerTool`) on a plain SDK `McpServer` lists the
+variant the groups' context states — `systemType` in the `HandlerContext` the groups are
+built with, `HandlerExporter`'s `systemType` option. It is the rule a server instance
+(`BaseMcpServer`) applies: a tool the variant's ADT type table does not serve, or whose
+`available_in` leaves the environment out, is not listed; the others carry that variant's
+description and schema, and their search `_meta` (`mcp-abap-adt/search`) names only the members
+the variant offers. `SAP_SYSTEM_TYPE` is not read on this path: an embedded library takes no
+configuration from the environment.
+
+```typescript
+const registry = new HandlerExporter({ systemType: "cloud" }).createRegistry();
+registry.registerAllTools(mcpServer); // the cloud tools, schemas and descriptions
+```
+
+With no `systemType` stated, every definition is listed as it is (the on-premise description and
+schema, every member in the search `_meta`), and every call that would reach a system is refused
+`system_type_required`. `registerTool` lists a tool on the one variant its registry's groups state;
+groups that state none, or different ones, list it as it is.
+
 ### Selective Handler Registration
 
 ```typescript

@@ -937,6 +937,7 @@ export const VERSIONED_ROUTES = {
   ddl: { api: 'ddl', operation: 'versions' },
   behavior_definition: { api: 'behaviorDefinition', operation: 'versions' },
   metadata_extension: { api: 'metadataExtension', operation: 'versions' },
+  table_type: { api: 'tableType', operation: 'versions' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
 /** A kind the version tools read. */
@@ -957,6 +958,7 @@ export const VERSIONED_KINDS = projected<
     'ddl',
     'behavior_definition',
     'metadata_extension',
+    'table_type',
   ],
   cloud: [
     'class',
@@ -968,6 +970,7 @@ export const VERSIONED_KINDS = projected<
     'ddl',
     'behavior_definition',
     'metadata_extension',
+    'table_type',
   ],
 });
 

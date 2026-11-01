@@ -200,11 +200,11 @@ describe('version diff tools (#30)', () => {
     expect(payload.step).toBe('read version source (from)');
   });
 
-  it('the factory builds 9 VersionDiff tools (27 total) and they register in High', () => {
+  it('the factory builds 10 VersionDiff tools (30 total) and they register in High', () => {
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
     const diffNames = names.filter((n) => n.endsWith('VersionDiff'));
-    expect(diffNames.length).toBe(9);
-    expect(names.length).toBe(27);
+    expect(diffNames.length).toBe(10);
+    expect(names.length).toBe(30);
 
     const group = new HighLevelHandlersGroup({
       connection: {},

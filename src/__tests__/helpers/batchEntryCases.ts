@@ -167,6 +167,7 @@ const FULL: BatchEntryCase[] = [
     tool: 'GetMetadataExtensionVersions',
     args: { metadata_extension_name: 'DDLX_A' },
   },
+  { tool: 'GetTableTypeVersions', args: { table_type_name: 'TTYP_A' } },
   ...[
     'GetClassVersionSource',
     'GetProgramVersionSource',
@@ -177,6 +178,7 @@ const FULL: BatchEntryCase[] = [
     'GetDdlVersionSource',
     'GetBehaviorDefinitionVersionSource',
     'GetMetadataExtensionVersionSource',
+    'GetTableTypeVersionSource',
   ].map((tool) => ({ tool, args: { content_uri: VERSION_URI } })),
   { tool: 'SearchObject', args: { object_name: 'Z*' } },
   { tool: 'SearchObject', args: { object_name: 'Z*', object_type: 'CLAS' } },
@@ -625,6 +627,7 @@ const ACTIVATIONS: Array<[string, Record<string, unknown>]> = [
   ['ActivateInterface', { interface_name: 'INTF_A' }],
   ['ActivateProgram', { program_name: 'PROG_A' }],
   ['ActivateInclude', { include_name: 'INCL_A' }],
+  ['ActivateTableType', { table_type_name: 'TTYP_A' }],
   ['ActivateFunctionGroup', { function_group_name: 'FUGR_A' }],
   [
     'ActivateFunctionModule',
@@ -650,6 +653,7 @@ const CHECKS: Array<[string, Record<string, unknown>]> = [
   ['CheckStructure', { structure_name: 'STRU_A' }],
   ['CheckDdl', { ddl_name: 'DDL_A' }],
   ['CheckDomain', { domain_name: 'DOM_A' }],
+  ['CheckTableType', { table_type_name: 'TTYP_A' }],
   ['CheckDataElement', { data_element_name: 'DTEL_A' }],
   ['CheckPackage', { package_name: 'PKG_A' }],
   ['CheckBehaviorDefinition', { name: 'BDEF_A' }],
@@ -1083,6 +1087,7 @@ const TOGETHER: BatchEntryCase[] = [
     'Ddl',
     'BehaviorDefinition',
     'MetadataExtension',
+    'TableType',
   ].map((t) => ({
     tool: `Get${t}VersionDiff`,
     args: { content_uri_from: VERSION_FROM, content_uri_to: VERSION_TO },

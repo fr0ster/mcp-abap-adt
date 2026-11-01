@@ -65,6 +65,7 @@ import { handleDeleteServiceBinding } from '../../handlers/service_binding/high/
 import { handleDeleteServiceDefinition } from '../../handlers/service_definition/high/handleDeleteServiceDefinition';
 import { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure';
 import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
+import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleDeleteUnitTest } from '../../handlers/unit_test/high/handleDeleteUnitTest';
 import {
@@ -269,6 +270,12 @@ const deletionServiceCases: DeletionCase[] = [
     expectedUri: '/sap/bc/adt/programs/includes/zi_del_x',
     run: (c) =>
       handleDeleteInclude(ctx(c) as any, { include_name: 'ZI_DEL_X' }),
+  },
+  {
+    name: 'DeleteTableType',
+    expectedUri: '/sap/bc/adt/ddic/tabletypes/ztt_del_x',
+    run: (c) =>
+      handleDeleteTableType(ctx(c) as any, { table_type_name: 'ZTT_DEL_X' }),
   },
   {
     name: 'DeleteProgram',

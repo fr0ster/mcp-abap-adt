@@ -4,15 +4,21 @@
  * sending anything.
  */
 
+import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
+import { handleGetObjectVersions } from '../../../handlers/common/readonly/handleGetObjectVersions';
+import { handleCheckTableType } from '../../../handlers/table_type/high/handleCheckTableType';
 import {
   TOOL_DEFINITION as CreateTableType_Tool,
   handleCreateTableType,
 } from '../../../handlers/table_type/high/handleCreateTableType';
+import { handleDeleteTableType } from '../../../handlers/table_type/high/handleDeleteTableType';
 import { handleGetTableType } from '../../../handlers/table_type/high/handleGetTableType';
 import {
   handleUpdateTableType,
   TOOL_DEFINITION as UpdateTableType_Tool,
 } from '../../../handlers/table_type/high/handleUpdateTableType';
+import { handleActivateTableType } from '../../../handlers/table_type/low/handleActivateTableType';
+import { corpusBody } from '../../../lib/adtCorpus';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -458,4 +464,308 @@ describe('UpdateTableType', () => {
     expect(result.isError).toBe(false);
     expect(connection.requests).toHaveLength(7);
   });
+});
+
+const DELETION_CHECK_URL = '/sap/bc/adt/deletion/check';
+const DELETION_URL = '/sap/bc/adt/deletion/delete';
+
+function deletionCheckXml(refusal?: string): string {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
+    `<del:object del:externalStrongReferences="0" del:externalWeakReferences="0" del:isDeletable="${refusal ? 'false' : 'true'}" adtcore:name="ZTT_X" xmlns:adtcore="http://www.sap.com/adt/core">` +
+    (refusal
+      ? `<del:message del:priority="0" del:type="E"><del:text>${refusal}</del:text></del:message>`
+      : '') +
+    '</del:object></del:checkResponse>'
+  );
+}
+
+const DELETED_XML =
+  '<?xml version="1.0" encoding="utf-8"?><del:deletionResult xmlns:del="http://www.sap.com/adt/deletion">' +
+  '<del:object del:isDeleted="true" adtcore:name="ZTT_X" xmlns:adtcore="http://www.sap.com/adt/core">' +
+  '<del:message del:priority="0" del:type="S"><del:text/></del:message></del:object></del:deletionResult>';
+
+describe('DeleteTableType', () => {
+  it('sends the check POST, then the delete POST, stateless and without a lock', async () => {
+    const connection = sessionRecording([
+      { data: deletionCheckXml() },
+      { data: DELETED_XML },
+    ]);
+    const result = await handleDeleteTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ztt_x', transport_request: 'K1' },
+    );
+    expect(result.isError).toBe(false);
+    expect(wire(connection)).toEqual([
+      `POST ${DELETION_CHECK_URL}`,
+      `POST ${DELETION_URL}`,
+    ]);
+    expect(connection.sessions).toEqual(['stateless', 'stateless']);
+    const [check, del] = connection.requests;
+    expect(check?.headers?.Accept).toBe(
+      'application/vnd.sap.adt.deletion.check.response.v1+xml',
+    );
+    expect(check?.headers?.['Content-Type']).toBe(
+      'application/vnd.sap.adt.deletion.check.request.v1+xml',
+    );
+    expect(del?.headers?.Accept).toBe(
+      'application/vnd.sap.adt.deletion.response.v1+xml',
+    );
+    expect(del?.headers?.['Content-Type']).toBe(
+      'application/vnd.sap.adt.deletion.request.v1+xml',
+    );
+    expect(String(check?.data)).toContain(`adtcore:uri="${TTYP}/ztt_x"`);
+    expect(String(del?.data)).toContain(`adtcore:uri="${TTYP}/ztt_x"`);
+    expect(String(del?.data)).toContain('K1');
+    expect(JSON.parse(textOf(result))).toMatchObject({
+      deleted: true,
+      object: 'ZTT_X',
+    });
+  });
+
+  it("answers a refused check with SAP's text and sends no delete", async () => {
+    const connection = sessionRecording([
+      { data: deletionCheckXml('Table type is still used') },
+    ]);
+    const result = await handleDeleteTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('Table type is still used');
+    expect(wire(connection)).toEqual([`POST ${DELETION_CHECK_URL}`]);
+  });
+
+  it.each([[{}], [{ table_type_name: '' }]])(
+    'refuses a missing table_type_name, sending nothing',
+    async (args) => {
+      const connection = recordingConnection();
+      const result = await handleDeleteTableType(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe('table_type_name is required');
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
+
+  it('is served on a connection declared cloud', async () => {
+    const connection = sessionRecording([
+      { data: deletionCheckXml() },
+      { data: DELETED_XML },
+    ]);
+    declareSystemKind(connection, 'cloud');
+    const result = await handleDeleteTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(2);
+  });
+});
+
+describe('ActivateTableType', () => {
+  it('sends one stateless activation POST naming the table type', async () => {
+    const connection = sessionRecording([
+      { data: corpusBody('activation-success-verdict--01-activation') },
+    ]);
+    const result = await handleActivateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ztt_x' },
+    );
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(textOf(result))).toMatchObject({ activated: true });
+    expect(wire(connection)).toEqual([
+      'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
+    ]);
+    const [sent] = connection.requests;
+    expect(String(sent?.data)).toContain(`${TTYP}/ztt_x`);
+    expect(String(sent?.data)).toContain('adtcore:name="ZTT_X"');
+    expect(sent?.headers?.Accept).toBe('application/xml');
+    expect(sent?.headers?.['Content-Type']).toBe(
+      'application/vnd.sap.adt.activation+xml',
+    );
+    expect(connection.sessions).toEqual(['stateless']);
+  });
+
+  it.each([[{}], [{ table_type_name: '' }]])(
+    'refuses a missing table_type_name, sending nothing',
+    async (args) => {
+      const connection = recordingConnection();
+      const result = await handleActivateTableType(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe('table_type_name is required');
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
+
+  it('is served on a connection declared cloud', async () => {
+    const connection = sessionRecording([
+      { data: corpusBody('activation-success-verdict--01-activation') },
+    ]);
+    declareSystemKind(connection, 'cloud');
+    const result = await handleActivateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(1);
+  });
+});
+
+describe('CheckTableType', () => {
+  const CHECK_OK =
+    '<?xml version="1.0" encoding="UTF-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"><chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="adt://X/sap/bc/adt/ddic/tabletypes/ztt_x" chkrun:status="processed" chkrun:statusText="Object ZTT_X has been checked"/></chkrun:checkRunReports>';
+
+  it('sends one check POST, active by default, stateless', async () => {
+    const connection = sessionRecording([{ data: CHECK_OK }]);
+    const result = await handleCheckTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ztt_x' },
+    );
+    expect(result.isError).toBe(false);
+    expect(wire(connection)).toEqual([`POST ${CHECK_URL}`]);
+    expect(connection.sessions).toEqual(['stateless']);
+    const [sent] = connection.requests;
+    expect(String(sent?.data)).toContain(`${TTYP}/ztt_x`);
+    expect(String(sent?.data)).toContain('chkrun:version="active"');
+  });
+
+  it('checks the inactive version when asked', async () => {
+    const connection = sessionRecording([{ data: CHECK_OK }]);
+    await handleCheckTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', version: 'inactive' },
+    );
+    expect(String(connection.requests[0]?.data)).toContain(
+      'chkrun:version="inactive"',
+    );
+  });
+
+  it("answers SAP's refusal text", async () => {
+    const connection = sessionRecording([REFUSED]);
+    const result = await handleCheckTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('refused');
+  });
+
+  it.each([[{}], [{ table_type_name: '' }]])(
+    'refuses a missing table_type_name, sending nothing',
+    async (args) => {
+      const connection = recordingConnection();
+      const result = await handleCheckTableType(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain('table_type_name is required');
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
+
+  it('is served on a connection declared cloud', async () => {
+    const connection = sessionRecording([{ data: CHECK_OK }]);
+    declareSystemKind(connection, 'cloud');
+    const result = await handleCheckTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(false);
+    expect(connection.requests).toHaveLength(1);
+  });
+});
+
+describe('the table-type version tools', () => {
+  const FEED =
+    '<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom">' +
+    '<atom:entry><atom:author><atom:name>DEV</atom:name></atom:author>' +
+    '<atom:content src="/sap/bc/adt/ddic/tabletypes/ztt_x/versions/0001"/>' +
+    '<atom:id>0001</atom:id><atom:title>Version 1</atom:title>' +
+    '<atom:updated>2026-01-01T00:00:00Z</atom:updated></atom:entry></atom:feed>';
+
+  const versionTool = (name: string) => {
+    const entry = buildObjectVersionTools().find(
+      (e) => e.toolDefinition.name === name,
+    );
+    if (!entry) throw new Error(`tool ${name} not found`);
+    return entry;
+  };
+
+  it('are the three per-type tools, [read-only], on both variants', () => {
+    for (const name of [
+      'GetTableTypeVersions',
+      'GetTableTypeVersionSource',
+      'GetTableTypeVersionDiff',
+    ]) {
+      const { toolDefinition } = versionTool(name);
+      expect(toolDefinition.description).toMatch(/^\[read-only\]/);
+      expect(toolDefinition.available_in).toEqual(['onprem', 'cloud']);
+    }
+  });
+
+  it('GetTableTypeVersions sends one GET to the versions feed of the table type', async () => {
+    const connection = sessionRecording([{ data: FEED }]);
+    const result = await versionTool('GetTableTypeVersions').handler(
+      { connection, logger: undefined },
+      { table_type_name: 'ztt_x' },
+    );
+    expect(result.isError).toBe(false);
+    expect(wire(connection)).toEqual([`GET ${TTYP}/ztt_x/versions`]);
+    const answered = JSON.parse(textOf(result));
+    expect(answered.object_type).toBe('table_type');
+    expect(answered.object_name).toBe('ZTT_X');
+    expect(connection.sessions).toEqual(['stateless']);
+  });
+
+  it('GetObjectVersions takes the kind table_type, on a connection declared cloud too', async () => {
+    const connection = sessionRecording([{ data: FEED }]);
+    declareSystemKind(connection, 'cloud');
+    const result = await handleGetObjectVersions(
+      { connection, logger: undefined },
+      { object_type: 'table_type', object_name: 'ZTT_X' },
+    );
+    expect(result.isError).toBe(false);
+    expect(wire(connection)).toEqual([`GET ${TTYP}/ztt_x/versions`]);
+  });
+
+  it('GetTableTypeVersionSource sends one GET to the content_uri', async () => {
+    const connection = sessionRecording([{ data: 'the version' }]);
+    const uri = `${TTYP}/ztt_x/versions/0001`;
+    const result = await versionTool('GetTableTypeVersionSource').handler(
+      { connection, logger: undefined },
+      { content_uri: uri },
+    );
+    expect(result.isError).toBe(false);
+    expect(wire(connection)).toEqual([`GET ${uri}`]);
+    expect(JSON.parse(textOf(result)).source).toBe('the version');
+  });
+
+  it.each([
+    ['GetTableTypeVersions', {}, 'table_type_name is required'],
+    ['GetTableTypeVersionSource', {}, 'content_uri is required'],
+    [
+      'GetTableTypeVersionDiff',
+      { content_uri_from: 'a' },
+      'content_uri_from and content_uri_to are required',
+    ],
+  ])(
+    '%s refuses missing arguments, sending nothing',
+    async (name, args, text) => {
+      const connection = recordingConnection();
+      const result = await versionTool(name).handler(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(text);
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 });

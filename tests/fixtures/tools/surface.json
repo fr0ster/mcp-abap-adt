@@ -259,6 +259,12 @@
   },
   {
     "group": "high",
+    "name": "ActivateTableType",
+    "inputs": "table_type_name*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "ActivateDataElement",
     "inputs": "data_element_name*, detail",
     "available_in": "cloud, onprem"
@@ -405,6 +411,12 @@
     "group": "high",
     "name": "DeleteDomain",
     "inputs": "domain_name*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "DeleteTableType",
+    "inputs": "table_type_name*, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1081,6 +1093,12 @@
   },
   {
     "group": "high",
+    "name": "CheckTableType",
+    "inputs": "table_type_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "CheckFunctionGroup",
     "inputs": "function_group_name*, version",
     "available_in": "cloud, onprem"
@@ -1220,6 +1238,24 @@
   {
     "group": "high",
     "name": "GetTableVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetTableTypeVersions",
+    "inputs": "table_type_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetTableTypeVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetTableTypeVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
     "available_in": "cloud, onprem"
   },

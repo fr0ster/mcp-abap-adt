@@ -105,6 +105,7 @@ export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.j
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';
 export { handleCreateTableType } from '../../handlers/table_type/high/handleCreateTableType.js';
+export { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType.js';
 export { handleUpdateTableType } from '../../handlers/table_type/high/handleUpdateTableType.js';
 export { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport.js';
 export { handleMoveTransportObjects } from '../../handlers/transport/high/handleMoveTransportObjects.js';

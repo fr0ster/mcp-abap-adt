@@ -133,6 +133,13 @@ export const VERSIONED_TYPES: VersionedTypeRow[] = [
     label: 'CDS metadata extension',
     available_in: ['onprem', 'cloud'],
   },
+  {
+    object_type: 'table_type',
+    display: 'TableType',
+    nameParam: 'table_type_name',
+    label: 'ABAP table type',
+    available_in: ['onprem', 'cloud'],
+  },
 ];
 
 function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
@@ -345,7 +352,7 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
 }
 
 /**
- * Build all 27 high-level per-object version tools (9 versioned types ×
+ * Build all 30 high-level per-object version tools (10 versioned types ×
  * {Versions, VersionSource, VersionDiff}). The handlers take (context, args);
  * the registering group wraps each with withContext.
  */

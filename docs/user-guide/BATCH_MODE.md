@@ -397,7 +397,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-179 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+184 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -418,6 +418,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `ActivateServiceDefinition` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateStructure` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateTable` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
+| `ActivateTableType` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `AddTransportObject` | every call | PUT /sap/bc/adt/cts/transportrequests/{number} with the object |
 | `CheckBehaviorDefinition` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckClass` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
@@ -432,6 +433,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `CheckProgram` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckStructure` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckTable` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
+| `CheckTableType` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CreateBehaviorImplementation` | every call | POST /sap/bc/adt/oo/classes: the create alone |
 | `CreateClass` | every call | POST /sap/bc/adt/oo/classes: the create alone |
 | `CreateDdl` | every call | POST /sap/bc/adt/ddic/ddl/sources: the create alone |
@@ -509,6 +511,9 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetTable` | every call | one request: GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/tables/{name} (part metadata) |
 | `GetTableContents` | every call | POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with SELECT * FROM the table as the body |
 | `GetTableType` | every call | GET /sap/bc/adt/ddic/tabletypes/{name} |
+| `GetTableTypeVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
+| `GetTableTypeVersions` | every call | GET /sap/bc/adt/ddic/tabletypes/{name}/versions |
+| `GetTableTypeVersionSource` | every call | GET the content_uri given |
 | `GetTableVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
 | `GetTableVersionSource` | every call | GET the content_uri given |

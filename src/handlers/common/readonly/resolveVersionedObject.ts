@@ -19,6 +19,7 @@ import {
   programDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
   analyseUnsupportedStatus,
@@ -136,6 +137,11 @@ export function resolveVersionedObject(
           resultsFor(metadataExtensionDocuments),
         ),
         config: { name },
+      };
+    case 'table_type':
+      return {
+        obj: client.getTableType(resultsFor(tableTypeDocuments)),
+        config: { tableTypeName: name },
       };
   }
 }

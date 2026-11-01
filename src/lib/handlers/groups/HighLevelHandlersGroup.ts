@@ -491,9 +491,17 @@ import {
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
 import {
+  TOOL_DEFINITION as CheckTableType_Tool,
+  handleCheckTableType,
+} from '../../../handlers/table_type/high/handleCheckTableType';
+import {
   TOOL_DEFINITION as CreateTableType_Tool,
   handleCreateTableType,
 } from '../../../handlers/table_type/high/handleCreateTableType';
+import {
+  TOOL_DEFINITION as DeleteTableType_Tool,
+  handleDeleteTableType,
+} from '../../../handlers/table_type/high/handleDeleteTableType';
 import {
   TOOL_DEFINITION as GetTableType_Tool,
   handleGetTableType,
@@ -502,6 +510,10 @@ import {
   handleUpdateTableType,
   TOOL_DEFINITION as UpdateTableType_Tool,
 } from '../../../handlers/table_type/high/handleUpdateTableType';
+import {
+  TOOL_DEFINITION as ActivateTableType_Tool,
+  handleActivateTableType,
+} from '../../../handlers/table_type/low/handleActivateTableType';
 import {
   TOOL_DEFINITION as AddTransportObject_Tool,
   handleAddTransportObject,
@@ -633,6 +645,15 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
             'Activates the ABAP domain named by domain_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateDomain),
+      },
+      {
+        toolDefinition: {
+          ...ActivateTableType_Tool,
+          name: 'ActivateTableType',
+          description:
+            'Activates the ABAP table type named by table_type_name, so its inactive version is in force.',
+        },
+        handler: withContext(handleActivateTableType),
       },
       {
         toolDefinition: {
@@ -795,6 +816,14 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: UpdateTableType_Tool,
         handler: withContext(handleUpdateTableType),
+      },
+      {
+        toolDefinition: DeleteTableType_Tool,
+        handler: withContext(handleDeleteTableType),
+      },
+      {
+        toolDefinition: CheckTableType_Tool,
+        handler: withContext(handleCheckTableType),
       },
       {
         toolDefinition: UpdateDomainHigh_Tool,

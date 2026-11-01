@@ -108,8 +108,8 @@ describe("lib's read and write handler barrels", () => {
     // the server writes program includes: `CreateInclude` (94),
     // `UpdateInclude` and `UpdateIncludeMetadata` (96),
     // `DeleteInclude` (97); and table types: `CreateTableType` (98),
-    // `UpdateTableType` (99).
-    expect(write).toHaveLength(99);
+    // `UpdateTableType` (99), `DeleteTableType` (100).
+    expect(write).toHaveLength(100);
   });
 
   it('share not one symbol', () => {

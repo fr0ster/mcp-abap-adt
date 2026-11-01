@@ -240,6 +240,12 @@
     "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main/versions"
   },
   {
+    "tool": "GetTableTypeVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/tabletypes/{name}/versions"
+  },
+  {
     "tool": "GetClassVersionSource",
     "set": "full",
     "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
@@ -289,6 +295,12 @@
   },
   {
     "tool": "GetMetadataExtensionVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetTableTypeVersionSource",
     "set": "full",
     "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
     "sends": "GET the content_uri given"
@@ -885,6 +897,12 @@
     "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
   },
   {
+    "tool": "ActivateTableType",
+    "set": "full",
+    "handler": "src/handlers/table_type/low/handleActivateTableType.ts#handleActivateTableType",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
     "tool": "ActivateDataElement",
     "set": "full",
     "handler": "src/handlers/data_element/low/handleActivateDataElement.ts#handleActivateDataElement",
@@ -1127,6 +1145,12 @@
     "tool": "CheckDomain",
     "set": "full",
     "handler": "src/handlers/domain/high/handleCheckDomain.ts#handleCheckDomain",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckTableType",
+    "set": "full",
+    "handler": "src/handlers/table_type/high/handleCheckTableType.ts#handleCheckTableType",
     "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
   },
   {
@@ -1591,6 +1615,12 @@
   },
   {
     "tool": "GetMetadataExtensionVersionDiff",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"
+  },
+  {
+    "tool": "GetTableTypeVersionDiff",
     "set": "full",
     "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
     "sends": "GET content_uri_from and GET content_uri_to, sent together, diffed locally"

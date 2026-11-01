@@ -233,6 +233,22 @@
     ],
     "semantic": "Activate an ABAP database table after it was created or changed, so the change is in force."
   },
+  "ActivateTableType": {
+    "keywords": [
+      "activate",
+      "activation",
+      "make active",
+      "inactive",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Activate an ABAP table type after it was created or changed, so the change is in force."
+  },
   "AddTransportObject": {
     "keywords": [
       "add to transport",
@@ -562,6 +578,23 @@
       "table definition"
     ],
     "semantic": "Run a syntax check on an ABAP database table and see its errors and warnings."
+  },
+  "CheckTableType": {
+    "keywords": [
+      "syntax check",
+      "check",
+      "errors",
+      "warnings",
+      "does it compile",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Run a check on an ABAP table type and see its errors and warnings."
   },
   "CreateBehaviorDefinition": {
     "keywords": [
@@ -1488,6 +1521,22 @@
       "table definition"
     ],
     "semantic": "Delete an existing ABAP database table from the system."
+  },
+  "DeleteTableType": {
+    "keywords": [
+      "delete",
+      "drop",
+      "erase",
+      "get rid of",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Delete an existing ABAP table type from the system."
   },
   "DeleteUnitTest": {
     "keywords": [
@@ -2723,6 +2772,60 @@
       "internal table type"
     ],
     "semantic": "Show the definition of an ABAP table type: its row type, access type and key."
+  },
+  "GetTableTypeVersionDiff": {
+    "keywords": [
+      "compare versions",
+      "diff",
+      "difference",
+      "changes between versions",
+      "what changed",
+      "compare with previous version",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Compare two versions of an ABAP table type and see what changed between them."
+  },
+  "GetTableTypeVersionSource": {
+    "keywords": [
+      "old version",
+      "previous version",
+      "earlier version",
+      "version source",
+      "source of a version",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "Read the content of an earlier version of an ABAP table type."
+  },
+  "GetTableTypeVersions": {
+    "keywords": [
+      "version history",
+      "versions",
+      "revisions",
+      "who changed",
+      "when changed",
+      "change history",
+      "transport history",
+      "table type",
+      "TTYP",
+      "row type",
+      "line type",
+      "access type",
+      "primary key",
+      "internal table type"
+    ],
+    "semantic": "List the version history of an ABAP table type: who changed it, when, and in which transport request."
   },
   "GetTableVersionDiff": {
     "keywords": [

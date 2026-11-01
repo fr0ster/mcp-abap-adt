@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 169
+- Total tools: 174
 
 ## Navigation
 
@@ -66,6 +66,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
     - [GetStructureVersions](#getstructureversions-high-level-common)
     - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
+    - [GetTableTypeVersionDiff](#gettabletypeversiondiff-high-level-common)
+    - [GetTableTypeVersions](#gettabletypeversions-high-level-common)
+    - [GetTableTypeVersionSource](#gettabletypeversionsource-high-level-common)
     - [GetTableVersionDiff](#gettableversiondiff-high-level-common)
     - [GetTableVersions](#gettableversions-high-level-common)
     - [GetTableVersionSource](#gettableversionsource-high-level-common)
@@ -173,7 +176,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
   - [Table Type](#high-level-table-type)
+    - [CheckTableType](#checktabletype-high-level-table-type)
     - [CreateTableType](#createtabletype-high-level-table-type)
+    - [DeleteTableType](#deletetabletype-high-level-table-type)
     - [GetTableType](#gettabletype-high-level-table-type)
     - [UpdateTableType](#updatetabletype-high-level-table-type)
   - [Transport](#high-level-transport)
@@ -861,6 +866,40 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP structure's version history.
+
+---
+
+<a id="gettabletypeversiondiff-high-level-common"></a>
+#### GetTableTypeVersionDiff (High-Level / Common)
+**Description:** [read-only] Compares the two ABAP table type versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP table type's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP table type's version history.
+
+---
+
+<a id="gettabletypeversions-high-level-common"></a>
+#### GetTableTypeVersions (High-Level / Common)
+**Description:** [read-only] Lists the version history of the ABAP table type named by table_type_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - ABAP table type name.
+
+---
+
+<a id="gettabletypeversionsource-high-level-common"></a>
+#### GetTableTypeVersionSource (High-Level / Common)
+**Description:** [read-only] Reads the source of the ABAP table type version named by content_uri, an entry of the ABAP table type's version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP table type's version history.
 
 ---
 
@@ -2179,6 +2218,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-table-type"></a>
 ### High-Level / Table Type
 
+<a id="checktabletype-high-level-table-type"></a>
+#### CheckTableType (High-Level / Table Type)
+**Description:** [read-only] Runs a check on the ABAP table type named by table_type_name. Returns errors, warnings, and messages.
+
+**Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - Table type name.
+- `version` (string, optional) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+
+---
+
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
 **Description:** Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step.
@@ -2191,6 +2242,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `package_name` (string, required) - Package the table type is created in.
 - `table_type_name` (string, required) - Table type name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
+<a id="deletetabletype-high-level-table-type"></a>
+#### DeleteTableType (High-Level / Table Type)
+**Description:** Deletes the ABAP table type named by table_type_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+
+**Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - Table type name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 

@@ -18,6 +18,7 @@
         "ActivateServiceDefinition",
         "ActivateStructure",
         "ActivateTable",
+        "ActivateTableType",
         "AddTransportObject",
         "AmdpDebugCancel",
         "AmdpDebugGetTable",
@@ -42,6 +43,7 @@
         "CheckProgram",
         "CheckStructure",
         "CheckTable",
+        "CheckTableType",
         "CreateBehaviorDefinition",
         "CreateBehaviorImplementation",
         "CreateCdsUnitTest",
@@ -116,6 +118,7 @@
         "DeleteServiceDefinition",
         "DeleteStructure",
         "DeleteTable",
+        "DeleteTableType",
         "DeleteUnitTest",
         "DescribeByList",
         "DiscardBackgroundRun",
@@ -194,6 +197,9 @@
         "GetTable",
         "GetTableContents",
         "GetTableType",
+        "GetTableTypeVersionDiff",
+        "GetTableTypeVersionSource",
+        "GetTableTypeVersions",
         "GetTableVersionDiff",
         "GetTableVersionSource",
         "GetTableVersions",
@@ -294,7 +300,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -305,7 +312,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersionSource.object_type": [
           "class",
@@ -316,7 +324,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ]
       },
       "argumentDescriptions": {
@@ -438,7 +447,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -449,7 +459,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersionSource.object_type": [
           "class",
@@ -460,7 +471,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ]
       },
       "argumentDescriptions": {
@@ -915,6 +927,7 @@
         "ActivateServiceDefinition",
         "ActivateStructure",
         "ActivateTable",
+        "ActivateTableType",
         "AddTransportObject",
         "AmdpDebugCancel",
         "AmdpDebugGetTable",
@@ -939,6 +952,7 @@
         "CheckProgram",
         "CheckStructure",
         "CheckTable",
+        "CheckTableType",
         "CreateBehaviorDefinition",
         "CreateBehaviorImplementation",
         "CreateCdsUnitTest",
@@ -1008,6 +1022,7 @@
         "DeleteServiceDefinition",
         "DeleteStructure",
         "DeleteTable",
+        "DeleteTableType",
         "DeleteUnitTest",
         "DescribeByList",
         "DiscardBackgroundRun",
@@ -1086,6 +1101,9 @@
         "GetTable",
         "GetTableContents",
         "GetTableType",
+        "GetTableTypeVersionDiff",
+        "GetTableTypeVersionSource",
+        "GetTableTypeVersions",
         "GetTableVersionDiff",
         "GetTableVersionSource",
         "GetTableVersions",
@@ -1180,7 +1198,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -1191,7 +1210,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersionSource.object_type": [
           "class",
@@ -1202,7 +1222,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ]
       },
       "argumentDescriptions": {
@@ -1323,7 +1344,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersions.object_type": [
           "class",
@@ -1334,7 +1356,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ],
         "GetObjectVersionSource.object_type": [
           "class",
@@ -1345,7 +1368,8 @@
           "structure",
           "ddl",
           "behavior_definition",
-          "metadata_extension"
+          "metadata_extension",
+          "table_type"
         ]
       },
       "argumentDescriptions": {

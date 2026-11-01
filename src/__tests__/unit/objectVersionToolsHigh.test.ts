@@ -3,7 +3,7 @@
  *  - Get<Display>Versions dispatches to the right client accessor per type and
  *    forwards the natural name param as the resolver config;
  *  - Get<Display>VersionSource forwards content_uri to getVersionSource;
- *  - the factory registers all 27 expected tool names (9 versioned types ×
+ *  - the factory registers all 30 expected tool names (10 versioned types ×
  *    {Versions, VersionSource, VersionDiff}) with the per-type available_in
  *    copied from each high-level Get<X> (program is onprem);
  *  - non-versioned types (function_group, domain, data_element, package) get
@@ -133,7 +133,7 @@ describe('per-object high-level version tools (#30)', () => {
     expect(data.source).toBe('DEFINE TABLE zmy_table.');
   });
 
-  it('registers all 27 expected tool names', () => {
+  it('registers all 30 expected tool names', () => {
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
     const displays = [
       'Class',
@@ -145,6 +145,7 @@ describe('per-object high-level version tools (#30)', () => {
       'Ddl',
       'BehaviorDefinition',
       'MetadataExtension',
+      'TableType',
     ];
     const expected = displays.flatMap((d) => [
       `Get${d}Versions`,
@@ -152,7 +153,7 @@ describe('per-object high-level version tools (#30)', () => {
       `Get${d}VersionDiff`,
     ]);
     expect(names.sort()).toEqual(expected.sort());
-    expect(new Set(names).size).toBe(27);
+    expect(new Set(names).size).toBe(30);
   });
 
   it('does not register version tools for non-versioned types', () => {
@@ -166,7 +167,7 @@ describe('per-object high-level version tools (#30)', () => {
     }
   });
 
-  it('the registered HighLevel group contains all 27 version tools (no dups)', () => {
+  it('the registered HighLevel group contains all 30 version tools (no dups)', () => {
     const group = new HighLevelHandlersGroup({
       connection: {},
       logger: undefined,

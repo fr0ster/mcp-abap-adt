@@ -747,6 +747,41 @@ describe('the definition SAP stored, read at a stated version', () => {
     });
   });
 
+  it('UpdateTableType: a check refused under the lock, before the wait, answers no stored definition', async () => {
+    const connection = sessionRecording([
+      undefined,
+      { data: STRING_TABLE },
+      undefined,
+      REFUSED,
+    ]);
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', access_type: 'hashed' },
+    );
+    expect(result.isError).toBe(true);
+    expect(wire(connection).slice(3)).toEqual([
+      `POST ${CHECK_URL}`,
+      `POST ${UNLOCK_URL}`,
+    ]);
+    const answered = answerOf(result);
+    expect(answered).not.toHaveProperty('stored_definition');
+    expect(answered).not.toHaveProperty('stored_version');
+  });
+
+  it('the descriptions say which version each answers, per tool', () => {
+    const create = CreateTableType_Tool.description;
+    const update = UpdateTableType_Tool.description;
+    // Create checks after the wait: a refused check carries the inactive
+    // definition. Update checks under the lock, before the read.
+    expect(create.includes('a refused check or a refused activation')).toBe(
+      true,
+    );
+    expect(update.includes('activate false or a refused activation')).toBe(
+      true,
+    );
+    expect(update.includes('a refused check is answered alone')).toBe(true);
+  });
+
   it('a write refused before the wait answers no stored definition', async () => {
     const connection = sessionRecording([
       undefined,

@@ -1,11 +1,11 @@
 # High-Level Tools - MCP ABAP ADT Server
 
-Generated from code in `src/handlers/**` (not from docs).
+Generated from the tool definitions the server builds (not from docs).
 
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 174
+- Total tools: 188
 
 ## Navigation
 
@@ -15,6 +15,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetATCRunStatus](#getatcrunstatus-high-level-atc)
     - [RunATC](#runatc-high-level-atc)
   - [Behavior Definition](#high-level-behavior-definition)
+    - [ActivateBehaviorDefinition](#activatebehaviordefinition-high-level-behavior-definition)
     - [CheckBehaviorDefinition](#checkbehaviordefinition-high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
     - [DeleteBehaviorDefinition](#deletebehaviordefinition-high-level-behavior-definition)
@@ -26,6 +27,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetBehaviorImplementation](#getbehaviorimplementation-high-level-behavior-implementation)
     - [UpdateBehaviorImplementation](#updatebehaviorimplementation-high-level-behavior-implementation)
   - [Class](#high-level-class)
+    - [ActivateClass](#activateclass-high-level-class)
     - [CheckClass](#checkclass-high-level-class)
     - [CreateClass](#createclass-high-level-class)
     - [DeleteClass](#deleteclass-high-level-class)
@@ -63,6 +65,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-high-level-common)
     - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
     - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
+    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
+    - [GetProgramVersions](#getprogramversions-high-level-common)
+    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
     - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
     - [GetStructureVersions](#getstructureversions-high-level-common)
     - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
@@ -73,28 +78,34 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetTableVersions](#gettableversions-high-level-common)
     - [GetTableVersionSource](#gettableversionsource-high-level-common)
   - [Data Element](#high-level-data-element)
+    - [ActivateDataElement](#activatedataelement-high-level-data-element)
     - [CheckDataElement](#checkdataelement-high-level-data-element)
     - [CreateDataElement](#createdataelement-high-level-data-element)
     - [DeleteDataElement](#deletedataelement-high-level-data-element)
     - [GetDataElement](#getdataelement-high-level-data-element)
     - [UpdateDataElement](#updatedataelement-high-level-data-element)
   - [Ddl](#high-level-ddl)
+    - [ActivateDdl](#activateddl-high-level-ddl)
     - [CheckDdl](#checkddl-high-level-ddl)
     - [CreateDdl](#createddl-high-level-ddl)
     - [DeleteDdl](#deleteddl-high-level-ddl)
     - [GetDdl](#getddl-high-level-ddl)
     - [UpdateDdl](#updateddl-high-level-ddl)
   - [Ddlx](#high-level-ddlx)
+    - [ActivateMetadataExtension](#activatemetadataextension-high-level-ddlx)
     - [CheckMetadataExtension](#checkmetadataextension-high-level-ddlx)
     - [CreateMetadataExtension](#createmetadataextension-high-level-ddlx)
     - [UpdateMetadataExtension](#updatemetadataextension-high-level-ddlx)
   - [Domain](#high-level-domain)
+    - [ActivateDomain](#activatedomain-high-level-domain)
     - [CheckDomain](#checkdomain-high-level-domain)
     - [CreateDomain](#createdomain-high-level-domain)
     - [DeleteDomain](#deletedomain-high-level-domain)
     - [GetDomain](#getdomain-high-level-domain)
     - [UpdateDomain](#updatedomain-high-level-domain)
   - [Function](#high-level-function)
+    - [ActivateFunctionGroup](#activatefunctiongroup-high-level-function)
+    - [ActivateFunctionModule](#activatefunctionmodule-high-level-function)
     - [CheckFunctionGroup](#checkfunctiongroup-high-level-function)
     - [CheckFunctionModule](#checkfunctionmodule-high-level-function)
     - [CreateFunctionGroup](#createfunctiongroup-high-level-function)
@@ -112,11 +123,13 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Include](#high-level-include)
+    - [ActivateInclude](#activateinclude-high-level-include)
     - [CreateInclude](#createinclude-high-level-include)
     - [DeleteInclude](#deleteinclude-high-level-include)
     - [UpdateInclude](#updateinclude-high-level-include)
     - [UpdateIncludeMetadata](#updateincludemetadata-high-level-include)
   - [Interface](#high-level-interface)
+    - [ActivateInterface](#activateinterface-high-level-interface)
     - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
     - [DeleteInterface](#deleteinterface-high-level-interface)
@@ -141,12 +154,14 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetPackage](#getpackage-high-level-package)
     - [UpdatePackage](#updatepackage-high-level-package)
   - [Program](#high-level-program)
+    - [ActivateProgram](#activateprogram-high-level-program)
     - [CheckProgram](#checkprogram-high-level-program)
     - [CreateProgram](#createprogram-high-level-program)
     - [DeleteProgram](#deleteprogram-high-level-program)
     - [GetProgram](#getprogram-high-level-program)
     - [UpdateProgram](#updateprogram-high-level-program)
   - [Service Binding](#high-level-service-binding)
+    - [ActivateServiceBinding](#activateservicebinding-high-level-service-binding)
     - [CreateServiceBinding](#createservicebinding-high-level-service-binding)
     - [DeleteServiceBinding](#deleteservicebinding-high-level-service-binding)
     - [GetServiceBinding](#getservicebinding-high-level-service-binding)
@@ -154,11 +169,13 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [UpdateServiceBinding](#updateservicebinding-high-level-service-binding)
     - [ValidateServiceBinding](#validateservicebinding-high-level-service-binding)
   - [Service Definition](#high-level-service-definition)
+    - [ActivateServiceDefinition](#activateservicedefinition-high-level-service-definition)
     - [CreateServiceDefinition](#createservicedefinition-high-level-service-definition)
     - [DeleteServiceDefinition](#deleteservicedefinition-high-level-service-definition)
     - [GetServiceDefinition](#getservicedefinition-high-level-service-definition)
     - [UpdateServiceDefinition](#updateservicedefinition-high-level-service-definition)
   - [Structure](#high-level-structure)
+    - [ActivateStructure](#activatestructure-high-level-structure)
     - [CheckStructure](#checkstructure-high-level-structure)
     - [CreateStructure](#createstructure-high-level-structure)
     - [DeleteStructure](#deletestructure-high-level-structure)
@@ -170,12 +187,14 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [RuntimeRunClass](#runtimerunclass-high-level-system)
     - [RuntimeRunProgram](#runtimerunprogram-high-level-system)
   - [Table](#high-level-table)
+    - [ActivateTable](#activatetable-high-level-table)
     - [CheckTable](#checktable-high-level-table)
     - [CreateTable](#createtable-high-level-table)
     - [DeleteTable](#deletetable-high-level-table)
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
   - [Table Type](#high-level-table-type)
+    - [ActivateTableType](#activatetabletype-high-level-table-type)
     - [CheckTableType](#checktabletype-high-level-table-type)
     - [CreateTableType](#createtabletype-high-level-table-type)
     - [DeleteTableType](#deletetabletype-high-level-table-type)
@@ -195,12 +214,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [CreateUnitTest](#createunittest-high-level-unit-test)
     - [DeleteCdsUnitTest](#deletecdsunittest-high-level-unit-test)
     - [DeleteUnitTest](#deleteunittest-high-level-unit-test)
-    - [GetCdsUnitTest](#getcdsunittest-high-level-unit-test)
-    - [GetCdsUnitTestResult](#getcdsunittestresult-high-level-unit-test)
-    - [GetCdsUnitTestStatus](#getcdsunitteststatus-high-level-unit-test)
-    - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
-    - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
     - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunCdsUnitTest](#runcdsunittest-high-level-unit-test)
     - [RunFunctionGroupUnitTest](#runfunctiongroupunittest-high-level-unit-test)
@@ -261,6 +275,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
+
+<a id="activatebehaviordefinition-high-level-behavior-definition"></a>
+#### ActivateBehaviorDefinition (High-Level / Behavior Definition)
+**Description:** Activates the RAP behavior definition named by name, so its inactive version is in force.
+
+**Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `name` (string, required) - Behavior definition name (root entity).
+
+---
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
@@ -398,6 +424,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-class"></a>
 ### High-Level / Class
+
+<a id="activateclass-high-level-class"></a>
+#### ActivateClass (High-Level / Class)
+**Description:** Activates the ABAP class named by class_name, so its inactive version is in force.
+
+**Source:** `src/handlers/class/low/handleActivateClass.ts`
+
+**Parameters:**
+- `class_name` (string, required) - Class name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+---
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
@@ -857,6 +895,40 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 ---
 
+<a id="getprogramversiondiff-high-level-common"></a>
+#### GetProgramVersionDiff (High-Level / Common)
+**Description:** [read-only] Compares the two ABAP program versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources. On ABAP Cloud, the programs are SAP's standard programs.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP program's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP program's version history.
+
+---
+
+<a id="getprogramversions-high-level-common"></a>
+#### GetProgramVersions (High-Level / Common)
+**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source. On ABAP Cloud, the programs are SAP's standard programs.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `program_name` (string, required) - ABAP program name.
+
+---
+
+<a id="getprogramversionsource-high-level-common"></a>
+#### GetProgramVersionSource (High-Level / Common)
+**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history. On ABAP Cloud, the programs are SAP's standard programs.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP program's version history.
+
+---
+
 <a id="getstructureversiondiff-high-level-common"></a>
 #### GetStructureVersionDiff (High-Level / Common)
 **Description:** [read-only] Compares the two ABAP structure versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
@@ -962,6 +1034,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-data-element"></a>
 ### High-Level / Data Element
 
+<a id="activatedataelement-high-level-data-element"></a>
+#### ActivateDataElement (High-Level / Data Element)
+**Description:** Activates the ABAP data element named by data_element_name, so its inactive version is in force.
+
+**Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
+
+**Parameters:**
+- `data_element_name` (string, required) - Data element name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+---
+
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
 **Description:** [read-only] Runs a syntax check on the ABAP data element named by data_element_name. Returns syntax errors, warnings, and messages.
@@ -1058,6 +1142,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-ddl"></a>
 ### High-Level / Ddl
 
+<a id="activateddl-high-level-ddl"></a>
+#### ActivateDdl (High-Level / Ddl)
+**Description:** Activates the CDS view (DDL source) named by ddl_name, so its inactive version is in force.
+
+**Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+---
+
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
 **Description:** [read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
@@ -1131,6 +1227,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-ddlx"></a>
 ### High-Level / Ddlx
 
+<a id="activatemetadataextension-high-level-ddlx"></a>
+#### ActivateMetadataExtension (High-Level / Ddlx)
+**Description:** Activates the CDS metadata extension named by name, so its inactive version is in force.
+
+**Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `name` (string, required) - Metadata Extension name.
+
+---
+
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
 **Description:** [read-only] Runs a syntax check on the CDS metadata extension (DDLX) named by name. Returns syntax errors, warnings, and messages.
@@ -1178,6 +1286,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-domain"></a>
 ### High-Level / Domain
+
+<a id="activatedomain-high-level-domain"></a>
+#### ActivateDomain (High-Level / Domain)
+**Description:** Activates the ABAP domain named by domain_name, so its inactive version is in force.
+
+**Source:** `src/handlers/domain/low/handleActivateDomain.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `domain_name` (string, required) - Domain name.
+
+---
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
@@ -1267,6 +1387,31 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-function"></a>
 ### High-Level / Function
+
+<a id="activatefunctiongroup-high-level-function"></a>
+#### ActivateFunctionGroup (High-Level / Function)
+**Description:** Activates the ABAP function group named by function_group_name, so its inactive version is in force.
+
+**Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `function_group_name` (string, required) - Function group name.
+
+---
+
+<a id="activatefunctionmodule-high-level-function"></a>
+#### ActivateFunctionModule (High-Level / Function)
+**Description:** Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.
+
+**Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `function_group_name` (string, required) - Function group name.
+- `function_module_name` (string, required) - Function module name.
+
+---
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
@@ -1465,6 +1610,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-include"></a>
 ### High-Level / Include
 
+<a id="activateinclude-high-level-include"></a>
+#### ActivateInclude (High-Level / Include)
+**Description:** Activates the ABAP include named by include_name, so its inactive version is in force.
+
+**Source:** `src/handlers/include/low/handleActivateInclude.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `include_name` (string, required) - Include name.
+
+---
+
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
 **Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written afterwards.
@@ -1525,6 +1682,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-interface"></a>
 ### High-Level / Interface
+
+<a id="activateinterface-high-level-interface"></a>
+#### ActivateInterface (High-Level / Interface)
+**Description:** Activates the ABAP interface named by interface_name, so its inactive version is in force.
+
+**Source:** `src/handlers/interface/low/handleActivateInterface.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `interface_name` (string, required) - Interface name.
+
+---
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
@@ -1761,7 +1930,17 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/package/high/handleCreatePackage.ts`
 
 **Parameters:**
-- None
+- `application_component` (string, optional) - Application component (optional, e.g., BC-ABA)
+- `description` (string, optional) - Package description. If not provided, package_name will be used.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `package_name` (string, required) - Package name.
+- `package_type` (string, optional (default: development), one of: `development`, `structure`) - Package type: 'development' (default) or 'structure'
+- `record_changes` (boolean, optional) - Enable change recording for the package. Required for transportable packages. Default: false.
+- `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
+- `super_package` (string, required) - Parent package name. Required for structure packages.
+- `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number, not a task. Required if the package is transportable.
 
 ---
 
@@ -1808,6 +1987,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-program"></a>
 ### High-Level / Program
+
+<a id="activateprogram-high-level-program"></a>
+#### ActivateProgram (High-Level / Program)
+**Description:** Activates the ABAP program (report) named by program_name, so its inactive version is in force.
+
+**Source:** `src/handlers/program/low/handleActivateProgram.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `program_name` (string, required) - Program name.
+
+---
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
@@ -1882,6 +2073,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-service-binding"></a>
 ### High-Level / Service Binding
+
+<a id="activateservicebinding-high-level-service-binding"></a>
+#### ActivateServiceBinding (High-Level / Service Binding)
+**Description:** Activates the OData service binding named by name, so its inactive version is in force.
+
+**Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `name` (string, required) - Service binding name.
+
+---
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
@@ -1979,6 +2182,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-service-definition"></a>
 ### High-Level / Service Definition
 
+<a id="activateservicedefinition-high-level-service-definition"></a>
+#### ActivateServiceDefinition (High-Level / Service Definition)
+**Description:** Activates the service definition named by name, so its inactive version is in force.
+
+**Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `name` (string, required) - Service definition name.
+
+---
+
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
 **Description:** Create a service definition that exposes CDS views as an OData service, in initial state.
@@ -2040,6 +2255,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-structure"></a>
 ### High-Level / Structure
+
+<a id="activatestructure-high-level-structure"></a>
+#### ActivateStructure (High-Level / Structure)
+**Description:** Activates the ABAP structure named by structure_name, so its inactive version is in force.
+
+**Source:** `src/handlers/structure/low/handleActivateStructure.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `structure_name` (string, required) - Structure name.
+
+---
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
@@ -2218,6 +2445,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 <a id="high-level-table"></a>
 ### High-Level / Table
 
+<a id="activatetable-high-level-table"></a>
+#### ActivateTable (High-Level / Table)
+**Description:** Activates the ABAP database table named by table_name, so its inactive version is in force.
+
+**Source:** `src/handlers/table/low/handleActivateTable.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `table_name` (string, required) - Table name.
+
+---
+
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
 **Description:** [read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
@@ -2290,6 +2529,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="high-level-table-type"></a>
 ### High-Level / Table Type
+
+<a id="activatetabletype-high-level-table-type"></a>
+#### ActivateTableType (High-Level / Table Type)
+**Description:** Activates the ABAP table type named by table_type_name, so its inactive version is in force.
+
+**Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `table_type_name` (string, required) - Table type name.
+
+---
 
 <a id="checktabletype-high-level-table-type"></a>
 #### CheckTableType (High-Level / Table Type)
@@ -2550,53 +2801,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 ---
 
-<a id="getcdsunittest-high-level-unit-test"></a>
-#### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
-
-**Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by unit test run.
-
----
-
-<a id="getcdsunittestresult-high-level-unit-test"></a>
-#### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run result for a run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
-
-**Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
-
-**Parameters:**
-- `format` (string, optional) - Result format: abapunit or junit.
-- `run_id` (string, required) - Run identifier returned by unit test run.
-- `with_navigation_uris` (boolean, optional (default: false)) - Include navigation URIs in result if supported.
-
----
-
-<a id="getcdsunitteststatus-high-level-unit-test"></a>
-#### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** [read-only] Retrieve CDS unit test run status for a run_id. 
-
-**Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by unit test run.
-- `with_long_polling` (boolean, optional (default: true)) - Enable long polling while waiting for status.
-
----
-
-<a id="getunittest-high-level-unit-test"></a>
-#### GetUnitTest (High-Level / Unit Test)
-**Description:** [read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
-
-**Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by RunUnitTest.
-
----
-
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
 **Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.
@@ -2606,18 +2810,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `run_id` (string, required) - Run id a unit test run answered.
-
----
-
-<a id="getunitteststatus-high-level-unit-test"></a>
-#### GetUnitTestStatus (High-Level / Unit Test)
-**Description:** [read-only] Retrieve ABAP Unit test run status for a run_id.
-
-**Source:** `src/handlers/unit_test/high/handleGetUnitTestStatus.ts`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by unit test run.
-- `with_long_polling` (boolean, optional (default: true)) - Enable long polling while waiting for status.
 
 ---
 

@@ -1,6 +1,6 @@
 # Read-Only Tools - MCP ABAP ADT Server
 
-Generated from code in `src/handlers/**` (not from docs).
+Generated from the tool definitions the server builds (not from docs).
 
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
@@ -556,7 +556,12 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
 **Parameters:**
-- None
+- `include_descriptions` (boolean, optional) - Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)
+- `include_subpackages` (boolean, optional) - Include contents of subpackages recursively (default: false)
+- `max_depth` (number, optional) - Maximum depth for recursive package traversal (default: 5)
+- `package_name` (string, optional) - Name of the ABAP package (give this or package_names)
+- `package_names` (array, optional) - Names of several ABAP packages, read together (give this or package_name)
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1019,7 +1024,21 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
 **Parameters:**
-- None
+- `emit_no_hits` (boolean, optional) - When true, list zero-hit targets in a separate no_hits array. Default false.
+- `exclude` (array, optional) - Up to 3 substrings; a line containing any of them is dropped.
+- `exclude_comments` (boolean, optional) - Skip col-1 '*' and full-line '"' comment lines. Default false (comments are scanned).
+- `include_subpackages` (boolean, optional) - Recurse into subpackages (default true).
+- `max_hits_per_object` (integer, optional) - Cap hits per root object across its source units (default 100). When exceeded, truncated.by_object_cap=true is set. Raise this value if you need more hits per object.
+- `max_objects` (integer, optional) - Cap the total objects scanned across all packages (default 500). Setting truncated.by_max_objects=true when exceeded.
+- `object_filter` (string, optional) - Glob applied to object names within each package (e.g. "Z*").
+- `object_types` (array, optional) - Subset of object families to scan (default: all three).
+- `packages` (array, required) - Packages to scan. Each entry is either an exact dev-class name or a `*` mask, where `*` stands for any characters and a namespace prefix may lead it.
+- `query` (string, required) - Primary substring to match (case-insensitive, ABAP CS).
+- `query2` (string, optional) - Optional second substring. When set, both query and query2 must appear on the same line.
+- `start_at` (integer, optional) - Index of the first scan target to read, from `next_start_at` of the previous answer; 0 by default.
+- `time_budget_ms` (integer, optional) - Internal scan deadline in ms. When exceeded, returns the hits of the objects before `next_start_at` with truncated.by_timeout=true and next_start_at; when next_start_at equals start_at, the deadline passed before the first object was answered: raise time_budget_ms or lower max_objects. Set this BELOW your client/transport timeout (e.g. 540000 for a 600s client) so you get a partial result instead of a hard cutoff.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `version` (string, optional, one of: `active`, `inactive`) - Source version for PROG and CLAS main include reads. Default active. FUGR subincludes always read the active version.
 
 ---
 
@@ -1033,7 +1052,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
 **Parameters:**
-- None
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `max_rows` (number, optional) - Maximum number of rows to retrieve
+- `table_name` (string, required) - Name of the ABAP table
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 

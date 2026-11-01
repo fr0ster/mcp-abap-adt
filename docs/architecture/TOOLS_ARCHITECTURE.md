@@ -316,7 +316,7 @@ node tools/update-handlers-with-tool-definitions.js [--help]
 
 ### Generating Documentation
 
-The `tools/generate-tools-docs.js` script automatically generates `docs/user-guide/AVAILABLE_TOOLS.md` from all `TOOL_DEFINITION` exports.
+The `tools/generate-tools-docs.js` script generates `docs/user-guide/AVAILABLE_TOOLS.md` (and its `_READONLY` and `_HIGH` pages) from the tool definitions the server builds.
 
 ```bash
 npm run docs:tools
@@ -325,10 +325,10 @@ node tools/generate-tools-docs.js [--help]
 ```
 
 **What it does:**
-- Scans all handler files in `src/handlers/` and its subdirectories
-- Extracts `TOOL_DEFINITION` from each
-- Groups tools by category based on subdirectory structure
-- Generates comprehensive markdown documentation
+- Reads the built tool sets (`fullToolSet`, `fullReadOnlyToolSet` in `dist`): every tool a binary serves, with the description and input schema it registers (a Zod shape converted as the MCP SDK lists it)
+- Files each tool under the object and level of the built handler module that holds its definition (`dist/handlers/<object>/<level>/…`), a `low` module under its handler group's level
+- Reads no source text, so a spread-in or shared property is listed as the server registers it
+- Generates the markdown pages
 
 **When to use:**
 - After adding or updating tools

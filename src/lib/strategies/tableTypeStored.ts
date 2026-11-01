@@ -1,6 +1,7 @@
 /**
  * The definition SAP stored for a table type, answered by the table-type
- * writes beside their result.
+ * writes beside their result: a success, and a failure after the wait (a
+ * refused check or activation) alike (`AnswerContext.beside`).
  *
  * SAP takes a definition and stores other values than those sent (measured
  * on premise, 2026-11-01: a hashed access forces a unique key, a standard
@@ -75,30 +76,4 @@ export async function readStoredDefinition<T>(
     };
   }
   return { stored_definition: stored };
-}
-
-/**
- * `projection`, with the stored definition beside what it answers: a terse
- * write's `'SUCCESS'` (or any answer that is not an object) becomes
- * `{ result, … }`. `stored()` is read when the answer is projected, after
- * the call; with no read made (a chain that ended before the wait) the
- * projection answers as it is.
- */
-export function besideStoredDefinition<R>(
-  projection: (reading: R) => unknown,
-  stored: () => StoredDefinitionAnswer | undefined,
-): (reading: R) => unknown {
-  return (reading) => {
-    const projected = projection(reading);
-    const said = stored();
-    if (projected === undefined || said === undefined) return projected;
-    if (
-      typeof projected === 'object' &&
-      projected !== null &&
-      !Array.isArray(projected)
-    ) {
-      return { ...projected, ...said };
-    }
-    return { result: projected, ...said };
-  };
 }

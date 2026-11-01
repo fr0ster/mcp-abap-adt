@@ -38,7 +38,6 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
 import {
-  besideStoredDefinition,
   readStoredDefinition,
   type StoredDefinitionAnswer,
 } from '../../../lib/strategies/tableTypeStored';
@@ -212,7 +211,9 @@ export async function handleCreateTableType(
   let stored: StoredDefinitionAnswer | undefined;
 
   return answer(
-    { tool: 'CreateTableType', detail },
+    // The definition SAP stored rides along a success and a failure after
+    // the wait alike; a chain that ended before the wait has none.
+    { tool: 'CreateTableType', detail, beside: () => stored },
     async () => {
       const obj = createAdtClient(connection, logger).getTableType(
         resultsFor(tableTypeDocuments),
@@ -327,6 +328,6 @@ export async function handleCreateTableType(
         ),
       );
     },
-    besideStoredDefinition(project(detail, terseWrite), () => stored),
+    project(detail, terseWrite),
   );
 }

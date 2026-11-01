@@ -355,3 +355,51 @@ describe('the failure payload carries everything it has', () => {
     expect(payload.origin).toBeUndefined();
   });
 });
+
+describe('the facts a handler states beside its answer (AnswerContext.beside)', () => {
+  const beside = () => ({ stored_definition: { key_kind: 'unique' } });
+
+  it('ride along a throw answered as client_threw', async () => {
+    const result = await answer(
+      { tool: 'CreateTableType', detail: 'terse', beside },
+      async () => {
+        throw new Error('socket hang up');
+      },
+      project,
+    );
+    expect(result.isError).toBe(true);
+    const first = result.content[0];
+    expect(JSON.parse(first ? first.text : '{}')).toMatchObject({
+      error: 'client_threw',
+      message: 'socket hang up',
+      stored_definition: { key_kind: 'unique' },
+    });
+  });
+
+  it('ride along a refusal beside the allowlisted fields', () => {
+    const result = return_answer(
+      failure({ message: 'refused', origin: 'refusal' }),
+      project,
+      { tool: 'CreateTableType', detail: 'terse', beside },
+    );
+    const first = result.content[0];
+    expect(JSON.parse(first ? first.text : '{}')).toEqual({
+      message: 'refused',
+      origin: 'refusal',
+      stored_definition: { key_kind: 'unique' },
+    });
+  });
+
+  it('add nothing when the handler has nothing to state', () => {
+    const result = return_answer(
+      failure({ message: 'refused', origin: 'refusal' }),
+      project,
+      { tool: 'CreateTableType', detail: 'terse', beside: () => undefined },
+    );
+    const first = result.content[0];
+    expect(JSON.parse(first ? first.text : '{}')).toEqual({
+      message: 'refused',
+      origin: 'refusal',
+    });
+  });
+});

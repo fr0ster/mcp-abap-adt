@@ -32,6 +32,22 @@ export interface AnswerContext {
   /** The tool's own name, so a local failure can say where it happened. */
   tool: string;
   detail: AnswerDetail;
+  /**
+   * Facts the handler states beside its answer, success or failure alike,
+   * read once the call is done (the definition SAP stored, read by the wait
+   * after a write): their fields ride along the way `cleanup` does. A
+   * `string` answer becomes `{ result, … }`. `undefined`: nothing to add.
+   */
+  beside?: () => Readonly<Record<string, unknown>> | undefined;
+}
+
+/** `payload` with the context's facts beside it (`AnswerContext.beside`). */
+function withBeside(
+  payload: Record<string, unknown>,
+  ctx: AnswerContext | undefined,
+): Record<string, unknown> {
+  const beside = ctx?.beside?.();
+  return beside === undefined ? payload : { ...payload, ...beside };
 }
 
 export interface McpResult {
@@ -81,7 +97,7 @@ function local(
   const step = stepOf(thrown);
   if (step !== undefined) payload.step = step;
 
-  return json(payload, true);
+  return json(withBeside(payload, ctx), true);
 }
 
 /**
@@ -320,7 +336,7 @@ export function answerFailure(
   if (ctx !== undefined && isSystemContextRefusal(error.message)) {
     return local('system_context_missing', ctx, error.message);
   }
-  return json(failurePayload(error, ctx?.detail), true);
+  return json(withBeside(failurePayload(error, ctx?.detail), ctx), true);
 }
 
 /**
@@ -481,14 +497,17 @@ export function return_answer<T>(
   // Shape: unchanged when there is nothing to report, which is almost
   // always. A terse write's `'SUCCESS'` is a string and has nowhere to put a
   // field, so in the rare case it becomes `{ result: 'SUCCESS', cleanup }`.
+  // The context's facts (`AnswerContext.beside`) ride along the same way.
   const cleanup = safeCleanup(
     (answer as { cleanup?: unknown } | undefined)?.cleanup,
   );
-  if (cleanup !== undefined) {
+  const beside = ctx.beside?.();
+  if (cleanup !== undefined || beside !== undefined) {
+    const added = { ...(cleanup !== undefined ? { cleanup } : {}), ...beside };
     return json(
       typeof projected === 'string'
-        ? { result: projected, cleanup }
-        : { ...(projected as Record<string, unknown>), cleanup },
+        ? { result: projected, ...added }
+        : { ...(projected as Record<string, unknown>), ...added },
     );
   }
 

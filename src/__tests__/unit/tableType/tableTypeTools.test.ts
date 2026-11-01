@@ -480,6 +480,31 @@ const STORED_HASHED_DEFINITION = {
   key_kind: 'unique',
 };
 
+/** What the activation is sent to. */
+const ACTIVATE_URL =
+  '/sap/bc/adt/activation?method=activate&preauditRequested=true';
+
+/** `inner`, with the request to `url` thrown as the real transports throw a 403. */
+function throwingAt(
+  inner: RecordingConnection,
+  url: string,
+): RecordingConnection {
+  return {
+    ...inner,
+    async makeAdtRequest<T = unknown, D = unknown>(
+      options: Parameters<RecordingConnection['makeAdtRequest']>[0],
+    ) {
+      if (options.url === url) {
+        inner.requests.push({ method: options.method, url: options.url });
+        throw Object.assign(new Error('Request failed with status code 403'), {
+          response: { ...REFUSED, headers: {} },
+        });
+      }
+      return inner.makeAdtRequest<T, D>(options);
+    },
+  };
+}
+
 /** The two details that parse SAP's answer. */
 const DETAILS: ReadonlyArray<'terse' | 'full'> = ['terse', 'full'];
 
@@ -583,6 +608,96 @@ describe('the definition SAP stored, read from the wait after the unlock', () =>
       result: 'SUCCESS',
       stored_definition: STORED_HASHED_DEFINITION,
     });
+  });
+
+  it("CreateTableType answers a refused activation after the write with SAP's refusal and the stored definition", async () => {
+    const connection = sessionRecording([
+      undefined,
+      undefined,
+      undefined,
+      { data: STRING_TABLE },
+      undefined,
+      undefined,
+      { data: STORED_HASHED },
+    ]);
+    const result = await handleCreateTableType(
+      { connection: throwingAt(connection, ACTIVATE_URL), logger: undefined },
+      { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
+    );
+    expect(result.isError).toBe(true);
+    expect(connection.requests).toHaveLength(9);
+    expect(answerOf(result)).toMatchObject({
+      status: 403,
+      raw_body: REFUSED.data,
+      step: 'activate',
+      stored_definition: STORED_HASHED_DEFINITION,
+    });
+  });
+
+  it("CreateTableType answers a refused check after the write with SAP's refusal and the stored definition", async () => {
+    const connection = sessionRecording([
+      undefined,
+      undefined,
+      undefined,
+      { data: STRING_TABLE },
+      undefined,
+      undefined,
+      { data: STORED_HASHED },
+      REFUSED,
+    ]);
+    const result = await handleCreateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
+    );
+    expect(result.isError).toBe(true);
+    expect(connection.requests).toHaveLength(8);
+    expect(answerOf(result)).toMatchObject({
+      message: 'refused',
+      status: 403,
+      step: 'check',
+      stored_definition: STORED_HASHED_DEFINITION,
+    });
+  });
+
+  it("UpdateTableType answers a refused activation after the write with SAP's refusal and the stored definition", async () => {
+    const connection = sessionRecording([
+      undefined,
+      { data: STRING_TABLE },
+      undefined,
+      undefined,
+      undefined,
+      { data: STORED_HASHED },
+    ]);
+    const result = await handleUpdateTableType(
+      { connection: throwingAt(connection, ACTIVATE_URL), logger: undefined },
+      { table_type_name: 'ZTT_X', access_type: 'hashed' },
+    );
+    expect(result.isError).toBe(true);
+    expect(connection.requests).toHaveLength(7);
+    expect(answerOf(result)).toMatchObject({
+      status: 403,
+      raw_body: REFUSED.data,
+      step: 'activate',
+      stored_definition: STORED_HASHED_DEFINITION,
+    });
+  });
+
+  it('a write refused before the wait answers no stored definition', async () => {
+    const connection = sessionRecording([
+      undefined,
+      { data: STRING_TABLE },
+      REFUSED,
+    ]);
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: 'ZTT_X', access_type: 'hashed' },
+    );
+    expect(result.isError).toBe(true);
+    expect(connection.requests).toHaveLength(4);
+    const answered = answerOf(result);
+    expect(answered.message).toBe('refused');
+    expect(answered).not.toHaveProperty('stored_definition');
+    expect(answered).not.toHaveProperty('stored_definition_not_read');
   });
 
   it("says the stored definition was not read when the wait's read is refused, with SAP's answer", async () => {

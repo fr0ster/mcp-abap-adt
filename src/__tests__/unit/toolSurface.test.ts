@@ -444,9 +444,10 @@ describe('the MCP tool surface', () => {
    * rows gained it in the snapshot; every other row was checked unchanged.
    */
   /**
-   * **The ninth deliberate move: `CreateInclude` arrived** (the server writes
-   * program includes and table types). The first of the new full-set tools
-   * of that work, on premise only; every other row was checked unchanged.
+   * **The ninth deliberate move: `CreateInclude`, `UpdateInclude` and
+   * `UpdateIncludeMetadata` arrived** (the server writes program includes
+   * and table types). The first of the new full-set tools of that work, on
+   * premise only; every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

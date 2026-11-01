@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateInclude',
   available_in: ['onprem'] as const,
   description:
-    'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written by UpdateInclude.',
+    'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -3957,6 +3957,41 @@
     ],
     "semantic": "Change an ABAP function module (BAPI or RFC function): write its new source code with its parameters."
   },
+  "UpdateInclude": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "write",
+      "fix",
+      "save",
+      "rewrite",
+      "source code",
+      "include",
+      "ABAP include",
+      "PROG/I",
+      "report include"
+    ],
+    "semantic": "Change the source code of an existing ABAP include, replacing it whole, and activate it when asked."
+  },
+  "UpdateIncludeMetadata": {
+    "keywords": [
+      "update",
+      "change",
+      "modify",
+      "edit",
+      "metadata",
+      "description",
+      "attributes",
+      "properties",
+      "include",
+      "ABAP include",
+      "PROG/I",
+      "report include"
+    ],
+    "semantic": "Change the metadata of an existing ABAP include, such as its description, by replacing its whole metadata document."
+  },
   "UpdateInterface": {
     "keywords": [
       "update",

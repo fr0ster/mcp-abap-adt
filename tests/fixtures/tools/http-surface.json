@@ -241,6 +241,8 @@
     "UpdateFunctionGroupUnitTest": "function_group_name*, test_class_source*, transport_request, detail, state_handle",
     "UpdateFunctionInclude": "function_group_name*, include_name*, source_code*, transport_request, activate, detail, state_handle",
     "UpdateFunctionModule": "function_group_name*, function_module_name*, source_code*, transport_request, activate, detail, state_handle",
+    "UpdateInclude": "include_name*, source_code*, transport_request, activate, detail, state_handle",
+    "UpdateIncludeMetadata": "include_name*, metadata*, transport_request, detail, state_handle",
     "UpdateInterface": "interface_name*, source_code*, transport_request, activate, detail, state_handle",
     "UpdateLocalDefinitions": "class_name*, definitions_code*, transport_request, activate_on_update, detail, state_handle",
     "UpdateLocalMacros": "class_name*, macros_code*, transport_request, activate_on_update, detail, state_handle",

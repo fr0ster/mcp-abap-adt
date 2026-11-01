@@ -105,8 +105,9 @@ describe("lib's read and write handler barrels", () => {
     // (92).
     // 22.0.0: the boundary of an activation's objects, whose group is typed
     // by the declared variant, for compact's `HandlerActivate` (93).
-    // the server writes program includes: `CreateInclude` (94).
-    expect(write).toHaveLength(94);
+    // the server writes program includes: `CreateInclude` (94),
+    // `UpdateInclude` and `UpdateIncludeMetadata` (96).
+    expect(write).toHaveLength(96);
   });
 
   it('share not one symbol', () => {

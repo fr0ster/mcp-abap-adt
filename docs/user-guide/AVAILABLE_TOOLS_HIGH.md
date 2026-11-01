@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 163
+- Total tools: 165
 
 ## Navigation
 
@@ -110,6 +110,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Include](#high-level-include)
     - [CreateInclude](#createinclude-high-level-include)
+    - [UpdateInclude](#updateinclude-high-level-include)
+    - [UpdateIncludeMetadata](#updateincludemetadata-high-level-include)
   - [Interface](#high-level-interface)
     - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
@@ -1379,7 +1381,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written by UpdateInclude.
+**Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written afterwards.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -1388,6 +1390,33 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `include_name` (string, required) - Include name.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
+<a id="updateinclude-high-level-include"></a>
+#### UpdateInclude (High-Level / Include)
+**Description:** Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).
+
+**Source:** `src/handlers/include/high/handleUpdateInclude.ts`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate the include after the write. Default: false.
+- `include_name` (string, required) - Include name. The include must already exist.
+- `source_code` (string, required) - Complete ABAP source of the include.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
+<a id="updateincludemetadata-high-level-include"></a>
+#### UpdateIncludeMetadata (High-Level / Include)
+**Description:** Writes the given metadata document as the whole stored metadata of the ABAP include named by include_name: locks it, writes, unlocks. Returns SAP's answer to the write.
+
+**Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
+
+**Parameters:**
+- `include_name` (string, required) - Include name. The include must already exist.
+- `metadata` (string, required) - The whole ADT metadata document of the include, as GetInclude part "metadata" returns it, with the changes made; it is sent as given and replaces the stored one.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---

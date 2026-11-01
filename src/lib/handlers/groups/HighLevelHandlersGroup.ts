@@ -269,6 +269,14 @@ import {
   handleCreateInclude,
 } from '../../../handlers/include/high/handleCreateInclude';
 import {
+  handleUpdateInclude,
+  TOOL_DEFINITION as UpdateInclude_Tool,
+} from '../../../handlers/include/high/handleUpdateInclude';
+import {
+  handleUpdateIncludeMetadata,
+  TOOL_DEFINITION as UpdateIncludeMetadata_Tool,
+} from '../../../handlers/include/high/handleUpdateIncludeMetadata';
+import {
   TOOL_DEFINITION as CheckInterface_Tool,
   handleCheckInterface,
 } from '../../../handlers/interface/high/handleCheckInterface';
@@ -1050,6 +1058,14 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: CreateInclude_Tool,
         handler: withContext(handleCreateInclude),
+      },
+      {
+        toolDefinition: UpdateInclude_Tool,
+        handler: withContext(handleUpdateInclude),
+      },
+      {
+        toolDefinition: UpdateIncludeMetadata_Tool,
+        handler: withContext(handleUpdateIncludeMetadata),
       },
       {
         toolDefinition: CreateProgram_Tool,

@@ -67,6 +67,8 @@ export { handleUpdateFunctionModule } from '../../handlers/function/high/handleU
 export { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup.js';
 export { handleDeleteFunctionModule } from '../../handlers/function_module/high/handleDeleteFunctionModule.js';
 export { handleCreateInclude } from '../../handlers/include/high/handleCreateInclude.js';
+export { handleUpdateInclude } from '../../handlers/include/high/handleUpdateInclude.js';
+export { handleUpdateIncludeMetadata } from '../../handlers/include/high/handleUpdateIncludeMetadata.js';
 export { handleCreateInterface } from '../../handlers/interface/high/handleCreateInterface.js';
 export { handleDeleteInterface } from '../../handlers/interface/high/handleDeleteInterface.js';
 export { handleUpdateInterface } from '../../handlers/interface/high/handleUpdateInterface.js';

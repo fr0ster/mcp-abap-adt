@@ -202,6 +202,8 @@ const TOOL_NEEDS_BY_NAME = {
   UpdateLocalMacros: { api: 'localMacros', operation: 'update' },
   DeleteLocalMacros: { api: 'localMacros', operation: 'delete' },
   CreateInclude: { api: 'include', operation: 'create' },
+  UpdateInclude: { api: 'include', operation: 'update' },
+  UpdateIncludeMetadata: { api: 'include', operation: 'updateMetadata' },
   CreateProgram: { api: 'program', operation: 'create' },
   UpdateProgram: { api: 'program', operation: 'update' },
   DeleteProgram: { api: 'program', operation: 'delete' },

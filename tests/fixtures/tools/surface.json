@@ -823,6 +823,18 @@
   },
   {
     "group": "high",
+    "name": "UpdateInclude",
+    "inputs": "include_name*, source_code*, transport_request, activate, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateIncludeMetadata",
+    "inputs": "include_name*, metadata*, transport_request, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
     "name": "CreateProgram",
     "inputs": "program_name*, description, package_name*, transport_request, program_type, application, master_language, detail",
     "available_in": "onprem"

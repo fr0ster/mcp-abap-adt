@@ -247,6 +247,8 @@ const JSON_ANSWERING: readonly string[] = [
   'UpdateFunctionGroupUnitTest',
   'UpdateFunctionInclude',
   'UpdateFunctionModule',
+  'UpdateInclude',
+  'UpdateIncludeMetadata',
   'UpdateInterface',
   'UpdateLocalDefinitions',
   'UpdateLocalMacros',

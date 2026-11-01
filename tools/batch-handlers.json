@@ -1208,6 +1208,12 @@
     "sends": "POST /sap/bc/adt/oo/classes: the create alone"
   },
   {
+    "tool": "CreateInclude",
+    "set": "full",
+    "handler": "src/handlers/include/high/handleCreateInclude.ts#handleCreateInclude",
+    "sends": "POST /sap/bc/adt/programs/includes: the create alone"
+  },
+  {
     "tool": "CreateProgram",
     "set": "full",
     "handler": "src/handlers/program/high/handleCreateProgram.ts#handleCreateProgram",

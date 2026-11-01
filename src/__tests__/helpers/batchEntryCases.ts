@@ -830,6 +830,14 @@ const WRITES: BatchEntryCase[] = [
     },
   },
   {
+    tool: 'CreateInclude',
+    args: {
+      include_name: 'INCL_A',
+      package_name: 'PKG_A',
+      description: 'text',
+    },
+  },
+  {
     tool: 'CreateProgram',
     args: {
       program_name: 'PROG_A',

@@ -1111,4 +1111,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-10-31*
+*Last updated: 2026-11-01*

@@ -265,6 +265,10 @@ import {
   handleGetFunctionModule,
 } from '../../../handlers/function_module/high/handleGetFunctionModule';
 import {
+  TOOL_DEFINITION as CreateInclude_Tool,
+  handleCreateInclude,
+} from '../../../handlers/include/high/handleCreateInclude';
+import {
   TOOL_DEFINITION as CheckInterface_Tool,
   handleCheckInterface,
 } from '../../../handlers/interface/high/handleCheckInterface';
@@ -1042,6 +1046,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteLocalMacros_Tool,
         handler: withContext(handleDeleteLocalMacros),
+      },
+      {
+        toolDefinition: CreateInclude_Tool,
+        handler: withContext(handleCreateInclude),
       },
       {
         toolDefinition: CreateProgram_Tool,

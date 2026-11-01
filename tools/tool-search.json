@@ -710,6 +710,19 @@
     ],
     "semantic": "Create a new function module in a function group: an FM, BAPI or RFC-enabled function with its parameters."
   },
+  "CreateInclude": {
+    "keywords": [
+      "create",
+      "new",
+      "generate",
+      "make",
+      "include",
+      "ABAP include",
+      "PROG/I",
+      "report include"
+    ],
+    "semantic": "Create a new ABAP include in a package and recorded on a transport request, empty and inactive, ready for its source to be written."
+  },
   "CreateInterface": {
     "keywords": [
       "create",

@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 264
+- Total tools: 265
 - Read-only tools: 65
-- High-level tools: 162
+- High-level tools: 163
 - Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
@@ -216,6 +216,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
+  - [Include](#high-level-include)
+    - [CreateInclude](#createinclude-high-level-include)
   - [Interface](#high-level-interface)
     - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
@@ -2427,6 +2429,24 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
+<a id="high-level-include"></a>
+### High-Level / Include
+
+<a id="createinclude-high-level-include"></a>
+#### CreateInclude (High-Level / Include)
+**Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written by UpdateInclude.
+
+**Source:** `src/handlers/include/high/handleCreateInclude.ts`
+
+**Parameters:**
+- `description` (string, optional) - Include description. If not provided, include_name is used.
+- `include_name` (string, required) - Include name.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
 <a id="high-level-interface"></a>
 ### High-Level / Interface
 
@@ -4062,4 +4082,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-31*
+*Last updated: 2026-11-01*

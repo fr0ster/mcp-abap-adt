@@ -817,6 +817,12 @@
   },
   {
     "group": "high",
+    "name": "CreateInclude",
+    "inputs": "include_name*, package_name*, description, transport_request, master_language, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
     "name": "CreateProgram",
     "inputs": "program_name*, description, package_name*, transport_request, program_type, application, master_language, detail",
     "available_in": "onprem"

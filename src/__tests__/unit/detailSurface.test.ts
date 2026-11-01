@@ -152,6 +152,7 @@ const JSON_ANSWERING: readonly string[] = [
   'CreateFunctionGroupUnitTest',
   'CreateFunctionInclude',
   'CreateFunctionModule',
+  'CreateInclude',
   'CreateInterface',
   'CreateMessageClass',
   'CreateMetadataExtension',

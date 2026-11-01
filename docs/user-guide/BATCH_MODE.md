@@ -397,7 +397,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-176 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+177 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -437,6 +437,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `CreateFunctionGroup` | when activate is false | POST /sap/bc/adt/functions/groups: the create alone (nothing activated) |
 | `CreateFunctionInclude` | every call | POST /sap/bc/adt/functions/groups/{group}/includes: the create alone |
 | `CreateFunctionModule` | every call | POST /sap/bc/adt/functions/groups/{group}/fmodules: the create alone |
+| `CreateInclude` | every call | POST /sap/bc/adt/programs/includes: the create alone |
 | `CreateInterface` | every call | POST /sap/bc/adt/oo/interfaces: the create alone |
 | `CreateMessageClass` | every call | POST /sap/bc/adt/messageclass: the create alone |
 | `CreatePackage` | when the connection is HTTP | POST /sap/bc/adt/packages; over RFC the create runs in an ABAP session of its own, outside the batch |

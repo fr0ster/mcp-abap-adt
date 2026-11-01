@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
 
 - Level: High-Level
-- Total tools: 162
+- Total tools: 163
 
 ## Navigation
 
@@ -108,6 +108,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
+  - [Include](#high-level-include)
+    - [CreateInclude](#createinclude-high-level-include)
   - [Interface](#high-level-interface)
     - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
@@ -1372,6 +1374,24 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 ---
 
+<a id="high-level-include"></a>
+### High-Level / Include
+
+<a id="createinclude-high-level-include"></a>
+#### CreateInclude (High-Level / Include)
+**Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive and empty; its source is written by UpdateInclude.
+
+**Source:** `src/handlers/include/high/handleCreateInclude.ts`
+
+**Parameters:**
+- `description` (string, optional) - Include description. If not provided, include_name is used.
+- `include_name` (string, required) - Include name.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
 <a id="high-level-interface"></a>
 ### High-Level / Interface
 
@@ -2485,4 +2505,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-10-31*
+*Last updated: 2026-11-01*

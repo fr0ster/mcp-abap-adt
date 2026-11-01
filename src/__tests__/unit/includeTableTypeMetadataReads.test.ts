@@ -4,7 +4,10 @@
  * and answers the document as SAP sent it. The real client over a connection
  * double.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import {
   METADATA_READ_TYPES,
@@ -20,20 +23,33 @@ type Sent = { method: string; url: string };
 function systemAnswering(document: string) {
   const sent: Sent[] = [];
   const connection = {
-    makeAdtRequest: jest.fn(async (request: Sent) => {
-      sent.push(request);
-      return { status: 200, statusText: 'OK', headers: {}, data: document };
-    }),
-  } as unknown as IAbapConnection;
-  return { client: createAdtClient(connection), sent };
+    connect: async () => {},
+    getBaseUrl: async () => 'http://sap.test',
+    getSessionId: () => null,
+    setSessionType: () => {},
+    makeAdtRequest: async (request: IAbapRequestOptions) => {
+      sent.push({ method: request.method, url: request.url });
+      return {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: document,
+      };
+    },
+  };
+  return {
+    client: createAdtClient(connection as unknown as IAbapConnection),
+    sent,
+  };
 }
 
 /** The document an answer carries, as SAP sent it. */
-function rawOf(response: {
-  ok: boolean;
-  getResult?: () => { value: { raw: string } };
-}): string | undefined {
-  return response.getResult?.().value.raw;
+function rawOf(
+  response: Awaited<
+    ReturnType<typeof readIncludeMetadata | typeof readTableTypeMetadata>
+  >,
+): string | undefined {
+  return response.ok ? response.getResult().value.raw : undefined;
 }
 
 describe('the shared include and table-type metadata reads', () => {

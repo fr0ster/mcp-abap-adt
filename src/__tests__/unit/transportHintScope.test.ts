@@ -214,7 +214,12 @@ describe('the other ways a handler is invoked enter the same scope', () => {
             : async (_args: unknown) => handler(),
       } as unknown as HandlerEntry;
       (exporter as unknown as { handlerGroups: unknown[] }).handlerGroups = [
-        { getName: () => 'stub', getHandlers: () => [entry] },
+        {
+          getName: () => 'stub',
+          getHandlers: () => [entry],
+          // What the exporter reads an args-only handler's context by.
+          currentContext: () => ({ connection: null }),
+        },
       ];
       const [exported] = exporter.getHandlerEntries();
       const run = exported?.handler as (...a: unknown[]) => Promise<any>;

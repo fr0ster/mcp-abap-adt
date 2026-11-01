@@ -59,6 +59,15 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
   abstract getHandlers(): HandlerEntry[];
 
   /**
+   * The context the group holds now: what an args-only handler of it
+   * (`(args) => handleX(this.context, args)`) reads when it is called — the
+   * call's own while a registration path calls it (`InGroupContext`).
+   */
+  currentContext(): HandlerContext {
+    return this.context;
+  }
+
+  /**
    * The SAP environment this group's context states (`systemType`), the
    * variant its tools are listed and called on; `undefined` when it states
    * none. Read from the context only, never from the environment.

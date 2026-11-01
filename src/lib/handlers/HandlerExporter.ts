@@ -19,7 +19,6 @@ import { SystemHandlersGroup } from './groups/SystemHandlersGroup.js';
 import { NoDedupStrategy } from './groups/strategies/index.js';
 import type {
   HandlerEntry,
-  IHandlerGroup,
   IHandlersRegistry,
   SapEnvironment,
   ToolHandler,
@@ -269,7 +268,10 @@ export class HandlerExporter {
    * failure renderer's transport hint), and with the system lookup when a
    * resolver is given.
    */
-  private wrapEntry(group: IHandlerGroup, entry: HandlerEntry): HandlerEntry {
+  private wrapEntry(
+    group: BaseHandlerGroup,
+    entry: HandlerEntry,
+  ): HandlerEntry {
     // The scope a plain registration gives a call (`inStatedScope`), on the
     // call's connection and this exporter's options.
     const inScope = <T>(
@@ -283,11 +285,7 @@ export class HandlerExporter {
       ? // Args-only handlers close over their group's context, which the
         // embedder swaps before calling — so read it at call time.
         (args: unknown) =>
-          inScope(
-            (group as Partial<{ context: HandlerContext }>).context?.connection,
-            args,
-            () => original(args),
-          )
+          inScope(group.currentContext().connection, args, () => original(args))
       : (context: HandlerContext, args: unknown) =>
           inScope(context?.connection, args, () => original(context, args));
     Object.defineProperty(wrapped, 'length', { value: original.length });

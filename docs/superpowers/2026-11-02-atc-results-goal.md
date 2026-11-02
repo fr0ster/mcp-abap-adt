@@ -22,8 +22,10 @@ Two reads:
 ## What SAP answers (Measured, on premise and cloud)
 
 - `GET /sap/bc/adt/atc/results?createdBy=…&centralResult=true|activeResult=true&ageMin=…&ageMax=…`
-  → `200`, `application/xml`, `atcresult:resultList` of `atcresult:result` entries. Without
-  `createdBy`: `400` "Parameter createdBy could not be found" (SADT_RESOURCE 017).
+  → `200`, `application/xml`, `atcresult:resultList` of `atcresult:result` entries. With none
+  of `createdBy`, `centralResult` and `activeResult`: `400` "Parameter createdBy could not be
+  found" (SADT_RESOURCE 017). With a kind but no `createdBy`: `200` and an empty list, even
+  where the user's own results exist.
 - `GET /sap/bc/adt/atc/results/{displayId}?activeResult=false&includeExemptedFindings=false`
   → `200`, `application/xml`, the same `resultList` holding one result with its `objects` and
   their `findings`.
@@ -38,9 +40,9 @@ Two reads:
 - **Read-only.** Both reads change nothing. They are offered in the read-only servers as well.
 - **Nothing the system cannot serve is offered.** A read is offered where it was measured: on
   premise and cloud now; legacy only after it is measured there.
-- **Every answer as SAP gave it, read by a strategy.** The parsing lives in adt-clients' result
-  strategies like every other read. The tool answers what the strategy read, with no
-  re-interpretation of its own.
+- **Every answer as SAP gave it, read by a strategy.** adt-clients answers each document through
+  a result-set slot, as it arrived by default. The tool reads it with the server's own strategy,
+  as `GetATCFindings` reads the worklist, and answers what that strategy read.
 - **Contract first, from the registry.** The reads are declared in `@mcp-abap-adt/interfaces-adt`,
   implemented in adt-clients and used by mcp-abap-adt. Each package is published before its
   consumer depends on it.

@@ -49,7 +49,7 @@ each step names the spec section it carries out.
       Its answers stay unchanged, proven by the existing tests.
     - Add `atcResults.ts` with `parseAtcResultList` and `parseAtcResult` over that shared
       reading.
-15. Capture one list, one result with findings on two objects, and one empty list. Scrub every
+15. Capture one list, one result over one object and one over three objects, and one empty list. Scrub every
     user name, package and host so the identity allowlist test passes. Write the parsers' unit
     tests over them first.
 16. Add the handlers `ListATCResults` and `GetATCResult` in `src/handlers/atc/high/`, with

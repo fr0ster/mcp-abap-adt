@@ -145,7 +145,7 @@ Two tools, beside `RunATC`, `GetATCRunStatus` and `GetATCFindings`.
 
 - Server unit tests read captured documents:
   - one list;
-  - one result with findings on two objects;
+  - one result over one object and one over three objects;
   - the empty list.
 
   The documents are scrubbed of every user name, package and host, and the identity check is

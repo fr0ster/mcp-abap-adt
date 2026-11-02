@@ -464,6 +464,10 @@ describe('the MCP tool surface', () => {
    * the source is read as before). `GetTableType` reads at a version: its
    * row gained `version` (optional, active by default). Every other row was
    * checked unchanged.
+   *
+   * **23.0.1: `GetMainPrograms` arrived** (on premise only): an include's main
+   * programs, one read of `…/programs/includes/{name}/mainprograms`. Every
+   * other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

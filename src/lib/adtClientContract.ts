@@ -39,6 +39,7 @@ import type {
   IAdtGroupLifecycle,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtMainProgramsReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
   IAdtObjectProperties,
@@ -362,6 +363,12 @@ export type IncludeApi<
   > &
   StatedReadable<IIncludeConfig, ReturnType<R['source']>> &
   StatedMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
+  PerformedOn<
+    V,
+    'include',
+    'mainPrograms',
+    IAdtMainProgramsReadable<IIncludeConfig, ReturnType<R['mainPrograms']>>
+  > &
   PerformedOn<
     V,
     'include',

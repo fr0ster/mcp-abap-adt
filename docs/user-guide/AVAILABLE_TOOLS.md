@@ -4,8 +4,8 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 289
-- Read-only tools: 66
+- Total tools: 290
+- Read-only tools: 67
 - High-level tools: 186
 - Debug tools: 32
 - Session tools: 2
@@ -61,6 +61,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Include](#read-only-include)
     - [GetInclude](#getinclude-read-only-include)
     - [GetIncludesList](#getincludeslist-read-only-include)
+    - [GetMainPrograms](#getmainprograms-read-only-include)
   - [Interface](#read-only-interface)
     - [GetInterface](#getinterface-read-only-interface)
   - [Message Class](#read-only-message-class)
@@ -694,6 +695,17 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_type` (string, optional, one of: `PROG/P`, `PROG/I`, `FUGR/F`, `CLAS/OC`, `FUGR`, `CLAS`) - [read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC. A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+---
+
+<a id="getmainprograms-read-only-include"></a>
+#### GetMainPrograms (Read-Only / Include)
+**Description:** [read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns main_programs, a list of { name, type, uri } — type PROG/P for a program, FUGR/F for a function group.
+
+**Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
+
+**Parameters:**
+- `include_name` (string, required) - Include name.
 
 ---
 

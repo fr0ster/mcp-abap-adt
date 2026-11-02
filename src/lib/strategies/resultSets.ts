@@ -282,6 +282,11 @@ export const READING_BY_SLOT = {
   enhancementElements: verbatim,
   enhancementOptions: verbatim,
 
+  // Arrived with adt-clients 40.1.0, on the include set: its main programs, an
+  // `adtcore:objectReferences` document read by the tool itself
+  // (`GetMainPrograms`), so the document is the answer.
+  mainPrograms: verbatim,
+
   // Arrived with adt-clients 37.0.0, on `getObjectProperties`: an
   // `opr:objectProperties` document — the object and its facets
   // (application component, package chain). `GetTransaction` reads it.

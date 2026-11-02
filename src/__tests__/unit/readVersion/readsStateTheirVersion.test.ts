@@ -82,6 +82,9 @@ const NOT_A_READ = [
   '/enhancements/elements',
   '/enhancements/options',
   '/bindings/bindingtypes',
+  // An include's main programs: the programs that include it, a listing of
+  // references with no version of the include's own.
+  '/mainprograms',
 ];
 
 /**
@@ -108,6 +111,7 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   ActivateStructure: 'activates',
   ActivateTable: 'activates',
   ActivateTableType: 'activates',
+  GetMainPrograms: "lists an include's main programs (no version to state)",
   AddTransportObject: 'works on transport requests',
   CheckBehaviorDefinition: 'runs a syntax check',
   CheckClass: 'runs a syntax check',

@@ -75,6 +75,10 @@ import {
   handleGetIncludesList,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import {
+  TOOL_DEFINITION as GetMainPrograms_Tool,
+  handleGetMainPrograms,
+} from '../../../handlers/include/readonly/handleGetMainPrograms';
+import {
   TOOL_DEFINITION as GetInterface_Tool,
   handleGetInterface,
 } from '../../../handlers/interface/high/handleGetInterface';
@@ -213,6 +217,10 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetIncludesList_Tool,
         handler: (args: any) => handleGetIncludesList(this.context, args),
+      },
+      {
+        toolDefinition: GetMainPrograms_Tool,
+        handler: (args: any) => handleGetMainPrograms(this.context, args),
       },
       {
         toolDefinition: GetEnhancements_Tool,

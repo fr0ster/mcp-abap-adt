@@ -54,8 +54,17 @@ import { handleUpdateStructure } from '../../../handlers/structure/high/handleUp
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
-import { type GroupObject, namesItsParent } from '../../../lib/adtTypeCode';
-import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
+import { ACTIVATION_CODES } from '../../../lib/adtProjections';
+import {
+  acceptedOf,
+  type GroupObject,
+  namesItsParent,
+} from '../../../lib/adtTypeCode';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import {
   type ActivationRunSource,
   awaitActivationRun,
@@ -152,6 +161,53 @@ async function forceSaveViewSource(
   if (failures.length > 0) {
     throw new Error(`${viewName}: ${failures.join('; ')}`);
   }
+}
+
+/**
+ * Starts the group activation of `objects` with the client of the system type
+ * the connection is declared for, and hands back that client's utils for the
+ * run's wait. On ABAP cloud only a code its group activation takes
+ * (`ACTIVATION_CODES.cloud`) is sent; an object of another code is refused
+ * here by name, and nothing is sent.
+ */
+function startGroupActivation(
+  connection: IAbapConnection,
+  objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
+) {
+  const options = {
+    headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
+    analyse: analyseException,
+  };
+  if (variantOf(connection) === 'onprem') {
+    const utils = createOnPremAdtClient(connection).getUtils(ourUtils);
+    return {
+      utils,
+      started: utils.activateObjectsGroup(
+        objects.filter(namesItsParent),
+        true,
+        options,
+      ),
+    };
+  }
+  const references: GroupObject<(typeof ACTIVATION_CODES.cloud)[number]>[] = [];
+  for (const obj of objects) {
+    const type = acceptedOf(obj.type, ACTIVATION_CODES.cloud);
+    if (type === undefined) {
+      throw new Error(
+        `${obj.type} ${obj.name}: ABAP cloud takes no group activation of this type`,
+      );
+    }
+    references.push({ ...obj, type });
+  }
+  const utils = createAdtClient(connection).getUtils(ourUtils);
+  return {
+    utils,
+    started: utils.activateObjectsGroup(
+      references.filter(namesItsParent),
+      true,
+      options,
+    ),
+  };
 }
 
 /** Map shared_dependencies section name to ADT object type code */
@@ -1736,15 +1792,9 @@ describe('Admin: Setup shared dependencies', () => {
             // inactive, with not one SAP message to say why. The run id, then
             // `getActivationRun` until it settles, then `getActivationResults`
             // — see `lib/strategies/activationRun.ts`.
-            const utils = createOnPremAdtClient(connection).getUtils(ourUtils);
-            const started = await utils.activateObjectsGroup(
-              toActivate.filter(namesItsParent),
-              true,
-              {
-                headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
-                analyse: analyseException,
-              },
-            );
+            const group = startGroupActivation(connection, toActivate);
+            const utils = group.utils;
+            const started = await group.started;
             if (!started.ok) {
               throw new Error(started.getError().message);
             }
@@ -1844,16 +1894,9 @@ describe('Admin: Setup shared dependencies', () => {
                 // The same three requests as the bulk path above: a chunk is
                 // still an activation run, and its POST still answers only the
                 // id.
-                const utils =
-                  createOnPremAdtClient(connection).getUtils(ourUtils);
-                const resp = await utils.activateObjectsGroup(
-                  chunk.filter(namesItsParent),
-                  true,
-                  {
-                    headers: DEFAULT_ADT_HEADERS['utils.activateObjectsGroup'],
-                    analyse: analyseException,
-                  },
-                );
+                const group = startGroupActivation(connection, chunk);
+                const utils = group.utils;
+                const resp = await group.started;
                 if (!resp.ok) {
                   throw new Error(resp.getError().message);
                 }

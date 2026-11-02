@@ -718,10 +718,14 @@ export async function walkPackage(
     await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
   );
 
-  const found: WalkedItem[] = root.objects.map((o) => ({
-    ...o,
-    packageName: pkg,
-  }));
+  // A description only when asked for: SAP sends some without it.
+  const owned = (o: WalkedItem): WalkedItem => {
+    const { description, ...rest } = o;
+    return withShortDescriptions && description !== undefined
+      ? { ...rest, description, packageName: pkg }
+      : { ...rest, packageName: pkg };
+  };
+  const found: WalkedItem[] = root.objects.map(owned);
   for (const child of root.childNodes) {
     const level = levelOf(
       await utils.fetchNodeStructure('DEVC/K', pkg, {
@@ -729,7 +733,7 @@ export async function walkPackage(
         withShortDescriptions,
       }),
     );
-    found.push(...level.objects.map((o) => ({ ...o, packageName: pkg })));
+    found.push(...level.objects.map(owned));
   }
 
   if (!options.includeSubpackages) return found;

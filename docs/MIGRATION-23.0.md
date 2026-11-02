@@ -37,6 +37,12 @@ The server now names one on every read:
 - `CreateTableType` / `UpdateTableType` name the version of the definition they answer
   (`stored_version`, below).
 
+## Readers of a walk's descriptions: pass `include_descriptions`
+
+`GetObjectInfo`, `GetPackageContents`, `GetPackageTree` and compact `HandlerGet` `PACKAGE` (part `contents`) answer an object's description only with `include_descriptions: true`. In 22.0.x a system without the communication batch answered the description SAP sends unasked in a node structure, and a system with it answered none — the same call, different answers. Now neither path answers one unasked.
+
+**What to do:** pass `include_descriptions: true` where you need the descriptions. `GetObjectInfo`'s `enrich` still adds each node's description and package from a repository search.
+
 ## Callers of `CreateProgram`: an include is created by `CreateInclude`
 
 `CreateProgram`'s `program_type` no longer offers `include`; the schema refuses it before the

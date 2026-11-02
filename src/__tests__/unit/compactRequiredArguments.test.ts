@@ -97,6 +97,16 @@ const NEEDS: readonly Need[] = [
   },
   {
     tool: 'HandlerValidate',
+    objectType: 'PROGRAM',
+    needed: { package_name: 'ZPKG_A' },
+    rest: { object_name: 'ZPROG_A' },
+    token: 'PROGRAM(object_name*, package_name*)',
+    refusal: (missing) =>
+      `Program validation requires package_name; missing: ${missing}`,
+    variants: ['onprem'],
+  },
+  {
+    tool: 'HandlerValidate',
     objectType: 'INCLUDE',
     needed: { package_name: 'ZPKG_A' },
     rest: { object_name: 'ZINCL_A' },

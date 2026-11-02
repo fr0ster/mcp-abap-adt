@@ -108,7 +108,8 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Optional package name for validation',
+        description:
+          'Package of the object. Required for program, include, behavior_implementation and metadata_extension (and for behavior_definition with its other fields); elsewhere optional, used for a name in a namespace (/NS/…).',
       },
       description: {
         type: 'string',
@@ -230,12 +231,16 @@ export async function validateObject(
       );
     }
   }
-  // The include's validation names its package (adt-clients upper-cases
-  // `packageName`): a call without it is refused before anything is sent.
-  if (normalizedType === 'include' && !package_name) {
+  // A program's or an include's validation names its package: SAP's program
+  // validation, which serves includes too, refuses an empty one (SEDI_ADT
+  // 003). A call without it is refused before anything is sent.
+  if (
+    (normalizedType === 'program' || normalizedType === 'include') &&
+    !package_name
+  ) {
     return return_error(
       new Error(
-        'Include validation requires package_name; missing: package_name',
+        `${normalizedType === 'program' ? 'Program' : 'Include'} validation requires package_name; missing: package_name`,
       ),
     );
   }

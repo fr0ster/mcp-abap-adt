@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [23.0.2] - 2026-11-02
+
+A patch. The eighteen packages are at 23.0.2, every sibling range at `^23.0.2`; `@mcp-abap-adt/adt-clients` `^42.0.0`.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` `^42.0.0`**: a create takes its package in the type, and an absent package no longer reaches SAP as the text `undefined` (read in SAP's handlers on premise, 2026-11-02: SAP creates nothing without a package; program and include name validation refuses an empty one). The server already passed a package to every create; no request it sends with a package changes.
+- **`ValidateObjectLow` and compact `HandlerValidate` `PROGRAM` require `package_name`**, refused before anything is sent (`Program validation requires package_name`), as an include already did: SAP's program validation refuses an empty package (SEDI_ADT 003). `HandlerValidate`'s description names it, `PROGRAM(object_name*, package_name*)`; `ValidateObjectLow`'s `package_name` description says where it is required and that elsewhere it serves a name in a namespace.
+
 ## [23.0.1] - 2026-11-02
 
 A patch: an include's main programs, on premise. The eighteen packages are at 23.0.1, every sibling range at `^23.0.1`; `@mcp-abap-adt/adt-clients` `^41.0.0` (its handlers typed by the values their slots answer, no casts — no request or answer of the server changes), `@mcp-abap-adt/adt-strategies` `^0.18.1`, `@mcp-abap-adt/interfaces-adt` `^25.0.2`.

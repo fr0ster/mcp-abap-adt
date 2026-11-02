@@ -78,6 +78,12 @@ describe('the walk is composed of single-answer steps', () => {
     });
     expect(objects.some((o) => (o.description ?? '').length > 0)).toBe(true);
   });
+
+  it('answers no description when none is asked for, though the levels carry some', async () => {
+    const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG');
+    expect(objects.length).toBeGreaterThan(0);
+    expect(objects.some((o) => 'description' in o)).toBe(false);
+  });
 });
 
 describe('one walk, two assemblies', () => {

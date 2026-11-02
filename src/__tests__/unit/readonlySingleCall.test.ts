@@ -717,25 +717,34 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
     // `unit/batch/packageWalks.test.ts`.)
     const notServed = createBatchAvailability();
     notServed.noteOuterStatus(404);
-    const result: any = await handleGetObjectInfo(
-      { ...context, batchAvailability: notServed } as any,
-      {
-        parent_type: 'DEVC/K',
-        parent_name: 'ZMCP_SHR_PKG',
-        enrich: false, // isolate the tree walk from SearchObject enrichment
-      },
-    );
+    const read = async (describe: boolean) => {
+      const result: any = await handleGetObjectInfo(
+        { ...context, batchAvailability: notServed } as any,
+        {
+          parent_type: 'DEVC/K',
+          parent_name: 'ZMCP_SHR_PKG',
+          enrich: false, // isolate the tree walk from SearchObject enrichment
+          ...(describe ? { include_descriptions: true } : {}),
+        },
+      );
+      expect(result.isError).toBe(false);
+      const tree = JSON.parse(result.content[0].text);
+      expect(tree.OBJECT_TYPE).toBe('DEVC/K');
+      expect(tree.OBJECT_NAME).toBe('ZMCP_SHR_PKG');
+      const bdef = tree.CHILDREN.find(
+        (c: any) => c.OBJECT_NAME === 'ZMCP_SHR_I_ROOT',
+      );
+      expect(bdef).toBeDefined();
+      expect(bdef.OBJECT_TYPE).toBe('BDEF/BDO');
+      return bdef;
+    };
 
-    expect(result.isError).toBe(false);
-    const tree = JSON.parse(result.content[0].text);
-    expect(tree.OBJECT_TYPE).toBe('DEVC/K');
-    expect(tree.OBJECT_NAME).toBe('ZMCP_SHR_PKG');
-    const bdef = tree.CHILDREN.find(
-      (c: any) => c.OBJECT_NAME === 'ZMCP_SHR_I_ROOT',
-    );
-    expect(bdef).toBeDefined();
-    expect(bdef.OBJECT_TYPE).toBe('BDEF/BDO');
-    expect(bdef.OBJECT_DESCRIPTION).toContain('Shared BDEF');
+    // Asked for: the node structure's description.
+    expect((await read(true)).OBJECT_DESCRIPTION).toContain('Shared BDEF');
+    // Not asked for: none, though the captured document carries one — the
+    // batched path answers none either.
+    expect(bdefBody).toContain('Shared BDEF');
+    expect('OBJECT_DESCRIPTION' in (await read(false))).toBe(false);
   });
 });
 

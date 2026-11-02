@@ -356,7 +356,10 @@ async function buildTree(
       children.push({
         OBJECT_TYPE: o.type,
         OBJECT_NAME: o.name,
-        ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+        // A description only when asked for: SAP sends some without it.
+        ...(describe && o.description
+          ? { OBJECT_DESCRIPTION: o.description }
+          : {}),
       });
     }
 
@@ -405,7 +408,9 @@ async function buildTree(
           children.push({
             OBJECT_TYPE: o.type,
             OBJECT_NAME: o.name,
-            ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+            ...(describe && o.description
+              ? { OBJECT_DESCRIPTION: o.description }
+              : {}),
           });
         }
       }

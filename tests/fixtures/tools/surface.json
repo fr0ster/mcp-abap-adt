@@ -25,6 +25,12 @@
   },
   {
     "group": "readonly",
+    "name": "GetMainPrograms",
+    "inputs": "include_name*",
+    "available_in": "onprem"
+  },
+  {
+    "group": "readonly",
     "name": "GetEnhancements",
     "inputs": "object_name*, object_type*",
     "available_in": "cloud, onprem"

@@ -1401,6 +1401,18 @@ create_include:
           * Include for the include high-level integration test
           DATA gv_incl_test TYPE string VALUE 'include-roundtrip'.
 
+# An include's main programs, on premise: a delivered include, read only
+# (GetMainPrograms and compact HandlerGet part main_programs). LSVIMTOP is an
+# include of function group SVIM.
+include_main_programs:
+  test_cases:
+    - name: "delivered_include"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Read the main programs of a delivered include"
+      params:
+        include_name: "LSVIMTOP"
+
 # Program include read on ABAP cloud: a delivered include, read only (both
 # parts). Empty include_name: the case is skipped, naming the reason.
 include_cloud_read:

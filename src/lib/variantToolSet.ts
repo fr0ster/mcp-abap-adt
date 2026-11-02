@@ -63,6 +63,7 @@ export function variantServes(variant: ServerVariant, need: AdtNeed): boolean {
  */
 const TOOL_NEEDS_BY_NAME = {
   GetInclude: { api: 'include', operation: 'read' },
+  GetMainPrograms: { api: 'include', operation: 'mainPrograms' },
   GetEnhancementSpot: { api: 'enhancement', operation: 'readMetadata' },
   GetEnhancementImpl: { api: 'enhancement', operation: 'read' },
   GetTransport: { api: 'request', operation: 'readMetadata' },

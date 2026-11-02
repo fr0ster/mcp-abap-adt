@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [23.0.1] - 2026-11-02
+
+A patch: an include's main programs, on premise. The eighteen packages are at 23.0.1, every sibling range at `^23.0.1`; `@mcp-abap-adt/adt-clients` `^41.0.0` (its handlers typed by the values their slots answer, no casts — no request or answer of the server changes), `@mcp-abap-adt/adt-strategies` `^0.18.1`, `@mcp-abap-adt/interfaces-adt` `^25.0.2`.
+
+### Added
+
+- **`GetMainPrograms`** (full set, on premise): reads the main programs of the include named by `include_name` in one request (`GET …/programs/includes/{name}/mainprograms`) and answers `main_programs`, a list of `{ name, type, uri }` — a program (`PROG/P`), or for an include of a function group the group (`FUGR/F`: `LSVIMTOP` answered `SVIM`); an include no program includes directly answers an empty list (measured on premise, 2026-11-02). The ABAP cloud table lists no `mainPrograms`, so the tool is not offered there.
+- **Compact `HandlerGet` INCLUDE `part: 'main_programs'`**, the same read, on premise. `HandlerGet`'s `part` now lists `main_programs` only on premise; on ABAP cloud its schema and the parts a refusal names leave it out. `compactGetSchemaFor` (`@mcp-abap-adt/lib/compact-shared`) takes, as an optional second argument, the members whose `main_programs` part is served (`COMPACT_MAIN_PROGRAMS`, new).
+
 ## [23.0.0] - 2026-11-02
 
 A major ([#336](https://github.com/fr0ster/mcp-abap-adt/pull/336)): the server writes program includes (on premise) and table types (on premise and on ABAP cloud) — twelve full-set tools (five for the include, seven for the table type), the compact members `INCLUDE` and `TABLE_TYPE` — and the include leaves `CreateProgram`. Beside it, an embedder that registers the `./handlers` groups on an `McpServer` of its own gets the variant its groups state, for the listing and for every call, and `HandlerExporter` registers its tools on such a server with a connection per call. Every breaking item has its **Migrating:** note, and [the 23.0 migration note](docs/MIGRATION-23.0.md) collects them. The eighteen packages are all at 23.0.0, every sibling range at `^23.0.0`; the ADT dependencies move to `@mcp-abap-adt/interfaces-adt` `^25.0.0`, `@mcp-abap-adt/adt-clients` `^40.0.1` and `@mcp-abap-adt/adt-strategies` `^0.18.0`, and every read the server sends states which version it reads.

@@ -34,6 +34,7 @@ import {
   handleGetLocalMacros,
   handleGetLocalTestClass,
   handleGetLocalTypes,
+  handleGetMainPrograms,
   handleGetMetadataExtension,
   handleGetPackage,
   handleGetProgram,
@@ -83,6 +84,16 @@ export const readTableType: CompactHandler = async (context, args) => {
  * arguments arrive from outside the type system: the name is passed on only
  * as a string, and a version only as one of the three the read takes.
  */
+/**
+ * An include's main programs (`part: 'main_programs'`). The name arrives from
+ * outside the type system and is passed on only as a string.
+ */
+export const readMainPrograms: CompactHandler = async (context, args) =>
+  handleGetMainPrograms(context, {
+    include_name:
+      typeof args.include_name === 'string' ? args.include_name : undefined,
+  });
+
 export const readIncludePart =
   (part: 'source' | 'metadata'): CompactHandler =>
   async (context, args) => {

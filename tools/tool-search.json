@@ -2123,6 +2123,19 @@
     ],
     "semantic": "List all includes that a program, include, function group or class is made of."
   },
+  "GetMainPrograms": {
+    "keywords": [
+      "main program",
+      "main programs",
+      "include",
+      "where is this include used",
+      "programs that include",
+      "include usage",
+      "PROG/I",
+      "context program"
+    ],
+    "semantic": "Find the programs, or the function group, that include an ABAP include: its main programs."
+  },
   "GetInterface": {
     "keywords": [
       "read",

@@ -2,6 +2,7 @@ import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   acceptedOf,
   byVariant,
+  COMPACT_MAIN_PROGRAMS,
   COMPACT_READ,
   compactGetDescription,
   compactGetSchemaFor,
@@ -29,7 +30,10 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: compactGetDescription(variant),
-    inputSchema: compactGetSchemaFor(COMPACT_READ[variant]),
+    inputSchema: compactGetSchemaFor(
+      COMPACT_READ[variant],
+      COMPACT_MAIN_PROGRAMS[variant],
+    ),
     members: COMPACT_READ[variant],
   })),
 } as const;
@@ -184,12 +188,13 @@ export async function handleHandlerGet(
   }
 
   if (part === 'source') {
-    if (!hasSource && partsFor(args.object_type, false).length > 0) {
+    const variant = variantOf(context.connection);
+    if (!hasSource && partsFor(args.object_type, false, variant).length > 0) {
       // A type with a metadata document and no source: what it has, named.
       return return_error(
         new Error(
           `part=source is not available for object_type=${args.object_type}. ` +
-            `It offers: ${partsFor(args.object_type, false).join(', ')}.`,
+            `It offers: ${partsFor(args.object_type, false, variant).join(', ')}.`,
         ),
       );
     }

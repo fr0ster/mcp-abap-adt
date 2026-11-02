@@ -2,11 +2,10 @@
  * The internally batched reads timed against their sequential path (spec §11,
  * plan Task 31), on the configured system.
  *
- * Where it runs: the on-premise SAP system the test config names
- * (tests/test-config.yaml, or the file `MCP_TEST_CONFIG` names — one per
+ * Where it runs: the SAP system the test config names, on premise or ABAP
+ * Cloud (tests/test-config.yaml, or the file `MCP_TEST_CONFIG` names — one per
  * transport: `connection_type: http` or `rfc`); without a configuration,
- * connection or session every case skips, saying why. ABAP Cloud is not in
- * this run. It only reads: the config's `environment.default_package` ("the
+ * connection or session every case skips, saying why. It only reads: the config's `environment.default_package` ("the
  * package") and, when the config names one, `shared_dependencies.super_package`
  * ("a larger package"), through the real handlers and the real
  * `AdtBatchConnection`.
@@ -26,8 +25,7 @@
  *
  * Tools of Tasks 23 and 24: GetPackageContents, GetPackageTree,
  * GetObjectsList, GetObjectInfo, compact HandlerGet part `contents`,
- * SearchSource. Tasks 25–27 are not built yet: pending below, measured when
- * they are.
+ * SearchSource.
  *
  * Run (HTTP): npm test -- --testPathPatterns='batchedReadsTiming' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
@@ -317,7 +315,4 @@ describe('batched reads timed against the sequential path on the system the test
       );
     }
   }
-
-  it.todo('Tasks 25–27: their tools, timed once they are built');
-  it.todo('ABAP Cloud: not in this run');
 });

@@ -14,11 +14,12 @@
  * Which is why these are two separate maps: what is absent from them is the answer.
  */
 import {
+  COMPACT_MAIN_PROGRAMS,
   type CompactHandler,
   type CompactObjectType,
   dispatchCompact,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetBehaviorDefinition,
   handleGetBehaviorImplementation,
@@ -43,6 +44,7 @@ import { return_error } from '@mcp-abap-adt/lib/utils';
 import {
   compactReadRouterMap,
   readIncludePart,
+  readMainPrograms,
   readTableType,
 } from './compactReadRoutes';
 
@@ -178,7 +180,30 @@ async function packageContentsLines(
   }
 }
 
-export type CompactReadPart = 'source' | 'metadata' | 'urls' | 'contents';
+/** A system type of `COMPACT_MAIN_PROGRAMS`. */
+type MainProgramsVariant = keyof typeof COMPACT_MAIN_PROGRAMS;
+
+/**
+ * `part: 'main_programs'` — an include's main programs (`GetMainPrograms`), on
+ * the system types whose `COMPACT_MAIN_PROGRAMS` lists the member: the same
+ * table the schema offers the part from.
+ */
+export function compactMainProgramsRoutes(
+  variant: MainProgramsVariant,
+): Partial<Record<CompactObjectType, CompactHandler>> {
+  const routes: Partial<Record<CompactObjectType, CompactHandler>> = {};
+  for (const member of COMPACT_MAIN_PROGRAMS[variant]) {
+    routes[member] = readMainPrograms;
+  }
+  return routes;
+}
+
+export type CompactReadPart =
+  | 'source'
+  | 'metadata'
+  | 'urls'
+  | 'contents'
+  | 'main_programs';
 
 /**
  * The types with a metadata document and no source: their `Get<Type>` reads
@@ -204,12 +229,16 @@ export function hasSourcePart(objectType: CompactObjectType): boolean {
 export function partsFor(
   objectType: CompactObjectType,
   hasSource: boolean,
+  variant: MainProgramsVariant,
 ): CompactReadPart[] {
   const parts: CompactReadPart[] = [];
   if (hasSource) parts.push('source');
   if (compactMetadataRoutes[objectType]) parts.push('metadata');
   if (compactUrlRoutes[objectType]) parts.push('urls');
   if (compactContentsRoutes[objectType]) parts.push('contents');
+  if (compactMainProgramsRoutes(variant)[objectType]) {
+    parts.push('main_programs');
+  }
   return parts;
 }
 
@@ -220,17 +249,20 @@ export async function routeCompactPart(
   args: { object_type: CompactObjectType } & Record<string, unknown>,
   hasSource: boolean,
 ): Promise<unknown> {
+  const variant = variantOf(context.connection);
   const routes =
     part === 'metadata'
       ? compactMetadataRoutes
       : part === 'contents'
         ? compactContentsRoutes
-        : compactUrlRoutes;
+        : part === 'main_programs'
+          ? compactMainProgramsRoutes(variant)
+          : compactUrlRoutes;
   if (routes[args.object_type] === undefined) {
     // Answered as a refusal rather than thrown, the way the router answers an
     // unsupported operation: both paths through this surface should have the same
     // shape, and a caller reads the message either way.
-    const offered = partsFor(args.object_type, hasSource);
+    const offered = partsFor(args.object_type, hasSource, variant);
     return return_error(
       new Error(
         `part=${part} is not available for object_type=${args.object_type}. ` +

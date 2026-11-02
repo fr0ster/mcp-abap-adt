@@ -44,6 +44,7 @@ export { handleGetDomain } from '../../handlers/domain/high/handleGetDomain.js';
 export { handleGetFunctionGroup } from '../../handlers/function_group/high/handleGetFunctionGroup.js';
 export { handleGetFunctionModule } from '../../handlers/function_module/high/handleGetFunctionModule.js';
 export { handleGetIncludePart } from '../../handlers/include/readonly/handleGetInclude.js';
+export { handleGetMainPrograms } from '../../handlers/include/readonly/handleGetMainPrograms.js';
 export { handleGetInterface } from '../../handlers/interface/high/handleGetInterface.js';
 export { handleGetMetadataExtension } from '../../handlers/metadata_extension/high/handleGetMetadataExtension.js';
 export { handleGetPackage } from '../../handlers/package/high/handleGetPackage.js';

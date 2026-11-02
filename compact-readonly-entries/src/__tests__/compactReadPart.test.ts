@@ -52,14 +52,25 @@ describe('the parts a compact read can answer', () => {
   });
 
   it('lists what a type offers, so a refusal is actionable', () => {
-    expect(partsFor('SERVICE_BINDING' as never, true)).toEqual([
+    expect(partsFor('SERVICE_BINDING' as never, true, 'onprem')).toEqual([
       'source',
       'metadata',
       'urls',
     ]);
-    expect(partsFor('CLASS' as never, true)).toEqual(['source', 'metadata']);
-    expect(partsFor('INCLUDE', true)).toEqual(['source', 'metadata']);
-    expect(partsFor('TRANSPORT' as never, true)).toEqual(['source']);
+    expect(partsFor('CLASS' as never, true, 'onprem')).toEqual([
+      'source',
+      'metadata',
+    ]);
+    expect(partsFor('TRANSPORT' as never, true, 'onprem')).toEqual(['source']);
+  });
+
+  it("offers an include's main programs on premise only", () => {
+    expect(partsFor('INCLUDE', true, 'onprem')).toEqual([
+      'source',
+      'metadata',
+      'main_programs',
+    ]);
+    expect(partsFor('INCLUDE', true, 'cloud')).toEqual(['source', 'metadata']);
   });
 
   it('refuses a part the type does not have, naming the ones it does', async () => {

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "23.0.0",
+  "version": "23.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -224,12 +224,12 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^40.0.1",
-    "@mcp-abap-adt/adt-strategies": "^0.18.0",
+    "@mcp-abap-adt/adt-clients": "^41.0.0",
+    "@mcp-abap-adt/adt-strategies": "^0.18.1",
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
     "@mcp-abap-adt/connection": "^19.1.0",
-    "@mcp-abap-adt/interfaces-adt": "^25.0.0",
+    "@mcp-abap-adt/interfaces-adt": "^25.0.2",
     "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^3.4.0",

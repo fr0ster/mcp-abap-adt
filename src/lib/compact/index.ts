@@ -42,6 +42,7 @@ export {
   dispatchCompact,
 } from './compactRoutes.js';
 export {
+  COMPACT_MAIN_PROGRAMS,
   compactActivateSchema,
   compactActivateSchemaFor,
   compactCdsUnitTestResultSchema,

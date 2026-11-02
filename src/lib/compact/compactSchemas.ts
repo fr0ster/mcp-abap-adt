@@ -485,6 +485,27 @@ const GET_PROPERTIES = {
 type ReadMember = (typeof COMPACT_READ.onprem)[number];
 
 /**
+ * The read members whose `part: 'main_programs'` is served, per system type:
+ * an include's main programs are read on premise only (the ABAP cloud table
+ * lists no `mainPrograms`).
+ */
+export const COMPACT_MAIN_PROGRAMS = {
+  onprem: ['INCLUDE'],
+  cloud: [],
+} as const satisfies Record<ProjectionVariant, readonly ReadMember[]>;
+
+/** `HandlerGet`'s `part`, with `main_programs` where a member serves it. */
+function readPartFor(mainPrograms: readonly ReadMember[]) {
+  return mainPrograms.length === 0
+    ? readPartSchema
+    : {
+        ...readPartSchema,
+        enum: [...readPartSchema.enum, 'main_programs'],
+        description: `${readPartSchema.description} main_programs (${mainPrograms.join(', ')}): the include's main programs.`,
+      };
+}
+
+/**
  * What `HandlerGet` takes: the part, and the repository-address and
  * activation-run parts' arguments, on every call; per type the name its read
  * takes, and `version` where its `Get<Type>` reads one.
@@ -545,6 +566,7 @@ export const COMPACT_READ_TAKES = takesOf<
 
 export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
   members: M,
+  mainPrograms: readonly ReadMember[] = [],
 ) {
   const properties = {
     timeout: GET_TIMEOUT,
@@ -557,13 +579,16 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
       ...offered(properties, COMPACT_READ_TAKES, members),
       timeout: properties.timeout,
       object_type: properties.object_type,
-      part: properties.part,
+      part: readPartFor(mainPrograms),
     },
     required: [],
   } as const;
 }
 
-export const compactGetSchema = compactGetSchemaFor(COMPACT_READ.onprem);
+export const compactGetSchema = compactGetSchemaFor(
+  COMPACT_READ.onprem,
+  COMPACT_MAIN_PROGRAMS.onprem,
+);
 
 const UPDATE_PROPERTIES = {
   lock_handle: {

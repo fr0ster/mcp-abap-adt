@@ -65,6 +65,8 @@ Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available every
 - Programs on ABAP Cloud: read, source, versions, check and the unit run are served (SAP programs; `ADT_TYPES_CLOUD`); create, update, delete, activate, lock and validate are on premise only
 - Runtime profiling (class-based) and dumps work on both cloud and onprem
 - `RuntimeRunProgram*` tools are on premise only (a program cannot be run on cloud)
+- Program includes (`PROG/I`) on ABAP Cloud: read, source, metadata, deletion check and where-used are served; create, update, delete, activate, lock and validate are on premise only. Table types (`TTYP/DA`) are served whole on both; their version list is served, their version source is not (SAP answers `403` on both).
+- An include's main programs (`GetMainPrograms`, compact `HandlerGet` part `main_programs`) are read on premise only: the ABAP cloud table lists no `mainPrograms`.
 
 ## npm Package Verification
 

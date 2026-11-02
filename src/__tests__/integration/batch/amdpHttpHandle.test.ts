@@ -47,9 +47,14 @@ import * as dotenv from 'dotenv';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
+import {
+  amdpGateVerdict,
+  databaseSource,
+  type FixtureRead,
+} from '../helpers/amdpFixture';
 import {
   getEnabledTestCase,
+  getStatedDatabaseSystem,
   getTimeout,
   loadTestConfig,
   testAuthBrokerPath,
@@ -283,7 +288,9 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
       const { connection } = await createTestConnectionAndSession();
       const plainCtx = createHandlerContext({ connection, logger: testLogger });
       const verdict = amdpGateVerdict({
-        systemInformation: await readSystemInformation(connection),
+        database: await databaseSource(getStatedDatabaseSystem(), () =>
+          readSystemInformation(connection),
+        ),
         className: cls,
         classRead: await sourceRead(handleGetClass, plainCtx, {
           class_name: cls,

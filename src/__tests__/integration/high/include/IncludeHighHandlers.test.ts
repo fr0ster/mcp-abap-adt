@@ -12,7 +12,8 @@
  *
  * Lifecycle, one run, every object of its own:
  *   CreatePackage ($ZMCP_I<run>, local, no transport)
- *   -> CreateInclude -> GetInclude source (SAP's comment header, no code) and metadata
+ *   -> CreateInclude -> GetInclude source (SAP's comment header, no code) and
+ *      metadata, both at `workingArea`: the include has no active version yet
  *   -> UpdateInclude activate:true -> source reads back equal, GetInactiveObjects
  *      lists nothing of it
  *   -> UpdateIncludeMetadata (description changed) -> metadata reads back changed
@@ -283,7 +284,10 @@ describe('Include High-Level Handlers Integration', () => {
         // (measured on premise, 2026-11-01: three `*&` comment lines, the
         // name in lower case).
         const emptySource = await must(`GetInclude ${INCLUDE} source`, () =>
-          handleGetInclude(context, { include_name: INCLUDE }),
+          handleGetInclude(context, {
+            include_name: INCLUDE,
+            version: 'workingArea',
+          }),
         );
         const headerLines = normalisedSource(emptySource.text)
           .split('\n')
@@ -296,6 +300,7 @@ describe('Include High-Level Handlers Integration', () => {
           handleGetInclude(context, {
             include_name: INCLUDE,
             part: 'metadata',
+            version: 'workingArea',
           }),
         );
         const document = field(parsed(firstMetadata.text), 'metadata');
@@ -344,6 +349,7 @@ describe('Include High-Level Handlers Integration', () => {
             handleGetInclude(context, {
               include_name: INCLUDE,
               part: 'metadata',
+              version: 'workingArea',
             }),
         );
         const changedDocument = field(parsed(changed.text), 'metadata');
@@ -401,6 +407,7 @@ describe('Include High-Level Handlers Integration', () => {
               object_type: 'INCLUDE',
               include_name: INCLUDE,
               part: 'metadata',
+              version: 'workingArea',
             }),
         );
         const compactDocument = field(parsed(compactRead.text), 'metadata');
@@ -451,6 +458,7 @@ describe('Include High-Level Handlers Integration', () => {
               object_type: 'INCLUDE',
               include_name: INCLUDE,
               part: 'metadata',
+              version: 'workingArea',
             }),
         );
         const compactChanged = field(parsed(compactMetadata.text), 'metadata');

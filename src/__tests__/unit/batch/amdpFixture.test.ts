@@ -1,13 +1,15 @@
 /**
  * When the AMDP gate of the debugger batch test runs, skips or fails
- * (`integration/helpers/amdpFixture.ts`): it skips only where SAP's system
- * information names a database system other than HANA, and fails on any
- * other reason it cannot run — so an enabled gate never passes having
- * tested nothing.
+ * (`integration/helpers/amdpFixture.ts`): it skips only where the database
+ * system — stated by the test config, else named by SAP's system
+ * information — is not HANA, and fails on any other reason it cannot run —
+ * so an enabled gate never passes having tested nothing.
  */
 import {
   amdpGateVerdict,
   breakpointLineOf,
+  type DatabaseSource,
+  databaseSource,
   databaseSystemOf,
   type FixtureRead,
 } from '../../integration/helpers/amdpFixture';
@@ -30,12 +32,12 @@ const CLASS_SOURCE = [
 const ok = (text: string): FixtureRead => ({ status: 200, text });
 
 function verdict(over: {
-  systemInformation?: FixtureRead;
+  database?: DatabaseSource;
   classRead?: FixtureRead;
   ddlRead?: FixtureRead;
 }) {
   return amdpGateVerdict({
-    systemInformation: over.systemInformation ?? ok(feed('HDB')),
+    database: over.database ?? { systemInformation: ok(feed('HDB')) },
     className: 'ZCLS',
     classRead: over.classRead ?? ok(CLASS_SOURCE),
     ddlName: 'ZTF',
@@ -56,7 +58,9 @@ describe('the AMDP gate: run, skip or fail', () => {
   });
 
   it('skips only when SAP names another database system, and names it', () => {
-    const answered = verdict({ systemInformation: ok(feed('ORA')) });
+    const answered = verdict({
+      database: { systemInformation: ok(feed('ORA')) },
+    });
     expect(answered).toEqual({
       run: false,
       skip: expect.stringContaining('the database system ORA'),
@@ -64,13 +68,46 @@ describe('the AMDP gate: run, skip or fail', () => {
   });
 
   it('fails when the system information cannot be read or names no database', () => {
-    expect(verdict({ systemInformation: { status: 403, text: 'no' } })).toEqual(
-      { run: false, fail: expect.stringContaining('status 403') },
-    );
-    expect(verdict({ systemInformation: ok('<atom:feed/>') })).toEqual({
+    expect(
+      verdict({
+        database: { systemInformation: { status: 403, text: 'no' } },
+      }),
+    ).toEqual({ run: false, fail: expect.stringContaining('status 403') });
+    expect(
+      verdict({
+        database: { systemInformation: ok('<atom:feed/>') },
+      }),
+    ).toEqual({
       run: false,
       fail: expect.stringContaining('names no DBSystem'),
     });
+  });
+
+  it('takes the database system the test config states, and names where it came from', () => {
+    expect(verdict({ database: { stated: 'HDB' } })).toEqual({
+      run: true,
+      breakpointLine: 3,
+    });
+    expect(verdict({ database: { stated: 'ORA' } })).toEqual({
+      run: false,
+      skip: expect.stringContaining(
+        'the test config states the database system ORA',
+      ),
+    });
+  });
+
+  it('reads SAP only when the test config states no database system', async () => {
+    let reads = 0;
+    const read = async (): Promise<FixtureRead> => {
+      reads += 1;
+      return ok(feed('HDB'));
+    };
+    expect(await databaseSource('HDB', read)).toEqual({ stated: 'HDB' });
+    expect(reads).toBe(0);
+    expect(await databaseSource(undefined, read)).toEqual({
+      systemInformation: ok(feed('HDB')),
+    });
+    expect(reads).toBe(1);
   });
 
   it('fails, never skips, when a shared object has no active version', () => {

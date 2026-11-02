@@ -3,12 +3,14 @@
  * (`shared_dependencies`: the class `ZMCP_SHR_DBG_AMDP`, the table function
  * `ZMCP_SHR_DBG_TF`), and whether the gate can run on this system.
  *
- * Pure: it reads answers already received and sends nothing. The gate skips
- * only on a verified unsupported system — SAP's own system information names
- * a database system other than SAP HANA (`DBSystem` not `HDB`) — and names
- * it. Anything else that keeps the gate from running fails it: a system
- * information it cannot read, a shared object that is not active, a class
- * without its breakpoint marker.
+ * Pure: it reads answers already received and sends nothing. The database
+ * system is the one the test config states (`environment.database_system`),
+ * else the one SAP's own system information names (`DBSystem`), read only
+ * when the config states none. The gate skips only on a known unsupported
+ * system — a database system other than SAP HANA (`HDB`) — and names it and
+ * where it came from. Anything else that keeps the gate from running fails
+ * it: a system information it cannot read or that names no database system,
+ * a shared object that is not active, a class without its breakpoint marker.
  */
 
 /** The SQLScript line marker the AMDP gate sets its breakpoint on. */
@@ -18,6 +20,49 @@ export const AMDP_BREAKPOINT_MARKER = '-- BP:tf';
 export interface FixtureRead {
   status: number | undefined;
   text: string;
+}
+
+/**
+ * Where the gate learns the database system: the test config states it, or
+ * SAP's system information was read.
+ */
+export type DatabaseSource =
+  | { stated: string }
+  | { systemInformation: FixtureRead };
+
+/**
+ * The database source: the stated system when there is one — `read` is then
+ * never called — else SAP's system information, read by `read`.
+ */
+export async function databaseSource(
+  stated: string | undefined,
+  read: () => Promise<FixtureRead>,
+): Promise<DatabaseSource> {
+  return stated !== undefined
+    ? { stated }
+    : { systemInformation: await read() };
+}
+
+/** The database system a source names, or why it names none. */
+function databaseOf(
+  source: DatabaseSource,
+): { database: string; from: string } | { fail: string } {
+  if ('stated' in source) {
+    return { database: source.stated, from: 'the test config states' };
+  }
+  const { systemInformation } = source;
+  if (systemInformation.status !== 200) {
+    return {
+      fail: `SAP's system information could not be read (status ${systemInformation.status}): whether this system runs AMDP is unknown; the test config can state it (environment.database_system)`,
+    };
+  }
+  const database = databaseSystemOf(systemInformation.text);
+  if (database === undefined) {
+    return {
+      fail: "SAP's system information names no DBSystem: whether this system runs AMDP is unknown; the test config can state it (environment.database_system)",
+    };
+  }
+  return { database, from: "SAP's system information names" };
 }
 
 export type AmdpGateVerdict =
@@ -59,30 +104,19 @@ export function breakpointLineOf(classSource: string): number {
  * class source SAP answered — the one the debugger stops in.
  */
 export function amdpGateVerdict(input: {
-  systemInformation: FixtureRead;
+  database: DatabaseSource;
   className: string;
   classRead: FixtureRead;
   ddlName: string;
   ddlRead: FixtureRead;
 }): AmdpGateVerdict {
-  const { systemInformation, className, classRead, ddlName, ddlRead } = input;
-  if (systemInformation.status !== 200) {
+  const { className, classRead, ddlName, ddlRead } = input;
+  const known = databaseOf(input.database);
+  if ('fail' in known) return { run: false, fail: known.fail };
+  if (known.database !== 'HDB') {
     return {
       run: false,
-      fail: `SAP's system information could not be read (status ${systemInformation.status}): whether this system runs AMDP is unknown`,
-    };
-  }
-  const database = databaseSystemOf(systemInformation.text);
-  if (database === undefined) {
-    return {
-      run: false,
-      fail: "SAP's system information names no DBSystem: whether this system runs AMDP is unknown",
-    };
-  }
-  if (database !== 'HDB') {
-    return {
-      run: false,
-      skip: `SAP's system information names the database system ${database}; an AMDP runs only on SAP HANA (HDB)`,
+      skip: `${known.from} the database system ${known.database}; an AMDP runs only on SAP HANA (HDB)`,
     };
   }
   for (const [what, read] of [

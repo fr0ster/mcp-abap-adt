@@ -769,6 +769,22 @@ export function isCloudConnection(): boolean {
  * Detection: JWT auth → cloud, otherwise onprem.
  * Legacy can be set via test-config.yaml `environment.system_type: legacy`.
  */
+/**
+ * The database system the test config states for its system
+ * (`environment.database_system`, e.g. "HDB"), upper case, or undefined when
+ * it states none: the AMDP gates then read it from SAP's system information.
+ */
+export function getStatedDatabaseSystem(): string | undefined {
+  try {
+    const stated = loadTestConfig()?.environment?.database_system;
+    return typeof stated === 'string' && stated.trim() !== ''
+      ? stated.trim().toUpperCase()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
   // Check explicit override in test config
   try {

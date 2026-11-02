@@ -92,9 +92,14 @@ import {
   stderrStateLogger,
 } from '../../../lib/state/InstanceState';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
-import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
+import {
+  amdpGateVerdict,
+  databaseSource,
+  type FixtureRead,
+} from '../helpers/amdpFixture';
 import {
   getSharedDependenciesConfig,
+  getStatedDatabaseSystem,
   getSystemType,
   getTimeout,
   isTestAvailableForSystem,
@@ -1823,10 +1828,14 @@ describe('Debugger handlers (integration)', () => {
       await tester.run(async () => {
         softOnly('the AMDP chain drives the instance in process');
         // The shared pair, read, never written: the case skips only where
-        // SAP's system information names a database system other than HANA.
+        // the database system (stated by the test config, else named by
+        // SAP's system information) is not HANA.
         const obj = plain();
         const verdict = amdpGateVerdict({
-          systemInformation: await systemInformationRead(),
+          database: await databaseSource(
+            getStatedDatabaseSystem(),
+            systemInformationRead,
+          ),
           className: amdpClass,
           classRead: sourceRead(
             await call(obj, 'GetClass', { class_name: amdpClass }),

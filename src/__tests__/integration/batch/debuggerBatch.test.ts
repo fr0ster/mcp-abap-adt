@@ -70,9 +70,14 @@ import {
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { amdpGateVerdict, type FixtureRead } from '../helpers/amdpFixture';
+import {
+  amdpGateVerdict,
+  databaseSource,
+  type FixtureRead,
+} from '../helpers/amdpFixture';
 import {
   getEnabledTestCase,
+  getStatedDatabaseSystem,
   getTimeout,
   loadTestConfig,
   testAuthBrokerPath,
@@ -570,10 +575,13 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
   const plain = createHandlerContext({ connection, logger });
 
   // The shared pair (`shared_dependencies`): read, never written. The case
-  // skips only where SAP's own system information names a database system
-  // other than HANA; any other reason it cannot run fails it.
+  // skips only where the database system — the one the test config states,
+  // else the one SAP's system information names — is not HANA; any other
+  // reason it cannot run fails it.
   const verdict = amdpGateVerdict({
-    systemInformation: await readSystemInformation(connection),
+    database: await databaseSource(getStatedDatabaseSystem(), () =>
+      readSystemInformation(connection),
+    ),
     className: cls,
     classRead: fixtureRead(
       await local(handleGetClass, plain, { class_name: cls }),

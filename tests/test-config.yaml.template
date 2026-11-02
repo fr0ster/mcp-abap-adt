@@ -104,6 +104,9 @@ environment:
   group: ""                                  # logon group (connection default: PUBLIC)
   saprouter: ""                              # SAProuter string
   # Test defaults
+  # database_system: "HDB"                  # the system's database, stated (e.g. ABAP cloud,
+                                             # whose system information names none); the AMDP
+                                             # tests read SAP's DBSystem when omitted
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   cleanup_after: true                        # Clean up objects after test

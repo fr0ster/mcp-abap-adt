@@ -145,6 +145,12 @@
   },
   {
     "group": "readonly",
+    "name": "GetTableType",
+    "inputs": "table_type_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
     "name": "GetFunctionGroup",
     "inputs": "function_group_name*, version",
     "available_in": "cloud, onprem"
@@ -253,6 +259,12 @@
   },
   {
     "group": "high",
+    "name": "ActivateTableType",
+    "inputs": "table_type_name*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "ActivateDataElement",
     "inputs": "data_element_name*, detail",
     "available_in": "cloud, onprem"
@@ -291,6 +303,12 @@
     "group": "high",
     "name": "ActivateProgram",
     "inputs": "program_name*, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "ActivateInclude",
+    "inputs": "include_name*, detail",
     "available_in": "onprem"
   },
   {
@@ -367,6 +385,24 @@
   },
   {
     "group": "high",
+    "name": "GetTableType",
+    "inputs": "table_type_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "CreateTableType",
+    "inputs": "table_type_name*, package_name*, description, transport_request, row_type_kind, row_type_name, data_type, length, decimals, access_type, key_definition, key_kind, activate, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateTableType",
+    "inputs": "table_type_name*, description, transport_request, row_type_kind, row_type_name, data_type, length, decimals, access_type, key_definition, key_kind, activate, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "UpdateDomain",
     "inputs": "domain_name*, description, package_name*, transport_request, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, activate, fixed_values, detail",
     "available_in": "cloud, onprem"
@@ -375,6 +411,12 @@
     "group": "high",
     "name": "DeleteDomain",
     "inputs": "domain_name*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "DeleteTableType",
+    "inputs": "table_type_name*, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -817,6 +859,30 @@
   },
   {
     "group": "high",
+    "name": "CreateInclude",
+    "inputs": "include_name*, package_name*, description, transport_request, master_language, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateInclude",
+    "inputs": "include_name*, source_code*, transport_request, activate, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateIncludeMetadata",
+    "inputs": "include_name*, metadata*, transport_request, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "DeleteInclude",
+    "inputs": "include_name*, transport_request, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
     "name": "CreateProgram",
     "inputs": "program_name*, description, package_name*, transport_request, program_type, application, master_language, detail",
     "available_in": "onprem"
@@ -1027,6 +1093,12 @@
   },
   {
     "group": "high",
+    "name": "CheckTableType",
+    "inputs": "table_type_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "CheckFunctionGroup",
     "inputs": "function_group_name*, version",
     "available_in": "cloud, onprem"
@@ -1167,6 +1239,12 @@
     "group": "high",
     "name": "GetTableVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetTableTypeVersions",
+    "inputs": "table_type_name*",
     "available_in": "cloud, onprem"
   },
   {

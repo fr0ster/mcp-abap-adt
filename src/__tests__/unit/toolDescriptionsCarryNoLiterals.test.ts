@@ -35,7 +35,11 @@
  * until a consumer's retrieval degrades.
  */
 import { compactDebugEntries } from '../../lib/compact/debug/group';
+import { BackgroundRunHandlersGroup } from '../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DebugHandlersGroup } from '../../lib/handlers/groups/DebugHandlersGroup';
+import { RuntimeRunHandlersGroup } from '../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
+import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
 
 /**
  * Classes of literal, not a list of known offenders: a new example of the same
@@ -139,10 +143,15 @@ describe('descriptions carry no incidental literals', () => {
       includeHighLevel: true,
       includeSystem: true,
       includeSearch: true,
-      includeDebug: true,
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
+    // What the exporter leaves out (no store, no debugger): the groups' own.
+    ...[
+      new RuntimeRunHandlersGroup(noConnectionContext()),
+      new BackgroundRunHandlersGroup(noConnectionContext()),
+      new DebugHandlersGroup(noConnectionContext()),
+    ].flatMap((group) => group.getHandlers().map((e) => e.toolDefinition)),
     // The compact debug tools (their own package): their text joins the same rule.
     ...compactDebugEntries().map((e) => e.toolDefinition),
   ];

@@ -101,7 +101,7 @@ export async function handleUpdatePackage(
                 atStep('read metadata', () =>
                   pkg.readMetadata(
                     { packageName },
-                    { analyse: analyseException },
+                    { version: 'active', analyse: analyseException },
                   ),
                 ),
                 atStep('update metadata', (current) =>

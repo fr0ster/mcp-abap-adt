@@ -15,7 +15,10 @@
  * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
  */
 
-import type { VersionedKind } from '../../../lib/adtProjections';
+import type {
+  VersionedKind,
+  VersionSourceKind,
+} from '../../../lib/adtProjections';
 import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,
@@ -42,9 +45,9 @@ export interface ObjectVersionToolEntry {
   handler: RawHandler;
 }
 
-interface VersionedTypeRow {
+interface VersionedTypeRow<K extends VersionedKind> {
   /** The kind resolveVersionedObject reads: one of `VERSIONED_ROUTES`. */
-  object_type: VersionedKind;
+  object_type: K;
   /** PascalCase display matching the existing high-level Get<Display> tool. */
   display: string;
   /** The natural name input param (e.g. class_name) — required on the Versions tool. */
@@ -68,7 +71,7 @@ interface VersionedTypeRow {
  * getVersions/getVersionSource throw "not supported", so per-type version tools
  * for them would always error.
  */
-export const VERSIONED_TYPES: VersionedTypeRow[] = [
+export const VERSIONED_TYPES: VersionedTypeRow<VersionSourceKind>[] = [
   {
     object_type: 'class',
     display: 'Class',
@@ -135,7 +138,27 @@ export const VERSIONED_TYPES: VersionedTypeRow[] = [
   },
 ];
 
-function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
+/**
+ * The versioned types whose version list SAP serves and whose version source
+ * it refuses: the table type (403 "Request version for TTYP is not
+ * supported", measured on premise 2026-11-01 and on ABAP cloud 2026-11-02).
+ * Each gets its Versions tool alone.
+ */
+export const LIST_ONLY_VERSIONED_TYPES: VersionedTypeRow<
+  Exclude<VersionedKind, VersionSourceKind>
+>[] = [
+  {
+    object_type: 'table_type',
+    display: 'TableType',
+    nameParam: 'table_type_name',
+    label: 'ABAP table type',
+    available_in: ['onprem', 'cloud'],
+  },
+];
+
+function buildVersionsTool(
+  row: VersionedTypeRow<VersionedKind>,
+): ObjectVersionToolEntry {
   const isFm = row.object_type === 'function_module';
   const properties: Record<string, unknown> = {
     [row.nameParam]: {
@@ -215,7 +238,9 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   return { toolDefinition, handler };
 }
 
-function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
+function buildVersionSourceTool(
+  row: VersionedTypeRow<VersionSourceKind>,
+): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionSource`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
@@ -268,7 +293,9 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   return { toolDefinition, handler };
 }
 
-function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
+function buildVersionDiffTool(
+  row: VersionedTypeRow<VersionSourceKind>,
+): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionDiff`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
@@ -345,9 +372,10 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
 }
 
 /**
- * Build all 27 high-level per-object version tools (9 versioned types ×
- * {Versions, VersionSource, VersionDiff}). The handlers take (context, args);
- * the registering group wraps each with withContext.
+ * Build the 28 high-level per-object version tools: {Versions, VersionSource,
+ * VersionDiff} for each of the 9 types with a version source, and Versions
+ * alone for each list-only type. The handlers take (context, args); the
+ * registering group wraps each with withContext.
  */
 export function buildObjectVersionTools(): ObjectVersionToolEntry[] {
   const entries: ObjectVersionToolEntry[] = [];
@@ -355,6 +383,9 @@ export function buildObjectVersionTools(): ObjectVersionToolEntry[] {
     entries.push(buildVersionsTool(row));
     entries.push(buildVersionSourceTool(row));
     entries.push(buildVersionDiffTool(row));
+  }
+  for (const row of LIST_ONLY_VERSIONED_TYPES) {
+    entries.push(buildVersionsTool(row));
   }
   return entries;
 }

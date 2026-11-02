@@ -79,6 +79,7 @@ const PART_READS: Array<[string, Record<string, unknown>]> = [
 const FULL: BatchEntryCase[] = [
   { tool: 'GetPackage', args: { package_name: 'PKG_A' } },
   { tool: 'GetDomain', args: { domain_name: 'DOM_A' } },
+  { tool: 'GetTableType', args: { table_type_name: 'TTYP_A' } },
   { tool: 'GetDataElement', args: { data_element_name: 'DTEL_A' } },
   { tool: 'GetTable', args: { table_name: 'TAB_A' } },
   { tool: 'GetStructure', args: { structure_name: 'STRU_A' } },
@@ -166,6 +167,7 @@ const FULL: BatchEntryCase[] = [
     tool: 'GetMetadataExtensionVersions',
     args: { metadata_extension_name: 'DDLX_A' },
   },
+  { tool: 'GetTableTypeVersions', args: { table_type_name: 'TTYP_A' } },
   ...[
     'GetClassVersionSource',
     'GetProgramVersionSource',
@@ -235,6 +237,7 @@ const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
   ['LOCAL_DEFINITIONS', { class_name: 'CLAS_A' }],
   ['LOCAL_MACROS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   [
     'FUNCTION_MODULE',
@@ -252,6 +255,7 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A' }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }],
   ['TABLE', { table_name: 'TAB_A' }],
   ['STRUCTURE', { structure_name: 'STRU_A' }],
   ['DDL', { ddl_name: 'DDL_A' }],
@@ -259,6 +263,7 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['SERVICE_BINDING', { service_binding_name: 'SRVB_A' }],
   ['CLASS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   [
     'FUNCTION_MODULE',
@@ -276,6 +281,8 @@ const LOCKED_TYPES: Array<[string, string]> = [
   ['SERVICE_BINDING', 'SRVB_A'],
   ['CLASS', 'CLAS_A'],
   ['PROGRAM', 'PROG_A'],
+  ['INCLUDE', 'INCL_A'],
+  ['TABLE_TYPE', 'TTYP_A'],
   ['INTERFACE', 'INTF_A'],
   ['FUNCTION_GROUP', 'FUGR_A'],
   ['FUNCTION_MODULE', 'FUGR_A|FM_A'],
@@ -297,6 +304,12 @@ const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A', source_code: DOCUMENT }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A', source_code: DOCUMENT }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A', source_code: DOCUMENT }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A', source_code: DOCUMENT }],
+  ['INCLUDE', { include_name: 'INCL_A', source_code: 'source text' }],
+  [
+    'INCLUDE',
+    { include_name: 'INCL_A', part: 'metadata', source_code: DOCUMENT },
+  ],
   ['TABLE', { table_name: 'TAB_A', ddl_code: 'source text' }],
   ['STRUCTURE', { structure_name: 'STRU_A', ddl_code: 'source text' }],
   ['DDL', { ddl_name: 'DDL_A', ddl_source: 'source text' }],
@@ -514,6 +527,8 @@ const DELETIONS: Array<[string, Record<string, unknown>]> = [
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }],
 ];
 
 /** `HandlerDelete` of a class include: its empty write under `lock_handle`. */
@@ -594,6 +609,8 @@ const CREATES: Array<[string, Record<string, unknown>]> = [
   ],
   ['BEHAVIOR_IMPLEMENTATION', { class_name: 'BP_A', package_name: 'PKG_A' }],
   ['METADATA_EXTENSION', { name: 'DDLX_A', package_name: 'PKG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A', package_name: 'PKG_A' }],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A', package_name: 'PKG_A' }],
 ];
 
 const CREATE_CASES: BatchEntryCase[] = [
@@ -623,6 +640,8 @@ const ACTIVATIONS: Array<[string, Record<string, unknown>]> = [
   ['ActivateClass', { class_name: 'CLAS_A' }],
   ['ActivateInterface', { interface_name: 'INTF_A' }],
   ['ActivateProgram', { program_name: 'PROG_A' }],
+  ['ActivateInclude', { include_name: 'INCL_A' }],
+  ['ActivateTableType', { table_type_name: 'TTYP_A' }],
   ['ActivateFunctionGroup', { function_group_name: 'FUGR_A' }],
   [
     'ActivateFunctionModule',
@@ -648,6 +667,7 @@ const CHECKS: Array<[string, Record<string, unknown>]> = [
   ['CheckStructure', { structure_name: 'STRU_A' }],
   ['CheckDdl', { ddl_name: 'DDL_A' }],
   ['CheckDomain', { domain_name: 'DOM_A' }],
+  ['CheckTableType', { table_type_name: 'TTYP_A' }],
   ['CheckDataElement', { data_element_name: 'DTEL_A' }],
   ['CheckPackage', { package_name: 'PKG_A' }],
   ['CheckBehaviorDefinition', { name: 'BDEF_A' }],
@@ -699,12 +719,16 @@ const WRITES: BatchEntryCase[] = [
     body: ACTIVATED,
   })),
   // An activation run started: the one POST, answered { run_id }.
-  ...['PACKAGE', 'SERVICE_DEFINITION', 'SERVICE_BINDING'].map(
-    (object_type) => ({
-      tool: 'HandlerActivate',
-      args: { object_type, object_name: 'OBJ_A' },
-    }),
-  ),
+  ...[
+    'PACKAGE',
+    'SERVICE_DEFINITION',
+    'SERVICE_BINDING',
+    'INCLUDE',
+    'TABLE_TYPE',
+  ].map((object_type) => ({
+    tool: 'HandlerActivate',
+    args: { object_type, object_name: 'OBJ_A' },
+  })),
   {
     tool: 'HandlerActivate',
     args: { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' },
@@ -825,6 +849,14 @@ const WRITES: BatchEntryCase[] = [
     args: {
       class_name: 'BIMP_A',
       behavior_definition: 'BDEF_A',
+      package_name: 'PKG_A',
+      description: 'text',
+    },
+  },
+  {
+    tool: 'CreateInclude',
+    args: {
+      include_name: 'INCL_A',
       package_name: 'PKG_A',
       description: 'text',
     },

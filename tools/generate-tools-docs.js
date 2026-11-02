@@ -1,24 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Generate AVAILABLE_TOOLS.md from TOOL_DEFINITION in src/handlers/**
+ * Generate AVAILABLE_TOOLS.md from the tool definitions the server builds.
  *
  * Rules:
- * - Scan code folders only (src/handlers)
+ * - Read the build only: the tool sets' handler groups (`dist/lib/toolSet.js`)
+ *   and the built handler modules that hold each definition — never source text
  * - Hierarchy in output: Group(level) -> Object(folder) -> Tools
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const HANDLERS_ROOT = path.join(__dirname, '../src/handlers');
-// Per-object high-level version tools are built by a DRY factory (#30) rather
-// than one-TOOL_DEFINITION-per-file, so the file walker can't see them. Parse
-// the factory's VERSIONED_TYPES table directly.
-const OBJECT_VERSION_TOOLS_PATH = path.join(
-  __dirname,
-  '../src/handlers/common/high/objectVersionTools.ts',
-);
+const DIST_ROOT = path.join(__dirname, '..', 'dist');
+const DIST_HANDLERS = path.join(DIST_ROOT, 'handlers');
 const OUTPUT_PATHS = {
   all: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md'),
   readonly: path.join(
@@ -36,7 +31,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
 Usage: node tools/generate-tools-docs.js
 
-Scans src/handlers/**/(readonly|high|debug|session|batch)/*.ts and generates:
+Reads the built tool sets (dist; run npm run build first) and generates:
   docs/user-guide/AVAILABLE_TOOLS.md
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
@@ -44,8 +39,8 @@ Scans src/handlers/**/(readonly|high|debug|session|batch)/*.ts and generates:
 
 Output hierarchy:
   1) Group (level)
-  2) Object (folder under src/handlers)
-  3) Tools (TOOL_DEFINITION.name)
+  2) Object (the folder under src/handlers of the module that holds the definition)
+  3) Tools (the definition's name)
 `);
   process.exit(0);
 }
@@ -57,502 +52,21 @@ function titleCaseFolder(folder) {
     .join(' ');
 }
 
+/** Lower case; letters, digits and '-' kept; each run of white space one '-'. */
 function slug(value) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
+  const kept = [];
+  for (const ch of value.toLowerCase()) {
+    const letterOrDigit = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+    if (letterOrDigit || ch === '-') kept.push(ch);
+    else if (ch.trim() === '') kept.push(' ');
+  }
+  const words = kept.join('').trim().split(' ');
+  return words.filter((word, i) => word !== '' || i === 0).join('-');
 }
 
 function anchorFromHeading(heading) {
   // GitHub-style links are derived from heading text.
   return slug(heading);
-}
-
-function walk(dir, acc) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walk(full, acc);
-      continue;
-    }
-    if (entry.isFile() && entry.name.endsWith('.ts')) {
-      acc.push(full);
-    }
-  }
-}
-
-function findToolDefinitionBlock(content) {
-  const marker = 'export const TOOL_DEFINITION';
-  const start = content.indexOf(marker);
-  if (start === -1) return null;
-
-  const firstBrace = content.indexOf('{', start);
-  if (firstBrace === -1) return null;
-
-  let depth = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let isEscaped = false;
-
-  for (let i = firstBrace; i < content.length; i++) {
-    const ch = content[i];
-
-    if (isEscaped) {
-      isEscaped = false;
-      continue;
-    }
-
-    if (ch === '\\') {
-      isEscaped = true;
-      continue;
-    }
-
-    if (!inDouble && !inTemplate && ch === "'") {
-      inSingle = !inSingle;
-      continue;
-    }
-    if (!inSingle && !inTemplate && ch === '"') {
-      inDouble = !inDouble;
-      continue;
-    }
-    if (!inSingle && !inDouble && ch === '`') {
-      inTemplate = !inTemplate;
-      continue;
-    }
-
-    if (inSingle || inDouble || inTemplate) continue;
-
-    if (ch === '{') depth++;
-    if (ch === '}') {
-      depth--;
-      if (depth === 0) {
-        return content.slice(firstBrace, i + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function extractInputSchemaBlock(toolBlock) {
-  const key = 'inputSchema';
-  const keyPos = toolBlock.indexOf(key);
-  if (keyPos === -1) return null;
-
-  const firstBrace = toolBlock.indexOf('{', keyPos);
-  if (firstBrace === -1) return null;
-
-  let depth = 0;
-  for (let i = firstBrace; i < toolBlock.length; i++) {
-    const ch = toolBlock[i];
-    if (ch === '{') depth++;
-    if (ch === '}') {
-      depth--;
-      if (depth === 0) {
-        return toolBlock.slice(firstBrace, i + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function extractInputSchemaRef(toolBlock) {
-  const refMatch = toolBlock.match(/inputSchema\s*:\s*([A-Za-z0-9_]+)\b/);
-  return refMatch ? refMatch[1] : null;
-}
-
-/**
- * A `description:` whose value is several string literals joined with `+`.
- *
- * This reads source with regexes rather than importing the built definitions, so
- * a concatenation used to be captured up to its FIRST literal and the rest of the
- * text was dropped from the generated docs — five tools lost a whole sentence
- * each, and `CreateCdsUnitTest` ended on the seam, which is the trailing space a
- * reviewer saw in `git diff --check` (PR #244). Reads the whole chain now.
- */
-function readDescription(text) {
-  const LITERAL =
-    '\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"|`(?:\\\\.|[^`\\\\])*`';
-  const chain = text.match(
-    new RegExp(
-      `description\\s*:\\s*((?:${LITERAL})(?:\\s*\\+\\s*(?:${LITERAL}))*)`,
-    ),
-  );
-  if (!chain) return '';
-  return (chain[1].match(new RegExp(LITERAL, 'g')) || [])
-    .map((part) => part.slice(1, -1).replace(/\\(['"`\\])/g, '$1'))
-    .join('');
-}
-
-function findMatchingBrace(content, openIndex) {
-  let depth = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let isEscaped = false;
-
-  for (let i = openIndex; i < content.length; i++) {
-    const ch = content[i];
-    if (isEscaped) {
-      isEscaped = false;
-      continue;
-    }
-    if (ch === '\\') {
-      isEscaped = true;
-      continue;
-    }
-    if (!inDouble && !inTemplate && ch === "'") {
-      inSingle = !inSingle;
-      continue;
-    }
-    if (!inSingle && !inTemplate && ch === '"') {
-      inDouble = !inDouble;
-      continue;
-    }
-    if (!inSingle && !inDouble && ch === '`') {
-      inTemplate = !inTemplate;
-      continue;
-    }
-    if (inSingle || inDouble || inTemplate) continue;
-
-    if (ch === '{') depth++;
-    if (ch === '}') {
-      depth--;
-      if (depth === 0) return i;
-    }
-  }
-  return -1;
-}
-
-function extractNamedObjectContent(block, key) {
-  const keyPos = block.indexOf(key);
-  if (keyPos === -1) return null;
-  const open = block.indexOf('{', keyPos);
-  if (open === -1) return null;
-  const close = findMatchingBrace(block, open);
-  if (close === -1) return null;
-  return block.slice(open + 1, close);
-}
-
-function extractTopLevelRequiredArray(block) {
-  const matches = [...block.matchAll(/required\s*:\s*\[([^\]]*)\]/g)];
-  if (matches.length === 0) return [];
-  const raw = matches[matches.length - 1][1];
-  return raw
-    .split(',')
-    .map((s) => s.trim().replace(/['"]/g, ''))
-    .filter(Boolean);
-}
-
-/**
- * Skip whitespace, separators AND comments from `i` onward.
- *
- * The comments matter: this scanner reads a tool's `properties` object as
- * text, and a `//` comment inside it is text too. A sentence containing the
- * words "may or may not want:" put a parameter called `want` into three
- * published documentation files, typed `any` and described with nothing —
- * a parameter no tool has and no caller can pass. Prose belongs in a schema
- * block as much as anywhere else; it is this reader that had to learn to
- * step over it.
- */
-function skipIgnorable(text, i) {
-  for (;;) {
-    while (i < text.length && /[\s,\n\r\t]/.test(text[i])) i++;
-    if (text[i] === '/' && text[i + 1] === '/') {
-      const end = text.indexOf('\n', i);
-      i = end === -1 ? text.length : end + 1;
-      continue;
-    }
-    if (text[i] === '/' && text[i + 1] === '*') {
-      const end = text.indexOf('*/', i + 2);
-      i = end === -1 ? text.length : end + 2;
-      continue;
-    }
-    return i;
-  }
-}
-
-function parseTopLevelProperties(propertiesContent) {
-  const props = {};
-  let i = 0;
-  while (i < propertiesContent.length) {
-    i = skipIgnorable(propertiesContent, i);
-    if (i >= propertiesContent.length) break;
-
-    const keyMatch = propertiesContent.slice(i).match(/^([A-Za-z0-9_]+)/);
-    if (!keyMatch) {
-      i++;
-      continue;
-    }
-    const key = keyMatch[1];
-    i += key.length;
-
-    i = skipIgnorable(propertiesContent, i);
-    if (propertiesContent[i] !== ':') continue;
-    i++;
-    i = skipIgnorable(propertiesContent, i);
-    if (propertiesContent[i] === '{') {
-      const open = i;
-      const close = findMatchingBrace(propertiesContent, open);
-      if (close === -1) break;
-      const body = propertiesContent.slice(open + 1, close);
-
-      const type =
-        body.match(/type\s*:\s*(['"])((?:\\.|(?!\1).)*)\1/)?.[2] || 'any';
-      const description = readDescription(body);
-      const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
-
-      props[key] = {
-        type,
-        description,
-        default: defaultRaw
-          ? defaultRaw.replace(/^['"]|['"]$/g, '')
-          : undefined,
-      };
-      i = close + 1;
-      continue;
-    }
-
-    // Fallback for schema references like "object_type: commonObjectTypeSchema"
-    props[key] = { type: 'any', description: '', default: undefined };
-    while (
-      i < propertiesContent.length &&
-      propertiesContent[i] !== ',' &&
-      propertiesContent[i] !== '\n'
-    ) {
-      i++;
-    }
-    i++;
-  }
-  return props;
-}
-
-function parseInputSchemaBlock(inputSchemaBlock) {
-  const inputSchema = {
-    properties: {},
-    required: [],
-  };
-
-  if (!inputSchemaBlock) return inputSchema;
-
-  inputSchema.required = extractTopLevelRequiredArray(inputSchemaBlock);
-  const propertiesContent = extractNamedObjectContent(
-    inputSchemaBlock,
-    'properties',
-  );
-  if (propertiesContent) {
-    inputSchema.properties = parseTopLevelProperties(propertiesContent);
-  }
-
-  return inputSchema;
-}
-
-function extractImportPathForSymbol(content, symbol) {
-  const importRegex = /import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"]/g;
-  let m = importRegex.exec(content);
-  while (m !== null) {
-    const symbolsRaw = m[1];
-    const importPath = m[2];
-    const symbols = symbolsRaw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (symbols.includes(symbol)) {
-      return importPath;
-    }
-    m = importRegex.exec(content);
-  }
-  return null;
-}
-
-function extractToolDefinition(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const block = findToolDefinitionBlock(content);
-  if (!block) return null;
-
-  const nameMatch = block.match(/name\s*:\s*['"]([^'"]+)['"]/);
-  if (!nameMatch) return null;
-
-  const toolDescription = readDescription(block);
-  const inputSchemaBlock = extractInputSchemaBlock(block);
-  const inputSchemaRef = inputSchemaBlock ? null : extractInputSchemaRef(block);
-  let inputSchema = parseInputSchemaBlock(inputSchemaBlock);
-
-  // Resolve referenced schema (e.g. compactActionSchema) from imported file.
-  if (
-    inputSchemaRef &&
-    Object.keys(inputSchema.properties).length === 0 &&
-    filePath.endsWith('.ts')
-  ) {
-    const importPath = extractImportPathForSymbol(content, inputSchemaRef);
-    if (importPath) {
-      const resolvedPath = path.resolve(
-        path.dirname(filePath),
-        `${importPath}.ts`,
-      );
-      if (fs.existsSync(resolvedPath)) {
-        const refContent = fs.readFileSync(resolvedPath, 'utf8');
-        const refBlock = extractConstObjectBlock(refContent, inputSchemaRef);
-        if (refBlock) {
-          inputSchema = parseInputSchemaBlock(refBlock);
-        }
-      }
-    }
-  }
-
-  // Extract available_in array
-  const availableInMatch = block.match(/available_in\s*:\s*\[([^\]]*)\]/);
-  let availableIn = [];
-  if (availableInMatch) {
-    availableIn = availableInMatch[1]
-      .split(',')
-      .map((s) => s.trim().replace(/['"]/g, ''))
-      .filter(Boolean);
-  }
-
-  return {
-    name: nameMatch[1],
-    description: toolDescription,
-    inputSchema,
-    inputSchemaRef,
-    availableIn,
-  };
-}
-
-function extractConstObjectBlock(content, constName) {
-  const marker = `export const ${constName}`;
-  const start = content.indexOf(marker);
-  if (start === -1) return null;
-
-  const firstBrace = content.indexOf('{', start);
-  if (firstBrace === -1) return null;
-
-  let depth = 0;
-  for (let i = firstBrace; i < content.length; i++) {
-    const ch = content[i];
-    if (ch === '{') depth++;
-    if (ch === '}') {
-      depth--;
-      if (depth === 0) {
-        return content.slice(firstBrace, i + 1);
-      }
-    }
-  }
-  return null;
-}
-
-function parseMatrixObject(block) {
-  const result = {};
-  const entryPattern = /([A-Z_]+)\s*:\s*\[([^\]]*)\]/g;
-  let entry = entryPattern.exec(block);
-  while (entry !== null) {
-    const objectType = entry[1];
-    const rawValues = entry[2].trim();
-    const values = rawValues
-      ? rawValues
-          .split(',')
-          .map((s) => s.trim().replace(/['"]/g, ''))
-          .filter(Boolean)
-      : [];
-    result[objectType] = values;
-    entry = entryPattern.exec(block);
-  }
-  return result;
-}
-
-/**
- * Synthesize doc entries for the per-object high-level version tools (#30),
- * which are produced by the buildObjectVersionTools() factory and therefore are
- * not discoverable by the per-file TOOL_DEFINITION walker. Parses the factory's
- * VERSIONED_TYPES table to stay in sync with the source of truth.
- */
-function loadObjectVersionTools() {
-  const content = fs.readFileSync(OBJECT_VERSION_TOOLS_PATH, 'utf8');
-  const rowRegex =
-    /object_type:\s*'([^']+)',\s*display:\s*'([^']+)',\s*nameParam:\s*'([^']+)',\s*label:\s*'([^']+)',\s*available_in:\s*\[([^\]]*)\]/g;
-  const tools = [];
-  let m = rowRegex.exec(content);
-  while (m !== null) {
-    const [, objectType, display, nameParam, label, availRaw] = m;
-    const availableIn = availRaw
-      .split(',')
-      .map((s) => s.trim().replace(/['"]/g, ''))
-      .filter(Boolean);
-    const isFm = objectType === 'function_module';
-
-    const versionsProps = {
-      [nameParam]: { type: 'string', description: `${label} name.` },
-    };
-    const versionsRequired = [nameParam];
-    if (isFm) {
-      versionsProps.function_group_name = {
-        type: 'string',
-        description: 'Owning function group name (required).',
-      };
-      versionsRequired.push('function_group_name');
-    }
-
-    tools.push({
-      name: `Get${display}Versions`,
-      description: `[read-only] Lists the version history of the ${label} named by ${nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.`,
-      inputSchema: { properties: versionsProps, required: versionsRequired },
-      inputSchemaRef: null,
-      availableIn,
-      objectFolder: 'common',
-      objectTitle: titleCaseFolder('common'),
-      level: 'high',
-      filePath: 'src/handlers/common/high/objectVersionTools.ts',
-    });
-    tools.push({
-      name: `Get${display}VersionSource`,
-      description: `[read-only] Reads the source of the ${label} version named by content_uri, an entry of the ${label}'s version history.`,
-      inputSchema: {
-        properties: {
-          content_uri: {
-            type: 'string',
-            description: `Opaque content_uri of a version, from the ${label}'s version history.`,
-          },
-        },
-        required: ['content_uri'],
-      },
-      inputSchemaRef: null,
-      availableIn,
-      objectFolder: 'common',
-      objectTitle: titleCaseFolder('common'),
-      level: 'high',
-      filePath: 'src/handlers/common/high/objectVersionTools.ts',
-    });
-    tools.push({
-      name: `Get${display}VersionDiff`,
-      description: `[read-only] Compares the two ${label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.`,
-      inputSchema: {
-        properties: {
-          content_uri_from: {
-            type: 'string',
-            description: `Opaque content_uri of the OLD/base version, from the ${label}'s version history.`,
-          },
-          content_uri_to: {
-            type: 'string',
-            description: `Opaque content_uri of the NEW/compare version, from the ${label}'s version history.`,
-          },
-        },
-        required: ['content_uri_from', 'content_uri_to'],
-      },
-      inputSchemaRef: null,
-      availableIn,
-      objectFolder: 'common',
-      objectTitle: titleCaseFolder('common'),
-      level: 'high',
-      filePath: 'src/handlers/common/high/objectVersionTools.ts',
-    });
-    m = rowRegex.exec(content);
-  }
-  return tools;
 }
 
 /**
@@ -619,208 +133,228 @@ function requireFreshBuild(distEntry) {
   }
 }
 
-function builtDefinitions() {
-  const distEntry = path.join(
-    __dirname,
-    '..',
-    'dist',
-    'lib',
-    'handlers',
-    'HandlerExporter.js',
-  );
-  requireFreshBuild(distEntry);
-  const { HandlerExporter } = require(distEntry);
-  const entries = new HandlerExporter({
-    includeReadOnly: true,
-    includeHighLevel: true,
-    includeSystem: true,
-    includeSearch: true,
-    includeDebug: true,
-  }).getHandlerEntries();
-  const byName = new Map();
-  for (const entry of entries)
-    byName.set(entry.toolDefinition.name, entry.toolDefinition);
-  return byName;
-}
+/**
+ * The level a tool is listed under when the folder of its module names none
+ * (a `low` module served by the high group): its handler group's.
+ */
+const GROUP_LEVELS = {
+  ReadOnlyHandlersGroup: 'readonly',
+  SearchHandlersGroup: 'readonly',
+  SystemHandlersGroup: 'readonly',
+  BackgroundRunHandlersGroup: 'readonly',
+  HighLevelHandlersGroup: 'high',
+  RuntimeRunHandlersGroup: 'high',
+  DebugHandlersGroup: 'debug',
+  DebugBatchHandlersGroup: 'debug',
+  LeftoverSessionHandlersGroup: 'session',
+  LeftoverSessionListHandlersGroup: 'session',
+  BatchHandlersGroup: 'batch',
+};
 
-/** A parameter's own schema, in either shape a definition is written in. */
-function builtProperty(definition, key) {
-  const flat = definition.inputSchema;
-  const properties = flat && flat.properties ? flat.properties : flat;
-  return properties ? properties[key] : undefined;
-}
-
-/** Overwrite parsed text with the shipped text, tool by tool and parameter by parameter. */
-function applyBuiltText(tools) {
-  const built = builtDefinitions();
-  for (const tool of tools) {
-    const definition = built.get(tool.name);
-    if (!definition) continue;
-    if (typeof definition.description === 'string' && definition.description)
-      tool.description = definition.description;
-    // The debug tools compose their schemas from shared spreads, which the file
-    // parser cannot follow: their whole (plain JSON) schema is taken from the build.
-    if (
-      tool.level === 'debug' &&
-      definition.inputSchema &&
-      definition.inputSchema.type === 'object'
-    ) {
-      tool.inputSchema = definition.inputSchema;
-      continue;
-    }
-    const props = tool.inputSchema && tool.inputSchema.properties;
-    if (!props) continue;
-    for (const key of Object.keys(props)) {
-      // `.description` by ACCESS, so a Zod getter answers as well as a plain key.
-      const stated = builtProperty(definition, key);
-      const text = stated ? stated.description : undefined;
-      if (typeof text === 'string' && text) props[key].description = text;
-      // A property written as a reference (`runner: RUNNER_PROPERTY.runner`)
-      // parses as `any`: its type and default come from the build too.
-      if (props[key].type === 'any' && stated) {
-        if (typeof stated.type === 'string') props[key].type = stated.type;
-        if (props[key].default === undefined && stated.default !== undefined)
-          props[key].default = String(stated.default);
-      }
+/** Every built handler module, `dist/handlers/<object>/<level>/<file>.js`. */
+function builtHandlerModules() {
+  const modules = [];
+  const stack = [DIST_HANDLERS];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.isFile() && entry.name.endsWith('.js')) modules.push(full);
     }
   }
-  return tools;
+  return modules.sort();
 }
 
-function loadToolsFromHandlers() {
-  const files = [];
-  walk(HANDLERS_ROOT, files);
-
-  const tools = [...loadObjectVersionTools()];
-
-  for (const filePath of files) {
-    const rel = path.relative(HANDLERS_ROOT, filePath).replace(/\\/g, '/');
-    const parts = rel.split('/');
-    if (parts.length < 3) continue;
-
-    const objectFolder = parts[0];
-    const level = parts[1];
-    if (!LEVELS.includes(level)) continue;
-
-    const toolDef = extractToolDefinition(filePath);
-    if (!toolDef) continue;
-
-    tools.push({
-      ...toolDef,
-      objectFolder,
-      objectTitle: titleCaseFolder(objectFolder),
-      level,
-      filePath: `src/handlers/${rel}`,
-    });
-  }
-
-  tools.push(...readOnlyCopies(tools));
-
-  // The walk finds every handler file; the long-session tools are served by
-  // the Streamable HTTP binaries alone, so they leave the stdio groups for
-  // the page's Streamable HTTP section.
-  const httpOnly = new Set(
-    httpSurfaces().all.sessionTools.map((tool) => tool.name),
+function isDefinition(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.name === 'string' &&
+    value.inputSchema !== undefined
   );
-  const stdioTools = tools.filter((tool) => !httpOnly.has(tool.name));
-  tools.length = 0;
-  tools.push(...stdioTools);
-
-  tools.sort((a, b) => {
-    if (a.level !== b.level)
-      return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
-    if (a.objectTitle !== b.objectTitle)
-      return a.objectTitle.localeCompare(b.objectTitle);
-    return a.name.localeCompare(b.name);
-  });
-
-  return applyBuiltText(tools);
 }
 
 /**
- * A read-only tool may be a COPY of a tool whose file sits under another level
- * (same name, schema and handler — e.g. a pure read kept under `high/`). The
- * file walk files it under that level only, so the built read-only group is
- * asked which names it serves, and each one the walk did not place under
- * `readonly` is documented there as well.
+ * Where each definition lives: the built module that exports it — the same
+ * object, or (a group's copy with its own name or words) the same
+ * `inputSchema` object — or whose exported `build…Tools()` factory makes a
+ * tool of that name.
  */
-function readOnlyCopies(tools) {
-  const distEntry = path.join(
-    __dirname,
-    '..',
-    'dist',
-    'lib',
-    'handlers',
-    'groups',
-    'ReadOnlyHandlersGroup.js',
-  );
+function moduleIndex() {
+  const byDefinition = new Map();
+  const bySchema = new Map();
+  const byName = new Map();
+  for (const file of builtHandlerModules()) {
+    const exported = require(file);
+    for (const [key, value] of Object.entries(exported)) {
+      if (isDefinition(value)) {
+        if (!byDefinition.has(value)) byDefinition.set(value, file);
+        if (typeof value.inputSchema === 'object' && !bySchema.has(value.inputSchema))
+          bySchema.set(value.inputSchema, file);
+      } else if (
+        typeof value === 'function' &&
+        key.startsWith('build') &&
+        key.endsWith('Tools') &&
+        value.length === 0
+      ) {
+        for (const entry of value()) {
+          const name = entry.toolDefinition.name;
+          if (!byName.has(name)) byName.set(name, file);
+        }
+      }
+    }
+  }
+  return (definition) =>
+    byDefinition.get(definition) ??
+    bySchema.get(definition.inputSchema) ??
+    byName.get(definition.name);
+}
+
+/**
+ * A definition's input as JSON Schema: a plain object schema as it is, a Zod
+ * shape converted as the MCP SDK lists it (input side).
+ */
+function jsonSchemaOf(inputSchema) {
+  if (
+    inputSchema &&
+    inputSchema.type === 'object' &&
+    typeof inputSchema.properties === 'object'
+  )
+    return inputSchema;
+  const { z } = require('zod');
+  return z.toJSONSchema(z.object(inputSchema), { io: 'input' });
+}
+
+/** A built JSON-Schema property as the page lists it: type, default, enum, words. */
+function listedProperty(stated) {
+  const type = Array.isArray(stated.type)
+    ? stated.type.join(' | ')
+    : typeof stated.type === 'string'
+      ? stated.type
+      : 'any';
+  return {
+    type,
+    description:
+      typeof stated.description === 'string' ? stated.description : '',
+    default: stated.default === undefined ? undefined : String(stated.default),
+    enum: Array.isArray(stated.enum) ? stated.enum.map(String) : undefined,
+  };
+}
+
+/** The page's entry for one served definition, filed by the module that holds it. */
+function documentedTool(definition, groupName, moduleOf) {
+  const file = moduleOf(definition);
+  if (file === undefined) {
+    throw new Error(
+      `${definition.name} (${groupName}) is held by no built handler module`,
+    );
+  }
+  const [objectFolder, folderLevel] = path
+    .relative(DIST_HANDLERS, file)
+    .split(path.sep);
+  const level = LEVELS.includes(folderLevel)
+    ? folderLevel
+    : GROUP_LEVELS[groupName];
+  if (level === undefined) {
+    throw new Error(`${groupName} has no level on the page`);
+  }
+  const schema = jsonSchemaOf(definition.inputSchema);
+  const properties = {};
+  for (const [key, stated] of Object.entries(schema.properties || {}))
+    properties[key] = listedProperty(stated);
+  return {
+    name: definition.name,
+    description:
+      typeof definition.description === 'string' ? definition.description : '',
+    inputSchema: {
+      properties,
+      required: Array.isArray(schema.required) ? [...schema.required] : [],
+    },
+    availableIn: Array.isArray(definition.available_in)
+      ? [...definition.available_in]
+      : [],
+    objectFolder,
+    objectTitle: titleCaseFolder(objectFolder),
+    level,
+    filePath: path
+      .join('src', path.relative(DIST_ROOT, file))
+      .split(path.sep)
+      .join('/')
+      .slice(0, -'.js'.length)
+      .concat('.ts'),
+  };
+}
+
+/** The served definitions of a tool set on stdio, each with its group's name. */
+function servedEntries(toolSet) {
+  return toolSet
+    .groups({ connection: null }, 'stdio')
+    .flatMap((group) =>
+      group
+        .getHandlers()
+        .map((entry) => ({ definition: entry.toolDefinition, group: group.constructor.name })),
+    );
+}
+
+function builtToolSets() {
+  const distEntry = path.join(DIST_ROOT, 'lib', 'toolSet.js');
   requireFreshBuild(distEntry);
-  const { ReadOnlyHandlersGroup } = require(distEntry);
-  const names = new ReadOnlyHandlersGroup({ connection: null })
-    .getHandlers()
-    .map((entry) => entry.toolDefinition.name);
+  return require(distEntry);
+}
+
+function byPageOrder(a, b) {
+  if (a.level !== b.level)
+    return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
+  if (a.objectTitle !== b.objectTitle)
+    return a.objectTitle.localeCompare(b.objectTitle);
+  return a.name.localeCompare(b.name);
+}
+
+/**
+ * Every tool the full stdio binary serves (`fullToolSet`), and a read-only
+ * copy of each tool the read-only group serves whose module sits under
+ * another level (the set lists such a tool once, from the high group).
+ */
+function loadToolsFromHandlers() {
+  const { fullToolSet } = builtToolSets();
+  const moduleOf = moduleIndex();
+  const tools = servedEntries(fullToolSet).map(({ definition, group }) =>
+    documentedTool(definition, group, moduleOf),
+  );
   const placed = new Set(
     tools.filter((t) => t.level === 'readonly').map((t) => t.name),
   );
-  const copies = [];
-  for (const name of names) {
+  // The read-only group as it stands alone: within the full set it lists
+  // only what the high group does not.
+  const { ReadOnlyHandlersGroup } = require(
+    path.join(DIST_ROOT, 'lib', 'handlers', 'groups', 'ReadOnlyHandlersGroup.js'),
+  );
+  for (const entry of new ReadOnlyHandlersGroup({
+    connection: null,
+  }).getHandlers()) {
+    const name = entry.toolDefinition.name;
     if (placed.has(name)) continue;
     const source = tools.find((t) => t.name === name);
-    if (source) copies.push({ ...source, level: 'readonly' });
+    if (source) tools.push({ ...source, level: 'readonly' });
   }
-  return copies;
+  return tools.sort(byPageOrder);
 }
 
 /**
  * The tools a read-only binary serves (`mcp-abap-adt-ro`, `-http-ro`,
- * `-sse-ro`), taken from the set the binary uses — `fullReadOnlyToolSet` of
- * the build — never from a group or a folder: the readonly folders also hold
- * the background-run tools, which core-ro does not serve. Each tool keeps its source
- * file and object; its parameters are the set's: a parameter the set's
- * definition does not declare is dropped. Throws when the set serves a tool
- * the file walk did not find, so the page cannot silently miss one.
+ * `-sse-ro`): `fullReadOnlyToolSet` of the build on stdio, in the set's
+ * order, each with the parameters it takes there, filed under the
+ * read-only level.
  */
-function readOnlySetTools(tools) {
-  const distEntry = path.join(__dirname, '..', 'dist', 'lib', 'toolSet.js');
-  requireFreshBuild(distEntry);
-  const { fullReadOnlyToolSet } = require(distEntry);
-  // The stdio binary's set: the http and sse ones are the same without the
-  // leftover-session list, which is stdio's only.
-  const entries = fullReadOnlyToolSet
-    .groups({ connection: null }, 'stdio')
-    .flatMap((group) => group.getHandlers());
-  return entries.map((entry) => {
-    const definition = entry.toolDefinition;
-    const source = tools.find((t) => t.name === definition.name);
-    if (!source) {
-      throw new Error(
-        `${definition.name} is served by mcp-abap-adt-ro but was found in no handler file`,
-      );
-    }
-    const declared = builtPropertiesOf(definition);
-    const parsed = source.inputSchema?.properties;
-    const inputSchema =
-      parsed && declared
-        ? {
-            ...source.inputSchema,
-            properties: Object.fromEntries(
-              Object.entries(parsed).filter(([key]) => declared.has(key)),
-            ),
-            required: (source.inputSchema.required || []).filter((key) =>
-              declared.has(key),
-            ),
-          }
-        : source.inputSchema;
-    return { ...source, inputSchema, level: 'readonly' };
-  });
-}
-
-/** The parameter names a built definition declares, in either schema shape. */
-function builtPropertiesOf(definition) {
-  const schema = definition.inputSchema;
-  if (!schema || typeof schema !== 'object') return undefined;
-  const properties = schema.properties ? schema.properties : schema;
-  return new Set(Object.keys(properties));
+function readOnlySetTools() {
+  const { fullReadOnlyToolSet } = builtToolSets();
+  const moduleOf = moduleIndex();
+  return servedEntries(fullReadOnlyToolSet)
+    .map(({ definition, group }) => ({
+      ...documentedTool(definition, group, moduleOf),
+      level: 'readonly',
+    }));
 }
 
 function levelTitle(level) {
@@ -853,12 +387,7 @@ function groupByLevelAndObject(tools) {
 function renderParams(tool) {
   const props = tool.inputSchema?.properties || {};
   const keys = Object.keys(props);
-  if (keys.length === 0) {
-    if (tool.inputSchemaRef) {
-      return `- See schema reference \`${tool.inputSchemaRef}\` in source file\n`;
-    }
-    return '- None\n';
-  }
+  if (keys.length === 0) return '- None\n';
 
   const required = new Set(tool.inputSchema?.required || []);
   let out = '';
@@ -866,7 +395,11 @@ function renderParams(tool) {
     const p = props[key];
     const req = required.has(key) ? 'required' : 'optional';
     const def = p.default !== undefined ? ` (default: ${p.default})` : '';
-    out += `- \`${key}\` (${p.type}, ${req}${def}) - ${p.description}\n`;
+    const values = p.enum
+      ? `, one of: ${p.enum.map((v) => `\`${v}\``).join(', ')}`
+      : '';
+    const words = p.description ? ` - ${p.description}` : '';
+    out += `- \`${key}\` (${p.type}, ${req}${def}${values})${words}\n`;
   }
   return out;
 }
@@ -924,10 +457,8 @@ function httpNavigationMarkdown(surface) {
 
 /** Each HTTP surface of the build: the full set's and the read-only one's. */
 function httpSurfaces() {
-  const distEntry = path.join(__dirname, '..', 'dist', 'lib', 'toolSet.js');
-  requireFreshBuild(distEntry);
   const { fullToolSet, fullReadOnlyToolSet, streamableHttpSurface } =
-    require(distEntry);
+    builtToolSets();
   return {
     all: streamableHttpSurface(fullToolSet),
     readonly: streamableHttpSurface(fullReadOnlyToolSet),
@@ -946,7 +477,7 @@ function generateMarkdown(tools, surface) {
   };
 
   let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
-  md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  md += `Generated from the tool definitions the server builds (not from docs).\n\n`;
   md += `## Summary\n\n`;
   md += `- Total tools: ${summary.total}\n`;
   md += `- Read-only tools: ${summary.readonly}\n`;
@@ -1041,7 +572,7 @@ function generateLevelMarkdown(
   );
 
   let md = `# ${levelTitle(level)} Tools - MCP ABAP ADT Server\n\n`;
-  md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  md += `Generated from the tool definitions the server builds (not from docs).\n\n`;
   if (intro) md += `${intro}\n\n`;
   md += `- Level: ${levelTitle(level)}\n`;
   md += `- Total tools: ${levelTools.length}\n\n`;
@@ -1093,7 +624,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
   const grouped = groupByLevelAndObject(envTools);
 
   let md = `# ${envLabel} Tools - MCP ABAP ADT Server\n\n`;
-  md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  md += `Generated from the tool definitions the server builds (not from docs).\n\n`;
   md += `${envDescription}\n\n`;
   md += `- Total tools: ${envTools.length}\n`;
   for (const level of LEVELS) {
@@ -1165,11 +696,11 @@ const HIGH_PAGE_INTRO =
   "The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).";
 
 function main() {
-  console.log('🔍 Scanning handler code in src/handlers...');
+  console.log('🔍 Reading the built tool sets...');
   const tools = loadToolsFromHandlers();
 
   if (tools.length === 0) {
-    console.error('❌ No TOOL_DEFINITION found in src/handlers');
+    console.error('❌ The built tool set serves no tool');
     process.exit(1);
   }
 
@@ -1180,7 +711,7 @@ function main() {
   fs.writeFileSync(
     OUTPUT_PATHS.readonly,
     generateLevelMarkdown(
-      readOnlySetTools(tools),
+      readOnlySetTools(),
       'readonly',
       READ_ONLY_PAGE_INTRO,
       httpSectionMarkdown(surfaces.readonly),
@@ -1244,10 +775,11 @@ if (require.main === module) {
 }
 
 module.exports = {
+  GROUP_LEVELS,
+  servedEntries,
   readOnlySetTools,
-  extractToolDefinition,
+  renderParams,
   loadToolsFromHandlers,
-  parseTopLevelProperties,
   generateMarkdown,
   generateLevelMarkdown,
   httpSectionMarkdown,

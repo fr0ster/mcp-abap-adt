@@ -19,6 +19,7 @@ import {
   domainDocuments,
   functionGroupDocuments,
   functionModuleDocuments,
+  includeDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
   packageDocuments,
@@ -27,6 +28,7 @@ import {
   serviceDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { LOCK_KINDS, type LockKind } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
@@ -194,6 +196,15 @@ export async function lockObject(
           return createOnPremAdtClient(connection, logger)
             .getProgram(resultsFor(programDocuments))
             .lock({ programName: objectName }, { analyse: analyseLock });
+        case 'include':
+          // An include is locked on premise only (`ADT_TYPES_ONPREM`).
+          return createOnPremAdtClient(connection, logger)
+            .getInclude(resultsFor(includeDocuments))
+            .lock({ includeName: objectName }, { analyse: analyseLock });
+        case 'table_type':
+          return client
+            .getTableType(resultsFor(tableTypeDocuments))
+            .lock({ tableTypeName: objectName }, { analyse: analyseLock });
         case 'interface':
           return client
             .getInterface(resultsFor(interfaceDocuments))

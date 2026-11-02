@@ -444,26 +444,38 @@ export function codesWithNames(
 
 /**
  * HandlerWhereUsed's `object_type`: each compact name with the name of
- * {@link TYPE_NAMES} it is handed to GetWhereUsed as.
+ * {@link TYPE_NAMES} it is handed to GetWhereUsed as, or its code where no
+ * name stands for it (a table type, `TTYP/DA`).
  */
 export const COMPACT_WHERE_USED_ROUTES = {
-  CLASS: 'class',
-  INTERFACE: 'interface',
-  PROGRAM: 'program',
-  INCLUDE: 'include',
-  FUNCTION_GROUP: 'functiongroup',
-  FUNCTION_MODULE: 'functionmodule',
-  PACKAGE: 'package',
-  TABLE: 'table',
-  STRUCTURE: 'structure',
-  DOMAIN: 'domain',
-  DATA_ELEMENT: 'dataelement',
-  DDL: 'view',
-} as const satisfies Readonly<Record<string, TypeName>>;
+  ...({
+    CLASS: 'class',
+    INTERFACE: 'interface',
+    PROGRAM: 'program',
+    INCLUDE: 'include',
+    FUNCTION_GROUP: 'functiongroup',
+    FUNCTION_MODULE: 'functionmodule',
+    PACKAGE: 'package',
+    TABLE: 'table',
+    STRUCTURE: 'structure',
+    DOMAIN: 'domain',
+    DATA_ELEMENT: 'dataelement',
+    DDL: 'view',
+  } as const satisfies Readonly<Record<string, TypeName>>),
+  // A code where no name stands for it.
+  ...({
+    TABLE_TYPE: 'TTYP/DA',
+  } as const satisfies Readonly<Record<string, WhereUsedCode<'onprem'>>>),
+} as const;
 
-/** The compact names whose where-used name stands for a code of `P`. */
+/** The code a where-used route stands for: a name's code, or the code. */
+type WhereUsedRouteCode<R> = R extends TypeName ? (typeof TYPE_NAMES)[R] : R;
+
+/** The compact names whose where-used route stands for a code of `P`. */
 type CompactWhereUsedName<P> = {
-  [K in keyof typeof COMPACT_WHERE_USED_ROUTES]: (typeof TYPE_NAMES)[(typeof COMPACT_WHERE_USED_ROUTES)[K]] extends P
+  [K in keyof typeof COMPACT_WHERE_USED_ROUTES]: WhereUsedRouteCode<
+    (typeof COMPACT_WHERE_USED_ROUTES)[K]
+  > extends P
     ? K
     : never;
 }[keyof typeof COMPACT_WHERE_USED_ROUTES];
@@ -486,6 +498,7 @@ export const COMPACT_WHERE_USED = projected<
     'DOMAIN',
     'DATA_ELEMENT',
     'DDL',
+    'TABLE_TYPE',
   ],
   cloud: [
     'CLASS',
@@ -500,6 +513,7 @@ export const COMPACT_WHERE_USED = projected<
     'DOMAIN',
     'DATA_ELEMENT',
     'DDL',
+    'TABLE_TYPE',
   ],
 });
 
@@ -714,10 +728,12 @@ export const SINGLE_ACTIVATION_NAMES = projected<
 export const COMPACT_ACTIVATE_ROUTES = {
   CLASS: 'CLAS/OC',
   PROGRAM: 'PROG/P',
+  INCLUDE: 'PROG/I',
   INTERFACE: 'INTF/OI',
   FUNCTION_GROUP: 'FUGR/F',
   TABLE: 'TABL/DT',
   STRUCTURE: 'TABL/DS',
+  TABLE_TYPE: 'TTYP/DA',
   DDL: 'DDLS/DF',
   DOMAIN: 'DOMA/DD',
   DATA_ELEMENT: 'DTEL/DE',
@@ -738,10 +754,12 @@ export const COMPACT_ACTIVATE = projected<
   onprem: [
     'CLASS',
     'PROGRAM',
+    'INCLUDE',
     'INTERFACE',
     'FUNCTION_GROUP',
     'TABLE',
     'STRUCTURE',
+    'TABLE_TYPE',
     'DDL',
     'DOMAIN',
     'DATA_ELEMENT',
@@ -759,6 +777,7 @@ export const COMPACT_ACTIVATE = projected<
     'FUNCTION_GROUP',
     'TABLE',
     'STRUCTURE',
+    'TABLE_TYPE',
     'DDL',
     'DOMAIN',
     'DATA_ELEMENT',
@@ -926,8 +945,12 @@ export const INCLUDES_PARENT_MAIN_TYPES = projected<
 // Versions (GetObjectVersions, GetObjectVersionSource, GetObjectVersionDiff)
 // ---------------------------------------------------------------------------
 
-/** The kinds the generic version tools read, each with its API. */
-export const VERSIONED_ROUTES = {
+/**
+ * The kinds whose version sources SAP serves, each with its API: the
+ * version tools' source and diff (GetObjectVersionSource,
+ * GetObjectVersionDiff, Get<X>VersionSource, Get<X>VersionDiff).
+ */
+export const VERSION_SOURCE_ROUTES = {
   class: { api: 'class', operation: 'versions' },
   program: { api: 'program', operation: 'versions' },
   interface: { api: 'interface', operation: 'versions' },
@@ -939,13 +962,59 @@ export const VERSIONED_ROUTES = {
   metadata_extension: { api: 'metadataExtension', operation: 'versions' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
-/** A kind the version tools read. */
+/**
+ * The kinds whose version list the version tools read, each with its API:
+ * every kind with a version source, and the table type, whose list SAP
+ * serves and whose version source it refuses (403 "Request version for TTYP
+ * is not supported": measured on premise 2026-11-01, on ABAP cloud
+ * 2026-11-02).
+ */
+export const VERSIONED_ROUTES = {
+  ...VERSION_SOURCE_ROUTES,
+  table_type: { api: 'tableType', operation: 'versions' },
+} as const satisfies Readonly<Record<string, AdtNeed>>;
+
+/** A kind whose version list the version tools read. */
 export type VersionedKind = keyof typeof VERSIONED_ROUTES;
 
-/** The generic version tools' `object_type`. */
+/** A kind whose version source the version tools read. */
+export type VersionSourceKind = keyof typeof VERSION_SOURCE_ROUTES;
+
+/** GetObjectVersions' `object_type`. */
 export const VERSIONED_KINDS = projected<
   ServedName<'onprem', typeof VERSIONED_ROUTES>,
   ServedName<'cloud', typeof VERSIONED_ROUTES>
+>()({
+  onprem: [
+    'class',
+    'program',
+    'interface',
+    'function_module',
+    'table',
+    'structure',
+    'ddl',
+    'behavior_definition',
+    'metadata_extension',
+    'table_type',
+  ],
+  cloud: [
+    'class',
+    'program',
+    'interface',
+    'function_module',
+    'table',
+    'structure',
+    'ddl',
+    'behavior_definition',
+    'metadata_extension',
+    'table_type',
+  ],
+});
+
+/** GetObjectVersionSource's and GetObjectVersionDiff's `object_type`. */
+export const VERSION_SOURCE_KINDS = projected<
+  ServedName<'onprem', typeof VERSION_SOURCE_ROUTES>,
+  ServedName<'cloud', typeof VERSION_SOURCE_ROUTES>
 >()({
   onprem: [
     'class',
@@ -975,9 +1044,10 @@ export const VERSIONED_KINDS = projected<
 // The compact tools whose `object_type` (or `target_type`) picks the API
 // ---------------------------------------------------------------------------
 //
-// A cloud list is its on-premise list without `PROGRAM` where ABAP cloud
-// serves no program for the operation: the filter's narrowed element type is
-// what `projected` checks against the cloud projection.
+// A cloud list is its on-premise list without `PROGRAM` (and `INCLUDE`)
+// where ABAP cloud serves no program (or include) for the operation: the
+// filter's narrowed element type is what `projected` checks against the
+// cloud projection.
 
 /** What `HandlerCreate` creates, each with its API. */
 export const COMPACT_CREATE_ROUTES = {
@@ -987,11 +1057,13 @@ export const COMPACT_CREATE_ROUTES = {
   TRANSPORT: { api: 'request', operation: 'create' },
   TABLE: { api: 'table', operation: 'create' },
   STRUCTURE: { api: 'structure', operation: 'create' },
+  TABLE_TYPE: { api: 'tableType', operation: 'create' },
   DDL: { api: 'ddl', operation: 'create' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'create' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'create' },
   CLASS: { api: 'class', operation: 'create' },
   PROGRAM: { api: 'program', operation: 'create' },
+  INCLUDE: { api: 'include', operation: 'create' },
   INTERFACE: { api: 'interface', operation: 'create' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'create' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'create' },
@@ -1010,11 +1082,13 @@ const CREATE_ONPREM = [
   'TRANSPORT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1029,7 +1103,9 @@ export const COMPACT_CREATE = projected<
   ServedName<'cloud', typeof COMPACT_CREATE_ROUTES>
 >()({
   onprem: CREATE_ONPREM,
-  cloud: CREATE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: CREATE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerGet` reads, each with its API. */
@@ -1039,6 +1115,7 @@ export const COMPACT_READ_ROUTES = {
   DATA_ELEMENT: { api: 'dataElement', operation: 'readMetadata' },
   TABLE: { api: 'table', operation: 'read' },
   STRUCTURE: { api: 'structure', operation: 'read' },
+  TABLE_TYPE: { api: 'tableType', operation: 'readMetadata' },
   DDL: { api: 'ddl', operation: 'read' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'read' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'read' },
@@ -1048,6 +1125,7 @@ export const COMPACT_READ_ROUTES = {
   LOCAL_DEFINITIONS: { api: 'localDefinitions', operation: 'read' },
   LOCAL_MACROS: { api: 'localMacros', operation: 'read' },
   PROGRAM: { api: 'program', operation: 'read' },
+  INCLUDE: { api: 'include', operation: 'read' },
   INTERFACE: { api: 'interface', operation: 'read' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'read' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'read' },
@@ -1065,6 +1143,7 @@ const READ_ONPREM = [
   'DATA_ELEMENT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
@@ -1074,6 +1153,7 @@ const READ_ONPREM = [
   'LOCAL_DEFINITIONS',
   'LOCAL_MACROS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1085,7 +1165,7 @@ const READ_ONPREM = [
   'TRANSPORT',
 ] as const;
 
-/** HandlerGet's `object_type`: a program is read on both variants. */
+/** HandlerGet's `object_type`: a program and an include are read on both variants. */
 export const COMPACT_READ = projected<
   ServedName<'onprem', typeof COMPACT_READ_ROUTES>,
   ServedName<'cloud', typeof COMPACT_READ_ROUTES>
@@ -1096,6 +1176,7 @@ export const COMPACT_UPDATE_ROUTES = {
   PACKAGE: { api: 'package', operation: 'updateMetadata' },
   DOMAIN: { api: 'domain', operation: 'updateMetadata' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'updateMetadata' },
+  TABLE_TYPE: { api: 'tableType', operation: 'updateMetadata' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'update' },
   TABLE: { api: 'table', operation: 'update' },
   STRUCTURE: { api: 'structure', operation: 'update' },
@@ -1109,6 +1190,7 @@ export const COMPACT_UPDATE_ROUTES = {
   UNIT_TEST: { api: 'localTestClass', operation: 'update' },
   CDS_UNIT_TEST: { api: 'localTestClass', operation: 'update' },
   PROGRAM: { api: 'program', operation: 'update' },
+  INCLUDE: { api: 'include', operation: 'update' },
   INTERFACE: { api: 'interface', operation: 'update' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'update' },
   BEHAVIOR_DEFINITION: { api: 'behaviorDefinition', operation: 'update' },
@@ -1124,6 +1206,7 @@ const UPDATE_ONPREM = [
   'PACKAGE',
   'DOMAIN',
   'DATA_ELEMENT',
+  'TABLE_TYPE',
   'FUNCTION_GROUP',
   'TABLE',
   'STRUCTURE',
@@ -1137,6 +1220,7 @@ const UPDATE_ONPREM = [
   'UNIT_TEST',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_MODULE',
   'BEHAVIOR_DEFINITION',
@@ -1151,7 +1235,9 @@ export const COMPACT_UPDATE = projected<
   ServedName<'cloud', typeof COMPACT_UPDATE_ROUTES>
 >()({
   onprem: UPDATE_ONPREM,
-  cloud: UPDATE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: UPDATE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /**
@@ -1165,12 +1251,14 @@ export const COMPACT_DELETE_ROUTES = {
   DATA_ELEMENT: { api: 'dataElement', operation: 'delete' },
   TABLE: { api: 'table', operation: 'delete' },
   STRUCTURE: { api: 'structure', operation: 'delete' },
+  TABLE_TYPE: { api: 'tableType', operation: 'delete' },
   DDL: { api: 'ddl', operation: 'delete' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'delete' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'delete' },
   CLASS: { api: 'class', operation: 'delete' },
   CDS_UNIT_TEST: { api: 'class', operation: 'delete' },
   PROGRAM: { api: 'program', operation: 'delete' },
+  INCLUDE: { api: 'include', operation: 'delete' },
   INTERFACE: { api: 'interface', operation: 'delete' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'delete' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'delete' },
@@ -1193,12 +1281,14 @@ const DELETE_ONPREM = [
   'DATA_ELEMENT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1218,18 +1308,22 @@ export const COMPACT_DELETE = projected<
   ServedName<'cloud', typeof COMPACT_DELETE_ROUTES>
 >()({
   onprem: DELETE_ONPREM,
-  cloud: DELETE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: DELETE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerLock` locks, each with its API. */
 export const COMPACT_LOCK_ROUTES = {
   CLASS: { api: 'class', operation: 'lock' },
   PROGRAM: { api: 'program', operation: 'lock' },
+  INCLUDE: { api: 'include', operation: 'lock' },
   INTERFACE: { api: 'interface', operation: 'lock' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'lock' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'lock' },
   TABLE: { api: 'table', operation: 'lock' },
   STRUCTURE: { api: 'structure', operation: 'lock' },
+  TABLE_TYPE: { api: 'tableType', operation: 'lock' },
   DDL: { api: 'ddl', operation: 'lock' },
   DOMAIN: { api: 'domain', operation: 'lock' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'lock' },
@@ -1245,11 +1339,13 @@ export const COMPACT_LOCK_ROUTES = {
 export const COMPACT_UNLOCK_ROUTES = {
   CLASS: { api: 'class', operation: 'unlock' },
   PROGRAM: { api: 'program', operation: 'unlock' },
+  INCLUDE: { api: 'include', operation: 'unlock' },
   INTERFACE: { api: 'interface', operation: 'unlock' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'unlock' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'unlock' },
   TABLE: { api: 'table', operation: 'unlock' },
   STRUCTURE: { api: 'structure', operation: 'unlock' },
+  TABLE_TYPE: { api: 'tableType', operation: 'unlock' },
   DDL: { api: 'ddl', operation: 'unlock' },
   DOMAIN: { api: 'domain', operation: 'unlock' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'unlock' },
@@ -1267,11 +1363,13 @@ export const COMPACT_UNLOCK_ROUTES = {
 const LOCK_ONPREM = [
   'CLASS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'DOMAIN',
   'DATA_ELEMENT',
@@ -1289,7 +1387,9 @@ export const COMPACT_LOCK = projected<
   ServedName<'cloud', typeof COMPACT_LOCK_ROUTES>
 >()({
   onprem: LOCK_ONPREM,
-  cloud: LOCK_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: LOCK_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** HandlerUnlock's `object_type`. */
@@ -1298,18 +1398,22 @@ export const COMPACT_UNLOCK = projected<
   ServedName<'cloud', typeof COMPACT_UNLOCK_ROUTES>
 >()({
   onprem: LOCK_ONPREM,
-  cloud: LOCK_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: LOCK_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerValidate` validates, each with its API. */
 export const COMPACT_VALIDATE_ROUTES = {
   CLASS: { api: 'class', operation: 'validate' },
   PROGRAM: { api: 'program', operation: 'validate' },
+  INCLUDE: { api: 'include', operation: 'validate' },
   INTERFACE: { api: 'interface', operation: 'validate' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'validate' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'validate' },
   TABLE: { api: 'table', operation: 'validate' },
   STRUCTURE: { api: 'structure', operation: 'validate' },
+  TABLE_TYPE: { api: 'tableType', operation: 'validate' },
   DDL: { api: 'ddl', operation: 'validate' },
   DOMAIN: { api: 'domain', operation: 'validate' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'validate' },
@@ -1326,11 +1430,13 @@ export const COMPACT_VALIDATE_ROUTES = {
 const VALIDATE_ONPREM = [
   'CLASS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'DOMAIN',
   'DATA_ELEMENT',
@@ -1347,7 +1453,9 @@ export const COMPACT_VALIDATE = projected<
   ServedName<'cloud', typeof COMPACT_VALIDATE_ROUTES>
 >()({
   onprem: VALIDATE_ONPREM,
-  cloud: VALIDATE_ONPREM.filter((member) => member !== 'PROGRAM'),
+  cloud: VALIDATE_ONPREM.filter(
+    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+  ),
 });
 
 /** What `HandlerCheckRun` checks, each with its API. */
@@ -1359,6 +1467,7 @@ export const COMPACT_CHECK_ROUTES = {
   FUNCTION_MODULE: { api: 'functionModule', operation: 'check' },
   TABLE: { api: 'table', operation: 'check' },
   STRUCTURE: { api: 'structure', operation: 'check' },
+  TABLE_TYPE: { api: 'tableType', operation: 'check' },
   DDL: { api: 'ddl', operation: 'check' },
   DOMAIN: { api: 'domain', operation: 'check' },
   DATA_ELEMENT: { api: 'dataElement', operation: 'check' },
@@ -1375,6 +1484,7 @@ const CHECK_ONPREM = [
   'FUNCTION_MODULE',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'DOMAIN',
   'DATA_ELEMENT',
@@ -1396,12 +1506,14 @@ export const COMPACT_DELETION_CHECK_ROUTES = {
   DATA_ELEMENT: { api: 'dataElement', operation: 'deletionCheck' },
   TABLE: { api: 'table', operation: 'deletionCheck' },
   STRUCTURE: { api: 'structure', operation: 'deletionCheck' },
+  TABLE_TYPE: { api: 'tableType', operation: 'deletionCheck' },
   DDL: { api: 'ddl', operation: 'deletionCheck' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'deletionCheck' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'deletionCheck' },
   CLASS: { api: 'class', operation: 'deletionCheck' },
   CDS_UNIT_TEST: { api: 'class', operation: 'deletionCheck' },
   PROGRAM: { api: 'program', operation: 'deletionCheck' },
+  INCLUDE: { api: 'include', operation: 'deletionCheck' },
   INTERFACE: { api: 'interface', operation: 'deletionCheck' },
   FUNCTION_GROUP: { api: 'functionGroup', operation: 'deletionCheck' },
   FUNCTION_MODULE: { api: 'functionModule', operation: 'deletionCheck' },
@@ -1422,12 +1534,14 @@ const DELETION_CHECK_ONPREM = [
   'DATA_ELEMENT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',
   'CDS_UNIT_TEST',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',
@@ -1436,7 +1550,7 @@ const DELETION_CHECK_ONPREM = [
   'METADATA_EXTENSION',
 ] as const;
 
-/** HandlerDeletionCheck's `object_type`: a program's on both variants. */
+/** HandlerDeletionCheck's `object_type`: a program's and an include's on both variants. */
 export const COMPACT_DELETION_CHECK = projected<
   ServedName<'onprem', typeof COMPACT_DELETION_CHECK_ROUTES>,
   ServedName<'cloud', typeof COMPACT_DELETION_CHECK_ROUTES>
@@ -1533,6 +1647,7 @@ export const CHECK_KIND_ROUTES = {
   function_module: { api: 'functionModule', operation: 'check' },
   table: { api: 'table', operation: 'check' },
   structure: { api: 'structure', operation: 'check' },
+  table_type: { api: 'tableType', operation: 'check' },
   ddl: { api: 'ddl', operation: 'check' },
   domain: { api: 'domain', operation: 'check' },
   data_element: { api: 'dataElement', operation: 'check' },
@@ -1552,6 +1667,7 @@ const CHECK_KIND_LIST = [
   'function_module',
   'table',
   'structure',
+  'table_type',
   'ddl',
   'domain',
   'data_element',
@@ -1575,6 +1691,7 @@ export const COMPACT_CHECK_KINDS = {
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',
@@ -1590,11 +1707,13 @@ export const COMPACT_CHECK_KINDS = {
 export const LOCK_KIND_ROUTES = {
   class: { api: 'class', operation: 'lock' },
   program: { api: 'program', operation: 'lock' },
+  include: { api: 'include', operation: 'lock' },
   interface: { api: 'interface', operation: 'lock' },
   function_group: { api: 'functionGroup', operation: 'lock' },
   function_module: { api: 'functionModule', operation: 'lock' },
   table: { api: 'table', operation: 'lock' },
   structure: { api: 'structure', operation: 'lock' },
+  table_type: { api: 'tableType', operation: 'lock' },
   ddl: { api: 'ddl', operation: 'lock' },
   domain: { api: 'domain', operation: 'lock' },
   data_element: { api: 'dataElement', operation: 'lock' },
@@ -1610,11 +1729,13 @@ export const LOCK_KIND_ROUTES = {
 export const UNLOCK_KIND_ROUTES = {
   class: { api: 'class', operation: 'unlock' },
   program: { api: 'program', operation: 'unlock' },
+  include: { api: 'include', operation: 'unlock' },
   interface: { api: 'interface', operation: 'unlock' },
   function_group: { api: 'functionGroup', operation: 'unlock' },
   function_module: { api: 'functionModule', operation: 'unlock' },
   table: { api: 'table', operation: 'unlock' },
   structure: { api: 'structure', operation: 'unlock' },
+  table_type: { api: 'tableType', operation: 'unlock' },
   ddl: { api: 'ddl', operation: 'unlock' },
   domain: { api: 'domain', operation: 'unlock' },
   data_element: { api: 'dataElement', operation: 'unlock' },
@@ -1638,11 +1759,13 @@ export type UnlockKind = keyof typeof UNLOCK_KIND_ROUTES;
 const LOCK_KIND_LIST = [
   'class',
   'program',
+  'include',
   'interface',
   'function_group',
   'function_module',
   'table',
   'structure',
+  'table_type',
   'ddl',
   'domain',
   'data_element',
@@ -1660,7 +1783,9 @@ export const LOCK_KINDS = projected<
   ServedName<'cloud', typeof LOCK_KIND_ROUTES>
 >()({
   onprem: LOCK_KIND_LIST,
-  cloud: LOCK_KIND_LIST.filter((kind) => kind !== 'program'),
+  cloud: LOCK_KIND_LIST.filter(
+    (kind) => kind !== 'program' && kind !== 'include',
+  ),
 });
 
 /** `UnlockObjectLow`'s `object_type`. */
@@ -1669,18 +1794,22 @@ export const UNLOCK_KINDS = projected<
   ServedName<'cloud', typeof UNLOCK_KIND_ROUTES>
 >()({
   onprem: LOCK_KIND_LIST,
-  cloud: LOCK_KIND_LIST.filter((kind) => kind !== 'program'),
+  cloud: LOCK_KIND_LIST.filter(
+    (kind) => kind !== 'program' && kind !== 'include',
+  ),
 });
 
 /** HandlerLock's members, each with the kind it is locked as. */
 export const COMPACT_LOCK_KINDS = {
   CLASS: 'class',
   PROGRAM: 'program',
+  INCLUDE: 'include',
   INTERFACE: 'interface',
   FUNCTION_GROUP: 'function_group',
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',
@@ -1700,11 +1829,13 @@ export const COMPACT_LOCK_KINDS = {
 export const VALIDATE_KIND_ROUTES = {
   class: { api: 'class', operation: 'validate' },
   program: { api: 'program', operation: 'validate' },
+  include: { api: 'include', operation: 'validate' },
   interface: { api: 'interface', operation: 'validate' },
   function_group: { api: 'functionGroup', operation: 'validate' },
   function_module: { api: 'functionModule', operation: 'validate' },
   table: { api: 'table', operation: 'validate' },
   structure: { api: 'structure', operation: 'validate' },
+  table_type: { api: 'tableType', operation: 'validate' },
   ddl: { api: 'ddl', operation: 'validate' },
   domain: { api: 'domain', operation: 'validate' },
   data_element: { api: 'dataElement', operation: 'validate' },
@@ -1724,11 +1855,13 @@ export type ValidateKind = keyof typeof VALIDATE_KIND_ROUTES;
 const VALIDATE_KIND_LIST = [
   'class',
   'program',
+  'include',
   'interface',
   'function_group',
   'function_module',
   'table',
   'structure',
+  'table_type',
   'ddl',
   'domain',
   'data_element',
@@ -1745,7 +1878,9 @@ export const VALIDATE_KINDS = projected<
   ServedName<'cloud', typeof VALIDATE_KIND_ROUTES>
 >()({
   onprem: VALIDATE_KIND_LIST,
-  cloud: VALIDATE_KIND_LIST.filter((kind) => kind !== 'program'),
+  cloud: VALIDATE_KIND_LIST.filter(
+    (kind) => kind !== 'program' && kind !== 'include',
+  ),
 });
 
 /**
@@ -1755,11 +1890,13 @@ export const VALIDATE_KINDS = projected<
 export const COMPACT_VALIDATE_KINDS = {
   CLASS: 'class',
   PROGRAM: 'program',
+  INCLUDE: 'include',
   INTERFACE: 'interface',
   FUNCTION_GROUP: 'function_group',
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',

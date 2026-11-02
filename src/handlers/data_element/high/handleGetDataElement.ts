@@ -1,6 +1,10 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { readDataElementMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
@@ -9,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'GetDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.',
+    '[read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -17,13 +21,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Data element name.',
       },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
     },
     required: ['data_element_name'],
   },
@@ -31,7 +29,7 @@ export const TOOL_DEFINITION = {
 
 interface GetDataElementArgs {
   data_element_name: string;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
 }
 
 export async function handleGetDataElement(
@@ -48,14 +46,11 @@ export async function handleGetDataElement(
 
   // A data element has no source of its own — `IDataElementContract`
   // composes `IAdtMetadataReadable` and nothing else, so unlike its
-  // siblings there is no `.read()` to call at all. `version` is not
-  // forwarded — the library ignores it at every level for this family — and
-  // is echoed, deliberately unfixed (task 11 fix round 1, deferred to the
-  // documentation task). One call, used for the one field this tool has
-  // always answered.
+  // siblings there is no `.read()` to call at all. One call, at the version
+  // asked.
   return answer(
     { tool: 'GetDataElement', detail: 'terse' },
-    () => readDataElementMetadata(client, { dataElementName }),
+    () => readDataElementMetadata(client, { dataElementName }, version),
     (metadata: AdtReading<string>) => ({
       success: true,
       data_element_name: dataElementName,

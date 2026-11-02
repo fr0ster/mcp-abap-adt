@@ -18,6 +18,10 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -56,12 +60,7 @@ export const TOOL_DEFINITION = {
         description:
           'Several structure names, read together (give this or structure_name).',
       },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description: 'Version to read: "active" (default) or "inactive".',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
       include_extensions: {
         type: 'boolean',
         description:
@@ -202,7 +201,7 @@ async function structuresListOf(
   context: HandlerContext,
   args: {
     structure_name: string;
-    version?: 'active' | 'inactive';
+    version?: ReadVersion;
     include_extensions?: boolean;
   },
 ) {
@@ -270,17 +269,15 @@ async function structuresListOf(
         return null;
       };
       const structure = await attempt('read structure', () =>
-        obj.read({ structureName: name }, version as 'active' | 'inactive', {
+        obj.read({ structureName: name }, version, {
           analyse: analyseException,
         }),
       );
       if (structure != null) return { source: structure };
       const table = await attempt('read table', () =>
-        client
-          .getTable(tableDocuments)
-          .read({ tableName: name }, version as 'active' | 'inactive', {
-            analyse: analyseException,
-          }),
+        client.getTable(tableDocuments).read({ tableName: name }, version, {
+          analyse: analyseException,
+        }),
       );
       if (table != null) return { source: table };
       return answered === 2 ? { absent: true } : { failures };
@@ -553,10 +550,7 @@ const settledAs = (result: PhaseResult<unknown>): Promise<unknown> =>
  * answered. A credential failure any of them answers ends the call: thrown,
  * as the sequential version throws it.
  */
-function structureReads(
-  context: HandlerContext,
-  version: 'active' | 'inactive',
-) {
+function structureReads(context: HandlerContext, version: ReadVersion) {
   const { logger } = context;
   const structures = new Map<string, PhaseResult<unknown>>();
   const tables = new Map<string, PhaseResult<unknown>>();
@@ -932,7 +926,7 @@ async function structureTreeFromAnswers(
 async function structureTrees(
   context: HandlerContext,
   rootNames: readonly string[],
-  version: 'active' | 'inactive',
+  version: ReadVersion,
   includeExtensions: boolean,
 ) {
   const reads = structureReads(context, version);
@@ -1040,7 +1034,7 @@ export async function handleGetStructuresList(
   args: {
     structure_name?: string;
     structure_names?: string[];
-    version?: 'active' | 'inactive';
+    version?: ReadVersion;
     include_extensions?: boolean;
   },
 ) {

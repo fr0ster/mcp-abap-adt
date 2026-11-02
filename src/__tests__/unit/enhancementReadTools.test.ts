@@ -98,7 +98,7 @@ describe('GetEnhancementSpot', () => {
     // adt-clients' request: the subtype's own media type, a header, never
     // the body of the GET.
     expect(connection.calls[0]?.url).toBe(
-      '/sap/bc/adt/enhancements/enhsxsb/sadt_rest_rfc_application',
+      '/sap/bc/adt/enhancements/enhsxsb/sadt_rest_rfc_application?version=active',
     );
     expect(connection.calls[0]?.headers?.Accept).toBe(
       'application/vnd.sap.adt.enh.enhs.v2+xml',

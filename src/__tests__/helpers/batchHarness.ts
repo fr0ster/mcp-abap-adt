@@ -88,9 +88,21 @@ function runLocation(method: string, url: string): Record<string, string> {
   return {};
 }
 
+/** One request as the connection was asked to send it. */
+export interface CountedRequest {
+  method: string;
+  url: string;
+  /** Its request parameters, where it carries any (a version, for some reads). */
+  params: IAbapRequestOptions['params'];
+  /** Its body, where it carries one (an ADT batch envelope's requests). */
+  data: IAbapRequestOptions['data'];
+}
+
 export interface Counting {
   connection: IAbapConnection;
   sent: string[];
+  /** Each sent request, with its parameters. */
+  requests: CountedRequest[];
   /** Each sent request's session kind, as a batch reads it (`requestKind`). */
   kinds: SessionKind[];
 }
@@ -106,6 +118,7 @@ export function countingConnection(
   headers: Record<string, string> = {},
 ): Counting {
   const sent: string[] = [];
+  const requests: CountedRequest[] = [];
   const kinds: SessionKind[] = [];
   let session: 'stateful' | 'stateless' = 'stateless';
   const documentFor = (method: string, url: string): string => {
@@ -138,6 +151,12 @@ export function countingConnection(
     },
     async makeAdtRequest(options: IAbapRequestOptions) {
       sent.push(`${options.method} ${options.url}`);
+      requests.push({
+        method: options.method,
+        url: options.url,
+        params: options.params,
+        data: options.data,
+      });
       kinds.push(requestKind(options, session, 'communication'));
       if (mode === 'pending') return new Promise<never>(() => {});
       if (mode === 'not-found') {
@@ -165,7 +184,12 @@ export function countingConnection(
       };
     },
   };
-  return { connection: connection as unknown as IAbapConnection, sent, kinds };
+  return {
+    connection: connection as unknown as IAbapConnection,
+    sent,
+    requests,
+    kinds,
+  };
 }
 
 /** The served tools of the full and compact sets, each reading the context at call time. */

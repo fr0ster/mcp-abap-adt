@@ -28,10 +28,11 @@ run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-stdio / Streamable HTTP / SSE: core 257 / 257 / 255 (with the 3 batch tools and the debugger
-batch's 2); core-ro 70 / 71 / 69 (each with the 3 batch tools); compact 40 / 39 / 38 (29 + 4
-debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 19 / 19 / 18
-(17 + `HandlerBatch`). stdio adds the leftover-session tools — list and logoff in the full sets, the
+on premise, stdio / Streamable HTTP / SSE: core 269 / 269 / 267 (with the 3 batch tools and the
+debugger batch's 2); core-ro 71 / 72 / 70 (each with the 3 batch tools); compact 40 / 39 / 38 (29 +
+4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 19 / 19 / 18
+(17 + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
+premise only), core-ro 70, compact 40, compact-ro 19. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`
 in the compact ones — and declares an optional `state_handle` argument on every tool
@@ -337,6 +338,20 @@ import { fullReadOnlyToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
 
 const registry = registryOf(fullReadOnlyToolSet); // a CompositeHandlersRegistry
 ```
+
+### The variant a plain registration lists
+
+A registry registered on a plain SDK `McpServer` (`registry.registerAllTools(mcpServer)`, for
+example from `HandlerExporter` in `@mcp-abap-adt/lib/handlers`) lists the variant its groups state
+(`systemType` of their `HandlerContext`, `HandlerExporter`'s `systemType` option), by the same rule
+as a server instance: the variant's tool set, its descriptions and schemas, and search `_meta`
+naming only the members it offers; its calls run on that variant. `SAP_SYSTEM_TYPE` is not read
+there, for the listing or for a call. With no `systemType` stated, every definition is listed as it
+is, and every call that would reach a system is refused `system_type_required` before anything is
+sent, whatever `SAP_SYSTEM_TYPE` says. The binaries and `EmbeddableMcpServer` still read `SAP_SYSTEM_TYPE` when no
+`systemType` option is given. Groups that state different variants are refused when they are
+registered, before anything is registered — a variant stated beside none as well; the error names
+each group and what it states (`none` for a group that states none).
 
 ## Adding New Handlers
 

@@ -53,6 +53,7 @@ import { handleCheckFunctionModule } from '../../handlers/function/high/handleCh
 import { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleDeleteFunctionInclude } from '../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleDeleteFunctionModule } from '../../handlers/function_module/high/handleDeleteFunctionModule';
+import { handleDeleteInclude } from '../../handlers/include/high/handleDeleteInclude';
 import { handleCheckInterface } from '../../handlers/interface/high/handleCheckInterface';
 import { handleDeleteInterface } from '../../handlers/interface/high/handleDeleteInterface';
 import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
@@ -67,6 +68,8 @@ import { handleCheckStructure } from '../../handlers/structure/high/handleCheckS
 import { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure';
 import { handleCheckTable } from '../../handlers/table/high/handleCheckTable';
 import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
+import { handleCheckTableType } from '../../handlers/table_type/high/handleCheckTableType';
+import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { corpusBody } from '../../lib/adtCorpus';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
@@ -124,7 +127,7 @@ describe('a refused deletion, masked as a 200 by ADT itself', () => {
   });
 });
 
-describe('the seventeen deletion-service deletes: analyseDeletion, and terseDeletion fields', () => {
+describe('the nineteen deletion-service deletes: analyseDeletion, and terseDeletion fields', () => {
   it.each([
     [
       'DeleteBehaviorDefinition',
@@ -159,6 +162,8 @@ describe('the seventeen deletion-service deletes: analyseDeletion, and terseDele
       handleDeleteFunctionModule,
       { function_module_name: 'Z_FM', function_group_name: 'ZFG' },
     ],
+    ['DeleteInclude', handleDeleteInclude, { include_name: 'ZI_X' }],
+    ['DeleteTableType', handleDeleteTableType, { table_type_name: 'ZTT_X' }],
     ['DeleteInterface', handleDeleteInterface, { interface_name: 'ZIF_X' }],
     [
       'DeleteMessageClass',
@@ -320,6 +325,7 @@ describe('the thirteen checks: analyseException, and terseCheck fields', () => {
     ['CheckProgram', handleCheckProgram, { program_name: 'ZPROG' }],
     ['CheckStructure', handleCheckStructure, { structure_name: 'ZST' }],
     ['CheckTable', handleCheckTable, { table_name: 'ZTAB' }],
+    ['CheckTableType', handleCheckTableType, { table_type_name: 'ZTT_X' }],
   ])(
     '%s takes analyseException and projects the check report',
     async (_n, handler, args) => {

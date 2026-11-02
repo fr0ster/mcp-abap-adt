@@ -188,7 +188,10 @@ export async function handleUpdateDomain(
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             atStep('read metadata', () =>
-              obj.readMetadata({ domainName }, { analyse: analyseException }),
+              obj.readMetadata(
+                { domainName },
+                { version: 'workingArea', analyse: analyseException },
+              ),
             ),
             atStep('update metadata', (current) =>
               withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
@@ -243,7 +246,11 @@ export async function handleUpdateDomain(
       await obj
         .readMetadata(
           { domainName },
-          { withLongPolling: true, analyse: analyseException },
+          {
+            version: 'inactive',
+            withLongPolling: true,
+            analyse: analyseException,
+          },
         )
         .catch(unlessCredentialFailure);
 

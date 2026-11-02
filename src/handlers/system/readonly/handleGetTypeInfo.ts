@@ -15,8 +15,6 @@
  * cannot recognise. A name no read finds is the call's error.
  */
 
-import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -31,9 +29,9 @@ import {
   readDataElementMetadata,
   readDomainMetadata,
   readStructureMetadata,
+  readTableTypeMetadata,
 } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
@@ -41,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key.",
+    "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -250,14 +248,19 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         step: 'read data element',
         document: 'blue:wbobj (dtel:dataElement)',
         read: () =>
-          readDataElementMetadata(client, { dataElementName: typeName }),
+          readDataElementMetadata(
+            client,
+            { dataElementName: typeName },
+            'workingArea',
+          ),
         parse: parseDataElement,
       },
       {
         kind: 'domain',
         step: 'read domain',
         document: 'doma:domain',
-        read: () => readDomainMetadata(client, { domainName: typeName }),
+        read: () =>
+          readDomainMetadata(client, { domainName: typeName }, 'workingArea'),
         parse: parseDomain,
       },
       ...(includeStructure
@@ -267,7 +270,11 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
               step: 'read structure',
               document: 'blue:blueSource',
               read: () =>
-                readStructureMetadata(client, { structureName: typeName }),
+                readStructureMetadata(
+                  client,
+                  { structureName: typeName },
+                  'workingArea',
+                ),
               parse: parseStructure,
             },
           ]
@@ -277,12 +284,11 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         step: 'read table type',
         document: 'ttyp:tableType',
         read: () =>
-          client
-            .getTableType(resultsFor(tableTypeDocuments))
-            .readMetadata(
-              { tableTypeName: typeName },
-              { analyse: analyseException },
-            ),
+          readTableTypeMetadata(
+            client,
+            { tableTypeName: typeName },
+            'workingArea',
+          ),
         parse: parseTableType,
       },
     ];

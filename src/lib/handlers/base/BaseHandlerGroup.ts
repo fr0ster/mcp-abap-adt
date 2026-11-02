@@ -7,7 +7,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
-import { runWithCallTransport } from '../../callTransport.js';
+import { listedTool, statedEnvironment } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import {
   isLongRead,
@@ -17,16 +17,23 @@ import {
   TIMEOUT_NOT_FOR_RUN_WORDS,
   withoutTimeout,
 } from '../../longTools.js';
-import { withResolvedSystemContext } from '../../requestSystemResolution.js';
-import { declareSystemKind } from '../../systemKind.js';
+import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
   HandlerEntry,
   IHandlerGroup,
+  SapEnvironment,
+  ToolDefinition,
   ToolHandler,
 } from '../interfaces.js';
-import { jsonSchemaToZod } from '../utils/schemaUtils.js';
+import {
+  type CallContext,
+  callInItsForm,
+  type InGroupContext,
+  inStatedScope,
+} from '../utils/handlerCall.js';
+import { registeredSchema } from '../utils/schemaUtils.js';
 
 /**
  * Base class for handler groups
@@ -53,24 +60,88 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
   abstract getHandlers(): HandlerEntry[];
 
   /**
-   * Registers all handlers from this group on the MCP server
+   * The context the group holds now: what an args-only handler of it
+   * (`(args) => handleX(this.context, args)`) reads when it is called — the
+   * call's own while a registration path calls it (`InGroupContext`).
+   */
+  currentContext(): HandlerContext {
+    return this.context;
+  }
+
+  /**
+   * The SAP environment this group's context states (`systemType`), the
+   * variant its tools are listed and called on; `undefined` when it states
+   * none. Read from the context only, never from the environment.
+   */
+  statedSystemType(): SapEnvironment | undefined {
+    return statedEnvironment(this.context.systemType);
+  }
+
+  /**
+   * Registers all handlers from this group on the MCP server, as the
+   * variant the group's context states lists them (`listedTool`, the rule
+   * a server instance applies): a tool that variant does not serve is left
+   * out, the others carry its description, schema and search members. With
+   * none stated, every definition as it is.
    */
   registerHandlers(server: McpServer): void {
-    const handlers = this.getHandlers();
-    for (const entry of handlers) {
-      this.registerToolOnServer(
+    this.registerHandlersOnCall(server, () => Promise.resolve(this.context));
+  }
+
+  /**
+   * Registers the group's tools as `registerHandlers` does, each call
+   * running in the context `callContext` gives it when the call comes (its
+   * connection above all). An args-only handler reads that context as its
+   * group's for exactly its synchronous call, so calls at once on one group
+   * each read their own. A rejection of `callContext` is the call's answer,
+   * and the handler does not run.
+   */
+  registerHandlersOnCall(server: McpServer, callContext: CallContext): void {
+    for (const entry of this.getHandlers()) {
+      this.registerOneTool(
         server,
         entry.toolDefinition.name,
-        entry.toolDefinition.description,
-        entry.toolDefinition.inputSchema,
+        entry.toolDefinition,
         entry.handler,
+        callContext,
       );
     }
   }
 
   /**
+   * Registers one tool as `registerHandlers` registers each of the group's:
+   * listed on the variant the group states (left out when it does not serve
+   * it), each call in the group's path — the handler's call form, the
+   * group's context for an args-only handler, the stated kind — in the
+   * context `callContext` gives (the group's own by default). The path
+   * `CompositeHandlersRegistry.registerTool` registers a tool of the group by.
+   */
+  registerOneTool(
+    server: McpServer,
+    toolName: string,
+    toolDefinition: ToolDefinition,
+    handler: ToolHandler,
+    callContext: CallContext = () => Promise.resolve(this.context),
+  ): void {
+    const listed = listedTool(toolDefinition, this.statedSystemType());
+    if (!listed.listed) return;
+    this.registerToolOnServer(
+      server,
+      toolName,
+      listed.description,
+      listed.inputSchema,
+      handler,
+      listed.search,
+      callContext,
+    );
+  }
+
+  /**
    * Helper function to register a tool on McpServer
    * Wraps handler to convert our response format to MCP format
+   * `search`: the tool's search `_meta` (`listedTool`), when it has one.
+   * `callContext`: the context each call runs in, asked for when it comes;
+   * the group's own by default.
    */
   protected registerToolOnServer(
     server: McpServer,
@@ -78,21 +149,18 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     description: string,
     inputSchema: any,
     handler: ToolHandler,
+    search: { _meta?: Record<string, unknown> } = {},
+    callContext: CallContext = () => Promise.resolve(this.context),
   ): void {
-    // Convert JSON Schema to Zod if needed, otherwise pass as-is
-    const zodSchema =
-      inputSchema &&
-      typeof inputSchema === 'object' &&
-      inputSchema.type === 'object' &&
-      inputSchema.properties
-        ? jsonSchemaToZod(inputSchema)
-        : inputSchema;
+    // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
+    const zodSchema = registeredSchema(inputSchema);
 
     server.registerTool(
       toolName,
       {
         description,
         inputSchema: zodSchema,
+        ...search,
       },
       async (given: any) => {
         try {
@@ -118,28 +186,8 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             }
             args = withoutBackground(given);
           }
-          // The connection's parameters, when the registrant's context
-          // carries a resolver (and rules) — see
-          // src/lib/requestSystemResolution.ts; else nothing is looked up.
-          const context = this.context;
-          // The variant of the call's ADT client: the kind the context
-          // states, for a connection the factory did not build.
-          if (context?.connection) {
-            declareSystemKind(context.connection, context.systemType);
-          }
-          // Inside the call-transport scope with this call's own
-          // `transport_request`: the failure renderer's transport hint.
-          const withParameters = <T>(fn: () => Promise<T>) =>
-            runWithCallTransport(args, () =>
-              withResolvedSystemContext(
-                context?.connection,
-                fn,
-                context?.systemContextResolver ?? null,
-                context?.systemType,
-                context?.systemContextRules ?? null,
-              ),
-            );
-          let result: any;
+          // The argument refusals come before the call's context: a refused
+          // call asks for none (no provider is called).
           const listed = isLongTool(toolName);
           const read = listed && isLongRead(toolName, args);
           if (listed && !read && readTimeout(args) !== undefined) {
@@ -149,16 +197,41 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
               content: { type: 'text'; text: string }[];
             };
           }
+          // A long read's `timeout`, cutting the read.
+          const timeoutSeconds = read ? readTimeout(args) : undefined;
+          if (timeoutSeconds === null) {
+            return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
+              isError: true;
+              content: { type: 'text'; text: string }[];
+            };
+          }
+          // The call's context, asked for now: the group's own, or one made
+          // for this call (its provider's connection). Its rejection is
+          // this call's answer (the catch below); the handler does not run.
+          const context = await callContext();
+          // An args-only handler reads its group's context when it is
+          // called: the call's own, for exactly that synchronous call, then
+          // the group's again — so calls at once each read their own.
+          const inGroupContext: InGroupContext = (given, call) => {
+            const before = this.context;
+            this.context = given;
+            try {
+              return call();
+            } finally {
+              this.context = before;
+            }
+          };
+          // The kind the context states on its connection (none stated,
+          // none: SAP_SYSTEM_TYPE is not read), the call-transport scope,
+          // and the connection's parameters when the context carries a
+          // resolver (and rules) — the scope `HandlerExporter` gives every
+          // handler it hands out (`inStatedScope`).
+          const withParameters = <T>(fn: () => Promise<T>) =>
+            inStatedScope(context, args, fn);
+          let result: any;
           if (read) {
             // A listed long tool: a read on a connection of its
             // own, its `timeout` cutting the read.
-            const timeoutSeconds = readTimeout(args);
-            if (timeoutSeconds === null) {
-              return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
-                isError: true;
-                content: { type: 'text'; text: string }[];
-              };
-            }
             result = await withParameters(() =>
               runLongCall({
                 name: toolName,
@@ -166,28 +239,24 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
                 logger: context.logger,
                 timeoutSeconds,
                 run: (own) => {
+                  stateSystemKind(own, context.systemType);
                   const ownContext = {
                     ...context,
                     connection: own,
                   } as HandlerContext;
-                  if (handler.length >= 2) {
-                    return handler(ownContext, withoutTimeout(args));
-                  }
-                  // An args-only handler reads its group's context when it is
-                  // called: the call's own, for exactly that synchronous call.
-                  this.context = ownContext;
-                  try {
-                    return (handler as (args: unknown) => Promise<unknown>)(
-                      withoutTimeout(args),
-                    );
-                  } finally {
-                    this.context = context;
-                  }
+                  return callInItsForm(
+                    handler,
+                    ownContext,
+                    withoutTimeout(args),
+                    inGroupContext,
+                  );
                 },
               }),
             );
           } else {
-            result = await withParameters(() => handler(context, args));
+            result = await withParameters(() =>
+              callInItsForm(handler, context, args, inGroupContext),
+            );
           }
 
           // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.

@@ -33,6 +33,7 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { ReadVersion } from '../../../lib/handlers/readVersion';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
@@ -84,7 +85,7 @@ export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
+    '[read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type, read at its active version. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -378,7 +379,10 @@ async function determineObjectTypeAndPath(
     const metadata = await probe('read include metadata', () =>
       client
         .getInclude(includeDocuments)
-        .readMetadata({ includeName: name }, { analyse: analyseException }),
+        .readMetadata(
+          { includeName: name },
+          { version: 'active', analyse: analyseException },
+        ),
     );
     if (metadata === undefined) return undefined;
     let context: string | undefined;
@@ -434,7 +438,10 @@ async function determineObjectTypeAndPath(
     (await probe('read class metadata', () =>
       client
         .getClass(classDocuments)
-        .readMetadata({ className: name }, { analyse: analyseException }),
+        .readMetadata(
+          { className: name },
+          { version: 'active', analyse: analyseException },
+        ),
     )) !== undefined
   ) {
     return withReport(classPath);
@@ -443,7 +450,10 @@ async function determineObjectTypeAndPath(
     (await probe('read program metadata', () =>
       client
         .getProgram(programDocuments)
-        .readMetadata({ programName: name }, { analyse: analyseException }),
+        .readMetadata(
+          { programName: name },
+          { version: 'active', analyse: analyseException },
+        ),
     )) !== undefined
   ) {
     return withReport(programPath);
@@ -992,18 +1002,22 @@ function sendEnhancementRead(
 ): Promise<unknown> {
   const client = createAdtClient(connection, logger);
   const analyse = { analyse: analyseException };
+  const active: { version: ReadVersion; analyse: typeof analyseException } = {
+    version: 'active',
+    analyse: analyseException,
+  };
   if (read.kind === 'metadata') {
     if (read.host === 'class')
       return client
         .getClass(classDocuments)
-        .readMetadata({ className: read.name }, analyse);
+        .readMetadata({ className: read.name }, active);
     if (read.host === 'program')
       return client
         .getProgram(programDocuments)
-        .readMetadata({ programName: read.name }, analyse);
+        .readMetadata({ programName: read.name }, active);
     return client
       .getInclude(includeDocuments)
-      .readMetadata({ includeName: read.name }, analyse);
+      .readMetadata({ includeName: read.name }, active);
   }
   if (read.kind === 'elements') {
     switch (read.host) {

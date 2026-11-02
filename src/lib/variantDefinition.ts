@@ -11,6 +11,8 @@ import type { ProjectionVariant } from './adtProjections';
 export interface StatedOnVariant<S> {
   readonly description: string;
   readonly inputSchema: S;
+  /** The members its `object_type` (or `target_type`) offers there. */
+  readonly members?: readonly string[];
 }
 
 /**

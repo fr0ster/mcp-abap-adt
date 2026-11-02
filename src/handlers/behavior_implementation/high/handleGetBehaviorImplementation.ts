@@ -8,6 +8,10 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -16,7 +20,7 @@ export const TOOL_DEFINITION = {
   name: 'GetBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
+    '[read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -25,13 +29,7 @@ export const TOOL_DEFINITION = {
         description: 'BehaviorImplementation name.',
       },
       part: READ_PART_PROPERTY,
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
     },
     required: ['behavior_implementation_name'],
   },
@@ -40,7 +38,7 @@ export const TOOL_DEFINITION = {
 interface GetBehaviorImplementationArgs {
   behavior_implementation_name: string;
   part?: ReadPart;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
 }
 
 export async function handleGetBehaviorImplementation(
@@ -69,7 +67,7 @@ export async function handleGetBehaviorImplementation(
       () =>
         obj.readMetadata(
           { className: behaviorImplementationName },
-          { analyse: analyseException },
+          { version, analyse: analyseException },
         ),
       (metadata: AdtReading<string>) => ({
         success: true,

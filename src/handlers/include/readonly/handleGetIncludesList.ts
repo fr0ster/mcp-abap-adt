@@ -1,10 +1,14 @@
+import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   AdtModernVariant,
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { UtilsApi } from '../../../lib/adtClientContract';
+import type {
+  IServerAdtClient,
+  UtilsApi,
+} from '../../../lib/adtClientContract';
 import type { AdtHeadersContext } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   INCLUDES_PARENT_MAIN_TYPES,
@@ -44,7 +48,7 @@ import {
   type NodeLevel,
   nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
-import { ourUtils } from '../../../lib/strategies/resultSets';
+import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
@@ -265,7 +269,8 @@ async function includesListOf(context: HandlerContext, args: any) {
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
 
-    const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+    const client = createAdtClient(connection, logger);
+    const utils = client.getUtils(ourUtils);
 
     /** What could not be read, and why — reported beside the tree. */
     const unreadable: Record<string, unknown>[] = [];
@@ -294,7 +299,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       return '';
     };
     const readInclude = async (name: string) =>
-      sourceOf(name, utils.getInclude(name, { analyse: analyseException }));
+      sourceOf(name, readIncludeSource(client, name));
 
     // Two different things, and one `visited` set was calling both a cycle.
     //
@@ -343,6 +348,7 @@ async function includesListOf(context: HandlerContext, args: any) {
       const meta = await sourceOf(
         `class ${parent.name}`,
         utils.readObjectMetadata('CLAS/OC', parent.name, undefined, {
+          version: 'active',
           analyse: analyseException,
         }),
       );
@@ -388,7 +394,7 @@ async function includesListOf(context: HandlerContext, args: any) {
                 'PROG/P',
                 parent.name,
                 undefined,
-                undefined,
+                'active',
                 { analyse: analyseException },
               ),
             )
@@ -445,21 +451,30 @@ const readKey = (read: IncludeRead): string =>
 /** The utilities every read of this tool is sent on. */
 type IncludeUtils = UtilsApi<typeof ourUtils, AdtModernVariant>;
 
-/** `read` sent on `utils`, as the sequential version sends it. */
+/** An include's source, active: what the tree is built from. */
+function readIncludeSource(client: IServerAdtClient, includeName: string) {
+  return client
+    .getInclude(resultsFor(includeDocuments))
+    .read({ includeName }, 'active', { analyse: analyseException });
+}
+
+/** `read` sent on `client`, as the sequential version sends it. */
 function sendRead(
   context: AdtHeadersContext,
-  utils: IncludeUtils,
+  client: IServerAdtClient,
   read: IncludeRead,
 ): Promise<unknown> {
+  const utils: IncludeUtils = client.getUtils(ourUtils);
   switch (read.kind) {
     case 'program':
-      return utils.readObjectSource('PROG/P', read.name, undefined, undefined, {
+      return utils.readObjectSource('PROG/P', read.name, undefined, 'active', {
         analyse: analyseException,
       });
     case 'include':
-      return utils.getInclude(read.name, { analyse: analyseException });
+      return readIncludeSource(client, read.name);
     case 'class':
       return utils.readObjectMetadata('CLAS/OC', read.name, undefined, {
+        version: 'active',
         analyse: analyseException,
       });
     case 'group': {
@@ -495,11 +510,7 @@ function includeAnswers(context: HandlerContext) {
       if (asked.size === 0) return;
       const pending = [...asked.values()];
       const results = await runPhase(context, pending, (read, connection) =>
-        sendRead(
-          context,
-          createAdtClient(connection, context.logger).getUtils(ourUtils),
-          read,
-        ),
+        sendRead(context, createAdtClient(connection, context.logger), read),
       );
       results.forEach((result, i) => {
         const read = pending[i] as IncludeRead;

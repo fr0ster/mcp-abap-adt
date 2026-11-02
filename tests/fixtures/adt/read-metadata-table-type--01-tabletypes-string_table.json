@@ -1,0 +1,25 @@
+{
+  "case": "read-metadata-table-type",
+  "step": 1,
+  "stepTag": "tabletypes-string_table",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/tabletypes/string_table",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/tabletypes/string_table",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+    },
+    "body": null,
+    "headersNote": "Caller-supplied headers only. The body was taken by a direct GET on an on-premise system, 2026-11-01, Accept as shown; adtcore:responsible, changedBy and createdBy were set to SAP and masterSystem to SID. Not taken by the capture script."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headersNote": "The response headers were not recorded. The content-type shown is the media type the request accepted, not a captured header.",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.tabletype.v1+xml; charset=utf-8"
+    },
+    "bodyFile": "read-metadata-table-type--01-tabletypes-string_table.body.xml"
+  }
+}

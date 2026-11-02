@@ -22,6 +22,7 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export type { ReadVersion } from '../handlers/readVersion.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';
 export { DETAIL_PROPERTY } from '../strategies/detail.js';
@@ -40,4 +41,49 @@ export {
   type CompactRouterMap,
   dispatchCompact,
 } from './compactRoutes.js';
-export * from './compactSchemas.js';
+export {
+  compactActivateSchema,
+  compactActivateSchemaFor,
+  compactCdsUnitTestResultSchema,
+  compactCdsUnitTestStatusSchema,
+  compactCheckRunSchema,
+  compactCheckRunSchemaFor,
+  compactCreateSchema,
+  compactCreateSchemaFor,
+  compactDeleteSchema,
+  compactDeleteSchemaFor,
+  compactDeletionCheckSchema,
+  compactDeletionCheckSchemaFor,
+  compactDumpListSchema,
+  compactDumpViewSchema,
+  compactGetDataSchema,
+  compactGetSchema,
+  compactGetSchemaFor,
+  compactLockSchema,
+  compactLockSchemaFor,
+  compactProfileListSchema,
+  compactProfileRunSchema,
+  compactProfileRunSchemaFor,
+  compactProfileScheduleSchema,
+  compactProfileViewSchema,
+  compactSearchSchema,
+  compactServiceBindingListTypesSchema,
+  compactServiceBindingValidateSchema,
+  compactTransportCreateSchema,
+  compactTransportMoveObjectsSchema,
+  compactTransportSortAndCompressSchema,
+  compactUnitTestResultSchema,
+  compactUnitTestRunSchema,
+  compactUnitTestStatusSchema,
+  compactUnlockSchema,
+  compactUnlockSchemaFor,
+  compactUpdateSchema,
+  compactUpdateSchemaFor,
+  compactValidateSchema,
+  compactValidateSchemaFor,
+  compactWhereUsedSchema,
+  compactWhereUsedSchemaFor,
+  DELETABLE_TYPES,
+  DELETION_CHECK_TYPES,
+  EMPTIED_INCLUDE_TYPES,
+} from './compactSchemas.js';

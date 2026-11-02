@@ -1382,6 +1382,55 @@ create_program:
           REPORT ZMCP_BLD_PROG_H1.
           WRITE: / 'Builder test program'.
 
+# Program include (Include) — on premise only: ABAP cloud holds no program
+# include of the caller's. The suite creates a fresh local package ($ + a
+# run-unique suffix) and deletes it last.
+create_include:
+  test_cases:
+    - name: "builder_include"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Include created, written, read back and deleted by the include suite"
+      params:
+        include_name: "ZMCP_BLD_INCL_H1"
+        description: "Include for the include high-level tests"
+        update_source_code: |
+          * Include for the include high-level integration test
+          DATA gv_incl_test TYPE string VALUE 'include-roundtrip'.
+
+# Program include read on ABAP cloud: a delivered include, read only (both
+# parts). Empty include_name: the case is skipped, naming the reason.
+include_cloud_read:
+  test_cases:
+    - name: "read_delivered_include"
+      enabled: true
+      available_in: ["cloud"]
+      description: "Read a delivered include's source and metadata on ABAP cloud"
+      params:
+        include_name: ""
+
+# Table type (TableType) — on premise and on ABAP cloud. On cloud the suite
+# works in shared_dependencies.package.
+create_table_type:
+  test_cases:
+    - name: "builder_table_type"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Table type created with its definition, changed, checked and deleted"
+      params:
+        table_type_name: "ZMCP_BLD_TTYP_H1"
+        description: "Table type for the table type high-level tests"
+        # transport_request: ""
+        row_type_kind: "dictionaryType"
+        row_type_name: "ABAP_BOOLEAN"
+        access_type: "standard"
+        key_definition: "standard"
+        key_kind: "nonUnique"
+        # The one property UpdateTableType changes: hashed, so SAP's own
+        # key rule shows in the stored definition (a hashed access forces a
+        # unique key; measured on premise, 2026-11-01).
+        update_access_type: "hashed"
+
 # Create Table
 
 # Program (Program - Low-Level)

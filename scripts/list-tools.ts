@@ -44,13 +44,13 @@ const groups = {
 
 // Two input-schema shapes exist among the 362 tools (a codebase finding, not a script
 // bug — see the document): most `inputSchema`s are plain JSON Schema
-// (`{ type: 'object', properties: {...}, required: [...] }`), but five handlers
-// (CreatePackage, GetPackageContents, GetTableContents, GetInclude, SearchSource) declare
+// (`{ type: 'object', properties: {...}, required: [...] }`), but four handlers
+// (CreatePackage, GetPackageContents, GetTableContents, SearchSource) declare
 // a bare zod raw shape instead — a plain object whose values are zod schema instances,
 // with no `type`/`properties`/`required` wrapper at all. Reading `.properties`/`.required`
 // on that shape silently returns `undefined`, which previously rendered as "(none)" — the
 // exact "empty cell reads as checked" failure the brief warns about, one level below the
-// column. Detect the shape instead of hardcoding the five names, so a sixth handler
+// column. Detect the shape instead of hardcoding the four names, so a fifth handler
 // written in either style lands correctly with no script edit.
 type ParamInfo = { name: string; required: 'yes' | 'no' | 'unknown' };
 

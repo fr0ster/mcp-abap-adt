@@ -25,13 +25,18 @@ import {
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   HandlerContext,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import { registryForExposition } from '../../../lib/handlers/registry/expositionRegistry';
+import {
+  noConnectionContext,
+  registryForExposition,
+} from '../../../lib/handlers/registry/expositionRegistry';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   compactReadOnlyToolSetOf,
@@ -257,15 +262,10 @@ describe('where the background-run tools are served: beside the run tools', () =
     }
   });
 
-  it('an embedder’s exporter serves them beside the system group', () => {
+  it('an embedder’s exporter leaves them out: it keeps no background-run store', () => {
     const names = new HandlerExporter({ systemType: 'onprem' }).getToolNames();
-    expect(names).toEqual(expect.arrayContaining(['RuntimeRunClass', ...FULL]));
-    expect(
-      new HandlerExporter({
-        systemType: 'onprem',
-        includeSystem: false,
-      }).getToolNames(),
-    ).not.toContain('GetBackgroundRun');
+    expect(names).toContain('RuntimeRunClass');
+    expect(names.filter((name) => FULL.includes(name))).toEqual([]);
   });
 });
 
@@ -278,10 +278,15 @@ describe('which tools take background', () => {
       includeHighLevel: true,
       includeSystem: true,
       includeSearch: true,
-      includeDebug: true,
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
+    // What the exporter leaves out (no store, no debugger): the groups' own.
+    ...[
+      new RuntimeRunHandlersGroup(noConnectionContext()),
+      new BackgroundRunHandlersGroup(noConnectionContext()),
+      new DebugHandlersGroup(noConnectionContext()),
+    ].flatMap((group) => group.getHandlers().map((e) => e.toolDefinition)),
     ...new CompactReadOnlyHandlersGroup(placeholder)
       .getHandlers()
       .map((e) => e.toolDefinition),

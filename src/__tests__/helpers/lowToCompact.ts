@@ -23,7 +23,12 @@ export interface LowToCompactRow {
   handler: string;
   low_call: Record<string, unknown>;
   compact: Array<{ tool: string; args: Record<string, unknown> }>;
-  accepted?: { kind: string; reason: string };
+  /**
+   * A difference the owner accepted. `since` names the release that accepted
+   * it after MIGRATION-19.0 was released: that note is history, so such a
+   * difference is not rendered into it.
+   */
+  accepted?: { kind: string; reason: string; since?: string };
   note?: string;
   /** What the row rests on that is not measured; never rendered into the docs. */
   unmeasured?: string;
@@ -122,7 +127,9 @@ export function renderLowToCompactTable(rows: LowToCompactRow[]): string {
   for (const row of ordered) {
     const calls = row.compact.map(callCell).join(', then ');
     const notes = [
-      row.accepted ? `**accepted:** ${row.accepted.reason}` : '',
+      row.accepted && row.accepted.since === undefined
+        ? `**accepted:** ${row.accepted.reason}`
+        : '',
       row.note ?? '',
     ]
       .filter((n) => n !== '')

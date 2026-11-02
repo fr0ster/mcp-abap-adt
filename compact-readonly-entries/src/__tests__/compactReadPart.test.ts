@@ -58,6 +58,7 @@ describe('the parts a compact read can answer', () => {
       'urls',
     ]);
     expect(partsFor('CLASS' as never, true)).toEqual(['source', 'metadata']);
+    expect(partsFor('INCLUDE', true)).toEqual(['source', 'metadata']);
     expect(partsFor('TRANSPORT' as never, true)).toEqual(['source']);
   });
 
@@ -78,6 +79,18 @@ describe('the parts a compact read can answer', () => {
       await refusalOf({ object_type: 'RUNTIME_DUMP', part: 'urls' }),
     ).toMatch(
       /Unsupported read for object_type: RUNTIME_DUMP\. Supported: PACKAGE,/,
+    );
+  });
+
+  it('refuses the source of a table type, naming its metadata', async () => {
+    expect(
+      await refusalOf({
+        object_type: 'TABLE_TYPE',
+        part: 'source',
+        table_type_name: 'X',
+      }),
+    ).toBe(
+      'part=source is not available for object_type=TABLE_TYPE. It offers: metadata.',
     );
   });
 

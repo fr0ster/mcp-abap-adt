@@ -17,7 +17,19 @@ import {
   type ActivationCode,
   type AdtCodes,
   type AtcKindOn,
+  type COMPACT_ACTIVATE,
+  type COMPACT_CHECK,
+  type COMPACT_CREATE,
   type COMPACT_CREATE_ROUTES,
+  type COMPACT_DELETE,
+  type COMPACT_DELETION_CHECK,
+  type COMPACT_LOCK,
+  type COMPACT_READ_ROUTES,
+  type COMPACT_UNLOCK,
+  type COMPACT_UPDATE,
+  type COMPACT_VALIDATE,
+  type COMPACT_WHERE_USED,
+  type COMPACT_WHERE_USED_ROUTES,
   type INCLUDES_PARENT_ROUTES,
   projected,
   type ServedName,
@@ -101,6 +113,80 @@ type CreateOnCloud = ServedName<'cloud', typeof COMPACT_CREATE_ROUTES>;
 export const classCreatedOnCloud: CreateOnCloud = 'CLASS';
 // @ts-expect-error HandlerCreate does not offer PROGRAM on ABAP cloud.
 export const programCreatedCompactOnCloud: CreateOnCloud = 'PROGRAM';
+
+/** A table type is created on both variants… */
+export const tableTypeCreatedCompactOnCloud: CreateOnCloud = 'TABLE_TYPE';
+/** …an include on premise… */
+export const includeCreatedCompactOnPrem: ServedName<
+  'onprem',
+  typeof COMPACT_CREATE_ROUTES
+> = 'INCLUDE';
+// @ts-expect-error …and not on ABAP cloud.
+export const includeCreatedCompactOnCloud: CreateOnCloud = 'INCLUDE';
+/** HandlerCreate's cloud list holds the table type… */
+export const tableTypeInCloudCreate: (typeof COMPACT_CREATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
+export const includeInCloudCreate: (typeof COMPACT_CREATE.cloud)[number] =
+  'INCLUDE';
+
+/** HandlerGet reads a table type's metadata on ABAP cloud. */
+export const tableTypeReadCompactOnCloud: ServedName<
+  'cloud',
+  typeof COMPACT_READ_ROUTES
+> = 'TABLE_TYPE';
+
+/** HandlerUpdate's cloud list holds the table type… */
+export const tableTypeInCloudUpdate: (typeof COMPACT_UPDATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
+export const includeInCloudUpdate: (typeof COMPACT_UPDATE.cloud)[number] =
+  'INCLUDE';
+
+/** HandlerDelete's cloud list holds the table type… */
+export const tableTypeInCloudDelete: (typeof COMPACT_DELETE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and leaves the include out, as it leaves PROGRAM.
+export const includeInCloudDelete: (typeof COMPACT_DELETE.cloud)[number] =
+  'INCLUDE';
+/** HandlerDeletionCheck asks about an include on ABAP cloud too. */
+export const includeInCloudDeletionCheck: (typeof COMPACT_DELETION_CHECK.cloud)[number] =
+  'INCLUDE';
+
+/** HandlerLock and HandlerUnlock lock a table type on ABAP cloud… */
+export const tableTypeInCloudLock: (typeof COMPACT_LOCK.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and no include, as no program.
+export const includeInCloudLock: (typeof COMPACT_LOCK.cloud)[number] =
+  'INCLUDE';
+// @ts-expect-error the unlock follows the lock.
+export const includeInCloudUnlock: (typeof COMPACT_UNLOCK.cloud)[number] =
+  'INCLUDE';
+
+/** HandlerValidate validates a table type on ABAP cloud… */
+export const tableTypeInCloudValidate: (typeof COMPACT_VALIDATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and no include, as no program.
+export const includeInCloudValidate: (typeof COMPACT_VALIDATE.cloud)[number] =
+  'INCLUDE';
+/** HandlerCheckRun checks a table type on ABAP cloud… */
+export const tableTypeInCloudCheck: (typeof COMPACT_CHECK.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and an include on neither variant: it has no check.
+export const includeInCheck: (typeof COMPACT_CHECK.onprem)[number] = 'INCLUDE';
+
+/** HandlerActivate activates a table type on ABAP cloud… */
+export const tableTypeInCloudActivate: (typeof COMPACT_ACTIVATE.cloud)[number] =
+  'TABLE_TYPE';
+// @ts-expect-error …and no include, activated on premise only.
+export const includeInCloudActivate: (typeof COMPACT_ACTIVATE.cloud)[number] =
+  'INCLUDE';
+
+/** HandlerWhereUsed takes a table type on both variants, by its code. */
+export const tableTypeInCloudWhereUsed: (typeof COMPACT_WHERE_USED.cloud)[number] =
+  'TABLE_TYPE';
+export const tableTypeWhereUsedRoute: (typeof COMPACT_WHERE_USED_ROUTES)['TABLE_TYPE'] =
+  'TTYP/DA';
 
 // --- A list is exactly its projection --------------------------------------
 

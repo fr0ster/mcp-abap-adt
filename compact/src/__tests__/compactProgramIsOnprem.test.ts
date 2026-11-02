@@ -1,5 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 
 /**
  * A compact tool offered on cloud must not offer PROGRAM without saying where
@@ -71,4 +74,49 @@ describe('compact tools that mention PROGRAM', () => {
       });
     },
   );
+});
+
+/**
+ * An include on ABAP cloud is read, checked for deletion and asked where it
+ * is used — and nothing else: no create, write, lock, validation or
+ * activation of one is offered there. Read from the tools' own cloud
+ * statements, so a member a cloud list gains is caught the day it is added.
+ */
+describe('compact tools that offer INCLUDE on ABAP cloud', () => {
+  // No handler runs here: only the definitions are read.
+  const context = (): HandlerContext => {
+    throw new Error('no handler runs in this test');
+  };
+  const entries = [
+    ...compactReadOnlyEntries(context),
+    ...compactModifyEntries(context),
+  ];
+
+  /** The enum values of the tool's `object_type` on `variant`, if it has one. */
+  const membersOn = (
+    entry: (typeof entries)[number],
+    variant: 'onprem' | 'cloud',
+  ): readonly string[] => {
+    const stated = entry.toolDefinition.variants?.[variant];
+    const values: unknown = stated?.inputSchema?.properties?.object_type?.enum;
+    return Array.isArray(values)
+      ? values.filter((value) => typeof value === 'string')
+      : [];
+  };
+
+  it('finds tools that offer INCLUDE on premise, so the check is not vacuous', () => {
+    expect(
+      entries.filter((entry) => membersOn(entry, 'onprem').includes('INCLUDE'))
+        .length,
+    ).toBeGreaterThan(5);
+  });
+
+  it('offers it only where cloud serves it', () => {
+    expect(
+      entries
+        .filter((entry) => membersOn(entry, 'cloud').includes('INCLUDE'))
+        .map((entry) => entry.toolDefinition.name)
+        .sort(),
+    ).toEqual(['HandlerDeletionCheck', 'HandlerGet', 'HandlerWhereUsed']);
+  });
 });

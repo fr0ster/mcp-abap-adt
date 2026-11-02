@@ -54,6 +54,7 @@ const CREATE_TOKENS: Tokens<(typeof COMPACT_CREATE.onprem)[number]> = {
   TRANSPORT: 'TRANSPORT(description*)',
   TABLE: 'TABLE(table_name*, package_name*)',
   STRUCTURE: 'STRUCTURE(structure_name*, package_name*)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*, package_name*)',
   DDL: 'DDL(ddl_name*, package_name*)',
   SERVICE_DEFINITION:
     'SERVICE_DEFINITION(service_definition_name*, package_name*)',
@@ -61,6 +62,7 @@ const CREATE_TOKENS: Tokens<(typeof COMPACT_CREATE.onprem)[number]> = {
     'SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*)',
   CLASS: 'CLASS(class_name*, package_name*)',
   PROGRAM: 'PROGRAM(program_name*, package_name*)',
+  INCLUDE: 'INCLUDE(include_name*, package_name*)',
   INTERFACE: 'INTERFACE(interface_name*, package_name*)',
   FUNCTION_GROUP: 'FUNCTION_GROUP(function_group_name*, package_name*)',
   FUNCTION_MODULE:
@@ -84,6 +86,7 @@ const READ_TOKENS: Tokens<(typeof COMPACT_READ.onprem)[number]> = {
   DATA_ELEMENT: 'DATA_ELEMENT(data_element_name*)',
   TABLE: 'TABLE(table_name*)',
   STRUCTURE: 'STRUCTURE(structure_name*)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*)',
   DDL: 'DDL(ddl_name*)',
   SERVICE_DEFINITION: 'SERVICE_DEFINITION(service_definition_name*)',
   SERVICE_BINDING: 'SERVICE_BINDING(service_binding_name*)',
@@ -93,6 +96,7 @@ const READ_TOKENS: Tokens<(typeof COMPACT_READ.onprem)[number]> = {
   LOCAL_DEFINITIONS: 'LOCAL_DEFINITIONS(class_name*)',
   LOCAL_MACROS: 'LOCAL_MACROS(class_name*)',
   PROGRAM: 'PROGRAM(program_name*)',
+  INCLUDE: 'INCLUDE(include_name*)',
   INTERFACE: 'INTERFACE(interface_name*)',
   FUNCTION_GROUP: 'FUNCTION_GROUP(function_group_name*)',
   FUNCTION_MODULE:
@@ -109,7 +113,7 @@ const READ_TOKENS: Tokens<(typeof COMPACT_READ.onprem)[number]> = {
 /** HandlerGet's description on `variant`. */
 export function compactGetDescription(variant: ProjectionVariant): string {
   return withLongToolAdvice(
-    `[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. Otherwise object_type required: ${named(COMPACT_READ[variant], READ_TOKENS)}. TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime.`,
+    `[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. Otherwise object_type required: ${named(COMPACT_READ[variant], READ_TOKENS)}. TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime.`,
   );
 }
 
@@ -118,6 +122,7 @@ const UPDATE_TOKENS: Tokens<(typeof COMPACT_UPDATE.onprem)[number]> = {
   DOMAIN: 'DOMAIN(domain_name*, source_code*, transport_request)',
   DATA_ELEMENT:
     'DATA_ELEMENT(data_element_name*, source_code*, transport_request)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*, source_code*, transport_request)',
   FUNCTION_GROUP:
     'FUNCTION_GROUP(function_group_name*, source_code*, transport_request)',
   TABLE: 'TABLE(table_name*, ddl_code*, transport_request)',
@@ -136,6 +141,7 @@ const UPDATE_TOKENS: Tokens<(typeof COMPACT_UPDATE.onprem)[number]> = {
   CDS_UNIT_TEST:
     'CDS_UNIT_TEST(class_name*, test_class_source*, transport_request)',
   PROGRAM: 'PROGRAM(program_name*, source_code*, transport_request)',
+  INCLUDE: 'INCLUDE(include_name*, source_code*, part, transport_request)',
   INTERFACE: 'INTERFACE(interface_name*, source_code*, transport_request)',
   FUNCTION_MODULE:
     'FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request)',
@@ -151,7 +157,22 @@ const UPDATE_TOKENS: Tokens<(typeof COMPACT_UPDATE.onprem)[number]> = {
 
 /** HandlerUpdate's description on `variant`. */
 export function compactUpdateDescription(variant: ProjectionVariant): string {
-  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(COMPACT_UPDATE[variant], UPDATE_TOKENS)}. For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
+  const served: readonly string[] = COMPACT_UPDATE[variant];
+  const serves = (member: string) => served.includes(member);
+  const metadata = [
+    ...[
+      'PACKAGE',
+      'DOMAIN',
+      'DATA_ELEMENT',
+      'FUNCTION_GROUP',
+      'TABLE_TYPE',
+    ].filter(serves),
+    ...(serves('INCLUDE') ? ['INCLUDE with part metadata'] : []),
+  ];
+  const parted = serves('INCLUDE')
+    ? ' part is taken by INCLUDE alone: source (when absent) writes its source, metadata its metadata document.'
+    : '';
+  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(COMPACT_UPDATE[variant], UPDATE_TOKENS)}. For ${listed(metadata)}, source_code is the whole metadata document, sent as given.${parted} For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
 }
 
 const DELETE_TOKENS: Tokens<(typeof COMPACT_DELETE.onprem)[number]> = {
@@ -160,6 +181,7 @@ const DELETE_TOKENS: Tokens<(typeof COMPACT_DELETE.onprem)[number]> = {
   DATA_ELEMENT: 'DATA_ELEMENT(data_element_name*, transport_request)',
   TABLE: 'TABLE(table_name*, transport_request)',
   STRUCTURE: 'STRUCTURE(structure_name*, transport_request)',
+  TABLE_TYPE: 'TABLE_TYPE(table_type_name*, transport_request)',
   DDL: 'DDL(ddl_name*, transport_request)',
   SERVICE_DEFINITION:
     'SERVICE_DEFINITION(service_definition_name*, transport_request)',
@@ -167,6 +189,7 @@ const DELETE_TOKENS: Tokens<(typeof COMPACT_DELETE.onprem)[number]> = {
   CLASS: 'CLASS(class_name*, transport_request)',
   CDS_UNIT_TEST: 'CDS_UNIT_TEST(class_name*, transport_request)',
   PROGRAM: 'PROGRAM(program_name*, transport_request)',
+  INCLUDE: 'INCLUDE(include_name*, transport_request)',
   INTERFACE: 'INTERFACE(interface_name*, transport_request)',
   FUNCTION_GROUP: 'FUNCTION_GROUP(function_group_name*, transport_request)',
   FUNCTION_MODULE:
@@ -218,6 +241,8 @@ export function compactValidateDescription(variant: ProjectionVariant): string {
     COMPACT_VALIDATE[variant],
     {
       CLASS: 'CLASS(object_name*, superclass)',
+      INCLUDE: 'INCLUDE(object_name*, package_name*)',
+      TABLE_TYPE: 'TABLE_TYPE(object_name*, description)',
       FUNCTION_MODULE: 'FUNCTION_MODULE(object_name* as GROUP|MODULE)',
       PACKAGE: 'PACKAGE(object_name*, super_package)',
       BEHAVIOR_DEFINITION:
@@ -290,6 +315,7 @@ const WHERE_USED_WORDS: Tokens<(typeof COMPACT_WHERE_USED.onprem)[number]> = {
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data element',
   DDL: 'CDS DDL source',
+  TABLE_TYPE: 'table type',
 };
 
 /** HandlerWhereUsed's description on `variant`. */

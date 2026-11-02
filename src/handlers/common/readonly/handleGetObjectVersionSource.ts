@@ -8,7 +8,7 @@
 
 import {
   type ProjectionVariant,
-  VERSIONED_KINDS,
+  VERSION_SOURCE_KINDS,
 } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
@@ -43,7 +43,7 @@ function objectVersionSourceSchema(variant: ProjectionVariant) {
         type: 'string',
         description:
           'Object type (the same value the version history was read with).',
-        enum: VERSIONED_KINDS[variant],
+        enum: VERSION_SOURCE_KINDS[variant],
       },
       content_uri: {
         type: 'string',
@@ -73,11 +73,14 @@ export async function handleGetObjectVersionSource(
       );
     }
     const variant = variantOf(connection);
-    const object_type = acceptedOf(args.object_type, VERSIONED_KINDS[variant]);
+    const object_type = acceptedOf(
+      args.object_type,
+      VERSION_SOURCE_KINDS[variant],
+    );
     if (object_type === undefined) {
       return return_error(
         new Error(
-          `Invalid object_type. Must be one of: ${VERSIONED_KINDS[variant].join(', ')}`,
+          `Invalid object_type. Must be one of: ${VERSION_SOURCE_KINDS[variant].join(', ')}`,
         ),
       );
     }

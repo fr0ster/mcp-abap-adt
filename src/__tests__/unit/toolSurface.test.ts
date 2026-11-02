@@ -306,6 +306,13 @@ describe('the MCP tool surface', () => {
         'high/GetBehaviorImplementation': ['part'],
         'high/GetMetadataExtension': ['part'],
         'high/GetFunctionModule': ['part'],
+        // The ninth deliberate move (below): GetInclude reads the include's
+        // metadata too, `part` and `version` optional.
+        'readonly/GetInclude': ['part', 'version'],
+        // The ninth deliberate move too: GetTableType reads at the version
+        // asked, `version` optional (active by default).
+        'readonly/GetTableType': ['version'],
+        'high/GetTableType': ['version'],
         'low/UpdateClassLow': ['transport_request'],
         'low/UpdateClassTestClassesLow': ['transport_request'],
         'low/UpdateDdlLow': ['transport_request'],
@@ -442,6 +449,21 @@ describe('the MCP tool surface', () => {
    * `RunFunctionModuleUnitTest` and `RunAbapUnit` — take `wait`, optional,
    * default true: `false` answers the run id right after the start. Their
    * rows gained it in the snapshot; every other row was checked unchanged.
+   */
+  /**
+   * **The ninth deliberate move: `CreateInclude`, `UpdateInclude`,
+   * `UpdateIncludeMetadata`, `DeleteInclude`, `ActivateInclude`,
+   * `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`,
+   * `ActivateTableType`, `CheckTableType` and `GetTableTypeVersions`
+   * arrived** (the server writes program includes and table types). A table
+   * type's version list only: SAP refuses its version source (403, measured on
+   * premise and on ABAP cloud), so no source or diff tool came with it. The new full-set
+   * tools of that work: the include tools on premise only, the table-type
+   * tools on premise and cloud. `GetInclude` reads the include's metadata
+   * too: its row gained `part` and `version` (both optional; without them
+   * the source is read as before). `GetTableType` reads at a version: its
+   * row gained `version` (optional, active by default). Every other row was
+   * checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

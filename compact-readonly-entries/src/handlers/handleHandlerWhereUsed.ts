@@ -15,6 +15,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactWhereUsedDescription(variant),
     inputSchema: compactWhereUsedSchemaFor(COMPACT_WHERE_USED[variant]),
+    members: COMPACT_WHERE_USED[variant],
   })),
 } as const;
 

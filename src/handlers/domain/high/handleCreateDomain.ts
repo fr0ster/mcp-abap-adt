@@ -230,7 +230,7 @@ export async function handleCreateDomain(
                 atStep('read metadata', () =>
                   obj.readMetadata(
                     { domainName },
-                    { analyse: analyseException },
+                    { version: 'workingArea', analyse: analyseException },
                   ),
                 ),
                 atStep('update metadata', (current) =>
@@ -278,7 +278,11 @@ export async function handleCreateDomain(
           await obj
             .readMetadata(
               { domainName },
-              { withLongPolling: true, analyse: analyseException },
+              {
+                version: 'inactive',
+                withLongPolling: true,
+                analyse: analyseException,
+              },
             )
             .catch(unlessCredentialFailure);
           return withAdtHeaders(context, 'domain.check', (headers) =>

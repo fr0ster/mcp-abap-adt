@@ -102,7 +102,7 @@ export async function handleUpdateFunctionGroup(
             atStep('read metadata', () =>
               obj.readMetadata(
                 { functionGroupName },
-                { analyse: analyseException },
+                { version: 'workingArea', analyse: analyseException },
               ),
             ),
             atStep('update metadata', (current) =>

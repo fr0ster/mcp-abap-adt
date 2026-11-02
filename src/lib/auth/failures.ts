@@ -54,7 +54,8 @@ export type FailureCode =
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
-  | 'long_session_unavailable';
+  | 'long_session_unavailable'
+  | 'connection_provider_failed';
 
 /**
  * A failure as it was read: the fields of the failure answer, and the chain's

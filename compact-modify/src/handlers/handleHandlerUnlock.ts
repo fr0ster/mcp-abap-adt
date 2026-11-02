@@ -20,6 +20,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactUnlockDescription(variant),
     inputSchema: compactUnlockSchemaFor(COMPACT_UNLOCK[variant]),
+    members: COMPACT_UNLOCK[variant],
   })),
 } as const;
 

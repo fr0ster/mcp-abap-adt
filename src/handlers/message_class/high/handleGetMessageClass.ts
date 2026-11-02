@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'GetMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.',
+    '[read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -46,7 +46,11 @@ export async function handleGetMessageClass(
   return answer(
     { tool: 'GetMessageClass', detail: 'terse' },
     () =>
-      readMessageClassMetadata(createAdtClient(connection, logger), { name }),
+      readMessageClassMetadata(
+        createAdtClient(connection, logger),
+        { name },
+        'active',
+      ),
     (metadata: AdtReading<string>) => ({
       success: true,
       message_class_name: name,

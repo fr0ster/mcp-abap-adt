@@ -139,7 +139,7 @@ export async function handleCreateFunctionGroup(
         );
         const readBack = await obj.readMetadata(
           { functionGroupName },
-          { analyse: analyseException },
+          { version: 'workingArea', analyse: analyseException },
         );
         if (readBack.ok) {
           logger?.info(

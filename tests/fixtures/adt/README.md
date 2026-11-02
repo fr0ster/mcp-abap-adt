@@ -17,6 +17,9 @@ are unknown.
 
 48 cases, 61 exchanges. Captured by `scripts/capture-adt-corpus.ts` (removed in #234; last at
 `f78b9611`) against the ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
+Those are the 48 cases and 61 exchanges of that run; later cases were added by hand and are
+listed in their own sections below (the last: `read-metadata-table-type`, 2026-11-01). The files in this
+directory outnumber that run's.
 
 ## Layout
 
@@ -97,6 +100,19 @@ byte except for these substitutions:
 | `read-transport-list-structure` | transport requests for the saved search above | 200, `tm:root` → `tm:workbench` → `tm:modifiable` → one `tm:request` |
 | `lock-success` | lock the scratch class | 200, `asx:abap` carrying the lock handle |
 | `unlock-success` | unlock with a valid handle | 200, **zero-byte body** |
+
+## Recorded by hand, not by the script
+
+| Case | What provoked it | What came back |
+|---|---|---|
+| `read-metadata-table-type` | `GET /sap/bc/adt/ddic/tabletypes/string_table`, Accept `application/vnd.sap.adt.tabletype.v1+xml`, an on-premise system, 2026-11-01 | 200, `ttyp:tableType` of SAP's `STRING_TABLE`: root description and `descriptionTextLimit="60"`, four `atom:link`s, a `packageRef` with a description of its own, `rowType`, `primaryKey`, `secondaryKeys`, and `ttyp:valueHelps` with SAP's value lists |
+
+The body is the answer byte for byte, one line as SAP sent it, except that
+`adtcore:responsible`, `changedBy` and `createdBy` were set to `SAP` and
+`masterSystem` to `SID`. It was taken by a direct GET, not by
+`scripts/capture-adt-corpus.ts`; the response headers were not recorded, and the
+sidecar carries no timestamp. The table-type tests share it (`getTypeInfo`,
+`tableTypePatch`, `tableTypeTools`, `includeTableTypeMetadataReads`).
 
 ## Refusals
 

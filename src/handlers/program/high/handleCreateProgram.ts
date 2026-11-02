@@ -53,10 +53,9 @@ export const TOOL_DEFINITION = {
       program_type: {
         type: 'string',
         description:
-          "Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
+          "Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
         enum: [
           'executable',
-          'include',
           'module_pool',
           'function_group',
           'class_pool',

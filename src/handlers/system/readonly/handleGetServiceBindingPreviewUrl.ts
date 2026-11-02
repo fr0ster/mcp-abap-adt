@@ -81,7 +81,7 @@ export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.',
+    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -210,7 +210,7 @@ export async function handleGetServiceBindingPreviewUrl(
     () =>
       sequence(
         atStep('read binding', () =>
-          binding.read({ bindingName }, undefined, {
+          binding.read({ bindingName }, 'active', {
             analyse: analyseException,
           }),
         ),

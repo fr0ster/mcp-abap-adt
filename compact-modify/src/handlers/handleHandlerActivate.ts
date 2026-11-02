@@ -50,6 +50,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactActivateDescription(variant),
     inputSchema: compactActivateSchemaFor(COMPACT_ACTIVATE[variant], variant),
+    members: COMPACT_ACTIVATE[variant],
   })),
 } as const;
 

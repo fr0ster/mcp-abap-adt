@@ -13,6 +13,9 @@
  *
  * - `activation-run`: compact activates the same object through the
  *   activation run instead of the inline activation the low tool sent.
+ * - `version-stated` (23.0.0): every read names its version, so the compact
+ *   read sends the low request with `version=active` beside its query; the
+ *   low read sent none.
  */
 
 import * as fs from 'node:fs';
@@ -266,6 +269,21 @@ describe('the low set → compact mapping table', () => {
     },
   );
 
+  const stated = TABLE.rows.filter(
+    (r) => r.accepted?.kind === 'version-stated',
+  );
+  it.each(stated.map((r): [string, LowToCompactRow] => [r.tool, r]))(
+    '%s (accepted, version stated): the low requests, each read with version=active',
+    async (_tool, row) => {
+      const withVersion = (row.low_requests ?? []).map((request) =>
+        request.method === 'GET' && !request.url.includes('?')
+          ? { ...request, url: `${request.url}?version=active` }
+          : request,
+      );
+      expect(await compactRequests(row)).toEqual(withVersion);
+    },
+  );
+
   /**
    * The rows the owner accepted (2026-10-13), each with its kind — fixed
    * here, so a row cannot be marked accepted later, or change its kind,
@@ -279,14 +297,17 @@ describe('the low set → compact mapping table', () => {
     ['ActivateFunctionModuleLow', 'activation-run'],
     ['ActivateServiceDefinitionLow', 'activation-run'],
     ['ActivateServiceBindingLow', 'activation-run'],
+    // 23.0.0 (the owner's ruling): every read names its version.
+    ['UpdateDomainLow', 'version-stated'],
+    ['UpdateDataElementLow', 'version-stated'],
   ];
 
-  it('accepts exactly the 3 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 5 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(3);
+    expect(ACCEPTED).toHaveLength(5);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
@@ -296,7 +317,7 @@ describe('the low set → compact mapping table', () => {
     const kinds = new Set(
       TABLE.rows.flatMap((r) => (r.accepted ? [r.accepted.kind] : [])),
     );
-    expect([...kinds].sort()).toEqual(['activation-run']);
+    expect([...kinds].sort()).toEqual(['activation-run', 'version-stated']);
   });
 });
 

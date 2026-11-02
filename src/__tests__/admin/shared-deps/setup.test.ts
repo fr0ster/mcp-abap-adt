@@ -412,7 +412,7 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getTable(tableDocuments)
-                .read({ tableName: item.name }, undefined, {
+                .read({ tableName: item.name }, 'workingArea', {
                   analyse: analyseException,
                 });
               exists = readResult.ok;
@@ -536,7 +536,7 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getStructure(structureDocuments)
-                .read({ structureName: item.name }, undefined, {
+                .read({ structureName: item.name }, 'workingArea', {
                   analyse: analyseException,
                 });
               exists = readResult.ok;
@@ -658,7 +658,7 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getDdl(ddlDocuments)
-                .read({ ddlName: item.name }, undefined, {
+                .read({ ddlName: item.name }, 'workingArea', {
                   analyse: analyseException,
                 });
               exists = readResult.ok;
@@ -787,7 +787,7 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getBehaviorDefinition(behaviorDefinitionDocuments)
-                .read({ name: item.name }, undefined, {
+                .read({ name: item.name }, 'active', {
                   analyse: analyseException,
                 });
               exists = readResult.ok;
@@ -909,7 +909,7 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getClass(classDocuments)
-                .read({ className: item.name }, undefined, {
+                .read({ className: item.name }, 'workingArea', {
                   analyse: analyseException,
                 });
               exists = readResult.ok;
@@ -1049,7 +1049,7 @@ describe('Admin: Setup shared dependencies', () => {
                 .getFunctionGroup(functionGroupDocuments)
                 .readMetadata(
                   { functionGroupName: item.name },
-                  { analyse: analyseException },
+                  { version: 'workingArea', analyse: analyseException },
                 );
               exists = readResult.ok;
             } catch {
@@ -1143,7 +1143,7 @@ describe('Admin: Setup shared dependencies', () => {
                     functionModuleName: item.name,
                     functionGroupName: item.group,
                   },
-                  undefined,
+                  'workingArea',
                   { analyse: analyseException },
                 );
               exists = readResult.ok;
@@ -1338,7 +1338,7 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getServiceDefinition(serviceDefinitionDocuments)
-                .read({ serviceDefinitionName: item.name }, undefined, {
+                .read({ serviceDefinitionName: item.name }, 'active', {
                   analyse: analyseException,
                 });
               exists = readResult.ok;

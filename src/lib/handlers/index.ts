@@ -19,7 +19,10 @@ export type { ArgsOf } from './argsOf.js';
 export { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 // Handler groups
 export * from './groups/index.js';
-export type { HandlerExporterOptions } from './HandlerExporter.js';
+export type {
+  ConnectionProvider,
+  HandlerExporterOptions,
+} from './HandlerExporter.js';
 // Handler exporter for external server integration
 export {
   createDefaultHandlerExporter,
@@ -34,3 +37,10 @@ export {
   noConnectionContext,
   registryForExposition,
 } from './registry/expositionRegistry.js';
+// The call form of a handler: the one rule every registration path follows
+export {
+  type CallContext,
+  callInItsForm,
+  type InGroupContext,
+  isArgsOnly,
+} from './utils/handlerCall.js';

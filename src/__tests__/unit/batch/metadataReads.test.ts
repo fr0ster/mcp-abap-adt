@@ -191,11 +191,53 @@ const EXCLUDED: Record<string, string> = {
     "the behavior pool's class metadata; the walks list it as its class",
   'enhancement/readonly/handleGetEnhancements.ts':
     "a probe of an include's metadata to tell an include from a program",
+  'include/readonly/handleGetInclude.ts':
+    "a program include's metadata, the shared read; the package walk does not read includes' metadata, so the batch has no read of the type",
   'include/readonly/handleGetIncludesList.ts':
     "a class's metadata, read to find its includes",
   'system/readonly/handleGetTypeInfo.ts':
-    'a type name read as a data element, a domain, a structure and a table type; the table type has no Get handler, so its read is its own',
+    'a type name read as a data element, a domain, a structure and a table type; the table type read is the shared one of GetTableType, which the batch does not use',
+  'table_type/high/handleGetTableType.ts':
+    "a table type's metadata; the package walk does not read table types, so the batch has no read of the type",
 };
+
+/**
+ * The version each type's description is read at in the walks: the request
+ * 22.0.x sent, now stated. adt-clients 39 sent `active` for a metadata read
+ * without a version of a service definition, a behavior definition, a
+ * function group include, a package and an access control, and no version
+ * for every other type here — ADT's working area.
+ */
+const WALK_VERSION: Readonly<Record<string, 'active' | 'workingArea'>> = {
+  'CLAS/OC': 'workingArea',
+  'INTF/OI': 'workingArea',
+  'PROG/P': 'workingArea',
+  'DDLS/DF': 'workingArea',
+  'DDLX/EX': 'workingArea',
+  'DOMA/DD': 'workingArea',
+  'DTEL/DE': 'workingArea',
+  'TABL/DT': 'workingArea',
+  'TABL/DS': 'workingArea',
+  'FUGR/F': 'workingArea',
+  'FUGR/FF': 'workingArea',
+  'FUGR/I': 'active',
+  'SRVD/SRV': 'active',
+  'SRVB/SVB': 'workingArea',
+  'BDEF/BDO': 'active',
+  'DEVC/K': 'active',
+  'MSAG/N': 'workingArea',
+  'ENHS/XSB': 'workingArea',
+  'DCLS/DL': 'active',
+};
+
+/** `url` with its `version` set to `version`, the rest of its query kept. */
+function atVersion(url: string, version: string): string {
+  const at = url.indexOf('?');
+  const path = at < 0 ? url : url.slice(0, at);
+  const query = new URLSearchParams(at < 0 ? '' : url.slice(at + 1));
+  query.set('version', version);
+  return `${path}?${query.toString()}`;
+}
 
 const HANDLERS_DIR = join(__dirname, '../../../handlers');
 
@@ -234,6 +276,21 @@ const targetOf = (type: string): MetadataTarget => ({
 });
 
 /** The request the type's `Get<Type>` handler sends, on a plain connection. */
+/**
+ * A direct request's address with its request parameters in the query, as an
+ * envelope part carries them (a service binding's version is a parameter).
+ */
+function withParams(url: string, params: IAbapRequestOptions['params']) {
+  if (typeof params !== 'object' || params === null) return url;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.append(key, String(value));
+  }
+  const text = query.toString();
+  if (text === '') return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${text}`;
+}
+
 async function handlerRequest(type: string) {
   const fake = envelopeConnection(
     () => envelopeResponse([]),
@@ -257,7 +314,7 @@ async function handlerRequest(type: string) {
   const request = fake.directs[0] as IAbapRequestOptions;
   return {
     method: request.method,
-    url: request.url,
+    url: withParams(request.url, request.params),
     headers: lowerHeaders(request.headers),
     body: request.data === undefined ? '' : String(request.data),
   };
@@ -332,7 +389,7 @@ describe('one metadata read per type, shared by handler and batch', () => {
   );
 
   it.each(Object.keys(HANDLERS))(
-    "%s: the batch part is the handler's request whole",
+    "%s: the batch part is the handler's request whole, at the version 22.0.x read",
     async (type) => {
       const direct = await handlerRequest(type);
       const fake = envelopeConnection((parts) =>
@@ -357,13 +414,17 @@ describe('one metadata read per type, shared by handler and batch', () => {
       const parts = fake.envelopes[0]?.parts ?? [];
       expect(parts).toHaveLength(1);
       const inner = parts[0];
+      const version = WALK_VERSION[type] ?? '';
       expect({
         method: inner?.method,
         url: inner?.url,
         headers: lowerHeaders(inner?.headers),
         // The envelope frames an empty body with its line break.
         body: (inner?.body ?? '').trim(),
-      }).toEqual(direct);
+      }).toEqual({ ...direct, url: atVersion(direct.url, version) });
+      expect(new URLSearchParams(inner?.url.split('?')[1]).get('version')).toBe(
+        version,
+      );
       expect(direct.headers.accept).toBeTruthy();
       expect([...descriptions.values()]).toEqual(['Placeholder']);
     },

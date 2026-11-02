@@ -2,7 +2,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present.',
+    '[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present, reading the active version of the object it names.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -20,6 +20,19 @@ import { answerRequestThrown } from '../../../lib/answer';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { makeAdtRequest } from '../../../lib/utils';
+
+/**
+ * `endpoint` reading the active version: `version=active` in its query, the
+ * rest of the query kept. A read states its version; this tool has no version
+ * parameter, so it reads the active one.
+ */
+function atActiveVersion(endpoint: string): string {
+  const at = endpoint.indexOf('?');
+  const path = at < 0 ? endpoint : endpoint.slice(0, at);
+  const query = new URLSearchParams(at < 0 ? '' : endpoint.slice(at + 1));
+  query.set('version', 'active');
+  return `${path}?${query.toString()}`;
+}
 
 /**
  * @param args { object_type, object_name, tech_name }
@@ -72,7 +85,7 @@ export async function handleGetObjectNodeFromCache(
       }
       return uri;
     };
-    const endpoint = buildEndpoint(node.OBJECT_URI);
+    const endpoint = atActiveVersion(buildEndpoint(node.OBJECT_URI));
     let resp: Awaited<ReturnType<typeof makeAdtRequest>>;
     try {
       // No deadline of the server's: the request waits for SAP's answer.

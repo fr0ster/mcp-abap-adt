@@ -154,7 +154,10 @@ export async function handleUpdateDataElement(
         atStep('read metadata', () =>
           client
             .getDataElement(dataElementDocuments)
-            .readMetadata({ dataElementName }, { analyse: analyseException }),
+            .readMetadata(
+              { dataElementName },
+              { version: 'workingArea', analyse: analyseException },
+            ),
         ),
         atStep('update metadata', (current) =>
           withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>

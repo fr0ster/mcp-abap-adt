@@ -10,7 +10,11 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtObjectIdentity,
+  IAdtError,
+  IIncludeConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
@@ -117,7 +121,7 @@ describe('GetInclude: through the adt-clients member, answered by answer()', () 
   it("SAP's refusal is the method's error as it is, not its message as text", async () => {
     const analyses: unknown[] = [];
     fakeClient = fakeClientOf({
-      getInclude: async (_name: unknown, options: any) => {
+      read: async (_config: unknown, _version: unknown, options: any) => {
         analyses.push(options?.analyse);
         return forbidden();
       },
@@ -139,7 +143,7 @@ describe('GetInclude: through the adt-clients member, answered by answer()', () 
 
   it('answers the source as it came', async () => {
     fakeClient = fakeClientOf({
-      getInclude: async () => okResponse(reading('DATA a TYPE i.')),
+      read: async () => okResponse(reading('DATA a TYPE i.')),
     });
     const result: any = await handleGetInclude(
       { connection: {} as any, logger: undefined } as any,
@@ -207,7 +211,10 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
     expect(payloadOf(result)).toEqual({
       origin: 'connection',
       // The first lookup is the data element (`getDataElement().readMetadata`).
-      ...sapRefusal('/sap/bc/adt/ddic/dataelements/zt', 'read data element'),
+      ...sapRefusal(
+        '/sap/bc/adt/ddic/dataelements/zt?version=workingArea',
+        'read data element',
+      ),
     });
     // The refusal is the answer: no further lookup is sent.
     expect(sent).toHaveLength(1);
@@ -232,8 +239,8 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       step: 'read domain',
     });
     expect(sent).toEqual([
-      '/sap/bc/adt/ddic/dataelements/zt',
-      '/sap/bc/adt/ddic/domains/zt',
+      '/sap/bc/adt/ddic/dataelements/zt?version=workingArea',
+      '/sap/bc/adt/ddic/domains/zt?version=workingArea',
     ]);
   });
 });
@@ -278,7 +285,10 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject(
-      sapRefusal('/sap/bc/adt/programs/programs/zprog', 'read OBJECT_URI'),
+      sapRefusal(
+        '/sap/bc/adt/programs/programs/zprog?version=active',
+        'read OBJECT_URI',
+      ),
     );
     // Nothing of the failure was cached as the node's content.
     expect(
@@ -369,8 +379,8 @@ describe('GetIncludesList: SAP answered 401 to an include', () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () =>
         okResponse(reading('REPORT z.\nINCLUDE zone.\nINCLUDE ztwo.\n')),
-      getInclude: async (name: unknown) => {
-        read.push(String(name));
+      read: async (config: AdtObjectIdentity<IIncludeConfig>) => {
+        read.push(config.includeName ?? '');
         return unauthorized();
       },
     });

@@ -32,7 +32,12 @@ export const reading = <T>(
   status = 200,
 ) => ({ value, raw, status });
 
-type Members = Record<string, (...args: unknown[]) => unknown>;
+/**
+ * The members a fake answers, each typed as the test types it — by the
+ * contract it stands in for, where it reads its arguments (`never[]` takes
+ * any parameter list).
+ */
+type Members = Record<string, (...args: never[]) => unknown>;
 
 /**
  * A client whose every factory answers the same member table.

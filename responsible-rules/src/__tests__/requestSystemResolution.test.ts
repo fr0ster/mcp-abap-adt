@@ -813,6 +813,8 @@ function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
     context: { connection } as HandlerContext,
     getName: () => 'fake',
     registerHandlers: () => {},
+    // What the exporter reads an args-only handler's context by.
+    currentContext: () => group.context,
     getHandlers(): HandlerEntry[] {
       return [
         {

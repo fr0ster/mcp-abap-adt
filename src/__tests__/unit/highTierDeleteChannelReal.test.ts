@@ -55,6 +55,7 @@ import { handleDeleteDomain } from '../../handlers/domain/high/handleDeleteDomai
 import { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleDeleteFunctionInclude } from '../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleDeleteFunctionModule } from '../../handlers/function_module/high/handleDeleteFunctionModule';
+import { handleDeleteInclude } from '../../handlers/include/high/handleDeleteInclude';
 import { handleDeleteInterface } from '../../handlers/interface/high/handleDeleteInterface';
 import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
 import { handleDeleteMessageClassMessage } from '../../handlers/message_class/high/handleDeleteMessageClassMessage';
@@ -64,6 +65,7 @@ import { handleDeleteServiceBinding } from '../../handlers/service_binding/high/
 import { handleDeleteServiceDefinition } from '../../handlers/service_definition/high/handleDeleteServiceDefinition';
 import { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure';
 import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
+import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleDeleteUnitTest } from '../../handlers/unit_test/high/handleDeleteUnitTest';
 import {
@@ -262,6 +264,24 @@ const deletionServiceCases: DeletionCase[] = [
       handleDeleteMessageClass(ctx(c) as any, {
         message_class_name: 'ZMSGC_DEL_X',
       }),
+  },
+  {
+    name: 'DeleteInclude',
+    expectedUri: '/sap/bc/adt/programs/includes/zi_del_x',
+    run: (c) =>
+      handleDeleteInclude(
+        { connection: c, logger: undefined },
+        { include_name: 'ZI_DEL_X' },
+      ),
+  },
+  {
+    name: 'DeleteTableType',
+    expectedUri: '/sap/bc/adt/ddic/tabletypes/ztt_del_x',
+    run: (c) =>
+      handleDeleteTableType(
+        { connection: c, logger: undefined },
+        { table_type_name: 'ZTT_DEL_X' },
+      ),
   },
   {
     name: 'DeleteProgram',

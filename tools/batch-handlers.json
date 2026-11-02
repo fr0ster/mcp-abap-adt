@@ -12,6 +12,12 @@
     "sends": "GET /sap/bc/adt/ddic/domains/{name}"
   },
   {
+    "tool": "GetTableType",
+    "set": "full",
+    "handler": "src/handlers/table_type/high/handleGetTableType.ts#handleGetTableType",
+    "sends": "GET /sap/bc/adt/ddic/tabletypes/{name}"
+  },
+  {
     "tool": "GetDataElement",
     "set": "full",
     "handler": "src/handlers/data_element/high/handleGetDataElement.ts#handleGetDataElement",
@@ -147,7 +153,7 @@
     "tool": "GetInclude",
     "set": "full",
     "handler": "src/handlers/include/readonly/handleGetInclude.ts#handleGetInclude",
-    "sends": "GET /sap/bc/adt/programs/includes/{name}/source/main"
+    "sends": "one request: GET /sap/bc/adt/programs/includes/{name}/source/main (part source, the default; ?version= the version given), or GET /sap/bc/adt/programs/includes/{name} (part metadata)"
   },
   {
     "tool": "GetTransport",
@@ -232,6 +238,12 @@
     "set": "full",
     "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
     "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetTableTypeVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/tabletypes/{name}/versions"
   },
   {
     "tool": "GetClassVersionSource",
@@ -404,6 +416,7 @@
           "LOCAL_DEFINITIONS",
           "LOCAL_MACROS",
           "PROGRAM",
+          "INCLUDE",
           "INTERFACE",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
@@ -439,11 +452,13 @@
           "SERVICE_BINDING",
           "CLASS",
           "PROGRAM",
+          "INCLUDE",
           "INTERFACE",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -657,7 +672,9 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -700,7 +717,9 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING"
+          "SERVICE_BINDING",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -743,7 +762,9 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING"
+          "SERVICE_BINDING",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -796,7 +817,9 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -845,7 +868,9 @@
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -876,6 +901,12 @@
     "tool": "ActivateDomain",
     "set": "full",
     "handler": "src/handlers/domain/low/handleActivateDomain.ts#handleActivateDomain",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateTableType",
+    "set": "full",
+    "handler": "src/handlers/table_type/low/handleActivateTableType.ts#handleActivateTableType",
     "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
   },
   {
@@ -912,6 +943,12 @@
     "tool": "ActivateInterface",
     "set": "full",
     "handler": "src/handlers/interface/low/handleActivateInterface.ts#handleActivateInterface",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
+  },
+  {
+    "tool": "ActivateInclude",
+    "set": "full",
+    "handler": "src/handlers/include/low/handleActivateInclude.ts#handleActivateInclude",
     "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
   },
   {
@@ -1058,7 +1095,9 @@
         "equals": [
           "PACKAGE",
           "SERVICE_DEFINITION",
-          "SERVICE_BINDING"
+          "SERVICE_BINDING",
+          "INCLUDE",
+          "TABLE_TYPE"
         ]
       }
     ]
@@ -1115,6 +1154,12 @@
     "tool": "CheckDomain",
     "set": "full",
     "handler": "src/handlers/domain/high/handleCheckDomain.ts#handleCheckDomain",
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
+  },
+  {
+    "tool": "CheckTableType",
+    "set": "full",
+    "handler": "src/handlers/table_type/high/handleCheckTableType.ts#handleCheckTableType",
     "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
   },
   {
@@ -1206,6 +1251,12 @@
     "set": "full",
     "handler": "src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts#handleCreateBehaviorImplementation",
     "sends": "POST /sap/bc/adt/oo/classes: the create alone"
+  },
+  {
+    "tool": "CreateInclude",
+    "set": "full",
+    "handler": "src/handlers/include/high/handleCreateInclude.ts#handleCreateInclude",
+    "sends": "POST /sap/bc/adt/programs/includes: the create alone"
   },
   {
     "tool": "CreateProgram",

@@ -27,6 +27,7 @@ import {
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { endTestConnection } from './helpers/openConnections';
 import { restoreResolution } from './helpers/packageSources';
+import { setupSystemKind } from './helpers/setupSystemKind';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';
 
 function loadTestConfig(): any {
@@ -80,6 +81,18 @@ async function setUp(): Promise<void> {
     return;
   }
 
+  // The kind the logon is built for, stated before anything connects: the
+  // config's environment.system_type, else SAP_SYSTEM_TYPE. A session file
+  // need not state one, and none stated refuses the connection before the
+  // cached token, the refresh or a login is tried.
+  const kind = setupSystemKind(config);
+  if (kind === undefined) {
+    console.log(
+      '[globalSetup] Auth skipped: no system type stated (environment.system_type in the test config, or SAP_SYSTEM_TYPE); nothing was sent to the system',
+    );
+    return;
+  }
+
   const useUnsafe =
     process.env.MCP_UNSAFE === 'true' ||
     config?.auth_broker?.unsafe === true ||
@@ -127,7 +140,14 @@ async function setUp(): Promise<void> {
     const settings = await factory.settingsFor(destination);
     const provider = await factory.getProvider(destination);
     // connect() logs on: cached token → refresh → browser (if needed).
-    const connection = createAbapConnection(settings, provider);
+    const connection = createAbapConnection(
+      settings,
+      provider,
+      undefined,
+      undefined,
+      undefined,
+      kind,
+    );
     await connection.connect();
     console.log(`[globalSetup] Session ready for "${destination}"`);
     await endTestConnection(connection);

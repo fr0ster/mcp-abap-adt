@@ -265,6 +265,26 @@ import {
   handleGetFunctionModule,
 } from '../../../handlers/function_module/high/handleGetFunctionModule';
 import {
+  TOOL_DEFINITION as CreateInclude_Tool,
+  handleCreateInclude,
+} from '../../../handlers/include/high/handleCreateInclude';
+import {
+  TOOL_DEFINITION as DeleteInclude_Tool,
+  handleDeleteInclude,
+} from '../../../handlers/include/high/handleDeleteInclude';
+import {
+  handleUpdateInclude,
+  TOOL_DEFINITION as UpdateInclude_Tool,
+} from '../../../handlers/include/high/handleUpdateInclude';
+import {
+  handleUpdateIncludeMetadata,
+  TOOL_DEFINITION as UpdateIncludeMetadata_Tool,
+} from '../../../handlers/include/high/handleUpdateIncludeMetadata';
+import {
+  TOOL_DEFINITION as ActivateInclude_Tool,
+  handleActivateInclude,
+} from '../../../handlers/include/low/handleActivateInclude';
+import {
   TOOL_DEFINITION as CheckInterface_Tool,
   handleCheckInterface,
 } from '../../../handlers/interface/high/handleCheckInterface';
@@ -471,6 +491,30 @@ import {
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
 import {
+  TOOL_DEFINITION as CheckTableType_Tool,
+  handleCheckTableType,
+} from '../../../handlers/table_type/high/handleCheckTableType';
+import {
+  TOOL_DEFINITION as CreateTableType_Tool,
+  handleCreateTableType,
+} from '../../../handlers/table_type/high/handleCreateTableType';
+import {
+  TOOL_DEFINITION as DeleteTableType_Tool,
+  handleDeleteTableType,
+} from '../../../handlers/table_type/high/handleDeleteTableType';
+import {
+  TOOL_DEFINITION as GetTableType_Tool,
+  handleGetTableType,
+} from '../../../handlers/table_type/high/handleGetTableType';
+import {
+  handleUpdateTableType,
+  TOOL_DEFINITION as UpdateTableType_Tool,
+} from '../../../handlers/table_type/high/handleUpdateTableType';
+import {
+  TOOL_DEFINITION as ActivateTableType_Tool,
+  handleActivateTableType,
+} from '../../../handlers/table_type/low/handleActivateTableType';
+import {
   TOOL_DEFINITION as AddTransportObject_Tool,
   handleAddTransportObject,
 } from '../../../handlers/transport/high/handleAddTransportObject';
@@ -604,6 +648,15 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          ...ActivateTableType_Tool,
+          name: 'ActivateTableType',
+          description:
+            'Activates the ABAP table type named by table_type_name, so its inactive version is in force.',
+        },
+        handler: withContext(handleActivateTableType),
+      },
+      {
+        toolDefinition: {
           ...ActivateDataElement_Tool,
           name: 'ActivateDataElement',
           description:
@@ -664,6 +717,15 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
             'Activates the ABAP program (report) named by program_name, so its inactive version is in force.',
         },
         handler: withContext(handleActivateProgram),
+      },
+      {
+        toolDefinition: {
+          ...ActivateInclude_Tool,
+          name: 'ActivateInclude',
+          description:
+            'Activates the ABAP include named by include_name, so its inactive version is in force.',
+        },
+        handler: withContext(handleActivateInclude),
       },
       {
         toolDefinition: {
@@ -742,6 +804,26 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetDomain_Tool,
         handler: withContext(handleGetDomain),
+      },
+      {
+        toolDefinition: GetTableType_Tool,
+        handler: withContext(handleGetTableType),
+      },
+      {
+        toolDefinition: CreateTableType_Tool,
+        handler: withContext(handleCreateTableType),
+      },
+      {
+        toolDefinition: UpdateTableType_Tool,
+        handler: withContext(handleUpdateTableType),
+      },
+      {
+        toolDefinition: DeleteTableType_Tool,
+        handler: withContext(handleDeleteTableType),
+      },
+      {
+        toolDefinition: CheckTableType_Tool,
+        handler: withContext(handleCheckTableType),
       },
       {
         toolDefinition: UpdateDomainHigh_Tool,
@@ -1042,6 +1124,22 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteLocalMacros_Tool,
         handler: withContext(handleDeleteLocalMacros),
+      },
+      {
+        toolDefinition: CreateInclude_Tool,
+        handler: withContext(handleCreateInclude),
+      },
+      {
+        toolDefinition: UpdateInclude_Tool,
+        handler: withContext(handleUpdateInclude),
+      },
+      {
+        toolDefinition: UpdateIncludeMetadata_Tool,
+        handler: withContext(handleUpdateIncludeMetadata),
+      },
+      {
+        toolDefinition: DeleteInclude_Tool,
+        handler: withContext(handleDeleteInclude),
       },
       {
         toolDefinition: CreateProgram_Tool,

@@ -5,6 +5,7 @@ export type CompactObjectType =
   | 'TRANSPORT'
   | 'TABLE'
   | 'STRUCTURE'
+  | 'TABLE_TYPE'
   | 'DDL'
   | 'SERVICE_DEFINITION'
   | 'SERVICE_BINDING'
@@ -16,6 +17,7 @@ export type CompactObjectType =
   | 'LOCAL_DEFINITIONS'
   | 'LOCAL_MACROS'
   | 'PROGRAM'
+  | 'INCLUDE'
   | 'INTERFACE'
   | 'FUNCTION_GROUP'
   | 'FUNCTION_MODULE'
@@ -32,6 +34,7 @@ export const COMPACT_OBJECT_TYPES: CompactObjectType[] = [
   'TRANSPORT',
   'TABLE',
   'STRUCTURE',
+  'TABLE_TYPE',
   'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
@@ -43,6 +46,7 @@ export const COMPACT_OBJECT_TYPES: CompactObjectType[] = [
   'LOCAL_DEFINITIONS',
   'LOCAL_MACROS',
   'PROGRAM',
+  'INCLUDE',
   'INTERFACE',
   'FUNCTION_GROUP',
   'FUNCTION_MODULE',

@@ -8,6 +8,10 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { readProgramMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -17,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetProgram',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read. On ABAP Cloud, the programs are SAP\'s standard programs.',
+    '[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP\'s standard programs.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -26,13 +30,7 @@ export const TOOL_DEFINITION = {
         description: 'Program name.',
       },
       part: READ_PART_PROPERTY,
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
     },
     required: ['program_name'],
   },
@@ -41,7 +39,7 @@ export const TOOL_DEFINITION = {
 interface GetProgramArgs {
   program_name: string;
   part?: ReadPart;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
 }
 
 export async function handleGetProgram(
@@ -62,7 +60,7 @@ export async function handleGetProgram(
   if (part === 'metadata') {
     return answer(
       { tool: 'GetProgram', detail: 'terse' },
-      () => readProgramMetadata(client, { programName }),
+      () => readProgramMetadata(client, { programName }, version),
       (metadata: AdtReading<string>) => ({
         success: true,
         program_name: programName,

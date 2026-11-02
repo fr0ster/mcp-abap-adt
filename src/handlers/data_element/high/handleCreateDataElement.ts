@@ -246,7 +246,7 @@ export async function handleCreateDataElement(
                 atStep('read metadata', () =>
                   obj.readMetadata(
                     { dataElementName },
-                    { analyse: analyseException },
+                    { version: 'workingArea', analyse: analyseException },
                   ),
                 ),
                 atStep('update metadata', (current) =>
@@ -302,7 +302,11 @@ export async function handleCreateDataElement(
           await obj
             .readMetadata(
               { dataElementName },
-              { withLongPolling: true, analyse: analyseException },
+              {
+                version: 'inactive',
+                withLongPolling: true,
+                analyse: analyseException,
+              },
             )
             .catch(unlessCredentialFailure);
           return withAdtHeaders(context, 'dataElement.check', (headers) =>

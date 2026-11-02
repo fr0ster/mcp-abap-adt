@@ -7,7 +7,7 @@
  *   answered with a document and answered `404` alike; the answer carries the
  *   part read, `{ part: 'source', source }` or `{ part: 'metadata', metadata }`,
  *   the same keys for every type;
- * - DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and PACKAGE have no source: `source`
+ * - DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE and PACKAGE have no source: `source`
  *   is refused before any request, naming the parts the type has;
  * - FUNCTION_MODULE takes its group in the arguments (`GROUP|MODULE`, or
  *   `function_group_name`): its source is one request at that group;
@@ -84,6 +84,7 @@ const BOTH: Array<[string, Record<string, unknown>]> = [
   ['SERVICE_BINDING', { service_binding_name: 'SRVB_A' }],
   ['CLASS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
@@ -104,6 +105,7 @@ const SOURCELESS: Array<[string, Record<string, unknown>, string]> = [
   ['DOMAIN', { domain_name: 'DOM_A' }, 'metadata'],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }, 'metadata'],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }, 'metadata'],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }, 'metadata'],
   ['PACKAGE', { package_name: 'PKG_A' }, 'metadata, contents'],
 ];
 
@@ -284,6 +286,148 @@ describe('compact HandlerGet: one part, one request', () => {
       expect(sent).toEqual([]);
       expect(answer?.isError).toBe(true);
       expect(textOf(answer)).toContain(words);
+    });
+  });
+
+  describe('INCLUDE: the source and the metadata document, one request each', () => {
+    const SOURCE = "REPORT zincl.\n  WRITE 'x'.\n";
+
+    it.each([
+      [
+        'absent',
+        {},
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+      ],
+      [
+        'source',
+        { part: 'source' },
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+      ],
+      [
+        'source, inactive',
+        { part: 'source', version: 'inactive' },
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=inactive',
+      ],
+      [
+        'source, workingArea',
+        { part: 'source', version: 'workingArea' },
+        'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=workingArea',
+      ],
+      [
+        'metadata',
+        { part: 'metadata' },
+        'GET /sap/bc/adt/programs/includes/incl_a?version=active',
+      ],
+      [
+        'metadata, workingArea',
+        { part: 'metadata', version: 'workingArea' },
+        'GET /sap/bc/adt/programs/includes/incl_a?version=workingArea',
+      ],
+    ])('part %s: exactly that request', async (_label, part, request) => {
+      for (const mode of MODES) {
+        const { sent } = await run(mode, {
+          object_type: 'INCLUDE',
+          include_name: 'INCL_A',
+          ...part,
+        });
+        expect(sent).toEqual([request]);
+      }
+    });
+
+    it('source answers { part: "source", source } beside the name', async () => {
+      const { answer } = await run(
+        'document',
+        { object_type: 'INCLUDE', include_name: 'incl_a' },
+        SOURCE,
+      );
+      expect(answer?.isError).not.toBe(true);
+      expect(jsonOf(answer)).toEqual({
+        success: true,
+        include_name: 'INCL_A',
+        part: 'source',
+        source: SOURCE,
+      });
+    });
+
+    it('source with a version answers it beside the source', async () => {
+      const { answer } = await run(
+        'document',
+        {
+          object_type: 'INCLUDE',
+          include_name: 'INCL_A',
+          version: 'inactive',
+        },
+        SOURCE,
+      );
+      expect(jsonOf(answer)).toEqual({
+        success: true,
+        include_name: 'INCL_A',
+        version: 'inactive',
+        part: 'source',
+        source: SOURCE,
+      });
+    });
+
+    it('metadata answers { part: "metadata", metadata } beside the name', async () => {
+      const DOCUMENT = '<include:abapInclude adtcore:name="INCL_A"/>';
+      const { answer } = await run(
+        'document',
+        { object_type: 'INCLUDE', include_name: 'INCL_A', part: 'metadata' },
+        DOCUMENT,
+      );
+      expect(jsonOf(answer)).toEqual({
+        success: true,
+        include_name: 'INCL_A',
+        part: 'metadata',
+        metadata: DOCUMENT,
+      });
+    });
+
+    it.each(['source', 'metadata'])(
+      'part %s with another version: refused before any request, naming the three',
+      async (part) => {
+        const { sent, answer } = await run('document', {
+          object_type: 'INCLUDE',
+          include_name: 'INCL_A',
+          part,
+          version: 'latest',
+        });
+        expect(sent).toEqual([]);
+        expect(answer?.isError).toBe(true);
+        expect(textOf(answer)).toContain(
+          'version must be "active", "inactive" or "workingArea"',
+        );
+      },
+    );
+
+    describe('on ABAP cloud', () => {
+      beforeAll(() => {
+        process.env.SAP_SYSTEM_TYPE = 'cloud';
+      });
+      afterAll(() => {
+        process.env.SAP_SYSTEM_TYPE = 'onprem';
+      });
+
+      it.each([
+        [
+          'source',
+          'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+        ],
+        ['metadata', 'GET /sap/bc/adt/programs/includes/incl_a?version=active'],
+      ])('part %s: exactly that request', async (part, request) => {
+        for (const mode of MODES) {
+          const { sent, answer } = await run(mode, {
+            object_type: 'INCLUDE',
+            include_name: 'INCL_A',
+            part,
+          });
+          expect(sent).toEqual([request]);
+          if (mode === 'document') {
+            expect(answer?.isError).not.toBe(true);
+            expect(jsonOf(answer).part).toBe(part);
+          }
+        }
+      });
     });
   });
 

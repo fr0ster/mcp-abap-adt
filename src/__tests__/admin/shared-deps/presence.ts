@@ -23,6 +23,7 @@ import {
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import type { ReadVersion } from '../../../lib/handlers/readVersion';
 
 /** One shared object as `shared_dependencies.<section>` lists it. */
 export interface SharedItem {
@@ -47,64 +48,87 @@ type Read = (client: IServerAdtClient, item: SharedItem) => Promise<any>;
 const options = { analyse: analyseException };
 
 /**
+ * The version an existence probe reads: the working area, which answers the
+ * inactive version where one exists — the request a probe without a version
+ * sent — except where adt-clients 39 sent `active` for none (a behavior or
+ * service definition) or `inactive` (an append structure); each keeps it.
+ */
+const WORKING_AREA: ReadVersion = 'workingArea';
+
+/**
  * The read per section — the one setup's existence probe uses where it has a
  * read, the object's own read otherwise. A function group, a domain and a
  * data element carry a document, not a source: `readMetadata`.
  */
 export const SHARED_READS: Record<string, Read> = {
   tables: (c, i) =>
-    c.getTable(tableDocuments).read({ tableName: i.name }, undefined, options),
+    c
+      .getTable(tableDocuments)
+      .read({ tableName: i.name }, WORKING_AREA, options),
   structures: (c, i) =>
     c
       .getStructure(structureDocuments)
-      .read({ structureName: i.name }, undefined, options),
+      .read({ structureName: i.name }, WORKING_AREA, options),
   append_structures: (c, i) =>
     c
       .getAppendStructure(appendStructureDocuments)
-      .read({ appendStructureName: i.name }, undefined, options),
+      .read({ appendStructureName: i.name }, 'inactive', options),
   views: (c, i) =>
-    c.getDdl(ddlDocuments).read({ ddlName: i.name }, undefined, options),
+    c.getDdl(ddlDocuments).read({ ddlName: i.name }, WORKING_AREA, options),
   behavior_definitions: (c, i) =>
     c
       .getBehaviorDefinition(behaviorDefinitionDocuments)
-      .read({ name: i.name }, undefined, options),
+      .read({ name: i.name }, 'active', options),
   classes: (c, i) =>
-    c.getClass(classDocuments).read({ className: i.name }, undefined, options),
+    c
+      .getClass(classDocuments)
+      .read({ className: i.name }, WORKING_AREA, options),
   function_groups: (c, i) =>
     c
       .getFunctionGroup(functionGroupDocuments)
-      .readMetadata({ functionGroupName: i.name }, options),
+      .readMetadata(
+        { functionGroupName: i.name },
+        { version: WORKING_AREA, ...options },
+      ),
   function_modules: (c, i) =>
     c.getFunctionModule(functionModuleDocuments).read(
       {
         functionModuleName: i.name,
         functionGroupName: i.group,
       } as any,
-      undefined,
+      WORKING_AREA,
       options,
     ),
   service_definitions: (c, i) =>
     c
       .getServiceDefinition(serviceDefinitionDocuments)
-      .read({ serviceDefinitionName: i.name }, undefined, options),
+      .read({ serviceDefinitionName: i.name }, 'active', options),
   domains: (c, i) =>
-    c.getDomain(domainDocuments).readMetadata({ domainName: i.name }, options),
+    c
+      .getDomain(domainDocuments)
+      .readMetadata(
+        { domainName: i.name },
+        { version: WORKING_AREA, ...options },
+      ),
   data_elements: (c, i) =>
     c
       .getDataElement(dataElementDocuments)
-      .readMetadata({ dataElementName: i.name }, options),
+      .readMetadata(
+        { dataElementName: i.name },
+        { version: WORKING_AREA, ...options },
+      ),
   interfaces: (c, i) =>
     c
       .getInterface(interfaceDocuments)
-      .read({ interfaceName: i.name }, undefined, options),
+      .read({ interfaceName: i.name }, WORKING_AREA, options),
   programs: (c, i) =>
     c
       .getProgram(programDocuments)
-      .read({ programName: i.name }, undefined, options),
+      .read({ programName: i.name }, WORKING_AREA, options),
   metadata_extensions: (c, i) =>
     c
       .getMetadataExtension(metadataExtensionDocuments)
-      .read({ name: i.name }, undefined, options),
+      .read({ name: i.name }, WORKING_AREA, options),
 };
 
 /** Sections in the order the report lists them */

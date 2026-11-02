@@ -26,6 +26,40 @@ get_program:
       params:
         program_name: "SAPMV45A"
 
+# Program include tests (on premise only)
+create_include:
+  test_cases:
+    - name: "builder_include"
+      enabled: false
+      available_in: ["onprem"]
+      params:
+        include_name: "ZMCP_BLD_INCL_H1"
+        description: "Include for the include high-level tests"
+
+# Program include read on ABAP cloud (empty include_name: the case is skipped)
+include_cloud_read:
+  test_cases:
+    - name: "read_delivered_include"
+      enabled: false
+      available_in: ["cloud"]
+      params:
+        include_name: ""
+
+# Table type tests (on premise and ABAP cloud)
+create_table_type:
+  test_cases:
+    - name: "builder_table_type"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        table_type_name: "ZMCP_BLD_TTYP_H1"
+        description: "Table type for the table type high-level tests"
+        row_type_kind: "dictionaryType"
+        row_type_name: "ABAP_BOOLEAN"
+        access_type: "standard"
+        key_definition: "standard"
+        key_kind: "nonUnique"
+
 # Class Tests
 get_class:
   test_cases:

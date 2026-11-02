@@ -94,6 +94,8 @@ import {
   SINGLE_ACTIVATION_ROUTES,
   TYPE_NAMES,
   type VariantValues,
+  VERSION_SOURCE_KINDS,
+  VERSION_SOURCE_ROUTES,
   VERSIONED_KINDS,
   VERSIONED_ROUTES,
   WHERE_USED_CODES,
@@ -192,6 +194,15 @@ const codeRoute = (code: string): Route => ({
   addressed: true,
 });
 
+/** Whether a where-used route is a name of `TYPE_NAMES`. */
+function isTypeName(route: string): route is keyof typeof TYPE_NAMES {
+  return Object.hasOwn(TYPE_NAMES, route);
+}
+
+/** The code a where-used route stands for: a name's code, or the code. */
+const whereUsedCodeOf = (route: string): string =>
+  isTypeName(route) ? TYPE_NAMES[route] : route;
+
 const routesOf = (
   routes: Readonly<
     Record<string, { readonly api: AdtApiName; readonly operation: string }>
@@ -244,6 +255,8 @@ const VALUES: Readonly<Record<string, string>> = {
   service_binding_name: 'ZSRVB_A',
   class_name: 'ZCL_A',
   program_name: 'ZPROG_A',
+  include_name: 'ZINCL_A',
+  table_type_name: 'ZTTYP_A',
   interface_name: 'ZIF_A',
   function_group_name: 'ZFG_A',
   function_module_name: 'Z_FM_A',
@@ -290,6 +303,7 @@ const METADATA_ONLY = new Set<string>([
   'DOMAIN',
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
+  'TABLE_TYPE',
 ]);
 
 /** The object name a lifecycle tool takes: a function module's as GROUP|MODULE. */
@@ -483,7 +497,7 @@ const WALKS: Readonly<Record<string, Walk>> = {
       Object.entries(COMPACT_WHERE_USED_ROUTES).map(
         ([name, alias]): [string, Route] => [
           name,
-          codeRoute(TYPE_NAMES[alias]),
+          codeRoute(whereUsedCodeOf(alias)),
         ],
       ),
     ),
@@ -565,23 +579,23 @@ const WALKS: Readonly<Record<string, Walk>> = {
     routes: routesOf(VERSIONED_ROUTES),
   }),
   'GetObjectVersionSource.object_type': walk({
-    values: VERSIONED_KINDS,
+    values: VERSION_SOURCE_KINDS,
     send: (context, value, variant) =>
       handleGetObjectVersionSource(context, {
         object_type: value,
         content_uri: versionContent(value, variant),
       }),
-    routes: routesOf(VERSIONED_ROUTES),
+    routes: routesOf(VERSION_SOURCE_ROUTES),
   }),
   'GetObjectVersionDiff.object_type': walk({
-    values: VERSIONED_KINDS,
+    values: VERSION_SOURCE_KINDS,
     send: (context, value, variant) =>
       handleGetObjectVersionDiff(context, {
         object_type: value,
         content_uri_from: versionContent(value, variant),
         content_uri_to: versionContent(value, variant),
       }),
-    routes: routesOf(VERSIONED_ROUTES),
+    routes: routesOf(VERSION_SOURCE_ROUTES),
   }),
 };
 

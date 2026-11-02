@@ -1,3 +1,7 @@
+import type {
+  AdtObjectIdentity,
+  IIncludeConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
 import {
   fakeClientOf,
@@ -30,6 +34,8 @@ jest.mock('../../lib/clients', () => ({
 const context = { connection: {} as any, logger: undefined };
 const body = (result: any) => JSON.parse(result.content[0].text);
 const source = (text: string) => okResponse(reading(text, text));
+/** What an include read is asked for: the include's identity, by contract. */
+type IncludeIdentity = AdtObjectIdentity<IIncludeConfig>;
 const names = (node: any): any =>
   node.children.map((c: any) =>
     c.children.length ? { [c.name]: names(c) } : c.name,
@@ -50,7 +56,8 @@ describe('GetIncludesList', () => {
             '" INCLUDE zquoted.\n' +
             'TYPES BEGIN OF t.\n  INCLUDE STRUCTURE zst.\nTYPES END OF t.\n',
         ),
-      getInclude: async (name: unknown) => source(sources[String(name)] ?? ''),
+      read: async (config: IncludeIdentity) =>
+        source(sources[config.includeName ?? ''] ?? ''),
       fetchNodeStructure: async () =>
         okResponse({ objects: [], childNodes: [] }),
     });
@@ -86,7 +93,8 @@ describe('GetIncludesList', () => {
               objects: [],
               childNodes: [{ type: 'FUGR/I', nodeId: '420' }],
             }),
-      getInclude: async (name: unknown) => source(sources[String(name)] ?? ''),
+      read: async (config: IncludeIdentity) =>
+        source(sources[config.includeName ?? ''] ?? ''),
     });
 
     const answered = body(
@@ -137,8 +145,8 @@ describe('GetIncludesList', () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () =>
         source('REPORT zprog.\nINCLUDE zsecret.\nINCLUDE zopen.\n'),
-      getInclude: async (name: unknown) =>
-        String(name) === 'ZSECRET'
+      read: async (config: IncludeIdentity) =>
+        config.includeName === 'ZSECRET'
           ? refusedResponse('You are not authorized to display ZSECRET', {
               adtType: 'ExceptionResourceNoAccess',
             })
@@ -172,7 +180,7 @@ describe('GetIncludesList', () => {
   it('says nothing about an include that is simply not there', async () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () => source('REPORT zprog.\nINCLUDE zgone.\n'),
-      getInclude: async () =>
+      read: async () =>
         refusedResponse('Resource does not exist', {
           adtType: 'ExceptionResourceNotFound',
         }),
@@ -212,7 +220,8 @@ describe('GetIncludesList', () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () =>
         source('REPORT zprog.\nINCLUDE za.\nINCLUDE zb.\nINCLUDE zloop.\n'),
-      getInclude: async (name: unknown) => source(sources[String(name)] ?? ''),
+      read: async (config: IncludeIdentity) =>
+        source(sources[config.includeName ?? ''] ?? ''),
       fetchNodeStructure: async () =>
         okResponse({ objects: [], childNodes: [] }),
     });

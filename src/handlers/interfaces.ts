@@ -88,9 +88,14 @@ export interface HandlerContext {
     send: (connection: IAbapConnection) => Promise<T>,
   ) => Promise<T>;
   /**
-   * The system kind the server states (its `systemType` option), for a
-   * connection the factory did not build; absent where none is stated
-   * (`SAP_SYSTEM_TYPE` then decides — see `systemKindOf`).
+   * The system kind stated for a connection the factory did not build: in a
+   * server instance's context, its `systemType` option — absent where it
+   * states none, and `SAP_SYSTEM_TYPE` then decides; in the context of a
+   * handler group registered on a plain McpServer (`HandlerExporter`'s
+   * `systemType`), the only source — its tools are listed and called on
+   * this kind, `SAP_SYSTEM_TYPE` is not read, and with none stated every
+   * call that would reach a system is refused `system_type_required`. See
+   * `systemKindOf`.
    */
   systemType?: string;
   /**

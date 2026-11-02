@@ -13,6 +13,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactDeletionCheckDescription(variant),
     inputSchema: compactDeletionCheckSchemaFor(COMPACT_DELETION_CHECK[variant]),
+    members: COMPACT_DELETION_CHECK[variant],
   })),
 } as const;
 

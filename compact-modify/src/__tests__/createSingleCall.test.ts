@@ -27,6 +27,7 @@ import {
   handleCreateDomain,
   handleCreateFunctionGroup,
   handleCreateFunctionModule,
+  handleCreateInclude,
   handleCreateInterface,
   handleCreateMetadataExtension,
   handleCreatePackage,
@@ -35,6 +36,7 @@ import {
   handleCreateServiceDefinition,
   handleCreateStructure,
   handleCreateTable,
+  handleCreateTableType,
   handleCreateTransport,
 } from '@mcp-abap-adt/lib/handlers/write';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
@@ -204,6 +206,8 @@ const TYPES: Array<[string, Record<string, unknown>]> = [
   ],
   ['BEHAVIOR_IMPLEMENTATION', { class_name: 'ZBP_A', package_name: 'ZPKG_A' }],
   ['METADATA_EXTENSION', { name: 'ZDDLX_A', package_name: 'ZPKG_A' }],
+  ['INCLUDE', { include_name: 'ZINCL_A', package_name: 'ZPKG_A' }],
+  ['TABLE_TYPE', { table_type_name: 'ZTTYP_A', package_name: 'ZPKG_A' }],
 ];
 
 /** The types whose create is a chain: refused, pointing to the full set's tool. */
@@ -258,6 +262,8 @@ const FULL: Record<string, [Full, Record<string, unknown>]> = {
     { behavior_definition: 'ZBDEF_A' },
   ],
   METADATA_EXTENSION: [handleCreateMetadataExtension as Full, {}],
+  INCLUDE: [handleCreateInclude, {}],
+  TABLE_TYPE: [handleCreateTableType, {}],
 };
 
 const fullCreate =
@@ -357,6 +363,29 @@ describe('HandlerCreate is one POST', () => {
     expect(textOf(answered.answer)).toContain('has not been created');
   });
 
+  // An include is its own resource (`HandlerCreate INCLUDE`): a program
+  // create with program_type include is refused before any request — today
+  // by adt-clients' guard, whose words reach the answer.
+  it('PROGRAM with program_type include: no request, an error', async () => {
+    for (const mode of ['pending', 'answered'] as const) {
+      const answered = await run(
+        mode,
+        create('PROGRAM', {
+          program_name: 'ZPROG_A',
+          package_name: 'ZPKG_A',
+          program_type: 'include',
+        }),
+      );
+      expect(answered.sent).toEqual([]);
+      if (mode === 'answered') {
+        expect(answered.answer?.isError).toBe(true);
+        expect(textOf(answered.answer)).toContain(
+          "programType 'include' is not a program",
+        );
+      }
+    }
+  });
+
   it.each(CHAINS)(
     '%s: its create is a chain — refused before any request, pointing to %s',
     async (objectType, fullTool, fields) => {
@@ -429,6 +458,8 @@ const CARRIES: Record<string, string[]> = {
   BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
   BEHAVIOR_IMPLEMENTATION: ['class_name'],
   METADATA_EXTENSION: ['name', 'master_language'],
+  INCLUDE: ['include_name', 'master_language'],
+  TABLE_TYPE: ['table_type_name', 'master_language'],
 };
 
 /** Accepted for every type: the common three, and what is not a request argument. */

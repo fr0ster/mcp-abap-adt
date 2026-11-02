@@ -13,6 +13,10 @@ import {
   handleHandlerLock,
 } from '../../../compact-modify/src/handlers/handleHandlerLock';
 import {
+  TOOL_DEFINITION as HandlerCheckRun,
+  handleHandlerCheckRun,
+} from '../../../compact-readonly-entries/src/handlers/handleHandlerCheckRun';
+import {
   TOOL_DEFINITION as HandlerValidate,
   handleHandlerValidate,
 } from '../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
@@ -45,6 +49,8 @@ interface Need {
   readonly token: string;
   /** The refusal of a call without `missing`, the others given. */
   readonly refusal: (missing: string) => string;
+  /** The variants that offer the type; both when absent. */
+  readonly variants?: readonly ProjectionVariant[];
 }
 
 const NEEDS: readonly Need[] = [
@@ -88,6 +94,16 @@ const NEEDS: readonly Need[] = [
     token: 'METADATA_EXTENSION(object_name*, description*, package_name*)',
     refusal: (missing) =>
       `Metadata extension validation requires description and package_name; missing: ${missing}`,
+  },
+  {
+    tool: 'HandlerValidate',
+    objectType: 'INCLUDE',
+    needed: { package_name: 'ZPKG_A' },
+    rest: { object_name: 'ZINCL_A' },
+    token: 'INCLUDE(object_name*, package_name*)',
+    refusal: (missing) =>
+      `Include validation requires package_name; missing: ${missing}`,
+    variants: ['onprem'],
   },
   {
     tool: 'HandlerValidate',
@@ -157,8 +173,13 @@ describe('the arguments a compact tool needs for one object type', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
+  const offeredOn = (variant: ProjectionVariant) =>
+    NEEDS.filter((need) => (need.variants ?? VARIANTS).includes(variant));
+
   const cases = VARIANTS.flatMap((variant) =>
-    NEEDS.map((need) => [need.tool, need.objectType, variant, need] as const),
+    offeredOn(variant).map(
+      (need) => [need.tool, need.objectType, variant, need] as const,
+    ),
   );
 
   it.each(cases)(
@@ -182,7 +203,7 @@ describe('the arguments a compact tool needs for one object type', () => {
   );
 
   const missing = VARIANTS.flatMap((variant) =>
-    NEEDS.flatMap((need) =>
+    offeredOn(variant).flatMap((need) =>
       Object.keys(need.needed).map(
         (argument) =>
           [need.tool, need.objectType, argument, variant, need] as const,
@@ -207,6 +228,53 @@ describe('the arguments a compact tool needs for one object type', () => {
       }
     },
   );
+});
+
+/**
+ * The table type's validation and check: one request each, on both variants,
+ * named in the descriptions.
+ */
+describe('HandlerValidate and HandlerCheckRun take a table type', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  it.each(VARIANTS)('on %s: one validation request', async (variant) => {
+    process.env.SAP_SYSTEM_TYPE = variant;
+    const connection = recordingConnection();
+    declareSystemKind(connection, variant);
+    expect(HandlerValidate.variants[variant].description).toContain(
+      'TABLE_TYPE(object_name*, description)',
+    );
+    await handleHandlerValidate(
+      { connection },
+      { object_type: 'TABLE_TYPE', object_name: 'ZTTYP_A' },
+    );
+    expect(connection.requests).toHaveLength(1);
+    expect(JSON.stringify(connection.requests[0]).toLowerCase()).toContain(
+      'tabletype',
+    );
+  });
+
+  it.each(VARIANTS)('on %s: one check request', async (variant) => {
+    process.env.SAP_SYSTEM_TYPE = variant;
+    const connection = recordingConnection();
+    declareSystemKind(connection, variant);
+    expect(HandlerCheckRun.variants[variant].description).toContain(
+      'TABLE_TYPE(object_name*)',
+    );
+    await handleHandlerCheckRun(
+      { connection },
+      { object_type: 'TABLE_TYPE', object_name: 'ZTTYP_A' },
+    );
+    expect(connection.requests).toHaveLength(1);
+    expect(JSON.stringify(connection.requests[0]).toLowerCase()).toContain(
+      '/sap/bc/adt/ddic/tabletypes/zttyp_a',
+    );
+  });
 });
 
 /**

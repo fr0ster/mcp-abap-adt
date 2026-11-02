@@ -37,7 +37,8 @@ export type ServerRefusalCode =
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
-  | 'long_session_unavailable';
+  | 'long_session_unavailable'
+  | 'connection_provider_failed';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -171,6 +172,15 @@ export const BATCH_MODE_UNAVAILABLE_WORDS =
 export const LONG_SESSION_UNAVAILABLE_WORDS =
   'a long session is not available here: only the Streamable HTTP server keeps one';
 
+/**
+ * A call on tools registered with `HandlerExporter.registerOnServer` whose
+ * connection provider (the embedder's) threw or rejected with anything but a
+ * credential failure: the call has no connection, and the tool did not run.
+ * Nothing of what the provider threw is in the words.
+ */
+export const CONNECTION_PROVIDER_FAILED_WORDS =
+  "the embedder's connection provider failed, so this call has no connection; the tool did not run";
+
 /** A begin while a batch of the same kind is open. */
 export const BATCH_MODE_ON_WORDS =
   'a batch of this kind is already open on this server: end it before beginning another';
@@ -292,6 +302,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_ended: BATCH_ENDED_WORDS,
   batch_unsplit: BATCH_UNSPLIT_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
+  connection_provider_failed: CONNECTION_PROVIDER_FAILED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

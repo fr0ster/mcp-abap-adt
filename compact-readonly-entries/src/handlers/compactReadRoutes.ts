@@ -9,7 +9,10 @@
  * route cannot go missing by landing in neither file.
  */
 
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
+import type {
+  CompactObjectType,
+  ReadVersion,
+} from '@mcp-abap-adt/lib/compact-shared';
 import {
   type CompactHandler,
   type CompactRouterMap,
@@ -25,6 +28,7 @@ import {
   handleGetDomain,
   handleGetFunctionGroup,
   handleGetFunctionModule,
+  handleGetIncludePart,
   handleGetInterface,
   handleGetLocalDefinitions,
   handleGetLocalMacros,
@@ -37,9 +41,60 @@ import {
   handleGetServiceDefinition,
   handleGetStructure,
   handleGetTable,
+  handleGetTableType,
   handleGetUnitTestResultOnce,
   handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
+import { return_error } from '@mcp-abap-adt/lib/utils';
+
+/**
+ * The version a read is asked for, from outside the type system: absent, or
+ * one of the three ADT takes; anything else is an error naming them.
+ */
+function readVersionOf(given: unknown): ReadVersion | undefined | Error {
+  if (given === undefined) return undefined;
+  if (given === 'active' || given === 'inactive' || given === 'workingArea') {
+    return given;
+  }
+  return new Error('version must be "active", "inactive" or "workingArea"');
+}
+
+/**
+ * A table type's read: its metadata document, the one part it has, at the
+ * version given. The arguments arrive from outside the type system: the name
+ * is passed on only as a string, and a version only as one of the three the
+ * read takes.
+ */
+export const readTableType: CompactHandler = async (context, args) => {
+  const version = readVersionOf(args.version);
+  if (version instanceof Error) return return_error(version);
+  return handleGetTableType(context, {
+    table_type_name:
+      typeof args.table_type_name === 'string'
+        ? args.table_type_name
+        : undefined,
+    version,
+  });
+};
+
+/**
+ * An include's read of `part` (`source` here, `metadata` from the metadata
+ * route), answered as a program's: the source too beside its name. The
+ * arguments arrive from outside the type system: the name is passed on only
+ * as a string, and a version only as one of the three the read takes.
+ */
+export const readIncludePart =
+  (part: 'source' | 'metadata'): CompactHandler =>
+  async (context, args) => {
+    const version = readVersionOf(args.version);
+    if (version instanceof Error) return return_error(version);
+    return handleGetIncludePart(context, {
+      include_name:
+        typeof args.include_name === 'string' ? args.include_name : undefined,
+      part,
+      version,
+    });
+  };
 
 export const compactReadRouterMap: CompactRouterMap = {
   PACKAGE: {
@@ -59,6 +114,9 @@ export const compactReadRouterMap: CompactRouterMap = {
   },
   STRUCTURE: {
     get: handleGetStructure as unknown as CompactHandler,
+  },
+  TABLE_TYPE: {
+    get: readTableType,
   },
   DDL: {
     get: handleGetDdl as unknown as CompactHandler,
@@ -95,6 +153,9 @@ export const compactReadRouterMap: CompactRouterMap = {
   },
   PROGRAM: {
     get: handleGetProgram as unknown as CompactHandler,
+  },
+  INCLUDE: {
+    get: readIncludePart('source'),
   },
   INTERFACE: {
     get: handleGetInterface as unknown as CompactHandler,

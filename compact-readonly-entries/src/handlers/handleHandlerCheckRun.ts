@@ -37,6 +37,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: compactCheckRunDescription(variant),
     inputSchema: compactCheckRunSchemaFor(COMPACT_CHECK[variant]),
+    members: COMPACT_CHECK[variant],
   })),
 } as const;
 

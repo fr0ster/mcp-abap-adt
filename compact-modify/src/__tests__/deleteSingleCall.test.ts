@@ -173,6 +173,16 @@ const DELETIONS: Array<[string, Record<string, unknown>, string]> = [
     { metadata_extension_name: 'ZDDLX_A' },
     '/sap/bc/adt/ddic/ddlx/sources/zddlx_a',
   ],
+  [
+    'INCLUDE',
+    { include_name: 'ZINCL_A' },
+    '/sap/bc/adt/programs/includes/zincl_a',
+  ],
+  [
+    'TABLE_TYPE',
+    { table_type_name: 'ZTTYP_A' },
+    '/sap/bc/adt/ddic/tabletypes/zttyp_a',
+  ],
 ];
 
 /** The class includes removed by an empty write, and the include each writes. */
@@ -386,6 +396,13 @@ describe('the HandlerDelete schema and description', () => {
           .enum as readonly string[]),
       ].sort(),
     ).toEqual(withDelete);
+  });
+
+  it('deletes a table type on ABAP cloud, and no include there', () => {
+    const members: readonly string[] =
+      TOOL_DEFINITION.variants.cloud.inputSchema.properties.object_type.enum;
+    expect(members).toContain('TABLE_TYPE');
+    expect(members).not.toContain('INCLUDE');
   });
 
   it('lock_handle and transport_request are in the schema', () => {

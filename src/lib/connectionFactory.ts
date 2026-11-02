@@ -287,8 +287,11 @@ const records = new WeakMap<object, ConnectionRecord>();
  * recorded when it built it (`resolveSystemKind` then). A connection the
  * factory did not build (an embedder's own) has no settings: the kind the
  * server states for it (`declared`, the server's `systemType` option) wins,
- * then the kind declared for it (`declareSystemKind`), then
- * `SAP_SYSTEM_TYPE`; `undefined` when none states one — the kind is never
+ * then the kind declared for it (`declareSystemKind`), then — for a
+ * server's connection only — `SAP_SYSTEM_TYPE`. A connection a handler
+ * group registered on a plain McpServer handed its tool (`stateSystemKind`)
+ * has the kind the group's context states, or none: the environment is not
+ * read for it. `undefined` when none states one — the kind is never
  * guessed, not from the URL either. What a missing kind means is the
  * host's rules'.
  */
@@ -300,9 +303,10 @@ export function systemKindOf(
   const record = records.get(connection);
   if (record) return record.kind;
   if (declared) return statedSystemKind(declared);
-  return (
-    declaredSystemKindOf(connection) ?? statedSystemKind(env.SAP_SYSTEM_TYPE)
-  );
+  const stated = declaredSystemKindOf(connection);
+  // A plain registration stated none: no kind, the environment not read.
+  if (stated === 'none') return undefined;
+  return stated ?? statedSystemKind(env.SAP_SYSTEM_TYPE);
 }
 
 /**

@@ -25,12 +25,15 @@
  */
 
 import type {
+  IAdtError,
   IAdtHeaders,
+  IAnalyse,
   IDdlResults,
   IDomainResults,
   IIncludeResults,
   IPackageResults,
   IProgramResults,
+  ITableTypeResults,
   ITransformationResults,
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -44,6 +47,7 @@ declare const ddl: IDdlResults;
 declare const domain: IDomainResults;
 declare const include: IIncludeResults;
 declare const program: IProgramResults;
+declare const tableType: ITableTypeResults;
 declare const pkg: IPackageResults;
 declare const transformation: ITransformationResults;
 
@@ -61,17 +65,21 @@ export function operationsTheApiLacks() {
   // Served on premise and on ABAP cloud, gated on 7.40.
   onPrem.getDdl(ddl).checkCdsTestDoubles('VIEW');
   cloud.getDdl(ddl).checkCdsTestDoubles('VIEW');
-  legacy.getDdl(ddl).read({ ddlName: 'VIEW' });
+  legacy.getDdl(ddl).read({ ddlName: 'VIEW' }, 'active');
   // @ts-expect-error SAP_BASIS 7.40's DDL source lists no checkCdsTestDoubles
   legacy.getDdl(ddl).checkCdsTestDoubles('VIEW');
 
   // On premise: a domain is read through its metadata; it has no source.
-  onPrem.getDomain(domain).readMetadata({ domainName: 'DOMAIN' });
+  onPrem
+    .getDomain(domain)
+    .readMetadata({ domainName: 'DOMAIN' }, { version: 'active' });
   // @ts-expect-error the on-premise table lists no read for a domain
-  onPrem.getDomain(domain).read({ domainName: 'DOMAIN' });
+  onPrem.getDomain(domain).read({ domainName: 'DOMAIN' }, 'active');
 
   // ABAP cloud: a package's metadata is read; a package is never activated.
-  cloud.getPackage(pkg).readMetadata({ packageName: 'PACKAGE' });
+  cloud
+    .getPackage(pkg)
+    .readMetadata({ packageName: 'PACKAGE' }, { version: 'active' });
   // @ts-expect-error the cloud table lists no activate for a package
   cloud.getPackage(pkg).activate({ packageName: 'PACKAGE' });
 }
@@ -116,7 +124,62 @@ export function onPremOnlyMembers() {
   void cloud.getInclude(include).update;
 }
 
+/**
+ * An include's metadata update, deletion check and name validation, and every
+ * table-type member, are gated per table: the include's on premise only (the
+ * cloud table lists a deletion check and the reads, nothing that writes), the
+ * table type's on every variant that serves it.
+ */
+export function includeWritesAndTableTypeMembers() {
+  const inc = onPrem.getInclude(include);
+  void inc.updateMetadata;
+  void inc.checkDeletion;
+  void inc.validate;
+  void inc.create;
+  void inc.update;
+  void inc.lock;
+  void inc.activate;
+  void inc.delete;
+
+  const cloudInc = cloud.getInclude(include);
+  void cloudInc.checkDeletion;
+  void cloudInc.read;
+  void cloudInc.readMetadata;
+  // @ts-expect-error the cloud table lists no create for an include
+  void cloudInc.create;
+  // @ts-expect-error the cloud table lists no update for an include
+  void cloudInc.update;
+  // @ts-expect-error the cloud table lists no updateMetadata for an include
+  void cloudInc.updateMetadata;
+  // @ts-expect-error the cloud table lists no lock for an include
+  void cloudInc.lock;
+  // @ts-expect-error the cloud table lists no activate for an include
+  void cloudInc.activate;
+  // @ts-expect-error the cloud table lists no validate for an include
+  void cloudInc.validate;
+  // @ts-expect-error the cloud table lists no delete for an include
+  void cloudInc.delete;
+
+  for (const ttyp of [
+    onPrem.getTableType(tableType),
+    cloud.getTableType(tableType),
+  ]) {
+    void ttyp.create;
+    void ttyp.readMetadata;
+    void ttyp.updateMetadata;
+    void ttyp.delete;
+    void ttyp.checkDeletion;
+    void ttyp.validate;
+    void ttyp.check;
+    void ttyp.activate;
+    void ttyp.lock;
+    void ttyp.unlock;
+    void ttyp.getVersions;
+  }
+}
+
 declare const utilResults: IUtilResults;
+declare const analyse: IAnalyse<IAdtError>;
 declare const headers: IAdtHeaders;
 
 /**
@@ -188,4 +251,40 @@ export function groupMembersTakeTheTypedReferences() {
     { object_name: 'ZI', object_type: 'FUGR/I' },
     { headers },
   );
+}
+
+/**
+ * Every read states its version (the owner, 2026-11-01): ADT answers a read
+ * without one from the working area, and adt-clients sends exactly the
+ * version it is given. A read with no version does not compile.
+ */
+export function everyReadStatesItsVersion() {
+  onPrem.getDdl(ddl).read({ ddlName: 'VIEW' }, 'active');
+  // @ts-expect-error a source read names its version
+  onPrem.getDdl(ddl).read({ ddlName: 'VIEW' });
+  // @ts-expect-error a source read names its version, never undefined
+  onPrem.getDdl(ddl).read({ ddlName: 'VIEW' }, undefined);
+
+  onPrem
+    .getDomain(domain)
+    .readMetadata({ domainName: 'DOMAIN' }, { version: 'workingArea' });
+  // @ts-expect-error a metadata read names its version
+  onPrem.getDomain(domain).readMetadata({ domainName: 'DOMAIN' });
+  // @ts-expect-error a metadata read names its version in its options
+  onPrem.getDomain(domain).readMetadata({ domainName: 'DOMAIN' }, {});
+
+  const readUtils = onPrem.getUtils(utilResults);
+  void readUtils.readObjectSource('PROG/P', 'ZP', undefined, 'inactive', {
+    analyse,
+  });
+  // @ts-expect-error a source read through the utilities names its version
+  void readUtils.readObjectSource('PROG/P', 'ZP', undefined, undefined, {
+    analyse,
+  });
+  void readUtils.readObjectMetadata('CLAS/OC', 'ZCL', undefined, {
+    version: 'active',
+    analyse,
+  });
+  // @ts-expect-error a metadata read through the utilities names its version
+  void readUtils.readObjectMetadata('CLAS/OC', 'ZCL', undefined, { analyse });
 }

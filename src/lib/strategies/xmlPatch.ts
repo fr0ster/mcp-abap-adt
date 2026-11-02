@@ -69,7 +69,8 @@ function replaceOrThrow(
       `Cannot patch ${target}: it is not present in the XML being updated. ${NOT_PRESENT}`,
     );
   }
-  return xml.replace(regex, replacement);
+  // a function, so no `$` pattern in the value is read as one
+  return xml.replace(regex, () => replacement);
 }
 
 /** `adtcore:description="old"` becomes `adtcore:description="new"`. */
@@ -120,7 +121,10 @@ export function patchXmlElementAttribute(
   const value = escapeXmlAttr(newValue);
   const withAttribute = new RegExp(`(<${elementTag}[^>]*?)${attrName}="[^"]*"`);
   if (withAttribute.test(xml)) {
-    return xml.replace(withAttribute, `$1${attrName}="${value}"`);
+    return xml.replace(
+      withAttribute,
+      (_match, head) => `${head}${attrName}="${value}"`,
+    );
   }
   const element = new RegExp(`<${elementTag}(\\s[^>]*?)?(/?)>`);
   if (element.test(xml)) {

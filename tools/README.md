@@ -72,9 +72,10 @@ Defaults not given on the command line come from `tests/test-config.yaml` →
 
 ## Documentation generator
 
-**`generate-tools-docs.js`** — generates the tool lists from `TOOL_DEFINITION` in
-`src/handlers/**`: `docs/user-guide/AVAILABLE_TOOLS.md` and its `_READONLY`, `_HIGH`, `_LOW` and
-`_LEGACY` variants. Never edit those files by hand.
+**`generate-tools-docs.js`** — generates the tool lists from the tool definitions the server builds
+(`dist`: the tool sets' handler groups, each definition filed by the built handler module that
+holds it; no source text is read): `docs/user-guide/AVAILABLE_TOOLS.md` and its `_READONLY`,
+`_HIGH` and `_LEGACY` variants. Never edit those files by hand.
 
 ```bash
 npm run docs:tools            # builds first

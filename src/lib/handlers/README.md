@@ -43,6 +43,43 @@ const mcpServer = new McpServer({ name: "mcp-abap-adt", version: "1.0.0" });
 handlersRegistry.registerAllTools(mcpServer);
 ```
 
+### Which variant a plain registration lists
+
+`registerAllTools(mcpServer)` (and `registerTool`) on a plain SDK `McpServer` lists the
+variant the groups' context states — `systemType` in the `HandlerContext` the groups are
+built with, `HandlerExporter`'s `systemType` option. It is the rule a server instance
+(`BaseMcpServer`) applies: a tool the variant's ADT type table does not serve, or whose
+`available_in` leaves the environment out, is not listed; the others carry that variant's
+description and schema, and their search `_meta` (`mcp-abap-adt/search`) names only the members
+the variant offers. Its calls run on the same variant. `SAP_SYSTEM_TYPE` is not read on this
+path, for the listing or for a call: an embedded library takes no configuration from the
+environment.
+
+```typescript
+const registry = new HandlerExporter({ systemType: "cloud" }).createRegistry();
+registry.registerAllTools(mcpServer); // the cloud tools, schemas and descriptions
+```
+
+The exporter's groups are built on a context with no connection: listed this way, their calls
+have none to run on. `exporter.registerOnServer(mcpServer, connectionProvider)` lists the same
+tools through the same code and runs each call on the connection the provider returns for it
+(see [the Handler Exporter guide](../../../docs/architecture/HANDLER_EXPORTER.md)).
+
+With no `systemType` stated, every definition is listed as it is (the on-premise description and
+schema, every member in the search `_meta`), and every call that would reach a system is refused
+`system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says.
+
+Groups that state different variants are refused at registration, before anything is registered:
+the error names each group and the variant it states (`none` for a group that states none).
+`registerAllTools` and `registerTool` take only one variant stated by every group, or none stated
+by any (the definitions as they are); one group stating a variant beside another stating none is
+refused.
+
+`registerTool(server, name, definition, handler)` registers a tool of one of the registry's groups
+through that group's path, as `registerAllTools` registers it: the handler called in its form, an
+args-only one reading the group's context, on the stated variant. A name no group of the registry
+holds is refused at registration: its call would have no context to run on.
+
 ### Selective Handler Registration
 
 ```typescript

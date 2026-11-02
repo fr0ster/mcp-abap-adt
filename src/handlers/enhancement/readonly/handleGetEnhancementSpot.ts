@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'GetEnhancementSpot',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve metadata and list of implementations for a specific enhancement spot.',
+    '[read-only] Retrieve metadata and list of implementations for a specific enhancement spot, at its active version.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -146,6 +146,7 @@ export async function handleGetEnhancementSpot(
       {
         enhancementName: enhancementSpot,
       },
+      'active',
     );
 
     if (answer.ok) {

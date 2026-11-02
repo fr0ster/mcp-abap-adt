@@ -19,7 +19,7 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
   ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http#held-state-and-the-long-session)).
   Every tool declares the optional `state_handle` argument.
 
-71 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and
+72 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and
 background runs — those are
 `mcp-abap-adt-http`'s ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)).
 

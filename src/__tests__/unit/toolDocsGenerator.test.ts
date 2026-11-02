@@ -1,62 +1,115 @@
-const {
-  parseTopLevelProperties,
-} = require('../../../tools/generate-tools-docs.js');
+import fs from 'node:fs';
+import path from 'node:path';
+
+const GENERATOR = path.join(__dirname, '../../../tools/generate-tools-docs.js');
 
 /**
- * The generator reads a `TOOL_DEFINITION` as text, and text includes
- * comments.
- *
- * A sentence inside an `inputSchema` — "a refinement a caller may or may not
- * want:" — put a parameter called `want` into three published documentation
- * files: typed `any`, described with nothing, and impossible to pass. Prose
- * belongs in a schema block as much as anywhere else; it was this reader that
- * had to learn to step over it.
+ * The generator reads what the server builds — the handler groups' built
+ * definitions and the built modules that hold them — and never parses
+ * source text: a reader of source text documented a parameter out of a
+ * comment, cut descriptions at a `+`, and missed every spread-in property.
  */
-describe('the tool-docs generator reads properties, not prose', () => {
-  it('invents no parameter out of a line comment', () => {
-    const properties = `
-      name: {
-        type: 'string',
-        description: 'Metadata extension name.',
-      },
-      // The one knob that is not a knob: a refinement a caller may or may not
-      // want: ask for the version an extension does not have and the endpoint
-      // answers notProcessed.
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        default: 'active',
-        description: 'Which version to check.',
-      },
-    `;
+describe('the tool-docs generator reads no source text', () => {
+  const text = fs.readFileSync(GENERATOR, 'utf8');
 
-    const parsed = parseTopLevelProperties(properties);
-
-    expect(Object.keys(parsed).sort()).toEqual(['name', 'version']);
-    expect(parsed.version.type).toBe('string');
-    expect(parsed.version.default).toBe('active');
+  it('opens no file to read it', () => {
+    expect(text).not.toContain('readFileSync');
+    expect(text).not.toContain('readFile(');
   });
 
-  it('invents none out of a block comment either', () => {
-    const properties = `
-      /* a note: mentioning anything: here must not become a parameter */
-      only_one: { type: 'boolean', description: 'The only one.' },
-    `;
+  it('exports no source parser', () => {
+    const exported = Object.keys(require(GENERATOR));
+    expect(exported).not.toContain('parseTopLevelProperties');
+    expect(exported).not.toContain('extractToolDefinition');
+  });
+});
 
-    expect(Object.keys(parseTopLevelProperties(properties))).toEqual([
-      'only_one',
-    ]);
+/**
+ * The reference shows what the server registers: every tool's parameters
+ * come from its built definition, so a property a schema spreads in
+ * (`...TABLE_TYPE_DEFINITION_PROPERTIES`, `...DETAIL_PROPERTY`), which the
+ * text reader cannot follow, is listed with its type, enum and words.
+ */
+describe('the tool-docs generator lists the built schema', () => {
+  const {
+    loadToolsFromHandlers,
+    renderParams,
+  } = require('../../../tools/generate-tools-docs.js');
+  const tools: ReadonlyArray<{
+    name: string;
+    level: string;
+    objectFolder: string;
+    filePath: string;
+    inputSchema: { properties: Record<string, { enum?: readonly string[] }> };
+  }> = loadToolsFromHandlers();
+  const named = (name: string) => {
+    const tool = tools.find((t) => t.name === name && t.level === 'high');
+    if (tool === undefined) throw new Error(`no high tool ${name}`);
+    return tool;
+  };
+
+  it('lists a spread-in property of CreateTableType with its enum', () => {
+    const tool = named('CreateTableType');
+    expect(tool.inputSchema.properties.row_type_kind?.enum).toContain(
+      'dictionaryType',
+    );
+    const text: string = renderParams(tool);
+    expect(text).toContain(
+      '- `row_type_kind` (string, optional, one of: `predefinedAbapType`, `dictionaryType`,',
+    );
+    expect(text).toContain('- `key_kind` (string, optional, one of:');
   });
 
-  it('still reads a property whose description contains a colon', () => {
-    // The scanner steps over comments, not over content.
-    const properties = `
-      detail: {
-        type: 'string',
-        description: 'How much to return: terse, full or raw.',
-      },
-    `;
-    const parsed = parseTopLevelProperties(properties);
-    expect(parsed.detail.description).toContain('terse, full or raw');
+  it('lists every tool the full stdio binary serves, and no other', () => {
+    const { fullToolSet } = require('../../../dist/lib/toolSet.js');
+    const served: string[] = fullToolSet
+      .groups({ connection: null }, 'stdio')
+      .flatMap(
+        (group: { getHandlers(): { toolDefinition: { name: string } }[] }) =>
+          group.getHandlers().map((entry) => entry.toolDefinition.name),
+      );
+    const listed = new Set(tools.map((tool) => tool.name));
+    expect([...listed].sort()).toEqual([...new Set(served)].sort());
+  });
+
+  it('files a tool under the object and source of the module that holds it', () => {
+    expect(named('ActivateClass')).toMatchObject({
+      objectFolder: 'class',
+      filePath: 'src/handlers/class/low/handleActivateClass.ts',
+    });
+  });
+
+  it('lists the spread-in detail property', () => {
+    expect(renderParams(named('CreateTableType'))).toContain(
+      '- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`)',
+    );
+  });
+});
+
+/**
+ * A tool whose module sits under no level folder is listed under its handler
+ * group's level, from the generator's hand table: a group missing there must
+ * fail here, not only when the generator runs.
+ */
+describe('every handler group the docs read has a page level', () => {
+  const { GROUP_LEVELS, servedEntries } = require(GENERATOR);
+  const {
+    fullToolSet,
+    fullReadOnlyToolSet,
+  } = require('../../../dist/lib/toolSet.js');
+  const groups: string[] = [
+    ...new Set<string>(
+      [fullToolSet, fullReadOnlyToolSet]
+        .flatMap((set) => servedEntries(set))
+        .map((entry: { group: string }) => entry.group),
+    ),
+  ];
+
+  it('reads at least one group', () => {
+    expect(groups.length).toBeGreaterThan(0);
+  });
+
+  it.each(groups)('%s has a level', (group) => {
+    expect(typeof GROUP_LEVELS[group]).toBe('string');
   });
 });

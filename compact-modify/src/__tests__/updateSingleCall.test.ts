@@ -31,8 +31,14 @@ import {
   setSystemContext,
 } from '../../../src/lib/systemContext';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
-import { handleHandlerLock } from '../handlers/handleHandlerLock';
-import { handleHandlerUnlock } from '../handlers/handleHandlerUnlock';
+import {
+  TOOL_DEFINITION as HandlerLock,
+  handleHandlerLock,
+} from '../handlers/handleHandlerLock';
+import {
+  TOOL_DEFINITION as HandlerUnlock,
+  handleHandlerUnlock,
+} from '../handlers/handleHandlerUnlock';
 import {
   handleHandlerUpdate,
   TOOL_DEFINITION,
@@ -144,6 +150,18 @@ const DOCUMENTS: Array<[string, Record<string, unknown>]> = [
       source_code: DOCUMENT('group:abapFunctionGroup'),
     },
   ],
+  [
+    'TABLE_TYPE',
+    { table_type_name: 'ZTTYP_A', source_code: DOCUMENT('ttyp:tableType') },
+  ],
+  [
+    'INCLUDE',
+    {
+      include_name: 'ZINCL_A',
+      part: 'metadata',
+      source_code: DOCUMENT('include:abapInclude'),
+    },
+  ],
 ];
 
 const SOURCES: Array<[string, Record<string, unknown>]> = [
@@ -165,6 +183,7 @@ const SOURCES: Array<[string, Record<string, unknown>]> = [
   ['UNIT_TEST', { class_name: 'ZCL_A', test_class_source: 'source text' }],
   ['CDS_UNIT_TEST', { class_name: 'ZCL_T', test_class_source: 'source text' }],
   ['PROGRAM', { program_name: 'ZPROG_A', source_code: 'source text' }],
+  ['INCLUDE', { include_name: 'ZINCL_A', source_code: 'source text' }],
   ['INTERFACE', { interface_name: 'ZIF_A', source_code: 'source text' }],
   [
     'FUNCTION_MODULE',
@@ -360,6 +379,86 @@ describe('HandlerUpdate is one write under lock_handle', () => {
   );
 });
 
+/** The types `part` is taken by, as the refusal names them. */
+const PART_WORDS =
+  'part is taken only by INCLUDE (source or metadata); leave it out for';
+
+describe('HandlerUpdate part: the include’s source or its metadata', () => {
+  withSystemContext();
+
+  const include = { include_name: 'ZINCL_A', source_code: 'source text' };
+
+  it.each([
+    ['absent', {}],
+    ['source', { part: 'source' }],
+  ])('INCLUDE part %s: one PUT of the source', async (_label, part) => {
+    const held = await run(
+      'pending',
+      update('INCLUDE', underLock({ ...include, ...part })),
+    );
+    expect(held.sent).toHaveLength(1);
+    expect(held.sent[0].method).toBe('PUT');
+    expect(held.sent[0].url).toContain(
+      '/programs/includes/zincl_a/source/main',
+    );
+  });
+
+  it('INCLUDE part metadata: one PUT of the metadata document, as given', async () => {
+    const document = DOCUMENT('include:abapInclude');
+    const held = await run(
+      'pending',
+      update(
+        'INCLUDE',
+        underLock({ ...include, part: 'metadata', source_code: document }),
+      ),
+    );
+    expect(held.sent).toHaveLength(1);
+    expect(held.sent[0].method).toBe('PUT');
+    expect(held.sent[0].url).toContain('/programs/includes/zincl_a?');
+    expect(held.sent[0].url).not.toContain('/source/main');
+    expect(held.sent[0].data).toBe(document);
+  });
+
+  it('INCLUDE with a part of no such name: refused before any request', async () => {
+    const answered = await run(
+      'answered',
+      update('INCLUDE', underLock({ ...include, part: 'urls' })),
+    );
+    expect(answered.sent).toEqual([]);
+    expect(answered.answer?.isError).toBe(true);
+    expect(textOf(answered.answer)).toContain(
+      'part is source or metadata for INCLUDE',
+    );
+  });
+
+  const others = TYPES.filter(([type]) => type !== 'INCLUDE');
+
+  it.each(
+    others.flatMap(([type, fields]) =>
+      ['metadata', 'source'].map((part) => [type, part, fields] as const),
+    ),
+  )(
+    '%s with part %s: refused before any request, naming the types that take it',
+    async (objectType, part, fields) => {
+      const answered = await run(
+        'answered',
+        update(objectType, underLock({ ...fields, part })),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(`${PART_WORDS} ${objectType}`);
+    },
+  );
+
+  it('part declares no schema default', () => {
+    expect(schemaProperties.part).toEqual({
+      type: 'string',
+      enum: ['source', 'metadata'],
+      description: expect.any(String),
+    });
+  });
+});
+
 const schemaProperties = compactUpdateSchema.properties as Record<
   string,
   unknown
@@ -459,6 +558,51 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
       );
     }
   });
+
+  it.each([
+    ['INCLUDE', 'ZINCL_A', '/sap/bc/adt/programs/includes/zincl_a'],
+    ['TABLE_TYPE', 'ZTTYP_A', '/sap/bc/adt/ddic/tabletypes/zttyp_a'],
+  ])(
+    '%s: the lock is one LOCK, the unlock one UNLOCK',
+    async (object_type, object_name, uri) => {
+      const locked = await run('answered', (context) =>
+        handleHandlerLock(context, { object_type, object_name }),
+      );
+      expect(locked.sent).toHaveLength(1);
+      expect(locked.sent[0].url.toLowerCase()).toContain(uri);
+      expect(locked.sent[0].url).toContain('_action=LOCK');
+      expect(locked.answer?.isError).not.toBe(true);
+      expect(textOf(locked.answer)).toContain('lock_handle');
+
+      const unlocked = await run('answered', (context) =>
+        handleHandlerUnlock(context, {
+          object_type,
+          object_name,
+          lock_handle: LOCK,
+        }),
+      );
+      expect(unlocked.sent).toHaveLength(1);
+      expect(unlocked.sent[0].url.toLowerCase()).toContain(uri);
+      expect(unlocked.sent[0].url).toContain('_action=UNLOCK');
+      expect(unlocked.answer?.isError).not.toBe(true);
+    },
+  );
+
+  it.each([
+    ['HandlerLock', HandlerLock.variants],
+    ['HandlerUnlock', HandlerUnlock.variants],
+  ])(
+    '%s locks a table type on both variants, an include on premise only',
+    (_tool, variants) => {
+      const onprem: readonly string[] =
+        variants.onprem.inputSchema.properties.object_type.enum;
+      const cloud: readonly string[] =
+        variants.cloud.inputSchema.properties.object_type.enum;
+      expect(onprem).toEqual(expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']));
+      expect(cloud).toContain('TABLE_TYPE');
+      expect(cloud).not.toContain('INCLUDE');
+    },
+  );
 
   it('HandlerUpdate’s schema names every type it writes', () => {
     const named = (

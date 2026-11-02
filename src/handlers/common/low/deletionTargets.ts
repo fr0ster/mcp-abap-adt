@@ -24,6 +24,7 @@ import {
   domainDocuments,
   functionGroupDocuments,
   functionModuleDocuments,
+  includeDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
   packageDocuments,
@@ -32,6 +33,7 @@ import {
   serviceDocuments,
   structureDocuments,
   tableDocuments,
+  tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
@@ -128,6 +130,11 @@ export const DELETION_TARGETS: Readonly<
     (c) => c.getStructure(resultsFor(structureDocuments)),
     ({ name }) => ({ structureName: name }),
   ),
+  TABLE_TYPE: target(
+    'tableType',
+    (c) => c.getTableType(resultsFor(tableTypeDocuments)),
+    ({ name }) => ({ tableTypeName: name }),
+  ),
   DDL: target(
     'ddl',
     (c) => c.getDdl(resultsFor(ddlDocuments)),
@@ -155,6 +162,18 @@ export const DELETION_TARGETS: Readonly<
         resultsFor(programDocuments),
       ),
     config: withConfig(({ name }) => ({ programName: name })),
+    deleteAnalyse: analyseDeletion,
+  },
+  // An include's deletion check is served on both variants, its deletion on
+  // premise only (`ADT_TYPES_CLOUD` lists no `delete` for `PROG/I`).
+  INCLUDE: {
+    objectType: 'include',
+    checked: (c) => c.getInclude(resultsFor(includeDocuments)),
+    deleted: (connection, logger) =>
+      createOnPremAdtClient(connection, logger).getInclude(
+        resultsFor(includeDocuments),
+      ),
+    config: withConfig(({ name }) => ({ includeName: name })),
     deleteAnalyse: analyseDeletion,
   },
   INTERFACE: target(

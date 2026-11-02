@@ -35,6 +35,7 @@ import {
   type TYPE_NAME_VALUES,
   TYPE_NAMES,
   type VersionedKind,
+  type VersionSourceKind,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
   type WhereUsedCode,
@@ -89,6 +90,7 @@ export const checkKinds = {
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
+  TABLE_TYPE: 'table_type',
   DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',
@@ -113,6 +115,14 @@ export const checkKindsCrossed = {
 export const classVersioned: VersionedKind = 'class';
 // @ts-expect-error a domain has no version history: no table lists `versions`.
 export const domainVersioned: VersionedKind = 'domain';
+
+// A table type's version list is served; its version source is not (SAP
+// answers 403 "Request version for TTYP is not supported", measured on
+// premise 2026-11-01 and on ABAP cloud 2026-11-02).
+export const tableTypeVersioned: VersionedKind = 'table_type';
+export const classVersionSource: VersionSourceKind = 'class';
+// @ts-expect-error no version source is offered for a table type.
+export const tableTypeVersionSource: VersionSourceKind = 'table_type';
 
 // --- HandlerActivate's routes ----------------------------------------------
 

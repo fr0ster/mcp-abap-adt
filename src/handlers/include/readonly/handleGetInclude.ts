@@ -1,37 +1,128 @@
+import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_PART_PROPERTY,
+  type ReadPart,
+  readPartOf,
+} from '../../../lib/handlers/readPart';
+import {
+  READ_VERSION_PROPERTY_UNDEFAULTED,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
+import { readIncludeMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUtils } from '../../../lib/strategies/resultSets';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetInclude',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). Reads includes (PROG/I) by name.',
+    '[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
   inputSchema: {
-    include_name: z.string().describe('Name of the ABAP Include'),
+    type: 'object',
+    properties: {
+      include_name: {
+        type: 'string',
+        description: 'Include name.',
+      },
+      part: READ_PART_PROPERTY,
+      version: READ_VERSION_PROPERTY_UNDEFAULTED,
+    },
+    required: ['include_name'],
   },
 } as const;
 
-export async function handleGetInclude(context: HandlerContext, args: any) {
+interface GetIncludeArgs {
+  /** Required by the schema; a call from outside it may leave it out. */
+  include_name?: string;
+  part?: ReadPart;
+  version?: ReadVersion;
+}
+
+/** How a source read is answered: the read's text, with what was asked. */
+type SourceAnswer = (
+  includeName: string,
+  version: ReadVersion | undefined,
+  source: string,
+) => unknown;
+
+/**
+ * The one request a call sends: the source or the metadata document, at
+ * `version` (active when none is given), answered as `GetProgram` answers it, the source as
+ * `sourceAnswer` makes it.
+ */
+async function readInclude(
+  context: HandlerContext,
+  args: GetIncludeArgs,
+  sourceAnswer: SourceAnswer,
+) {
   const { connection, logger } = context;
-  if (!args?.include_name) {
-    return return_error('Include name is required');
+  const { include_name, version } = args;
+  if (!include_name) return return_error('Include name is required');
+  const part = readPartOf(args.part);
+  if (part instanceof Error) return return_error(part);
+
+  const includeName = include_name.toUpperCase();
+  logger?.info(`Fetching include: ${includeName}`);
+  const client = createAdtClient(connection, logger);
+
+  // One request per call: the part asked for, and only it. SAP's refusal is
+  // the method's error as it is, a credential failure the chain's answer, a
+  // throw of our own `client_threw`.
+  if (part === 'metadata') {
+    return answer(
+      { tool: 'GetInclude', detail: 'terse' },
+      () => readIncludeMetadata(client, { includeName }, version ?? 'active'),
+      (metadata: AdtReading<string>) => ({
+        success: true,
+        include_name: includeName,
+        part,
+        metadata: metadata.raw,
+      }),
+    );
   }
-  logger?.info(`Fetching include: ${args.include_name}`);
-  // The adt-clients member, answered by `answer()`: SAP's refusal is the
-  // method's error as it is, a credential failure the chain's answer, a throw
-  // of our own `client_threw`.
   return answer(
     { tool: 'GetInclude', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getUtils(ourUtils)
-        .getInclude(args.include_name, { analyse: analyseException }),
-    (source: AdtReading<string>) => source.raw,
+      client
+        .getInclude(resultsFor(includeDocuments))
+        .read({ includeName }, version ?? 'active', {
+          analyse: analyseException,
+        }),
+    (source: AdtReading<string>) =>
+      sourceAnswer(includeName, version, source.raw),
   );
+}
+
+/**
+ * `GetInclude`: the source as the text SAP sent, the metadata document as
+ * `GetProgram` answers it.
+ */
+export async function handleGetInclude(
+  context: HandlerContext,
+  args: GetIncludeArgs,
+) {
+  return readInclude(context, args, (_name, _version, source) => source);
+}
+
+/**
+ * Both parts as `GetProgram` answers them: the source too, as
+ * `{ success, include_name, version, part: 'source', source }` (compact
+ * `HandlerGet`), `version` present when the call gave one.
+ */
+export async function handleGetIncludePart(
+  context: HandlerContext,
+  args: GetIncludeArgs,
+) {
+  return readInclude(context, args, (includeName, version, source) => ({
+    success: true,
+    include_name: includeName,
+    ...(version === undefined ? {} : { version }),
+    part: 'source',
+    source,
+  }));
 }

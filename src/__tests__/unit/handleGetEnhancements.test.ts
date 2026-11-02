@@ -95,10 +95,10 @@ describe('GetEnhancements', () => {
     expect(connection.calls[0]?.headers?.Accept).toBe(ELEMENTS_ACCEPT);
   });
 
-  it("when it must probe, reads each kind's metadata through adt-clients, Accept as a header", async () => {
+  it("when it must probe, reads each kind's active metadata through adt-clients, Accept as a header", async () => {
     const connection = connectionAnswering(
       (u) =>
-        u === '/sap/bc/adt/programs/programs/zprog' ||
+        u === '/sap/bc/adt/programs/programs/zprog?version=active' ||
         u.startsWith(
           '/sap/bc/adt/programs/programs/zprog/source/main/enhancements',
         ),
@@ -114,13 +114,13 @@ describe('GetEnhancements', () => {
       expect(call.data).toBeUndefined();
     }
     expect(connection.calls.map((c) => c.url)).toEqual([
-      '/sap/bc/adt/oo/classes/zprog',
-      '/sap/bc/adt/programs/programs/zprog',
+      '/sap/bc/adt/oo/classes/zprog?version=active',
+      '/sap/bc/adt/programs/programs/zprog?version=active',
       '/sap/bc/adt/programs/programs/zprog/source/main/enhancements/elements',
     ]);
     expect(
       connection.calls.find(
-        (c) => c.url === '/sap/bc/adt/programs/programs/zprog',
+        (c) => c.url === '/sap/bc/adt/programs/programs/zprog?version=active',
       )?.headers?.Accept,
     ).toContain('application/vnd.sap.adt.programs.programs');
     expect(JSON.parse(result.content[0].text).unreadable).toBeUndefined();
@@ -135,7 +135,7 @@ describe('GetEnhancements', () => {
       async makeAdtRequest(req: Call) {
         calls.push(req);
         if (
-          req.url === '/sap/bc/adt/programs/programs/zprog' ||
+          req.url === '/sap/bc/adt/programs/programs/zprog?version=active' ||
           req.url.startsWith(
             '/sap/bc/adt/programs/programs/zprog/source/main/enhancements',
           )
@@ -189,7 +189,7 @@ describe('GetEnhancements: the elements read on the wire, through adt-clients', 
 
   it("an include's read names its main program, from the include's contextRef", async () => {
     const connection = answering(async (req) =>
-      req.url === '/sap/bc/adt/programs/includes/lsvimtop'
+      req.url === '/sap/bc/adt/programs/includes/lsvimtop?version=active'
         ? {
             status: 200,
             data: '<include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes"><include:contextRef adtcore:uri="/sap/bc/adt/functions/groups/svim" adtcore:type="FUGR/F" adtcore:name="SVIM"/></include:abapInclude>',
@@ -205,7 +205,7 @@ describe('GetEnhancements: the elements read on the wire, through adt-clients', 
     });
     expect(result.isError).toBe(false);
     expect(connection.calls.map((c) => c.url)).toEqual([
-      '/sap/bc/adt/programs/includes/lsvimtop',
+      '/sap/bc/adt/programs/includes/lsvimtop?version=active',
       `/sap/bc/adt/programs/includes/lsvimtop/source/main/enhancements/elements?context=${encodeURIComponent('/sap/bc/adt/programs/programs/saplsvim')}`,
     ]);
     expect(connection.calls[1]?.headers?.Accept).toBe(ELEMENTS_ACCEPT);

@@ -1,6 +1,10 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_VERSION_PROPERTY,
+  type ReadVersion,
+} from '../../../lib/handlers/readVersion';
 import { readDomainMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
@@ -9,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'GetDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.',
+    '[read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -17,13 +21,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Domain name.',
       },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
-        default: 'active',
-      },
+      version: READ_VERSION_PROPERTY,
     },
     required: ['domain_name'],
   },
@@ -31,7 +29,7 @@ export const TOOL_DEFINITION = {
 
 interface GetDomainArgs {
   domain_name: string;
-  version?: 'active' | 'inactive';
+  version?: ReadVersion;
 }
 
 export async function handleGetDomain(
@@ -48,16 +46,10 @@ export async function handleGetDomain(
   // A domain has no source of its own — `IDomainContract` composes
   // `IAdtMetadataReadable` and nothing else, so unlike its siblings there
   // is no `.read()` to call at all: `read` and `readMetadata` fetched the
-  // identical document even before 19.
-  // `version` is not forwarded to the call — `AdtDomain` ignores it at
-  // every level — and is echoed, deliberately unfixed
-  // (task 11 fix round 1: "the library ignores `version` at every level
-  // and the pre-existing echo is inert ... deferred to the documentation
-  // task"). One call, used for the one field this tool has always
-  // answered.
+  // identical document even before 19. One call, at the version asked.
   return answer(
     { tool: 'GetDomain', detail: 'terse' },
-    () => readDomainMetadata(client, { domainName }),
+    () => readDomainMetadata(client, { domainName }, version),
     (metadata: AdtReading<string>) => ({
       success: true,
       domain_name: domainName,

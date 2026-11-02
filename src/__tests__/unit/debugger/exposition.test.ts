@@ -9,17 +9,18 @@ describe('the debug set', () => {
     ).toBe('DebugHandlers');
   });
 
-  it('HandlerExporter leaves it out unless asked, and gives it when asked', () => {
-    const names = (o: any) =>
-      new HandlerExporter({ systemType: 'onprem', ...o })
-        .getHandlerEntries()
-        .map((e) => e.toolDefinition.name);
+  it('HandlerExporter leaves it out (its options have no includeDebug)', () => {
+    const names = new HandlerExporter({ systemType: 'onprem' })
+      .getHandlerEntries()
+      .map((e) => e.toolDefinition.name);
     expect(
-      names({}).some((n: string) =>
-        /^(Debug|AmdpDebug|MemorySnapshot)/.test(n),
+      names.some(
+        (n: string) =>
+          n.startsWith('Debug') ||
+          n.startsWith('AmdpDebug') ||
+          n.startsWith('MemorySnapshot'),
       ),
     ).toBe(false);
-    expect(names({ includeDebug: true })).toContain('DebugStartListener');
   });
 
   // The binary fixes its set: always in core, never in core-ro.

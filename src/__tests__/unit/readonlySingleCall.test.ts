@@ -183,7 +183,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args[0]).toEqual({ name: 'ZMC' });
   });
 
-  it('GetMessageClassMessage calls getMessageClassMessage().read({className, msgno}, undefined, ...)', async () => {
+  it('GetMessageClassMessage calls getMessageClassMessage().read({className, msgno}, active, ...)', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetMessageClassMessage(context as any, {
@@ -192,7 +192,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     });
     const call = seen.calls.filter((c) => c.member === 'read').at(-1);
     expect(call?.args[0]).toEqual({ className: 'ZMC', msgno: '001' });
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   it('GetObjectsByType calls fetchNodeStructure(parent_type, parent_name, {nodeId, withShortDescriptions})', async () => {

@@ -370,6 +370,48 @@ const SHARED_CASES: SharedCase[] = [
   },
 ];
 
+/**
+ * Where the answer's JSON text holds an `error` entry: a list tool keeps one
+ * item's failure beside the others' and the call itself succeeds, so a
+ * reference read is checked item by item before it is timed.
+ */
+function itemErrors(answer: unknown): string[] {
+  const found: string[] = [];
+  const walk = (value: unknown, at: string): void => {
+    if (Array.isArray(value)) {
+      for (const [i, inner] of value.entries()) walk(inner, `${at}[${i}]`);
+      return;
+    }
+    if (typeof value !== 'object' || value === null) return;
+    for (const [key, inner] of Object.entries(value)) {
+      if (key === 'error' && inner !== undefined && inner !== null) {
+        found.push(`${at}.error`);
+      }
+      walk(inner, `${at}.${key}`);
+    }
+  };
+  const content =
+    typeof answer === 'object' && answer !== null
+      ? Reflect.get(answer, 'content')
+      : undefined;
+  if (!Array.isArray(content)) return found;
+  for (const [i, part] of content.entries()) {
+    const text =
+      typeof part === 'object' && part !== null
+        ? Reflect.get(part, 'text')
+        : undefined;
+    if (typeof text !== 'string') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    walk(parsed, `content[${i}]`);
+  }
+  return found;
+}
+
 /** The connection's own kind, not the config's word for it. */
 const transport = (connection: IAbapConnection): string =>
   isRfcConnection(connection) ? 'rfc' : 'http';
@@ -387,6 +429,7 @@ async function timeBothPaths(
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
   expect(isError(reference.answer)).toBe(false);
+  expect(itemErrors(reference.answer)).toEqual([]);
   expect(reference.measure.envelopes).toBe(0);
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };

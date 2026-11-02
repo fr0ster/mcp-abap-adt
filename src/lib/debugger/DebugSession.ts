@@ -15,6 +15,7 @@ import {
   AdtBatchConnection,
   type abapDebuggerDocuments,
   type IDebuggerListenerConflict,
+  type ResultValuesOf,
   readListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
 import {
@@ -95,7 +96,9 @@ export const LISTEN_HOLD_SECONDS = 60;
 export const FIRST_POLL_HOLD_SECONDS = 3;
 export const WAIT_MAX_SECONDS = 30;
 
-export type Debugger = AbapDebugger<typeof abapDebuggerDocuments>;
+export type Debugger = AbapDebugger<
+  ResultValuesOf<typeof abapDebuggerDocuments>
+>;
 export interface RunTarget {
   kind: RunKind;
   name: string;

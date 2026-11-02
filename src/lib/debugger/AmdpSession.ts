@@ -19,6 +19,7 @@ import {
   AdtBatchConnection,
   type AmdpDebugger,
   type amdpDebuggerDocuments,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -65,7 +66,9 @@ import { Serial } from './serial';
 /** An AMDP breakpoint's object: the class whose method is the procedure. */
 const AMDP_LABEL: BreakpointLabel = 'CLAS';
 
-export type AmdpDebuggerT = AmdpDebugger<typeof amdpDebuggerDocuments>;
+export type AmdpDebuggerT = AmdpDebugger<
+  ResultValuesOf<typeof amdpDebuggerDocuments>
+>;
 export interface AmdpSessionPorts<O = unknown> {
   /** A connection of its own, `stateful` unless `session` says otherwise. */
   openConnection(

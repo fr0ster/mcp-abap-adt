@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [23.0.1] - 2026-11-02
 
-A patch: an include's main programs, on premise. The eighteen packages are at 23.0.1, every sibling range at `^23.0.1`; `@mcp-abap-adt/adt-clients` `^40.1.0`, `@mcp-abap-adt/adt-strategies` `^0.18.1`, `@mcp-abap-adt/interfaces-adt` `^25.0.2`.
+A patch: an include's main programs, on premise. The eighteen packages are at 23.0.1, every sibling range at `^23.0.1`; `@mcp-abap-adt/adt-clients` `^41.0.0` (its handlers typed by the values their slots answer, no casts — no request or answer of the server changes), `@mcp-abap-adt/adt-strategies` `^0.18.1`, `@mcp-abap-adt/interfaces-adt` `^25.0.2`.
 
 ### Added
 

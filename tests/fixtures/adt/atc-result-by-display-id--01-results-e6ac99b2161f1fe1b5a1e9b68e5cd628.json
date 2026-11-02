@@ -1,0 +1,25 @@
+{
+  "case": "atc-result-by-display-id",
+  "step": 1,
+  "stepTag": "results-e6ac99b2161f1fe1b5a1e9b68e5cd628",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/atc/results/E6AC99B2161F1FE1B5A1E9B68E5CD628?activeResult=false&includeExemptedFindings=false",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/atc/results/E6AC99B2161F1FE1B5A1E9B68E5CD628?activeResult=false&includeExemptedFindings=false",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "body": null,
+    "headersNote": "Caller-supplied headers only. The body was taken by a direct GET on the ABAP cloud trial system, 2026-11-02, Accept */*; every SAP user id was set to SAPUSER01. Not taken by the capture script."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headersNote": "The response headers were not recorded. The content-type shown is the one SAP answered.",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "atc-result-by-display-id--01-results-e6ac99b2161f1fe1b5a1e9b68e5cd628.body.xml"
+  }
+}

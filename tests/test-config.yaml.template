@@ -421,12 +421,12 @@ shared_dependencies:
     # The table function of the AMDP debugger batch gate (debuggerBatch.test.ts),
     # implemented by the shared class ZMCP_SHR_DBG_AMDP below; the two name each
     # other and activate together. Running it changes nothing, so it can be
-    # shared. On premise on HANA only: an AMDP needs SAP HANA.
+    # shared. On HANA only: an AMDP needs SAP HANA (ABAP cloud runs on it).
     - name: "ZMCP_SHR_DBG_TF"
       description: "Shared AMDP table function for the debugger batch"
-      available_in: ["onprem"]
+      available_in: ["onprem", "cloud"]
       source: |
-        @EndUserText.label: 'Shared AMDP table function for the debugger'
+        @EndUserText.label: 'Shared AMDP table function for debugger'
         @ClientHandling.type: #CLIENT_INDEPENDENT
         @AccessControl.authorizationCheck: #NOT_REQUIRED
         define table function ZMCP_SHR_DBG_TF
@@ -570,10 +570,10 @@ shared_dependencies:
     # The AMDP class of the debugger batch gate (debuggerBatch.test.ts): its
     # table function ZMCP_SHR_DBG_TF (views above). `-- BP:tf` marks the
     # SQLScript line the gate stops at. Running it changes nothing, so it can
-    # be shared. On premise on HANA only.
+    # be shared. On HANA only (ABAP cloud runs on it).
     - name: "ZMCP_SHR_DBG_AMDP"
       description: "Shared AMDP class for the debugger batch"
-      available_in: ["onprem"]
+      available_in: ["onprem", "cloud"]
       source: |
         CLASS zmcp_shr_dbg_amdp DEFINITION PUBLIC FINAL CREATE PUBLIC.
           PUBLIC SECTION.

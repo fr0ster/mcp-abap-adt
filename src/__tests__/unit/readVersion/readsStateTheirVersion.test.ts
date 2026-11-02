@@ -85,20 +85,6 @@ const NOT_A_READ = [
 ];
 
 /**
- * Tools whose write member in adt-clients 40 reads the object itself before
- * it writes: a message class message's create, update and delete read the
- * message class with no version (`AdtMessageClassMessage`). That read is the
- * library's, and its version is not the server's to name; each of these sends
- * exactly that one unversioned read, so a library that names it turns this
- * red.
- */
-const LIBRARY_READS: Readonly<Record<string, string>> = {
-  CreateMessageClassMessage: 'GET /sap/bc/adt/messageclass/',
-  UpdateMessageClassMessage: 'GET /sap/bc/adt/messageclass/',
-  DeleteMessageClassMessage: 'GET /sap/bc/adt/messageclass/',
-};
-
-/**
  * The served tools that read no object's document or source, each with why:
  * the guard requires every other tool to send at least one object read in
  * its samples, so a tool that stops reading, or a sample that stops reaching
@@ -586,13 +572,7 @@ describe('every read a served tool sends states its version', () => {
         tool,
         reads: NO_OBJECT_READ[tool] === undefined,
       });
-      const library = LIBRARY_READS[tool];
-      if (library === undefined) {
-        expect(unstated).toEqual([]);
-        return;
-      }
-      expect(unstated.length).toBeGreaterThan(0);
-      expect(unstated.filter((read) => !read.startsWith(library))).toEqual([]);
+      expect(unstated).toEqual([]);
     },
   );
 

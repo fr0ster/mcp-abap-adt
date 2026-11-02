@@ -123,8 +123,8 @@ exporter.registerOnServer(mcpServer, () => connection);
   `registerTool`): state it — `new HandlerExporter({ systemType })`, or `systemType` in your own
   groups' `HandlerContext`.
 - **You call the handlers `getHandlerEntries()` hands out:** the same — each runs on the
-  exporter's stated `systemType`, none stated refused `system_type_required`. A connection built
-  by `createAbapConnection` keeps the kind it was built for.
+  exporter's stated `systemType`, none stated refused `system_type_required`. A connection you
+  hold (built by `createConnection` from `@mcp-abap-adt/connection`) keeps the kind it was built for.
 - **Your groups state different system types** (or some one and some none): the registration is
   refused before anything is registered, naming each group and what it states. State the same
   `systemType` in every group of one registration, or none in any.

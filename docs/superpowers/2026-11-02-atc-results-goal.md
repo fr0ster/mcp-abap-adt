@@ -10,14 +10,13 @@ in ADT, or by a central or baseline run. SAP keeps these results, each named by 
 Two reads:
 
 - **The list of results.** The results SAP holds for the filters given: whose (`createdBy`,
-  required, `*` for everyone), which kind (central or active), how old (`ageMin` / `ageMax`, in
-  days) and, where SAP offers them, `contactPerson` and `sysId`. Each entry gives its Display
+  required, `*` for everyone), central ones only or every kind, and how old (`ageMin` /
+  `ageMax`, in days). Each entry gives its Display
   ID, title, check variant, run series, creation time and the count of findings per priority
   and of failures.
 - **One result.** The result named by its Display ID: its objects, and each object's findings
   as `GetATCFindings` answers a worklist's (location, priority, check, message, exemption, the
-  link to the finding's documentation). Exempted findings are included only when asked for
-  (`includeExemptedFindings`).
+  link to the finding's documentation).
 
 ## What SAP answers (Measured, on premise and cloud)
 
@@ -46,6 +45,8 @@ Two reads:
 - **Contract first, from the registry.** The reads are declared in `@mcp-abap-adt/interfaces-adt`,
   implemented in adt-clients and used by mcp-abap-adt. Each package is published before its
   consumer depends on it.
+- **Only parameters measured to act.** A parameter SAP declares but that was not shown to change
+  the answer is not offered.
 - **Tools are explainable.** Each tool's description says what it reads, its parameters and its
   answer, in functional words only.
 

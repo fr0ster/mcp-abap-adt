@@ -47,38 +47,34 @@ findings carry, plus `processor`, `lastChangedBy`, `checksum`, `remarkText`, `re
 A new capability next to `IAtcFindings`, in `runtime/IAtcRun.ts`, exported from the index:
 
 ```ts
-export type AtcResultKind = 'central' | 'active';
-
 export interface IAtcResultListOptions {
   /** Whose results: a user name, or `*` for every user. */
   createdBy: string;
-  /** Central (`centralResult=true`) or active (`activeResult=true`); absent sends neither. */
-  kind?: AtcResultKind;
+  /** Central results only (`centralResult=true`); absent, every kind. */
+  centralOnly?: boolean;
   /** Age in days. */
   ageMin?: number;
   ageMax?: number;
-  contactPerson?: string;
-  sysId?: string;
-}
-
-export interface IAtcResultOptions {
-  activeResult?: boolean;
-  contactPerson?: string;
-  includeExemptedFindings?: boolean;
 }
 
 export interface IAtcResultsReadable<TResultList, TResult> {
   listResults(options: IAtcResultListOptions & IAdtAnalyseOptions<E> & …): …;
-  getResult(displayId: string, options?: IAtcResultOptions & IAdtAnalyseOptions<E> & …): …;
+  getResult(displayId: string, options?: IAdtAnalyseOptions<E> & …): …;
 }
 ```
 
-Both methods have the `analyse` overload pair that `getFindings` has. The options carry the URI
-templates' parameters and nothing invented.
+Both methods have the `analyse` overload pair that `getFindings` has. `createdBy` is required by
+type.
 
-- `createdBy` is required by type.
-- `kind` is the one exception to the templates: it replaces their two booleans, so a caller cannot
-  send both.
+**Only what was measured to act.** The templates also declare `activeResult`, `contactPerson`,
+`sysId` and `includeExemptedFindings`, and none of them is offered:
+
+- `activeResult` answered only empty lists, and made no difference to one result.
+- `contactPerson` and `sysId` were not measured.
+- `includeExemptedFindings` changed nothing on a result without exemptions. Measuring it needs an
+  exemption, which is a change to the system.
+
+Any of them is added once it is measured to act.
 
 Types only; minor, because nothing existing changes.
 
@@ -87,8 +83,7 @@ Types only; minor, because nothing existing changes.
 - `runtime/atc/results.ts`: `listAtcResults(connection, options)` and
   `getAtcResult(connection, displayId, options)`.
   - Each is one GET, `Accept: application/xml`, with only the parameters given.
-  - The kind maps to `centralResult=true` or `activeResult=true`, and the Display ID is
-    URI-encoded.
+  - `centralOnly: true` sends `centralResult=true`, and the Display ID is URI-encoded.
   - `createdBy` that is empty or only spaces is refused before anything is sent. That is a
     value rule: SAP matches nobody for it.
 - `IAtcResults` gains `resultList` and `result`, both `rawDocument` in `atcDocuments`.
@@ -121,9 +116,8 @@ Two tools, beside `RunATC`, `GetATCRunStatus` and `GetATCFindings`.
 **`ListATCResults`.**
 - Parameters:
   - `created_by` (required: a user name, or `*` for every user);
-  - `kind` (`central` | `active`; absent = every kind);
-  - `age_min` and `age_max` (days);
-  - `contact_person`, `sys_id`.
+  - `central_only` (central results only; absent = every kind);
+  - `age_min` and `age_max` (days).
 - Answers `results`, newest first as SAP sends them. Each entry has `display_id`, `title`,
   `check_variant`, `run_series` (absent when empty), `created_at`, `by_priority` (keyed `"1"`…`"4"`)
   and `failures`.
@@ -131,8 +125,7 @@ Two tools, beside `RunATC`, `GetATCRunStatus` and `GetATCFindings`.
   the ages are the bound.
 
 **`GetATCResult`.**
-- Parameters: `display_id` (required), `include_exempted_findings`, `detail` (as
-  `GetATCFindings`).
+- Parameters: `display_id` (required), `detail` (as `GetATCFindings`).
 - Answers `display_id`, `title`, `check_variant`, `created_at`, `objects_checked`, `by_priority`
   and `findings`, each finding as `GetATCFindings` gives it, terse or full.
 - `objects_checked` and `by_priority` are counted from the objects and findings the result
@@ -182,7 +175,5 @@ Two tools, beside `RunATC`, `GetATCRunStatus` and `GetATCFindings`.
 
 ## 7. For the owner
 
-- **Active results.** `kind: 'active'` is offered, because SAP's template has it. It was measured
-  only empty, on both systems.
 - **No count limit.** The list has no limit of its own. The ages bound it, and SAP's own window
   bounds it when they are absent.

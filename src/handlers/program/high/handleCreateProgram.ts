@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
  *
@@ -18,7 +20,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { isCloudConnection, return_error } from '../../../lib/utils';
@@ -29,53 +31,47 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Program description. If not provided, program_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      program_type: {
-        type: 'string',
-        description:
-          "Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
-        enum: [
-          'executable',
-          'module_pool',
-          'function_group',
-          'class_pool',
-          'interface_pool',
-        ],
-      },
-      application: {
-        type: 'string',
-        description:
-          "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'",
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'package_name'],
-  },
+  inputSchema: z.object({
+    program_name: z.string().describe('Program name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Program description. If not provided, program_name will be used.',
+      ),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    program_type: z
+      .enum([
+        'executable',
+        'module_pool',
+        'function_group',
+        'class_pool',
+        'interface_pool',
+      ])
+      .optional()
+      .describe(
+        "Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
+      ),
+    application: z
+      .string()
+      .optional()
+      .describe(
+        "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'",
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateProgramArgs {

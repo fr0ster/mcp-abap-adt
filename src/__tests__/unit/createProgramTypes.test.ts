@@ -8,7 +8,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { TOOL_DEFINITION } from '../../handlers/program/high/handleCreateProgram';
-import { jsonSchemaToZod } from '../../lib/handlers/utils/schemaUtils';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 
 const BASE = { program_name: 'ZPROG_A', package_name: 'ZPKG' };
 
@@ -20,7 +20,7 @@ async function call(
   const server = new McpServer({ name: 'probe', version: '1.0.0' });
   server.registerTool(
     TOOL_DEFINITION.name,
-    { inputSchema: jsonSchemaToZod(TOOL_DEFINITION.inputSchema) },
+    { inputSchema: TOOL_DEFINITION.inputSchema },
     async (): Promise<CallToolResult> => {
       ran = true;
       return { content: [{ type: 'text', text: 'ok' }] };
@@ -61,10 +61,13 @@ describe('CreateProgram program_type through the MCP SDK', () => {
   });
 
   it('names no include in the description', () => {
-    const { program_type } = TOOL_DEFINITION.inputSchema.properties;
-    expect(program_type.description.toLowerCase().includes('include')).toBe(
-      false,
+    const programType = jsonAt(
+      listedJson(TOOL_DEFINITION.inputSchema),
+      'program_type',
     );
-    expect(program_type.enum).not.toContain('include');
+    expect(
+      String(programType.description).toLowerCase().includes('include'),
+    ).toBe(false);
+    expect(programType.enum).not.toContain('include');
   });
 });

@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateFunctionInclude Handler - Write a function group include's source
  *
@@ -33,7 +35,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -46,36 +48,29 @@ export const TOOL_DEFINITION = {
   name: 'UpdateFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
   description: 'Update source code of an existing ABAP function group include.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name containing the include.',
-      },
-      include_name: {
-        type: 'string',
-        description: 'Include name. Include must already exist.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP include source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable includes.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.',
-        default: false,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'include_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group name containing the include.'),
+    include_name: z
+      .string()
+      .describe('Include name. Include must already exist.'),
+    source_code: z.string().describe('Complete ABAP include source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable includes.',
+      ),
+    activate: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateFunctionIncludeArgs {

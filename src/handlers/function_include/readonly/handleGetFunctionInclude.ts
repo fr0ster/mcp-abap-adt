@@ -1,15 +1,16 @@
 import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readFunctionIncludeMetadata } from '../../../lib/strategies/metadataReads';
@@ -22,22 +23,14 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata"), at the version asked. Returns the part read.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group containing the include.',
-      },
-      include_name: {
-        type: 'string',
-        description: 'Include name.',
-      },
-      part: READ_PART_PROPERTY,
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['function_group_name', 'include_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group containing the include.'),
+    include_name: z.string().describe('Include name.'),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
 interface GetFunctionIncludeArgs {

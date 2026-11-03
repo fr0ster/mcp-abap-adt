@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 72
+- Total tools: 74
 
 ## Navigation
 
@@ -14,6 +14,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [RunATC](#runatc-read-only-atc)
     - [GetATCRunStatus](#getatcrunstatus-read-only-atc)
     - [GetATCFindings](#getatcfindings-read-only-atc)
+    - [ListATCResults](#listatcresults-read-only-atc)
+    - [GetATCResult](#getatcresult-read-only-atc)
   - [Batch](#read-only-batch)
     - [BatchBegin](#batchbegin-read-only-batch)
     - [BatchEnd](#batchend-read-only-batch)
@@ -158,6 +160,34 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
+
+---
+
+<a id="listatcresults-read-only-atc"></a>
+#### ListATCResults (Read-Only / Atc)
+**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+
+**Source:** `src/handlers/atc/high/handleListATCResults.ts`
+
+**Parameters:**
+- `age_max` (integer, optional) - Oldest age to list, in days.
+- `age_min` (integer, optional) - Youngest age to list, in days.
+- `central_only` (boolean, optional) - true lists central results only; absent lists every kind.
+- `created_by` (string, required) - Whose results: a user name, or * for every user.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+---
+
+<a id="getatcresult-read-only-atc"></a>
+#### GetATCResult (Read-Only / Atc)
+**Description:** [read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
+
+**Source:** `src/handlers/atc/high/handleGetATCResult.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `display_id` (string, required) - Display ID of a stored ATC result.
+- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1194,4 +1224,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-02*
+*Last updated: 2026-11-03*

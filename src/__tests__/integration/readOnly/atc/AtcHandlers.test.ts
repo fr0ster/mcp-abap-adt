@@ -1,6 +1,7 @@
 /**
  * Integration tests for the ATC handlers: RunATC → GetATCRunStatus →
- * GetATCFindings.
+ * GetATCFindings, and the stored result of that run through ListATCResults →
+ * GetATCResult.
  *
  * Runs the ABAP Test Cockpit over a shared object with the system's DEFAULT
  * check variant. ATC reads the object and changes nothing in it, so a shared
@@ -12,7 +13,9 @@
  */
 
 import { handleGetATCFindings } from '../../../../handlers/atc/high/handleGetATCFindings';
+import { handleGetATCResult } from '../../../../handlers/atc/high/handleGetATCResult';
 import { handleGetATCRunStatus } from '../../../../handlers/atc/high/handleGetATCRunStatus';
+import { handleListATCResults } from '../../../../handlers/atc/high/handleListATCResults';
 import { handleRunATC } from '../../../../handlers/atc/high/handleRunATC';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
@@ -199,6 +202,89 @@ describe('ATC Handlers Integration', () => {
         expect(typeof run.finding_stats).toBe('string');
 
         await readFindings(connection, run.worklist_id, params);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  /**
+   * The run's stored result, found in the list of every user's results of the
+   * last day (a list to rely on states its ages: SAP's own window moved,
+   * measured), holds the findings its worklist holds.
+   */
+  it(
+    'lists the stored result of a run and reads the findings its worklist holds',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params } = context;
+        const args = runArgs(params, true);
+        const done = await tester.invokeToolOrHandler(
+          'RunATC',
+          args,
+          async () =>
+            handleRunATC(
+              createHandlerContext({ connection, logger }),
+              args as any,
+            ),
+        );
+        if (done.isError) {
+          throw new Error(`RunATC failed: ${extractErrorMessage(done)}`);
+        }
+        const run = payload(done);
+        const fromWorklist = await readFindings(
+          connection,
+          run.worklist_id,
+          params,
+        );
+
+        const listArgs = { created_by: '*', age_min: 0, age_max: 1 };
+        const listed = await tester.invokeToolOrHandler(
+          'ListATCResults',
+          listArgs,
+          async () =>
+            handleListATCResults(
+              createHandlerContext({ connection, logger }),
+              listArgs,
+            ),
+        );
+        if (listed.isError) {
+          throw new Error(
+            `ListATCResults failed: ${extractErrorMessage(listed)}`,
+          );
+        }
+        const list = payload(listed);
+        expect(list.result_count).toBe(list.results.length);
+        const ours = list.results.filter(
+          (r: any) => r.title === params.object_name,
+        );
+        expect(ours.length).toBeGreaterThanOrEqual(1);
+        const newest = ours.reduce((a: any, b: any) =>
+          String(b.created_at) > String(a.created_at) ? b : a,
+        );
+
+        const readArgs = { display_id: newest.display_id };
+        const read = await tester.invokeToolOrHandler(
+          'GetATCResult',
+          readArgs,
+          async () =>
+            handleGetATCResult(
+              createHandlerContext({ connection, logger }),
+              readArgs,
+            ),
+        );
+        if (read.isError) {
+          throw new Error(`GetATCResult failed: ${extractErrorMessage(read)}`);
+        }
+        const result = payload(read);
+        expect(result.display_id).toBe(newest.display_id);
+        expect(result.title).toBe(params.object_name);
+        expect(result.objects_checked).toBe(fromWorklist.objects_checked);
+        const checks = (findings: any[]) =>
+          findings.map((f) => `${f.object}|${f.line}|${f.check}`).sort();
+        expect(checks(result.findings)).toEqual(checks(fromWorklist.findings));
+        logger?.info(
+          `ATC result ${newest.display_id} of ${list.result_count} listed: ${result.finding_count} finding(s)`,
+        );
       });
     },
     getTimeout('long'),

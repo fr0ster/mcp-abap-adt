@@ -133,8 +133,8 @@ in the compact ones — and declares an optional `state_handle` argument on ever
    - SQL queries
    - Inactive objects
    - Transactions
-   - ATC runs and their findings (`RunATC`, `GetATCRunStatus`, `GetATCFindings`), in the core
-     and core-ro binaries
+   - ATC runs and their findings (`RunATC`, `GetATCRunStatus`, `GetATCFindings`), and the
+     stored ATC results (`ListATCResults`, `GetATCResult`), in the core and core-ro binaries
    - Class and program runs (`RuntimeRunClass`, `RuntimeRunProgram`) and the profiler trace
      parameters they run under (`RuntimeCreateProfilerTraceParameters`), in
      `RuntimeRunHandlersGroup`, and beside them their background runs: `GetBackgroundRun`,

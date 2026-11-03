@@ -889,7 +889,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // core: the debugger, high, background runs, the three batch tools
       // and the two debugger batch tools, always; on http SessionOpen and
       // SessionClose.
-      expect(full.tools).toHaveLength(onStdio ? 270 : onHttp ? 270 : 268);
+      expect(full.tools).toHaveLength(onStdio ? 272 : onHttp ? 272 : 270);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -907,7 +907,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // tools (and, on stdio, the leftover-session list; on http SessionOpen
       // and SessionClose); no write, run, debugger, background run, logoff
       // or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 72 : onHttp ? 73 : 71);
+      expect(fullRo.tools).toHaveLength(onStdio ? 74 : onHttp ? 75 : 73);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',

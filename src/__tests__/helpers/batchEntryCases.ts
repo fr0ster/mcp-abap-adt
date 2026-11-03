@@ -202,6 +202,8 @@ const FULL: BatchEntryCase[] = [
   { tool: 'GetTableContents', args: { table_name: 'TAB_A' } },
   { tool: 'GetATCRunStatus', args: { run_id: 'RUN_A' } },
   { tool: 'GetATCFindings', args: { worklist_id: 'WORKLIST_A' } },
+  { tool: 'ListATCResults', args: { created_by: '*' } },
+  { tool: 'GetATCResult', args: { display_id: 'RESULT_A' } },
   { tool: 'RuntimeListProfilerTraceFiles', args: {} },
   ...['hitlist', 'statements', 'db_accesses'].map((view) => ({
     tool: 'RuntimeGetProfilerTraceData',

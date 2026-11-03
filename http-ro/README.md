@@ -11,7 +11,8 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
 - the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
 - the **system** tools — where-used, type and object information, the ABAP AST and semantic
   analysis, SQL queries, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
-  (`RunATC`, `GetATCRunStatus`, `GetATCFindings`);
+  (`RunATC`, `GetATCRunStatus`, `GetATCFindings`, and the stored results:
+  `ListATCResults`, `GetATCResult`);
 - **search** (`SearchObject`);
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together;
 - the **long session** (`SessionOpen`, `SessionClose`): an instance and its SAP connection kept

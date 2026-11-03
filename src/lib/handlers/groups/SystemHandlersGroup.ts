@@ -3,9 +3,17 @@ import {
   handleGetATCFindings,
 } from '../../../handlers/atc/high/handleGetATCFindings';
 import {
+  TOOL_DEFINITION as GetATCResult_Tool,
+  handleGetATCResult,
+} from '../../../handlers/atc/high/handleGetATCResult';
+import {
   TOOL_DEFINITION as GetATCRunStatus_Tool,
   handleGetATCRunStatus,
 } from '../../../handlers/atc/high/handleGetATCRunStatus';
+import {
+  handleListATCResults,
+  TOOL_DEFINITION as ListATCResults_Tool,
+} from '../../../handlers/atc/high/handleListATCResults';
 import {
   handleRunATC,
   TOOL_DEFINITION as RunATC_Tool,
@@ -156,6 +164,14 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetATCFindings_Tool,
         handler: (args: any) => handleGetATCFindings(this.context, args),
+      },
+      {
+        toolDefinition: ListATCResults_Tool,
+        handler: (args: any) => handleListATCResults(this.context, args),
+      },
+      {
+        toolDefinition: GetATCResult_Tool,
+        handler: (args: any) => handleGetATCResult(this.context, args),
       },
       {
         toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,

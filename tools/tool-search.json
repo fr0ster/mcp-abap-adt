@@ -1580,6 +1580,17 @@
     ],
     "semantic": "Show the findings of an ATC check run: the errors and warnings that ABAP Test Cockpit found."
   },
+  "GetATCResult": {
+    "keywords": [
+      "ATC result",
+      "ATC results",
+      "display ID",
+      "central check",
+      "findings",
+      "test cockpit"
+    ],
+    "semantic": "Show the findings of one stored ABAP Test Cockpit (ATC) result, by its display ID."
+  },
   "GetATCRunStatus": {
     "keywords": [
       "ATC run status",
@@ -3953,6 +3964,17 @@
         "CDS view"
       ]
     }
+  },
+  "ListATCResults": {
+    "keywords": [
+      "ATC results",
+      "list ATC results",
+      "central check",
+      "check history",
+      "display ID",
+      "test cockpit"
+    ],
+    "semantic": "List the stored ABAP Test Cockpit (ATC) results: central and users' check runs, newest first."
   },
   "ListBackgroundRuns": {
     "keywords": [

@@ -206,6 +206,7 @@ export const READING_BY_SLOT = {
   waitingRun: structured,
   runStatus: structured,
   findings: structured,
+  resultList: structured,
   checkFailures: structured,
   executionLog: structured,
   hitlist: structured,

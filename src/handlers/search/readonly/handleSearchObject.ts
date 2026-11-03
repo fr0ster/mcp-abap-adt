@@ -40,11 +40,13 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface SearchHit {
+export interface SearchHit {
   name: string;
   type: string;
   description: string;
   packageName?: string;
+  /** The object's address (`adtcore:uri`), when the hit names one. */
+  uri?: string;
 }
 
 /**
@@ -55,7 +57,7 @@ interface SearchHit {
  * `structured` parse (`resultSets.ts`'s `READING_BY_SLOT`), so this walks that
  * tree directly rather than re-running a parser of its own.
  */
-function parseSearchHits(value: unknown): SearchHit[] {
+export function parseSearchHits(value: unknown): SearchHit[] {
   const root =
     child(value, 'adtcore:objectReferences') ??
     child(value, 'objectReferences');
@@ -69,12 +71,14 @@ function parseSearchHits(value: unknown): SearchHit[] {
     const name = attr(a, 'adtcore:name') ?? attr(a, 'name');
     const type = attr(a, 'adtcore:type') ?? attr(a, 'type');
     if (!name || !type) continue;
+    const uri = attr(a, 'adtcore:uri') ?? attr(a, 'uri');
     hits.push({
       name,
       type,
       description:
         attr(a, 'adtcore:description') ?? attr(a, 'description') ?? '',
       packageName: attr(a, 'adtcore:packageName') ?? attr(a, 'packageName'),
+      ...(uri === undefined ? {} : { uri }),
     });
   }
   return hits;

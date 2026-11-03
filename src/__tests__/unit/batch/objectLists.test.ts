@@ -64,6 +64,11 @@ function labelOf(method: string, url: string, params?: unknown): string {
   if (path === '/sap/bc/adt/repository/informationsystem/search') {
     return `qs:${query.get('query')}:${query.get('objectType') ?? ''}`;
   }
+  const groups = '/sap/bc/adt/functions/groups/';
+  if (path.startsWith(groups)) {
+    const [group = '', , name = ''] = path.slice(groups.length).split('/');
+    return `src:func:${group.toUpperCase()}/${name.toUpperCase()}`;
+  }
   const kinds: Array<[string, string]> = [
     ['/sap/bc/adt/oo/classes/', 'class'],
     ['/sap/bc/adt/oo/interfaces/', 'intf'],
@@ -172,7 +177,14 @@ const REPOSITORY: Record<string, PartAnswer> = {
   ),
   'qs:ZNONE:': ok(hitsXml([])),
 
+  // A function module's search: its address names its group (measured on
+  // premise and on ABAP cloud: `…/functions/groups/{group}/fmodules/{name}`).
+  'qs:Z_FUNC:FUNC': ok(
+    '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/zfg_a/fmodules/z_func" adtcore:type="FUGR/FF" adtcore:name="Z_FUNC" adtcore:packageName="ZPKG" adtcore:description="Function Z"/></adtcore:objectReferences>',
+  ),
+
   // Sources of the symbols.
+  'src:func:ZFG_A/Z_FUNC': ok('FUNCTION z_func.\nENDFUNCTION.', text),
   'src:class:ZCL_A': ok('CLASS zcl_a DEFINITION PUBLIC.\nENDCLASS.', text),
   'src:class:ZCL_B': ok('CLASS zcl_b DEFINITION PUBLIC.\nENDCLASS.', text),
   'src:intf:ZIF_A': ok('INTERFACE zif_a PUBLIC.\nENDINTERFACE.', text),
@@ -759,7 +771,7 @@ describe('GetAbapSystemSymbols', () => {
     },
   );
 
-  it('one phase: every symbol’s read, each independent of the others, in one envelope', async () => {
+  it('two phases: every independent read in one envelope, then the function modules at the groups found', async () => {
     const fake = system();
     await withinTurns(
       handleGetAbapSystemSymbols(contextOn(fake), { code: CODE }),
@@ -771,9 +783,74 @@ describe('GetAbapSystemSymbols', () => {
         'src:intf:ZIF_A',
         'src:class:ZCL_B',
         'src:class:ZCL_GONE',
+        'qs:Z_FUNC:FUNC',
       ],
+      ['src:func:ZFG_A/Z_FUNC'],
     ]);
     expect(fake.directs).toHaveLength(0);
+  });
+
+  it('a function module is resolved: its group found by a search, its source read at that group', async () => {
+    const { a, b, sequential } = await bothWays(handleGetAbapSystemSymbols, {
+      code: CODE,
+    });
+    expect(contentOf(a)).toBe(contentOf(b));
+    expect(directsOf(sequential)).toEqual([
+      'src:class:ZCL_A',
+      'src:intf:ZIF_A',
+      'src:class:ZCL_B',
+      'src:class:ZCL_GONE',
+      'qs:Z_FUNC:FUNC',
+      'src:func:ZFG_A/Z_FUNC',
+    ]);
+    const content: unknown = JSON.parse(contentOf(a));
+    expect(content).toMatchObject([
+      {
+        type: 'json',
+        json: {
+          symbols: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'Z_FUNC',
+              systemInfo: {
+                exists: true,
+                objectType: 'FUNC',
+                description: 'Function Z',
+                package: 'ZPKG',
+                functionGroup: 'ZFG_A',
+              },
+            }),
+          ]),
+        },
+      },
+    ]);
+  });
+
+  it('a function module the search does not find: not found, and no source is read', async () => {
+    const model = { answers: { 'qs:Z_FUNC:FUNC': ok(hitsXml([])) } };
+    const { a, b, batched, sequential } = await bothWays(
+      handleGetAbapSystemSymbols,
+      { code: CODE },
+      model,
+    );
+    expect(contentOf(a)).toBe(contentOf(b));
+    expect(phasesOf(batched)).toHaveLength(1);
+    expect(directsOf(sequential)).not.toContain('src:func:ZFG_A/Z_FUNC');
+    const content: unknown = JSON.parse(contentOf(a));
+    expect(content).toMatchObject([
+      {
+        json: {
+          symbols: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'Z_FUNC',
+              systemInfo: {
+                exists: false,
+                error: 'Function not found in SAP system',
+              },
+            }),
+          ]),
+        },
+      },
+    ]);
   });
 
   it('nothing to read in the system: no envelope', async () => {
@@ -840,13 +917,13 @@ describe('GetAbapSystemSymbols', () => {
       { code: CODE },
       phasesOf(fake)[0] as string[],
     );
-    expectEnvelopeFailure(result, expected, 4);
+    expectEnvelopeFailure(result, expected, 5);
     const symbols = (result as any).content[0].json.symbols;
     expect(
       symbols
         .filter((s: { error?: unknown }) => s.error !== undefined)
         .map((s: { name: string }) => s.name),
-    ).toEqual(['ZCL_A', 'ZIF_A', 'ZCL_B', 'ZCL_GONE']);
+    ).toEqual(['ZCL_A', 'ZIF_A', 'ZCL_B', 'ZCL_GONE', 'Z_FUNC']);
     expect(fake.envelopes).toHaveLength(1);
     expect(fake.directs).toHaveLength(0);
   });
@@ -863,6 +940,8 @@ describe('GetAbapSystemSymbols', () => {
       'src:intf:ZIF_A',
       'src:class:ZCL_B',
       'src:class:ZCL_GONE',
+      'qs:Z_FUNC:FUNC',
+      'src:func:ZFG_A/Z_FUNC',
     ]);
     expect(context.batchAvailability?.available()).toBe(false);
   });

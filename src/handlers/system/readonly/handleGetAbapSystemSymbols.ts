@@ -18,6 +18,11 @@ import { child, text } from '../../../lib/xml/tree';
 import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';
+import {
+  handleSearchObject,
+  parseSearchHits,
+  type SearchHit,
+} from '../../search/readonly/handleSearchObject';
 export const TOOL_DEFINITION = {
   name: 'GetAbapSystemSymbols',
   available_in: ['onprem', 'cloud'] as const,
@@ -95,6 +100,8 @@ interface AbapSystemInfo {
   interfaces?: string[];
   superClass?: string;
   attributes?: string[];
+  /** A function module's group, as the repository search named it. */
+  functionGroup?: string;
   error?: string;
 }
 
@@ -550,6 +557,35 @@ function statsOf(
   };
 }
 
+/** The address of a function module's group, before the group's name. */
+const FUNCTION_GROUPS = '/sap/bc/adt/functions/groups/';
+
+/**
+ * The function group a function module's address names: SAP answers a
+ * module's search hit with `…/functions/groups/{group}/fmodules/{name}`, the
+ * group URI-encoded in lower case (`%2f` for a namespace's `/`; measured on
+ * premise and on ABAP cloud). `undefined` for any other address.
+ */
+function functionGroupOf(uri: string): string | undefined {
+  if (!uri.startsWith(FUNCTION_GROUPS)) return undefined;
+  const rest = uri.slice(FUNCTION_GROUPS.length);
+  const end = rest.indexOf('/');
+  if (end <= 0 || !rest.startsWith('/fmodules/', end)) return undefined;
+  try {
+    return decodeURIComponent(rest.slice(0, end)).toUpperCase();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Where a function module symbol stands after its search: resolved already
+ * (not found, or the search failed), or found in its group, with the hit.
+ */
+type FunctionLocation =
+  | { resolved: AbapSymbolInfo }
+  | { resolved?: undefined; group: string; hit: SearchHit };
+
 /** A delegated read's text, parsed: `{}` when it is none or no JSON. */
 function parsedText(item: { text: string }): unknown {
   if (!item.text) return {};
@@ -596,41 +632,94 @@ class AbapSystemSymbolResolver {
   }
 
   /**
-   * `resolveSymbols` in one ADT batch envelope (spec §11): every symbol's
-   * read — a class's or an interface's source GET; a function module or a
-   * local symbol sends none — recorded on one batch connection and sent
-   * together, then assembled as `resolveSymbols` assembles them: the first
-   * credential failure in the order of the symbols ends the call with its
-   * answer. Nothing is sent again.
+   * `resolveSymbols` in ADT batch envelopes (spec §11): every symbol's first
+   * read — a class's or an interface's source GET, a function module's
+   * search; a local symbol sends none — recorded on one batch connection and
+   * sent together; then, in a second envelope, the source GET of every
+   * function module found, at the group its search named. Assembled as
+   * `resolveSymbols` assembles them: the first credential failure in the
+   * order of the symbols ends the call with its answer, and one in the first
+   * envelope sends no second. Nothing is sent again.
    */
   public async resolveSymbolsInEnvelope(
     context: HandlerContext,
     symbols: AbapSymbolInfo[],
   ): Promise<Resolution> {
-    const answered = await runPhase(context, symbols, (symbol, batch) =>
-      this.resolveSymbol({ ...context, connection: batch }, symbol),
+    const firsts = await runPhase(
+      context,
+      symbols,
+      async (symbol, batch): Promise<FunctionLocation> => {
+        const on = { ...context, connection: batch };
+        if (symbol.type === 'function') {
+          return this.locateFunctionSymbol(on, symbol);
+        }
+        return { resolved: await this.resolveSymbol(on, symbol) };
+      },
     );
+    const located: FunctionLocation[] = [];
+    for (const [i, symbol] of symbols.entries()) {
+      const result = firsts[i];
+      if (result === undefined || !result.ok) {
+        located.push({
+          resolved: threwAt(symbol, result?.error, 'resolve symbol'),
+        });
+      } else {
+        located.push(result.value);
+      }
+    }
+    for (const step of located) {
+      const ended = step.resolved?.error
+        ? credentialAnswers.get(step.resolved.error)
+        : undefined;
+      if (ended !== undefined) return { ended };
+    }
+
+    const pending: Array<{
+      at: number;
+      symbol: AbapSymbolInfo;
+      location: { group: string; hit: SearchHit };
+    }> = [];
+    for (const [at, step] of located.entries()) {
+      const symbol = symbols[at];
+      if (step.resolved === undefined && symbol !== undefined) {
+        pending.push({ at, symbol, location: step });
+      }
+    }
+    const reads =
+      pending.length === 0
+        ? []
+        : await runPhase(context, pending, (item, batch) =>
+            this.readFunctionSymbol(
+              { ...context, connection: batch },
+              item.symbol,
+              item.location,
+            ),
+          );
+    const readAt = new Map<number, AbapSymbolInfo>();
+    for (const [j, item] of pending.entries()) {
+      const result = reads[j];
+      readAt.set(
+        item.at,
+        result !== undefined && result.ok
+          ? result.value
+          : threwAt(item.symbol, result?.error, 'resolve symbol'),
+      );
+    }
+
     const resolvedSymbols: AbapSymbolInfo[] = [];
     let resolvedCount = 0;
     let failedCount = 0;
-
-    for (const [i, symbol] of symbols.entries()) {
-      try {
-        const result = answered[i];
-        if (!result.ok) throw result.error;
-        const resolved = result.value;
-        const ended = resolved.error
-          ? credentialAnswers.get(resolved.error)
-          : undefined;
-        if (ended !== undefined) return { ended };
-        resolvedSymbols.push(resolved);
-        if (resolved.systemInfo?.exists) {
-          resolvedCount++;
-        } else {
-          failedCount++;
-        }
-      } catch (error) {
-        resolvedSymbols.push(threwAt(symbol, error, 'resolve symbol'));
+    for (const [i, step] of located.entries()) {
+      const resolved = step.resolved ?? readAt.get(i);
+      if (resolved === undefined) continue;
+      const ended = resolved.error
+        ? credentialAnswers.get(resolved.error)
+        : undefined;
+      if (ended !== undefined) return { ended };
+      resolvedSymbols.push(resolved);
+      if (resolved.systemInfo?.exists) {
+        resolvedCount++;
+      } else {
         failedCount++;
       }
     }
@@ -719,19 +808,66 @@ class AbapSystemSymbolResolver {
     context: HandlerContext,
     symbol: AbapSymbolInfo,
   ): Promise<AbapSymbolInfo> {
+    const location = await this.locateFunctionSymbol(context, symbol);
+    if (location.resolved !== undefined) return location.resolved;
+    return this.readFunctionSymbol(context, symbol, location);
+  }
+
+  /**
+   * A function module's group: a repository search for the module (type
+   * `FUNC`), its hit of the same name, and the group its address names.
+   */
+  private async locateFunctionSymbol(
+    context: HandlerContext,
+    symbol: AbapSymbolInfo,
+  ): Promise<FunctionLocation> {
+    const notFound = {
+      resolved: {
+        ...symbol,
+        systemInfo: {
+          exists: false,
+          error: 'Function not found in SAP system',
+        },
+      },
+    };
+    try {
+      const found = await handleSearchObject(context, {
+        object_name: symbol.name,
+        object_type: 'FUNC',
+        maxResults: 10,
+        detail: 'full',
+      });
+      const refused = refusalOf(found, 'search function module');
+      if (refused) return { resolved: { ...symbol, error: refused } };
+      const [item] = found.isError ? [] : found.content;
+      if (item === undefined) return notFound;
+      const hit = parseSearchHits(parsedText(item)).find(
+        (each) =>
+          each.type === 'FUGR/FF' && each.name.toUpperCase() === symbol.name,
+      );
+      const group =
+        hit?.uri === undefined ? undefined : functionGroupOf(hit.uri);
+      if (hit === undefined || group === undefined) return notFound;
+      return { group, hit };
+    } catch (error) {
+      return { resolved: threwAt(symbol, error, 'search function module') };
+    }
+  }
+
+  /** A function module read at the group its search found. */
+  private async readFunctionSymbol(
+    context: HandlerContext,
+    symbol: AbapSymbolInfo,
+    location: { group: string; hit: SearchHit },
+  ): Promise<AbapSymbolInfo> {
     try {
       const functionInfo = await handleGetFunctionModule(context, {
         function_module_name: symbol.name,
-        function_group_name: '',
+        function_group_name: location.group,
       });
       const refused = refusalOf(functionInfo, 'read function module');
       if (refused) return { ...symbol, error: refused };
-      if (
-        !functionInfo ||
-        functionInfo.isError ||
-        !functionInfo.content ||
-        functionInfo.content.length === 0
-      ) {
+      if (functionInfo.isError || functionInfo.content.length === 0) {
         return {
           ...symbol,
           systemInfo: {
@@ -740,12 +876,15 @@ class AbapSystemSymbolResolver {
           },
         };
       }
-      // GetFunctionModule answers text: there is no `json` item to read.
       return {
         ...symbol,
         systemInfo: {
-          exists: false,
-          error: 'Invalid response format from GetFunction',
+          exists: true,
+          objectType: 'FUNC',
+          description:
+            location.hit.description || `ABAP Function ${symbol.name}`,
+          package: location.hit.packageName || 'Unknown',
+          functionGroup: location.group,
         },
       };
     } catch (error) {

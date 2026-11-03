@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateBehaviorImplementation Handler - Write a Behavior Implementation's
  * implementations include
@@ -53,7 +55,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -67,38 +69,36 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description:
-          'Behavior Implementation class name. Must exist in the system.',
-      },
-      behavior_definition: {
-        type: 'string',
-        description:
-          'Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).',
-      },
-      implementation_code: {
-        type: 'string',
-        description:
-          'Implementation code for the implementations include. Contains the actual behavior implementation methods.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate behavior implementation after update. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'behavior_definition', 'implementation_code'],
-  },
+  inputSchema: z.object({
+    class_name: z
+      .string()
+      .describe(
+        'Behavior Implementation class name. Must exist in the system.',
+      ),
+    behavior_definition: z
+      .string()
+      .describe(
+        'Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).',
+      ),
+    implementation_code: z
+      .string()
+      .describe(
+        'Implementation code for the implementations include. Contains the actual behavior implementation methods.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate behavior implementation after update. Default: true.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateBehaviorImplementationArgs {

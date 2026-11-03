@@ -153,3 +153,82 @@ Tests:
 Inference, not measured: while `express` has no types, every value typed by it (`Request`,
 `Response`, `NextFunction`, the `express()` app) is `any` without an error, so adding
 `@types/express` (step 12) may show further errors in the files that use them.
+
+## Appendix B — undeclared keys
+
+Measured (step 3) by reading the code: every handler a compact route or a compact tool hands the
+model's arguments to — the read and part routes (`compactReadRoutes`, `compactPartRoutes`), the
+address and run parts of `handleHandlerGet`, the write handlers (`handleCreateOnly`,
+`handleUpdateUnderLock`, `handleDeleteOnly`) and each per-type target they call, and every other
+`Handler*` tool of `compact-readonly-entries` and `compact-modify` with the handler it calls. For
+each, the keys it reads from its arguments (`args.x`, `args['x']`, destructuring, `detailOf(args)`
+for `detail`, the dynamic reads of `CLASS_INCLUDES` and `DELETION_NAME_FIELDS`) against the
+properties of the schema it is listed with (the step 1 fixture; a tool no binary lists, from its
+`TOOL_DEFINITION`).
+
+**A target reads a key its own schema does not declare:**
+
+1. `handleGetObjectStructure` (`src/handlers/system/readonly/handleGetObjectStructure.ts:209-210`)
+   reads `object_type` and `object_name` as the fallbacks of `objecttype` and `objectname`. Its
+   schema (`GetObjectStructure`) declares `objecttype` (required), `objectname`, `detail`.
+   `HandlerGet`'s `part: 'object_structure'` passes exactly `{ object_type, object_name }`
+   (`handleHandlerGet.ts:81-84`). Validated against `GetObjectStructure`'s schema, both are
+   dropped and `objecttype` is missing: the route must pass `objecttype` / `objectname`, or the
+   schema declare the two.
+2. `handleGetUnitTestResultOnce` and `handleGetCdsUnitTestResultOnce`
+   (`src/handlers/unit_test/shared/resultOnce.ts:38-50`, `readResultOnce`) read `run_id`,
+   `detail`, `with_navigation_uris` and `format`. They are reached from `HandlerGet` (`UNIT_TEST`,
+   `CDS_UNIT_TEST`) and from `HandlerUnitTestResult` / `HandlerCdsUnitTestResult`.
+   - The `TOOL_DEFINITION` of their module, `GetUnitTestResult`, declares `run_id` and `detail`
+     only; `GetCdsUnitTestResult` declares all four.
+   - `compactUnitTestResultSchema` (both compact result tools) declares `run_id`,
+     `with_navigation_uris`, `format`, not `detail`.
+   - `HandlerGet`'s schema declares `run_id` only of the four.
+   - No tool's entry has the `…Once` function as its handler with a schema of these four, so the
+     `UNIT_TEST` / `CDS_UNIT_TEST` routes cannot be "the target tool's entry" as they are (step 9).
+   - The full `handleGetUnitTestResult` (same module, line 40) reads `with_navigation_uris` and
+     `format` too, which `GetUnitTestResult` does not declare.
+3. `handleCreateOnly` (`src/handlers/common/low/handleCreateOnly.ts`) reads `detail` (`ALWAYS`,
+   `detailOf` in `createAlone` and the `INCLUDE` branch); `HandlerCreate` declares no `detail`, so
+   over MCP it is always dropped and the answer always terse.
+4. `handleUpdateUnderLock` reads `part` for every type (`partRefusal`, line 106). `HandlerUpdate`
+   declares `part` on onprem, not on cloud.
+
+**`detail` read by a target, not declared by the compact tool that hands it the arguments**
+(declared by the target's own tool; over MCP the compact path is always terse):
+`HandlerTransportCreate` → `handleCreateTransport`, `HandlerTransportMoveObjects` →
+`handleMoveTransportObjects`, `HandlerTransportSortAndCompress` →
+`handleSortAndCompressTransportTask`, `HandlerServiceBindingValidate` →
+`handleValidateServiceBinding`, `HandlerUnitTestStatus` → `handleGetUnitTestStatus`,
+`HandlerCdsUnitTestStatus` → `handleGetCdsUnitTestStatus`, and the two result tools of item 2.
+`HandlerGet` declares no `detail` either; of the targets it reaches, `GetPackage`,
+`ReadTransportObjects`, `GetVirtualFoldersLow`, `GetObjectStructure` and the two `…Once` result
+reads read it, each declaring it in its own schema.
+
+**Checked, every key declared by the target's own schema:** `GetPackage`, `GetDomain`,
+`GetDataElement`, `ReadTransportObjects`, `GetTable`, `GetStructure`, `GetTableType`, `GetDdl`,
+`GetServiceDefinition`, `GetServiceBinding`, `GetClass`, `GetLocalTestClass`, `GetLocalTypes`,
+`GetLocalDefinitions`, `GetLocalMacros`, `GetProgram`, `GetInclude`, `GetInterface`,
+`GetFunctionGroup`, `GetFunctionModule`, `GetBehaviorDefinition`, `GetBehaviorImplementation`,
+`GetMetadataExtension`, `GetMainPrograms`, `GetPackageContents`, `GetServiceBindingPreviewUrl`,
+`GetVirtualFoldersLow`, `GetNodeStructureLow`; `CreatePackage`, `CreateTransport`, `CreateTable`,
+`CreateDdl`, `CreateClass`, `CreateProgram`, `CreateInclude`, `CreateInterface`,
+`CreateFunctionModule`; `UpdateTableLow`, `UpdateStructureLow`, `UpdateDdlLow`, `UpdateClassLow`,
+`UpdateProgramLow`, `UpdateInterfaceLow`, `UpdateFunctionModuleLow`,
+`UpdateBehaviorDefinitionLow`, `UpdateMetadataExtensionLow`; `SearchObject`, `GetWhereUsed`,
+`GetSqlQuery`, `GetTableContents`, `RuntimeCreateProfilerTraceParameters`,
+`ListServiceBindingTypes`; `handleDeleteOnly` against `HandlerDelete`; every `Handler*` tool's
+own reads against its own schema.
+
+**No schema of their own:** `handleGetActivationStatus` / `handleGetActivationResults` (read
+`run_id`, called with `{ run_id }` built by `HandlerGet`), `handleStartUnitTestRun` (reads what
+`HandlerUnitTestRun` declares), `handleDeletionCheck` (reads `object_type`, `object_name`, both
+declared by `HandlerDeletionCheck`).
+
+**Values:** every target with a `part` lists `source` and `metadata`, the two values the compact
+passes it; a target without `part` drops it.
+
+How it was read, and its limit: the keys come from the handlers' source, by reading each
+target and a scan of its module for `args.x`, `args['x']` and destructuring; a key a helper of
+another module reads from a passed `args` was followed only for `detailOf`, `readPartOf`,
+`readResultOnce` and the in-module helpers named above.

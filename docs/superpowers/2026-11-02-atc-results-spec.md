@@ -27,7 +27,10 @@ carries no objects and no findings.
 Read from the table:
 
 - With no kind, the list holds every kind: central runs and the users' own runs.
-- With no ages, SAP applies a window of its own, narrower than ten years.
+- With no ages, SAP applies a window of its own, narrower than ten years. It is not stable: on
+  premise, central results without ages were 26 on 2026-11-02 and 0 on 2026-11-03, when the
+  same query with ages 0–3650 listed 159 (and 238 of every kind, 139 KB). A list to rely on
+  states its ages.
 - `createdBy` absent next to a kind matches nobody.
 - Active results were empty on both systems, so their content is unmeasured.
 
@@ -90,15 +93,18 @@ Types only; minor, because nothing existing changes.
   `AdtAtc` implements `IAtcResultsReadable<T['resultList'], T['result']>`.
 - Minor, as `mainPrograms` in 40.1.0. A consumer that wrote its own complete `IAtcResults`
   must add the two slots. Spreading `atcDocuments` covers it, as it did for `mainPrograms`.
-- **Legacy.** `AdtAtc` on the legacy client refuses both reads until they are measured on 7.40,
-  as `readMainPrograms` does.
-- Manifest, shape atoms, behaviour guard and variant gates as for `mainPrograms`.
+- **Legacy.** `AdtRuntimeClient` has no legacy variant, so there is no legacy `AdtAtc` to
+  override. 7.40 SP04's discovery lists `/atc/customizing` and `/atc/runs`, and no
+  `/atc/results`. `LEGACY.md` lists both reads among the runtime families with no legacy
+  variant (adt-clients-legacy 0.6.1, docs only).
+- The manifest, shape atoms, behaviour guard and variant gates cover the core object handlers.
+  `AdtAtc` is in none of them, so the two reads add nothing there.
 - Unit tests:
   - the request each call sends: path, query and `Accept`;
   - the empty-`createdBy` refusal;
   - both slots answering through a custom result set.
-- Live test: list central results with `createdBy=*` on both systems, then read the first by its
-  Display ID.
+- Live test: list central results with `createdBy=*` and ages 0–3650 on both systems, then
+  read the first by its Display ID.
 
 ## 4. Tools: mcp-abap-adt 23.1.0 (minor)
 

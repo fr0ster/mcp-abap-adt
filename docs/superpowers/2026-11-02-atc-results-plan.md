@@ -26,9 +26,10 @@ each step names the spec section it carries out.
 
    Add the endpoint constants beside the existing ATC ones.
 7. Add the `resultList` and `result` slots to `IAtcResults` and `atcDocuments` (`rawDocument`).
-   `AdtAtc` implements `IAtcResultsReadable`. Add the manifest and shape atoms, the behaviour
-   guard verbs and the variant gates, as for `mainPrograms`.
-8. Make legacy `AdtAtc` refuse both reads, as `readMainPrograms` does (spec §3).
+   `AdtAtc` implements `IAtcResultsReadable`. adt-strategies takes the same `interfaces-adt`
+   range (the two packages share their ranges).
+8. In the legacy package, list both reads in `LEGACY.md` among the runtime families with no
+   legacy variant (spec §3). Docs only, on adt-clients `^42.1.0`.
 9. Unit tests (TDD, each test written first and seen red):
    - each request's path, query and `Accept`;
    - the blank `createdBy` refusal;

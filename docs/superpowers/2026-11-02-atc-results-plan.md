@@ -34,9 +34,8 @@ each step names the spec section it carries out.
    - each request's path, query and `Accept`;
    - the blank `createdBy` refusal;
    - both slots answering through a custom result set;
-   - the legacy refusals.
 10. Live test in the ATC integration suite, on E19 and the trial: list central results with
-    `createdBy: '*'`, then read the first by its Display ID. The test is guarded and skipped
+    `createdBy: '*'` and ages 0–3650, then read the first by its Display ID. The test is guarded and skipped
     with a reason where it cannot run. Do a realm check before each run.
 11. Write the CHANGELOG entries (adt-clients 42.1.0, the legacy minor) and the README. Run every
     package's lint, test:check, build and test.

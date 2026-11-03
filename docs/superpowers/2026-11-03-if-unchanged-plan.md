@@ -18,7 +18,7 @@ each:
 
 ## Part A — `@mcp-abap-adt/interfaces-adt` (minor; its own PR, in mcp-abap-adt-interfaces)
 
-1. Add `ifMatch?: string` to `IAdtOperationOptions`, with the doc comment of spec §2.
+1. Add `IAdtUpdateOptions` (`IAdtOperationOptions` with `ifMatch?: string`, the doc comment of spec §2) and type `update` and `updateMetadata` with it.
 2. Add a typecheck proving that an update takes it and that a create does not.
 3. Bump the minor and write the CHANGELOG entry and README line. Run the package's lint,
    test:check, build and test.

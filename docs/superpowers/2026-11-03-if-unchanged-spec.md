@@ -39,7 +39,7 @@ object was deleted afterwards.
 
 ## 2. Contract: `@mcp-abap-adt/interfaces-adt` (minor)
 
-`IAdtOperationOptions` gains:
+`update` and `updateMetadata` take a new `IAdtUpdateOptions`, which extends `IAdtOperationOptions` (reads and creates take that type too, so the ETag stays off them) with:
 
 ```ts
 /**

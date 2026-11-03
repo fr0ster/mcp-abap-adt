@@ -20,7 +20,8 @@ Each restriction is optional:
 
 5. **Table data.** The contents of a table or view are read only when the configuration allows
    it: either a list of tables whose data cannot be read, or a list of the only tables whose
-   data can be. This covers every tool that answers a table's rows, the SQL query included.
+   data can be. It covers the tools that name the table in their arguments. A free SQL query
+   is not analysed: it is allowed or not as an action (item 1).
 
 Every check runs once, at the start of the handler, before its first call that changes
 anything in SAP. The handler then either runs whole or is refused whole; nothing is checked
@@ -69,6 +70,9 @@ request is allowed.
 - **The consumer decides about a draft.** The server gives the facts: whose draft, its age. The
   age limit and what happens on each side of it are the consumer's settings, with no default of
   the server's. The server keeps no state on its clock.
+- **The checks are formal.** They read the call's own target: the tool, the object, its package
+  and request, the table it names. They do not analyse code. A class written to read what is
+  denied, or to create objects elsewhere, is a matter for SAP's authorization, not this server.
 - **A mistake in the configuration stops the start.** An unknown tool or action, a malformed
   entry or an unreadable list is never ignored.
 
@@ -81,7 +85,6 @@ request is allowed.
   activation, a move to another package, the transport tools, batch and the compact routes.
 - How a create is checked, where the object has no package in SAP yet.
 - How the server learns the request that holds an object, read at the handler's start.
-- For table data: which tools answer rows; how the tables a SQL query reads are found, and
-  what happens to a query whose tables cannot be found; whether a deny list and an allow list
-  may be configured together.
+- For table data: which tools name a table whose rows they answer; whether a deny list and an
+  allow list may be configured together.
 - The semver of the release.

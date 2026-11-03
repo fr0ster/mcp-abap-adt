@@ -1,26 +1,21 @@
+import * as z from 'zod';
 import { answerBackgroundDiscard } from '../../backgroundRuns/answers';
-import type { ArgsOf, HandlerContext } from '../../handlers/index';
+import type { HandlerContext } from '../../handlers/index';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunDiscard',
   description:
     '[read-only] Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      run_handle: {
-        type: 'string',
-        description:
-          'The run_handle a run started with background=true answered.',
-      },
-    },
-    required: ['run_handle'],
-  },
+  inputSchema: z.object({
+    run_handle: z
+      .string()
+      .describe('The run_handle a run started with background=true answered.'),
+  }),
 } as const;
 
 export async function handleHandlerBackgroundRunDiscard(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return answerBackgroundDiscard(context, args.run_handle);
 }

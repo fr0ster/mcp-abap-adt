@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,27 +27,23 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ddl_name: {
-        type: 'string',
-        description: 'CDS view name to check, passed as ddl_name.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' or 'inactive'. Without `version` the active version is checked.",
-        enum: ['active', 'inactive'],
-      },
-      ddl_source: {
-        type: 'string',
-        description:
-          'Optional: DDL source code to validate instead of the saved version.',
-      },
-    },
-    required: ['ddl_name'],
-  },
+  inputSchema: z.object({
+    ddl_name: z
+      .string()
+      .describe('CDS view name to check, passed as ddl_name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        "Version to check: 'active' or 'inactive'. Without `version` the active version is checked.",
+      ),
+    ddl_source: z
+      .string()
+      .optional()
+      .describe(
+        'Optional: DDL source code to validate instead of the saved version.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckDdl(

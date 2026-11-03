@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ActivateDdlLow Handler - Activate ABAP DDL Source (CDS View)
  *
@@ -10,7 +12,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -20,17 +22,10 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ddl_name: {
-        type: 'string',
-        description: 'DDL source name.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['ddl_name'],
-  },
+  inputSchema: z.object({
+    ddl_name: z.string().describe('DDL source name.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ActivateDdlArgs {

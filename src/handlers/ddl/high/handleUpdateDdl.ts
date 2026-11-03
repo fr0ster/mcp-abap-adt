@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateDdl Handler - Update existing CDS/Classic view DDL source
  *
@@ -25,7 +27,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -40,27 +42,21 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ddl_name: {
-        type: 'string',
-        description: 'DDL source name.',
-      },
-      ddl_source: { type: 'string', description: 'Complete DDL source code.' },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after update. Default: false.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['ddl_name', 'ddl_source'],
-  },
+  inputSchema: z.object({
+    ddl_name: z.string().describe('DDL source name.'),
+    ddl_source: z.string().describe('Complete DDL source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after update. Default: false.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateDdlArgs {

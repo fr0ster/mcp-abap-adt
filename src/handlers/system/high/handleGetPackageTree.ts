@@ -158,7 +158,7 @@ async function readTreesBatched(
   packageNames: readonly string[],
   options: TreeOptions,
 ): Promise<TreeRead[]> {
-  const read = batchReader<FirstItem, unknown>(context, (item, c) =>
+  const read = batchReader<FirstItem, Metadata>(context, (item, c) =>
     'metadata' in item
       ? readMetadata(context, c, item.metadata)
       : readNode(
@@ -191,7 +191,7 @@ async function readTreesBatched(
     (requests) => read(requests.map((node) => ({ node }))),
     kept.map((i) => packageNames[i] as string),
     options,
-    kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
+    kept.map((i) => first[packageNames.length + i]),
   );
   kept.forEach((i, k) => {
     (reads[i] as TreeRead).walked = walked[k];
@@ -221,7 +221,7 @@ async function readTreesConcurrent(
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
-    concurrentReader<NodeRequest, unknown>(context, (request, c) =>
+    concurrentReader<NodeRequest, Metadata>(context, (request, c) =>
       readNode(
         nodeStructureOn(
           context,

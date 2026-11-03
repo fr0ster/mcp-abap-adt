@@ -1,6 +1,7 @@
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { failureOf } from '../auth/failures';
 import { SystemContextMissingError } from '../systemContextGuard';
+import { child, isList } from '../xml/tree';
 import { failed, type StepError, type StepResponse } from './stepResponse';
 
 /**
@@ -16,8 +17,7 @@ export interface StepCarrier {
 }
 
 function stepOf(value: unknown): string | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
-  const step = (value as StepCarrier).step;
+  const step = child(value, 'step');
   return typeof step === 'string' ? step : undefined;
 }
 
@@ -36,11 +36,10 @@ export class StepThrew extends Error {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
     this.name = 'StepThrew';
     this.step = step;
-    const carrier = cause as { cleanup?: unknown; operation?: unknown };
-    if (cause !== null && typeof cause === 'object') {
-      if (carrier.cleanup !== undefined) this.cleanup = carrier.cleanup;
-      if (carrier.operation !== undefined) this.operation = carrier.operation;
-    }
+    const cleanup = child(cause, 'cleanup');
+    const operation = child(cause, 'operation');
+    if (cleanup !== undefined) this.cleanup = cleanup;
+    if (operation !== undefined) this.operation = operation;
   }
 }
 
@@ -86,7 +85,8 @@ export function atStep<A extends unknown[], T>(
   };
 }
 
-const METHOD_FAILURE = Symbol('methodFailure');
+/** The method's error each throw carries, by the thrown object. */
+const METHOD_FAILURE = new WeakMap<object, StepError>();
 
 /**
  * A handler that works by throws carries the method's error on the throw.
@@ -100,11 +100,7 @@ export function carryingFailure<E extends Error>(
   error: IAdtError,
   step: string,
 ): E {
-  Object.defineProperty(thrown, METHOD_FAILURE, {
-    value: withStep(error, step),
-    enumerable: false,
-    configurable: true,
-  });
+  METHOD_FAILURE.set(thrown, withStep(error, step));
   return thrown;
 }
 
@@ -124,12 +120,15 @@ export function mergedLeftBehind(
   prior: unknown,
   added: LeftBehind,
 ): LeftBehind {
-  const before = (prior ?? {}) as LeftBehind;
-  const message = [before.message, added.message]
+  const listed = (name: string): readonly unknown[] => {
+    const value = child(prior, name);
+    return isList(value) ? value : [];
+  };
+  const message = [child(prior, 'message'), added.message]
     .filter((m): m is string => typeof m === 'string' && m !== '')
     .join('; ');
-  const failures = [...(before.failures ?? []), ...(added.failures ?? [])];
-  const notes = [...(before.notes ?? []), ...(added.notes ?? [])];
+  const failures = [...listed('failures'), ...(added.failures ?? [])];
+  const notes = [...listed('notes'), ...(added.notes ?? [])];
   return {
     ...(message ? { message } : {}),
     ...(failures.length ? { failures } : {}),
@@ -147,22 +146,20 @@ export function noteLeftBehind(
   thrown: unknown,
   note: string | LeftBehind,
 ): void {
-  const carried = methodFailureOf(thrown);
+  if (typeof thrown !== 'object' || thrown === null) return;
+  const carried = METHOD_FAILURE.get(thrown);
   if (carried === undefined) return;
-  Object.defineProperty(thrown, METHOD_FAILURE, {
-    value: {
-      ...carried,
-      cleanup: mergedLeftBehind(
-        (carried as { cleanup?: unknown }).cleanup,
-        typeof note === 'string' ? { message: note } : note,
-      ),
-    },
-    enumerable: false,
-    configurable: true,
+  METHOD_FAILURE.set(thrown, {
+    ...carried,
+    cleanup: mergedLeftBehind(
+      carried.cleanup,
+      typeof note === 'string' ? { message: note } : note,
+    ),
   });
 }
 
-const CARRIED_PAYLOAD = Symbol('carriedPayload');
+/** The whole answer each throw carries, by the thrown object. */
+const CARRIED_PAYLOAD = new WeakMap<object, Record<string, unknown>>();
 
 /**
  * A throw that carries its whole answer: a failure that is several failures
@@ -174,11 +171,7 @@ export function carryingPayload<E extends object>(
   thrown: E,
   payload: Record<string, unknown>,
 ): E {
-  Object.defineProperty(thrown, CARRIED_PAYLOAD, {
-    value: payload,
-    enumerable: false,
-    configurable: true,
-  });
+  CARRIED_PAYLOAD.set(thrown, payload);
   return thrown;
 }
 
@@ -187,17 +180,13 @@ export function payloadCarriedBy(
   thrown: unknown,
 ): Record<string, unknown> | undefined {
   if (thrown === null || typeof thrown !== 'object') return undefined;
-  const carried = (thrown as { [CARRIED_PAYLOAD]?: unknown })[CARRIED_PAYLOAD];
-  return carried === undefined
-    ? undefined
-    : (carried as Record<string, unknown>);
+  return CARRIED_PAYLOAD.get(thrown);
 }
 
 /** A method failure carried on a throw, or `undefined`. */
-export function methodFailureOf(thrown: unknown): IAdtError | undefined {
+export function methodFailureOf(thrown: unknown): StepError | undefined {
   if (thrown === null || typeof thrown !== 'object') return undefined;
-  const carried = (thrown as { [METHOD_FAILURE]?: unknown })[METHOD_FAILURE];
-  return carried === undefined ? undefined : (carried as IAdtError);
+  return METHOD_FAILURE.get(thrown);
 }
 
 export { stepOf };

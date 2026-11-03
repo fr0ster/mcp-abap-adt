@@ -9,6 +9,7 @@
  * re-exported from here so the delete handlers keep one import.
  */
 import { XMLParser } from 'fast-xml-parser';
+import { child, childAt, listOf } from '../xml/tree';
 
 export {
   analyseDeletion,
@@ -28,18 +29,11 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-const asArray = <T>(value: T | T[] | undefined | null): T[] =>
-  value === undefined || value === null
-    ? []
-    : Array.isArray(value)
-      ? value
-      : [value];
-
 function textOf(node: unknown): string {
   if (typeof node === 'string') return node.trim();
   if (typeof node === 'number') return String(node);
   if (node && typeof node === 'object') {
-    const text = (node as Record<string, unknown>)['#text'];
+    const text = child(node, '#text');
     if (typeof text === 'string') return text.trim();
   }
   return '';
@@ -63,20 +57,18 @@ function textOf(node: unknown): string {
  */
 export function absentPerCheck(document: unknown): DeletionMessage | null {
   if (typeof document !== 'string' || document.trim() === '') return null;
-  let parsed: Record<string, any>;
+  let parsed: unknown;
   try {
     parsed = parser.parse(document);
   } catch {
     return null;
   }
-  for (const object of asArray<Record<string, any>>(
-    parsed?.checkResponse?.object,
-  )) {
-    for (const message of asArray<Record<string, any>>(object?.message)) {
-      const text = textOf(message?.text);
+  for (const object of listOf(childAt(parsed, 'checkResponse', 'object'))) {
+    for (const message of listOf(child(object, 'message'))) {
+      const text = textOf(child(message, 'text'));
       if (/\bdoes not exist\b/i.test(text)) {
         return {
-          type: String(message?.['@type'] ?? '').toUpperCase(),
+          type: String(child(message, '@type') ?? '').toUpperCase(),
           text,
         };
       }

@@ -27,6 +27,7 @@
  * the run.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { child, type Element, isElement, isList } from '../xml/tree';
 import type { AdtReading } from './reading';
 import { withStep } from './step';
 
@@ -81,23 +82,23 @@ export function readingOf(value: unknown): {
   parsed: unknown;
   raw: string;
 } {
-  const reading = value as { value?: unknown; raw?: unknown } | null;
   if (
-    reading !== null &&
-    typeof reading === 'object' &&
-    ('value' in reading || 'raw' in reading)
+    value !== null &&
+    typeof value === 'object' &&
+    ('value' in value || 'raw' in value)
   ) {
+    const raw = 'raw' in value ? value.raw : undefined;
     return {
-      parsed: reading.value,
-      raw: typeof reading.raw === 'string' ? reading.raw : '',
+      parsed: 'value' in value ? value.value : undefined,
+      raw: typeof raw === 'string' ? raw : '',
     };
   }
   return { parsed: value, raw: typeof value === 'string' ? value : '' };
 }
 
-function attrs(node: unknown): Record<string, unknown> {
-  const a = (node as { '@'?: Record<string, unknown> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+function attrs(node: unknown): Element {
+  const a = child(node, '@');
+  return isElement(a) ? a : {};
 }
 
 /**
@@ -109,7 +110,7 @@ function attrs(node: unknown): Record<string, unknown> {
  */
 export function runStatusOf(value: unknown): string {
   const { parsed, raw } = readingOf(value);
-  const root = (parsed as Record<string, unknown> | undefined)?.['runs:run'];
+  const root = child(parsed, 'runs:run');
   const stated = attrs(root)['runs:status'] ?? attrs(root).status;
   if (typeof stated === 'string' && stated !== '') return stated.toLowerCase();
   const fromText = raw.match(/\brun[s]?:status="([^"]+)"/i)?.[1];
@@ -128,22 +129,18 @@ export function runStatusOf(value: unknown): string {
 export function activationMessagesOf(value: unknown): ActivationMessage[] {
   const { parsed, raw } = readingOf(value);
   const messages: ActivationMessage[] = [];
-  const root =
-    (parsed as Record<string, unknown> | undefined)?.['chkl:messages'] ??
-    (parsed as Record<string, unknown> | undefined)?.messages;
-  const raw_msgs = (root as Record<string, unknown> | undefined)?.msg;
-  const list = Array.isArray(raw_msgs)
+  const root = child(parsed, 'chkl:messages') ?? child(parsed, 'messages');
+  const raw_msgs = child(root, 'msg');
+  const list = isList(raw_msgs)
     ? raw_msgs
     : raw_msgs === undefined
       ? []
       : [raw_msgs];
   for (const msg of list) {
     const a = attrs(msg);
-    const shortText = (msg as { shortText?: unknown })?.shortText;
+    const shortText = child(msg, 'shortText');
     const text =
-      typeof shortText === 'string'
-        ? shortText
-        : ((shortText as { txt?: unknown })?.txt as string | undefined);
+      typeof shortText === 'string' ? shortText : child(shortText, 'txt');
     messages.push({
       type: String(a.type ?? a['@_type'] ?? 'info'),
       text: String(text ?? a.text ?? 'Unknown message'),
@@ -187,12 +184,8 @@ export function activationMessagesOf(value: unknown): ActivationMessage[] {
  */
 export function activationExecutedOf(value: unknown): boolean | undefined {
   const { parsed, raw } = readingOf(value);
-  const root =
-    (parsed as Record<string, unknown> | undefined)?.['chkl:messages'] ??
-    (parsed as Record<string, unknown> | undefined)?.messages;
-  const properties = (root as Record<string, unknown> | undefined)?.[
-    'chkl:properties'
-  ];
+  const root = child(parsed, 'chkl:messages') ?? child(parsed, 'messages');
+  const properties = child(root, 'chkl:properties');
   const stated = attrs(properties).activationExecuted;
   if (stated === 'true' || stated === 'false') return stated === 'true';
   const element = raw.indexOf('<chkl:properties');

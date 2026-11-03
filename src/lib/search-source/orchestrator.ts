@@ -6,6 +6,7 @@ import type { HandlerContext } from '../handlers/interfaces';
 import {
   assembleList,
   batchReader,
+  type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
   readNode,
@@ -504,14 +505,16 @@ async function runSearchSourceInPhases(
 
   // (2) The package walk's levels; the deadline is checked before each.
   const names = resolved.map((name) => name.toUpperCase());
-  const levels = batchReader<NodeRequest, unknown>(ctx, (request, connection) =>
-    readNode(
-      nodeStructureOn(
-        ctx,
-        createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+  const levels = batchReader<NodeRequest, NodeAnswer>(
+    ctx,
+    (request, connection) =>
+      readNode(
+        nodeStructureOn(
+          ctx,
+          createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+        ),
+        request,
       ),
-      request,
-    ),
   );
   let walked: PhaseResult<WalkedItem[]>[];
   try {

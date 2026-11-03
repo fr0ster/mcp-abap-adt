@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { child } from '../xml/tree';
 import type { AnswerDetail } from './projections';
 
 export type { AnswerDetail };
@@ -23,12 +24,13 @@ export const DETAIL_SHAPE = {
     .describe(DETAIL_WORDS),
 };
 
-const LEVELS = new Set<AnswerDetail>(['terse', 'full', 'raw']);
+/** Whether `value` is one of the three levels. */
+function isDetail(value: unknown): value is AnswerDetail {
+  return value === 'terse' || value === 'full' || value === 'raw';
+}
 
 /** Read it out of `args`, defaulting to terse. An unknown value is terse too. */
 export function detailOf(args: unknown): AnswerDetail {
-  const value = (args as { detail?: unknown } | undefined)?.detail;
-  return typeof value === 'string' && LEVELS.has(value as AnswerDetail)
-    ? (value as AnswerDetail)
-    : 'terse';
+  const value = child(args, 'detail');
+  return isDetail(value) ? value : 'terse';
 }

@@ -9,6 +9,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
+import { attr, child, childAt, listOf } from '../xml/tree';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
 import { succeeded } from './stepResponse';
@@ -102,14 +103,9 @@ export interface WhereUsedFilter {
   disableTypes?: string[];
 }
 
-function asArray<T>(value: T | T[] | undefined | null): T[] {
-  if (value === undefined || value === null) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-function attrs(node: unknown): Record<string, string> {
-  const a = (node as { '@'?: Record<string, string> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+/** The attribute `name` of `node`'s attribute group (`@`). */
+function attrOf(node: unknown, name: string): string | undefined {
+  return attr(child(node, '@'), name);
 }
 
 /**
@@ -124,45 +120,34 @@ function attrs(node: unknown): Record<string, string> {
  * usagereferences.body.xml`, the one captured fixture for this endpoint.
  */
 export function parseWhereUsedReferences(value: unknown): WhereUsedListResult {
-  const root = (value as Record<string, unknown> | undefined)?.[
-    'usagereferences:usageReferenceResult'
-  ];
-  const rootAttrs = attrs(root);
-  const objectsRoot = (root as Record<string, unknown> | undefined)?.[
-    'usagereferences:referencedObjects'
-  ];
-  const rawRefs = (objectsRoot as Record<string, unknown> | undefined)?.[
-    'usagereferences:referencedObject'
-  ];
+  const root = child(value, 'usagereferences:usageReferenceResult');
+  const rawRefs = childAt(
+    root,
+    'usagereferences:referencedObjects',
+    'usagereferences:referencedObject',
+  );
 
-  const references: WhereUsedReference[] = asArray(rawRefs as unknown)
+  const references: WhereUsedReference[] = listOf(rawRefs)
     .map((ref) => {
-      const refAttrs = attrs(ref);
-      const adtObject = (ref as Record<string, unknown> | undefined)?.[
-        'usagereferences:adtObject'
-      ];
-      const adtAttrs = attrs(adtObject);
-      const packageRef = (adtObject as Record<string, unknown> | undefined)?.[
-        'adtcore:packageRef'
-      ];
-      const packageAttrs = attrs(packageRef);
+      const adtObject = child(ref, 'usagereferences:adtObject');
+      const packageRef = child(adtObject, 'adtcore:packageRef');
       return {
-        name: adtAttrs['adtcore:name'] ?? '',
-        type: adtAttrs['adtcore:type'] ?? '',
-        uri: refAttrs.uri || undefined,
-        package_name: packageAttrs['adtcore:name'] || undefined,
-        responsible: adtAttrs['adtcore:responsible'] || undefined,
-        usage_information: refAttrs.usageInformation || undefined,
+        name: attrOf(adtObject, 'adtcore:name') ?? '',
+        type: attrOf(adtObject, 'adtcore:type') ?? '',
+        uri: attrOf(ref, 'uri') || undefined,
+        package_name: attrOf(packageRef, 'adtcore:name') || undefined,
+        responsible: attrOf(adtObject, 'adtcore:responsible') || undefined,
+        usage_information: attrOf(ref, 'usageInformation') || undefined,
       };
     })
     .filter((r) => r.name);
 
-  const declaredTotal = Number(rootAttrs.numberOfResults);
+  const declaredTotal = Number(attrOf(root, 'numberOfResults'));
   return {
     totalReferences: Number.isFinite(declaredTotal)
       ? declaredTotal
       : references.length,
-    resultDescription: rootAttrs.resultDescription || undefined,
+    resultDescription: attrOf(root, 'resultDescription') || undefined,
     references,
   };
 }

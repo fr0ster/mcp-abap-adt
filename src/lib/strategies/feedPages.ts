@@ -15,7 +15,11 @@
  * caller passes back as `to` to go on.
  */
 import { rawOf } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
 import { succeededWith } from './sequence';
 
 /**
@@ -62,10 +66,10 @@ export function nextToOf(xml: string): string | undefined {
  * library's readings answer the entries alone.
  */
 export function feedPage<T>(
-  read: (answer: never) => T[],
-): (answer: never) => FeedPage<T> {
+  read: IResultStrategy<T[]>,
+): IResultStrategy<FeedPage<T>> {
   return (answer) => {
-    const next_to = nextToOf(String(rawOf(answer as never) ?? ''));
+    const next_to = nextToOf(rawOf(answer));
     return next_to === undefined
       ? { entries: read(answer) }
       : { entries: read(answer), next_to };

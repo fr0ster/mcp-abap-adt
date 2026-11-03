@@ -8,6 +8,7 @@ import {
   assembleList,
   batchReader,
   concurrentReader,
+  type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
   readNode,
@@ -102,7 +103,7 @@ export async function handleGetPackageContents(
     const walked =
       options.includeDescriptions === true
         ? await walkPackages(
-            concurrentReader<NodeRequest, unknown>(context, readLevel),
+            concurrentReader<NodeRequest, NodeAnswer>(context, readLevel),
             packageNames,
             options,
           )
@@ -110,7 +111,7 @@ export async function handleGetPackageContents(
             context,
             () =>
               walkPackages(
-                batchReader<NodeRequest, unknown>(context, readLevel),
+                batchReader<NodeRequest, NodeAnswer>(context, readLevel),
                 packageNames,
                 options,
               ),

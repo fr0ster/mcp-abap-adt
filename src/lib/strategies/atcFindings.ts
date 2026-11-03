@@ -31,6 +31,7 @@
  * `reading.ts` and `packageWalk.ts` here use.
  */
 import { XMLParser } from 'fast-xml-parser';
+import { child, childAt, type Element, isElement, isList } from '../xml/tree';
 
 export interface AtcFinding {
   /** `adtcore:name` of the enclosing object element. */
@@ -124,19 +125,21 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-export type Element = Record<string, unknown> & {
-  '@'?: Record<string, string>;
-};
+export type { Element };
 
-/** One element, several, or none — all three arrive here as a list. */
+/**
+ * One element, several, or none — all three arrive here as a list. A member
+ * of a list that is not an element (an empty `<object/>` parses to `''`) is
+ * an element with nothing in it.
+ */
 function asList(value: unknown): Element[] {
-  if (Array.isArray(value)) return value as Element[];
-  if (value && typeof value === 'object') return [value as Element];
+  if (isList(value)) return value.map((m) => (isElement(m) ? m : {}));
+  if (isElement(value)) return [value];
   return [];
 }
 
 const attribute = (element: Element, name: string): string | undefined => {
-  const value = element['@']?.[name];
+  const value = child(element['@'], name);
   return typeof value === 'string' && value !== '' ? value : undefined;
 };
 
@@ -200,9 +203,8 @@ function quickfixes(finding: Element): AtcQuickfixFlags | undefined {
 }
 
 export function parseAtcWorklist(document: string): AtcWorklistReading {
-  const parsed = parser.parse(document) as Element;
-  const worklist = (parsed.worklist ?? {}) as Element;
-  return readAtcObjects(worklist.objects);
+  const parsed: unknown = parser.parse(document);
+  return readAtcObjects(childAt(parsed, 'worklist', 'objects'));
 }
 
 /** The XML parser every ATC document here is read with: SAP's document, unread. */

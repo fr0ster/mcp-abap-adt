@@ -21,13 +21,13 @@ import { callTransportRequest } from './callTransport';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
-import type { StepError } from './strategies/stepResponse';
+import { cleanupOf, type StepError } from './strategies/stepResponse';
 import {
   isSystemContextRefusal,
   SystemContextMissingError,
 } from './systemContextGuard';
 import { wireResponseOf } from './wireResponse';
-import { child } from './xml/tree';
+import { child, isElement, isList } from './xml/tree';
 
 export type { AnswerDetail };
 
@@ -87,13 +87,9 @@ function local(
   // A lock left held is a fact about SAP, not about the throw, and it must
   // survive it. Read structurally rather than by `instanceof`, so an error
   // built against a second copy of the module still renders.
-  const cleanup = safeCleanup(
-    (thrown as { cleanup?: unknown } | undefined)?.cleanup,
-  );
+  const cleanup = safeCleanup(child(thrown, 'cleanup'));
   if (cleanup !== undefined) payload.cleanup = cleanup;
-  if (
-    (thrown as { operation?: unknown } | undefined)?.operation === 'succeeded'
-  ) {
+  if (child(thrown, 'operation') === 'succeeded') {
     payload.operation = 'succeeded';
   }
   // The step the handler was doing when it threw (`atStep`).
@@ -145,14 +141,14 @@ const TRANSPORT_HINTS: ReadonlyMap<string, string> = new Map([
 function isRequestNumber(value: unknown): value is string {
   if (typeof value !== 'string' || value.length !== 10) return false;
   for (let i = 0; i < 3; i += 1) {
-    const c = value[i] as string;
+    const c = value.charAt(i);
     const letter = c >= 'A' && c <= 'Z';
     const digit = c >= '0' && c <= '9';
     if (!letter && !digit) return false;
   }
   if (value[3] !== 'K') return false;
   for (let i = 4; i < 10; i += 1) {
-    const c = value[i] as string;
+    const c = value.charAt(i);
     if (c < '0' || c > '9') return false;
   }
   return true;
@@ -307,7 +303,7 @@ export function failurePayload(
   //
   // The empty string is not a document — emitting `raw_body: ""` would read as
   // "SAP sent an empty body" when nothing was sent at all.
-  const body = (error.response as { data?: unknown } | undefined)?.data;
+  const body = error.response?.data;
   const answeredOk =
     typeof status === 'number' && status >= 200 && status < 300;
   if (
@@ -382,9 +378,7 @@ export function thrownEntry(thrown: unknown, step: string): FailureEntry {
 export function isCredentialFailure(thrown: unknown): boolean {
   if (failureOf(thrown)?.error === 'authentication_failed') return true;
   const carried = methodFailureOf(thrown);
-  return (
-    (carried?.response as { status?: unknown } | undefined)?.status === 401
-  );
+  return carried?.response?.status === 401;
 }
 
 /**
@@ -411,8 +405,8 @@ export function failedPayloadOf(
   result: { isError?: boolean; content?: unknown } | undefined,
   step: string,
 ): FailureEntry | undefined {
-  if (result?.isError !== true || !Array.isArray(result.content)) return;
-  const text = (result.content[0] as { text?: unknown } | undefined)?.text;
+  if (result?.isError !== true || !isList(result.content)) return;
+  const text = child(result.content[0], 'text');
   if (typeof text !== 'string') return;
   let payload: unknown;
   try {
@@ -420,11 +414,8 @@ export function failedPayloadOf(
   } catch {
     return;
   }
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
-    return;
-  return 'step' in payload
-    ? (payload as FailureEntry)
-    : { ...(payload as FailureEntry), step };
+  if (!isElement(payload)) return;
+  return 'step' in payload ? payload : { ...payload, step };
 }
 
 /**
@@ -437,31 +428,24 @@ export function failedAtStep(
   result: { isError?: boolean; content?: unknown },
   step: string,
 ): { isError?: boolean; content?: unknown } {
-  if (result?.isError !== true || !Array.isArray(result.content)) return result;
-  const [first, ...rest] = result.content as Array<{
-    type?: string;
-    text?: unknown;
-  }>;
-  if (typeof first?.text !== 'string') return result;
+  if (result?.isError !== true || !isList(result.content)) return result;
+  const [first, ...rest] = result.content;
+  const shown = child(first, 'text');
+  if (!isElement(first) || typeof shown !== 'string') return result;
   let payload: unknown;
   try {
-    payload = JSON.parse(first.text);
+    payload = JSON.parse(shown);
   } catch {
     return result;
   }
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
-    return result;
+  if (!isElement(payload)) return result;
   if ('step' in payload) return result;
   return {
     ...result,
     content: [
       {
         ...first,
-        text: JSON.stringify(
-          { ...(payload as Record<string, unknown>), step },
-          null,
-          2,
-        ),
+        text: JSON.stringify({ ...payload, step }, null, 2),
       },
       ...rest,
     ],
@@ -498,16 +482,19 @@ export function return_answer<T>(
   // always. A terse write's `'SUCCESS'` is a string and has nowhere to put a
   // field, so in the rare case it becomes `{ result: 'SUCCESS', cleanup }`.
   // The context's facts (`AnswerContext.beside`) ride along the same way.
-  const cleanup = safeCleanup(
-    (answer as { cleanup?: unknown } | undefined)?.cleanup,
-  );
+  const cleanup = safeCleanup(cleanupOf(answer));
   const beside = ctx.beside?.();
   if (cleanup !== undefined || beside !== undefined) {
     const added = { ...(cleanup !== undefined ? { cleanup } : {}), ...beside };
     return json(
       typeof projected === 'string'
         ? { result: projected, ...added }
-        : { ...(projected as Record<string, unknown>), ...added },
+        : {
+            ...(typeof projected === 'object' && projected !== null
+              ? projected
+              : {}),
+            ...added,
+          },
     );
   }
 

@@ -11,6 +11,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { attr, child, childAt, isList } from '../xml/tree';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -21,17 +22,12 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-type Element = Record<string, unknown> & { '@'?: Record<string, string> };
-
-const attrs = (element: unknown): Record<string, string> =>
-  (element as Element | undefined)?.['@'] ?? {};
+/** The attribute `name` of `element`'s attribute group (`@`). */
+const at = (element: unknown, name: string): string | undefined =>
+  attr(child(element, '@'), name);
 
 const count = (value: unknown): number =>
-  value === undefined || value === ''
-    ? 0
-    : Array.isArray(value)
-      ? value.length
-      : 1;
+  value === undefined || value === '' ? 0 : isList(value) ? value.length : 1;
 
 export interface PackageSummary {
   name?: string;
@@ -50,28 +46,29 @@ const orUndefined = (value: string | undefined) =>
   value === undefined || value === '' ? undefined : value;
 
 export function packageSummary(xml: string): PackageSummary {
-  const root = (parser.parse(xml) as Record<string, unknown>).package as
-    | Element
-    | undefined;
-  const pkg = attrs(root);
-  const transport = root?.transport as Element | undefined;
-  const subPackages = root?.subPackages as Element | string | undefined;
+  const root = child(parser.parse(xml), 'package');
+  const transport = child(root, 'transport');
   return {
-    name: orUndefined(pkg.name),
+    name: orUndefined(at(root, 'name')),
     description: orUndefined(
-      pkg.description ?? attrs(root?.packageRef).description,
+      at(root, 'description') ?? at(child(root, 'packageRef'), 'description'),
     ),
-    package_type: orUndefined(attrs(root?.attributes).packageType),
-    super_package: orUndefined(attrs(root?.superPackage).name),
-    software_component: orUndefined(attrs(transport?.softwareComponent).name),
-    application_component: orUndefined(attrs(root?.applicationComponent).name),
-    transport_layer: orUndefined(attrs(transport?.transportLayer).name),
-    language_version: orUndefined(attrs(root?.attributes).languageVersion),
-    responsible: orUndefined(pkg.responsible),
-    sub_package_count:
-      typeof subPackages === 'object' && subPackages !== null
-        ? count((subPackages as Element).packageRef)
-        : 0,
+    package_type: orUndefined(at(child(root, 'attributes'), 'packageType')),
+    super_package: orUndefined(at(child(root, 'superPackage'), 'name')),
+    software_component: orUndefined(
+      at(child(transport, 'softwareComponent'), 'name'),
+    ),
+    application_component: orUndefined(
+      at(child(root, 'applicationComponent'), 'name'),
+    ),
+    transport_layer: orUndefined(
+      at(child(transport, 'transportLayer'), 'name'),
+    ),
+    language_version: orUndefined(
+      at(child(root, 'attributes'), 'languageVersion'),
+    ),
+    responsible: orUndefined(at(root, 'responsible')),
+    sub_package_count: count(childAt(root, 'subPackages', 'packageRef')),
   };
 }
 
@@ -81,20 +78,14 @@ export interface PackageDetails extends PackageSummary {
 
 /** The summary and, for `detail: full`, every sub-package by name and description. */
 export function packageDetails(xml: string): PackageDetails {
-  const root = (parser.parse(xml) as Record<string, unknown>).package as
-    | Element
-    | undefined;
-  const subPackages = root?.subPackages as Element | string | undefined;
-  const refs =
-    typeof subPackages === 'object' && subPackages !== null
-      ? (subPackages as Element).packageRef
-      : undefined;
-  const list = refs === undefined ? [] : Array.isArray(refs) ? refs : [refs];
+  const root = child(parser.parse(xml), 'package');
+  const refs = childAt(root, 'subPackages', 'packageRef');
+  const list = refs === undefined ? [] : isList(refs) ? refs : [refs];
   return {
     ...packageSummary(xml),
     sub_packages: list.map((ref) => ({
-      name: orUndefined(attrs(ref).name),
-      description: orUndefined(attrs(ref).description),
+      name: orUndefined(at(ref, 'name')),
+      description: orUndefined(at(ref, 'description')),
     })),
   };
 }

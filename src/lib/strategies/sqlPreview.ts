@@ -1,4 +1,6 @@
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { attr, child, childAt, isElement, isList } from '../xml/tree';
 import { type AdtReading, parseStructure, reading } from './reading';
 
 /**
@@ -84,14 +86,13 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-type Element = Record<string, unknown> & { '@'?: Record<string, string> };
+/** One element or several, as a list; a single value that is not an element is none. */
+const asList = (value: unknown): readonly unknown[] =>
+  isList(value) ? value : isElement(value) ? [value] : [];
 
-const asList = (value: unknown): Element[] =>
-  Array.isArray(value)
-    ? (value as Element[])
-    : value && typeof value === 'object'
-      ? [value as Element]
-      : [];
+/** The attribute `name` of `element`'s attribute group (`@`). */
+const at = (element: unknown, name: string): string | undefined =>
+  attr(child(element, '@'), name);
 
 /**
  * A cell's text.
@@ -105,7 +106,7 @@ const asList = (value: unknown): Element[] =>
 const cell = (value: unknown): string | null => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'object') {
-    const text = (value as { '#text'?: unknown })['#text'];
+    const text = child(value, '#text');
     return text === undefined || text === '' ? null : String(text);
   }
   const text = String(value);
@@ -119,26 +120,23 @@ const numberOf = (value: unknown): number | undefined => {
 };
 
 export function parseSqlPreview(document: string): SqlPreview {
-  const table = (parser.parse(document) as Element)?.tableData as
-    | Element
-    | undefined;
+  const table = child(parser.parse(document), 'tableData');
   if (!table)
     return { columns: [], rows: [], document: parseStructure(document) };
 
   const columns: SqlColumn[] = [];
   const byColumn: Array<Array<string | null>> = [];
 
-  for (const column of asList(table.columns)) {
-    const metadata = (column.metadata ?? {}) as Element;
+  for (const column of asList(child(table, 'columns'))) {
+    const metadata = child(column, 'metadata');
     columns.push({
-      name: metadata['@']?.name ?? '',
-      type: metadata['@']?.type ?? '',
-      description: metadata['@']?.description ?? '',
+      name: at(metadata, 'name') ?? '',
+      type: at(metadata, 'type') ?? '',
+      description: at(metadata, 'description') ?? '',
     });
     // Each column carries its own `dataSet`, and the cells inside it are the
     // column's values in row order.
-    const dataSet = (column.dataSet ?? {}) as Element;
-    byColumn.push(asList(dataSet.data).map(cell));
+    byColumn.push(asList(childAt(column, 'dataSet', 'data')).map(cell));
   }
 
   // The longest column decides the row count: a column that came back short
@@ -159,14 +157,13 @@ export function parseSqlPreview(document: string): SqlPreview {
   return {
     columns,
     rows,
-    total_rows: numberOf(table.totalRows),
-    execution_time: numberOf(table.queryExecutionTime),
+    total_rows: numberOf(child(table, 'totalRows')),
+    execution_time: numberOf(child(table, 'queryExecutionTime')),
     document: parseStructure(document),
   };
 }
 
 /** The reading itself, for the `query` slot. */
-export const sqlPreview: (answer: unknown) => AdtReading<SqlPreview> = reading(
-  (answer) =>
-    parseSqlPreview(String((answer as { data?: unknown })?.data ?? '')),
-) as (answer: unknown) => AdtReading<SqlPreview>;
+export const sqlPreview: IResultStrategy<AdtReading<SqlPreview>> = reading(
+  (answer) => parseSqlPreview(String(answer.data ?? '')),
+);

@@ -16,11 +16,13 @@ import type {
   IAdtSuccess,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { Cleanup } from './safeFields';
+import type { LeftBehind } from './step';
 
 /** An ADT error, with the step it arose at and what that step left behind. */
 export interface StepError extends IAdtError {
   readonly step?: string;
-  readonly cleanup?: Cleanup;
+  /** A lock left held, or what a handler left behind after the failure. */
+  readonly cleanup?: Cleanup | LeftBehind;
   readonly operation?: 'succeeded';
 }
 

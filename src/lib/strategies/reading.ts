@@ -93,7 +93,7 @@ export function parseStructure(document: unknown): unknown {
 
 /** `answer.data` as text, without pretending an object was ever a string. */
 export function rawOf(answer: IAdtWireResponse): string {
-  const body = (answer as { data?: unknown }).data;
+  const body = answer.data;
   if (typeof body === 'string') return body;
   if (body === undefined || body === null) return '';
   if (typeof body === 'object') {
@@ -113,7 +113,7 @@ export function reading<T>(
   return (answer) => ({
     value: parse(answer),
     raw: rawOf(answer),
-    status: Number((answer as { status?: unknown }).status ?? 0),
+    status: answer.status,
   });
 }
 

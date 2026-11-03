@@ -67,5 +67,5 @@ export async function newTraceAfter(
   // Attempts spent, the feed answering normally every time. A success with no
   // trace id: SAP writes it asynchronously and it may arrive a week later.
   // Nothing refused anything, so there is nothing to report as a failure.
-  return succeededWith(undefined as string | undefined);
+  return succeededWith<string | undefined>(undefined);
 }

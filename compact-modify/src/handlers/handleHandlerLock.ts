@@ -6,6 +6,8 @@ import {
   COMPACT_LOCK_KINDS,
   compactLockDescription,
   compactLockSchemaFor,
+  isElement,
+  jsonOf,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
@@ -41,11 +43,11 @@ export async function handleHandlerLock(
     );
   }
 
-  const answered = (await lockObject(context, {
+  const answered = await lockObject(context, {
     object_name: args.object_name,
     object_type: COMPACT_LOCK_KINDS[member],
     super_package: args.super_package,
-  })) as LockAnswer;
+  });
   // A package lock over RFC lives in a session of its own.
   return keptLock(context, answered, member === 'PACKAGE' ? 'own' : 'main');
 }
@@ -71,16 +73,15 @@ function keptLock(
   if (locks === undefined || answered?.isError || text === undefined) {
     return answered;
   }
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    return answered;
-  }
-  const handle = body.lock_handle;
+  const read = jsonOf(text);
+  if (!isElement(read)) return answered;
+  const handle = read.lock_handle;
   if (typeof handle !== 'string' || handle === '') return answered;
   locks.hold(handle, session);
-  if (context.state !== undefined) body.state_handle = context.state.handle;
+  const body =
+    context.state === undefined
+      ? read
+      : { ...read, state_handle: context.state.handle };
   return {
     ...answered,
     content: [

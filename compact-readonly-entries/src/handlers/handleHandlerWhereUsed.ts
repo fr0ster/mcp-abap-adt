@@ -2,8 +2,12 @@ import {
   byVariant,
   COMPACT_WHERE_USED,
   COMPACT_WHERE_USED_ROUTES,
+  child,
   compactWhereUsedDescription,
   compactWhereUsedSchemaFor,
+  isElement,
+  isList,
+  jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -39,8 +43,6 @@ const whereUsed = defineTool(
   handleGetWhereUsed,
 ).call;
 
-type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
-
 export async function handleHandlerWhereUsed(
   context: HandlerContext,
   args: HandlerWhereUsedArgs,
@@ -66,31 +68,28 @@ export async function handleHandlerWhereUsed(
     type === 'functionmodule'
       ? `${args.function_group_name}|${args.object_name}`
       : args.object_name;
-  const answered = (await whereUsed(context, {
+  const answered = await whereUsed(context, {
     object_name: objectName,
     object_type: type,
-  })) as Answer;
+  });
 
   // The list is capped here: an object used everywhere answers thousands of
   // references, more than a client takes in one result. The total stays.
   const max = args.max_results ?? 100;
-  const text = answered?.content?.[0]?.text;
-  if (answered?.isError || typeof text !== 'string') return answered;
-  try {
-    const value = JSON.parse(text) as { references?: unknown[] };
-    if (!Array.isArray(value.references) || value.references.length <= max) {
-      return answered;
-    }
-    const capped = {
-      ...value,
-      references: value.references.slice(0, max),
-      returned_references: max,
-    };
-    return {
-      ...answered,
-      content: [{ type: 'text', text: JSON.stringify(capped, null, 2) }],
-    };
-  } catch {
+  const text = answered.content[0]?.text;
+  if (answered.isError || typeof text !== 'string') return answered;
+  const value = jsonOf(text);
+  const references = child(value, 'references');
+  if (!isElement(value) || !isList(references) || references.length <= max) {
     return answered;
   }
+  const capped = {
+    ...value,
+    references: references.slice(0, max),
+    returned_references: max,
+  };
+  return {
+    ...answered,
+    content: [{ type: 'text', text: JSON.stringify(capped, null, 2) }],
+  };
 }

@@ -59,14 +59,14 @@ export type ToolArgs = Readonly<Record<string, unknown>>;
  * runs, given the call's context and its arguments. Every registration path
  * passes the call's context at the call.
  */
-export interface HandlerEntry {
+export interface HandlerEntry<R = unknown> {
   readonly toolDefinition: ToolDefinition;
   /**
    * Runs one call: the arguments parsed with the definition's schema, the
    * handler called with the call's context and their typed output; refused,
    * naming each issue, when they do not parse.
    */
-  readonly call: (context: HandlerContext, args: ToolArgs) => Promise<unknown>;
+  readonly call: (context: HandlerContext, args: ToolArgs) => Promise<R>;
   /**
    * The tool works on no connection of the instance: the server calls it
    * without building or connecting one first (the leftover-session tools,
@@ -82,12 +82,12 @@ export interface HandlerEntry {
  * handler takes the output of the definition's schema. The entry's call
  * parses a call's arguments with that schema and hands the handler the
  * result; arguments that do not parse are refused, naming each issue, and
- * the handler does not run.
+ * the handler does not run. The call answers what the handler answers.
  */
-export function defineTool<S extends z.ZodObject>(
+export function defineTool<S extends z.ZodObject, R>(
   toolDefinition: ToolDefinition<S>,
-  handler: (context: HandlerContext, args: z.output<S>) => Promise<unknown>,
-): HandlerEntry {
+  handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
+): HandlerEntry<R> {
   return {
     toolDefinition,
     call: async (context, args) => {

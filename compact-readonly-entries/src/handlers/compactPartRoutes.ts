@@ -17,7 +17,11 @@ import {
   COMPACT_MAIN_PROGRAMS,
   type CompactHandler,
   type CompactObjectType,
+  child,
   dispatchCompact,
+  isElement,
+  isList,
+  jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
 import {
   defineTool,
@@ -87,12 +91,10 @@ export const compactContentsRoutes: Partial<
   PACKAGE: packageContentsLines,
 };
 
-type ContentsAnswer = {
-  isError?: boolean;
-  content?: Array<{ type?: string; text?: string }>;
-};
-
-type ContentsItem = { name?: string; type?: string; description?: string };
+/** A member's field as its listing line shows it: `''` when absent. */
+function fieldOf(item: unknown, name: string): string {
+  return String(child(item, name) ?? '');
+}
 
 /**
  * A package's members, one per line: name, type, description — the shape a
@@ -101,11 +103,11 @@ type ContentsItem = { name?: string; type?: string; description?: string };
  * for a package with a few hundred members that is tens of kilobytes
  * carrying three facts per object.
  */
-function contentsLines(items: ContentsItem[], max: number): string {
+function contentsLines(items: readonly unknown[], max: number): string {
   const lines = ['name\ttype\tdescription'];
   for (const item of items.slice(0, max)) {
     lines.push(
-      `${item.name ?? ''}\t${item.type ?? ''}\t${item.description ?? ''}`,
+      `${fieldOf(item, 'name')}\t${fieldOf(item, 'type')}\t${fieldOf(item, 'description')}`,
     );
   }
   if (items.length > max) {
@@ -123,45 +125,36 @@ async function packageContentsLines(
   context: HandlerContext,
   args: ToolArgs,
 ): Promise<unknown> {
-  const answered = (await packageContents(context, args)) as ContentsAnswer;
-  const text = answered?.content?.[0]?.text;
-  if (answered?.isError || typeof text !== 'string') return answered;
+  const answered = await packageContents(context, args);
+  const text = answered.content[0]?.text;
+  if (answered.isError || typeof text !== 'string') return answered;
   // Capped like a where-used list: a structure package's members are its
   // sub-packages, and on the cloud trial one had 5,813 of them.
   const max =
     typeof args.max_results === 'number' && args.max_results > 0
       ? args.max_results
       : 100;
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    if (!Array.isArray(parsed)) return answered;
-    const listed = Array.isArray(args.package_names)
-      ? JSON.stringify(
-          (
-            parsed as Array<{
-              package_name?: string;
-              objects?: ContentsItem[];
-              error?: unknown;
-            }>
-          ).map((entry) =>
-            Array.isArray(entry.objects)
-              ? {
-                  package_name: entry.package_name,
-                  contents: contentsLines(entry.objects, max),
-                }
-              : entry,
-          ),
-          null,
-          2,
-        )
-      : contentsLines(parsed as ContentsItem[], max);
-    return {
-      ...answered,
-      content: [{ type: 'text', text: listed }],
-    };
-  } catch {
-    return answered;
-  }
+  const parsed = jsonOf(text);
+  if (!isList(parsed)) return answered;
+  const listed = isList(args.package_names)
+    ? JSON.stringify(
+        parsed.map((entry) => {
+          const objects = child(entry, 'objects');
+          return isElement(entry) && isList(objects)
+            ? {
+                package_name: entry.package_name,
+                contents: contentsLines(objects, max),
+              }
+            : entry;
+        }),
+        null,
+        2,
+      )
+    : contentsLines(parsed, max);
+  return {
+    ...answered,
+    content: [{ type: 'text', text: listed }],
+  };
 }
 
 /** A system type of `COMPACT_MAIN_PROGRAMS`. */
@@ -193,13 +186,13 @@ export type CompactReadPart =
  * The types with a metadata document and no source: their `Get<Type>` reads
  * that document, so `part: 'source'` has nothing to answer.
  */
-const SOURCELESS: ReadonlySet<CompactObjectType> = new Set([
+const SOURCELESS: ReadonlySet<CompactObjectType> = new Set<CompactObjectType>([
   'PACKAGE',
   'DOMAIN',
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
   'TABLE_TYPE',
-] as CompactObjectType[]);
+]);
 
 /** Whether `part: 'source'` reads something for this type. */
 export function hasSourcePart(objectType: CompactObjectType): boolean {

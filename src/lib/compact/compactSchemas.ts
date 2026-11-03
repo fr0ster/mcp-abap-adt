@@ -115,6 +115,12 @@ const CREATE_PROPERTIES = {
     .string()
     .optional()
     .describe('ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).'),
+  behavior_definition: z
+    .string()
+    .optional()
+    .describe(
+      'Behavior definition the implementation is for (BEHAVIOR_IMPLEMENTATION, required there).',
+    ),
   program_name: z.string().optional().describe('ABAP program name.'),
   domain_name: z.string().optional().describe('ABAP domain name.'),
   function_module_name: z
@@ -309,7 +315,7 @@ export const COMPACT_CREATE_TAKES = takesOf<
     FUNCTION_GROUP: ['function_group_name', 'master_language'],
     FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
     BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
-    BEHAVIOR_IMPLEMENTATION: ['class_name'],
+    BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
     METADATA_EXTENSION: ['name', 'master_language'],
   },
 });

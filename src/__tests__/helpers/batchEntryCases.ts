@@ -609,7 +609,14 @@ const CREATES: Array<[string, Record<string, unknown>]> = [
     'BEHAVIOR_DEFINITION',
     { name: 'BDEF_A', package_name: 'PKG_A', implementation_type: 'Managed' },
   ],
-  ['BEHAVIOR_IMPLEMENTATION', { class_name: 'BP_A', package_name: 'PKG_A' }],
+  [
+    'BEHAVIOR_IMPLEMENTATION',
+    {
+      class_name: 'BP_A',
+      behavior_definition: 'BDEF_A',
+      package_name: 'PKG_A',
+    },
+  ],
   ['METADATA_EXTENSION', { name: 'DDLX_A', package_name: 'PKG_A' }],
   ['INCLUDE', { include_name: 'INCL_A', package_name: 'PKG_A' }],
   ['TABLE_TYPE', { table_type_name: 'TTYP_A', package_name: 'PKG_A' }],

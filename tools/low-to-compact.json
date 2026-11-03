@@ -2982,6 +2982,7 @@
           "args": {
             "object_type": "BEHAVIOR_IMPLEMENTATION",
             "class_name": "BIMP_A",
+            "behavior_definition": "BDEF_A",
             "description": "Text",
             "package_name": "PKG_TARGET",
             "transport_request": "XXXK900001"

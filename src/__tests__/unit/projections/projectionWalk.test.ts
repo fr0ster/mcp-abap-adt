@@ -265,6 +265,7 @@ const VALUES: Readonly<Record<string, string>> = {
   root_entity: 'ZBDEF_A',
   behavior_definition_name: 'ZBDEF_A',
   behavior_implementation_name: 'ZBP_A',
+  behavior_definition: 'ZBDEF_A',
   metadata_extension_name: 'ZDDLX_A',
   source_code: 'X',
   ddl_code: 'X',

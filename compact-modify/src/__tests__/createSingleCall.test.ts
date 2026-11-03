@@ -208,7 +208,14 @@ const TYPES: Array<[string, Record<string, unknown>]> = [
       implementation_type: 'Managed',
     },
   ],
-  ['BEHAVIOR_IMPLEMENTATION', { class_name: 'ZBP_A', package_name: 'ZPKG_A' }],
+  [
+    'BEHAVIOR_IMPLEMENTATION',
+    {
+      class_name: 'ZBP_A',
+      behavior_definition: 'ZBDEF_A',
+      package_name: 'ZPKG_A',
+    },
+  ],
   ['METADATA_EXTENSION', { name: 'ZDDLX_A', package_name: 'ZPKG_A' }],
   ['INCLUDE', { include_name: 'ZINCL_A', package_name: 'ZPKG_A' }],
   ['TABLE_TYPE', { table_type_name: 'ZTTYP_A', package_name: 'ZPKG_A' }],
@@ -431,6 +438,32 @@ describe('HandlerCreate is one POST', () => {
     },
   );
 
+  it('BEHAVIOR_IMPLEMENTATION without behavior_definition: refused before any request', async () => {
+    for (const behavior_definition of [undefined, '']) {
+      const answered = await run(
+        'answered',
+        create('BEHAVIOR_IMPLEMENTATION', {
+          ...fieldsOf('BEHAVIOR_IMPLEMENTATION'),
+          behavior_definition,
+        }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        'behavior_definition is required',
+      );
+    }
+  });
+
+  it('BEHAVIOR_IMPLEMENTATION with behavior_definition: the one create sent', async () => {
+    const held = await run(
+      'pending',
+      create('BEHAVIOR_IMPLEMENTATION', fieldsOf('BEHAVIOR_IMPLEMENTATION')),
+    );
+    expect(held.sent).toHaveLength(1);
+    expect(held.sent[0].method).toBe('POST');
+  });
+
   it.each(CHAINS)(
     '%s: its create is a chain — refused before any request, pointing to %s',
     async (objectType, fullTool, fields) => {
@@ -501,7 +534,7 @@ const CARRIES: Record<string, string[]> = {
   FUNCTION_GROUP: ['function_group_name', 'master_language'],
   FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
   BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
-  BEHAVIOR_IMPLEMENTATION: ['class_name'],
+  BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
   METADATA_EXTENSION: ['name', 'master_language'],
   INCLUDE: ['include_name', 'master_language'],
   TABLE_TYPE: ['table_type_name', 'master_language'],
@@ -527,6 +560,9 @@ const ACCEPTED_NOT_SENT: Record<string, string[]> = {
   SERVICE_BINDING: ['transport_request'],
   FUNCTION_MODULE: ['package_name'],
   METADATA_EXTENSION: ['transport_request'],
+  // adt-clients' create config requires it; the class shell's request does
+  // not carry it.
+  BEHAVIOR_IMPLEMENTATION: ['behavior_definition'],
 };
 
 /** A value an accepted argument may take, so the create still builds. */

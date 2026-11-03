@@ -70,7 +70,7 @@ const CREATE_TOKENS: Tokens<(typeof COMPACT_CREATE.onprem)[number]> = {
   BEHAVIOR_DEFINITION:
     'BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*)',
   BEHAVIOR_IMPLEMENTATION:
-    'BEHAVIOR_IMPLEMENTATION(class_name*, package_name*)',
+    'BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*)',
   METADATA_EXTENSION: 'METADATA_EXTENSION(name*, package_name*)',
 };
 

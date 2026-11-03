@@ -488,12 +488,16 @@ export async function handleCreateOnly(
       );
     }
     case 'BEHAVIOR_IMPLEMENTATION': {
-      // The create is the class shell: the behavior definition is named in
-      // the implementation's source, written afterwards, never in this
-      // request — so the create neither needs nor takes it.
-      const refused = missing(args, ['class_name', 'package_name']);
+      // The create is the class shell; adt-clients' create config requires
+      // the behavior definition it is for, so the create takes it.
+      const refused = missing(args, [
+        'class_name',
+        'package_name',
+        'behavior_definition',
+      ]);
       if (refused) return refused;
       const className = String(args.class_name).toUpperCase();
+      const behaviorDefinition = String(args.behavior_definition).toUpperCase();
       return createAlone(args, 'CreateBehaviorImplementation', async () => {
         // adt-clients builds the inner class with an empty system context:
         // the responsible and the master system go in the config.
@@ -507,12 +511,13 @@ export async function handleCreateOnly(
               .create(
                 {
                   className,
+                  behaviorDefinition,
                   packageName: packageName.toUpperCase(),
                   description: text(args.description) || className,
                   transportRequest,
                   responsible,
                   masterSystem,
-                } as never,
+                },
                 { headers, analyse: analyseException },
               ),
         );

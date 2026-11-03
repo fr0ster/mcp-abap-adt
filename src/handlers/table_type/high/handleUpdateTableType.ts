@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateTableType Handler - Update an Existing ABAP Table Type
  *
@@ -31,7 +33,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -58,33 +60,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name. The table type must already exist.',
-      },
-      description: {
-        type: 'string',
-        description: 'New table type description.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...TABLE_TYPE_DEFINITION_PROPERTIES,
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate the table type after the update (default: true).',
-        default: true,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_type_name'],
-  },
+  inputSchema: z.object({
+    table_type_name: z
+      .string()
+      .describe('Table type name. The table type must already exist.'),
+    description: z.string().optional().describe('New table type description.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...TABLE_TYPE_DEFINITION_PROPERTIES,
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Activate the table type after the update (default: true).'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a

@@ -36,12 +36,16 @@ import {
   VERSIONED_KINDS,
 } from '../../../lib/adtProjections';
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
-import { READ_VERSION_PROPERTY } from '../../../lib/handlers/readVersion';
+import {
+  READ_VERSION_FIELD,
+  READ_VERSION_PROPERTY,
+} from '../../../lib/handlers/readVersion';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { listedJson } from '../../helpers/listedJson';
 import {
   type RecordingConnection,
   recordingConnection,
@@ -91,9 +95,7 @@ describe('GetTableType', () => {
   });
 
   it('declares the shared read version, active by default', () => {
-    expect(GET_TABLE_TYPE.inputSchema.properties.version).toBe(
-      READ_VERSION_PROPERTY,
-    );
+    expect(GET_TABLE_TYPE.inputSchema.shape.version).toBe(READ_VERSION_FIELD);
   });
 
   it.each(READ_VERSION_PROPERTY.enum)(
@@ -344,9 +346,10 @@ describe('CreateTableType', () => {
   });
 
   it('declares a schema default on activate and the shared detail alone', () => {
-    const { properties } = CreateTableType_Tool.inputSchema;
+    const properties =
+      listedJson(CreateTableType_Tool.inputSchema).properties ?? {};
     const defaulted = Object.entries(properties)
-      .filter(([, schema]) => 'default' in schema)
+      .filter(([, schema]) => typeof schema === 'object' && 'default' in schema)
       .map(([name]) => name);
     expect(defaulted).toEqual(['activate', 'detail']);
   });
@@ -461,9 +464,10 @@ describe('UpdateTableType', () => {
   });
 
   it('declares a schema default on activate and the shared detail alone, and takes no package', () => {
-    const { properties } = UpdateTableType_Tool.inputSchema;
+    const properties =
+      listedJson(UpdateTableType_Tool.inputSchema).properties ?? {};
     const defaulted = Object.entries(properties)
-      .filter(([, schema]) => 'default' in schema)
+      .filter(([, schema]) => typeof schema === 'object' && 'default' in schema)
       .map(([name]) => name);
     expect(defaulted).toEqual(['activate', 'detail']);
     expect(Object.keys(properties)).not.toContain('package_name');

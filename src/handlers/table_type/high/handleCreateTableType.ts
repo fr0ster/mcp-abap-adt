@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTableType Handler - ABAP Table Type Creation via ADT API
  *
@@ -32,7 +34,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -91,85 +93,78 @@ export type KeyKind = (typeof KEY_KINDS)[number];
  * so the two tools describe them in the same words. Each is passed as given.
  */
 export const TABLE_TYPE_DEFINITION_PROPERTIES = {
-  row_type_kind: {
-    type: 'string',
-    enum: ROW_TYPE_KINDS,
-    description: 'Kind of the row type (ttyp:rowType/ttyp:typeKind).',
-  },
-  row_type_name: {
-    type: 'string',
-    description:
+  row_type_kind: z
+    .enum(ROW_TYPE_KINDS)
+    .optional()
+    .describe('Kind of the row type (ttyp:rowType/ttyp:typeKind).'),
+  row_type_name: z
+    .string()
+    .optional()
+    .describe(
       'Dictionary type used as the row type (ttyp:rowType/ttyp:typeName).',
-  },
-  data_type: {
-    type: 'string',
-    description:
+    ),
+  data_type: z
+    .string()
+    .optional()
+    .describe(
       'Built-in data type of the row (ttyp:builtInType/ttyp:dataType).',
-  },
-  length: {
-    type: 'number',
-    description:
+    ),
+  length: z
+    .number()
+    .optional()
+    .describe(
       'Length of the built-in row type (ttyp:builtInType/ttyp:length).',
-  },
-  decimals: {
-    type: 'number',
-    description:
+    ),
+  decimals: z
+    .number()
+    .optional()
+    .describe(
       'Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).',
-  },
-  access_type: {
-    type: 'string',
-    enum: ACCESS_TYPES,
-    description: 'Access type of the table (ttyp:accessType).',
-  },
-  key_definition: {
-    type: 'string',
-    enum: KEY_DEFINITIONS,
-    description:
+    ),
+  access_type: z
+    .enum(ACCESS_TYPES)
+    .optional()
+    .describe('Access type of the table (ttyp:accessType).'),
+  key_definition: z
+    .enum(KEY_DEFINITIONS)
+    .optional()
+    .describe(
       'Definition of the primary key (ttyp:primaryKey/ttyp:definition).',
-  },
-  key_kind: {
-    type: 'string',
-    enum: KEY_KINDS,
-    description: 'Kind of the primary key (ttyp:primaryKey/ttyp:kind).',
-  },
-} as const;
+    ),
+  key_kind: z
+    .enum(KEY_KINDS)
+    .optional()
+    .describe('Kind of the primary key (ttyp:primaryKey/ttyp:kind).'),
+};
 
 export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package the table type is created in.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Table type description. When left out, table_type_name is used.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...TABLE_TYPE_DEFINITION_PROPERTIES,
-      activate: {
-        type: 'boolean',
-        description: 'Activate the table type after creation (default: true).',
-        default: true,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_type_name', 'package_name'],
-  },
+  inputSchema: z.object({
+    table_type_name: z.string().describe('Table type name.'),
+    package_name: z.string().describe('Package the table type is created in.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Table type description. When left out, table_type_name is used.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...TABLE_TYPE_DEFINITION_PROPERTIES,
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Activate the table type after creation (default: true).'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a

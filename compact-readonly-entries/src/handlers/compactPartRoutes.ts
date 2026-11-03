@@ -19,26 +19,16 @@ import {
   type CompactObjectType,
   dispatchCompact,
 } from '@mcp-abap-adt/lib/compact-shared';
-import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
-  handleGetBehaviorDefinition,
-  handleGetBehaviorImplementation,
-  handleGetClass,
-  handleGetDataElement,
-  handleGetDdl,
-  handleGetDomain,
-  handleGetFunctionGroup,
-  handleGetFunctionModule,
-  handleGetInterface,
-  handleGetMetadataExtension,
-  handleGetPackage,
+  defineTool,
+  type HandlerContext,
+  type ToolArgs,
+  variantOf,
+} from '@mcp-abap-adt/lib/handlers';
+import {
   handleGetPackageContents,
-  handleGetProgram,
-  handleGetServiceBinding,
   handleGetServiceBindingPreviewUrl,
-  handleGetServiceDefinition,
-  handleGetStructure,
-  handleGetTable,
+  READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import {
@@ -46,58 +36,55 @@ import {
   readIncludePart,
   readMainPrograms,
   readTableType,
+  compactSourceRoutes as route,
 } from './compactReadRoutes';
 
 /**
- * `part: 'metadata'` — the ADT metadata document, for the types that have one:
- * the type's `Get<Type>`, which reads it in one request (`part: 'metadata'`
- * for a type with a source; a metadata-only type's read is that document).
+ * The metadata routes: the same target entries as the source reads, each
+ * given `part` metadata by the read (`handleHandlerGet` passes it on).
  */
 export const compactMetadataRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  PACKAGE: handleGetPackage as unknown as CompactHandler,
-  DOMAIN: handleGetDomain as unknown as CompactHandler,
-  DATA_ELEMENT: handleGetDataElement as unknown as CompactHandler,
-  TABLE: handleGetTable as unknown as CompactHandler,
-  STRUCTURE: handleGetStructure as unknown as CompactHandler,
+  PACKAGE: route.PACKAGE,
+  DOMAIN: route.DOMAIN,
+  DATA_ELEMENT: route.DATA_ELEMENT,
+  TABLE: route.TABLE,
+  STRUCTURE: route.STRUCTURE,
   TABLE_TYPE: readTableType,
-  DDL: handleGetDdl as unknown as CompactHandler,
-  SERVICE_DEFINITION: handleGetServiceDefinition as unknown as CompactHandler,
-  SERVICE_BINDING: handleGetServiceBinding as unknown as CompactHandler,
-  CLASS: handleGetClass as unknown as CompactHandler,
-  PROGRAM: handleGetProgram as unknown as CompactHandler,
+  DDL: route.DDL,
+  SERVICE_DEFINITION: route.SERVICE_DEFINITION,
+  SERVICE_BINDING: route.SERVICE_BINDING,
+  CLASS: route.CLASS,
+  PROGRAM: route.PROGRAM,
   INCLUDE: readIncludePart('metadata'),
-  INTERFACE: handleGetInterface as unknown as CompactHandler,
-  FUNCTION_GROUP: handleGetFunctionGroup as unknown as CompactHandler,
-  FUNCTION_MODULE: handleGetFunctionModule as unknown as CompactHandler,
-  BEHAVIOR_DEFINITION: handleGetBehaviorDefinition as unknown as CompactHandler,
-  BEHAVIOR_IMPLEMENTATION:
-    handleGetBehaviorImplementation as unknown as CompactHandler,
-  METADATA_EXTENSION: handleGetMetadataExtension as unknown as CompactHandler,
+  INTERFACE: route.INTERFACE,
+  FUNCTION_GROUP: route.FUNCTION_GROUP,
+  FUNCTION_MODULE: route.FUNCTION_MODULE,
+  BEHAVIOR_DEFINITION: route.BEHAVIOR_DEFINITION,
+  BEHAVIOR_IMPLEMENTATION: route.BEHAVIOR_IMPLEMENTATION,
+  METADATA_EXTENSION: route.METADATA_EXTENSION,
 };
 
-/**
- * `part: 'urls'` — the service URL, its `$metadata` and the browser preview.
- *
- * One entry, and that is the honest size of it: a preview URL is a thing a service
- * binding has and other repository objects do not.
- */
 export const compactUrlRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  SERVICE_BINDING:
-    handleGetServiceBindingPreviewUrl as unknown as CompactHandler,
+  SERVICE_BINDING: defineTool(
+    READ_DEFINITIONS.GetServiceBindingPreviewUrl,
+    handleGetServiceBindingPreviewUrl,
+  ).call,
 };
 
-/**
- * `part: 'contents'` — the objects a package contains, as a flat list. A package
- * has no source, and its metadata carries its sub-packages, not its members.
- */
+/** GetPackageContents' entry: the contents part reads through it. */
+const packageContents = defineTool(
+  READ_DEFINITIONS.GetPackageContents,
+  handleGetPackageContents,
+).call;
+
 export const compactContentsRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  PACKAGE: packageContentsLines as unknown as CompactHandler,
+  PACKAGE: packageContentsLines,
 };
 
 type ContentsAnswer = {
@@ -134,12 +121,9 @@ function contentsLines(items: ContentsItem[], max: number): string {
  */
 async function packageContentsLines(
   context: HandlerContext,
-  args: Record<string, unknown>,
+  args: ToolArgs,
 ): Promise<unknown> {
-  const answered = (await handleGetPackageContents(
-    context,
-    args as never,
-  )) as ContentsAnswer;
+  const answered = (await packageContents(context, args)) as ContentsAnswer;
   const text = answered?.content?.[0]?.text;
   if (answered?.isError || typeof text !== 'string') return answered;
   // Capped like a where-used list: a structure package's members are its
@@ -246,7 +230,7 @@ export function partsFor(
 export async function routeCompactPart(
   context: HandlerContext,
   part: Exclude<CompactReadPart, 'source'>,
-  args: { object_type: CompactObjectType } & Record<string, unknown>,
+  args: { readonly object_type: CompactObjectType } & ToolArgs,
   hasSource: boolean,
 ): Promise<unknown> {
   const variant = variantOf(context.connection);
@@ -258,7 +242,8 @@ export async function routeCompactPart(
         : part === 'main_programs'
           ? compactMainProgramsRoutes(variant)
           : compactUrlRoutes;
-  if (routes[args.object_type] === undefined) {
+  const routed = routes[args.object_type];
+  if (routed === undefined) {
     // Answered as a refusal rather than thrown, the way the router answers an
     // unsupported operation: both paths through this surface should have the same
     // shape, and a caller reads the message either way.
@@ -270,8 +255,10 @@ export async function routeCompactPart(
       ),
     );
   }
-  const map = {
-    [args.object_type]: { get: routes[args.object_type] },
-  } as never;
-  return dispatchCompact(context, map, 'get', args);
+  return dispatchCompact(
+    context,
+    { [args.object_type]: { get: routed } },
+    'get',
+    args,
+  );
 }

@@ -8,13 +8,18 @@ import {
   compactGetSchemaFor,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import {
+  defineTool,
+  type HandlerContext,
+  variantOf,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetActivationResults,
   handleGetActivationStatus,
   handleGetNodeStructureOnce,
   handleGetObjectStructure,
   handleGetVirtualFolders,
+  READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import {
@@ -49,19 +54,33 @@ const ADDRESS_PARTS = ['object_structure', 'node_structure', 'virtual_folders'];
 /** The parts that read an activation run by its run_id. */
 const RUN_PARTS = ['activation_status', 'activation_results'];
 
+/** The address parts' targets: each tool's entry, so its schema parses the call. */
+const virtualFolders = defineTool(
+  READ_DEFINITIONS.GetVirtualFoldersLow,
+  handleGetVirtualFolders,
+).call;
+const nodeStructure = defineTool(
+  READ_DEFINITIONS.GetNodeStructureLow,
+  handleGetNodeStructureOnce,
+).call;
+const objectStructure = defineTool(
+  READ_DEFINITIONS.GetObjectStructure,
+  handleGetObjectStructure,
+).call;
+
 function routeAddressPart(
   context: HandlerContext,
   part: string,
   args: Record<string, unknown>,
 ): Promise<unknown> | unknown {
   if (part === 'virtual_folders') {
-    return handleGetVirtualFolders(context, {
+    return virtualFolders(context, {
       object_search_pattern: args.object_search_pattern,
       preselection: args.preselection,
       facet_order: args.facet_order,
       with_versions: args.with_versions,
       ignore_short_descriptions: args.ignore_short_descriptions,
-    } as never);
+    });
   }
   if (!args.object_adt_type || !args.object_name) {
     return return_error(
@@ -69,17 +88,18 @@ function routeAddressPart(
     );
   }
   if (part === 'node_structure') {
-    return handleGetNodeStructureOnce(context, {
+    return nodeStructure(context, {
       parent_type: args.object_adt_type,
       parent_name: args.object_name,
       node_id: args.node_id,
       with_short_descriptions: args.with_short_descriptions,
-    } as never);
+    });
   }
-  return handleGetObjectStructure(context, {
-    object_type: args.object_adt_type,
-    object_name: args.object_name,
-  } as never);
+  // GetObjectStructure's own arguments: `objecttype`, `objectname`.
+  return objectStructure(context, {
+    objecttype: args.object_adt_type,
+    objectname: args.object_name,
+  });
 }
 
 /**

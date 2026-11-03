@@ -384,7 +384,7 @@ describe('compact HandlerGet: one part, one request', () => {
     });
 
     it.each(['source', 'metadata'])(
-      'part %s with another version: refused before any request, naming the three',
+      'part %s with another version: refused by GetInclude’s schema before any request, naming the three',
       async (part) => {
         const { sent, answer } = await run('document', {
           object_type: 'INCLUDE',
@@ -395,7 +395,7 @@ describe('compact HandlerGet: one part, one request', () => {
         expect(sent).toEqual([]);
         expect(answer?.isError).toBe(true);
         expect(textOf(answer)).toContain(
-          'version must be "active", "inactive" or "workingArea"',
+          'Invalid arguments for tool GetInclude: Invalid option: expected one of "active"|"inactive"|"workingArea" at version',
         );
       },
     );

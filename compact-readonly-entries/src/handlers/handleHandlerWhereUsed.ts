@@ -5,8 +5,11 @@ import {
   compactWhereUsedDescription,
   compactWhereUsedSchemaFor,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleGetWhereUsed } from '@mcp-abap-adt/lib/handlers/read';
+import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import {
+  handleGetWhereUsed,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -29,6 +32,12 @@ type HandlerWhereUsedArgs = {
 /** The compact object types, as the where-used tool names them. */
 const WHERE_USED_TYPE: Readonly<Record<string, string>> =
   COMPACT_WHERE_USED_ROUTES;
+
+/** GetWhereUsed's entry: its schema parses the read. */
+const whereUsed = defineTool(
+  READ_DEFINITIONS.GetWhereUsed,
+  handleGetWhereUsed,
+).call;
 
 type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
 
@@ -57,10 +66,10 @@ export async function handleHandlerWhereUsed(
     type === 'functionmodule'
       ? `${args.function_group_name}|${args.object_name}`
       : args.object_name;
-  const answered = (await handleGetWhereUsed(context, {
+  const answered = (await whereUsed(context, {
     object_name: objectName,
     object_type: type,
-  } as never)) as Answer;
+  })) as Answer;
 
   // The list is capped here: an object used everywhere answers thousands of
   // references, more than a client takes in one result. The total stays.

@@ -60,7 +60,13 @@ describe('HandlerSearch', () => {
     expect(calls).toEqual([
       {
         tool: 'SearchObject',
-        args: { object_name: 'Z*', object_type: 'CLAS/OC', maxResults: 20 },
+        // As SearchObject's schema parses them: its `detail` default added.
+        args: {
+          object_name: 'Z*',
+          object_type: 'CLAS/OC',
+          maxResults: 20,
+          detail: 'terse',
+        },
       },
     ]);
   });
@@ -80,7 +86,12 @@ describe('HandlerWhereUsed', () => {
     });
     expect(calls[0]).toEqual({
       tool: 'GetWhereUsed',
-      args: { object_name: 'ZI_VIEW', object_type: 'view' },
+      // As GetWhereUsed's schema parses them: its `enable_all_types` default added.
+      args: {
+        object_name: 'ZI_VIEW',
+        object_type: 'view',
+        enable_all_types: false,
+      },
     });
   });
 
@@ -91,7 +102,11 @@ describe('HandlerWhereUsed', () => {
     });
     expect(calls[0]).toEqual({
       tool: 'GetWhereUsed',
-      args: { object_name: 'ZTTYP_A', object_type: 'TTYP/DA' },
+      args: {
+        object_name: 'ZTTYP_A',
+        object_type: 'TTYP/DA',
+        enable_all_types: false,
+      },
     });
   });
 
@@ -104,6 +119,7 @@ describe('HandlerWhereUsed', () => {
     expect(calls[0].args).toEqual({
       object_name: 'ZFG|Z_FM',
       object_type: 'functionmodule',
+      enable_all_types: false,
     });
   });
 
@@ -150,7 +166,11 @@ describe('HandlerGetData', () => {
     expect(calls).toEqual([
       {
         tool: 'GetSqlQuery',
-        args: { sql_query: 'SELECT * FROM ZT WHERE A = 1', row_number: 5 },
+        args: {
+          sql_query: 'SELECT * FROM ZT WHERE A = 1',
+          row_number: 5,
+          detail: 'terse',
+        },
       },
     ]);
   });
@@ -158,7 +178,10 @@ describe('HandlerGetData', () => {
   it('reads every column of the object otherwise', async () => {
     await handleHandlerGetData(context, { object_name: 'ZT' });
     expect(calls).toEqual([
-      { tool: 'GetTableContents', args: { table_name: 'ZT', max_rows: 100 } },
+      {
+        tool: 'GetTableContents',
+        args: { table_name: 'ZT', max_rows: 100, detail: 'terse' },
+      },
     ]);
   });
 

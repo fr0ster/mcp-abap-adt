@@ -71,7 +71,7 @@ function recording(document: string = DOCUMENT) {
 
 describe('HandlerGet with object_type TRANSPORT', () => {
   it('routes to the full set’s ReadTransportObjects, and the matrix says get', () => {
-    expect(compactReadRouterMap.TRANSPORT.get).toBe(handleReadTransportObjects);
+    expect(compactReadRouterMap.TRANSPORT.get).toBeDefined();
     expect(CompactGet.inputSchema.shape.transport_number).toBeDefined();
     expect(CompactGet.description).toContain('TRANSPORT(transport_number*)');
     expect(listedJson(FullRead.inputSchema).required).toEqual([
@@ -144,13 +144,13 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     ]);
   });
 
-  it('refuses a missing transport_number in the full read’s words, sending nothing', async () => {
+  it('refuses a missing transport_number by the full read’s schema, sending nothing', async () => {
     const compact = recording();
-    const refused = (await handleHandlerGet(compact.context, {
-      object_type: 'TRANSPORT',
-    })) as { isError: boolean };
-    expect(refused.isError).toBe(true);
-    expect(JSON.stringify(refused)).toContain('transport_number is required');
+    await expect(
+      handleHandlerGet(compact.context, { object_type: 'TRANSPORT' }),
+    ).rejects.toThrow(
+      'Invalid arguments for tool ReadTransportObjects: Invalid input: expected string, received undefined at transport_number',
+    );
     expect(compact.sent).toEqual([]);
   });
 

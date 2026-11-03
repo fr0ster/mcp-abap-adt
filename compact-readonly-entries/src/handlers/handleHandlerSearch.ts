@@ -2,8 +2,11 @@ import {
   compactSearchSchema,
   withLongToolAdvice,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleSearchObject } from '@mcp-abap-adt/lib/handlers/read';
+import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import {
+  handleSearchObject,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -14,6 +17,12 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: compactSearchSchema,
 } as const;
+
+/** SearchObject's entry: its schema parses the search. */
+const searchObject = defineTool(
+  READ_DEFINITIONS.SearchObject,
+  handleSearchObject,
+).call;
 
 type HandlerSearchArgs = {
   query: string;
@@ -26,9 +35,9 @@ export async function handleHandlerSearch(
   args: HandlerSearchArgs,
 ) {
   if (!args?.query) return return_error(new Error('query is required'));
-  return handleSearchObject(context, {
+  return searchObject(context, {
     object_name: args.query,
     object_type: args.object_type,
     maxResults: args.max_results ?? 100,
-  } as never);
+  });
 }

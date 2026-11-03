@@ -18,6 +18,10 @@ Each restriction is optional:
    and whose it is: none, the caller's, or another user's, with its age. The consumer decides
    what happens: refuse, or write its own version.
 
+5. **Table data.** The contents of a table or view are read only when the configuration allows
+   it: either a list of tables whose data cannot be read, or a list of the only tables whose
+   data can be. This covers every tool that answers a table's rows, the SQL query included.
+
 Every check runs once, at the start of the handler, before its first call that changes
 anything in SAP. The handler then either runs whole or is refused whole; nothing is checked
 between its steps.
@@ -77,6 +81,7 @@ request is allowed.
   activation, a move to another package, the transport tools, batch and the compact routes.
 - How a create is checked, where the object has no package in SAP yet.
 - How the server learns the request that holds an object, read at the handler's start.
-- Whether table contents get a list of tables whose data cannot be read, as ARC-1's
-  `SAP_BLOCKED_DATA_SOURCES`.
+- For table data: which tools answer rows; how the tables a SQL query reads are found, and
+  what happens to a query whose tables cannot be found; whether a deny list and an allow list
+  may be configured together.
 - The semver of the release.

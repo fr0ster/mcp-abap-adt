@@ -75,7 +75,13 @@ export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }
 
-export function return_response(response: AxiosResponse) {
+/** What {@link return_response} reads of an answer: its text. */
+export interface ResponseText {
+  readonly data: string;
+}
+
+/** An answer's text as the tool's answer. */
+export function return_response(response: ResponseText): McpResult {
   return {
     isError: false,
     content: [

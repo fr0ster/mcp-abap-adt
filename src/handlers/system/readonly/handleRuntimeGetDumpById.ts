@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
+import { attr, child, childAt, isList } from '../../../lib/xml/tree';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
@@ -67,17 +68,18 @@ export function dumpSummaryOf(
   raw: unknown,
 ): Record<string, unknown> | undefined {
   if (typeof raw !== 'string' || !raw.trim().startsWith('<')) return undefined;
-  let root: Record<string, unknown> | undefined;
+  let parsed: unknown;
   try {
-    root = dumpXmlParser.parse(raw)?.dump;
+    parsed = dumpXmlParser.parse(raw);
   } catch {
     return undefined;
   }
+  const root = child(parsed, 'dump');
   if (!root || typeof root !== 'object') return undefined;
 
   const summary: Record<string, unknown> = {};
   const take = (attribute: string, as: string) => {
-    const value = root?.[attribute];
+    const value = child(root, attribute);
     if (typeof value === 'string' && value !== '') summary[as] = value;
   };
   take('error', 'runtime_error');
@@ -87,10 +89,13 @@ export function dumpSummaryOf(
   take('datetime', 'datetime');
   take('author', 'user');
 
-  const linksRaw = (root.links as { link?: unknown } | undefined)?.link;
-  const links = (
-    Array.isArray(linksRaw) ? linksRaw : linksRaw ? [linksRaw] : []
-  ) as Array<{ relation?: string; uri?: string }>;
+  const linksRaw = childAt(root, 'links', 'link');
+  const links = (isList(linksRaw) ? linksRaw : linksRaw ? [linksRaw] : []).map(
+    (link) => ({
+      relation: attr(link, 'relation'),
+      uri: attr(link, 'uri'),
+    }),
+  );
   const termination =
     links.find(
       (l) => /termination/i.test(l.relation ?? '') && l.uri?.includes('#'),

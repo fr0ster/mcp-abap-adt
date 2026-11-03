@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { child, entries, isElement, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeProfilerTrace',
@@ -65,10 +66,8 @@ function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
       out[key] = value;
       continue;
     }
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      for (const [nestedKey, nestedValue] of Object.entries(
-        value as Record<string, unknown>,
-      )) {
+    if (isElement(value)) {
+      for (const [nestedKey, nestedValue] of entries(value)) {
         if (
           typeof nestedValue === 'string' ||
           typeof nestedValue === 'number' ||
@@ -85,7 +84,7 @@ function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
 function rankBy(row: Record<string, unknown>, path: [string, string]): number {
   const outer = row[path[0]];
   if (!outer || typeof outer !== 'object') return 0;
-  const value = (outer as Record<string, unknown>)[path[1]];
+  const value = child(outer, path[1]);
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
@@ -126,10 +125,8 @@ function summarizeView(
   const rankPath: [string, string] =
     view === 'db_accesses' ? ['accessTime', 'total'] : ['grossTime', 'time'];
 
-  const collection = (payload as Record<string, unknown> | undefined)?.[
-    collectionKey
-  ];
-  const rows: Record<string, unknown>[] = Array.isArray(collection)
+  const collection = child(payload, collectionKey);
+  const rows: Record<string, unknown>[] = isList(collection)
     ? collection.filter(
         (row): row is Record<string, unknown> =>
           !!row && typeof row === 'object',

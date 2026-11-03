@@ -38,7 +38,7 @@ function atActiveVersion(endpoint: string): string {
  */
 export async function handleGetObjectNodeFromCache(
   context: HandlerContext,
-  args: any,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const { object_type, object_name, tech_name } = args;
@@ -88,7 +88,7 @@ export async function handleGetObjectNodeFromCache(
       // No deadline of the server's: the request waits for SAP's answer.
       resp = await makeAdtRequest(connection, endpoint, 'GET', 0);
     } catch (e) {
-      logger?.error('Failed to expand OBJECT_URI from cache', e as any);
+      logger?.error('Failed to expand OBJECT_URI from cache', e);
       // The read's error as SAP answered it, with its step — the call's
       // failure, not content inside a success; a credential failure as the
       // chain made it.

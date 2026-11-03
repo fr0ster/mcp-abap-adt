@@ -236,9 +236,7 @@ export async function handleGetServiceBindingPreviewUrl(
             ),
           )();
           if (!srvd.ok) return srvd;
-          const exposed = exposedEntitiesOf(
-            (srvd.getResult().value as AdtReading<string>).raw,
-          );
+          const exposed = exposedEntitiesOf(srvd.getResult().value.raw);
 
           // The view is read only when a navigation is needed and none was
           // named: a third request for a segment the caller already knows is
@@ -251,9 +249,7 @@ export async function handleGetServiceBindingPreviewUrl(
                 analyse: analyseException,
               });
             if (ddl.ok) {
-              associations = associationsOf(
-                (ddl.getResult().value as AdtReading<string>).raw,
-              );
+              associations = associationsOf(ddl.getResult().value.raw);
             }
           }
 
@@ -277,9 +273,7 @@ export async function handleGetServiceBindingPreviewUrl(
               { analyse: analyseException },
             );
             if (looked.ok) {
-              category = categoryServiceUrlsOf(
-                (looked.getResult().value as AdtReading<unknown>).raw,
-              );
+              category = categoryServiceUrlsOf(looked.getResult().value.raw);
             } else {
               // A `401` SAP answered ends the call with the lookup's error and
               // its step (a thrown credential refusal rejects from the member

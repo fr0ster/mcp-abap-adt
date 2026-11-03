@@ -8,6 +8,7 @@ import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { child, entries, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
@@ -25,29 +26,18 @@ export function transactionUri(name: string): string {
   return `/sap/bc/adt/vit/wb/object_type/trant/object_name/${encodeURIComponent(name)}`;
 }
 
-const asArray = (value: unknown): unknown[] =>
-  Array.isArray(value) ? value : value === undefined ? [] : [value];
+const asArray = (value: unknown): readonly unknown[] =>
+  isList(value) ? value : value === undefined ? [] : [value];
 
 /** The child whose local name (the part after any prefix) is `name`. */
-const byLocalName = (node: unknown, name: string): unknown => {
-  if (node === null || typeof node !== 'object') return undefined;
-  const key = Object.keys(node).find(
-    (k) => k.slice(k.indexOf(':') + 1) === name,
-  );
-  return key === undefined ? undefined : (node as Record<string, unknown>)[key];
-};
+const byLocalName = (node: unknown, name: string): unknown =>
+  entries(node).find(([k]) => k.slice(k.indexOf(':') + 1) === name)?.[1];
 
 /** An element's attributes as SAP sent them, values as text. */
-const attributesOf = (element: unknown): Record<string, string> => {
-  const group = (element as { '@'?: unknown } | null | undefined)?.['@'];
-  if (group === null || typeof group !== 'object') return {};
-  return Object.fromEntries(
-    Object.entries(group as Record<string, unknown>).map(([k, v]) => [
-      k,
-      String(v),
-    ]),
+const attributesOf = (element: unknown): Record<string, string> =>
+  Object.fromEntries(
+    entries(child(element, '@')).map(([k, v]) => [k, String(v)]),
   );
-};
 
 /**
  * `opr:objectProperties` (measured on premise, BASIS 816, 2026-10-21):

@@ -61,6 +61,7 @@ import {
   isIndeterminateWalkAnswer,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
@@ -110,8 +111,8 @@ interface GetNodeStructureArgs {
  * blank before `nodeLevel` collapses either a blank body or a genuinely
  * empty one into the identical `{objects: [], childNodes: []}`.
  */
-function rawNodeStructureXml(wire: unknown): string {
-  return String((wire as { data?: unknown } | undefined)?.data ?? '');
+function rawNodeStructureXml(wire: IAdtWireResponse): string {
+  return String(wire?.data ?? '');
 }
 
 /**

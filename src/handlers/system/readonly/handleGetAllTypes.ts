@@ -11,6 +11,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { child, childAt, isList, text } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
@@ -28,7 +29,7 @@ export const TOOL_DEFINITION = {
 
 interface NamedItem {
   name: string;
-  description: string;
+  description: string | undefined;
 }
 
 /**
@@ -42,18 +43,14 @@ interface NamedItem {
  * same way the pre-migration handler already did.
  */
 function extractNamedItems(value: unknown): NamedItem[] {
-  const list = (value as any)?.['nameditem:namedItemList'];
-  const raw = list?.['nameditem:namedItem'];
-  const items = raw ? (Array.isArray(raw) ? raw : [raw]) : [];
-  return items
-    .map((item: any) => ({
-      name: item?.['nameditem:name'],
-      description: item?.['nameditem:description'],
-    }))
-    .filter(
-      (item: NamedItem) =>
-        item.name !== undefined && item.name !== null && item.name !== '',
-    );
+  const raw = childAt(value, 'nameditem:namedItemList', 'nameditem:namedItem');
+  const items = raw ? (isList(raw) ? raw : [raw]) : [];
+  return items.flatMap((item) => {
+    const name = text(child(item, 'nameditem:name'));
+    return name === undefined || name === ''
+      ? []
+      : [{ name, description: text(child(item, 'nameditem:description')) }];
+  });
 }
 
 export async function handleGetAdtTypes(

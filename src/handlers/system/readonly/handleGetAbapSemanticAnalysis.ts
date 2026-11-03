@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { answerThrown } from '../../../lib/answer';
+import { answerThrown, type McpResult } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { StepThrew } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
@@ -399,7 +399,12 @@ class SimpleAbapSemanticAnalyzer {
 
     // This is a simplified parameter extraction
     // In a real implementation, this would be more sophisticated
-    const paramTypes = ['importing', 'exporting', 'changing', 'returning'];
+    const paramTypes = [
+      'importing',
+      'exporting',
+      'changing',
+      'returning',
+    ] as const;
 
     for (const paramType of paramTypes) {
       const regex = new RegExp(`${paramType}\\s+([a-zA-Z0-9_\\s,]+)`, 'gi');
@@ -410,7 +415,7 @@ class SimpleAbapSemanticAnalyzer {
           if (paramName) {
             parameters.push({
               name: paramName.toUpperCase(),
-              type: paramType as any,
+              type: paramType,
               optional: line.toLowerCase().includes('optional'),
             });
           }
@@ -424,7 +429,7 @@ class SimpleAbapSemanticAnalyzer {
 
 export async function handleGetAbapSemanticAnalysis(
   context: HandlerContext,
-  args: any,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   try {
@@ -436,7 +441,7 @@ export async function handleGetAbapSemanticAnalysis(
     const analyzer = new SimpleAbapSemanticAnalyzer();
     const analysis = analyzer.analyze(args.code);
 
-    const result = {
+    const result: McpResult = {
       isError: false,
       content: [
         {
@@ -448,7 +453,7 @@ export async function handleGetAbapSemanticAnalysis(
 
     return result;
   } catch (error) {
-    logger?.error('Failed to perform ABAP semantic analysis', error as any);
+    logger?.error('Failed to perform ABAP semantic analysis', error);
     // A local analysis over the caller's source, no request: its throw is
     // not SAP's answer but the method's own failure, `client_threw`.
     return answerThrown(new StepThrew('analyse', error), {

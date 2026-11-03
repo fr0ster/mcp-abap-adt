@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateFunctionModule Handler - Update Existing ABAP Function Module Source Code
  *
@@ -29,7 +31,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -44,37 +46,32 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name containing the function module.',
-      },
-      function_module_name: {
-        type: 'string',
-        description:
-          'Function module name. Function module must already exist.',
-      },
-      source_code: {
-        type: 'string',
-        description:
-          'Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable function modules.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate function module after source update. Default: false. Set to true to activate immediately.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'function_module_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group name containing the function module.'),
+    function_module_name: z
+      .string()
+      .describe('Function module name. Function module must already exist.'),
+    source_code: z
+      .string()
+      .describe(
+        'Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable function modules.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate function module after source update. Default: false. Set to true to activate immediately.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateFunctionModuleArgs {

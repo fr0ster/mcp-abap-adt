@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckFunctionModuleLow Handler - Syntax check for ABAP Function Module
  *
@@ -19,7 +21,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -29,27 +31,17 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages. Requires function group name.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name',
-      },
-      function_module_name: {
-        type: 'string',
-        description: 'Function module name',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active",
-        enum: ['active', 'inactive'],
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'function_module_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z.string().describe('Function group name'),
+    function_module_name: z.string().describe('Function module name'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active",
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CheckFunctionModuleArgs {

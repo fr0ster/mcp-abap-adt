@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateFunctionGroup Handler - Update Existing ABAP Function Group Metadata
  *
@@ -27,7 +29,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { patchFunctionGroupXml } from '../../../lib/strategies/functionGroupPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -44,26 +46,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name. Must exist in the system.',
-      },
-      description: {
-        type: 'string',
-        description: 'New description for the function group.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'description'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group name. Must exist in the system.'),
+    description: z.string().describe('New description for the function group.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateFunctionGroupArgs {

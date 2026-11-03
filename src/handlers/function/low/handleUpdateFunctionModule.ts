@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateFunctionModuleLow Handler - Update ABAP Function Module Source Code
  *
@@ -16,7 +18,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -26,41 +28,29 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update source code of an existing ABAP function module. Requires lock handle from LockObject and function group name. - use UpdateFunctionModule (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_module_name: {
-        type: 'string',
-        description:
-          'Function module name. Function module must already exist.',
-      },
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name containing the function module.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP function module source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects locked in a request.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockFunctionModule. Required for update operation.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [
-      'function_module_name',
-      'function_group_name',
-      'source_code',
-      'lock_handle',
-    ],
-  },
+  inputSchema: z.object({
+    function_module_name: z
+      .string()
+      .describe('Function module name. Function module must already exist.'),
+    function_group_name: z
+      .string()
+      .describe('Function group name containing the function module.'),
+    source_code: z
+      .string()
+      .describe('Complete ABAP function module source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects locked in a request.',
+      ),
+    lock_handle: z
+      .string()
+      .describe(
+        'Lock handle from LockFunctionModule. Required for update operation.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateFunctionModuleArgs {

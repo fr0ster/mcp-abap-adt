@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateFunctionGroup Handler - ABAP Function Group Creation via ADT API
  *
@@ -32,7 +34,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -44,41 +46,37 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name. Up to 26 characters.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Function group description. If not provided, function_group_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate function group after creation. Default: true. Set to false for batch operations.',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'package_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group name. Up to 26 characters.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Function group description. If not provided, function_group_name will be used.',
+      ),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate function group after creation. Default: true. Set to false for batch operations.',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateFunctionGroupArgs {

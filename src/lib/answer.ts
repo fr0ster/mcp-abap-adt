@@ -26,6 +26,8 @@ import {
   isSystemContextRefusal,
   SystemContextMissingError,
 } from './systemContextGuard';
+import { wireResponseOf } from './wireResponse';
+import { child } from './xml/tree';
 
 export type { AnswerDetail };
 
@@ -606,28 +608,25 @@ export function requestErrorOf(
   thrown: unknown,
   sent: SentRequest | undefined,
 ): IAdtError {
-  const carried =
-    thrown !== null && typeof thrown === 'object'
-      ? (thrown as { message?: unknown; response?: unknown })
-      : undefined;
+  const carried = child(thrown, 'message');
   const message =
-    typeof carried?.message === 'string'
-      ? carried.message
+    typeof carried === 'string'
+      ? carried
       : typeof thrown === 'string'
         ? thrown
         : 'The request did not complete';
-  const verdict = {
+  // The thrown value is outside the type system: its answer is read, and one
+  // that is not a wire answer is none.
+  const response = wireResponseOf(child(thrown, 'response'));
+  const verdict: IAdtError = {
     origin: 'connection',
     message,
-    response: carried?.response,
+    response,
     ...(sent !== undefined
       ? { request: { method: sent.method, url: sent.url } }
       : {}),
-  } as IAdtError;
-  const read = analyseException(
-    verdict,
-    carried?.response as Parameters<typeof analyseException>[1],
-  );
+  };
+  const read = analyseException(verdict, response);
   return read === ADT_NO_FAILURE ? verdict : read;
 }
 

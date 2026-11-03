@@ -449,7 +449,12 @@ describe('GetServiceBindingPreviewUrl', () => {
   it('a 401 thrown by the lookup ends the call with it; the binding is not read', async () => {
     systemInfo.mockRejectedValue(
       Object.assign(new Error('Request failed with status code 401'), {
-        response: { status: 401, data: '' },
+        response: {
+          status: 401,
+          statusText: 'Unauthorized',
+          headers: {},
+          data: '',
+        },
       }),
     );
     const reads: unknown[] = [];

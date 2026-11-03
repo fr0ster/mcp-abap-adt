@@ -10,10 +10,10 @@ Each restriction is optional:
 
 1. **Denied actions.** A tool, or one action of a tool, is not registered when the server
    starts. The model does not see it and cannot call it.
-2. **Allowed packages.** Objects are created, changed, deleted, activated and moved only in
-   these packages. A package outside the list is not touched either.
-3. **Allowed requests.** An object is written only through these transport requests. An object
-   that sits in another request is not saved.
+2. **Allowed packages.** A call that names a package in its arguments (a create, a move, a
+   package tool) runs only when that package is in the list.
+3. **Allowed requests.** A call that names a transport request in its arguments runs only when
+   that request is in the list.
 4. **Someone else's draft.** The server finds out whether the object has an unactivated change
    and whose it is: none, the caller's, or another user's, with its age. The consumer decides
    what happens: refuse, or write its own version.
@@ -27,8 +27,7 @@ Every check runs once, at the start of the handler, before its first call that c
 anything in SAP. The handler then either runs whole or is refused whole; nothing is checked
 between its steps.
 
-When both lists are configured, a write needs both: the object's package is allowed and its
-request is allowed.
+When both lists are configured, each name the call gives is checked against its own list.
 
 ## What there is today (Measured)
 
@@ -59,9 +58,9 @@ request is allowed.
   checks a deny list.
 - **The binary stays the ceiling.** A configuration only narrows what the binary offers. It
   never adds a tool.
-- **The package and the request are SAP's.** The server reads an object's package and request
-  from SAP, never from the model's arguments. When one cannot be read and a list is configured,
-  the write is refused.
+- **The checks read the arguments.** A package or request given in the call's arguments is
+  checked against its list, as given. One not given is not checked, and the call runs; SAP may
+  then refuse it. The server makes no call to SAP to find an object's package or request.
 - **The checks run at the handler's start.** A handler is allowed or refused as a whole, before
   it changes anything; no check sits inside its steps (lock, write, activation).
 - **The checks are a strategy.** One interface, given to the server by the host, decides every
@@ -83,8 +82,7 @@ request is allowed.
   each transport takes them at start (stdio configuration, http/sse start parameters).
 - Which tools count as a write for the package and request checks: create, update, delete,
   activation, a move to another package, the transport tools, batch and the compact routes.
-- How a create is checked, where the object has no package in SAP yet.
-- How the server learns the request that holds an object, read at the handler's start.
+- Which arguments of which tools name a package or a request.
 - For table data: which tools name a table whose rows they answer; whether a deny list and an
   allow list may be configured together.
 - The semver of the release.

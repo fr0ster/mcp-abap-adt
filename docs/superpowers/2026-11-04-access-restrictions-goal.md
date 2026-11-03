@@ -14,9 +14,13 @@ Each restriction is optional:
    these packages. A package outside the list is not touched either.
 3. **Allowed requests.** An object is written only through these transport requests. An object
    that sits in another request is not saved.
-4. **Someone else's draft.** Before it locks an object for a write, the server finds out
-   whether the object has an unactivated change and whose it is: none, the caller's, or another
-   user's, with its age. The consumer decides what happens: refuse, or write its own version.
+4. **Someone else's draft.** The server finds out whether the object has an unactivated change
+   and whose it is: none, the caller's, or another user's, with its age. The consumer decides
+   what happens: refuse, or write its own version.
+
+Every check runs once, at the start of the handler, before its first call that changes
+anything in SAP. The handler then either runs whole or is refused whole; nothing is checked
+between its steps.
 
 When both lists are configured, a write needs both: the object's package is allowed and its
 request is allowed.
@@ -53,8 +57,10 @@ request is allowed.
 - **The package and the request are SAP's.** The server reads an object's package and request
   from SAP, never from the model's arguments. When one cannot be read and a list is configured,
   the write is refused.
+- **The checks run at the handler's start.** A handler is allowed or refused as a whole, before
+  it changes anything; no check sits inside its steps (lock, write, activation).
 - **The checks are a strategy.** One interface, given to the server by the host, decides every
-  check before a write. A shipped strategy applies the configured lists and the draft rule. An
+  check at a handler's start. A shipped strategy applies the configured lists and the draft rule. An
   embedder can give its own.
 - **The consumer decides about a draft.** The server gives the facts: whose draft, its age. The
   age limit and what happens on each side of it are the consumer's settings, with no default of
@@ -70,7 +76,7 @@ request is allowed.
 - Which tools count as a write for the package and request checks: create, update, delete,
   activation, a move to another package, the transport tools, batch and the compact routes.
 - How a create is checked, where the object has no package in SAP yet.
-- How the server learns the request that holds an object, and at which step before the write.
+- How the server learns the request that holds an object, read at the handler's start.
 - Whether table contents get a list of tables whose data cannot be read, as ARC-1's
   `SAP_BLOCKED_DATA_SOURCES`.
 - The semver of the release.

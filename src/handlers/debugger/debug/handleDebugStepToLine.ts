@@ -1,3 +1,4 @@
+import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugStepToLine.ts
 import {
   debugBatchRecorder,
@@ -11,36 +12,35 @@ import {
 import { lineUriOf } from '../../../lib/debugger/objectUri';
 import {
   LINE_TARGET_PROPERTIES,
+  LINE_WORDS,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugStepToLine',
   available_in: ['onprem', 'cloud'] as const,
   description: '[debug] Runs or jumps the stopped debuggee to a line.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      mode: {
-        type: 'string',
-        enum: ['run', 'jump'],
-        description:
-          'run executes up to the line; jump moves there without executing what lies between.',
-      },
-      ...LINE_TARGET_PROPERTIES,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'mode', 'object_type', 'object_name', 'line'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    mode: z
+      .enum(['run', 'jump'])
+      .describe(
+        'run executes up to the line; jump moves there without executing what lies between.',
+      ),
+    object_type: z.string().describe(LINE_WORDS.object_type),
+    object_name: z.string().describe(LINE_WORDS.object_name),
+    line: z.number().int().describe(LINE_WORDS.line),
+    include: LINE_TARGET_PROPERTIES.include,
+    parent_name: LINE_TARGET_PROPERTIES.parent_name,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleDebugStepToLine(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const method = args.mode === 'jump' ? 'stepJumpToLine' : 'stepRunToLine';
   const recorder = debugBatchRecorder(context);

@@ -1,5 +1,11 @@
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import {
+  declaredRequired,
+  jsonAt,
+  jsonFind,
+  listedJson,
+} from '../../helpers/listedJson';
 
 /** A tool's own text and every parameter description, at any depth. */
 const textsOf = (definition: {
@@ -15,7 +21,7 @@ const textsOf = (definition: {
       else walk(value);
     }
   };
-  walk(definition.inputSchema);
+  walk(listedJson(definition.inputSchema));
   return found;
 };
 
@@ -73,30 +79,24 @@ describe('the debugger descriptions', () => {
   it('no new parameter carries a default the boundary would fill in', () => {
     for (const name of [...START_TOOLS, 'DebugSetSettings']) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
-      const props = (
-        tool.inputSchema as {
-          properties: Record<
-            string,
-            {
-              default?: unknown;
-              properties?: Record<string, { default?: unknown }>;
-            }
-          >;
-        }
-      ).properties;
+      const schema = listedJson(tool.inputSchema);
       for (const key of [
         'request_user',
         'debugging_mode',
         'settings',
         'system_debugging',
       ])
-        if (props[key]) {
-          expect({ key, default: props[key].default }).toEqual({
+        if (jsonFind(schema, key)) {
+          expect({ key, default: jsonFind(schema, key)?.default }).toEqual({
             key,
             default: undefined,
           });
-          for (const inner of Object.values(props[key].properties ?? {}))
-            expect(inner.default).toBeUndefined();
+          for (const inner of Object.values(
+            jsonFind(schema, key)?.properties ?? {},
+          ))
+            expect(
+              typeof inner === 'object' ? inner.default : undefined,
+            ).toBeUndefined();
         }
     }
   });
@@ -137,15 +137,15 @@ describe('the debugger descriptions', () => {
   it('both starts require at least one breakpoint, and say so', () => {
     for (const name of START_TOOLS) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
-      const schema = tool.inputSchema as {
-        required?: string[];
-        properties: Record<string, { minItems?: number }>;
-      };
-      expect({ name, required: schema.required }).toEqual({
+      const schema = listedJson(tool.inputSchema);
+      expect({
+        name,
+        required: declaredRequired(tool.inputSchema),
+      }).toEqual({
         name,
         required: expect.arrayContaining(['breakpoints']),
       });
-      expect(schema.properties.breakpoints.minItems).toBe(1);
+      expect(jsonAt(schema, 'breakpoints').minItems).toBe(1);
       expect(tool.description).toMatch(/at least one breakpoint/);
     }
   });

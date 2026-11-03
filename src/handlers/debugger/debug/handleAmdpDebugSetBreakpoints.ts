@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
@@ -6,28 +7,23 @@ import {
   amdpBreakpointsFromArgs,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugSetBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
   description: `[debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. ${AMDP_CATCH_SENTENCE}`,
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      ...AMDP_BREAKPOINTS_PROPERTY,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'breakpoints'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    ...AMDP_BREAKPOINTS_PROPERTY,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleAmdpDebugSetBreakpoints(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return debugAnswer(
     args,

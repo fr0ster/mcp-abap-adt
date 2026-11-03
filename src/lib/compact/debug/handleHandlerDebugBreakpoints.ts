@@ -1,11 +1,12 @@
 import type { IDebuggerLineBreakpoint } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import {
-  BREAKPOINTS_PROPERTY,
+  BREAKPOINT_ITEM,
   breakpointsFromArgs,
   readXmlDocument,
 } from '../../debugger/index';
-import type { ArgsOf, HandlerContext } from '../../handlers/index';
-import { DETAIL_PROPERTY } from '../index';
+import type { HandlerContext } from '../../handlers/index';
+import { DETAIL_SHAPE } from '../../strategies/detail';
 import {
   IDENTITY_PROPERTIES,
   identityOf,
@@ -31,59 +32,60 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Debugger breakpoints and watchpoints: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: setBreakpoints sets the breakpoint set of this debugging identity to breakpoints and answers each row SAP placed or refused; syncBreakpoints rewrites the full set (sync_scope full) or the part of the objects in sync_objects (sync_scope partial); deleteBreakpoint deletes breakpoint_id; createWatchpoint, listWatchpoints and deleteWatchpoint work on the attached debuggee. In user mode the breakpoints catch every request of the request user; the set is one per SAP user and request user, shared by every IDE of that user, and each change rewrites it as a whole. kind amdp: syncBreakpoints rewrites the breakpoints of the running AMDP session and answers the request id; SAP confirms them in a SYNC_BREAKPOINTS event. The answer carries state_handle, and for abap the identity in force.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...openingStateHandleProperty('abap setBreakpoints and syncBreakpoints'),
-      ...KIND_PROPERTY,
-      operation: {
-        type: 'string',
-        enum: [...ABAP_OPERATIONS],
-        description:
-          'The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.',
-      },
-      breakpoints: {
-        ...BREAKPOINTS_PROPERTY.breakpoints,
-        description:
-          'setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.',
-      },
-      sync_scope: {
-        type: 'string',
-        enum: ['full', 'partial'],
-        description:
-          'abap syncBreakpoints: full replaces every breakpoint of the set; partial replaces those of the objects in sync_objects and takes line breakpoints.',
-      },
-      sync_objects: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'abap syncBreakpoints with sync_scope partial: the ADT URIs of the objects whose breakpoints are replaced.',
-      },
-      breakpoint_id: {
-        type: 'string',
-        description: 'abap deleteBreakpoint: the id SAP gave the breakpoint.',
-      },
-      variable_name: {
-        type: 'string',
-        description: 'abap createWatchpoint: the variable watched.',
-      },
-      condition: {
-        type: 'string',
-        description:
-          'abap createWatchpoint: the ABAP condition the watchpoint stops on.',
-      },
-      watchpoint_id: {
-        type: 'string',
-        description: 'abap deleteWatchpoint: the id SAP gave the watchpoint.',
-      },
-      ...IDENTITY_PROPERTIES,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['kind', 'operation'],
-  },
+  inputSchema: z.object({
+    ...openingStateHandleProperty('abap setBreakpoints and syncBreakpoints'),
+    ...KIND_PROPERTY,
+    operation: z
+      .enum([...ABAP_OPERATIONS])
+      .describe(
+        'The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.',
+      ),
+    breakpoints: z
+      .array(BREAKPOINT_ITEM)
+      .optional()
+      .describe(
+        'setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.',
+      )
+      .optional()
+      .describe(
+        'setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.',
+      ),
+    sync_scope: z
+      .enum(['full', 'partial'])
+      .optional()
+      .describe(
+        'abap syncBreakpoints: full replaces every breakpoint of the set; partial replaces those of the objects in sync_objects and takes line breakpoints.',
+      ),
+    sync_objects: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'abap syncBreakpoints with sync_scope partial: the ADT URIs of the objects whose breakpoints are replaced.',
+      ),
+    breakpoint_id: z
+      .string()
+      .optional()
+      .describe('abap deleteBreakpoint: the id SAP gave the breakpoint.'),
+    variable_name: z
+      .string()
+      .optional()
+      .describe('abap createWatchpoint: the variable watched.'),
+    condition: z
+      .string()
+      .optional()
+      .describe(
+        'abap createWatchpoint: the ABAP condition the watchpoint stops on.',
+      ),
+    watchpoint_id: z
+      .string()
+      .optional()
+      .describe('abap deleteWatchpoint: the id SAP gave the watchpoint.'),
+    ...IDENTITY_PROPERTIES,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-type Args = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
+type Args = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerDebugBreakpoints(
   context: HandlerContext,

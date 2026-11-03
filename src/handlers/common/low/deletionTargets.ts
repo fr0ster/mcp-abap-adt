@@ -75,7 +75,7 @@ export interface DeletionTarget {
   /** The configuration of both requests. */
   config(name: DeletionName, transportRequest?: string): object;
   /** How the deletion's own answer is read. */
-  deleteAnalyse: IAnalyse<any>;
+  deleteAnalyse: IAnalyse;
 }
 
 const withConfig =
@@ -90,7 +90,7 @@ const target = (
   objectType: CheckedDeletableType,
   object: (client: AdtClient) => CheckedDeletable<any, any>,
   config: (name: DeletionName) => object,
-  deleteAnalyse: IAnalyse<any> = analyseDeletion,
+  deleteAnalyse: IAnalyse = analyseDeletion,
 ): DeletionTarget => ({
   objectType,
   checked: object,

@@ -68,21 +68,19 @@ export async function handleDeletionCheck(
   return answer(
     ANSWER,
     () =>
-      atStep(
-        'delete check',
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(target.objectType, 'checkDeletion'),
-            (headers) =>
-              target
-                .checked(createAdtClient(connection, logger))
-                .checkDeletion(
-                  target.config({ name, ...(group ? { group } : {}) }),
-                  { headers, analyse: analyseDeletion },
-                ),
-          ) as Promise<never>,
-      )() as Promise<never>,
+      atStep('delete check', () =>
+        withAdtHeaders(
+          context,
+          adtOperation(target.objectType, 'checkDeletion'),
+          (headers) =>
+            target
+              .checked(createAdtClient(connection, logger))
+              .checkDeletion(
+                target.config({ name, ...(group ? { group } : {}) }),
+                { headers, analyse: analyseDeletion },
+              ),
+        ),
+      )(),
     project('terse', terseDeletionCheck),
   );
 }

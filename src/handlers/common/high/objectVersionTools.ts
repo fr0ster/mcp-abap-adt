@@ -330,7 +330,7 @@ function buildVersionDiffTool(
 
       try {
         const { diff, identical, notes } = await buildVersionDiff(
-          resolved.obj,
+          resolved,
           String(content_uri_from),
           String(content_uri_to),
         );

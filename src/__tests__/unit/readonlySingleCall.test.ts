@@ -444,52 +444,70 @@ describe('GetEnhancements', () => {
 
 describe('resolveVersionedObject', () => {
   // Not a handler — a synchronous resolver with no call of its own. Tested on
-  // its own contract: which client factory it picks per object_type, and its
-  // two failure shapes (an unknown type answers null; a function_module with
-  // no group name throws).
+  // its own contract: which client factory it picks per object_type, the
+  // identity it binds to the history read, and its failure shape (a
+  // function_module with no group name throws).
+  const calls: Array<[string, unknown]> = [];
+  const versionable = (factory: string) => () => ({
+    getVersions: async (config: unknown) => {
+      calls.push([factory, config]);
+      return { ok: true, getResult: () => ({ value: [] }) };
+    },
+    getVersionSource: async () => ({
+      ok: true,
+      getResult: () => ({ value: '' }),
+    }),
+  });
   const client = {
-    getClass: () => 'CLASS_OBJ',
-    getProgram: () => 'PROGRAM_OBJ',
-    getInterface: () => 'INTERFACE_OBJ',
-    getFunctionModule: () => 'FM_OBJ',
-    getTable: () => 'TABLE_OBJ',
-    getStructure: () => 'STRUCTURE_OBJ',
-    getDdl: () => 'DDL_OBJ',
-    getBehaviorDefinition: () => 'BDEF_OBJ',
-    getMetadataExtension: () => 'MDE_OBJ',
+    getClass: versionable('getClass'),
+    getProgram: versionable('getProgram'),
+    getInterface: versionable('getInterface'),
+    getFunctionModule: versionable('getFunctionModule'),
+    getTable: versionable('getTable'),
+    getStructure: versionable('getStructure'),
+    getDdl: versionable('getDdl'),
+    getBehaviorDefinition: versionable('getBehaviorDefinition'),
+    getMetadataExtension: versionable('getMetadataExtension'),
   } as any;
-
-  it('resolves a class by className', () => {
-    const resolved = resolveVersionedObject(client, 'class', 'zcl_x');
-    expect(resolved).toEqual({
-      obj: 'CLASS_OBJ',
-      config: { className: 'ZCL_X' },
-    });
+  beforeEach(() => {
+    calls.length = 0;
   });
 
-  it('resolves a function_module, given its group', () => {
+  it('resolves a class by className', async () => {
+    const resolved = resolveVersionedObject(client, 'class', 'zcl_x');
+    await resolved.getVersions({ analyse: analyseException });
+    expect(calls).toEqual([['getClass', { className: 'ZCL_X' }]]);
+  });
+
+  it('resolves a function_module, given its group', async () => {
     const resolved = resolveVersionedObject(
       client,
       'function_module',
       'zfm',
       'zfg',
     );
-    expect(resolved).toEqual({
-      obj: 'FM_OBJ',
-      config: { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
-    });
+    await resolved.getVersions({ analyse: analyseException });
+    expect(calls).toEqual([
+      [
+        'getFunctionModule',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+    ]);
   });
 
-  it('resolves a function_module from GROUP|FM_NAME with no explicit group', () => {
+  it('resolves a function_module from GROUP|FM_NAME with no explicit group', async () => {
     const resolved = resolveVersionedObject(
       client,
       'function_module',
       'zfg|zfm',
     );
-    expect(resolved).toEqual({
-      obj: 'FM_OBJ',
-      config: { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
-    });
+    await resolved.getVersions({ analyse: analyseException });
+    expect(calls).toEqual([
+      [
+        'getFunctionModule',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+    ]);
   });
 
   it('throws for a function_module with no group name reachable', () => {

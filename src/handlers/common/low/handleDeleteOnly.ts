@@ -104,27 +104,25 @@ export async function handleDeleteOnly(
     return answer(
       ANSWER,
       () =>
-        atStep(
-          'update',
-          () =>
-            withAdtHeaders(
-              context,
-              adtOperation(includeType, 'update'),
-              (headers) =>
-                include(createAdtClient(connection, logger)).update(
-                  {
-                    className: className.toUpperCase(),
-                    ...(transportRequest ? { transportRequest } : {}),
-                  },
-                  {
-                    headers,
-                    source: '',
-                    lockHandle,
-                    analyse: analyseException,
-                  },
-                ),
-            ) as Promise<never>,
-        )() as Promise<never>,
+        atStep('update', () =>
+          withAdtHeaders(
+            context,
+            adtOperation(includeType, 'update'),
+            (headers) =>
+              include(createAdtClient(connection, logger)).update(
+                {
+                  className: className.toUpperCase(),
+                  ...(transportRequest ? { transportRequest } : {}),
+                },
+                {
+                  headers,
+                  source: '',
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ),
+        )(),
       project('terse', terseWrite),
     );
   }
@@ -152,25 +150,23 @@ export async function handleDeleteOnly(
   return answer(
     ANSWER,
     () =>
-      atStep(
-        'delete',
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(target.objectType, 'delete'),
-            (headers) =>
-              target.deleted(connection, logger).delete(
-                target.config(
-                  {
-                    name: name.toUpperCase(),
-                    ...(group ? { group: group.toUpperCase() } : {}),
-                  },
-                  transportRequest,
-                ),
-                { headers, analyse: target.deleteAnalyse },
+      atStep('delete', () =>
+        withAdtHeaders(
+          context,
+          adtOperation(target.objectType, 'delete'),
+          (headers) =>
+            target.deleted(connection, logger).delete(
+              target.config(
+                {
+                  name: name.toUpperCase(),
+                  ...(group ? { group: group.toUpperCase() } : {}),
+                },
+                transportRequest,
               ),
-          ) as Promise<never>,
-      )() as Promise<never>,
+              { headers, analyse: target.deleteAnalyse },
+            ),
+        ),
+      )(),
     // The metadata extension's DELETE answers an empty 2xx; every other
     // deletion a `del:deletionResult`.
     project(

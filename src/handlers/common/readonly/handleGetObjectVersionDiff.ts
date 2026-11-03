@@ -27,7 +27,10 @@ import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
-import { resolveVersionedObject } from './resolveVersionedObject';
+import {
+  type ResolvedVersionedObject,
+  resolveVersionedObject,
+} from './resolveVersionedObject';
 
 export interface VersionDiffResult {
   diff: string;
@@ -110,7 +113,7 @@ function unwrapVersionSource(
  * own comment for why.
  */
 export async function buildVersionDiff(
-  obj: IAdtVersionable<any, any, string>,
+  obj: ResolvedVersionedObject,
   contentUriFrom: string,
   contentUriTo: string,
 ): Promise<VersionDiffResult> {
@@ -209,12 +212,12 @@ export async function handleGetObjectVersionDiff(
       () =>
         both(
           atStep('read version source (from)', () =>
-            resolved.obj.getVersionSource(content_uri_from, {
+            resolved.getVersionSource(content_uri_from, {
               analyse: analyseException,
             }),
           ),
           atStep('read version source (to)', () =>
-            resolved.obj.getVersionSource(content_uri_to, {
+            resolved.getVersionSource(content_uri_to, {
               analyse: analyseException,
             }),
           ),

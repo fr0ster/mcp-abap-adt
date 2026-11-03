@@ -1,5 +1,10 @@
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtHeaders,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import type { AdtReading } from '../../../lib/strategies/reading';
 /**
  * The compact update: one write under the lock the caller holds (spec §4.6).
  *
@@ -191,15 +196,16 @@ const upper = (value: unknown): string => String(value ?? '').toUpperCase();
 const ANSWER = { tool: 'HandlerUpdate', detail: 'terse' } as const;
 
 /** The one write's answer, as every compact write answers it. */
-const written = (call: () => Promise<never>) =>
-  answer(ANSWER, call, project('terse', terseWrite));
+const written = (
+  call: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>,
+) => answer(ANSWER, call, project('terse', terseWrite));
 
 type AdtClient = IServerAdtClient;
 export type IncludeWriter = {
   update(
     config: object,
     options: { headers: IAdtHeaders } & Record<string, unknown>,
-  ): Promise<unknown>;
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 };
 
 /**
@@ -288,24 +294,23 @@ export async function handleUpdateUnderLock(
       if (missing) return return_error(missing);
       // The package lock lives in a session of its own over RFC; the write
       // runs in that session, where the handle is valid.
-      return written(
-        () =>
-          withAdtHeaders(context, 'package.updateMetadata', (headers) =>
-            createAdtClient(
-              connectionHoldingPackageLock(connection, lockHandle),
-              logger,
-            )
-              .getPackage(resultsFor(packageDocuments))
-              .updateMetadata(
-                { packageName: upper(args.package_name), ...transport },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'package.updateMetadata', (headers) =>
+          createAdtClient(
+            connectionHoldingPackageLock(connection, lockHandle),
+            logger,
+          )
+            .getPackage(resultsFor(packageDocuments))
+            .updateMetadata(
+              { packageName: upper(args.package_name), ...transport },
+              {
+                headers,
+                source: args.source_code as string,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'DOMAIN': {
@@ -313,21 +318,20 @@ export async function handleUpdateUnderLock(
         required('domain_name', args.domain_name) ??
         required('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
-            client()
-              .getDomain(resultsFor(domainDocuments))
-              .updateMetadata(
-                { domainName: upper(args.domain_name), ...transport },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+          client()
+            .getDomain(resultsFor(domainDocuments))
+            .updateMetadata(
+              { domainName: upper(args.domain_name), ...transport },
+              {
+                headers,
+                source: args.source_code as string,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'DATA_ELEMENT': {
@@ -335,24 +339,23 @@ export async function handleUpdateUnderLock(
         required('data_element_name', args.data_element_name) ??
         required('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
-            client()
-              .getDataElement(resultsFor(dataElementDocuments))
-              .updateMetadata(
-                {
-                  dataElementName: upper(args.data_element_name),
-                  ...transport,
-                },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
+          client()
+            .getDataElement(resultsFor(dataElementDocuments))
+            .updateMetadata(
+              {
+                dataElementName: upper(args.data_element_name),
+                ...transport,
+              },
+              {
+                headers,
+                source: args.source_code as string,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'FUNCTION_GROUP': {
@@ -360,24 +363,23 @@ export async function handleUpdateUnderLock(
         required('function_group_name', args.function_group_name) ??
         required('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'functionGroup.updateMetadata', (headers) =>
-            client()
-              .getFunctionGroup(resultsFor(functionGroupDocuments))
-              .updateMetadata(
-                {
-                  functionGroupName: upper(args.function_group_name),
-                  ...transport,
-                },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'functionGroup.updateMetadata', (headers) =>
+          client()
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
+            .updateMetadata(
+              {
+                functionGroupName: upper(args.function_group_name),
+                ...transport,
+              },
+              {
+                headers,
+                source: args.source_code as string,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'TABLE_TYPE': {
@@ -451,24 +453,23 @@ export async function handleUpdateUnderLock(
         required('service_definition_name', args.service_definition_name) ??
         required('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
-            client()
-              .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
-              .update(
-                {
-                  serviceDefinitionName: upper(args.service_definition_name),
-                  ...transport,
-                },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
+          client()
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .update(
+              {
+                serviceDefinitionName: upper(args.service_definition_name),
+                ...transport,
+              },
+              {
+                headers,
+                source: args.source_code as string,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'SERVICE_BINDING': {
@@ -504,37 +505,34 @@ export async function handleUpdateUnderLock(
       const bindingName = String(args.service_binding_name)
         .trim()
         .toUpperCase();
-      return written(
-        () =>
-          withAdtHeaders(context, 'serviceBinding.update', (headers) =>
-            client()
-              .getServiceBinding(resultsFor(serviceDocuments))
-              .update(
-                serviceType === 'odatav2'
-                  ? {
-                      bindingName,
-                      desiredPublicationState: state,
-                      serviceType,
-                      serviceName: String(args.service_name)
-                        .trim()
-                        .toUpperCase(),
-                      serviceVersion: String(
-                        args.service_version ?? '0001',
-                      ).trim(),
-                    }
-                  : {
-                      bindingName,
-                      desiredPublicationState: state,
-                      serviceType,
-                    },
-                {
-                  headers,
-                  lockHandle,
-                  timeout: 0,
-                  analyse: analysePublication,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'serviceBinding.update', (headers) =>
+          client()
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .update(
+              serviceType === 'odatav2'
+                ? {
+                    bindingName,
+                    desiredPublicationState: state,
+                    serviceType,
+                    serviceName: String(args.service_name).trim().toUpperCase(),
+                    serviceVersion: String(
+                      args.service_version ?? '0001',
+                    ).trim(),
+                  }
+                : {
+                    bindingName,
+                    desiredPublicationState: state,
+                    serviceType,
+                  },
+              {
+                headers,
+                lockHandle,
+                timeout: 0,
+                analyse: analysePublication,
+              },
+            ),
+        ),
       );
     }
     case 'LOCAL_TEST_CLASS':
@@ -549,22 +547,21 @@ export async function handleUpdateUnderLock(
       const missing =
         required('class_name', args.class_name) ?? required(field, body);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(includeType, 'update'),
-            (headers) =>
-              include(client()).update(
-                { className: upper(args.class_name), ...transport },
-                {
-                  headers,
-                  source: body as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(
+          context,
+          adtOperation(includeType, 'update'),
+          (headers) =>
+            include(client()).update(
+              { className: upper(args.class_name), ...transport },
+              {
+                headers,
+                source: body as string,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'TABLE':

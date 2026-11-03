@@ -1,4 +1,5 @@
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { attr, child, childAt, listOf, text } from '../xml/tree';
 import type { AdtReading } from './reading';
 
 /**
@@ -48,19 +49,19 @@ export function project<T>(
 // from a fixture; see tests/fixtures/adt/README.md.
 // ---------------------------------------------------------------------------
 
-function attrs(node: unknown): Record<string, string> {
-  const a = (node as { '@'?: Record<string, string> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+/** The attribute `name` of `node` (the reading parser groups them under `@`). */
+function attrOf(node: unknown, name: string): string | undefined {
+  return attr(child(node, '@'), name);
 }
 
+/** A repeatable level's first member, or the level itself when it is one. */
 function first(node: unknown): unknown {
-  return Array.isArray(node) ? node[0] : node;
+  return listOf(node)[0];
 }
 
-function text(node: unknown): string {
-  if (typeof node === 'string') return node;
-  const t = (node as { '#text'?: unknown } | undefined)?.['#text'];
-  return typeof t === 'string' ? t : '';
+/** `node`'s text, `''` when it has none. */
+function textOf(node: unknown): string {
+  return text(node) ?? '';
 }
 
 /**
@@ -87,18 +88,18 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  * whether the answer is a failure, and this decides how a caller reads a
  * success that says nothing was done.
  */
-export const terseActivation: Terse<any> = (value) => {
-  const root = value?.['chkl:messages'];
+export const terseActivation: Terse<unknown> = (value) => {
+  const root = child(value, 'chkl:messages');
   if (root) {
-    const messages = (root.msg ?? []).map((m: unknown) => ({
-      type: attrs(m).type,
-      text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
+    const messages = listOf(child(root, 'msg')).map((m) => ({
+      type: attrOf(m, 'type'),
+      text: textOf(childAt(m, 'shortText', 'txt')) || attrOf(m, 'objDescr'),
     }));
-    const activated =
-      attrs(root['chkl:properties']).activationExecuted === 'true';
+    const properties = child(root, 'chkl:properties');
+    const activated = attrOf(properties, 'activationExecuted') === 'true';
     return {
       activated,
-      generated: attrs(root['chkl:properties']).generationExecuted === 'true',
+      generated: attrOf(properties, 'generationExecuted') === 'true',
       ...(!activated && messages.length === 0
         ? { nothing_to_activate: true }
         : {}),
@@ -136,22 +137,14 @@ export const terseActivation: Terse<any> = (value) => {
   // `ioc:object` is itself an array per entry (`[""]` on the transport-only
   // entry that opens the list, `[{ "ioc:ref": {...} }]` on an object one) —
   // `first()` un-wraps it the same way every other reading here does.
-  const inactive = value?.['ioc:inactiveObjects'];
+  const inactive = child(value, 'ioc:inactiveObjects');
   if (inactive) {
-    const entriesRaw = inactive['ioc:entry'];
-    const entries = Array.isArray(entriesRaw)
-      ? entriesRaw
-      : entriesRaw
-        ? [entriesRaw]
-        : [];
-    const processed = entries
-      .map((entry: any) =>
-        attrs((first(entry?.['ioc:object']) as any)?.['ioc:ref']),
-      )
-      .filter((a: Record<string, string>) => a['adtcore:name'])
-      .map((a: Record<string, string>) => ({
-        type: a['adtcore:type'] ?? '',
-        name: a['adtcore:name'] ?? '',
+    const processed = listOf(child(inactive, 'ioc:entry'))
+      .map((entry) => child(first(child(entry, 'ioc:object')), 'ioc:ref'))
+      .filter((ref) => attrOf(ref, 'adtcore:name'))
+      .map((ref) => ({
+        type: attrOf(ref, 'adtcore:type') ?? '',
+        name: attrOf(ref, 'adtcore:name') ?? '',
       }));
     return {
       // Deliberately not `activated`. The caller reads the state back — with
@@ -166,22 +159,24 @@ export const terseActivation: Terse<any> = (value) => {
 };
 
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */
-export const terseCheck: Terse<any> = (value) => {
+export const terseCheck: Terse<unknown> = (value) => {
   const report = first(
-    value?.['chkrun:checkRunReports']?.['chkrun:checkReport'],
+    childAt(value, 'chkrun:checkRunReports', 'chkrun:checkReport'),
   );
   if (!report) return undefined;
-  const a = attrs(report);
-  const messages = (
-    report['chkrun:checkMessageList']?.['chkrun:checkMessage'] ?? []
-  ).map((m: unknown) => ({
-    type: attrs(m)['chkrun:type'],
-    text: attrs(m)['chkrun:shortText'],
-    ...(attrs(m)['chkrun:code'] ? { code: attrs(m)['chkrun:code'] } : {}),
-  }));
+  const messages = listOf(
+    childAt(report, 'chkrun:checkMessageList', 'chkrun:checkMessage'),
+  ).map((m) => {
+    const code = attrOf(m, 'chkrun:code');
+    return {
+      type: attrOf(m, 'chkrun:type'),
+      text: attrOf(m, 'chkrun:shortText'),
+      ...(code ? { code } : {}),
+    };
+  });
   return {
-    ran: a['chkrun:status'] === 'processed',
-    status_text: a['chkrun:statusText'],
+    ran: attrOf(report, 'chkrun:status') === 'processed',
+    status_text: attrOf(report, 'chkrun:statusText'),
     ...(messages.length ? { messages } : {}),
   };
 };
@@ -194,53 +189,45 @@ export const terseCheck: Terse<any> = (value) => {
  * that answer says `deleted: false` beside the check's own verdict and the
  * warning that explains it.
  */
-export const terseDeletion: Terse<any> = (value) => {
-  const result = value?.['del:deletionResult'] ?? value?.['del:checkResponse'];
-  const object = first(result?.['del:object']);
+export const terseDeletion: Terse<unknown> = (value) => {
+  const result =
+    child(value, 'del:deletionResult') ?? child(value, 'del:checkResponse');
+  const object = first(child(result, 'del:object'));
   if (!object) return undefined;
-  const a = attrs(object);
-  const message = first(object['del:message']) as
-    | { 'del:text'?: unknown }
-    | undefined;
+  const isDeleted = attrOf(object, 'del:isDeleted');
   return {
-    ...(a['del:isDeleted'] !== undefined
-      ? { deleted: a['del:isDeleted'] === 'true' }
-      : { deleted: false, deletable: a['del:isDeletable'] === 'true' }),
-    object: a['adtcore:name'],
-    ...(text(message?.['del:text'])
-      ? {
-          message: {
-            type: attrs(message)['del:type'],
-            text: text(message?.['del:text']),
-          },
-        }
-      : {}),
+    ...(isDeleted !== undefined
+      ? { deleted: isDeleted === 'true' }
+      : {
+          deleted: false,
+          deletable: attrOf(object, 'del:isDeletable') === 'true',
+        }),
+    object: attrOf(object, 'adtcore:name'),
+    ...deletionMessage(object),
   };
 };
+
+/** SAP's message on a deletion's object, when it carries text. */
+function deletionMessage(object: unknown) {
+  const message = first(child(object, 'del:message'));
+  const said = textOf(child(message, 'del:text'));
+  return said
+    ? { message: { type: attrOf(message, 'del:type'), text: said } }
+    : {};
+}
 
 /**
  * `del:checkResponse` alone — the deletion check's verdict: `deletable`, the
  * object, and SAP's message when it carries text (a permitted check may say
  * the object does not exist; that is SAP's answer, as it came).
  */
-export const terseDeletionCheck: Terse<any> = (value) => {
-  const object = first(value?.['del:checkResponse']?.['del:object']);
+export const terseDeletionCheck: Terse<unknown> = (value) => {
+  const object = first(childAt(value, 'del:checkResponse', 'del:object'));
   if (!object) return undefined;
-  const a = attrs(object);
-  const message = first(object['del:message']) as
-    | { 'del:text'?: unknown }
-    | undefined;
   return {
-    deletable: a['del:isDeletable'] === 'true',
-    object: a['adtcore:name'],
-    ...(text(message?.['del:text'])
-      ? {
-          message: {
-            type: attrs(message)['del:type'],
-            text: text(message?.['del:text']),
-          },
-        }
-      : {}),
+    deletable: attrOf(object, 'del:isDeletable') === 'true',
+    object: attrOf(object, 'adtcore:name'),
+    ...deletionMessage(object),
   };
 };
 
@@ -255,17 +242,14 @@ export const terseDeletionCheck: Terse<any> = (value) => {
  * behind it, so it is answered as `result`, exactly as sent (an absent or
  * empty one as `''`), with SAP's messages and no `admissible` of ours.
  */
-export const terseTransportCheck: Terse<any> = (value) => {
-  const data = value?.['asx:abap']?.['asx:values']?.DATA;
+export const terseTransportCheck: Terse<unknown> = (value) => {
+  const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
-  const result = text(data.RESULT);
-  const listed = data.MESSAGES?.CTS_MESSAGE;
-  const messages = (
-    Array.isArray(listed) ? listed : listed === undefined ? [] : [listed]
-  )
+  const result = textOf(child(data, 'RESULT'));
+  const messages = listOf(childAt(data, 'MESSAGES', 'CTS_MESSAGE'))
     .map((message) => ({
-      type: text(message?.SEVERITY),
-      text: text(message?.TEXT),
+      type: textOf(child(message, 'SEVERITY')),
+      text: textOf(child(message, 'TEXT')),
     }))
     .filter((message) => message.text !== '');
   const said = messages.length > 0 ? { messages } : {};
@@ -275,17 +259,18 @@ export const terseTransportCheck: Terse<any> = (value) => {
 };
 
 /** Validation: `CHECK_RESULT` means admissible, `SEVERITY` carries a verdict. */
-export const terseValidation: Terse<any> = (value) => {
-  const data = value?.['asx:abap']?.['asx:values']?.DATA;
+export const terseValidation: Terse<unknown> = (value) => {
+  const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
-  if (data.CHECK_RESULT !== undefined) {
-    return { admissible: text(data.CHECK_RESULT) === 'X' };
+  const checkResult = child(data, 'CHECK_RESULT');
+  if (checkResult !== undefined) {
+    return { admissible: textOf(checkResult) === 'X' };
   }
-  const severity = text(data.SEVERITY).toUpperCase();
+  const severity = textOf(child(data, 'SEVERITY')).toUpperCase();
   return {
     admissible: severity === 'OK',
     ...(severity !== 'OK'
-      ? { message: { type: severity, text: text(data.SHORT_TEXT) } }
+      ? { message: { type: severity, text: textOf(child(data, 'SHORT_TEXT')) } }
       : {}),
   };
 };

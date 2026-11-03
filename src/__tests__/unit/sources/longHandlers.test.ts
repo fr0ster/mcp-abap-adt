@@ -10,6 +10,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as z from 'zod';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
@@ -72,6 +73,9 @@ function shippedDefinitions(): ToolDefinition[] {
 
 /** Whether a schema declares `timeout`, JSON Schema or a zod raw shape. */
 function declaresTimeout(definition: ToolDefinition): boolean {
+  if (definition.inputSchema instanceof z.ZodObject) {
+    return Object.hasOwn(definition.inputSchema.shape, 'timeout');
+  }
   const schema = definition.inputSchema as
     | { properties?: Record<string, unknown> }
     | Record<string, unknown>

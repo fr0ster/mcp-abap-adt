@@ -1,15 +1,16 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import {
   notASearchType,
   SEARCH_TYPE_DESCRIPTION,
   searchNameOf,
 } from '../../../lib/searchTypes';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -20,27 +21,22 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      object_name: {
-        type: 'string',
-        description: "[read-only] Object name or mask (e.g. 'MARA*')",
-      },
-      object_type: {
-        type: 'string',
-        description: `[read-only] ${SEARCH_TYPE_DESCRIPTION}`,
-      },
-      maxResults: {
-        type: 'number',
-        description: '[read-only] Maximum number of results to return',
-        default: 100,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['object_name'],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    object_name: z
+      .string()
+      .describe("[read-only] Object name or mask (e.g. 'MARA*')"),
+    object_type: z
+      .string()
+      .optional()
+      .describe(`[read-only] ${SEARCH_TYPE_DESCRIPTION}`),
+    maxResults: z
+      .number()
+      .default(100)
+      .optional()
+      .describe('[read-only] Maximum number of results to return'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface SearchHit {

@@ -1,51 +1,46 @@
+import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
     '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      parent_name: {
-        type: 'string',
-        description:
-          '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
-      },
-      parent_tech_name: {
-        type: 'string',
-        description: '[read-only] Parent technical name',
-      },
-      parent_type: {
-        type: 'string',
-        description: '[read-only] Parent object type (e.g. PROG/P, FUGR)',
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several parents, read together (give this or parent_name)',
-        items: {
-          type: 'object',
-          properties: {
-            parent_type: {
-              type: 'string',
-              description: 'Parent object type (e.g. PROG/P, FUGR)',
-            },
-            parent_name: { type: 'string', description: 'Parent object name' },
-          },
-          required: ['parent_type', 'parent_name'],
-        },
-      },
-      with_short_descriptions: {
-        type: 'boolean',
-        description: '[read-only] Include short descriptions (default: true)',
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    parent_name: z
+      .string()
+      .optional()
+      .describe(
+        '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
+      ),
+    parent_tech_name: z
+      .string()
+      .optional()
+      .describe('[read-only] Parent technical name'),
+    parent_type: z
+      .string()
+      .optional()
+      .describe('[read-only] Parent object type (e.g. PROG/P, FUGR)'),
+    objects: z
+      .array(
+        z.object({
+          parent_type: z
+            .string()
+            .describe('Parent object type (e.g. PROG/P, FUGR)'),
+          parent_name: z.string().describe('Parent object name'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several parents, read together (give this or parent_name)',
+      ),
+    with_short_descriptions: z
+      .boolean()
+      .optional()
+      .describe('[read-only] Include short descriptions (default: true)'),
+  }),
 } as const;
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';

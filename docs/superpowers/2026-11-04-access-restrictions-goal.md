@@ -72,8 +72,10 @@ When both lists are configured, each name the call gives is checked against its 
 - **The checks are formal.** They read the call's own target: the tool, the object, its package
   and request, the table it names. They do not analyse code. A class written to read what is
   denied, or to create objects elsewhere, is a matter for SAP's authorization, not this server.
-- **A mistake in the configuration stops the start.** An unknown tool or action, a malformed
-  entry or an unreadable list is never ignored.
+- **A denied action the binary does not have is ignored.** Denying a tool or action that is not
+  registered in this binary changes nothing, so one list fits every binary.
+- **A malformed configuration stops the start.** A malformed entry or an unreadable list is
+  never ignored.
 
 ## Open for the spec
 

@@ -103,6 +103,22 @@ interface TreeRead {
   walked?: PhaseResult<WalkedItem[]>;
 }
 
+/**
+ * A package's walk: every package whose metadata was read is walked, so a
+ * walk is there for each one the answer reads; none, in words, otherwise.
+ */
+function walkOf(
+  read: TreeRead,
+  packageName: string,
+): PhaseResult<WalkedItem[]> {
+  return (
+    read.walked ?? {
+      ok: false,
+      error: new Error(`the package ${packageName} was not walked`),
+    }
+  );
+}
+
 interface TreeOptions {
   includeSubpackages: boolean;
   maxDepth: number;
@@ -182,19 +198,19 @@ async function readTreesBatched(
     ),
   ]);
   const reads: TreeRead[] = packageNames.map((_, i) => ({
-    metadata: first[i] as PhaseResult<Metadata>,
+    metadata: first[i],
   }));
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   // Walked further: the packages whose metadata was read.
   const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
     (requests) => read(requests.map((node) => ({ node }))),
-    kept.map((i) => packageNames[i] as string),
+    kept.map((i) => packageNames[i]),
     options,
     kept.map((i) => first[packageNames.length + i]),
   );
   kept.forEach((i, k) => {
-    (reads[i] as TreeRead).walked = walked[k];
+    reads[i].walked = walked[k];
   });
   return reads;
 }
@@ -230,11 +246,11 @@ async function readTreesConcurrent(
         request,
       ),
     ),
-    kept.map((i) => packageNames[i] as string),
+    kept.map((i) => packageNames[i]),
     options,
   );
   kept.forEach((i, k) => {
-    (reads[i] as TreeRead).walked = walked[k];
+    reads[i].walked = walked[k];
   });
   return reads;
 }
@@ -369,20 +385,20 @@ export async function handleGetPackageTree(
     }
 
     if (single) {
-      const walked = reads[0]?.walked as PhaseResult<WalkedItem[]>;
+      const walked = walkOf(reads[0], packageNames[0]);
       if (!walked.ok) throw walked.error;
       logger?.debug(`Package tree fetched successfully for ${single}`);
       return return_response({
         data: JSON.stringify(
-          treeOf(packageNames[0] as string, walked.value, options),
+          treeOf(packageNames[0], walked.value, options),
           null,
           2,
         ),
-      } as any);
+      });
     }
 
     const entries = reads.map((read, i) => {
-      const package_name = packageNames[i] as string;
+      const package_name = packageNames[i];
       const metadata = read.metadata;
       if (!metadata.ok) {
         return {
@@ -399,7 +415,7 @@ export async function handleGetPackageTree(
           ),
         };
       }
-      const walked = read.walked as PhaseResult<WalkedItem[]>;
+      const walked = walkOf(read, package_name);
       return walked.ok
         ? treeOf(package_name, walked.value, options)
         : {
@@ -409,8 +425,8 @@ export async function handleGetPackageTree(
     });
     return return_response({
       data: JSON.stringify(entries, null, 2),
-    } as any);
-  } catch (error: any) {
+    });
+  } catch (error) {
     logger?.error('Failed to fetch package tree', error);
     return return_error(error);
   }

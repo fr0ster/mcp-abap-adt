@@ -302,18 +302,26 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
 });
 
 describe('GetAbapAST / GetAbapSemanticAnalysis: a local parser that threw', () => {
-  it("GetAbapAST: the parser's own failure, client_threw at the parse step", async () => {
+  // The arguments are typed (a string of code), so the throw comes from the
+  // parse step's own work: the logger it calls once the tree is built.
+  it("GetAbapAST: the parse step's own failure, client_threw at the parse step", async () => {
+    const logger = {
+      debug: () => {
+        throw new Error('logger down');
+      },
+      error: () => undefined,
+    };
     const result: any = await handleGetAbapAST(
-      { connection: {} as any, logger: undefined } as any,
-      { code: 42 },
+      { connection: {} as any, logger } as any,
+      { code: 'REPORT z.' },
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject({
       error: 'client_threw',
       tool: 'GetAbapAST',
+      message: 'logger down',
       step: 'parse',
     });
-    expect(payloadOf(result).message).toContain('Failed to parse ABAP code');
   });
 
   it("GetAbapSemanticAnalysis: the analysis' own failure, client_threw at the analysis step", async () => {

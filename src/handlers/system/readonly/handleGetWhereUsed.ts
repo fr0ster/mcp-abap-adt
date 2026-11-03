@@ -139,8 +139,8 @@ function whereUsedSchema(variant: ProjectionVariant) {
 }
 
 interface WhereUsedArgs {
-  object_name: string;
-  object_type: string;
+  object_name?: string;
+  object_type?: string;
   objects?: Array<{ object_name: string; object_type: string }>;
   enable_all_types?: boolean;
   enable_only_types?: string[];
@@ -177,7 +177,10 @@ function notWhereUsed(connection: object, text: string): string {
 /**
  * Returns where-used references for ABAP objects using AdtClient utilities.
  */
-async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
+async function whereUsedOf(
+  context: HandlerContext,
+  args: WhereUsedArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args?.object_name) {
@@ -191,7 +194,11 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
     return return_error(notWhereUsed(connection, args.object_type));
   }
 
-  const typedArgs = args as WhereUsedArgs;
+  const typedArgs = {
+    ...args,
+    object_name: args.object_name,
+    object_type: args.object_type,
+  };
   logger?.info(
     `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
   );
@@ -315,19 +322,24 @@ function refusesCredential(
  */
 async function whereUsedFromAnswers(
   context: HandlerContext,
-  typedArgs: WhereUsedArgs,
+  given: WhereUsedArgs,
   scope: PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>> | undefined,
   references:
     | PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>
     | undefined,
 ) {
   const { connection, logger } = context;
-  if (!typedArgs?.object_name) {
+  if (!given?.object_name) {
     return return_error('Object name is required');
   }
-  if (!typedArgs?.object_type) {
+  if (!given?.object_type) {
     return return_error('Object type is required');
   }
+  const typedArgs = {
+    ...given,
+    object_name: given.object_name,
+    object_type: given.object_type,
+  };
   const objectType = whereUsedCodeOf(connection, typedArgs.object_type);
   if (objectType === undefined) {
     return return_error(notWhereUsed(connection, typedArgs.object_type));
@@ -439,16 +451,14 @@ async function whereUsedInEnvelopes(
   // A target without a name, or whose type is no code of the tables, is
   // sent nothing; `whereUsedFromAnswers` answers it with its refusal.
   const readable = targets.flatMap((target, i) => {
-    const code = target.object_name
+    const name = target.object_name;
+    const code = name
       ? whereUsedCodeOf(context.connection, target.object_type ?? '')
       : undefined;
-    return code === undefined ? [] : [{ target, i, code }];
+    return !name || code === undefined ? [] : [{ target, i, code, name }];
   });
-  const params = (entry: {
-    target: WhereUsedArgs;
-    code: AdtWhereUsedCode;
-  }) => ({
-    object_name: entry.target.object_name,
+  const params = (entry: { name: string; code: AdtWhereUsedCode }) => ({
+    object_name: entry.name,
     object_type: entry.code,
   });
   type Answered = PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>;
@@ -476,12 +486,12 @@ async function whereUsedInEnvelopes(
       );
     }
     return {
-      ended: (await whereUsedFromAnswers(
+      ended: await whereUsedFromAnswers(
         context,
-        targets[i] as WhereUsedArgs,
+        targets[i],
         scopes.get(i),
         references.get(i),
-      )) as McpResult,
+      ),
     };
   };
 
@@ -489,7 +499,7 @@ async function whereUsedInEnvelopes(
   if (readsScope(filter)) {
     let read: Answered[];
     try {
-      read = (await runPhase(context, readable, (entry, batch) => {
+      read = await runPhase(context, readable, (entry, batch) => {
         if (validatesScope(filter)) {
           return withAdtHeaders(context, 'utils.getWhereUsedScope', (headers) =>
             utilsOn(batch).getWhereUsedScope(params(entry), {
@@ -502,7 +512,7 @@ async function whereUsedInEnvelopes(
         // it names (`WhereUsedSource`).
         const source: WhereUsedSource = whereUsedOn(context, utilsOn(batch));
         return source.getWhereUsedScope(params(entry));
-      })) as Answered[];
+      });
     } catch (error) {
       // The sequential version throws a refusal of the validating read and
       // answers one of the scope read `fetchWhereUsedReferences` makes.
@@ -527,7 +537,7 @@ async function whereUsedInEnvelopes(
   if (searched.length > 0) {
     let read: Answered[];
     try {
-      read = (await runPhase(context, searched, (entry, batch) => {
+      read = await runPhase(context, searched, (entry, batch) => {
         const { i } = entry;
         // Sent as `fetchWhereUsedReferences` sends it, through the members
         // it names (`WhereUsedSource`).
@@ -548,7 +558,7 @@ async function whereUsedInEnvelopes(
             },
           ),
         });
-      })) as Answered[];
+      });
     } catch (error) {
       if (failureOf(error) === undefined) throw error;
       return { ended: answerThrown(error, WHERE_USED_CONTEXT) };
@@ -564,12 +574,12 @@ async function whereUsedInEnvelopes(
   const answers: McpResult[] = [];
   for (const [i, target] of targets.entries()) {
     answers.push(
-      (await whereUsedFromAnswers(
+      await whereUsedFromAnswers(
         context,
         target,
         scopes.get(i),
         references.get(i),
-      )) as McpResult,
+      ),
     );
   }
   return { answers };
@@ -599,7 +609,7 @@ function listAnswer(
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) => {
-    const asked = objects[i] as (typeof objects)[number];
+    const asked = objects[i];
     return result.isError
       ? {
           object_name: asked.object_name,
@@ -616,7 +626,7 @@ function listAnswer(
 
 /** One answer of the batched version: an object's, or the one that ended the call. */
 const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
-  'ended' in outcome ? outcome.ended : (outcome.answers[0] as McpResult);
+  'ended' in outcome ? outcome.ended : outcome.answers[0];
 
 /**
  * Where-used lists of one object or several, read in ADT batch envelopes
@@ -626,13 +636,8 @@ const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
  */
 export async function handleGetWhereUsed(
   context: HandlerContext,
-  given: Omit<WhereUsedArgs, 'object_name' | 'object_type'> & {
-    object_name?: string;
-    object_type?: string;
-  },
+  args: WhereUsedArgs,
 ) {
-  // The single object's arguments as the sequential version reads them.
-  const args = given as WhereUsedArgs;
   const listed = args?.objects;
   if (listed === undefined) {
     if (!args?.object_name || !args?.object_type || !readsScope(args)) {
@@ -641,7 +646,7 @@ export async function handleGetWhereUsed(
     return withSequentialFallback<McpResult>(
       context,
       async () => onlyAnswer(await whereUsedInEnvelopes(context, [args], args)),
-      () => whereUsedOf(context, args) as Promise<McpResult>,
+      () => whereUsedOf(context, args),
     );
   }
   if (
@@ -673,7 +678,7 @@ export async function handleGetWhereUsed(
       // credential failure ends the call, and nothing after it is read.
       const results: McpResult[] = [];
       for (const target of targets) {
-        const result = (await whereUsedOf(context, target)) as McpResult;
+        const result = await whereUsedOf(context, target);
         if (endsList(result)) return result;
         results.push(result);
       }

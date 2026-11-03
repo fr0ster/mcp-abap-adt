@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { answerThrown } from '../../../lib/answer';
+import { answerThrown, type McpResult } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { StepThrew } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
@@ -13,9 +13,22 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
+/** A statement opening a structure, with its line. */
+interface AstStructure {
+  type: 'class' | 'method' | 'form' | 'function';
+  line: number;
+  content: string;
+}
+
+/** A name found in the source, at its offset. */
+interface AstName {
+  name: string;
+  position: number;
+}
+
 // Simplified AST generator that doesn't depend on ANTLR until it's properly set up
 class SimpleAbapASTGenerator {
-  public parseToAST(code: string): any {
+  public parseToAST(code: string) {
     try {
       // This is a placeholder implementation until ANTLR is properly configured
       // It provides basic structure analysis
@@ -40,8 +53,8 @@ class SimpleAbapASTGenerator {
     }
   }
 
-  private analyzeStructures(code: string): any[] {
-    const structures: any[] = [];
+  private analyzeStructures(code: string): AstStructure[] {
+    const structures: AstStructure[] = [];
     const lines = code.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
@@ -83,7 +96,7 @@ class SimpleAbapASTGenerator {
     return matches.map((match) => match.replace(/include\s+/i, '').trim());
   }
 
-  private findClasses(code: string): any[] {
+  private findClasses(code: string): Array<AstName & { type: string }> {
     const classRegex =
       /class\s+([a-zA-Z0-9_]+)\s+(definition|implementation)/gi;
     const classes: Array<{ name: string; type: string; position: number }> = [];
@@ -101,9 +114,9 @@ class SimpleAbapASTGenerator {
     return classes;
   }
 
-  private findMethods(code: string): any[] {
+  private findMethods(code: string): AstName[] {
     const methodRegex = /methods?\s+([a-zA-Z0-9_]+)/gi;
-    const methods: any[] = [];
+    const methods: AstName[] = [];
     let match: RegExpExecArray | null = methodRegex.exec(code);
 
     while (match !== null) {
@@ -117,7 +130,7 @@ class SimpleAbapASTGenerator {
     return methods;
   }
 
-  private findDataDeclarations(code: string): any[] {
+  private findDataDeclarations(code: string): AstName[] {
     const dataRegex = /data:?\s+([a-zA-Z0-9_]+)/gi;
     const declarations: Array<{ name: string; position: number }> = [];
     let match: RegExpExecArray | null = dataRegex.exec(code);
@@ -133,9 +146,9 @@ class SimpleAbapASTGenerator {
     return declarations;
   }
 
-  private findForms(code: string): any[] {
+  private findForms(code: string): AstName[] {
     const formRegex = /form\s+([a-zA-Z0-9_]+)/gi;
-    const forms: any[] = [];
+    const forms: AstName[] = [];
     let match: RegExpExecArray | null = formRegex.exec(code);
 
     while (match !== null) {
@@ -150,7 +163,10 @@ class SimpleAbapASTGenerator {
   }
 }
 
-export async function handleGetAbapAST(context: HandlerContext, args: any) {
+export async function handleGetAbapAST(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
   const { connection, logger } = context;
   try {
     if (!args?.code) {
@@ -161,7 +177,7 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
     const ast = astGenerator.parseToAST(args.code);
     logger?.debug('Generated AST for provided ABAP code');
 
-    const result = {
+    const result: McpResult = {
       isError: false,
       content: [
         {
@@ -173,7 +189,7 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
 
     return result;
   } catch (error) {
-    logger?.error('Failed to generate ABAP AST', error as any);
+    logger?.error('Failed to generate ABAP AST', error);
     // A local parser over the caller's source, no request: its throw is
     // not SAP's answer but the method's own failure, `client_threw`.
     return answerThrown(new StepThrew('parse', error), {

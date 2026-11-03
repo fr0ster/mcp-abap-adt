@@ -13,8 +13,6 @@
  * one copy and registers once.
  */
 
-import { child } from './xml/tree';
-
 export interface LibInstance {
   readonly file: string;
 }
@@ -26,9 +24,17 @@ const REGISTRY = Symbol.for('@mcp-abap-adt/lib/instances');
  * global: a list of entries, each naming its file.
  */
 function isRegistry(value: unknown): value is LibInstance[] {
+  // Read here, not through the tree module: this module imports nothing, so
+  // it runs on its own, even where there is no `require`.
   return (
     Array.isArray(value) &&
-    value.every((entry) => typeof child(entry, 'file') === 'string')
+    value.every(
+      (entry: unknown) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        'file' in entry &&
+        typeof entry.file === 'string',
+    )
   );
 }
 

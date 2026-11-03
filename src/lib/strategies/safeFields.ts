@@ -6,7 +6,7 @@
  * its way there. Neither should hold its own copy of the rule.
  */
 
-import { child, isElement } from '../xml/tree';
+import { child, isElement, isList } from '../xml/tree';
 
 /**
  * What a failed release adds to a payload — in two shapes, and which one it is
@@ -90,9 +90,9 @@ export function safeCleanup(
 
   // What was left behind as failures of their own: entries already built in
   // the shape of every other failure (`failureEntry`, `thrownEntry`).
-  if (Array.isArray(carrier.failures) && carrier.failures.length > 0)
+  if (isList(carrier.failures) && carrier.failures.length > 0)
     out.failures = carrier.failures;
-  if (Array.isArray(carrier.notes) && carrier.notes.length > 0)
+  if (isList(carrier.notes) && carrier.notes.length > 0)
     out.notes = carrier.notes;
 
   // The lock that may be left behind: each field by its own type, the object

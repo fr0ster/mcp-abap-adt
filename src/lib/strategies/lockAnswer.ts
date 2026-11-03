@@ -25,10 +25,10 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { attr, child } from '../xml/tree';
+import { attr, child, isList } from '../xml/tree';
 
 function headerValue(value: unknown): string {
-  if (Array.isArray(value)) return String(value[0] ?? '').trim();
+  if (isList(value)) return String(value[0] ?? '').trim();
   return typeof value === 'string' ? value.trim() : '';
 }
 

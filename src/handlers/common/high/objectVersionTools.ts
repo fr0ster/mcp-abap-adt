@@ -15,6 +15,7 @@
  * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
  */
 
+import * as z from 'zod';
 import type {
   VersionedKind,
   VersionSourceKind,
@@ -160,30 +161,25 @@ function buildVersionsTool(
   row: VersionedTypeRow<VersionedKind>,
 ): ObjectVersionToolEntry {
   const isFm = row.object_type === 'function_module';
-  const properties: Record<string, unknown> = {
-    [row.nameParam]: {
-      type: 'string',
-      description: `${row.label} name.`,
-    },
+  const named = {
+    [row.nameParam]: z.string().describe(`${row.label} name.`),
   };
-  const required = [row.nameParam];
-  if (isFm) {
-    properties.function_group_name = {
-      type: 'string',
-      description: 'Owning function group name (required).',
-    };
-    required.push('function_group_name');
-  }
+  const inputSchema = z.object(
+    isFm
+      ? {
+          ...named,
+          function_group_name: z
+            .string()
+            .describe('Owning function group name (required).'),
+        }
+      : named,
+  );
 
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
     description: `[read-only] Lists the version history of the ${row.label} named by ${row.nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.${row.note ? ` ${row.note}` : ''}`,
-    inputSchema: {
-      type: 'object',
-      properties,
-      required,
-    },
+    inputSchema,
   };
 
   const handler: RawHandler = async (context, args) => {
@@ -245,16 +241,13 @@ function buildVersionSourceTool(
     name: `Get${row.display}VersionSource`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
     description: `[read-only] Reads the source of the ${row.label} version named by content_uri, an entry of the ${row.label}'s version history.${row.note ? ` ${row.note}` : ''}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        content_uri: {
-          type: 'string',
-          description: `Opaque content_uri of a version, from the ${row.label}'s version history.`,
-        },
-      },
-      required: ['content_uri'],
-    },
+    inputSchema: z.object({
+      content_uri: z
+        .string()
+        .describe(
+          `Opaque content_uri of a version, from the ${row.label}'s version history.`,
+        ),
+    }),
   };
 
   const handler: RawHandler = async (context, args) => {
@@ -300,20 +293,18 @@ function buildVersionDiffTool(
     name: `Get${row.display}VersionDiff`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
     description: `[read-only] Compares the two ${row.label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.${row.note ? ` ${row.note}` : ''}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        content_uri_from: {
-          type: 'string',
-          description: `Opaque content_uri of the OLD/base version, from the ${row.label}'s version history.`,
-        },
-        content_uri_to: {
-          type: 'string',
-          description: `Opaque content_uri of the NEW/compare version, from the ${row.label}'s version history.`,
-        },
-      },
-      required: ['content_uri_from', 'content_uri_to'],
-    },
+    inputSchema: z.object({
+      content_uri_from: z
+        .string()
+        .describe(
+          `Opaque content_uri of the OLD/base version, from the ${row.label}'s version history.`,
+        ),
+      content_uri_to: z
+        .string()
+        .describe(
+          `Opaque content_uri of the NEW/compare version, from the ${row.label}'s version history.`,
+        ),
+    }),
   };
 
   const handler: RawHandler = async (context, args) => {

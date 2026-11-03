@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * LockObject Handler - Lock ABAP object for modification via ADT API
  *
@@ -52,43 +53,35 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Lock an ABAP object for modification. Returns the lock handle the update and the unlock take; the lock stays in the instance’s session until the unlock or the instance’s end.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description:
-          'Object name. For function modules, use format GROUP|FM_NAME',
-      },
-      object_type: {
-        type: 'string',
-        description: 'Object type',
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'behavior_implementation',
-          'metadata_extension',
-          'service_definition',
-          'service_binding',
-        ],
-      },
-      super_package: {
-        type: 'string',
-        description: 'Super package (required for package locking)',
-      },
-    },
-    required: ['object_name', 'object_type'],
-  },
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .describe('Object name. For function modules, use format GROUP|FM_NAME'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'behavior_implementation',
+        'metadata_extension',
+        'service_definition',
+        'service_binding',
+      ])
+      .describe('Object type'),
+    super_package: z
+      .string()
+      .optional()
+      .describe('Super package (required for package locking)'),
+  }),
 } as const;
 
 interface LockObjectArgs {

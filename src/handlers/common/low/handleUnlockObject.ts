@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * UnlockObject Handler - Unlock ABAP object after modification via ADT API
  *
@@ -53,43 +54,32 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Unlock an ABAP object after modification, with the lock_handle the LockObject operation answered (the lock stays in the instance’s own session until then).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description:
-          'Object name. For function modules, use format GROUP|FM_NAME',
-      },
-      object_type: {
-        type: 'string',
-        description: 'Object type',
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'behavior_implementation',
-          'metadata_extension',
-          'service_definition',
-          'service_binding',
-        ],
-      },
-      lock_handle: {
-        type: 'string',
-        description: 'Lock handle from LockObject operation',
-      },
-    },
-    required: ['object_name', 'object_type', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .describe('Object name. For function modules, use format GROUP|FM_NAME'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'behavior_implementation',
+        'metadata_extension',
+        'service_definition',
+        'service_binding',
+      ])
+      .describe('Object type'),
+    lock_handle: z.string().describe('Lock handle from LockObject operation'),
+  }),
 } as const;
 
 interface UnlockObjectArgs {

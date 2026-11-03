@@ -45,7 +45,7 @@ import {
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
-import { listedJson } from '../../helpers/listedJson';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 import {
   type RecordingConnection,
   recordingConnection,
@@ -1171,16 +1171,22 @@ describe('the table-type version tools', () => {
       expect(VERSIONED_KINDS[variant]).toContain('table_type');
       expect(VERSION_SOURCE_KINDS[variant]).not.toContain('table_type');
       expect(
-        GET_OBJECT_VERSION_SOURCE.variants[variant].inputSchema.properties
-          .object_type.enum,
+        jsonAt(
+          listedJson(GET_OBJECT_VERSION_SOURCE.variants[variant].inputSchema),
+          'object_type',
+        ).enum,
       ).not.toContain('table_type');
       expect(
-        GET_OBJECT_VERSION_DIFF.variants[variant].inputSchema.properties
-          .object_type.enum,
+        jsonAt(
+          listedJson(GET_OBJECT_VERSION_DIFF.variants[variant].inputSchema),
+          'object_type',
+        ).enum,
       ).not.toContain('table_type');
       expect(
-        GET_OBJECT_VERSIONS.variants[variant].inputSchema.properties.object_type
-          .enum,
+        jsonAt(
+          listedJson(GET_OBJECT_VERSIONS.variants[variant].inputSchema),
+          'object_type',
+        ).enum,
       ).toContain('table_type');
     },
   );

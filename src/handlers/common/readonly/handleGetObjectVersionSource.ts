@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetObjectVersionSource Handler - read-only fetch of one version's source.
  *
@@ -36,23 +37,18 @@ export const TOOL_DEFINITION = {
 
 /** GetObjectVersionSource's input on `variant`. */
 function objectVersionSourceSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      object_type: {
-        type: 'string',
-        description:
-          'Object type (the same value the version history was read with).',
-        enum: VERSION_SOURCE_KINDS[variant],
-      },
-      content_uri: {
-        type: 'string',
-        description:
-          "Opaque content_uri of a version, from the object's version history.",
-      },
-    },
-    required: ['object_type', 'content_uri'],
-  } as const;
+  return z.object({
+    object_type: z
+      .enum(VERSION_SOURCE_KINDS[variant])
+      .describe(
+        'Object type (the same value the version history was read with).',
+      ),
+    content_uri: z
+      .string()
+      .describe(
+        "Opaque content_uri of a version, from the object's version history.",
+      ),
+  });
 }
 
 interface GetObjectVersionSourceArgs {

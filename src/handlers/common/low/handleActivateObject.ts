@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  *
@@ -172,44 +173,31 @@ export const TOOL_DEFINITION = {
 
 /** ActivateObjectLow's input on `variant`. */
 function activateObjectSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      objects: {
-        type: 'array',
-        description:
-          "Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.",
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Object name in uppercase' },
-            type: {
-              type: 'string',
-              description: activationTypeDescription(variant),
-            },
-            uri: { type: 'string', description: 'Optional ADT URI' },
-            parentName: {
-              type: 'string',
-              description: activationParentDescription(variant),
-            },
-          },
-          required: ['name', 'type'],
-        },
-      },
-      preaudit: {
-        type: 'boolean',
-        description: preauditDescription(variant),
-      },
-      detail: {
-        type: 'string',
-        enum: ['terse', 'full', 'raw'],
-        default: 'terse',
-        description:
-          'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.',
-      },
-    },
-    required: ['objects'],
-  } as const;
+  return z.object({
+    objects: z
+      .array(
+        z.object({
+          name: z.string().describe('Object name in uppercase'),
+          type: z.string().describe(activationTypeDescription(variant)),
+          uri: z.string().optional().describe('Optional ADT URI'),
+          parentName: z
+            .string()
+            .optional()
+            .describe(activationParentDescription(variant)),
+        }),
+      )
+      .describe(
+        "Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.",
+      ),
+    preaudit: z.boolean().optional().describe(preauditDescription(variant)),
+    detail: z
+      .enum(['terse', 'full', 'raw'])
+      .default('terse')
+      .optional()
+      .describe(
+        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.',
+      ),
+  });
 }
 
 /**

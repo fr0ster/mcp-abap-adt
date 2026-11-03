@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckObject Handler - Syntax check for ABAP objects via ADT API.
  *
@@ -41,7 +43,7 @@ import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -51,47 +53,37 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description: 'Object name',
-      },
-      object_type: {
-        type: 'string',
-        description: 'Object type',
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'metadata_extension',
-        ],
-      },
-      source_code: {
-        type: 'string',
-        description:
-          'Source to check instead of the saved one (class, structure, ddl only); nothing is saved.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' or 'inactive' (default active)",
-        enum: ['active', 'inactive'],
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['object_name', 'object_type'],
-  },
+  inputSchema: z.object({
+    object_name: z.string().describe('Object name'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'metadata_extension',
+      ])
+      .describe('Object type'),
+    source_code: z
+      .string()
+      .optional()
+      .describe(
+        'Source to check instead of the saved one (class, structure, ddl only); nothing is saved.',
+      ),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe("Version to check: 'active' or 'inactive' (default active)"),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CheckObjectArgs {

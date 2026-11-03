@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetObjectVersionDiff Handler - read-only unified diff between two versions.
  *
@@ -136,28 +137,23 @@ export const TOOL_DEFINITION = {
 
 /** GetObjectVersionDiff's input on `variant`. */
 function objectVersionDiffSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      object_type: {
-        type: 'string',
-        description:
-          'Object type (the same value the version history was read with).',
-        enum: VERSION_SOURCE_KINDS[variant],
-      },
-      content_uri_from: {
-        type: 'string',
-        description:
-          "Opaque content_uri of the OLD/base version (from the object's version history).",
-      },
-      content_uri_to: {
-        type: 'string',
-        description:
-          "Opaque content_uri of the NEW/compare version (from the object's version history).",
-      },
-    },
-    required: ['object_type', 'content_uri_from', 'content_uri_to'],
-  } as const;
+  return z.object({
+    object_type: z
+      .enum(VERSION_SOURCE_KINDS[variant])
+      .describe(
+        'Object type (the same value the version history was read with).',
+      ),
+    content_uri_from: z
+      .string()
+      .describe(
+        "Opaque content_uri of the OLD/base version (from the object's version history).",
+      ),
+    content_uri_to: z
+      .string()
+      .describe(
+        "Opaque content_uri of the NEW/compare version (from the object's version history).",
+      ),
+  });
 }
 
 interface GetObjectVersionDiffArgs {

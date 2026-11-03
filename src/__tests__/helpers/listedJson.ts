@@ -67,3 +67,23 @@ function optionalField(field: z.ZodType): boolean {
     field instanceof z.ZodDefault && field.unwrap() instanceof z.ZodOptional
   );
 }
+
+/** The node at `path` under `schema` (as {@link jsonAt}), or `undefined` when there is none. */
+export function jsonFind(
+  schema: JsonSchema,
+  ...path: string[]
+): JsonSchema | undefined {
+  let node = schema;
+  for (const step of path) {
+    const next = step === '[]' ? node.items : node.properties?.[step];
+    if (
+      next === undefined ||
+      typeof next === 'boolean' ||
+      Array.isArray(next)
+    ) {
+      return undefined;
+    }
+    node = next;
+  }
+  return node;
+}

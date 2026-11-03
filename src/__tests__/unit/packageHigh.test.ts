@@ -74,12 +74,12 @@ const shape = (requests: { method: string; url: string }[]) =>
 function compactTool(connection: unknown, name: string) {
   const context = ctx(connection);
   const entries: HandlerEntry[] = [
-    ...compactModifyEntries(() => context),
-    ...compactReadOnlyEntries(() => context),
+    ...compactModifyEntries(),
+    ...compactReadOnlyEntries(),
   ];
   const entry = entries.find((e) => e.toolDefinition.name === name);
   if (!entry) throw new Error(name);
-  return entry.handler as unknown as (args: unknown) => Promise<unknown>;
+  return (args: unknown) => entry.call(context, args);
 }
 
 describe('UpdatePackage (high)', () => {

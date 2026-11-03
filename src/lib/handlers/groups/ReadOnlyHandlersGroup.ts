@@ -204,169 +204,164 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       // Existing readonly handlers
       {
         toolDefinition: GetTableContents_Tool,
-        handler: (args: any) => handleGetTableContents(this.context, args),
+        call: handleGetTableContents,
       },
       {
         toolDefinition: GetPackageContents_Tool,
-        handler: (args: any) => handleGetPackageContents(this.context, args),
+        call: handleGetPackageContents,
       },
       {
         toolDefinition: GetInclude_Tool,
-        handler: (args: any) => handleGetInclude(this.context, args),
+        call: handleGetInclude,
       },
       {
         toolDefinition: GetIncludesList_Tool,
-        handler: (args: any) => handleGetIncludesList(this.context, args),
+        call: handleGetIncludesList,
       },
       {
         toolDefinition: GetMainPrograms_Tool,
-        handler: (args: any) => handleGetMainPrograms(this.context, args),
+        call: handleGetMainPrograms,
       },
       {
         toolDefinition: GetEnhancements_Tool,
-        handler: (args: any) => handleGetEnhancements(this.context, args),
+        call: handleGetEnhancements,
       },
       {
         toolDefinition: GetEnhancementSpot_Tool,
-        handler: (args: any) => handleGetEnhancementSpot(this.context, args),
+        call: handleGetEnhancementSpot,
       },
       {
         toolDefinition: GetEnhancementImpl_Tool,
-        handler: (args: any) => handleGetEnhancementImpl(this.context, args),
+        call: handleGetEnhancementImpl,
       },
       {
         toolDefinition: GetTransport_Tool,
-        handler: (args: any) => handleGetTransport(this.context, args),
+        call: handleGetTransport,
       },
       {
         toolDefinition: ListTransports_Tool,
-        handler: (args: any) => handleListTransports(this.context, args),
+        call: handleListTransports,
       },
       {
         toolDefinition: ReadTransportObjects_Tool,
-        handler: (args: any) => handleReadTransportObjects(this.context, args),
+        call: handleReadTransportObjects,
       },
       {
         toolDefinition: ReadTransportActionLog_Tool,
-        handler: (args: any) =>
-          handleReadTransportActionLog(this.context, args),
+        call: handleReadTransportActionLog,
       },
       {
         toolDefinition: GetStructuresList_Tool,
-        handler: (args: any) => handleGetStructuresList(this.context, args),
+        call: handleGetStructuresList,
       },
       {
         toolDefinition: GetObjectVersions_Tool,
-        handler: (args: any) => handleGetObjectVersions(this.context, args),
+        call: handleGetObjectVersions,
       },
       {
         toolDefinition: GetObjectVersionSource_Tool,
-        handler: (args: any) =>
-          handleGetObjectVersionSource(this.context, args),
+        call: handleGetObjectVersionSource,
       },
       {
         toolDefinition: GetObjectVersionDiff_Tool,
-        handler: (args: any) => handleGetObjectVersionDiff(this.context, args),
+        call: handleGetObjectVersionDiff,
       },
       {
         toolDefinition: ListFunctionGroupIncludes_Tool,
-        handler: (args: any) =>
-          handleListFunctionGroupIncludes(this.context, args),
+        call: handleListFunctionGroupIncludes,
       },
       {
         toolDefinition: ListFunctionModules_Tool,
-        handler: (args: any) => handleListFunctionModules(this.context, args),
+        call: handleListFunctionModules,
       },
       // The object reads, one Get<Type> per type. All but GetFunctionInclude
       // are copies of high-level tools: same name, schema and handler,
       // withheld by getHandlers() when the high group is exposed alongside.
       {
         toolDefinition: GetBehaviorDefinition_Tool,
-        handler: (args: any) => handleGetBehaviorDefinition(this.context, args),
+        call: handleGetBehaviorDefinition,
       },
       {
         toolDefinition: GetBehaviorImplementation_Tool,
-        handler: (args: any) =>
-          handleGetBehaviorImplementation(this.context, args),
+        call: handleGetBehaviorImplementation,
       },
       {
         toolDefinition: GetClass_Tool,
-        handler: (args: any) => handleGetClass(this.context, args),
+        call: handleGetClass,
       },
       {
         toolDefinition: GetDataElement_Tool,
-        handler: (args: any) => handleGetDataElement(this.context, args),
+        call: handleGetDataElement,
       },
       {
         toolDefinition: GetDdl_Tool,
-        handler: (args: any) => handleGetDdl(this.context, args),
+        call: handleGetDdl,
       },
       {
         toolDefinition: GetDomain_Tool,
-        handler: (args: any) => handleGetDomain(this.context, args),
+        call: handleGetDomain,
       },
       {
         toolDefinition: GetTableType_Tool,
-        handler: (args: any) => handleGetTableType(this.context, args),
+        call: handleGetTableType,
       },
       {
         toolDefinition: GetFunctionGroup_Tool,
-        handler: (args: any) => handleGetFunctionGroup(this.context, args),
+        call: handleGetFunctionGroup,
       },
       {
         toolDefinition: GetFunctionInclude_Tool,
-        handler: (args: any) => handleGetFunctionInclude(this.context, args),
+        call: handleGetFunctionInclude,
       },
       {
         toolDefinition: GetFunctionModule_Tool,
-        handler: (args: any) => handleGetFunctionModule(this.context, args),
+        call: handleGetFunctionModule,
       },
       {
         toolDefinition: GetInterface_Tool,
-        handler: (args: any) => handleGetInterface(this.context, args),
+        call: handleGetInterface,
       },
       {
         toolDefinition: GetMessageClass_Tool,
-        handler: (args: any) => handleGetMessageClass(this.context, args),
+        call: handleGetMessageClass,
       },
       {
         toolDefinition: GetMessageClassMessage_Tool,
-        handler: (args: any) =>
-          handleGetMessageClassMessage(this.context, args),
+        call: handleGetMessageClassMessage,
       },
       {
         toolDefinition: GetMetadataExtension_Tool,
-        handler: (args: any) => handleGetMetadataExtension(this.context, args),
+        call: handleGetMetadataExtension,
       },
       {
         toolDefinition: GetPackage_Tool,
-        handler: (args: any) => handleGetPackage(this.context, args),
+        call: handleGetPackage,
       },
       {
         toolDefinition: GetProgram_Tool,
-        handler: (args: any) => handleGetProgram(this.context, args),
+        call: handleGetProgram,
       },
       {
         toolDefinition: GetServiceBinding_Tool,
-        handler: (args: any) => handleGetServiceBinding(this.context, args),
+        call: handleGetServiceBinding,
       },
       {
         toolDefinition: GetServiceDefinition_Tool,
-        handler: (args: any) => handleGetServiceDefinition(this.context, args),
+        call: handleGetServiceDefinition,
       },
       {
         toolDefinition: GetStructure_Tool,
-        handler: (args: any) => handleGetStructure(this.context, args),
+        call: handleGetStructure,
       },
       {
         toolDefinition: GetTable_Tool,
-        handler: (args: any) => handleGetTable(this.context, args),
+        call: handleGetTable,
       },
       // Copies of high-level tools: same name, schema and handler. Withheld
       // by getHandlers() when the high group is exposed alongside.
       {
         toolDefinition: GetUnitTestResult_Tool,
-        handler: (args: any) => handleGetUnitTestResult(this.context, args),
+        call: handleGetUnitTestResult,
       },
     ];
   }

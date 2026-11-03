@@ -81,7 +81,7 @@ const tool = (name: string, property: string, handler: Handler) =>
         properties: { [property]: { type: 'string' } },
       },
     },
-    handler: handler as never,
+    call: handler as never,
   }) as HandlerEntry;
 
 const group = {

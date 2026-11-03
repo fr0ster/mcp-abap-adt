@@ -314,7 +314,7 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
       ...namesOf([new HighLevelHandlersGroup(context)]).filter(
         (n) => !readonlyNames.includes(n),
       ),
-      ...compactModifyEntries(() => context).map((e) => e.toolDefinition.name),
+      ...compactModifyEntries().map((e) => e.toolDefinition.name),
     ],
     debug: [
       ...namesOf([new DebugHandlersGroup(context)]),

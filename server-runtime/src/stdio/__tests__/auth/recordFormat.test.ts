@@ -212,7 +212,7 @@ async function toolCall(name: string, over: object) {
           description: 'a tool',
           inputSchema: { type: 'object', properties: {} },
         },
-        handler: async (_context: unknown, _args: unknown) => {
+        call: async (_context: unknown, _args: unknown) => {
           reached();
           return { content: [{ type: 'text', text: 'read' }] };
         },

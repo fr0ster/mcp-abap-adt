@@ -31,16 +31,15 @@ export class RuntimeRunHandlersGroup extends BaseHandlerGroup {
     return [
       {
         toolDefinition: RuntimeCreateProfilerTraceParameters_Tool,
-        handler: (args: any) =>
-          handleRuntimeCreateProfilerTraceParameters(this.context, args),
+        call: handleRuntimeCreateProfilerTraceParameters,
       },
       {
         toolDefinition: RuntimeRunClass_Tool,
-        handler: (args: any) => handleRuntimeRunClass(this.context, args),
+        call: handleRuntimeRunClass,
       },
       {
         toolDefinition: RuntimeRunProgram_Tool,
-        handler: (args: any) => handleRuntimeRunProgram(this.context, args),
+        call: handleRuntimeRunProgram,
       },
     ];
   }

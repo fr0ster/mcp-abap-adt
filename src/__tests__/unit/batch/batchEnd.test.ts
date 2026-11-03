@@ -128,7 +128,7 @@ function own(
             },
           },
         },
-        handler: async (context: HandlerContext, _args: unknown) =>
+        call: async (context: HandlerContext, _args: unknown) =>
           handler(context),
       },
     ],
@@ -629,7 +629,7 @@ describe('BatchEnd', () => {
             },
           },
           // Two parameters: the server hands `(context, args)` by the arity.
-          handler: async (context: HandlerContext, _args: unknown) => {
+          call: async (context: HandlerContext, _args: unknown) => {
             await context.connection.makeAdtRequest({
               url: '/sap/bc/adt/programs/programs/prog_a/source/main',
               method: 'GET',

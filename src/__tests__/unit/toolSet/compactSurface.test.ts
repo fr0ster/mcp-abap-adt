@@ -51,10 +51,9 @@ describe('the compact tool surface', () => {
     ),
   );
 
-  const context = () => ({}) as never;
   const current = [
-    ...compactReadOnlyEntries(context),
-    ...compactModifyEntries(context),
+    ...compactReadOnlyEntries(),
+    ...compactModifyEntries(),
     ...compactDebugEntries(),
     ...compactDebugBatchEntries(),
     ...compactBatchEntries(),

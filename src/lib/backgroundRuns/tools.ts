@@ -10,6 +10,7 @@
  * the list with it, fails.
  */
 
+import * as z from 'zod';
 import type { ToolDefinition } from '../handlers/interfaces.js';
 
 /** The tools that take `background`, with the names of the tools that read and discard their runs. */
@@ -69,6 +70,11 @@ export function withoutBackgroundParameter(
 function schemaWithoutBackground(
   schema: ToolDefinition['inputSchema'],
 ): ToolDefinition['inputSchema'] {
+  if (schema instanceof z.ZodObject) {
+    return 'background' in schema.shape
+      ? schema.omit({ background: true })
+      : schema;
+  }
   const { background: _left, ...properties } = schema.properties ?? {};
   return { ...schema, properties };
 }

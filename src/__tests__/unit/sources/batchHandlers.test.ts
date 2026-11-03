@@ -123,7 +123,7 @@ function groupRegisters(tool: string, fn: string): boolean {
     const source = fs.readFileSync(path.join(GROUPS_DIR, file), 'utf8');
     const at = source.indexOf(`name: '${tool}',`);
     if (at === -1) continue;
-    const handlerAt = source.indexOf('handler:', at);
+    const handlerAt = source.indexOf('call:', at);
     const nextName = source.indexOf('name:', at + 1);
     const registration = source.slice(
       handlerAt,
@@ -132,7 +132,8 @@ function groupRegisters(tool: string, fn: string): boolean {
     if (
       handlerAt !== -1 &&
       (nextName === -1 || handlerAt < nextName) &&
-      registration.includes(`(${fn})`)
+      (registration.includes(`(${fn})`) ||
+        registration.includes(`call: ${fn},`))
     ) {
       return true;
     }

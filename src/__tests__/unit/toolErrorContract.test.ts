@@ -25,7 +25,7 @@ const STUBS: HandlerEntry[] = [
       description: 'returns an isError result',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: async () => ({
+    call: async () => ({
       isError: true,
       content: [{ type: 'text', text: 'Domain ZD_NOPE not found' }],
     }),
@@ -36,7 +36,7 @@ const STUBS: HandlerEntry[] = [
       description: 'throws a plain Error',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: async () => {
+    call: async () => {
       throw new Error('Failed to read class: ZZ not found');
     },
   },
@@ -46,7 +46,7 @@ const STUBS: HandlerEntry[] = [
       description: 'returns multi-item content',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: async () => ({
+    call: async () => ({
       isError: true,
       content: [
         { type: 'text', text: 'first item' },
@@ -60,7 +60,7 @@ const STUBS: HandlerEntry[] = [
       description: 'throws an AxiosError with a response body',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: async () => {
+    call: async () => {
       const err = new AxiosError('Request failed with status code 404');
       (err as any).response = {
         status: 404,
@@ -80,7 +80,7 @@ const STUBS: HandlerEntry[] = [
       description: 'throws an SDK McpError, as an external handler group might',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: async () => {
+    call: async () => {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
     },
   },

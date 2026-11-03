@@ -50,6 +50,9 @@ export interface VariantToolDefinition {
   readonly members?: readonly string[];
 }
 
+/** A tool call's arguments as they reach the server, before its own schema reads them. */
+export type ToolArgs = Readonly<Record<string, unknown>>;
+
 /** A handler that takes the call's context and its arguments. */
 export type ContextHandler = (
   context: HandlerContext,
@@ -57,25 +60,13 @@ export type ContextHandler = (
 ) => Promise<any>;
 
 /**
- * A handler that takes its arguments alone and reads its group's context
- * (`(args) => handleX(this.context, args)`).
- */
-export type ArgsOnlyHandler = (args: any) => Promise<any>;
-
-/**
- * Tool handler function type, in either form: every registration path calls
- * it in the form it takes (`callInItsForm`), decided by its parameter count
- * (`isArgsOnly`). Context (containing connection and logger) is not part of
- * the MCP tool signature.
- */
-export type ToolHandler = ContextHandler | ArgsOnlyHandler;
-
-/**
- * Handler registration entry
+ * Handler registration entry: the tool's definition and how one of its calls
+ * runs, given the call's context and its arguments. Every registration path
+ * passes the call's context at the call.
  */
 export interface HandlerEntry {
-  toolDefinition: ToolDefinition;
-  handler: ToolHandler;
+  readonly toolDefinition: ToolDefinition;
+  readonly call: ContextHandler;
   /**
    * The tool works on no connection of the instance: the server calls it
    * without building or connecting one first (the leftover-session tools,
@@ -83,15 +74,13 @@ export interface HandlerEntry {
    * A function decides per call, on the arguments as the SDK parsed them,
    * before any connection is taken (`HandlerBatch`: every action but `end`).
    */
-  connectionless?: true | ((args: unknown) => boolean);
+  readonly connectionless?: true | ((args: unknown) => boolean);
 }
 
 /**
  * Pairs a tool definition with its handler, checked by the compiler: the
  * handler must take the arguments the definition's schema declares
- * (`ArgsOf`). The entry it answers is the ordinary, erased `HandlerEntry`, so
- * registration is unchanged; the handler takes `(context, args)`, and every
- * registration path passes the call's context to such a handler.
+ * (`ArgsOf`). The entry it answers is the ordinary, erased `HandlerEntry`.
  */
 export function defineTool<const D extends ToolDefinition>(
   toolDefinition: D,
@@ -100,7 +89,7 @@ export function defineTool<const D extends ToolDefinition>(
     args: ArgsOf<D['inputSchema']>,
   ) => Promise<unknown>,
 ): HandlerEntry {
-  return { toolDefinition, handler };
+  return { toolDefinition, call: handler };
 }
 
 /**
@@ -140,16 +129,9 @@ export interface IHandlersRegistry {
   /**
    * Registers a single tool on server
    * @param server - McpServer instance
-   * @param toolName - tool name
-   * @param toolDefinition - tool definition (name, description, inputSchema)
-   * @param handler - handler function
+   * @param entry - the tool's definition and its call
    */
-  registerTool(
-    server: McpServer,
-    toolName: string,
-    toolDefinition: ToolDefinition,
-    handler: ToolHandler,
-  ): void;
+  registerTool(server: McpServer, entry: HandlerEntry): void;
 
   /**
    * Gets list of registered tools

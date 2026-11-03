@@ -1,16 +1,12 @@
 /**
  * A compact handler runs against the connection of THIS request.
  *
- * **The bug this exists for.** `BaseMcpServer` builds a fresh context per call —
- * `{ connection: await this.getConnection(), logger }` — and hands it to the group
- * that owns the entry, through `setContext` when there is one and `group.context =`
- * otherwise. So a handler must read the context when it is CALLED. When
- * `CompactHandlersGroup` was first composed out of the two halves it instantiated
- * them with `this.context`, and their handlers closed over those child instances:
- * the server updated the parent, the children kept the context from construction,
- * and a call ran against a stale connection — or against the `null` a server holds
- * before it has connected. Found in review on PR #240, and invisible to every other
- * suite, which builds a group and calls it without ever replacing the context.
+ * `BaseMcpServer` builds a fresh context per call —
+ * `{ connection: await this.getConnection(), logger }` — and passes it to the
+ * entry's call. When `CompactHandlersGroup` was first composed out of the two
+ * halves, their handlers closed over a context of their own and a call ran
+ * against a stale connection (found in review on PR #240). An entry now holds
+ * no context: it runs on the one its call is given.
  *
  * The three groups are checked the same way, because the composition is what broke
  * and the halves are what a consumer imports directly.
@@ -72,11 +68,7 @@ describe('compact groups read the context of the current request', () => {
       };
       (group as unknown as { context: HandlerContext }).context = probe;
 
-      // The entry's declared type allows (context, args); these are built as
-      // args-only closures, which is the shape BaseMcpServer detects by arity.
-      await (
-        entries[0].handler as unknown as (args: unknown) => Promise<unknown>
-      )({});
+      await entries[0].call(probe, {});
 
       // The handler logged through the context it was given, so it read the
       // current one rather than the one captured at build time.

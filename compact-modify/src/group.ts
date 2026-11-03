@@ -16,7 +16,7 @@
  * binaries serve.
  */
 
-import type { HandlerContext, HandlerEntry } from '@mcp-abap-adt/lib/handlers';
+import type { HandlerEntry } from '@mcp-abap-adt/lib/handlers';
 import { BaseHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import {
   TOOL_DEFINITION as HandlerActivate_Tool,
@@ -68,69 +68,58 @@ import {
 } from './handlers/handleHandlerUpdate';
 
 /**
- * The entries, built against a LIVE context rather than a snapshot.
- *
- * Same contract as the read-only half: the context is read per call, from
- * whichever group owns the entry. See `compactReadOnlyEntries` for why a snapshot
- * is wrong.
+ * The entries: each takes the call's context at the call, as the read-only
+ * half's do.
  */
-export function compactModifyEntries(
-  getContext: () => HandlerContext,
-): HandlerEntry[] {
-  const withContext = <TArgs, TResult>(
-    handler: (context: HandlerContext, args: TArgs) => TResult,
-  ) => {
-    return (args: unknown) => handler(getContext(), args as TArgs);
-  };
-
+export function compactModifyEntries(): HandlerEntry[] {
   return [
     {
       toolDefinition: HandlerCreate_Tool,
-      handler: withContext(handleHandlerCreate),
+      call: handleHandlerCreate,
     },
     {
       toolDefinition: HandlerUpdate_Tool,
-      handler: withContext(handleHandlerUpdate),
+      call: handleHandlerUpdate,
     },
     {
       toolDefinition: HandlerDelete_Tool,
-      handler: withContext(handleHandlerDelete),
+      call: handleHandlerDelete,
     },
     {
       toolDefinition: HandlerActivate_Tool,
-      handler: withContext(handleHandlerActivate),
+      call: handleHandlerActivate,
     },
     {
       toolDefinition: HandlerTransportCreate_Tool,
-      handler: withContext(handleHandlerTransportCreate),
+      call: handleHandlerTransportCreate,
     },
     {
       toolDefinition: HandlerTransportSortAndCompress_Tool,
-      handler: withContext(handleHandlerTransportSortAndCompress),
+      call: handleHandlerTransportSortAndCompress,
     },
     {
       toolDefinition: HandlerTransportMoveObjects_Tool,
-      handler: withContext(handleHandlerTransportMoveObjects),
+      call: handleHandlerTransportMoveObjects,
     },
     {
       toolDefinition: HandlerLock_Tool,
-      handler: withContext(handleHandlerLock),
+      call: handleHandlerLock,
     },
     {
       toolDefinition: HandlerUnlock_Tool,
-      handler: withContext(handleHandlerUnlock),
+      call: handleHandlerUnlock,
     },
     {
       toolDefinition: HandlerUnitTestRun_Tool,
-      handler: withContext(handleHandlerUnitTestRun),
+      call: handleHandlerUnitTestRun,
     },
     {
       toolDefinition: HandlerProfileSchedule_Tool,
-      handler: withContext(handleHandlerProfileSchedule),
+      call: handleHandlerProfileSchedule,
     },
     {
       toolDefinition: HandlerProfileRun_Tool,
-      handler: withContext(handleHandlerProfileRun),
+      call: handleHandlerProfileRun,
     },
   ];
 }
@@ -139,6 +128,6 @@ export class CompactModifyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactModifyHandlers';
 
   getHandlers(): HandlerEntry[] {
-    return compactModifyEntries(() => this.context);
+    return compactModifyEntries();
   }
 }

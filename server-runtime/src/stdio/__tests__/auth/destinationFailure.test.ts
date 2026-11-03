@@ -273,7 +273,7 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
             description: 'a tool that would read the system',
             inputSchema: { type: 'object', properties: {} },
           },
-          handler: async () => {
+          call: async () => {
             reached();
             return { content: [{ type: 'text', text: 'read' }] };
           },

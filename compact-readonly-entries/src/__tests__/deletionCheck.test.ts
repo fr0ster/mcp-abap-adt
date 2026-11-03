@@ -247,9 +247,7 @@ describe('HandlerDeletionCheck is served by compact and compact-ro', () => {
   ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
   it('the read-only half carries it', () => {
-    const read = compactReadOnlyEntries(() => context).map(
-      (e) => e.toolDefinition.name,
-    );
+    const read = compactReadOnlyEntries().map((e) => e.toolDefinition.name);
     expect(read).toContain('HandlerDeletionCheck');
   });
 

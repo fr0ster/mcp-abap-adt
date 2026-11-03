@@ -77,9 +77,7 @@ describe('HandlerGet with object_type TRANSPORT', () => {
   });
 
   it('is still the one HandlerGet tool', () => {
-    const names = compactReadOnlyEntries(() => ({}) as never).map(
-      (e) => e.toolDefinition.name,
-    );
+    const names = compactReadOnlyEntries().map((e) => e.toolDefinition.name);
     expect(names.filter((n) => n === 'HandlerGet')).toHaveLength(1);
   });
 

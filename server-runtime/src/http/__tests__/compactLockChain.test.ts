@@ -36,7 +36,7 @@ const loseGroup: IHandlerGroup = {
         description: 'marks the session lost',
         inputSchema: { type: 'object', properties: {} },
       } as never,
-      handler: (async (
+      call: (async (
         context: { connection: { isConnected?: () => boolean } },
         _args: unknown,
       ) => {
@@ -61,7 +61,7 @@ const echoGroup: IHandlerGroup = {
           properties: { value: { type: 'string' } },
         },
       } as never,
-      handler: (async (_context: unknown, args: unknown) => ({
+      call: (async (_context: unknown, args: unknown) => ({
         content: [{ type: 'text', text: JSON.stringify(args) }],
       })) as never,
     },

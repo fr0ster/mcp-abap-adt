@@ -83,7 +83,7 @@ const reportingRegistry = new CompositeHandlersRegistry([
     getHandlers: (): HandlerEntry[] => [
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
-        handler: (async () => {
+        call: (async () => {
           const seen = getStatedSystemContext();
           return {
             content: [

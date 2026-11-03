@@ -39,7 +39,7 @@ const group = {
         description: 'a tool',
         inputSchema: { type: 'object', properties: {} },
       },
-      handler: async () => ({ content: [{ type: 'text', text: 'read' }] }),
+      call: async () => ({ content: [{ type: 'text', text: 'read' }] }),
     },
   ],
   registerHandlers: () => {},

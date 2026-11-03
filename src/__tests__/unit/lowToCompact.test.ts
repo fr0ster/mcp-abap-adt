@@ -171,14 +171,9 @@ const LOW_TOOLS_BEFORE_REMOVAL = [
   'GetObjectStructureLow',
 ];
 
-/** The compact tools, each reading the stand-in's context at call time. */
-function compactTools(
-  getContext: () => HandlerContext,
-): Map<string, HandlerEntry> {
-  const entries = [
-    ...compactModifyEntries(getContext),
-    ...compactReadOnlyEntries(getContext),
-  ];
+/** The compact tools, each given the stand-in's context at the call. */
+function compactTools(): Map<string, HandlerEntry> {
+  const entries = [...compactModifyEntries(), ...compactReadOnlyEntries()];
   return new Map(entries.map((e) => [e.toolDefinition.name, e]));
 }
 
@@ -207,13 +202,11 @@ async function compactRequests(row: LowToCompactRow): Promise<ParityRequest[]> {
     connection,
     logger: silentLogger,
   } as unknown as HandlerContext;
-  const tools = compactTools(() => context);
+  const tools = compactTools();
   for (const call of row.compact) {
     const entry = tools.get(call.tool);
     if (!entry) throw new Error(`no compact tool ${call.tool}`);
-    await (entry.handler as unknown as (args: unknown) => Promise<unknown>)(
-      declared(entry, call.args),
-    );
+    await entry.call(context, declared(entry, call.args));
   }
   return parityRequests(connection.requests);
 }

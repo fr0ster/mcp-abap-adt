@@ -48,7 +48,7 @@ const loseSession: HandlerEntry = {
       required: ['id'],
     },
   },
-  handler: (async (
+  call: (async (
     context: {
       connection: {
         makeAdtRequest(o: object): Promise<unknown>;
@@ -88,7 +88,7 @@ const readAndCheck: HandlerEntry = {
       required: ['id'],
     },
   },
-  handler: (async (
+  call: (async (
     context: { connection: { makeAdtRequest(o: object): Promise<unknown> } },
     args: { id: string },
   ) => {

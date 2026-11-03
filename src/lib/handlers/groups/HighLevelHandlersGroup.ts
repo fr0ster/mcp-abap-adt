@@ -624,17 +624,11 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
    * Gets all high-level handler entries
    */
   getHandlers(): HandlerEntry[] {
-    const withContext = <TArgs, TResult>(
-      handler: (context: typeof this.context, args: TArgs) => TResult,
-    ) => {
-      return (args: unknown) => handler(this.context, args as TArgs);
-    };
-
     const entries: HandlerEntry[] = [
       // Common — group activation
       {
         toolDefinition: ActivateObjects_Tool,
-        handler: withContext(handleActivateObjects),
+        call: handleActivateObjects,
       },
       // Per-type activation (reused from low-level, with high-level names/descriptions)
       {
@@ -644,7 +638,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP domain named by domain_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateDomain),
+        call: handleActivateDomain,
       },
       {
         toolDefinition: {
@@ -653,7 +647,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP table type named by table_type_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateTableType),
+        call: handleActivateTableType,
       },
       {
         toolDefinition: {
@@ -662,7 +656,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP data element named by data_element_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateDataElement),
+        call: handleActivateDataElement,
       },
       {
         toolDefinition: {
@@ -671,7 +665,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP database table named by table_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateTable),
+        call: handleActivateTable,
       },
       {
         toolDefinition: {
@@ -680,7 +674,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP structure named by structure_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateStructure),
+        call: handleActivateStructure,
       },
       {
         toolDefinition: {
@@ -689,7 +683,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the CDS view (DDL source) named by ddl_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateDdl),
+        call: handleActivateDdl,
       },
       {
         toolDefinition: {
@@ -698,7 +692,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP class named by class_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateClass),
+        call: handleActivateClass,
       },
       {
         toolDefinition: {
@@ -707,7 +701,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP interface named by interface_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateInterface),
+        call: handleActivateInterface,
       },
       {
         toolDefinition: {
@@ -716,7 +710,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP program (report) named by program_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateProgram),
+        call: handleActivateProgram,
       },
       {
         toolDefinition: {
@@ -725,7 +719,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP include named by include_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateInclude),
+        call: handleActivateInclude,
       },
       {
         toolDefinition: {
@@ -734,7 +728,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateFunctionModule),
+        call: handleActivateFunctionModule,
       },
       {
         toolDefinition: {
@@ -743,7 +737,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the ABAP function group named by function_group_name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateFunctionGroup),
+        call: handleActivateFunctionGroup,
       },
       {
         toolDefinition: {
@@ -752,7 +746,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the RAP behavior definition named by name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateBehaviorDefinition),
+        call: handleActivateBehaviorDefinition,
       },
       {
         toolDefinition: {
@@ -761,7 +755,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the CDS metadata extension named by name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateMetadataExtension),
+        call: handleActivateMetadataExtension,
       },
       {
         toolDefinition: {
@@ -770,7 +764,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the service definition named by name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateServiceDefinition),
+        call: handleActivateServiceDefinition,
       },
       {
         toolDefinition: {
@@ -779,551 +773,551 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description:
             'Activates the OData service binding named by name, so its inactive version is in force.',
         },
-        handler: withContext(handleActivateServiceBinding),
+        call: handleActivateServiceBinding,
       },
       {
         toolDefinition: CreatePackage_Tool,
-        handler: withContext(handleCreatePackage),
+        call: handleCreatePackage,
       },
       {
         toolDefinition: UpdatePackage_Tool,
-        handler: withContext(handleUpdatePackage),
+        call: handleUpdatePackage,
       },
       {
         toolDefinition: DeletePackage_Tool,
-        handler: withContext(handleDeletePackage),
+        call: handleDeletePackage,
       },
       {
         toolDefinition: GetPackage_Tool,
-        handler: withContext(handleGetPackage),
+        call: handleGetPackage,
       },
       {
         toolDefinition: CreateDomain_Tool,
-        handler: withContext(handleCreateDomain),
+        call: handleCreateDomain,
       },
       {
         toolDefinition: GetDomain_Tool,
-        handler: withContext(handleGetDomain),
+        call: handleGetDomain,
       },
       {
         toolDefinition: GetTableType_Tool,
-        handler: withContext(handleGetTableType),
+        call: handleGetTableType,
       },
       {
         toolDefinition: CreateTableType_Tool,
-        handler: withContext(handleCreateTableType),
+        call: handleCreateTableType,
       },
       {
         toolDefinition: UpdateTableType_Tool,
-        handler: withContext(handleUpdateTableType),
+        call: handleUpdateTableType,
       },
       {
         toolDefinition: DeleteTableType_Tool,
-        handler: withContext(handleDeleteTableType),
+        call: handleDeleteTableType,
       },
       {
         toolDefinition: CheckTableType_Tool,
-        handler: withContext(handleCheckTableType),
+        call: handleCheckTableType,
       },
       {
         toolDefinition: UpdateDomainHigh_Tool,
-        handler: withContext(handleUpdateDomainHigh),
+        call: handleUpdateDomainHigh,
       },
       {
         toolDefinition: DeleteDomain_Tool,
-        handler: withContext(handleDeleteDomain),
+        call: handleDeleteDomain,
       },
       {
         toolDefinition: GetMessageClass_Tool,
-        handler: withContext(handleGetMessageClass),
+        call: handleGetMessageClass,
       },
       {
         toolDefinition: CreateMessageClass_Tool,
-        handler: withContext(handleCreateMessageClass),
+        call: handleCreateMessageClass,
       },
       {
         toolDefinition: UpdateMessageClass_Tool,
-        handler: withContext(handleUpdateMessageClass),
+        call: handleUpdateMessageClass,
       },
       {
         toolDefinition: DeleteMessageClass_Tool,
-        handler: withContext(handleDeleteMessageClass),
+        call: handleDeleteMessageClass,
       },
       {
         toolDefinition: GetMessageClassMessage_Tool,
-        handler: withContext(handleGetMessageClassMessage),
+        call: handleGetMessageClassMessage,
       },
       {
         toolDefinition: CreateMessageClassMessage_Tool,
-        handler: withContext(handleCreateMessageClassMessage),
+        call: handleCreateMessageClassMessage,
       },
       {
         toolDefinition: UpdateMessageClassMessage_Tool,
-        handler: withContext(handleUpdateMessageClassMessage),
+        call: handleUpdateMessageClassMessage,
       },
       {
         toolDefinition: DeleteMessageClassMessage_Tool,
-        handler: withContext(handleDeleteMessageClassMessage),
+        call: handleDeleteMessageClassMessage,
       },
       {
         toolDefinition: CreateDataElement_Tool,
-        handler: withContext(handleCreateDataElement),
+        call: handleCreateDataElement,
       },
       {
         toolDefinition: GetDataElement_Tool,
-        handler: withContext(handleGetDataElement),
+        call: handleGetDataElement,
       },
       {
         toolDefinition: UpdateDataElementHigh_Tool,
-        handler: withContext(handleUpdateDataElementHigh),
+        call: handleUpdateDataElementHigh,
       },
       {
         toolDefinition: DeleteDataElement_Tool,
-        handler: withContext(handleDeleteDataElement),
+        call: handleDeleteDataElement,
       },
       {
         toolDefinition: CreateTransport_Tool,
-        handler: withContext(handleCreateTransport),
+        call: handleCreateTransport,
       },
       {
         toolDefinition: CreateTransportTask_Tool,
-        handler: withContext(handleCreateTransportTask),
+        call: handleCreateTransportTask,
       },
       {
         toolDefinition: RemoveTransportObject_Tool,
-        handler: withContext(handleRemoveTransportObject),
+        call: handleRemoveTransportObject,
       },
       {
         toolDefinition: SortAndCompressTransportTask_Tool,
-        handler: withContext(handleSortAndCompressTransportTask),
+        call: handleSortAndCompressTransportTask,
       },
       {
         toolDefinition: MoveTransportObjects_Tool,
-        handler: withContext(handleMoveTransportObjects),
+        call: handleMoveTransportObjects,
       },
       {
         toolDefinition: AddTransportObject_Tool,
-        handler: withContext(handleAddTransportObject),
+        call: handleAddTransportObject,
       },
       {
         toolDefinition: CreateTable_Tool,
-        handler: withContext(handleCreateTable),
+        call: handleCreateTable,
       },
       {
         toolDefinition: GetTable_Tool,
-        handler: withContext(handleGetTable),
+        call: handleGetTable,
       },
       {
         toolDefinition: UpdateTableHigh_Tool,
-        handler: withContext(handleUpdateTableHigh),
+        call: handleUpdateTableHigh,
       },
       {
         toolDefinition: DeleteTable_Tool,
-        handler: withContext(handleDeleteTable),
+        call: handleDeleteTable,
       },
       {
         toolDefinition: CreateStructure_Tool,
-        handler: withContext(handleCreateStructure),
+        call: handleCreateStructure,
       },
       {
         toolDefinition: GetStructure_Tool,
-        handler: withContext(handleGetStructure),
+        call: handleGetStructure,
       },
       {
         toolDefinition: UpdateStructureHigh_Tool,
-        handler: withContext(handleUpdateStructureHigh),
+        call: handleUpdateStructureHigh,
       },
       {
         toolDefinition: DeleteStructure_Tool,
-        handler: withContext(handleDeleteStructure),
+        call: handleDeleteStructure,
       },
       {
         toolDefinition: CreateDdl_Tool,
-        handler: withContext(handleCreateDdl),
+        call: handleCreateDdl,
       },
       {
         toolDefinition: GetDdl_Tool,
-        handler: withContext(handleGetDdl),
+        call: handleGetDdl,
       },
       {
         toolDefinition: UpdateDdlHigh_Tool,
-        handler: withContext(handleUpdateDdlHigh),
+        call: handleUpdateDdlHigh,
       },
       {
         toolDefinition: DeleteDdl_Tool,
-        handler: withContext(handleDeleteDdl),
+        call: handleDeleteDdl,
       },
       {
         toolDefinition: CreateServiceDefinition_Tool,
-        handler: withContext(handleCreateServiceDefinition),
+        call: handleCreateServiceDefinition,
       },
       {
         toolDefinition: GetServiceDefinition_Tool,
-        handler: withContext(handleGetServiceDefinition),
+        call: handleGetServiceDefinition,
       },
       {
         toolDefinition: UpdateServiceDefinition_Tool,
-        handler: withContext(handleUpdateServiceDefinition),
+        call: handleUpdateServiceDefinition,
       },
       {
         toolDefinition: DeleteServiceDefinition_Tool,
-        handler: withContext(handleDeleteServiceDefinition),
+        call: handleDeleteServiceDefinition,
       },
       {
         toolDefinition: CreateServiceBinding_Tool,
-        handler: withContext(handleCreateServiceBinding),
+        call: handleCreateServiceBinding,
       },
       {
         toolDefinition: ListServiceBindingTypes_Tool,
-        handler: withContext(handleListServiceBindingTypes),
+        call: handleListServiceBindingTypes,
       },
       {
         toolDefinition: GetServiceBinding_Tool,
-        handler: withContext(handleGetServiceBinding),
+        call: handleGetServiceBinding,
       },
       {
         toolDefinition: UpdateServiceBinding_Tool,
-        handler: withContext(handleUpdateServiceBinding),
+        call: handleUpdateServiceBinding,
       },
       {
         toolDefinition: ValidateServiceBinding_Tool,
-        handler: withContext(handleValidateServiceBinding),
+        call: handleValidateServiceBinding,
       },
       {
         toolDefinition: DeleteServiceBinding_Tool,
-        handler: withContext(handleDeleteServiceBinding),
+        call: handleDeleteServiceBinding,
       },
       {
         toolDefinition: GetClass_Tool,
-        handler: withContext(handleGetClass),
+        call: handleGetClass,
       },
       {
         toolDefinition: CreateClass_Tool,
-        handler: withContext(handleCreateClass),
+        call: handleCreateClass,
       },
       {
         toolDefinition: UpdateClassHigh_Tool,
-        handler: withContext(handleUpdateClassHigh),
+        call: handleUpdateClassHigh,
       },
       {
         toolDefinition: DeleteClass_Tool,
-        handler: withContext(handleDeleteClass),
+        call: handleDeleteClass,
       },
       {
         toolDefinition: CreateUnitTest_Tool,
-        handler: withContext(handleCreateUnitTest),
+        call: handleCreateUnitTest,
       },
       {
         toolDefinition: RunUnitTest_Tool,
-        handler: withContext(handleRunUnitTest),
+        call: handleRunUnitTest,
       },
       {
         toolDefinition: GetUnitTestResult_Tool,
-        handler: withContext(handleGetUnitTestResult),
+        call: handleGetUnitTestResult,
       },
       {
         toolDefinition: UpdateUnitTest_Tool,
-        handler: withContext(handleUpdateUnitTest),
+        call: handleUpdateUnitTest,
       },
       {
         toolDefinition: DeleteUnitTest_Tool,
-        handler: withContext(handleDeleteUnitTest),
+        call: handleDeleteUnitTest,
       },
       {
         toolDefinition: CreateCdsUnitTest_Tool,
-        handler: withContext(handleCreateCdsUnitTest),
+        call: handleCreateCdsUnitTest,
       },
       {
         toolDefinition: UpdateCdsUnitTest_Tool,
-        handler: withContext(handleUpdateCdsUnitTest),
+        call: handleUpdateCdsUnitTest,
       },
       {
         toolDefinition: DeleteCdsUnitTest_Tool,
-        handler: withContext(handleDeleteCdsUnitTest),
+        call: handleDeleteCdsUnitTest,
       },
       {
         toolDefinition: RunCdsUnitTest_Tool,
-        handler: withContext(handleRunCdsUnitTest),
+        call: handleRunCdsUnitTest,
       },
       {
         toolDefinition: CreateProgramUnitTest_Tool,
-        handler: withContext(handleCreateProgramUnitTest),
+        call: handleCreateProgramUnitTest,
       },
       {
         toolDefinition: UpdateProgramUnitTest_Tool,
-        handler: withContext(handleUpdateProgramUnitTest),
+        call: handleUpdateProgramUnitTest,
       },
       {
         toolDefinition: RunProgramUnitTest_Tool,
-        handler: withContext(handleRunProgramUnitTest),
+        call: handleRunProgramUnitTest,
       },
       {
         toolDefinition: CreateFunctionGroupUnitTest_Tool,
-        handler: withContext(handleCreateFunctionGroupUnitTest),
+        call: handleCreateFunctionGroupUnitTest,
       },
       {
         toolDefinition: UpdateFunctionGroupUnitTest_Tool,
-        handler: withContext(handleUpdateFunctionGroupUnitTest),
+        call: handleUpdateFunctionGroupUnitTest,
       },
       {
         toolDefinition: RunFunctionGroupUnitTest_Tool,
-        handler: withContext(handleRunFunctionGroupUnitTest),
+        call: handleRunFunctionGroupUnitTest,
       },
       {
         toolDefinition: RunFunctionModuleUnitTest_Tool,
-        handler: withContext(handleRunFunctionModuleUnitTest),
+        call: handleRunFunctionModuleUnitTest,
       },
       {
         toolDefinition: RunAbapUnit_Tool,
-        handler: withContext(handleRunAbapUnit),
+        call: handleRunAbapUnit,
       },
       {
         toolDefinition: GetLocalTestClass_Tool,
-        handler: withContext(handleGetLocalTestClass),
+        call: handleGetLocalTestClass,
       },
       {
         toolDefinition: UpdateLocalTestClass_Tool,
-        handler: withContext(handleUpdateLocalTestClass),
+        call: handleUpdateLocalTestClass,
       },
       {
         toolDefinition: DeleteLocalTestClass_Tool,
-        handler: withContext(handleDeleteLocalTestClass),
+        call: handleDeleteLocalTestClass,
       },
       {
         toolDefinition: GetLocalTypes_Tool,
-        handler: withContext(handleGetLocalTypes),
+        call: handleGetLocalTypes,
       },
       {
         toolDefinition: UpdateLocalTypes_Tool,
-        handler: withContext(handleUpdateLocalTypes),
+        call: handleUpdateLocalTypes,
       },
       {
         toolDefinition: DeleteLocalTypes_Tool,
-        handler: withContext(handleDeleteLocalTypes),
+        call: handleDeleteLocalTypes,
       },
       {
         toolDefinition: GetLocalDefinitions_Tool,
-        handler: withContext(handleGetLocalDefinitions),
+        call: handleGetLocalDefinitions,
       },
       {
         toolDefinition: UpdateLocalDefinitions_Tool,
-        handler: withContext(handleUpdateLocalDefinitions),
+        call: handleUpdateLocalDefinitions,
       },
       {
         toolDefinition: DeleteLocalDefinitions_Tool,
-        handler: withContext(handleDeleteLocalDefinitions),
+        call: handleDeleteLocalDefinitions,
       },
       {
         toolDefinition: GetLocalMacros_Tool,
-        handler: withContext(handleGetLocalMacros),
+        call: handleGetLocalMacros,
       },
       {
         toolDefinition: UpdateLocalMacros_Tool,
-        handler: withContext(handleUpdateLocalMacros),
+        call: handleUpdateLocalMacros,
       },
       {
         toolDefinition: DeleteLocalMacros_Tool,
-        handler: withContext(handleDeleteLocalMacros),
+        call: handleDeleteLocalMacros,
       },
       {
         toolDefinition: CreateInclude_Tool,
-        handler: withContext(handleCreateInclude),
+        call: handleCreateInclude,
       },
       {
         toolDefinition: UpdateInclude_Tool,
-        handler: withContext(handleUpdateInclude),
+        call: handleUpdateInclude,
       },
       {
         toolDefinition: UpdateIncludeMetadata_Tool,
-        handler: withContext(handleUpdateIncludeMetadata),
+        call: handleUpdateIncludeMetadata,
       },
       {
         toolDefinition: DeleteInclude_Tool,
-        handler: withContext(handleDeleteInclude),
+        call: handleDeleteInclude,
       },
       {
         toolDefinition: CreateProgram_Tool,
-        handler: withContext(handleCreateProgram),
+        call: handleCreateProgram,
       },
       {
         toolDefinition: GetProgram_Tool,
-        handler: withContext(handleGetProgram),
+        call: handleGetProgram,
       },
       {
         toolDefinition: UpdateProgramHigh_Tool,
-        handler: withContext(handleUpdateProgramHigh),
+        call: handleUpdateProgramHigh,
       },
       {
         toolDefinition: DeleteProgram_Tool,
-        handler: withContext(handleDeleteProgram),
+        call: handleDeleteProgram,
       },
       {
         toolDefinition: CreateInterface_Tool,
-        handler: withContext(handleCreateInterface),
+        call: handleCreateInterface,
       },
       {
         toolDefinition: GetInterface_Tool,
-        handler: withContext(handleGetInterface),
+        call: handleGetInterface,
       },
       {
         toolDefinition: UpdateInterfaceHigh_Tool,
-        handler: withContext(handleUpdateInterfaceHigh),
+        call: handleUpdateInterfaceHigh,
       },
       {
         toolDefinition: DeleteInterface_Tool,
-        handler: withContext(handleDeleteInterface),
+        call: handleDeleteInterface,
       },
       {
         toolDefinition: CreateFunctionGroup_Tool,
-        handler: withContext(handleCreateFunctionGroup),
+        call: handleCreateFunctionGroup,
       },
       {
         toolDefinition: GetFunctionGroup_Tool,
-        handler: withContext(handleGetFunctionGroup),
+        call: handleGetFunctionGroup,
       },
       {
         toolDefinition: UpdateFunctionGroup_Tool,
-        handler: withContext(handleUpdateFunctionGroup),
+        call: handleUpdateFunctionGroup,
       },
       {
         toolDefinition: DeleteFunctionGroup_Tool,
-        handler: withContext(handleDeleteFunctionGroup),
+        call: handleDeleteFunctionGroup,
       },
       {
         toolDefinition: CreateFunctionModule_Tool,
-        handler: withContext(handleCreateFunctionModule),
+        call: handleCreateFunctionModule,
       },
       {
         toolDefinition: GetFunctionModule_Tool,
-        handler: withContext(handleGetFunctionModule),
+        call: handleGetFunctionModule,
       },
       {
         toolDefinition: UpdateFunctionModuleHigh_Tool,
-        handler: withContext(handleUpdateFunctionModuleHigh),
+        call: handleUpdateFunctionModuleHigh,
       },
       {
         toolDefinition: DeleteFunctionModule_Tool,
-        handler: withContext(handleDeleteFunctionModule),
+        call: handleDeleteFunctionModule,
       },
       {
         toolDefinition: CreateFunctionInclude_Tool,
-        handler: withContext(handleCreateFunctionInclude),
+        call: handleCreateFunctionInclude,
       },
       {
         toolDefinition: UpdateFunctionInclude_Tool,
-        handler: withContext(handleUpdateFunctionInclude),
+        call: handleUpdateFunctionInclude,
       },
       {
         toolDefinition: DeleteFunctionInclude_Tool,
-        handler: withContext(handleDeleteFunctionInclude),
+        call: handleDeleteFunctionInclude,
       },
       {
         toolDefinition: CreateBdef_Tool,
-        handler: withContext(handleCreateBehaviorDefinition),
+        call: handleCreateBehaviorDefinition,
       },
       {
         toolDefinition: GetBehaviorDefinition_Tool,
-        handler: withContext(handleGetBehaviorDefinition),
+        call: handleGetBehaviorDefinition,
       },
       {
         toolDefinition: UpdateBdef_Tool,
-        handler: withContext(handleUpdateBehaviorDefinitionHigh),
+        call: handleUpdateBehaviorDefinitionHigh,
       },
       {
         toolDefinition: DeleteBehaviorDefinition_Tool,
-        handler: withContext(handleDeleteBehaviorDefinition),
+        call: handleDeleteBehaviorDefinition,
       },
       {
         toolDefinition: CreateBehaviorImplementation_Tool,
-        handler: withContext(handleCreateBehaviorImplementation),
+        call: handleCreateBehaviorImplementation,
       },
       {
         toolDefinition: GetBehaviorImplementation_Tool,
-        handler: withContext(handleGetBehaviorImplementation),
+        call: handleGetBehaviorImplementation,
       },
       {
         toolDefinition: UpdateBehaviorImplementation_Tool,
-        handler: withContext(handleUpdateBehaviorImplementation),
+        call: handleUpdateBehaviorImplementation,
       },
       {
         toolDefinition: DeleteBehaviorImplementation_Tool,
-        handler: withContext(handleDeleteBehaviorImplementation),
+        call: handleDeleteBehaviorImplementation,
       },
       {
         toolDefinition: CreateDdlx_Tool,
-        handler: withContext(handleCreateMetadataExtension),
+        call: handleCreateMetadataExtension,
       },
       {
         toolDefinition: GetMetadataExtension_Tool,
-        handler: withContext(handleGetMetadataExtension),
+        call: handleGetMetadataExtension,
       },
       {
         toolDefinition: UpdateDdlx_Tool,
-        handler: withContext(handleUpdateMetadataExtensionHigh),
+        call: handleUpdateMetadataExtensionHigh,
       },
       {
         toolDefinition: DeleteMetadataExtension_Tool,
-        handler: withContext(handleDeleteMetadataExtension),
+        call: handleDeleteMetadataExtension,
       },
       // Per-type Check handlers (high-level)
       {
         toolDefinition: CheckBehaviorDefinition_Tool,
-        handler: withContext(handleCheckBehaviorDefinition),
+        call: handleCheckBehaviorDefinition,
       },
       {
         toolDefinition: CheckClass_Tool,
-        handler: withContext(handleCheckClass),
+        call: handleCheckClass,
       },
       {
         toolDefinition: CheckDataElement_Tool,
-        handler: withContext(handleCheckDataElement),
+        call: handleCheckDataElement,
       },
       {
         toolDefinition: CheckDomain_Tool,
-        handler: withContext(handleCheckDomain),
+        call: handleCheckDomain,
       },
       {
         toolDefinition: CheckFunctionGroup_Tool,
-        handler: withContext(handleCheckFunctionGroup),
+        call: handleCheckFunctionGroup,
       },
       {
         toolDefinition: CheckFunctionModule_Tool,
-        handler: withContext(handleCheckFunctionModule),
+        call: handleCheckFunctionModule,
       },
       {
         toolDefinition: CheckInterface_Tool,
-        handler: withContext(handleCheckInterface),
+        call: handleCheckInterface,
       },
       {
         toolDefinition: CheckMetadataExtension_Tool,
-        handler: withContext(handleCheckMetadataExtension),
+        call: handleCheckMetadataExtension,
       },
       {
         toolDefinition: CheckPackage_Tool,
-        handler: withContext(handleCheckPackage),
+        call: handleCheckPackage,
       },
       {
         toolDefinition: CheckProgram_Tool,
-        handler: withContext(handleCheckProgram),
+        call: handleCheckProgram,
       },
       {
         toolDefinition: CheckStructure_Tool,
-        handler: withContext(handleCheckStructure),
+        call: handleCheckStructure,
       },
       {
         toolDefinition: CheckTable_Tool,
-        handler: withContext(handleCheckTable),
+        call: handleCheckTable,
       },
       {
         toolDefinition: CheckDdl_Tool,
-        handler: withContext(handleCheckDdl),
+        call: handleCheckDdl,
       },
       // Per-object high-level version-history tools (#30): 13 types ×
       // {Versions, VersionSource}. HighLevel-only (ReadOnly keeps the generic
       // GetObjectVersions/GetObjectVersionSource).
       ...buildObjectVersionTools().map((entry) => ({
         toolDefinition: entry.toolDefinition,
-        handler: withContext(entry.handler),
+        call: entry.handler,
       })),
     ];
 
@@ -1336,10 +1330,11 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       isMutatingToolName(entry.toolDefinition.name)
         ? {
             ...entry,
-            handler: withCriticalSection(
-              entry.handler,
-              () => this.context.connection,
-            ),
+            call: (context, args) =>
+              withCriticalSection(entry.call, () => context.connection)(
+                context,
+                args,
+              ),
           }
         : entry,
     );

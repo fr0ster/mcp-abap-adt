@@ -125,29 +125,27 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
     return [
       {
         toolDefinition: GetServiceBindingPreviewUrl_Tool,
-        handler: (args: any) =>
-          handleGetServiceBindingPreviewUrl(this.context, args),
+        call: handleGetServiceBindingPreviewUrl,
       },
       {
         toolDefinition: GetTypeInfo_Tool,
-        handler: (args: any) => handleGetTypeInfo(this.context, args),
+        call: handleGetTypeInfo,
       },
       {
         toolDefinition: GetTransaction_Tool,
-        handler: (args: any) => handleGetTransaction(this.context, args),
+        call: handleGetTransaction,
       },
       {
         toolDefinition: RuntimeListProfilerTraceFiles_Tool,
-        handler: () => handleRuntimeListProfilerTraceFiles(this.context),
+        call: (context) => handleRuntimeListProfilerTraceFiles(context),
       },
       {
         toolDefinition: RuntimeGetProfilerTraceData_Tool,
-        handler: (args: any) =>
-          handleRuntimeGetProfilerTraceData(this.context, args),
+        call: handleRuntimeGetProfilerTraceData,
       },
       {
         toolDefinition: RuntimeGetDumpById_Tool,
-        handler: (args: any) => handleRuntimeGetDumpById(this.context, args),
+        call: handleRuntimeGetDumpById,
       },
       // ATC — the run is three calls and the composite is this repository's,
       // which is what `AdtAtc` says in as many words when it explains why it
@@ -155,143 +153,89 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       // system (the owner's decision), so the read-only binaries serve it.
       {
         toolDefinition: RunATC_Tool,
-        handler: (args: any) => handleRunATC(this.context, args),
+        call: handleRunATC,
       },
       {
         toolDefinition: GetATCRunStatus_Tool,
-        handler: (args: any) => handleGetATCRunStatus(this.context, args),
+        call: handleGetATCRunStatus,
       },
       {
         toolDefinition: GetATCFindings_Tool,
-        handler: (args: any) => handleGetATCFindings(this.context, args),
+        call: handleGetATCFindings,
       },
       {
         toolDefinition: ListATCResults_Tool,
-        handler: (args: any) => handleListATCResults(this.context, args),
+        call: handleListATCResults,
       },
       {
         toolDefinition: GetATCResult_Tool,
-        handler: (args: any) => handleGetATCResult(this.context, args),
+        call: handleGetATCResult,
       },
       {
         toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,
-        handler: (args: any) =>
-          handleRuntimeAnalyzeProfilerTrace(this.context, args),
+        call: handleRuntimeAnalyzeProfilerTrace,
       },
       {
         toolDefinition: RuntimeListFeeds_Tool,
-        handler: (args: any) => handleRuntimeListFeeds(this.context, args),
+        call: handleRuntimeListFeeds,
       },
       {
         toolDefinition: RuntimeListSystemMessages_Tool,
-        handler: (args: any) =>
-          handleRuntimeListSystemMessages(this.context, args),
+        call: handleRuntimeListSystemMessages,
       },
       {
         toolDefinition: RuntimeGetGatewayErrorLog_Tool,
-        handler: (args: any) =>
-          handleRuntimeGetGatewayErrorLog(this.context, args),
+        call: handleRuntimeGetGatewayErrorLog,
       },
       {
         toolDefinition: GetSqlQuery_Tool,
-        handler: (args: any) => handleGetSqlQuery(this.context, args),
+        call: handleGetSqlQuery,
       },
       {
         toolDefinition: GetWhereUsed_Tool,
-        handler: (args: any) => handleGetWhereUsed(this.context, args),
+        call: handleGetWhereUsed,
       },
       {
         toolDefinition: GetObjectInfo_Tool,
-        handler: async (args: any) => {
-          if (!args || typeof args !== 'object') {
-            throw new Error('Missing or invalid arguments for GetObjectInfo');
-          }
-          return await handleGetObjectInfo(
-            this.context,
-            args as { parent_type: string; parent_name: string },
-          );
-        },
+        call: handleGetObjectInfo,
       },
       {
         toolDefinition: GetAbapAST_Tool,
-        handler: (args: any) => handleGetAbapAST(this.context, args),
+        call: handleGetAbapAST,
       },
       {
         toolDefinition: GetAbapSemanticAnalysis_Tool,
-        handler: (args: any) =>
-          handleGetAbapSemanticAnalysis(this.context, args),
+        call: handleGetAbapSemanticAnalysis,
       },
       {
         toolDefinition: GetAbapSystemSymbols_Tool,
-        handler: (args: any) => handleGetAbapSystemSymbols(this.context, args),
+        call: handleGetAbapSystemSymbols,
       },
       {
         toolDefinition: GetInactiveObjects_Tool,
-        handler: (args: any) => handleGetInactiveObjects(this.context, args),
+        call: handleGetInactiveObjects,
       },
       // Dynamic import handlers
       {
         toolDefinition: GetAdtTypes_Tool,
-        handler: (args: any) => {
-          return handleGetAdtTypes(
-            this.context,
-            args as { detail?: 'terse' | 'full' | 'raw' },
-          );
-        },
+        call: handleGetAdtTypes,
       },
       {
         toolDefinition: GetObjectStructure_Tool,
-        handler: (args: any) => {
-          return handleGetObjectStructure(
-            this.context,
-            args as { object_type: string; object_name: string },
-          );
-        },
+        call: handleGetObjectStructure,
       },
       {
         toolDefinition: GetObjectNodeFromCache_Tool,
-        handler: (args: any) => {
-          return handleGetObjectNodeFromCache(
-            this.context,
-            args as
-              | { object_type: string; object_name: string }
-              | {
-                  object_type: string;
-                  object_name: string;
-                  cache_type: string;
-                },
-          );
-        },
+        call: handleGetObjectNodeFromCache,
       },
       {
         toolDefinition: DescribeByList_Tool,
-        handler: (args: any) => {
-          return handleDescribeByList(
-            this.context,
-            args as
-              | { object_type: string; object_name: string }
-              | {
-                  object_type: string;
-                  object_name: string;
-                  cache_type: string;
-                },
-          );
-        },
+        call: handleDescribeByList,
       },
       // High-level handler for package tree
       {
         toolDefinition: GetPackageTree_Tool,
-        handler: (args: any) => {
-          return handleGetPackageTree(
-            this.context,
-            args as {
-              package_name: string;
-              include_subpackages?: boolean;
-              max_depth?: number;
-              include_descriptions?: boolean;
-            },
-          );
-        },
+        call: handleGetPackageTree,
       },
     ];
   }

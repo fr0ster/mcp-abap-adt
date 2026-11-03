@@ -67,7 +67,7 @@ function holdThenOpen(seen: Seen): HandlerEntry {
       inputSchema: { type: 'object', properties: {} },
     },
     // Two parameters: the server hands a handler its context only then.
-    handler: async (
+    call: async (
       ctx: { connection: IAbapConnection; state: InstanceState },
       _args: unknown,
     ) => {

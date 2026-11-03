@@ -90,7 +90,7 @@ const tool = (
   handler: (ctx: Ctx, args: Args) => Promise<unknown>,
 ): HandlerEntry => ({
   toolDefinition: { name, description: 'probe', inputSchema } as never,
-  handler: handler as never,
+  call: handler as never,
 });
 
 const probes = new CompositeHandlersRegistry([

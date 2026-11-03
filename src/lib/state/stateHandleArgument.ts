@@ -55,6 +55,16 @@ export function withoutStateHandle(args: unknown): unknown {
  * required where it is required; anything else unknown too.
  */
 export function withStateHandle(inputSchema: unknown): unknown {
+  if (inputSchema instanceof z.ZodObject) {
+    return 'state_handle' in inputSchema.shape
+      ? inputSchema
+      : inputSchema.extend({
+          state_handle: z
+            .string()
+            .optional()
+            .describe(STATE_HANDLE_ARGUMENT_WORDS),
+        });
+  }
   const fields = fieldsOf(inputSchema);
   if (fields === undefined || 'state_handle' in fields) return inputSchema;
   const schema = inputSchema as Record<string, unknown>;

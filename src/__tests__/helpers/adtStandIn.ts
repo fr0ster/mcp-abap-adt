@@ -367,7 +367,7 @@ export function probeGroup(
             required: ['id'],
           },
         } as never,
-        handler: (async (
+        call: (async (
           context: {
             connection: { makeAdtRequest(o: object): Promise<unknown> };
           },

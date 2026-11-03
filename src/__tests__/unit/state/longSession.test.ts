@@ -277,7 +277,7 @@ describe('the host declaration of state_handle', () => {
           description: 'answers its arguments',
           inputSchema: z.object({ state_handle: z.string() }),
         } as never,
-        handler: (async (_context: unknown, args: unknown) => ({
+        call: (async (_context: unknown, args: unknown) => ({
           content: [{ type: 'text', text: JSON.stringify(args) }],
         })) as never,
         connectionless: true,
@@ -336,7 +336,7 @@ describe('close on an instance', () => {
           description: 'takes the debugger',
           inputSchema: { type: 'object', properties: {}, required: [] },
         } as never,
-        handler: (async (
+        call: (async (
           context: { debugger?: () => unknown },
           _args: unknown,
         ) => {

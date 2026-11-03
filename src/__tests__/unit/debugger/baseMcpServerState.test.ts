@@ -57,7 +57,7 @@ class GatedServer extends BaseMcpServer {
           description: 'waits for a gate',
           inputSchema: { type: 'object', properties: {} },
         },
-        handler: async (context: HandlerContext, _args: unknown) => {
+        call: async (context: HandlerContext, _args: unknown) => {
           this.seen.push(context);
           await this.handlerGate;
           return { isError: false, content: [{ type: 'text', text: 'done' }] };

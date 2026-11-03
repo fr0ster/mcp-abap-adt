@@ -216,13 +216,15 @@ function moduleIndex() {
  * shape converted as the MCP SDK lists it (input side).
  */
 function jsonSchemaOf(inputSchema) {
+  const { z } = require('zod');
+  if (inputSchema instanceof z.ZodObject)
+    return z.toJSONSchema(inputSchema, { io: 'input' });
   if (
     inputSchema &&
     inputSchema.type === 'object' &&
     typeof inputSchema.properties === 'object'
   )
     return inputSchema;
-  const { z } = require('zod');
   return z.toJSONSchema(z.object(inputSchema), { io: 'input' });
 }
 

@@ -238,9 +238,7 @@ export async function runCase(
   if (!entry) throw new Error(`no served tool ${c.tool}`);
   const counting = countingConnection(mode, c.body, c.headers);
   (context as { connection: IAbapConnection }).connection = counting.connection;
-  const call = (entry.handler as unknown as (a: unknown) => Promise<Answer>)(
-    structuredClone(c.args),
-  );
+  const call: Promise<Answer> = entry.call(context, structuredClone(c.args));
   if (mode === 'pending') {
     call.catch(() => undefined);
     await settle();

@@ -108,7 +108,7 @@ function entry(
         required: Object.keys(properties).filter((k) => k !== 'state_handle'),
       },
     },
-    handler,
+    call: handler,
   } as unknown as HandlerEntry;
 }
 

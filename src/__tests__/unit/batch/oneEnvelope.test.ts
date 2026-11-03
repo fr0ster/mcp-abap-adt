@@ -266,7 +266,7 @@ function memberOf(steps: Step[]): IHandlerGroup {
             properties: { program_name: { type: 'string' } },
           },
         },
-        handler: async (context: HandlerContext, _args: unknown) => {
+        call: async (context: HandlerContext, _args: unknown) => {
           const parts: Promise<unknown>[] = [];
           for (const step of steps) {
             if (step === 'read') {

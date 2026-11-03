@@ -79,7 +79,7 @@ function tool(
 ): HandlerEntry {
   return {
     toolDefinition: { name, description: name, inputSchema },
-    handler: handler as never,
+    call: handler as never,
     ...extra,
   } as HandlerEntry;
 }

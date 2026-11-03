@@ -125,12 +125,8 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
       makeAdtRequest,
     } as unknown as IAbapConnection;
     let seen: HandlerContext['connection'] | undefined;
-    let held: HandlerContext | undefined;
     const capture: IHandlerGroup = {
       getName: () => 'capture',
-      setContext: (context: HandlerContext) => {
-        held = context;
-      },
       registerHandlers: () => {},
       getHandlers: (): HandlerEntry[] => [
         {
@@ -139,10 +135,10 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
             description: 'records the connection a handler is given',
             inputSchema: { type: 'object', properties: {} },
           } as never,
-          handler: (async () => {
-            seen = held?.connection;
+          call: async (context: HandlerContext) => {
+            seen = context.connection;
             return { content: [{ type: 'text', text: 'seen' }] };
-          }) as never,
+          },
         },
       ],
     } as never;

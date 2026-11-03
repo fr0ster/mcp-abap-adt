@@ -133,6 +133,7 @@ function typeOf(schema: any): z.ZodTypeAny {
 export function registeredSchema(
   inputSchema: ToolDefinition['inputSchema'],
 ): ZodRawShapeCompat | AnySchema {
+  if (inputSchema instanceof z.ZodObject) return inputSchema;
   return inputSchema &&
     typeof inputSchema === 'object' &&
     inputSchema.type === 'object' &&

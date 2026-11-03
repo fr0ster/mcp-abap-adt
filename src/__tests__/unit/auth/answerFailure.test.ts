@@ -254,7 +254,7 @@ describe('the answer sites read the failure first', () => {
               description: 'a tool whose call is refused',
               inputSchema: { type: 'object', properties: {} },
             },
-            handler: async () => {
+            call: async () => {
               throw new AuthProviderFailure(error);
             },
           },

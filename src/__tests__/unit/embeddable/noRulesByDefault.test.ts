@@ -88,7 +88,7 @@ class ReportingGroup extends BaseHandlerGroup {
           description: 'd',
           inputSchema: { type: 'object', properties: {} },
         } as never,
-        handler: async () => ({
+        call: async () => ({
           content: [
             {
               type: 'text',

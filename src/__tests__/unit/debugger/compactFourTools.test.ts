@@ -160,11 +160,10 @@ function install(
     debugger: () => instance,
     logger: { debug() {}, info() {}, warn() {}, error() {} },
   } as never;
-  const call = (name: string, args: Record<string, unknown>) =>
-    (
-      compactDebugEntries().find((e) => e.toolDefinition.name === name)!
-        .handler as unknown as (c: unknown, a: unknown) => Promise<Answer>
-    )(context, structuredClone(args));
+  const call = (name: string, args: Record<string, unknown>): Promise<Answer> =>
+    compactDebugEntries()
+      .find((e) => e.toolDefinition.name === name)!
+      .call(context, structuredClone(args));
   return { wire, state, instance, call };
 }
 

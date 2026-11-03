@@ -155,7 +155,7 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
       description: 'DebugWait',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: (async (_context: unknown, _args: unknown) => ({
+    call: (async (_context: unknown, _args: unknown) => ({
       content: [{ type: 'text', text: 'waited' }],
     })) as never,
   } as unknown as HandlerEntry;
@@ -282,7 +282,7 @@ describe('ABAP Cloud, the lookup refused', () => {
         required: ['id'],
       },
     },
-    handler: (async (
+    call: (async (
       context: {
         connection: { makeAdtRequest(o: object): Promise<unknown> };
       },
@@ -420,7 +420,7 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
       description: 'DebugWait',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: (async (_context: unknown, _args: unknown) => {
+    call: (async (_context: unknown, _args: unknown) => {
       ran += 1;
       return { content: [{ type: 'text', text: 'waited' }] };
     }) as never,
@@ -465,7 +465,7 @@ it('a replacement after a lost session asks no lookup: the same credential on th
       description: 'LoseSession',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: (async (
+    call: (async (
       context: { connection: Sender & { isConnected?: () => boolean } },
       _args: unknown,
     ) => {
@@ -484,7 +484,7 @@ it('a replacement after a lost session asks no lookup: the same credential on th
       description: 'Responsible',
       inputSchema: { type: 'object', properties: {} },
     },
-    handler: (async (context: { connection: Sender }, _args: unknown) => {
+    call: (async (context: { connection: Sender }, _args: unknown) => {
       const { responsible: user } = requireSystemContextForCreate();
       await context.connection.makeAdtRequest({
         url: `/sap/bc/adt/probe/after/${user}`,

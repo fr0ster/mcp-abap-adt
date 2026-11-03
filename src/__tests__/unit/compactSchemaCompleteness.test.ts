@@ -59,7 +59,7 @@ function parseDescriptionArgs(
  * `lib` does not, and must not.
  */
 const facadeDefinition = (name: string) => {
-  const entry = compactModifyEntries(() => ({}) as never).find(
+  const entry = compactModifyEntries().find(
     (candidate) => candidate.toolDefinition.name === name,
   );
   if (!entry) throw new Error(`the compact facade has no ${name}`);

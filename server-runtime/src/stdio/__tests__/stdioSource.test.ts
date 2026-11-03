@@ -73,7 +73,7 @@ const registry = new CompositeHandlersRegistry([
           description: 'answers its connection',
           inputSchema: { type: 'object', properties: {} },
         } as never,
-        handler: (async (
+        call: (async (
           context: { connection: { tag: string } },
           _args: unknown,
         ) => ({

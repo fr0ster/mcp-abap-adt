@@ -50,7 +50,7 @@ const echoGroup: IHandlerGroup = {
         },
       } as never,
       // Two parameters: the registration hands `(context, args)` only then.
-      handler: (async (context: { state: InstanceState }, _args: unknown) => ({
+      call: (async (context: { state: InstanceState }, _args: unknown) => ({
         content: [{ type: 'text', text: context.state.handle }],
       })) as never,
     },

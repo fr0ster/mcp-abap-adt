@@ -22,7 +22,7 @@
  * without writing, so they are here.
  */
 
-import type { HandlerContext, HandlerEntry } from '@mcp-abap-adt/lib/handlers';
+import type { HandlerEntry } from '@mcp-abap-adt/lib/handlers';
 import { BaseHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import {
   TOOL_DEFINITION as HandlerCdsUnitTestResult_Tool,
@@ -94,93 +94,78 @@ import {
 } from './handlers/handleHandlerWhereUsed';
 
 /**
- * The entries, built against a LIVE context rather than a snapshot.
- *
- * `BaseMcpServer` sets the context on the group that OWNS an entry, once per
- * request — a fresh connection each time. So an entry must read the context when
- * it is CALLED, never capture the one that existed when the list was built: a
- * composed group that instantiated this one with a snapshot handed its handlers a
- * stale connection, or the initial `null` (found in review on PR #240). Taking a
- * getter means the owning group can be this class or the composed facade, and
- * either way the handler sees that group's current context.
+ * The entries: each takes the call's context at the call, from whichever
+ * registration path runs it, so no entry holds a context of its own.
  */
-export function compactReadOnlyEntries(
-  getContext: () => HandlerContext,
-): HandlerEntry[] {
-  const withContext = <TArgs, TResult>(
-    handler: (context: HandlerContext, args: TArgs) => TResult,
-  ) => {
-    return (args: unknown) => handler(getContext(), args as TArgs);
-  };
-
+export function compactReadOnlyEntries(): HandlerEntry[] {
   return [
     {
       toolDefinition: HandlerGet_Tool,
-      handler: withContext(handleHandlerGet),
+      call: handleHandlerGet,
     },
     {
       toolDefinition: HandlerSearch_Tool,
-      handler: withContext(handleHandlerSearch),
+      call: handleHandlerSearch,
     },
     {
       toolDefinition: HandlerWhereUsed_Tool,
-      handler: withContext(handleHandlerWhereUsed),
+      call: handleHandlerWhereUsed,
     },
     {
       toolDefinition: HandlerGetData_Tool,
-      handler: withContext(handleHandlerGetData),
+      call: handleHandlerGetData,
     },
     {
       toolDefinition: HandlerValidate_Tool,
-      handler: withContext(handleHandlerValidate),
+      call: handleHandlerValidate,
     },
     {
       toolDefinition: HandlerCheckRun_Tool,
-      handler: withContext(handleHandlerCheckRun),
+      call: handleHandlerCheckRun,
     },
     {
       toolDefinition: HandlerDeletionCheck_Tool,
-      handler: withContext(handleHandlerDeletionCheck),
+      call: handleHandlerDeletionCheck,
     },
     {
       toolDefinition: HandlerUnitTestStatus_Tool,
-      handler: withContext(handleHandlerUnitTestStatus),
+      call: handleHandlerUnitTestStatus,
     },
     {
       toolDefinition: HandlerUnitTestResult_Tool,
-      handler: withContext(handleHandlerUnitTestResult),
+      call: handleHandlerUnitTestResult,
     },
     {
       toolDefinition: HandlerCdsUnitTestStatus_Tool,
-      handler: withContext(handleHandlerCdsUnitTestStatus),
+      call: handleHandlerCdsUnitTestStatus,
     },
     {
       toolDefinition: HandlerCdsUnitTestResult_Tool,
-      handler: withContext(handleHandlerCdsUnitTestResult),
+      call: handleHandlerCdsUnitTestResult,
     },
     {
       toolDefinition: HandlerProfileList_Tool,
-      handler: withContext(handleHandlerProfileList),
+      call: handleHandlerProfileList,
     },
     {
       toolDefinition: HandlerProfileView_Tool,
-      handler: withContext(handleHandlerProfileView),
+      call: handleHandlerProfileView,
     },
     {
       toolDefinition: HandlerDumpList_Tool,
-      handler: withContext(handleHandlerDumpList),
+      call: handleHandlerDumpList,
     },
     {
       toolDefinition: HandlerDumpView_Tool,
-      handler: withContext(handleHandlerDumpView),
+      call: handleHandlerDumpView,
     },
     {
       toolDefinition: HandlerServiceBindingListTypes_Tool,
-      handler: withContext(handleHandlerServiceBindingListTypes),
+      call: handleHandlerServiceBindingListTypes,
     },
     {
       toolDefinition: HandlerServiceBindingValidate_Tool,
-      handler: withContext(handleHandlerServiceBindingValidate),
+      call: handleHandlerServiceBindingValidate,
     },
   ];
 }
@@ -189,6 +174,6 @@ export class CompactReadOnlyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactReadOnlyHandlers';
 
   getHandlers(): HandlerEntry[] {
-    return compactReadOnlyEntries(() => this.context);
+    return compactReadOnlyEntries();
   }
 }

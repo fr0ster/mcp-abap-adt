@@ -24,7 +24,7 @@ const tool = (name: string, available_in?: SapEnvironment[]) => ({
     inputSchema: { type: 'object', properties: {} },
     ...(available_in !== undefined ? { available_in } : {}),
   },
-  handler: async () => ({ content: [] }),
+  call: async () => ({ content: [] }),
 });
 
 const group = {

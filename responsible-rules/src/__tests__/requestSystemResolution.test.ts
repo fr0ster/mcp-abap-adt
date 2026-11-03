@@ -813,20 +813,18 @@ function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
     context: { connection } as HandlerContext,
     getName: () => 'fake',
     registerHandlers: () => {},
-    // What the exporter reads an args-only handler's context by.
-    currentContext: () => group.context,
     getHandlers(): HandlerEntry[] {
       return [
         {
           toolDefinition: { name: 'WithContext', description: 'd' } as never,
-          handler: async (_context: HandlerContext, _args: unknown) => seen(),
+          call: async (_context: HandlerContext, _args: unknown) => seen(),
         },
         {
           toolDefinition: { name: 'Closure', description: 'd' } as never,
-          handler: (async (_args: unknown) => ({
+          call: async (context: HandlerContext, _args: unknown) => ({
             ...seen(),
-            connection: group.context.connection,
-          })) as never,
+            connection: context.connection,
+          }),
         },
       ];
     },
@@ -846,40 +844,30 @@ function exporterWith(
 }
 
 describe('HandlerExporter.getHandlerEntries', () => {
-  it('keeps every handler arity the embedders branch on', () => {
+  it("hands out every entry with its group's definition", () => {
     const exporter = new HandlerExporter({ systemType: 'onprem' });
     const raw = (
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());
     const wrapped = exporter.getHandlerEntries();
-    expect(wrapped.map((e) => e.handler.length)).toEqual(
-      raw.map((e) => e.handler.length),
-    );
     expect(wrapped.map((e) => e.toolDefinition)).toEqual(
       raw.map((e) => e.toolDefinition),
     );
-    const arities = new Set(raw.map((e) => e.handler.length));
-    expect(arities.has(1)).toBe(true);
   });
 
-  it('a context+args handler runs with values filled from its connection', async () => {
+  it('a handler runs with values filled from its connection', async () => {
     const exporter = exporterWith([fakeGroup(null)]);
     const entry = exporter.getHandlerEntries()[0];
-    expect(entry.handler.length).toBe(2);
     await expect(
-      entry.handler({ connection: cloudConn() }, {}),
+      entry.call({ connection: cloudConn() }, {}),
     ).resolves.toMatchObject({ responsible: 'CB_USER', masterSystem: 'CLD' });
   });
 
-  it("an args-only handler resolves the group's swapped connection", async () => {
+  it("a handler reading its context's connection gets the call's", async () => {
     const group = fakeGroup(null);
     const entry = exporterWith([group]).getHandlerEntries()[1];
-    expect(entry.handler.length).toBe(1);
     const conn = cloudConn();
-    group.context = { connection: conn };
-    const result = await (entry.handler as unknown as (a: unknown) => unknown)(
-      {},
-    );
+    const result = await entry.call({ connection: conn }, {});
     expect(result).toMatchObject({
       responsible: 'CB_USER',
       masterSystem: 'CLD',
@@ -888,34 +876,26 @@ describe('HandlerExporter.getHandlerEntries', () => {
   });
 
   describe.each([
-    ['context+args', 0],
-    ['args-only', 1],
-  ])('a %s handler', (_arity, index) => {
+    ['WithContext', 0],
+    ['Closure', 1],
+  ])('the %s handler', (_name, index) => {
     /** Calls the entry on `connection` as an embedder does, recording whether it ran. */
     function callOn(connection: IAbapConnection) {
       const group = fakeGroup(connection);
       const ran = jest.fn();
       const original = group.getHandlers;
       group.getHandlers = () =>
-        original().map((e) => {
-          const handler = e.handler as (...a: unknown[]) => Promise<unknown>;
-          const counted =
-            handler.length >= 2
-              ? async (c: unknown, a: unknown) => {
-                  ran();
-                  return handler(c, a);
-                }
-              : async (a: unknown) => {
-                  ran();
-                  return handler(a);
-                };
-          return { ...e, handler: counted as never };
-        });
+        original().map(
+          (e): HandlerEntry => ({
+            ...e,
+            call: async (c, a) => {
+              ran();
+              return e.call(c, a);
+            },
+          }),
+        );
       const entry = exporterWith([group]).getHandlerEntries()[index];
-      const call = () =>
-        index === 0
-          ? entry.handler({ connection }, {})
-          : (entry.handler as unknown as (a: unknown) => Promise<unknown>)({});
+      const call = () => entry.call({ connection }, {});
       return { call, ran };
     }
 
@@ -1016,7 +996,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
     });
     const result = await exporter
       .getHandlerEntries()[0]
-      .handler({ connection: cloudConn() }, {});
+      .call({ connection: cloudConn() }, {});
     expect(lookup).not.toHaveBeenCalled();
     expect(result.responsible).toBeUndefined();
   });
@@ -1029,7 +1009,7 @@ class ReportingGroup extends BaseHandlerGroup {
     return [
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
-        handler: async () => {
+        call: async () => {
           this.observed = seen();
           return { content: [{ type: 'text', text: 'ok' }] };
         },
@@ -1077,31 +1057,20 @@ describe('BaseMcpServer.registerHandlers', () => {
     return {
       ...inner,
       getHandlers: () =>
-        inner.getHandlers().map((e) => ({
-          ...e,
-          handler: (e.handler.length >= 2
-            ? async (c: HandlerContext, a: unknown) => ({
-                content: [
-                  { type: 'text', text: JSON.stringify(await e.handler(c, a)) },
-                ],
-              })
-            : async (_a: unknown) => ({
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify(
-                      await (e.handler as unknown as (a: unknown) => unknown)(
-                        _a,
-                      ),
-                    ),
-                  },
-                ],
-              })) as never,
-        })),
+        inner.getHandlers().map(
+          (e): HandlerEntry => ({
+            ...e,
+            call: async (c, a) => ({
+              content: [
+                { type: 'text', text: JSON.stringify(await e.call(c, a)) },
+              ],
+            }),
+          }),
+        ),
     };
   }
 
-  it('fills values for both handler arities', async () => {
+  it('fills values for both handlers', async () => {
     const server = new EmbeddableMcpServer({
       connection: cloudConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),

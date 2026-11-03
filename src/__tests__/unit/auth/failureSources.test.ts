@@ -46,7 +46,7 @@ class StubGroup {
           description: 'a tool that would read the system',
           inputSchema: { type: 'object', properties: {} },
         },
-        handler: async () => {
+        call: async () => {
           this.reached();
           return { content: [{ type: 'text', text: 'read' }] };
         },

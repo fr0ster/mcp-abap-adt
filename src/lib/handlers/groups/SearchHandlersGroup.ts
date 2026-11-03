@@ -33,42 +33,20 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
     return [
       {
         toolDefinition: SearchObject_Tool,
-        handler: (args: any) => handleSearchObject(this.context, args),
+        call: handleSearchObject,
       },
       {
         toolDefinition: SearchSource_Tool,
-        handler: (args: any) => handleSearchSource(this.context, args),
+        call: handleSearchSource,
       },
       // Dynamic import handlers
       {
         toolDefinition: GetObjectsList_Tool,
-        handler: (args: any) => {
-          return handleGetObjectsList(
-            this.context,
-            args as {
-              parent_name?: string;
-              parent_tech_name?: string;
-              parent_type?: string;
-              with_short_descriptions?: boolean;
-            },
-          );
-        },
+        call: handleGetObjectsList,
       },
       {
         toolDefinition: GetObjectsByType_Tool,
-        handler: (args: any) => {
-          return handleGetObjectsByType(
-            this.context,
-            args as {
-              parent_name?: string;
-              parent_tech_name?: string;
-              parent_type?: string;
-              node_id?: string;
-              format?: string;
-              with_short_descriptions?: boolean;
-            },
-          );
-        },
+        call: handleGetObjectsByType,
       },
     ];
   }

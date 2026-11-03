@@ -18,7 +18,7 @@ describe('defineTool', () => {
   it('answers the definition and the handler as an entry', () => {
     const entry = defineTool(Wait, handleDebugWait);
     expect(entry.toolDefinition).toBe(Wait);
-    expect(entry.handler).toBe(handleDebugWait);
+    expect(entry.call).toBe(handleDebugWait);
   });
 
   it('refuses, at compile time, a handler that takes other arguments', () => {

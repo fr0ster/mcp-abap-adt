@@ -77,15 +77,11 @@ import {
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
 import type {
+  HandlerEntry,
   IHandlersRegistry,
   SapEnvironment,
-  ToolHandler,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
-import {
-  callInItsForm,
-  type InGroupContext,
-} from '../lib/handlers/utils/handlerCall.js';
 import { registeredSchema } from '../lib/handlers/utils/schemaUtils.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
@@ -1411,7 +1407,7 @@ export abstract class BaseMcpServer extends McpServer {
                   ),
                 );
               }
-              return this.runConnectionless(entry.handler, group, args, signal);
+              return this.runConnectionless(entry.call, args, signal);
             }
             let inUse: AbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
@@ -1560,8 +1556,7 @@ export abstract class BaseMcpServer extends McpServer {
               if (this.batchOpenFor(entry.toolDefinition.name)) {
                 return await this.recordCall({
                   tool: entry.toolDefinition.name,
-                  handler: entry.handler,
-                  group,
+                  call: entry.call,
                   context,
                   args: handlerArgs,
                   holdsFlow,
@@ -1587,8 +1582,7 @@ export abstract class BaseMcpServer extends McpServer {
                 handlerPromise = resolved(() =>
                   this.startBackground(
                     entry.toolDefinition.name,
-                    entry.handler,
-                    group,
+                    entry.call,
                     context,
                     handlerArgs,
                     signal,
@@ -1612,8 +1606,7 @@ export abstract class BaseMcpServer extends McpServer {
                     timeoutSeconds,
                     run: (own) =>
                       callHandler(
-                        entry.handler,
-                        group,
+                        entry.call,
                         { ...context, connection: own as AbapConnection },
                         withoutTimeout(args),
                       ),
@@ -1621,12 +1614,7 @@ export abstract class BaseMcpServer extends McpServer {
                 );
               } else {
                 handlerPromise = resolved(() =>
-                  callInItsForm(
-                    entry.handler,
-                    context,
-                    handlerArgs,
-                    inGroupContextOf(group),
-                  ),
+                  entry.call(context, handlerArgs),
                 );
               }
 
@@ -1795,8 +1783,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async recordCall(call: {
     tool: string;
-    handler: ToolHandler;
-    group: unknown;
+    call: HandlerEntry['call'];
     context: HandlerContext;
     args: unknown;
     holdsFlow: boolean;
@@ -1856,8 +1843,7 @@ export abstract class BaseMcpServer extends McpServer {
   private async runRecorded(
     call: {
       tool: string;
-      handler: ToolHandler;
-      group: unknown;
+      call: HandlerEntry['call'];
       context: HandlerContext;
       args: unknown;
       holdsFlow: boolean;
@@ -1928,12 +1914,7 @@ export abstract class BaseMcpServer extends McpServer {
                 () =>
                   withKnownSystemContext(call.system, () =>
                     asRecordedCall(() =>
-                      callHandler(
-                        call.handler,
-                        call.group,
-                        recordedContext,
-                        call.args,
-                      ),
+                      callHandler(call.call, recordedContext, call.args),
                     ),
                   ),
               ),
@@ -2011,8 +1992,7 @@ export abstract class BaseMcpServer extends McpServer {
    * reader, else `return_error`.
    */
   private async runConnectionless(
-    handler: ToolHandler,
-    group: unknown,
+    call: HandlerEntry['call'],
     args: unknown,
     signal: AbortSignal,
   ): Promise<{
@@ -2049,7 +2029,7 @@ export abstract class BaseMcpServer extends McpServer {
       };
       const result = await runWithRequestSignal(signal, () => {
         throwIfRequestAborted(signal);
-        return callHandler(handler, group, context, args);
+        return callHandler(call, context, args);
       });
       const content = normalizeToolContent(result) as {
         type: 'text';
@@ -2100,8 +2080,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async startBackground(
     tool: string,
-    handler: ToolHandler,
-    group: unknown,
+    call: HandlerEntry['call'],
     context: HandlerContext,
     args: unknown,
     signal: AbortSignal,
@@ -2126,12 +2105,7 @@ export abstract class BaseMcpServer extends McpServer {
       logger: this.logger,
       track: (own) => this.trackRun(own),
       run: (own) =>
-        this.backgroundAnswer(
-          handler,
-          group,
-          { ...context, connection: own },
-          args,
-        ),
+        this.backgroundAnswer(call, { ...context, connection: own }, args),
     });
     if (started === undefined) return shutdownRefusalAnswer();
     return answerBackgroundStarted(started);
@@ -2177,15 +2151,14 @@ export abstract class BaseMcpServer extends McpServer {
    * call that started it ends long before, and nothing of it reaches here.
    */
   private async backgroundAnswer(
-    handler: ToolHandler,
-    group: unknown,
+    call: HandlerEntry['call'],
     context: HandlerContext,
     args: unknown,
   ): Promise<BackgroundRunAnswer> {
     try {
       const result = await runWithRequestSignal(
         new AbortController().signal,
-        () => callHandler(handler, group, context, args),
+        () => callHandler(call, context, args),
       );
       const content = normalizeToolContent(result) as {
         type: 'text';
@@ -2619,44 +2592,15 @@ export abstract class BaseMcpServer extends McpServer {
 }
 
 /**
- * Calls a group's handler with `context`: one that takes `(context, args)`
- * directly, an older one that reads its group's context after it was set.
+ * Calls an entry's handler with `context`, in the call's own transport
+ * request scope (the failure renderer's transport hint, `callTransport.ts`).
  */
 function callHandler(
-  handler: ToolHandler,
-  group: unknown,
+  call: HandlerEntry['call'],
   context: HandlerContext,
   args: unknown,
 ): Promise<unknown> {
-  // The call's own transport request, for the failure renderer's transport
-  // hint (`callTransport.ts`).
-  return runWithCallTransport(args, () =>
-    callInItsForm(handler, context, args, inGroupContextOf(group)),
-  );
-}
-
-/**
- * How a server instance gives an args-only handler the call's context: its
- * group's context set before the call (`setContext` when the group has one),
- * left as the call set it.
- */
-function inGroupContextOf(group: unknown): InGroupContext {
-  return (context, call) => {
-    const contextAwareGroup = group as Partial<{
-      setContext: (ctx: HandlerContext) => void;
-      context: HandlerContext;
-    }>;
-    try {
-      if (typeof contextAwareGroup.setContext === 'function') {
-        contextAwareGroup.setContext(context);
-      } else {
-        contextAwareGroup.context = context;
-      }
-    } catch {
-      // ignore if group doesn't expose context setter
-    }
-    return call();
-  };
+  return runWithCallTransport(args, () => call(context, args));
 }
 
 /**

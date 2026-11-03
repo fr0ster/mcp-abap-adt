@@ -7,6 +7,7 @@
  * Type-checked by `npm run test:check`.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
+import * as z from 'zod';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { HandlerContext } from '../src/handlers/interfaces.js';
 import {
@@ -73,6 +74,12 @@ const hasIsOptional = (v: unknown): v is { isOptional: () => boolean } =>
   typeof (v as { isOptional?: unknown }).isOptional === 'function';
 
 const describeInputs = (schema: unknown): ParamInfo[] => {
+  if (schema instanceof z.ZodObject) {
+    return Object.entries(schema.shape).map(([name, value]) => ({
+      name,
+      required: value.isOptional() ? 'no' : 'yes',
+    }));
+  }
   if (isJsonSchemaObject(schema)) {
     const required = new Set(schema.required ?? []);
     return Object.keys(schema.properties).map((name) => ({

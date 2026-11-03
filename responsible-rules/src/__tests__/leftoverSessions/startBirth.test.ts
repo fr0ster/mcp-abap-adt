@@ -81,7 +81,7 @@ const needsResponsible = {
     description: 'NeedsResponsible',
     inputSchema: { type: 'object', properties: {} },
   },
-  handler: (async (
+  call: (async (
     context: { connection: { makeAdtRequest(o: object): Promise<unknown> } },
     _args: unknown,
   ) => {

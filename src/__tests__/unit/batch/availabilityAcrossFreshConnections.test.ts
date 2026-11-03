@@ -58,7 +58,7 @@ const longRead: HandlerEntry = {
     description: 'reads two items',
     inputSchema: { type: 'object', properties: {} },
   } as never,
-  handler: (async (context: HandlerContext, _args: unknown) => {
+  call: (async (context: HandlerContext, _args: unknown) => {
     const ran = await withSequentialFallback(
       context,
       async () => {

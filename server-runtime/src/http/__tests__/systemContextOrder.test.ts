@@ -55,7 +55,7 @@ const whoAmI: IHandlerGroup = {
           properties: { delayMs: { type: 'number' } },
         },
       } as never,
-      handler: (async (_context: unknown, args: { delayMs?: number }) => {
+      call: (async (_context: unknown, args: { delayMs?: number }) => {
         await new Promise((r) => setTimeout(r, args?.delayMs ?? 0));
         const seen = getStatedSystemContext();
         return {

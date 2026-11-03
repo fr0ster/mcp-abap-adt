@@ -31,7 +31,6 @@ import {
   READ_VERSION_PROPERTY,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { callInItsForm } from '../../../lib/handlers/utils/handlerCall';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -486,12 +485,7 @@ async function readsOf(
   const entry = servedTools(context).get(tool);
   if (entry === undefined) throw new Error(`no served tool ${tool}`);
   try {
-    await callInItsForm(
-      entry.handler,
-      context,
-      structuredClone(sample.args),
-      (_c, f) => f(),
-    );
+    await entry.call(context, structuredClone(sample.args));
   } catch {
     // What it sent before the throw is what is checked.
   }

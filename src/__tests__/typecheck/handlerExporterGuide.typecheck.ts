@@ -21,10 +21,8 @@ import { EmbeddableMcpServer } from '../../embeddable';
 import {
   type CallContext,
   type ConnectionProvider,
-  callInItsForm,
   type HandlerContext,
   HandlerExporter,
-  isArgsOnly,
 } from '../../lib/handlers';
 
 // Basic usage
@@ -134,8 +132,7 @@ export async function inspect(
   const entries = exporter.getHandlerEntries();
   for (const entry of entries) {
     console.error(`Tool: ${entry.toolDefinition.name}`);
-    if (isArgsOnly(entry.handler)) await entry.handler({});
-    await callInItsForm(entry.handler, context, {}, (_given, call) => call());
+    await entry.call(context, {});
   }
   return toolNames;
 }

@@ -74,11 +74,10 @@ interface Runs {
 function countedRegistry(runs: Runs): CompositeHandlersRegistry {
   const tools = shutdownTools().map((entry): HandlerEntry => {
     if (entry.toolDefinition.name !== 'LockedUpdate') return entry;
-    const inner = entry.handler as (c: unknown, a: unknown) => Promise<unknown>;
+    const inner = entry.call;
     return {
       ...entry,
-      // (context, args): the server hands a two-parameter handler its context.
-      handler: (async (context: unknown, args: { id: string }) => {
+      call: async (context, args) => {
         runs.started.push(args.id);
         const result = (await inner(context, args)) as {
           content: Array<{ text: string }>;
@@ -90,7 +89,7 @@ function countedRegistry(runs: Runs): CompositeHandlersRegistry {
           isError: result.isError === true,
         });
         return result;
-      }) as never,
+      },
     };
   });
   return new CompositeHandlersRegistry([probeGroup(tools)]);

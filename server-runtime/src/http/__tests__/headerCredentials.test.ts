@@ -60,7 +60,7 @@ const heldTools: HandlerEntry[] = [
         required: ['id'],
       },
     } as never,
-    handler: (async (ctx: Ctx, args: { id: string }) => {
+    call: (async (ctx: Ctx, args: { id: string }) => {
       ctx.state.attach(new HeldPart());
       await ctx.connection.makeAdtRequest({
         url: `${PROBE_PATH}${args.id}`,
@@ -83,7 +83,7 @@ const heldTools: HandlerEntry[] = [
         required: ['id', 'state_handle'],
       },
     } as never,
-    handler: (async (ctx: Ctx, args: { id: string; state_handle: string }) => {
+    call: (async (ctx: Ctx, args: { id: string; state_handle: string }) => {
       ctx.state.check(args.state_handle);
       await ctx.connection.makeAdtRequest({
         url: `${PROBE_PATH}${args.id}`,

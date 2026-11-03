@@ -46,7 +46,7 @@ const probe: HandlerEntry = {
     description: 'reads a where-used list',
     inputSchema: { type: 'object', properties: {} },
   } as never,
-  handler: (async (context: HandlerContext, _args: unknown) => {
+  call: (async (context: HandlerContext, _args: unknown) => {
     const answer = await withAdtHeaders(context, OP, (headers) =>
       createAdtClient(context.connection)
         .getUtils(utilDocuments)

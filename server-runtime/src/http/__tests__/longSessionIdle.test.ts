@@ -66,7 +66,7 @@ const slowPartGroup: IHandlerGroup = {
         description: 'holds a part whose cleanup is slow',
         inputSchema: { type: 'object', properties: {}, required: [] },
       } as never,
-      handler: (async (context: HandlerContext, _args: unknown) => {
+      call: (async (context: HandlerContext, _args: unknown) => {
         context.state?.attach(slowPart());
         return { content: [{ type: 'text', text: 'held' }] };
       }) as never,

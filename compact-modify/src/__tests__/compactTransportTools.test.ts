@@ -93,9 +93,7 @@ function withoutDetail(schema: {
 
 describe('the compact transport sort and move tools', () => {
   it('are registered in compact-modify under their compact names', () => {
-    const names = compactModifyEntries(() => ({}) as never).map(
-      (e) => e.toolDefinition.name,
-    );
+    const names = compactModifyEntries().map((e) => e.toolDefinition.name);
     expect(names).toEqual(
       expect.arrayContaining([
         'HandlerTransportSortAndCompress',

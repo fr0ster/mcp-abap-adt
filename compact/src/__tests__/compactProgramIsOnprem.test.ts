@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 
 /**
  * A compact tool offered on cloud must not offer PROGRAM without saying where
@@ -84,13 +83,7 @@ describe('compact tools that mention PROGRAM', () => {
  */
 describe('compact tools that offer INCLUDE on ABAP cloud', () => {
   // No handler runs here: only the definitions are read.
-  const context = (): HandlerContext => {
-    throw new Error('no handler runs in this test');
-  };
-  const entries = [
-    ...compactReadOnlyEntries(context),
-    ...compactModifyEntries(context),
-  ];
+  const entries = [...compactReadOnlyEntries(), ...compactModifyEntries()];
 
   /** The enum values of the tool's `object_type` on `variant`, if it has one. */
   const membersOn = (

@@ -58,7 +58,7 @@ function testGroup(
           description: name,
           inputSchema: { type: 'object', properties: {} },
         },
-        handler,
+        call: handler,
       }) as unknown as HandlerEntry,
   );
   return {

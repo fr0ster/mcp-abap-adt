@@ -21,13 +21,12 @@ import { recordingConnection } from '../helpers/recordingConnection';
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
-function tools(connection: unknown): Map<string, HandlerEntry> {
-  const context = { connection, logger: silentLogger } as HandlerContext;
+function tools(): Map<string, HandlerEntry> {
   return new Map(
-    [
-      ...compactModifyEntries(() => context),
-      ...compactReadOnlyEntries(() => context),
-    ].map((e) => [e.toolDefinition.name, e]),
+    [...compactModifyEntries(), ...compactReadOnlyEntries()].map((e) => [
+      e.toolDefinition.name,
+      e,
+    ]),
   );
 }
 
@@ -36,11 +35,10 @@ async function call(
   args: Record<string, unknown>,
   connection = recordingConnection(),
 ): Promise<{ isError?: boolean; text: string; sent: number }> {
-  const entry = tools(connection).get(tool);
+  const entry = tools().get(tool);
   if (!entry) throw new Error(tool);
-  const answered = (await (
-    entry.handler as unknown as (a: unknown) => Promise<unknown>
-  )(args)) as {
+  const context = { connection, logger: silentLogger } as HandlerContext;
+  const answered = (await entry.call(context, args)) as {
     isError?: boolean;
     content?: Array<{ text?: string }>;
   };

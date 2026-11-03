@@ -1,15 +1,16 @@
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readInterfaceMetadata } from '../../../lib/strategies/metadataReads';
@@ -22,18 +23,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      interface_name: {
-        type: 'string',
-        description: 'Interface name.',
-      },
-      part: READ_PART_PROPERTY,
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['interface_name'],
-  },
+  inputSchema: z.object({
+    interface_name: z.string().describe('Interface name.'),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
 interface GetInterfaceArgs {

@@ -8,4 +8,8 @@
  * embedder gets these rules only when it passes them.
  */
 export { responsibleRules } from './responsibleRules';
-export { listenerSystemTypeRequiredWords, SYSTEM_TYPE_ROW } from './systemType';
+export {
+  listenerSystemTypeRequiredWords,
+  SYSTEM_TYPE_ROW,
+  SYSTEM_TYPES,
+} from './systemType';

@@ -29,6 +29,15 @@ import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
 import { child, childAt, listOf } from './xml/tree';
 
+/** The readers of a value from outside the type system (`xml/tree`), for the packages. */
+export {
+  child,
+  childAt,
+  type Element,
+  isElement,
+  isList,
+} from './xml/tree';
+
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
 let overrideConfig: SapConfig | undefined;

@@ -37,6 +37,7 @@ import {
   StateUnavailableError,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
+import { child, childAt } from '@mcp-abap-adt/lib/utils';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -130,15 +131,14 @@ interface PerRequestServerApi extends Poolable {
 
 /** Whether a request body is, or holds, a `tools/call`: a JSON-RPC batch counts by its elements. */
 function carriesToolCall(body: unknown): boolean {
-  const isCall = (m: unknown) =>
-    (m as { method?: unknown } | null | undefined)?.method === 'tools/call';
+  const isCall = (m: unknown) => child(m, 'method') === 'tools/call';
   return Array.isArray(body) ? body.some(isCall) : isCall(body);
 }
 
 /** One tool error per request (an element with an id), in the body's shape; none: nothing to answer. */
 function notAvailableAnswers(body: unknown): unknown {
   const answerOf = (m: unknown) => {
-    const id = (m as { id?: unknown } | null | undefined)?.id;
+    const id = child(m, 'id');
     return id === undefined
       ? undefined
       : {
@@ -236,11 +236,14 @@ export class StreamableHttpServer extends BaseMcpServer {
   ) => Promise<void> {
     return async (req: Request, res: Response) => {
       const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
-      const mcpMethod = req.body?.method as string | undefined;
-      const mcpId = req.body?.id;
+      const body: unknown = req.body;
+      const method = child(body, 'method');
+      const mcpMethod = typeof method === 'string' ? method : undefined;
+      const mcpId = child(body, 'id');
+      const name = childAt(body, 'params', 'name');
       const toolName =
-        mcpMethod === 'tools/call'
-          ? (req.body?.params?.name as string | undefined)
+        mcpMethod === 'tools/call' && typeof name === 'string'
+          ? name
           : undefined;
       const methodInfo = toolName
         ? `${mcpMethod} -> ${toolName}`
@@ -401,14 +404,14 @@ export class StreamableHttpServer extends BaseMcpServer {
     };
 
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
-    app.post(this.path, withDnsRebindingProtection(handler, dnsOpts) as any);
+    app.post(this.path, withDnsRebindingProtection(handler, dnsOpts));
 
     // Return 405 for other methods to avoid SSE stream issues
     app.all(
       this.path,
       withDnsRebindingProtection((_req: Request, res: Response) => {
         res.status(405).send('Method Not Allowed');
-      }, dnsOpts) as any,
+      }, dnsOpts),
     );
 
     console.error(
@@ -443,11 +446,11 @@ export class StreamableHttpServer extends BaseMcpServer {
     const app = express();
     app.use(express.json());
 
-    this.registerRoutes(app as unknown as IHttpApplication);
+    this.registerRoutes(app);
 
     await new Promise<void>((resolve, reject) => {
       const protocol = getProtocol(this.tls);
-      const server = createServerListener(app as any, this.tls);
+      const server = createServerListener(app, this.tls);
       this.standaloneServer = server;
 
       server.listen(this.port, this.host);

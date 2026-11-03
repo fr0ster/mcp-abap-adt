@@ -130,9 +130,9 @@ function destinationConfigFailure(
   if (typeof destination !== 'string' || !Array.isArray(listed)) {
     return undefined;
   }
-  const copied: unknown[] = Array.from(listed as unknown[]);
-  if (!copied.every((field) => typeof field === 'string')) return undefined;
-  const fields = copied as string[];
+  const copied = Array.from<unknown>(listed);
+  const fields = copied.filter((field) => typeof field === 'string');
+  if (fields.length !== copied.length) return undefined;
   const carried = readOwn(thrown, 'error');
   const cause =
     carried === undefined ? undefined : classify(carried, 'unfamiliar-error');

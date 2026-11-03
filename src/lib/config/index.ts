@@ -69,6 +69,13 @@ export {
   rfcAddressRefusalOf,
 } from './messageServer.js';
 export {
+  flagValue,
+  listValue,
+  numberValue,
+  textValue,
+  wordValue,
+} from './parameterValues.js';
+export {
   answerVersionOrHelp,
   type LauncherEdges,
   processEdges,

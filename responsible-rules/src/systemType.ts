@@ -6,6 +6,9 @@
  */
 import type { Parameter } from '@mcp-abap-adt/lib/config';
 
+/** The system types `--system-type` takes. */
+export const SYSTEM_TYPES = ['onprem', 'cloud', 'legacy'] as const;
+
 /** `--system-type` / `SAP_SYSTEM_TYPE`, required. */
 export const SYSTEM_TYPE_ROW: Parameter = {
   key: 'systemType',
@@ -13,7 +16,7 @@ export const SYSTEM_TYPE_ROW: Parameter = {
   env: 'SAP_SYSTEM_TYPE',
   yaml: 'system-type',
   kind: 'enum',
-  values: ['onprem', 'cloud', 'legacy'],
+  values: SYSTEM_TYPES,
   section: 'OPTIONS',
   help: "SAP system type, required (no default, never guessed): the tools offered, the connector and how the system's answers are read",
 };

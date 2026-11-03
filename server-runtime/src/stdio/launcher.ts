@@ -356,15 +356,12 @@ export interface LauncherDeps {
 function envFileOf(
   config: CoreConfig,
 ): Pick<IAuthBrokerFactoryConfig, 'envFile'> {
-  const field = config.envFile
-    ? 'envFile'
-    : config.envFilePath
-      ? 'envFilePath'
-      : undefined;
-  if (!field) return {};
+  const field = config.envFile ? 'envFile' : 'envFilePath';
+  const path = config.envFile || config.envFilePath;
+  if (!path) return {};
   return {
     envFile: {
-      path: config[field] as string,
+      path,
       source: config.envFileSource ?? `CoreConfig.${field}`,
     },
   };
@@ -402,7 +399,8 @@ function effectiveFromEnvironment<T extends string>(
   if (!overridable) return value;
   const raw = env[key]?.trim().toLowerCase();
   if (!raw) return value;
-  if (!(values as readonly string[]).includes(raw)) {
+  const word = values.find((each) => each === raw);
+  if (word === undefined) {
     const words =
       values.length === 2
         ? values.join(' or ')
@@ -411,7 +409,7 @@ function effectiveFromEnvironment<T extends string>(
       `${key} (environment or env file) must be ${words}`,
     );
   }
-  return raw as T;
+  return word;
 }
 
 /** `config` without its message-server fields: they are read again after the env file. */

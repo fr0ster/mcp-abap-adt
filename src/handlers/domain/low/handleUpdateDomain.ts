@@ -1,4 +1,5 @@
 import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
  *
@@ -44,26 +45,17 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      domain_name: {
-        type: 'string',
-        description: 'Domain name. Domain must already exist.',
-      },
-      properties: {
-        type: 'object',
-        description:
-          'Domain properties object. Can include: description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, etc.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-    },
-    required: ['domain_name', 'properties', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    domain_name: z.string().describe('Domain name. Domain must already exist.'),
+    properties: z
+      .any()
+      .describe(
+        'Domain properties object. Can include: description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, etc.',
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+  }),
 } as const;
 
 interface UpdateDomainArgs {

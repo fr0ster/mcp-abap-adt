@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateDomain Handler - ABAP Domain Creation via ADT API
  *
@@ -37,7 +39,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -55,95 +57,80 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP domain in SAP system. Creates the domain object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      domain_name: {
-        type: 'string',
-        description: 'Domain name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          '(optional) Domain description. If not provided, domain_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: '(optional) Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          '(optional) Transport request number, not a task. Required for transportable packages.',
-      },
-      datatype: {
-        type: 'string',
-        description:
-          '(optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
-        default: 'CHAR',
-      },
-      length: {
-        type: 'number',
-        description: '(optional) Field length (max depends on datatype)',
-        default: 100,
-      },
-      decimals: {
-        type: 'number',
-        description: '(optional) Decimal places (for DEC, CURR, QUAN types)',
-        default: 0,
-      },
-      conversion_exit: {
-        type: 'string',
-        description:
-          '(optional) Conversion exit routine name (without CONVERSION_EXIT_ prefix)',
-      },
-      lowercase: {
-        type: 'boolean',
-        description: '(optional) Allow lowercase input',
-        default: false,
-      },
-      sign_exists: {
-        type: 'boolean',
-        description: '(optional) Field has sign (+/-)',
-        default: false,
-      },
-      value_table: {
-        type: 'string',
-        description: '(optional) Value table name for foreign key relationship',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          '(optional) Activate domain after creation (default: true)',
-        default: true,
-      },
-      fixed_values: {
-        type: 'array',
-        description: '(optional) Array of fixed values for domain value range',
-        items: {
-          type: 'object',
-          properties: {
-            low: {
-              type: 'string',
-              description: "Fixed value (e.g., '001', 'A')",
-            },
-            text: {
-              type: 'string',
-              description: 'Description text for the fixed value',
-            },
-          },
-          required: ['low', 'text'],
-        },
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['domain_name'],
-  },
+  inputSchema: z.object({
+    domain_name: z.string().describe('Domain name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Domain description. If not provided, domain_name will be used.',
+      ),
+    package_name: z.string().optional().describe('(optional) Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Transport request number, not a task. Required for transportable packages.',
+      ),
+    datatype: z
+      .string()
+      .default('CHAR')
+      .optional()
+      .describe(
+        '(optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
+      ),
+    length: z
+      .number()
+      .default(100)
+      .optional()
+      .describe('(optional) Field length (max depends on datatype)'),
+    decimals: z
+      .number()
+      .default(0)
+      .optional()
+      .describe('(optional) Decimal places (for DEC, CURR, QUAN types)'),
+    conversion_exit: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Conversion exit routine name (without CONVERSION_EXIT_ prefix)',
+      ),
+    lowercase: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('(optional) Allow lowercase input'),
+    sign_exists: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('(optional) Field has sign (+/-)'),
+    value_table: z
+      .string()
+      .optional()
+      .describe('(optional) Value table name for foreign key relationship'),
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('(optional) Activate domain after creation (default: true)'),
+    fixed_values: z
+      .array(
+        z.object({
+          low: z.string().describe("Fixed value (e.g., '001', 'A')"),
+          text: z.string().describe('Description text for the fixed value'),
+        }),
+      )
+      .optional()
+      .describe('(optional) Array of fixed values for domain value range'),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DomainArgs {

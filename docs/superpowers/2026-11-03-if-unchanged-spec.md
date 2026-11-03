@@ -32,10 +32,17 @@ object was deleted afterwards.
 - SAP's refusal quotes only the timestamp and the start of the media type. Whether the
   28-character part takes part in the comparison is unmeasured.
 
+**The legacy system (7.40, Measured 2026-11-03 over RFC, the transport legacy writes go through):**
+- A source read answers an ETag. A source write answers none.
+- A write with a stale `If-Match`, or with an arbitrary one, answered `200`, and the write took
+  place. 7.40 does not act on `If-Match`. The RFC transport passes the request's header fields
+  to SAP as given.
+- Over HTTP, 7.40 keeps no stateful session: a lock taken in one request is not valid in the
+  next (`423 ExceptionResourceInvalidLockHandle`). That is why legacy writes go over RFC.
+
 **Not measured:**
 - the other write paths: class includes, function modules, DDL and the other source types,
-  and the other DDIC types;
-- the legacy system (7.40).
+  and the other DDIC types.
 
 ## 2. Contract: `@mcp-abap-adt/interfaces-adt` (minor)
 
@@ -64,9 +71,8 @@ ETag from there.
   ETag, answer `412`.
 - **Legacy.** The legacy package overrides updates for 7.40. Each override passes `ifMatch`
   on as well.
-  - E77 is measured. If 7.40 acts on `If-Match`, the legacy tools offer it. If it does not,
-    `LEGACY.md` lists the guard among the capabilities the legacy system lacks, and the legacy
-    server's tools do not offer the parameter.
+  - 7.40 does not act on `If-Match` (§1). `LEGACY.md` lists the guard among the capabilities
+    the legacy system lacks, and the legacy server's tools do not offer the parameter.
 - adt-strategies takes the same `interfaces-adt` range, as for 25.1.0.
 
 ## 4. Tools: mcp-abap-adt (minor)

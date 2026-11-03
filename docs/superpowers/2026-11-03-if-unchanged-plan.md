@@ -32,12 +32,8 @@ each:
    the value exactly when `ifMatch` is given (spec §3).
 7. Send `If-Match` from the shared request-header builder beside `lockHandle`. Each update
    passes `ifMatch` through.
-8. **Legacy.**
-   - Measure on E77 (realm check first; a `$TMP` program created and deleted): a stale
-     `If-Match` on a source write.
-   - If it answers `412`, each legacy update override passes `ifMatch` on, with unit tests.
-   - If it does not, `LEGACY.md` lists the guard among what 7.40 lacks, and the overrides
-     ignore nothing silently: they take no `ifMatch` by type.
+8. **Legacy.** Measured (spec §1): 7.40 does not act on `If-Match`. `LEGACY.md` lists the
+   guard among what 7.40 lacks. The legacy server's tools offer no `etag` (step 15).
 9. Live tests in the integration suite, on premise and cloud, one per path in the table above:
    1. read;
    2. write with the ETag (`200`);

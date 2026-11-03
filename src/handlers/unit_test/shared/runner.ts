@@ -5,6 +5,7 @@
  */
 
 import * as z from 'zod';
+import { child } from '../../../lib/xml/tree';
 import { fieldOf } from './runTarget';
 
 export const UNIT_TEST_RUNNERS = ['async', 'sync'] as const;
@@ -23,17 +24,10 @@ export const RUNNER_FIELD = z
 
 /** The runner named by `args.runner`, `async` when none; an error for another value. */
 export function runnerOf(args: unknown): UnitTestRunner | Error {
-  const given =
-    args !== null && typeof args === 'object'
-      ? (args as { runner?: unknown }).runner
-      : undefined;
+  const given = child(args, 'runner');
   if (given === undefined) return 'async';
-  if (
-    typeof given === 'string' &&
-    (UNIT_TEST_RUNNERS as readonly string[]).includes(given)
-  ) {
-    return given as UnitTestRunner;
-  }
+  const runner = UNIT_TEST_RUNNERS.find((known) => known === given);
+  if (runner !== undefined) return runner;
   return new Error(
     `runner must be one of ${UNIT_TEST_RUNNERS.join(', ')}; got ${JSON.stringify(given)}`,
   );

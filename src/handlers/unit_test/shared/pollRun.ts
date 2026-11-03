@@ -3,6 +3,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { failedWith } from '../../../lib/strategies/sequence';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { succeeded } from '../../../lib/strategies/stepResponse';
+import { childAt } from '../../../lib/xml/tree';
 
 /**
  * Reconstructing what the v18 convenience read did.
@@ -29,13 +30,13 @@ import { succeeded } from '../../../lib/strategies/stepResponse';
 
 /** The run's own verdict on itself, read off `<aunit:progress status="..."/>`. */
 export function runProgressStatus(statusValue: unknown): string | undefined {
-  const run = (statusValue as Record<string, unknown> | null | undefined)?.[
-    'aunit:run'
-  ] as Record<string, unknown> | undefined;
-  const progress = run?.['aunit:progress'] as
-    | { '@'?: { status?: unknown } }
-    | undefined;
-  const status = progress?.['@']?.status;
+  const status = childAt(
+    statusValue,
+    'aunit:run',
+    'aunit:progress',
+    '@',
+    'status',
+  );
   return typeof status === 'string' ? status : undefined;
 }
 

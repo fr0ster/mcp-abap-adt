@@ -33,7 +33,6 @@ import {
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  type ActivationRunSource,
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
@@ -109,7 +108,7 @@ export async function writeClassTests(
         ),
       ),
     ),
-  ) as Promise<Answer>;
+  );
 }
 
 /** Where a new include goes: the report's own package, read off its metadata. */
@@ -201,7 +200,7 @@ export async function writeProgramTests(
           ),
         ),
       ),
-    ) as Promise<Answer>;
+    );
 
   return carryCleanup(written, async (): Promise<Answer> => {
     if (!options.create) return activateBoth();
@@ -236,7 +235,7 @@ export async function writeProgramTests(
               },
             ),
           ),
-        )() as Promise<Answer>;
+        )();
       },
       (lockHandle) =>
         program.unlock({ programName: name }, lockHandle, {
@@ -364,7 +363,7 @@ async function activateWithMainProgram(
   // Long polls back to back, no timer of ours: the server holds each one
   // until the run moves.
   const outcome = await awaitActivationRun(
-    utils as unknown as ActivationRunSource,
+    utils,
     started.getResult().value,
     analyseException,
     ACTIVATION_POLLS,
@@ -400,5 +399,5 @@ async function activateWithMainProgram(
     value: { run_id: outcome.runId, status: outcome.status },
     raw: outcome.results ?? '',
     status: 200,
-  }) as unknown as Answer;
+  });
 }

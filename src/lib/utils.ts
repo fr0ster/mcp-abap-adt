@@ -2,12 +2,20 @@ import './instance.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
-import { answerFailure } from './answer';
+import { XMLParser } from 'fast-xml-parser';
+import { answerFailure, type McpResult } from './answer';
 import { answerRead } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
+import { hasMethod } from './capability';
 import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
@@ -19,6 +27,7 @@ import { loggerAdapter } from './loggerAdapter';
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
+import { child, childAt, listOf } from './xml/tree';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -80,10 +89,10 @@ export function return_response(response: AxiosResponse) {
 /**
  * Safely serializes an error object, avoiding circular references
  */
-function _safeStringifyError(error: any): string {
+function _safeStringifyError(error: unknown): string {
   if (error instanceof AxiosError) {
     // For Axios errors, extract safe information
-    const safeError: any = {
+    const safeError: Record<string, unknown> = {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -126,16 +135,16 @@ function _safeStringifyError(error: any): string {
  * Safely logs an error without circular reference issues
  */
 export function logErrorSafely(
-  logger: any,
+  logger: { error?: (message: string, data?: unknown) => void } | undefined,
   operationName: string,
-  error: any,
+  error: unknown,
 ): void {
   if (!logger?.error) {
     return;
   }
 
   let errorMessage = `[ERROR] ${operationName} failed`;
-  const errorDetails: any = {};
+  const errorDetails: Record<string, unknown> = {};
 
   if (error instanceof AxiosError && error.response) {
     errorMessage += ` - Status: ${error.response.status}`;
@@ -180,15 +189,15 @@ export function logErrorSafely(
  * Prioritizes XML exception payloads (<exc:exception>) for detailed messages.
  */
 export function extractAdtErrorMessage(
-  error: any,
+  error: unknown,
   fallback = 'Operation failed',
 ): string {
   if (!error) {
     return fallback;
   }
 
-  const response = error?.response;
-  const responseData = response?.data;
+  const response = child(error, 'response');
+  const responseData = child(response, 'data');
 
   if (typeof responseData === 'string') {
     const raw = responseData.trim();
@@ -196,17 +205,16 @@ export function extractAdtErrorMessage(
     // Try to parse ADT XML exception payloads first.
     if (raw.includes('<exc:exception') || raw.includes('<message')) {
       try {
-        const { XMLParser } = require('fast-xml-parser');
         const parser = new XMLParser({
           ignoreAttributes: false,
           attributeNamePrefix: '@_',
         });
-        const parsed = parser.parse(raw);
+        const exception = child(parser.parse(raw), 'exc:exception');
         const xmlMessage =
-          parsed?.['exc:exception']?.message?.['#text'] ||
-          parsed?.['exc:exception']?.localizedMessage?.['#text'] ||
-          parsed?.['exc:exception']?.message ||
-          parsed?.['exc:exception']?.localizedMessage;
+          childAt(exception, 'message', '#text') ||
+          childAt(exception, 'localizedMessage', '#text') ||
+          child(exception, 'message') ||
+          child(exception, 'localizedMessage');
 
         if (xmlMessage && String(xmlMessage).trim().length > 0) {
           return `SAP Error: ${String(xmlMessage).trim()}`;
@@ -221,20 +229,22 @@ export function extractAdtErrorMessage(
     }
   } else if (responseData && typeof responseData === 'object') {
     const dataMessage =
-      (responseData as any).message ||
-      (responseData as any).error?.message ||
-      (responseData as any).error_description;
+      child(responseData, 'message') ||
+      childAt(responseData, 'error', 'message') ||
+      child(responseData, 'error_description');
     if (typeof dataMessage === 'string' && dataMessage.trim().length > 0) {
       return dataMessage.trim();
     }
   }
 
-  if (typeof error?.message === 'string' && error.message.trim().length > 0) {
-    return error.message.trim();
+  const message = child(error, 'message');
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message.trim();
   }
 
-  if (response?.status) {
-    return `HTTP ${response.status}: ${response.statusText || 'Error'}`;
+  const status = child(response, 'status');
+  if (status) {
+    return `HTTP ${String(status)}: ${String(child(response, 'statusText') || 'Error')}`;
   }
 
   return fallback;
@@ -302,7 +312,7 @@ function withoutMcpErrorPrefixes(text: string): string {
   return text.slice(at);
 }
 
-export function return_error(error: any) {
+export function return_error(error: unknown): McpResult {
   // The failure reader first: a chain failure or the server's own
   // refusal is answered as the failure answer — never its message.
   const read = failureOf(error);
@@ -330,7 +340,7 @@ export function return_error(error: any) {
       errorText = error;
     } else if (error instanceof AxiosError) {
       // Check for DNS/network errors first
-      const errorCode = (error as any).code;
+      const errorCode = error.code;
       const errorMessage = error.message || '';
 
       // Handle DNS resolution errors (common on Windows)
@@ -507,10 +517,8 @@ export function getManagedConnection(): IAbapConnection {
     // Also try to write to a debug file on Windows
     if (process.platform === 'win32') {
       try {
-        const fs = require('node:fs');
-        const path = require('node:path');
-        const debugFile = path.join(process.cwd(), 'mcp-debug.log');
-        fs.appendFileSync(
+        const debugFile = join(process.cwd(), 'mcp-debug.log');
+        appendFileSync(
           debugFile,
           `${new Date().toISOString()} ${message}`,
           'utf8',
@@ -710,9 +718,9 @@ export async function makeAdtRequest(
   method: string,
   timeout: number,
   data?: unknown,
-  params?: any,
+  params?: IAbapRequestOptions['params'],
   headers?: Record<string, string>,
-): Promise<AxiosResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url,
     method,
@@ -720,7 +728,7 @@ export async function makeAdtRequest(
     data,
     params,
     headers,
-  }) as Promise<AxiosResponse>;
+  });
 }
 
 /**
@@ -762,9 +770,11 @@ export function isCloudConnection(config?: SapConfig): boolean {
 
     // Try to get config from cached connection
     if (cachedConnection) {
-      const connectionConfig = (cachedConnection as any).getConfig?.();
+      const connectionConfig = hasMethod(cachedConnection, 'getConfig')
+        ? cachedConnection.getConfig()
+        : undefined;
       if (connectionConfig) {
-        return connectionConfig.authType === 'jwt';
+        return child(connectionConfig, 'authType') === 'jwt';
       }
     }
 
@@ -781,126 +791,148 @@ export function isCloudConnection(config?: SapConfig): boolean {
  * @param response - AxiosResponse from validation endpoint
  * @returns Parsed validation result with valid, severity, message, exists fields
  */
-export function parseValidationResponse(response: AxiosResponse): {
+/** What `parseValidationResponse` answers. */
+interface ValidationReading {
   valid: boolean;
   severity?: string;
   message?: string;
   longText?: string;
   exists?: boolean;
-} {
+}
+
+/**
+ * A validation answer read from its status and its text alone: what
+ * `parseValidationResponse` answers when the document cannot be read.
+ */
+function validationFromStatus(response: {
+  data: unknown;
+  status: number;
+}): ValidationReading {
+  if (response.status === 200) {
+    return { valid: true };
+  }
+  // If parsing fails and status is not 200, try to extract error message from response.data
+  let errorMessage = `Validation failed with status ${response.status}`;
+
+  // Try to extract error details from response data (plain text or XML)
+  if (response.data) {
+    const dataStr =
+      typeof response.data === 'string' ? response.data : String(response.data);
+    // Try to extract meaningful error from plain text or unparsed XML
+    if (dataStr.length > 0 && dataStr.length < 1000) {
+      // If it's short text, use it directly (might be plain error message)
+      errorMessage = dataStr.trim();
+    } else if (dataStr.includes('<message>')) {
+      // Try simple regex extraction for <message> tag
+      const match = dataStr.match(/<message[^>]*>([^<]+)<\/message>/i);
+      if (match?.[1]) {
+        errorMessage = match[1].trim();
+      }
+    }
+  }
+
+  return {
+    valid: false,
+    severity: 'ERROR',
+    message: errorMessage,
+  };
+}
+
+export function parseValidationResponse(response: {
+  data: unknown;
+  status: number;
+}): ValidationReading {
+  // A document this reading cannot take apart — not XML, or a field that is
+  // not text where text is read — is answered from the status and the text.
+  let result: unknown;
   try {
-    const { XMLParser } = require('fast-xml-parser');
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@_',
     });
-    const result = parser.parse(response.data);
+    result = parser.parse(xmlTextOf(response.data));
+  } catch (_error) {
+    return validationFromStatus(response);
+  }
 
-    // Check for exception format (<exc:exception>)
-    const exception = result['exc:exception'];
-    if (exception) {
-      const message = exception.message || '';
-      const localizedMessage = exception.localizedMessage || message;
-      const msgText = localizedMessage || message;
-      const msgLower = msgText.toLowerCase();
+  // Check for exception format (<exc:exception>)
+  const exception = child(result, 'exc:exception');
+  if (exception) {
+    const message = child(exception, 'message') || '';
+    const localizedMessage = child(exception, 'localizedMessage') || message;
+    const msgText = localizedMessage || message;
+    if (typeof msgText !== 'string') return validationFromStatus(response);
+    const msgLower = msgText.toLowerCase();
 
-      // Check exception type - ExceptionResourceAlreadyExists means object exists
-      const exceptionType = exception.type || '';
-      const isResourceAlreadyExists =
-        exceptionType === 'ExceptionResourceAlreadyExists' ||
-        exceptionType.includes('ResourceAlreadyExists') ||
-        exceptionType.includes('AlreadyExists');
-
-      // InvalidClifName with "already exists" message also means object exists
-      const isInvalidClifName = exceptionType === 'InvalidClifName';
-
-      // Check if message indicates object already exists
-      const exists =
-        isResourceAlreadyExists ||
-        (isInvalidClifName && msgLower.includes('already exists')) ||
-        msgLower.includes('already exists') ||
-        (msgLower.includes('exist') &&
-          (msgLower.includes('table') ||
-            msgLower.includes('database') ||
-            msgLower.includes('resource') ||
-            msgLower.includes('interface') ||
-            msgLower.includes('class')));
-
-      return {
-        valid: false,
-        severity: 'ERROR',
-        message: msgText,
-        exists: exists ? true : undefined,
-      };
+    // Check exception type - ExceptionResourceAlreadyExists means object exists
+    const exceptionType = child(exception, 'type') || '';
+    const isResourceAlreadyExists =
+      exceptionType === 'ExceptionResourceAlreadyExists' ||
+      (typeof exceptionType === 'string' &&
+        (exceptionType.includes('ResourceAlreadyExists') ||
+          exceptionType.includes('AlreadyExists')));
+    if (!isResourceAlreadyExists && typeof exceptionType !== 'string') {
+      return validationFromStatus(response);
     }
 
-    // Check for standard format (<asx:abap><asx:values><DATA>)
-    const data = result['asx:abap']?.['asx:values']?.DATA;
-    if (!data) {
-      // No data means validation passed
-      return { valid: true };
-    }
-
-    // Check for CHECK_RESULT=X (success)
-    if (data.CHECK_RESULT === 'X') {
-      return { valid: true };
-    }
-
-    // Check for SEVERITY (error/warning)
-    const severity = data.SEVERITY;
-    const shortText = data.SHORT_TEXT || '';
-    const longText = data.LONG_TEXT || '';
+    // InvalidClifName with "already exists" message also means object exists
+    const isInvalidClifName = exceptionType === 'InvalidClifName';
 
     // Check if message indicates object already exists
-    const msgLower = shortText.toLowerCase();
     const exists =
+      isResourceAlreadyExists ||
+      (isInvalidClifName && msgLower.includes('already exists')) ||
       msgLower.includes('already exists') ||
-      msgLower.includes('does already exist') ||
       (msgLower.includes('exist') &&
-        (msgLower.includes('resource') ||
-          msgLower.includes('definition') ||
-          msgLower.includes('object')));
-
-    return {
-      valid: severity !== 'ERROR',
-      severity: severity,
-      message: shortText,
-      longText: longText,
-      exists: exists || undefined,
-    };
-  } catch (_error) {
-    // If parsing fails, check HTTP status
-    if (response.status === 200) {
-      return { valid: true };
-    }
-    // If parsing fails and status is not 200, try to extract error message from response.data
-    let errorMessage = `Validation failed with status ${response.status}`;
-
-    // Try to extract error details from response data (plain text or XML)
-    if (response.data) {
-      const dataStr =
-        typeof response.data === 'string'
-          ? response.data
-          : String(response.data);
-      // Try to extract meaningful error from plain text or unparsed XML
-      if (dataStr.length > 0 && dataStr.length < 1000) {
-        // If it's short text, use it directly (might be plain error message)
-        errorMessage = dataStr.trim();
-      } else if (dataStr.includes('<message>')) {
-        // Try simple regex extraction for <message> tag
-        const match = dataStr.match(/<message[^>]*>([^<]+)<\/message>/i);
-        if (match?.[1]) {
-          errorMessage = match[1].trim();
-        }
-      }
-    }
+        (msgLower.includes('table') ||
+          msgLower.includes('database') ||
+          msgLower.includes('resource') ||
+          msgLower.includes('interface') ||
+          msgLower.includes('class')));
 
     return {
       valid: false,
       severity: 'ERROR',
-      message: errorMessage,
+      message: msgText,
+      exists: exists ? true : undefined,
     };
   }
+
+  // Check for standard format (<asx:abap><asx:values><DATA>)
+  const data = childAt(result, 'asx:abap', 'asx:values', 'DATA');
+  if (!data) {
+    // No data means validation passed
+    return { valid: true };
+  }
+
+  // Check for CHECK_RESULT=X (success)
+  if (child(data, 'CHECK_RESULT') === 'X') {
+    return { valid: true };
+  }
+
+  // Check for SEVERITY (error/warning)
+  const severity = child(data, 'SEVERITY');
+  const shortText = child(data, 'SHORT_TEXT') || '';
+  const longText = child(data, 'LONG_TEXT') || '';
+  if (typeof shortText !== 'string') return validationFromStatus(response);
+
+  // Check if message indicates object already exists
+  const msgLower = shortText.toLowerCase();
+  const exists =
+    msgLower.includes('already exists') ||
+    msgLower.includes('does already exist') ||
+    (msgLower.includes('exist') &&
+      (msgLower.includes('resource') ||
+        msgLower.includes('definition') ||
+        msgLower.includes('object')));
+
+  return {
+    valid: severity !== 'ERROR',
+    severity: severity === undefined ? undefined : String(severity),
+    message: shortText,
+    longText: String(longText),
+    exists: exists || undefined,
+  };
 }
 
 /**
@@ -909,8 +941,10 @@ export function parseValidationResponse(response: AxiosResponse): {
  * @param error - Error object or error message string
  * @returns true if error indicates object was already checked
  */
-export function isAlreadyCheckedError(error: any): boolean {
-  const errorMessage = error?.message || error?.text || String(error || '');
+export function isAlreadyCheckedError(error: unknown): boolean {
+  const errorMessage = String(
+    child(error, 'message') || child(error, 'text') || String(error || ''),
+  );
   const msgLower = errorMessage.toLowerCase();
   return (
     msgLower.includes('has been checked') ||
@@ -925,14 +959,13 @@ export function isAlreadyCheckedError(error: any): boolean {
  * @param error - Error object or error message string
  * @returns true if error indicates object already exists
  */
-export function isAlreadyExistsError(error: any): boolean {
-  const errorMessage = error?.message || error?.text || String(error || '');
+export function isAlreadyExistsError(error: unknown): boolean {
+  const errorMessage = String(
+    child(error, 'message') || child(error, 'text') || String(error || ''),
+  );
+  const data = childAt(error, 'response', 'data');
   const responseData =
-    typeof error?.response?.data === 'string'
-      ? error.response.data
-      : error?.response?.data
-        ? JSON.stringify(error.response.data)
-        : '';
+    typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
   const msgLower = `${errorMessage} ${responseData}`.toLowerCase();
   return (
     msgLower.includes('already exists') ||
@@ -957,7 +990,7 @@ export async function safeCheckOperation<T>(
 ): Promise<T> {
   try {
     return await checkOperation();
-  } catch (checkError: any) {
+  } catch (checkError) {
     if (isAlreadyCheckedError(checkError)) {
       // Object was already checked - this is OK, continue
       if (logger?.debug) {
@@ -967,10 +1000,10 @@ export async function safeCheckOperation<T>(
       }
       // Return a mock success response or rethrow with handled flag
       // For now, we'll rethrow but mark it as handled
-      const handledError = new Error(
-        `Object ${objectName} was already checked`,
+      const handledError = Object.assign(
+        new Error(`Object ${objectName} was already checked`),
+        { isAlreadyChecked: true },
       );
-      (handledError as any).isAlreadyChecked = true;
       throw handledError;
     }
     // Real check error - rethrow
@@ -1014,10 +1047,8 @@ function debugLog(message: string): void {
   // Also try to write to a debug file on Windows
   if (process.platform === 'win32') {
     try {
-      const fs = require('node:fs');
-      const path = require('node:path');
-      const debugFile = path.join(process.cwd(), 'mcp-debug.log');
-      fs.appendFileSync(
+      const debugFile = join(process.cwd(), 'mcp-debug.log');
+      appendFileSync(
         debugFile,
         `${new Date().toISOString()} ${message}`,
         'utf8',
@@ -1144,8 +1175,21 @@ export function formatAuthConfigForDisplay(
   return lines.join('\n');
 }
 
-export function parseActivationResponse(responseData: any) {
-  const { XMLParser } = require('fast-xml-parser');
+/** What fast-xml-parser reads of `value`: its text, as `parse` reads it. */
+function xmlTextOf(value: unknown): string | Uint8Array {
+  if (typeof value === 'string' || value instanceof Uint8Array) return value;
+  if (value === undefined || value === null) {
+    throw new TypeError('XML data is accepted in String or Bytes[] form.');
+  }
+  return String(value);
+}
+
+/** An attribute that reads `true`, as text or as a parsed boolean. */
+function isTrue(value: unknown): boolean {
+  return value === 'true' || value === true;
+}
+
+export function parseActivationResponse(responseData: unknown) {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
@@ -1156,35 +1200,33 @@ export function parseActivationResponse(responseData: any) {
     const data =
       typeof responseData === 'string'
         ? responseData
-        : responseData?.data || JSON.stringify(responseData);
-    const result = parser.parse(data);
-    const properties = result['chkl:messages']?.['chkl:properties'];
-    const activated =
-      properties?.['@_activationExecuted'] === 'true' ||
-      properties?.['@_activationExecuted'] === true;
-    const checked =
-      properties?.['@_checkExecuted'] === 'true' ||
-      properties?.['@_checkExecuted'] === true;
-    const generated =
-      properties?.['@_generationExecuted'] === 'true' ||
-      properties?.['@_generationExecuted'] === true;
+        : child(responseData, 'data') || JSON.stringify(responseData);
+    const result: unknown = parser.parse(xmlTextOf(data));
+    const properties = childAt(result, 'chkl:messages', 'chkl:properties');
+    const activated = isTrue(child(properties, '@_activationExecuted'));
+    const checked = isTrue(child(properties, '@_checkExecuted'));
+    const generated = isTrue(child(properties, '@_generationExecuted'));
     const messages: Array<{
       type: string;
       text: string;
       line?: number;
       column?: number;
     }> = [];
-    const msgData = result['chkl:messages']?.msg;
+    const numberOrNone = (value: unknown) =>
+      typeof value === 'number' ? value : undefined;
+    const msgData = childAt(result, 'chkl:messages', 'msg');
     if (msgData) {
-      const msgArray = Array.isArray(msgData) ? msgData : [msgData];
-      msgArray.forEach((msg: any) => {
+      for (const msg of listOf(msgData)) {
+        const shortText = child(msg, 'shortText');
         messages.push({
-          type: msg['@_type'] || 'info',
-          text: msg.shortText?.txt || msg.shortText || 'Unknown message',
-          line: msg['@_line'],
-          column: msg['@_column'],
+          type: String(child(msg, '@_type') || 'info'),
+          text: String(
+            child(shortText, 'txt') || shortText || 'Unknown message',
+          ),
+          line: numberOrNone(child(msg, '@_line')),
+          column: numberOrNone(child(msg, '@_column')),
         });
-      });
+      }
     }
     return {
       activated,

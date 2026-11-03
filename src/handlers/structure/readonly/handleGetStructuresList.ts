@@ -2,6 +2,7 @@ import { structureDocuments, tableDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import type { AdtCodes } from '../../../lib/adtProjections';
 import {
   type FailureEntry,
@@ -19,10 +20,10 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
@@ -46,30 +47,27 @@ export const TOOL_DEFINITION = {
       'Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; ' +
       'legacy systems (BASIS < 7.50) refuse it (issue #207).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      structure_name: {
-        type: 'string',
-        description: 'Structure name (or give structure_names).',
-      },
-      structure_names: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Several structure names, read together (give this or structure_name).',
-      },
-      version: READ_VERSION_PROPERTY,
-      include_extensions: {
-        type: 'boolean',
-        description:
-          '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
-        default: true,
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    structure_name: z
+      .string()
+      .optional()
+      .describe('Structure name (or give structure_names).'),
+    structure_names: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Several structure names, read together (give this or structure_name).',
+      ),
+    version: READ_VERSION_FIELD,
+    include_extensions: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
+      ),
+  }),
 } as const;
 
 interface StructureNode {

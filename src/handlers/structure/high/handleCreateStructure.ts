@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateStructure Handler - ABAP Structure Creation via ADT API
  *
@@ -46,7 +48,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -60,109 +62,87 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP structure in SAP system. Creates the structure object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      structure_name: {
-        type: 'string',
-        description: 'Structure name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Structure description. If not provided, structure_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      fields: {
-        type: 'array',
-        description:
-          'Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.',
-        items: {
-          type: 'object',
-          properties: {
-            name: {
-              type: 'string',
-              description: 'Field name (e.g., CLIENT, MATERIAL_ID)',
-            },
-            data_type: {
-              type: 'string',
-              description:
-                'Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
-            },
-            length: {
-              type: 'number',
-              description: 'Field length',
-            },
-            decimals: {
-              type: 'number',
-              description: 'Decimal places (for DEC, CURR, QUAN types)',
-              default: 0,
-            },
-            domain: {
-              type: 'string',
-              description: 'Domain name for type reference (optional)',
-            },
-            data_element: {
-              type: 'string',
-              description: 'Data element name for type reference (optional)',
-            },
-            structure_ref: {
-              type: 'string',
-              description: 'Include another structure (optional)',
-            },
-            table_ref: {
-              type: 'string',
-              description: 'Reference to table type (optional)',
-            },
-            description: {
-              type: 'string',
-              description: 'Field description',
-            },
-          },
-          required: ['name'],
-        },
-      },
-      includes: {
-        type: 'array',
-        description:
-          'Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.',
-        items: {
-          type: 'object',
-          properties: {
-            name: {
-              type: 'string',
-              description: 'Include structure name',
-            },
-            suffix: {
-              type: 'string',
-              description: 'Optional suffix for include fields',
-            },
-          },
-          required: ['name'],
-        },
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['structure_name', 'package_name', 'fields'],
-  },
+  inputSchema: z.object({
+    structure_name: z.string().describe('Structure name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Structure description. If not provided, structure_name will be used.',
+      ),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    fields: z
+      .array(
+        z.object({
+          name: z.string().describe('Field name (e.g., CLIENT, MATERIAL_ID)'),
+          data_type: z
+            .string()
+            .optional()
+            .describe(
+              'Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
+            ),
+          length: z.number().optional().describe('Field length'),
+          decimals: z
+            .number()
+            .default(0)
+            .optional()
+            .describe('Decimal places (for DEC, CURR, QUAN types)'),
+          domain: z
+            .string()
+            .optional()
+            .describe('Domain name for type reference (optional)'),
+          data_element: z
+            .string()
+            .optional()
+            .describe('Data element name for type reference (optional)'),
+          structure_ref: z
+            .string()
+            .optional()
+            .describe('Include another structure (optional)'),
+          table_ref: z
+            .string()
+            .optional()
+            .describe('Reference to table type (optional)'),
+          description: z.string().optional().describe('Field description'),
+        }),
+      )
+      .describe(
+        'Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.',
+      ),
+    includes: z
+      .array(
+        z.object({
+          name: z.string().describe('Include structure name'),
+          suffix: z
+            .string()
+            .optional()
+            .describe('Optional suffix for include fields'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface StructureField {

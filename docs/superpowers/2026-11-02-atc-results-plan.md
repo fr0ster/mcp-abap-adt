@@ -33,11 +33,11 @@ each step names the spec section it carries out.
 9. Unit tests (TDD, each test written first and seen red):
    - each request's path, query and `Accept`;
    - the blank `createdBy` refusal;
-   - both slots answering through a custom result set;
+   - both slots answering through a custom result set.
 10. Live test in the ATC integration suite, on E19 and the trial: list central results with
     `createdBy: '*'` and ages 0–3650, then read the first by its Display ID. The test is guarded and skipped
     with a reason where it cannot run. Do a realm check before each run.
-11. Write the CHANGELOG entries (adt-clients 42.1.0, the legacy minor) and the README. Run every
+11. Write the CHANGELOG entries (adt-clients 42.1.0, adt-strategies 0.18.2, legacy 0.6.1) and the README. Run every
     package's lint, test:check, build and test.
 12. Run Codex review and CI, then wait for the owner's merge, tag and publish. Check the registry.
 

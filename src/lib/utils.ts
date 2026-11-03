@@ -562,7 +562,6 @@ export function getManagedConnection(): IAbapConnection {
         hasUaaClientSecret,
         canRefresh:
           hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret,
-        configObjectId: (config as any).__debugId || 'no-id',
       },
     );
 
@@ -584,27 +583,6 @@ export function getManagedConnection(): IAbapConnection {
       fallbackSessionId,
     );
 
-    // Verify connection has access to refresh token
-    const connectionWithRefresh = cachedConnection as any;
-    if (
-      connectionWithRefresh.getConfig &&
-      connectionWithRefresh.canRefreshToken
-    ) {
-      const connectionConfig = connectionWithRefresh.getConfig();
-      const canRefresh = connectionWithRefresh.canRefreshToken();
-      connectionManagerLogger?.debug(
-        `[DEBUG] getManagedConnection - Connection created, refresh check:`,
-        {
-          canRefresh,
-          connectionHasRefreshToken: !!connectionConfig?.refreshToken,
-          connectionHasUaaUrl: !!connectionConfig?.uaaUrl,
-          configMatches:
-            connectionConfig === config
-              ? 'same object ✓'
-              : 'different object ✗',
-        },
-      );
-    }
     cachedConfigSignature = signature;
 
     // Don't call connect() here - it will be called lazily on first request

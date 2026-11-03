@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateBehaviorDefinition Handler - ABAP Behavior Definition Creation via ADT API
  *
@@ -28,7 +30,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -43,49 +45,34 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Behavior Definition name (usually same as Root Entity name)',
-      },
-      description: {
-        type: 'string',
-        description: 'Description',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description: 'Transport request number, not a task',
-      },
-      root_entity: {
-        type: 'string',
-        description: 'Root Entity name (CDS View name)',
-      },
-      implementation_type: {
-        type: 'string',
-        description:
-          "Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'",
-        enum: ['Managed', 'Unmanaged', 'Abstract', 'Projection'],
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after creation. Default: true',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name', 'package_name', 'root_entity', 'implementation_type'],
-  },
+  inputSchema: z.object({
+    name: z
+      .string()
+      .describe('Behavior Definition name (usually same as Root Entity name)'),
+    description: z.string().optional().describe('Description'),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe('Transport request number, not a task'),
+    root_entity: z.string().describe('Root Entity name (CDS View name)'),
+    implementation_type: z
+      .enum(['Managed', 'Unmanaged', 'Abstract', 'Projection'])
+      .describe(
+        "Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'",
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after creation. Default: true'),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateBehaviorDefinitionArgs {

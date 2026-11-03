@@ -1,4 +1,3 @@
-import type { IDebuggerLineBreakpoint } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import {
   BREAKPOINT_ITEM,
@@ -142,7 +141,7 @@ export async function handleHandlerDebugBreakpoints(
             throw new Error(
               `breakpoints[${i}]: sync_scope partial takes line breakpoints`,
             );
-          return b as IDebuggerLineBreakpoint;
+          return b;
         });
         return d.abap.syncBreakpointsOnce(identity(), {
           scope: 'partial',

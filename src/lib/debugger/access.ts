@@ -50,10 +50,14 @@ export function heldStateHandle(
 
 /** What a start answers beside its state: the handle, the SAP ids, and the identity in force. */
 export function startedExtra(context: HandlerContext): Record<string, unknown> {
-  const abap = context.debugger!().abap;
+  const { debugger: debuggerOf, state } = context;
+  if (debuggerOf === undefined || state === undefined) {
+    throw new Error('A started debug session has no debugger or state here');
+  }
+  const abap = debuggerOf().abap;
   const identity = abap.currentIdentity();
   return {
-    state_handle: context.state!.handle,
+    state_handle: state.handle,
     terminal_id: identity?.terminalId ?? abap.ids.terminalId,
     ide_id: abap.ids.ideId,
     ...(identity ? { debugging_mode: identity.debuggingMode } : {}),

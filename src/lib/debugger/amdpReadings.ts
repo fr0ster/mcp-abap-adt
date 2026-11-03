@@ -3,7 +3,9 @@
  * 2026-10-11: the start, a sync and its events, a break, the end of a
  * debuggee, a stop, a data preview).
  */
+
 import { XMLParser } from 'fast-xml-parser';
+import { child, childAt, entries, isList, listOf } from '../xml/tree';
 import { addressOf, type ObjectAddress } from './objectUri';
 import { terseFrames } from './readings';
 
@@ -28,7 +30,7 @@ const text = (v: unknown): string =>
   v === undefined || v === null
     ? ''
     : typeof v === 'object'
-      ? String((v as Record<string, unknown>)['#text'] ?? '')
+      ? String(child(v, '#text') ?? '')
       : String(v);
 
 /** A breakpoint as the system reports it: where, its state, and its reason when it gives one. */
@@ -76,37 +78,36 @@ const lineOf = (uri: unknown): number | undefined => {
   return start ? Number(start) : undefined;
 };
 
-function breakpointState(b: any): AmdpBreakpointState {
-  const name = text(b.name);
-  const line = lineOf(b.uri);
-  const errorMessage = text(b.errorMessage).trim();
+function breakpointState(b: unknown): AmdpBreakpointState {
+  const name = text(child(b, 'name'));
+  const line = lineOf(child(b, 'uri'));
+  const errorMessage = text(child(b, 'errorMessage')).trim();
   return {
     ...(name ? { class_name: name } : {}),
     ...(line !== undefined ? { line } : {}),
-    state: text(b.state),
+    state: text(child(b, 'state')),
     ...(errorMessage ? { errorMessage } : {}),
   };
 }
 
-type Attributes = Record<string, unknown>;
-function frameOf(
-  f: Attributes & { abapPosition?: Attributes; nativePosition?: Attributes },
-): AmdpFrame {
-  const abap = f.abapPosition ?? {};
-  const native = f.nativePosition ?? {};
-  const line = lineOf(abap.uri);
-  const nativeLine = text(native.line).trim();
+function frameOf(f: unknown): AmdpFrame {
+  const abap = child(f, 'abapPosition');
+  const native = child(f, 'nativePosition');
+  const line = lineOf(child(abap, 'uri'));
+  const nativeLine = text(child(native, 'line')).trim();
   return {
-    index: Number(text(f.index).trim() || 0),
-    procedure: text(abap.procedureName) || text(native.procedureName),
-    language: text(f.language),
-    type: text(f.type),
-    isDebugCompiled: text(f.isDebugCompiled) === 'true',
-    uri: text(abap.uri),
-    objectType: text(abap.type),
-    objectName: text(abap.name),
+    index: Number(text(child(f, 'index')).trim() || 0),
+    procedure:
+      text(child(abap, 'procedureName')) ||
+      text(child(native, 'procedureName')),
+    language: text(child(f, 'language')),
+    type: text(child(f, 'type')),
+    isDebugCompiled: text(child(f, 'isDebugCompiled')) === 'true',
+    uri: text(child(abap, 'uri')),
+    objectType: text(child(abap, 'type')),
+    objectName: text(child(abap, 'name')),
     ...(line !== undefined ? { line } : {}),
-    schema: text(native.schemaName),
+    schema: text(child(native, 'schemaName')),
     ...(nativeLine ? { nativeLine: Number(nativeLine) } : {}),
   };
 }
@@ -120,12 +121,12 @@ const MAIN_RESPONSE =
  * depths by kind (a sync's breakpoints under value/syncBreakpoints/breakpoints,
  * measured on premise 2026-10-11), and the reading must not depend on that.
  */
-function deep(node: unknown, key: string): any[] {
+function deep(node: unknown, key: string): unknown[] {
   if (!node || typeof node !== 'object') return [];
-  if (Array.isArray(node)) return node.flatMap((n) => deep(n, key));
-  const found: any[] = [];
-  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-    if (k === key) found.push(...(Array.isArray(v) ? v : [v]));
+  if (isList(node)) return node.flatMap((n) => deep(n, key));
+  const found: unknown[] = [];
+  for (const [k, v] of entries(node)) {
+    if (k === key) found.push(...(isList(v) ? v : [v]));
     else found.push(...deep(v, key));
   }
   return found;
@@ -133,25 +134,23 @@ function deep(node: unknown, key: string): any[] {
 
 export function readAmdpEvents(xml: string): AmdpEvent[] {
   if (!xml?.trim()) return [];
-  const doc = parser.parse(xml);
+  const doc: unknown = parser.parse(xml);
   // The system answers a mainResponseList (measured on premise, 2026-10-11).
-  const root =
-    doc.mainResponseList && typeof doc.mainResponseList === 'object'
-      ? doc.mainResponseList
-      : doc;
-  const rows: any[] = root.mainResponse ?? [];
+  const list = child(doc, 'mainResponseList');
+  const root = list && typeof list === 'object' ? list : doc;
+  const rows = listOf(child(root, 'mainResponse'));
   const bodies = [...xml.matchAll(MAIN_RESPONSE)].map((m) => m[0]);
   return rows.map((r, i) => {
-    const line = lineOf(deep(r, 'abapPosition')[0]?.uri);
+    const line = lineOf(child(deep(r, 'abapPosition')[0], 'uri'));
     const frames = deep(r, 'callstackEntry');
     return {
-      kind: text(r.kind),
-      requestId: text(r.requestId),
-      debuggeeId: text(r.debuggeeId),
+      kind: text(child(r, 'kind')),
+      requestId: text(child(r, 'requestId')),
+      debuggeeId: text(child(r, 'debuggeeId')),
       ...(line !== undefined ? { line } : {}),
-      variables: deep(r, 'variable').map((v: any) => ({
-        name: text(v.name),
-        value: text(v.isNullValue) === 'true' ? 'NULL' : text(v),
+      variables: deep(r, 'variable').map((v) => ({
+        name: text(child(v, 'name')),
+        value: text(child(v, 'isNullValue')) === 'true' ? 'NULL' : text(v),
       })),
       breakpoints: deep(r, 'breakpoint').map(breakpointState),
       ...(frames.length ? { stack: frames.map(frameOf) } : {}),
@@ -190,12 +189,11 @@ export function readAmdpPreview(xml: string): {
   rows: Array<Record<string, string>>;
   columns: string[];
 } {
-  const table = parser.parse(xml ?? '').tableData;
-  const columns: any[] =
-    table && typeof table === 'object' ? (table.columns ?? []) : [];
-  const names = columns.map((c) => text(c.metadata?.name));
+  const table = child(parser.parse(xml ?? ''), 'tableData');
+  const columns = listOf(child(table, 'columns'));
+  const names = columns.map((c) => text(childAt(c, 'metadata', 'name')));
   const values: string[][] = columns.map((c) =>
-    (c.dataSet?.data ?? []).map(text),
+    listOf(childAt(c, 'dataSet', 'data')).map(text),
   );
   const count = Math.max(0, ...values.map((v) => v.length));
   const rows = Array.from({ length: count }, (_, i) =>

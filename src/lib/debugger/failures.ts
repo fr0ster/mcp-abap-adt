@@ -4,6 +4,7 @@
  * throw — never dressed as SAP's answer (`thrownEntry`). A cleanup that could
  * not undo several things answers each as such an entry, not one text.
  */
+
 import type { IAdtError, IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
@@ -21,6 +22,7 @@ import {
   payloadCarriedBy,
 } from '../strategies/step';
 import { failed } from '../strategies/stepResponse';
+import { child } from '../xml/tree';
 import { failureText } from './readings';
 
 export type DebugFailure = FailureEntry;
@@ -77,8 +79,7 @@ export function describeFailures(list: readonly DebugFailure[]): string {
               response: { data: entry.raw_body },
             })
           : JSON.stringify(entry);
-      const left = (entry.cleanup as { message?: unknown } | undefined)
-        ?.message;
+      const left = child(entry.cleanup, 'message');
       return `${step}${message}${typeof left === 'string' ? `; ${left}` : ''}`;
     })
     .join('; ');

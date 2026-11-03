@@ -1,7 +1,7 @@
 import type { McpResult } from '../answer';
 import { detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
-import type { DebugState, DebugView, OnceStep, StopView } from './DebugSession';
+import type { DebugState, DebugView, OnceStep } from './DebugSession';
 import { terseSettings, terseStop } from './readings';
 
 const asText = (value: unknown) => ({
@@ -54,8 +54,6 @@ export async function debugAnswer<T>(
 /** A step of the one-request and batch paths, terse: SAP's step result, or the end it reports. */
 export const terseOnceStep = (v: OnceStep) =>
   'ended' in v ? { state: 'ended', reason: v.ended } : v.step;
-
-type Stopped = Extract<DebugState, { state: 'stopped' }>;
 
 /** A debug state: under terse a stop is its place and the top frames; raw is SAP's documents of the stop. */
 export async function debugStateAnswer(

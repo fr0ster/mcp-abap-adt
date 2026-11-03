@@ -43,6 +43,7 @@ import {
 } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { child } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtension',
@@ -95,8 +96,8 @@ export async function handleDeleteMetadataExtension(
       ),
     // The check's answer, when the object was not there and no DELETE was
     // sent, is a deletion document; the DELETE's own answer is an empty 2xx.
-    project(detail, (value: any, status) =>
-      value?.['del:checkResponse']
+    project(detail, (value: unknown, status) =>
+      child(value, 'del:checkResponse')
         ? terseDeletion(value, status)
         : terseWrite(value, status),
     ),

@@ -61,9 +61,7 @@ export async function handleCheckClass(
   }
 
   const checkVersion =
-    version && ['active', 'inactive'].includes(version.toLowerCase())
-      ? (version.toLowerCase() as 'active' | 'inactive')
-      : 'active';
+    version?.toLowerCase() === 'inactive' ? 'inactive' : 'active';
 
   const className = class_name.toUpperCase();
   const detail = detailOf(args);

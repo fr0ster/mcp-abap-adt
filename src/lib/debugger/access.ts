@@ -36,6 +36,17 @@ export function requireDebugger(
 }
 
 /**
+ * The debug state of this call: the one `requireDebugger` admitted the call
+ * with; refused in its words where the server serves no debugging.
+ */
+export function debugState(
+  context: HandlerContext,
+): NonNullable<HandlerContext['state']> {
+  if (!context.state) throw new Error('debugging is not served by this server');
+  return context.state;
+}
+
+/**
  * For a start's error answer: the handle, while the state still holds
  * something (a start that could not undo everything) — the model stops it
  * with this handle. Nothing held: nothing to answer.

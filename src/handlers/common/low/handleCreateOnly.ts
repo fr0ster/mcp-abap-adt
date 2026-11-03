@@ -429,9 +429,7 @@ export async function handleCreateOnly(
                   .trim()
                   .toUpperCase(),
                 serviceVersion: (text(args.service_version) || '0001').trim(),
-                bindingVariant:
-                  (args.binding_variant as ServiceBindingVariant | undefined) ??
-                  'ODATA_V4_UI',
+                bindingVariant: args.binding_variant ?? 'ODATA_V4_UI',
                 transportRequest,
                 masterLanguage,
               },

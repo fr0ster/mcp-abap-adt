@@ -37,9 +37,14 @@ import * as z from 'zod';
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answerFailure, answerThrown } from '../../../lib/answer';
+import {
+  answerFailure,
+  answerThrown,
+  messageCarriedBy,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { givenCount, givenText } from '../../../lib/propertyBag';
 import {
   type DataElementChanges,
   patchDataElementXml,
@@ -47,11 +52,7 @@ import {
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDataElementLow',
@@ -63,7 +64,7 @@ export const TOOL_DEFINITION = {
       .string()
       .describe('Data element name. Data element must already exist.'),
     properties: z
-      .any()
+      .unknown()
       .describe(
         'Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.',
       ),
@@ -73,42 +74,57 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateDataElementArgs {
-  data_element_name: string;
-  properties: Record<string, any>;
-  lock_handle: string;
-}
+/** The tool's arguments, as its schema parses them. */
+type UpdateDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** `properties` always took both spellings; the patch function only knows snake_case. */
-function changesOf(properties: Record<string, any>): DataElementChanges {
+/**
+ * `properties` always took both spellings; the patch function only knows
+ * snake_case. Each member as the patch writes it: text, a length or a count
+ * a number or text; a value of no such kind is left out.
+ */
+function changesOf(properties: unknown): DataElementChanges {
   return {
-    description: properties.description,
-    type_kind: properties.type_kind ?? properties.typeKind,
-    type_name: properties.type_name ?? properties.typeName,
-    data_type: properties.data_type ?? properties.dataType,
-    length: properties.length,
-    decimals: properties.decimals,
-    short_label:
-      properties.field_label_short ??
-      properties.short_label ??
-      properties.shortLabel,
-    medium_label:
-      properties.field_label_medium ??
-      properties.medium_label ??
-      properties.mediumLabel,
-    long_label:
-      properties.field_label_long ??
-      properties.long_label ??
-      properties.longLabel,
-    heading_label:
-      properties.field_label_heading ??
-      properties.heading_label ??
-      properties.headingLabel,
-    search_help: properties.search_help ?? properties.searchHelp,
-    search_help_parameter:
-      properties.search_help_parameter ?? properties.searchHelpParameter,
-    set_get_parameter:
-      properties.set_get_parameter ?? properties.setGetParameter,
+    description: givenText(properties, 'description'),
+    type_kind: givenText(properties, 'type_kind', 'typeKind'),
+    type_name: givenText(properties, 'type_name', 'typeName'),
+    data_type: givenText(properties, 'data_type', 'dataType'),
+    length: givenCount(properties, 'length'),
+    decimals: givenCount(properties, 'decimals'),
+    short_label: givenText(
+      properties,
+      'field_label_short',
+      'short_label',
+      'shortLabel',
+    ),
+    medium_label: givenText(
+      properties,
+      'field_label_medium',
+      'medium_label',
+      'mediumLabel',
+    ),
+    long_label: givenText(
+      properties,
+      'field_label_long',
+      'long_label',
+      'longLabel',
+    ),
+    heading_label: givenText(
+      properties,
+      'field_label_heading',
+      'heading_label',
+      'headingLabel',
+    ),
+    search_help: givenText(properties, 'search_help', 'searchHelp'),
+    search_help_parameter: givenText(
+      properties,
+      'search_help_parameter',
+      'searchHelpParameter',
+    ),
+    set_get_parameter: givenText(
+      properties,
+      'set_get_parameter',
+      'setGetParameter',
+    ),
   };
 }
 
@@ -118,8 +134,7 @@ export async function handleUpdateDataElement(
 ) {
   const { connection, logger } = context;
   try {
-    const { data_element_name, properties, lock_handle } =
-      args as UpdateDataElementArgs;
+    const { data_element_name, properties, lock_handle } = args;
 
     if (!data_element_name || !properties || !lock_handle) {
       return return_error(
@@ -136,7 +151,8 @@ export async function handleUpdateDataElement(
     logger?.info(`Starting data element update: ${dataElementName}`);
 
     const transportRequest =
-      properties.transport_request || properties.transportRequest;
+      givenText(properties, 'transport_request') ||
+      givenText(properties, 'transportRequest');
     const changes = changesOf(properties);
 
     try {
@@ -196,8 +212,8 @@ export async function handleUpdateDataElement(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is
       // where that verdict is read. This catch is left for a genuine bug in
@@ -206,7 +222,7 @@ export async function handleUpdateDataElement(
       // can still produce — that read belongs to `analyseException`, not a
       // second opinion here (found while writing the handler invariant that
       // checks for exactly this).
-      const message = error?.message ?? String(error);
+      const message = messageCarriedBy(error);
       logger?.error(
         `Error updating data element ${dataElementName}: ${message}`,
       );
@@ -215,7 +231,7 @@ export async function handleUpdateDataElement(
         detail: 'terse',
       });
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

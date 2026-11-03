@@ -1024,6 +1024,30 @@ describe('data_element', () => {
     expect(patched).toContain('<dtel:typeKind>domain</dtel:typeKind>');
     expect(patched).toContain('<dtel:typeName>ZD_DOMAIN</dtel:typeName>');
   });
+
+  // The bag is the model's own object: a type name given as a number failed
+  // the call (`toUpperCase` of a number); it is written out as text.
+  it('UpdateDataElementLow writes a type name given as a number', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="x"><dtel:typeKind>predefinedAbapType</dtel:typeKind><dtel:typeName></dtel:typeName><dtel:dataType>CHAR</dtel:dataType></blue:wbobj>';
+    let patched = '';
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (_config: unknown, options: { source: string }) => {
+        patched = options.source;
+        return okResponse(undefined);
+      },
+    });
+
+    const result = await handleUpdateDataElement(context, {
+      data_element_name: 'zdt_x',
+      properties: { type_name: 5 },
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(patched).toContain('<dtel:typeName>5</dtel:typeName>');
+  });
 });
 
 describe('service_binding — Activate only, over AdtServiceBinding', () => {

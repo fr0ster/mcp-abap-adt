@@ -105,7 +105,7 @@ export async function handleCreateBehaviorDefinition(
   try {
     validateTransportRequest(args.package_name, args.transport_request);
   } catch (error) {
-    return return_error(error as Error);
+    return return_error(error);
   }
 
   const name = args.name.toUpperCase();

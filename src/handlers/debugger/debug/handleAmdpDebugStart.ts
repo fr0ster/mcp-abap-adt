@@ -1,5 +1,9 @@
 import * as z from 'zod';
-import { heldStateHandle, requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugState,
+  heldStateHandle,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   AMDP_BREAKPOINTS_PROPERTY,
@@ -44,7 +48,7 @@ export async function handleAmdpDebugStart(
     },
     (v) => v,
     (v) => v,
-    () => ({ state_handle: context.state!.handle }),
+    () => ({ state_handle: debugState(context).handle }),
     () => heldStateHandle(context),
   );
 }

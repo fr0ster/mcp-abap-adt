@@ -133,8 +133,9 @@ export async function unlockObject(
   // Request-shape check that stays ahead of the client call, exactly where it
   // lived before this migration: `unlock()`'s config does not itself enforce
   // it.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (objectType === 'function_module') {
     if (!object_name.toUpperCase().includes('|')) {
       return return_error(
@@ -196,8 +197,8 @@ export async function unlockObject(
             .getFunctionModule(resultsFor(functionModuleDocuments))
             .unlock(
               {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
+                functionGroupName,
+                functionModuleName,
               },
               lock_handle,
               { analyse: analyseException },

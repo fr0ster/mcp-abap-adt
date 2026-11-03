@@ -177,6 +177,8 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
   const variant = variantOf(connection);
   const refs: IAtcObjectRef[] = [];
   for (const o of objects) {
+    // Named, as checked above.
+    const name = o.name ?? '';
     const kind = acceptedOf(o.type ?? '', ATC_OBJECT_TYPES[variant]);
     if (kind === undefined) {
       return return_error(
@@ -185,7 +187,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
         ),
       );
     }
-    const ref = toObjectRef(o, kind);
+    const ref = toObjectRef(o, name, kind);
     if (typeof ref === 'string') return return_error(new Error(ref));
     refs.push(ref);
   }
@@ -283,9 +285,10 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
  */
 function toObjectRef(
   o: RunATCObjectArg,
+  name: string,
   objectType: AtcObjectType,
 ): IAtcObjectRef | string {
-  const objectName = (o.name as string).toUpperCase();
+  const objectName = name.toUpperCase();
   // A field only one kind reads is refused on every other kind, rather than
   // dropped without a word.
   if (o.function_group !== undefined && objectType !== 'function_include') {

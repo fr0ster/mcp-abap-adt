@@ -129,7 +129,7 @@ export async function handleUpdatePackage(
                 analyse: analyseException,
               }),
             { type: 'PACKAGE', name: packageName },
-          ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+          );
         },
       ),
     project(detail, terseWrite),

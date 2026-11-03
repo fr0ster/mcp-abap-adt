@@ -217,11 +217,13 @@ export async function validateObject(
         ),
       );
     }
-    normalizedImplementationType = (implementation_type
-      .charAt(0)
-      .toUpperCase() +
-      implementation_type.slice(1).toLowerCase()) as ImplementationType;
-    if (!VALID_IMPLEMENTATION_TYPES.includes(normalizedImplementationType)) {
+    const spelled =
+      implementation_type.charAt(0).toUpperCase() +
+      implementation_type.slice(1).toLowerCase();
+    normalizedImplementationType = VALID_IMPLEMENTATION_TYPES.find(
+      (known) => known === spelled,
+    );
+    if (normalizedImplementationType === undefined) {
       return return_error(
         new Error(
           `Invalid implementationType. Must be one of: ${VALID_IMPLEMENTATION_TYPES.join(', ')}`,
@@ -261,8 +263,9 @@ export async function validateObject(
 
   // A function module is addressed under its group: GROUP|MODULE, as the
   // lock takes it.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (normalizedType === 'function_module') {
     const [group, module] = object_name.toUpperCase().split('|');
     if (!group || !module) {
@@ -356,8 +359,8 @@ export async function validateObject(
             .getFunctionModule(resultsFor(functionModuleDocuments))
             .validate(
               {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
+                functionGroupName,
+                functionModuleName,
                 description: normalizedDescription,
               },
               { analyse: analyseException },
@@ -443,7 +446,8 @@ export async function validateObject(
             .validate(
               {
                 className: objectName,
-                packageName: packageName as string,
+                // Required for a behavior implementation, refused above when absent.
+                packageName: packageName ?? '',
                 behaviorDefinition: behavior_definition || '',
                 ...(normalizedDescription
                   ? { description: normalizedDescription }

@@ -37,6 +37,7 @@ import type {
   IAdtEnhancementHost,
   IAdtError,
   IAdtGroupLifecycle,
+  IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMainProgramsReadable,
@@ -879,13 +880,26 @@ export type MessageClassApi<
   > &
   IAdtLockable<IMessageClassConfig>;
 
-/** What the server calls on `getMessageClassMessage()`'s answer. */
+/**
+ * What the server calls on `getMessageClassMessage()`'s answer — `delete`
+ * included: removing a message is a write of its parent class, so it is a
+ * member of the message's own (`AdtMessageClassMessage.delete`), not the
+ * deletion atom.
+ */
 export type MessageClassMessageApi<
   R extends IMessageClassMessageResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
   StatedReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
-  IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>;
+  IAdtUpdatable<
+    Partial<IMessageClassMessageConfig>,
+    ReturnType<R['written']>
+  > & {
+    delete<E extends IAdtError = IAdtError>(
+      config: Partial<IMessageClassMessageConfig>,
+      options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>>;
+  };
 
 /** What the server calls on `getAccessControl()`'s answer. */
 export type AccessControlApi<

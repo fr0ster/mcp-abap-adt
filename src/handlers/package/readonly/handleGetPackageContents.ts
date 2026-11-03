@@ -127,12 +127,12 @@ export async function handleGetPackageContents(
 
     let answered: unknown;
     if (single) {
-      const only = walked[0] as (typeof walked)[number];
+      const only = walked[0];
       if (!only.ok) throw only.error;
       answered = assembleList(single.toUpperCase(), only.value);
     } else {
       answered = walked.map((result, i) => {
-        const package_name = packageNames[i] as string;
+        const package_name = packageNames[i];
         return result.ok
           ? { package_name, objects: assembleList(package_name, result.value) }
           : {

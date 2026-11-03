@@ -506,6 +506,18 @@ function messageOf(thrown: unknown): string {
 }
 
 /**
+ * A thrown value's `message` when it carries one (an `Error`, or any object
+ * with the member), written out; else the value itself written out — what
+ * `error?.message ?? String(error)` read, without assuming the shape.
+ */
+export function messageCarriedBy(thrown: unknown): string {
+  const message = child(thrown, 'message');
+  return message === undefined || message === null
+    ? String(thrown)
+    : String(message);
+}
+
+/**
  * A throw from a handler's call, as the consumer gets it — the one rendering
  * `answer()` and a handler that works by throws share.
  */

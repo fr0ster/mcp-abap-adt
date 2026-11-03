@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import {
+  debugState,
   endDebugBatchAnswers,
   requireDebugger,
 } from '../../../lib/debugger/access';
@@ -24,7 +25,7 @@ export async function handleAmdpDebugStop(
     args,
     async () => {
       const d = requireDebugger(context, args, 'use');
-      context.state!.endWhenEmpty();
+      debugState(context).endWhenEmpty();
       await d.amdp.stop();
       // The whole debug state ended: a debugger batch's kept answers with it.
       endDebugBatchAnswers(context);

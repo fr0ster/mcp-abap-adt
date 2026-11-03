@@ -85,7 +85,7 @@ const OFFERINGS: readonly Offering[] = [
     inputSchema: (variant) => ACTIVATE_OBJECTS.variants[variant].inputSchema,
     parentOf: inList,
     args: listArgs,
-    handler: handleActivateObjects,
+    handler: (context, args) => handleActivateObjects(context, parsedLow(args)),
   },
   {
     argument: 'ActivateObjectLow.objects[]',

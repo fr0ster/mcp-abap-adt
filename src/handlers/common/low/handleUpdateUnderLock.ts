@@ -191,6 +191,10 @@ const source = (args: ToolArgs, field: string): unknown =>
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined;
 
+/** `value` when it is a non-empty string; else the error naming `field`. */
+const requiredText = (field: string, value: unknown): string | Error =>
+  text(value) ?? new Error(`${field} is required`);
+
 const upper = (value: unknown): string => String(value ?? '').toUpperCase();
 
 const ANSWER = { tool: 'HandlerUpdate', detail: 'terse' } as const;
@@ -288,10 +292,10 @@ export async function handleUpdateUnderLock(
 
   switch (args.object_type) {
     case 'PACKAGE': {
-      const missing =
-        required('package_name', args.package_name) ??
-        required('source_code', args.source_code);
+      const missing = required('package_name', args.package_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
       // The package lock lives in a session of its own over RFC; the write
       // runs in that session, where the handle is valid.
       return written(() =>
@@ -305,7 +309,7 @@ export async function handleUpdateUnderLock(
               { packageName: upper(args.package_name), ...transport },
               {
                 headers,
-                source: args.source_code as string,
+                source: sourceCode,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -314,10 +318,10 @@ export async function handleUpdateUnderLock(
       );
     }
     case 'DOMAIN': {
-      const missing =
-        required('domain_name', args.domain_name) ??
-        required('source_code', args.source_code);
+      const missing = required('domain_name', args.domain_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
       return written(() =>
         withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
           client()
@@ -326,7 +330,7 @@ export async function handleUpdateUnderLock(
               { domainName: upper(args.domain_name), ...transport },
               {
                 headers,
-                source: args.source_code as string,
+                source: sourceCode,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -335,10 +339,10 @@ export async function handleUpdateUnderLock(
       );
     }
     case 'DATA_ELEMENT': {
-      const missing =
-        required('data_element_name', args.data_element_name) ??
-        required('source_code', args.source_code);
+      const missing = required('data_element_name', args.data_element_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
       return written(() =>
         withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
           client()
@@ -350,7 +354,7 @@ export async function handleUpdateUnderLock(
               },
               {
                 headers,
-                source: args.source_code as string,
+                source: sourceCode,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -359,10 +363,10 @@ export async function handleUpdateUnderLock(
       );
     }
     case 'FUNCTION_GROUP': {
-      const missing =
-        required('function_group_name', args.function_group_name) ??
-        required('source_code', args.source_code);
+      const missing = required('function_group_name', args.function_group_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
       return written(() =>
         withAdtHeaders(context, 'functionGroup.updateMetadata', (headers) =>
           client()
@@ -374,7 +378,7 @@ export async function handleUpdateUnderLock(
               },
               {
                 headers,
-                source: args.source_code as string,
+                source: sourceCode,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -449,10 +453,13 @@ export async function handleUpdateUnderLock(
       );
     }
     case 'SERVICE_DEFINITION': {
-      const missing =
-        required('service_definition_name', args.service_definition_name) ??
-        required('source_code', args.source_code);
+      const missing = required(
+        'service_definition_name',
+        args.service_definition_name,
+      );
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
       return written(() =>
         withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
           client()
@@ -464,7 +471,7 @@ export async function handleUpdateUnderLock(
               },
               {
                 headers,
-                source: args.source_code as string,
+                source: sourceCode,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -484,12 +491,10 @@ export async function handleUpdateUnderLock(
           new Error('desired_publication_state is published or unpublished'),
         );
       }
-      const variant = (
-        SERVICE_BINDING_VARIANT_MAP as Record<
-          string,
-          { serviceType: 'odatav2' | 'odatav4' } | undefined
-        >
-      )[String(args.binding_variant)];
+      const variants: Readonly<
+        Record<string, { serviceType: 'odatav2' | 'odatav4' } | undefined>
+      > = SERVICE_BINDING_VARIANT_MAP;
+      const variant = variants[String(args.binding_variant)];
       if (variant === undefined) {
         return return_error(
           new Error(
@@ -543,10 +548,10 @@ export async function handleUpdateUnderLock(
     case 'CDS_UNIT_TEST':
     case 'BEHAVIOR_IMPLEMENTATION': {
       const [field, includeType, include] = CLASS_INCLUDES[args.object_type];
-      const body = source(args, field);
-      const missing =
-        required('class_name', args.class_name) ?? required(field, body);
+      const missing = required('class_name', args.class_name);
+      const body = requiredText(field, source(args, field));
       if (missing) return return_error(missing);
+      if (typeof body !== 'string') return return_error(body);
       return written(() =>
         withAdtHeaders(
           context,
@@ -556,7 +561,7 @@ export async function handleUpdateUnderLock(
               { className: upper(args.class_name), ...transport },
               {
                 headers,
-                source: body as string,
+                source: body,
                 lockHandle,
                 analyse: analyseException,
               },

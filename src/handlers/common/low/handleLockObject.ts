@@ -131,8 +131,9 @@ export async function lockObject(
   // Two request-shape checks that stay ahead of the client call, exactly
   // where they lived before this migration: `lock()`'s config does not
   // itself enforce either.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (objectType === 'function_module') {
     if (!object_name.toUpperCase().includes('|')) {
       return return_error(
@@ -163,7 +164,8 @@ export async function lockObject(
         .lock(
           {
             packageName: objectName,
-            superPackage: (super_package as string).toUpperCase(),
+            // Required for a package, refused above when absent.
+            superPackage: (super_package ?? '').toUpperCase(),
           },
           { analyse: analyseLock },
         );
@@ -211,8 +213,8 @@ export async function lockObject(
             .getFunctionModule(resultsFor(functionModuleDocuments))
             .lock(
               {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
+                functionGroupName,
+                functionModuleName,
               },
               { analyse: analyseLock },
             );

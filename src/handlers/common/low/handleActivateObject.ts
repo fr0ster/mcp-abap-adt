@@ -115,7 +115,6 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type ActivationRunOutcome,
-  type ActivationRunSource,
   activationVerdict,
   awaitActivationRun,
   isRefusal,
@@ -573,11 +572,7 @@ export async function handleActivateObject(
       const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) return started;
       const runId = started.getResult().value;
-      const outcome = await awaitActivationRun(
-        utils as unknown as ActivationRunSource,
-        runId,
-        analyseException,
-      );
+      const outcome = await awaitActivationRun(utils, runId, analyseException);
       // Reading the run failed: the method's error as it is, with its step.
       if (outcome.failure !== undefined)
         return failedWith<ActivationRunOutcome>(outcome.failure);

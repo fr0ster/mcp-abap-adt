@@ -1,6 +1,7 @@
 import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugStop.ts
 import {
+  debugState,
   endDebugBatchAnswers,
   requireDebugger,
 } from '../../../lib/debugger/access';
@@ -25,7 +26,7 @@ export async function handleDebugStop(
     args,
     async () => {
       const d = requireDebugger(context, args, 'use');
-      context.state!.endWhenEmpty();
+      debugState(context).endWhenEmpty();
       // A note is no debt: SAP's final refusal, reaching the model as it is.
       const notes = await d.stop();
       // Complete: a debugger batch's kept answers end with the state.

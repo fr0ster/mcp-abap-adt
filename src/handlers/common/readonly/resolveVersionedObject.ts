@@ -159,8 +159,10 @@ export function resolveVersionedObject(
  * every version listing answered that and nothing else (on premise, 2026-09-26).
  */
 function thrown(error: IAdtError, step: string): Error {
-  const failure = new Error(error.message) as Error & { code?: string };
-  if (error.code !== undefined) failure.code = error.code;
+  const failure = Object.assign(
+    new Error(error.message),
+    error.code !== undefined ? { code: error.code } : {},
+  );
   // The method's error rides on the throw, as it is, with the step: the
   // consumer gets it, not this message (`return_error`).
   return carryingFailure(failure, error, step);

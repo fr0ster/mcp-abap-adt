@@ -143,7 +143,7 @@ export async function handleCreateServiceDefinition(
       // The shell was created empty. Write the body, under a lock this call
       // also releases, before any activation — an activated empty object is
       // the bug this write exists to avoid.
-      let written = created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      let written: IAdtResponse<AdtReading<unknown>, IAdtError> = created;
       if (args.source_code) {
         written = await withLock(
           () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),

@@ -98,10 +98,10 @@ function unwrapVersionSource(
 ): string | undefined {
   if (response.ok) return response.getResult().value;
   const error = response.getError();
-  const failure = new Error(error.message) as Error & {
-    code?: string;
-  };
-  if (error.code !== undefined) failure.code = error.code;
+  const failure = Object.assign(
+    new Error(error.message),
+    error.code !== undefined ? { code: error.code } : {},
+  );
   // The method's error rides on the throw, as it is, with the step.
   throw carryingFailure(failure, error, step);
 }
@@ -240,7 +240,7 @@ export async function handleGetObjectVersionDiff(
         };
       },
     );
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

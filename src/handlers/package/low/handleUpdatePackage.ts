@@ -35,7 +35,7 @@ import * as z from 'zod';
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer } from '../../../lib/answer';
+import { answer, messageCarriedBy } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
@@ -43,11 +43,7 @@ import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
@@ -99,7 +95,7 @@ export async function handleUpdatePackage(
       updated_description,
       lock_handle,
       transport_request,
-    } = args as UpdatePackageArgs;
+    } = args;
 
     if (!package_name || !updated_description || !lock_handle) {
       return return_error(
@@ -184,8 +180,8 @@ export async function handleUpdatePackage(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is
       // where that verdict is read, per this file's own top comment. This
@@ -195,11 +191,11 @@ export async function handleUpdatePackage(
       // can still produce — that read belongs to `analyseException`, not a
       // second opinion here (issue #200-adjacent; found while writing the
       // handler invariant that checks for exactly this).
-      const message = error?.message ?? String(error);
+      const message = messageCarriedBy(error);
       logger?.error(`Error updating package ${packageName}: ${message}`);
       return return_error(new Error(`Failed to update package: ${message}`));
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

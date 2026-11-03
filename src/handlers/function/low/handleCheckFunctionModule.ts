@@ -65,9 +65,7 @@ export async function handleCheckFunctionModule(
   }
 
   const checkVersion =
-    version && ['active', 'inactive'].includes(version.toLowerCase())
-      ? (version.toLowerCase() as 'active' | 'inactive')
-      : 'active';
+    version?.toLowerCase() === 'inactive' ? 'inactive' : 'active';
 
   const functionGroupName = function_group_name.toUpperCase();
   const functionModuleName = function_module_name.toUpperCase();

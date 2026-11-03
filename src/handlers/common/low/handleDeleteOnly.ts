@@ -151,20 +151,15 @@ export async function handleDeleteOnly(
     ANSWER,
     () =>
       atStep('delete', () =>
-        withAdtHeaders(
+        target.delete(
           context,
-          adtOperation(target.objectType, 'delete'),
-          (headers) =>
-            target.deleted(connection, logger).delete(
-              target.config(
-                {
-                  name: name.toUpperCase(),
-                  ...(group ? { group: group.toUpperCase() } : {}),
-                },
-                transportRequest,
-              ),
-              { headers, analyse: target.deleteAnalyse },
-            ),
+          connection,
+          logger,
+          {
+            name: name.toUpperCase(),
+            ...(group ? { group: group.toUpperCase() } : {}),
+          },
+          transportRequest,
         ),
       )(),
     // The metadata extension's DELETE answers an empty 2xx; every other

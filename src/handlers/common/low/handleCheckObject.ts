@@ -135,9 +135,8 @@ export async function checkObject(
 
   const objectType = object_type;
 
-  const checkVersion = ['active', 'inactive'].includes(version.toLowerCase())
-    ? (version.toLowerCase() as 'active' | 'inactive')
-    : 'active';
+  const checkVersion =
+    version.toLowerCase() === 'inactive' ? 'inactive' : 'active';
 
   if (source_code !== undefined && !SOURCE_TYPES.includes(objectType)) {
     return return_error(
@@ -147,8 +146,9 @@ export async function checkObject(
 
   // A function module is addressed under its group: GROUP|MODULE, as the
   // lock takes it.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (objectType === 'function_module') {
     const [group, module] = object_name.toUpperCase().split('|');
     if (!group || !module) {
@@ -286,8 +286,8 @@ export async function checkObject(
           return withAdtHeaders(context, 'functionModule.check', (headers) =>
             client.getFunctionModule(resultsFor(functionModuleDocuments)).check(
               {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
+                functionGroupName,
+                functionModuleName,
               },
               checkVersion,
               { headers, analyse: analyseException },

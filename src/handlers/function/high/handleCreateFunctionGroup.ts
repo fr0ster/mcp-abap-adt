@@ -113,19 +113,21 @@ export async function handleCreateFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
-      let created = await atStep('create', () =>
-        withAdtHeaders(context, 'functionGroup.create', (headers) =>
-          obj.create(
-            {
-              functionGroupName,
-              description: args.description || functionGroupName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { headers, analyse: analyseException },
+      let created: IAdtResponse<AdtReading<unknown>, IAdtError> = await atStep(
+        'create',
+        () =>
+          withAdtHeaders(context, 'functionGroup.create', (headers) =>
+            obj.create(
+              {
+                functionGroupName,
+                description: args.description || functionGroupName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
-        ),
       )();
 
       // SAP's one refusal that can accompany a create that landed: the
@@ -143,7 +145,7 @@ export async function handleCreateFunctionGroup(
           logger?.info(
             `CreateFunctionGroup: ${functionGroupName} reads back, so the create landed`,
           );
-          created = readBack as unknown as typeof created;
+          created = readBack;
         }
       }
 

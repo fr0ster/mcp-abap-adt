@@ -83,7 +83,7 @@ export async function handleGetObjectVersions(
         object_name,
         function_group_name,
       );
-    } catch (e: any) {
+    } catch (e) {
       return return_error(e instanceof Error ? e : new Error(String(e)));
     }
 
@@ -100,13 +100,13 @@ export async function handleGetObjectVersions(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       return return_error(
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

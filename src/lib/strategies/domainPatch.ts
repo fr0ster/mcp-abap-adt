@@ -21,8 +21,10 @@ export interface DomainChanges {
   length?: number | string;
   decimals?: number | string;
   conversion_exit?: string;
-  sign_exists?: boolean;
-  lowercase?: boolean;
+  /** Written out as given: a flag, or its text. */
+  sign_exists?: boolean | string;
+  /** Written out as given: a flag, or its text. */
+  lowercase?: boolean | string;
   value_table?: string;
   fixed_values?: Array<{ low: string; text: string }>;
 }

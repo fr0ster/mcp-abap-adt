@@ -49,7 +49,7 @@ function activateObjectsSchema(variant: ProjectionVariant) {
 
 export async function handleActivateObjects(
   context: HandlerContext,
-  args: unknown,
+  args: z.output<ReturnType<typeof activateObjectsSchema>>,
 ) {
-  return handleActivateObject(context, args as any);
+  return handleActivateObject(context, args);
 }

@@ -36,10 +36,19 @@ import {
   tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { DELETION_CHECK_TYPES } from '../../../lib/compact/compactSchemas';
 import type {
@@ -47,6 +56,7 @@ import type {
   CheckedDeletableType,
 } from '../../../lib/strategies/checkedDeletion';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 
 type AdtClient = IServerAdtClient;
@@ -57,47 +67,94 @@ export interface DeletionName {
   group?: string;
 }
 
+/** What a deletion check or a deletion answers: a reading of the document. */
+export type DeletionAnswer = Promise<
+  IAdtResponse<AdtReading<unknown>, IAdtError>
+>;
+
 export interface DeletionTarget {
   /** The object type of its `checkDeletion` and `delete` (their header pairs). */
   objectType: CheckedDeletableType;
-  /** The adt-clients object whose `checkDeletion` is sent, on the variant's client. */
-  checked(client: AdtClient): Pick<CheckedDeletable<any, any>, 'checkDeletion'>;
   /**
-   * The adt-clients object whose `delete` is sent: on the variant's client,
-   * or on the on-premise one for a type only `ADT_TYPES_ONPREM` deletes (a
-   * program), which refuses a connection declared otherwise before anything
-   * is sent.
+   * The deletion check of the object `name` names, sent on the variant's
+   * client with the header pair of the type's `checkDeletion`.
    */
-  deleted(
+  checkDeletion(
+    context: AdtHeadersContext,
+    client: AdtClient,
+    name: DeletionName,
+    analyse: IAnalyse,
+  ): DeletionAnswer;
+  /**
+   * The deletion of the object `name` names: on the variant's client, or on
+   * the on-premise one for a type only `ADT_TYPES_ONPREM` deletes (a
+   * program), which refuses a connection declared otherwise before anything
+   * is sent — with the header pair of the type's `delete`, read as the type
+   * reads its deletion's answer.
+   */
+  delete(
+    context: AdtHeadersContext,
     connection: IAbapConnection,
-    logger?: ILogger,
-  ): Pick<CheckedDeletable<any, any>, 'delete'>;
-  /** The configuration of both requests. */
-  config(name: DeletionName, transportRequest?: string): object;
-  /** How the deletion's own answer is read. */
-  deleteAnalyse: IAnalyse;
+    logger: ILogger | undefined,
+    name: DeletionName,
+    transportRequest: string | undefined,
+  ): DeletionAnswer;
 }
 
+/** The configuration of both requests: the type's names, and the transport. */
 const withConfig =
-  (config: (name: DeletionName) => object) =>
+  <C>(config: (name: DeletionName) => C) =>
   (name: DeletionName, transportRequest?: string) => ({
     ...config(name),
     transportRequest,
   });
 
-/** A type whose check and deletion are both sent on the variant's client. */
-const target = (
+/**
+ * A type whose check is sent on `checked` and whose deletion on `deleted`,
+ * each with the configuration `config` builds — the object's own type,
+ * bound here once for both.
+ */
+const boundTarget = <C, V extends AdtReading<unknown>>(
   objectType: CheckedDeletableType,
-  object: (client: AdtClient) => CheckedDeletable<any, any>,
-  config: (name: DeletionName) => object,
-  deleteAnalyse: IAnalyse = analyseDeletion,
+  checked: (client: AdtClient) => Pick<CheckedDeletable<C, V>, 'checkDeletion'>,
+  deleted: (
+    connection: IAbapConnection,
+    logger: ILogger | undefined,
+  ) => Pick<CheckedDeletable<C, V>, 'delete'>,
+  config: (name: DeletionName, transportRequest?: string) => C,
+  deleteAnalyse: IAnalyse,
 ): DeletionTarget => ({
   objectType,
-  checked: object,
-  deleted: (connection, logger) => object(createAdtClient(connection, logger)),
-  config: withConfig(config),
-  deleteAnalyse,
+  checkDeletion: (context, client, name, analyse) =>
+    withAdtHeaders(
+      context,
+      adtOperation(objectType, 'checkDeletion'),
+      (headers) =>
+        checked(client).checkDeletion(config(name), { headers, analyse }),
+    ),
+  delete: (context, connection, logger, name, transportRequest) =>
+    withAdtHeaders(context, adtOperation(objectType, 'delete'), (headers) =>
+      deleted(connection, logger).delete(config(name, transportRequest), {
+        headers,
+        analyse: deleteAnalyse,
+      }),
+    ),
 });
+
+/** A type whose check and deletion are both sent on the variant's client. */
+const target = <C, V extends AdtReading<unknown>>(
+  objectType: CheckedDeletableType,
+  object: (client: AdtClient) => CheckedDeletable<C, V>,
+  config: (name: DeletionName) => C,
+  deleteAnalyse: IAnalyse = analyseDeletion,
+): DeletionTarget =>
+  boundTarget(
+    objectType,
+    object,
+    (connection, logger) => object(createAdtClient(connection, logger)),
+    withConfig(config),
+    deleteAnalyse,
+  );
 
 const asClass = (c: AdtClient) => c.getClass(resultsFor(classDocuments));
 
@@ -154,28 +211,28 @@ export const DELETION_TARGETS: Readonly<
   CDS_UNIT_TEST: target('class', asClass, ({ name }) => ({ className: name })),
   // A program's deletion check is served on both variants, its deletion on
   // premise only (`ADT_TYPES_CLOUD` lists no `delete` for `PROG/P`).
-  PROGRAM: {
-    objectType: 'program',
-    checked: (c) => c.getProgram(resultsFor(programDocuments)),
-    deleted: (connection, logger) =>
+  PROGRAM: boundTarget(
+    'program',
+    (c) => c.getProgram(resultsFor(programDocuments)),
+    (connection, logger) =>
       createOnPremAdtClient(connection, logger).getProgram(
         resultsFor(programDocuments),
       ),
-    config: withConfig(({ name }) => ({ programName: name })),
-    deleteAnalyse: analyseDeletion,
-  },
+    withConfig(({ name }) => ({ programName: name })),
+    analyseDeletion,
+  ),
   // An include's deletion check is served on both variants, its deletion on
   // premise only (`ADT_TYPES_CLOUD` lists no `delete` for `PROG/I`).
-  INCLUDE: {
-    objectType: 'include',
-    checked: (c) => c.getInclude(resultsFor(includeDocuments)),
-    deleted: (connection, logger) =>
+  INCLUDE: boundTarget(
+    'include',
+    (c) => c.getInclude(resultsFor(includeDocuments)),
+    (connection, logger) =>
       createOnPremAdtClient(connection, logger).getInclude(
         resultsFor(includeDocuments),
       ),
-    config: withConfig(({ name }) => ({ includeName: name })),
-    deleteAnalyse: analyseDeletion,
-  },
+    withConfig(({ name }) => ({ includeName: name })),
+    analyseDeletion,
+  ),
   INTERFACE: target(
     'interface',
     (c) => c.getInterface(resultsFor(interfaceDocuments)),

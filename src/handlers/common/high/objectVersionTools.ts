@@ -20,17 +20,14 @@ import type {
   VersionedKind,
   VersionSourceKind,
 } from '../../../lib/adtProjections';
+import type { McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,
   SapEnvironment,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
 import {
   readVersionSource,
@@ -38,8 +35,15 @@ import {
   resolveVersionedObject,
 } from '../readonly/resolveVersionedObject';
 
-/** Handler signature before context injection (the group wraps with withContext). */
-type RawHandler = (context: HandlerContext, args: any) => Promise<any>;
+/**
+ * A version tool's handler: the arguments as its schema parses them — the
+ * name parameter is the type's own (`nameParam`), so the keys are known
+ * only per row, and each is read as a value of unknown shape.
+ */
+type RawHandler = (
+  context: HandlerContext,
+  args: Readonly<Record<string, unknown>>,
+) => Promise<McpResult>;
 
 export interface ObjectVersionToolEntry {
   toolDefinition: ToolDefinition;
@@ -203,7 +207,7 @@ function buildVersionsTool(
           String(name),
           functionGroupName ? String(functionGroupName) : undefined,
         );
-      } catch (e: any) {
+      } catch (e) {
         return return_error(e instanceof Error ? e : new Error(String(e)));
       }
 
@@ -220,13 +224,13 @@ function buildVersionsTool(
             null,
             2,
           ),
-        } as AxiosResponse);
-      } catch (error: any) {
+        });
+      } catch (error) {
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       return return_error(error);
     }
   };
@@ -272,13 +276,13 @@ function buildVersionSourceTool(
         const source = await readVersionSource(resolved, String(content_uri));
         return return_response({
           data: JSON.stringify({ success: true, content_uri, source }, null, 2),
-        } as AxiosResponse);
-      } catch (error: any) {
+        });
+      } catch (error) {
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       return return_error(error);
     }
   };
@@ -348,13 +352,13 @@ function buildVersionDiffTool(
             null,
             2,
           ),
-        } as AxiosResponse);
-      } catch (error: any) {
+        });
+      } catch (error) {
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       return return_error(error);
     }
   };

@@ -14,6 +14,7 @@ import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { attr, child, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
@@ -56,22 +57,24 @@ interface SearchHit {
  */
 function parseSearchHits(value: unknown): SearchHit[] {
   const root =
-    (value as any)?.['adtcore:objectReferences'] ??
-    (value as any)?.objectReferences;
+    child(value, 'adtcore:objectReferences') ??
+    child(value, 'objectReferences');
   if (!root) return [];
-  const refsRaw = root['adtcore:objectReference'] ?? root.objectReference;
-  const refs = Array.isArray(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : [];
+  const refsRaw =
+    child(root, 'adtcore:objectReference') ?? child(root, 'objectReference');
+  const refs = isList(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : [];
   const hits: SearchHit[] = [];
   for (const ref of refs) {
-    const a = (ref as any)?.['@'] ?? {};
-    const name = a['adtcore:name'] ?? a.name;
-    const type = a['adtcore:type'] ?? a.type;
+    const a = child(ref, '@');
+    const name = attr(a, 'adtcore:name') ?? attr(a, 'name');
+    const type = attr(a, 'adtcore:type') ?? attr(a, 'type');
     if (!name || !type) continue;
     hits.push({
       name,
       type,
-      description: a['adtcore:description'] ?? a.description ?? '',
-      packageName: a['adtcore:packageName'] ?? a.packageName ?? undefined,
+      description:
+        attr(a, 'adtcore:description') ?? attr(a, 'description') ?? '',
+      packageName: attr(a, 'adtcore:packageName') ?? attr(a, 'packageName'),
     });
   }
   return hits;

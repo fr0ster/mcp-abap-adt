@@ -70,9 +70,7 @@ import {
   batchReader,
   endsTheCall,
   type NodeLevel,
-  type NodeRequest,
   nodeStructureOn,
-  readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -146,7 +144,7 @@ async function collectValidObjects(
   );
   if (!response.ok) return response;
 
-  const level = response.getResult().value as NodeLevel;
+  const level = response.getResult().value;
   let objects: FlatObject[] = level.objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
@@ -231,15 +229,18 @@ async function walkParentsBatched(
   parents: readonly Parent[],
   withShortDescriptions: boolean,
 ): Promise<ParentWalks> {
-  const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
-    readNode(
-      nodeStructureOn(
-        context,
-        createAdtClient(c, context.logger).getUtils(ourUtils),
-      ),
-      request,
-    ),
-  );
+  // Each node's structure, as `readNode` reads an analysed request.
+  const read = batchReader(context, (node: ListNode, c) => {
+    const parent = parents[node.root];
+    return nodeStructureOn(
+      context,
+      createAdtClient(c, context.logger).getUtils(ourUtils),
+    ).fetchNodeStructure(parent.type, parent.name, {
+      analyse: analyseException,
+      nodeId: node.nodeId,
+      withShortDescriptions,
+    });
+  });
   const failures = new Map<number, IAdtFailure | Thrown>();
   const visited = parents.map(() => new Set<string>(['000000']));
   const roots: ListNode[] = parents.map((_, root) => ({
@@ -251,19 +252,11 @@ async function walkParentsBatched(
 
   let level = roots;
   while (level.length > 0) {
-    const answers = await read(
-      level.map((node) => ({
-        parentType: (parents[node.root] as Parent).type,
-        parentName: (parents[node.root] as Parent).name,
-        nodeId: node.nodeId,
-        withShortDescriptions,
-        analysed: true,
-      })),
-    );
+    const answers = await read(level);
     const next: ListNode[] = [];
     for (const [i, node] of level.entries()) {
       if (failures.has(node.root)) continue;
-      const result = answers[i] as (typeof answers)[number];
+      const result = answers[i];
       // A read that threw is its parent's failure; one that ends the call
       // (a credential failure) is thrown as it came.
       if (!result.ok) {
@@ -271,7 +264,7 @@ async function walkParentsBatched(
         failures.set(node.root, { ok: false, thrown: result.error });
         continue;
       }
-      const response = result.value as IAdtResponse<unknown, IAdtError>;
+      const response = result.value;
       if (!response.ok) {
         if (credentialRefused(response)) {
           return { walks: [], ended: response };
@@ -279,9 +272,9 @@ async function walkParentsBatched(
         failures.set(node.root, response);
         continue;
       }
-      const found = response.getResult().value as NodeLevel;
+      const found = response.getResult().value;
       node.objects = flatObjects(found);
-      const seen = visited[node.root] as Set<string>;
+      const seen = visited[node.root];
       for (const child of found.childNodes) {
         if (seen.has(child.nodeId)) continue;
         seen.add(child.nodeId);
@@ -300,9 +293,7 @@ async function walkParentsBatched(
 
   return {
     walks: roots.map(
-      (root) =>
-        (failures.get(root.root) as ParentWalk | undefined) ??
-        ok(flatten(root)),
+      (root): ParentWalk => failures.get(root.root) ?? ok(flatten(root)),
     ),
   };
 }
@@ -418,7 +409,7 @@ export async function handleGetObjectsList(
         );
         // A credential failure SAP answered ends the call as it came.
         if (read.ended !== undefined) {
-          return read.ended as IAdtResponse<FlatObject[], IAdtError>;
+          return read.ended;
         }
         return ok([]);
       },
@@ -493,7 +484,7 @@ export async function handleGetObjectsList(
             [{ type: parentType, name: parentName }],
             withDescriptions,
           );
-          const walk = (read.ended ?? read.walks[0]) as ParentWalk;
+          const walk = read.ended ?? read.walks[0];
           if ('thrown' in walk) throw walk.thrown;
           return walk;
         },

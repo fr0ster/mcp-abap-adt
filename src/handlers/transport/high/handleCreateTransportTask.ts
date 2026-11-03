@@ -46,7 +46,9 @@ import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
+import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
+import { child, childAt } from '../../../lib/xml/tree';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 const TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -92,11 +94,8 @@ interface CreateTransportTaskArgs {
  * the shape `parseCreatedTransport` learned in adt-clients 20.0.0.
  */
 const taskNumberOf = (value: unknown): string => {
-  const root =
-    (value as Record<string, any>)?.['tm:root'] ??
-    (value as Record<string, any>);
-  const attributes = (root as Record<string, any>)?.['@'] ?? {};
-  return String(attributes['tm:number'] ?? '');
+  const root = child(value, 'tm:root') ?? value;
+  return String(childAt(root, '@', 'tm:number') ?? '');
 };
 
 export async function handleCreateTransportTask(
@@ -110,7 +109,8 @@ export async function handleCreateTransportTask(
   }
 
   const taskType = args.task_type ?? 'S';
-  if (!(TASK_TYPES as readonly string[]).includes(taskType)) {
+  const known: readonly string[] = TASK_TYPES;
+  if (!known.includes(taskType)) {
     return return_error(
       new Error(
         `task_type must be one of ${TASK_TYPES.join(', ')} — got ${taskType}`,
@@ -166,10 +166,7 @@ export async function handleCreateTransportTask(
       )();
       // A reading, as `project` receives it: the parsed document is its value.
       const number = created.ok
-        ? taskNumberOf(
-            (created.getResult().value as { value?: unknown } | undefined)
-              ?.value,
-          )
+        ? taskNumberOf(child(created.getResult().value, 'value'))
         : '';
       if (number && taskType !== 'X') {
         const changed = await withAdtHeaders(
@@ -203,25 +200,18 @@ export async function handleCreateTransportTask(
           // A credential failure (a `401`) is the call's failure, as it came
           // with its step — not a cleanup note beside a creation.
           if (isCredentialPayload(failureEntry(failure, 'change task type'))) {
-            const stepped = withStep(failure, 'change task type');
-            return {
-              ok: false,
-              getResult: () => {
-                throw new Error('asked for the result of a failure');
-              },
-              getError: () => stepped,
-            } as unknown as typeof created;
+            return failed(
+              withStep(failure, 'change task type'),
+              'CreateTransportTask',
+            );
           }
-          const result = created.ok ? created.getResult() : undefined;
-          return {
-            ok: created.ok,
-            getResult: () => result,
-            getError: () => failure,
-            cleanup: {
+          // A task number was read, so the creation answered a success.
+          if (created.ok) {
+            return succeeded(created.getResult().value, 'CreateTransportTask', {
               message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127)`,
               failures: [failureEntry(failure, 'change task type')],
-            },
-          } as unknown as typeof created;
+            });
+          }
         }
       }
       return created;

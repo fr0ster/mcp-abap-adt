@@ -20,6 +20,7 @@ import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { child, childAt, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportActionLog',
@@ -52,23 +53,23 @@ interface ReadTransportActionLogArgs {
  * entries. The `log:text` spellings stay for the shape this was first
  * written against.
  */
-const textOf = (entry: any): string => {
-  const message = entry?.['log:message']?.['log:messageText'];
+const textOf = (entry: unknown): string => {
+  const message = childAt(entry, 'log:message', 'log:messageText');
   const text =
-    (typeof message === 'object' ? message?.['#text'] : message) ??
-    entry?.['@']?.['log:text'] ??
-    entry?.['log:text'] ??
+    (typeof message === 'object' ? child(message, '#text') : message) ??
+    childAt(entry, '@', 'log:text') ??
+    child(entry, 'log:text') ??
     '';
   return String(text);
 };
 
 const entriesOf = (value: unknown): { text: string }[] => {
-  const log = (value as Record<string, any>)?.['log:log'] ?? value;
-  const raw = (log as Record<string, any>)?.['log:entry'];
-  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const log = child(value, 'log:log') ?? value;
+  const raw = child(log, 'log:entry');
+  const list = isList(raw) ? raw : raw ? [raw] : [];
   return list
-    .map((entry: any) => ({ text: textOf(entry) }))
-    .filter((entry: { text: string }) => entry.text !== '');
+    .map((entry) => ({ text: textOf(entry) }))
+    .filter((entry) => entry.text !== '');
 };
 
 export async function handleReadTransportActionLog(

@@ -33,6 +33,14 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { MAX_SEARCH_CONFIGURATIONS } from '../../../lib/strategies/transportSearch';
 import { getStatedSystemContext } from '../../../lib/systemContext';
+import {
+  attr,
+  child,
+  type Element,
+  elements,
+  entries,
+  isList,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
@@ -85,33 +93,27 @@ const STATUS_BY_CONTAINER: Record<string, string> = {
 /** Modifiable request statuses: D = modifiable, L = modifiable/protected. */
 const MODIFIABLE_STATUSES = new Set(['D', 'L']);
 
-function attrsOf(node: unknown): Record<string, string> {
-  const a = (node as { '@'?: Record<string, string> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+/** The attribute `name` of `node` (the reading groups them under `@`), `''` when absent. */
+function attrOf(node: unknown, name: string): string {
+  return attr(child(node, '@'), name) ?? '';
 }
 
 function collectRequestNodes(
   node: unknown,
   containerStatus: string,
-  found: { req: Record<string, unknown>; containerStatus: string }[],
+  found: { req: Element; containerStatus: string }[],
 ): void {
-  if (!node || typeof node !== 'object') {
-    return;
-  }
-  if (Array.isArray(node)) {
+  if (isList(node)) {
     for (const item of node) {
       collectRequestNodes(item, containerStatus, found);
     }
     return;
   }
-  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+  for (const [key, value] of entries(node)) {
     if (key === '@') continue; // attributes of THIS node, not a child to descend into
     if (key === 'tm:request') {
-      const requests = Array.isArray(value) ? value : [value];
-      for (const req of requests) {
-        if (req && typeof req === 'object') {
-          found.push({ req: req as Record<string, unknown>, containerStatus });
-        }
+      for (const req of elements(value)) {
+        found.push({ req, containerStatus });
       }
       // Do not descend into a request: its children are tasks, not requests.
       continue;
@@ -141,30 +143,29 @@ function collectRequestNodes(
  * branch) are collapsed, first occurrence winning.
  */
 export function parseTransportListValue(value: unknown): TransportEntry[] {
-  const found: { req: Record<string, unknown>; containerStatus: string }[] = [];
+  const found: { req: Element; containerStatus: string }[] = [];
   collectRequestNodes(value, '', found);
 
   const seen = new Set<string>();
-  const entries: TransportEntry[] = [];
+  const listed: TransportEntry[] = [];
 
   for (const { req, containerStatus } of found) {
-    const a = attrsOf(req);
-    const number = a['tm:number'] || a['adtcore:name'] || '';
+    const number = attrOf(req, 'tm:number') || attrOf(req, 'adtcore:name');
     if (!number || seen.has(number)) {
       continue;
     }
     seen.add(number);
-    entries.push({
+    listed.push({
       number,
-      description: a['tm:desc'] || a['tm:description'] || '',
-      type: a['tm:type'] || '',
-      status: a['tm:status'] || containerStatus || '',
-      owner: a['tm:owner'] || '',
-      target: a['tm:target'] || '',
+      description: attrOf(req, 'tm:desc') || attrOf(req, 'tm:description'),
+      type: attrOf(req, 'tm:type'),
+      status: attrOf(req, 'tm:status') || containerStatus || '',
+      owner: attrOf(req, 'tm:owner'),
+      target: attrOf(req, 'tm:target'),
     });
   }
 
-  return entries;
+  return listed;
 }
 
 /**
@@ -303,7 +304,7 @@ async function listTransportsOneByOne(
         if (!listed.ok) {
           return listed;
         }
-        readings.push(listed.getResult().value as AdtReading<unknown>);
+        readings.push(listed.getResult().value);
       }
 
       // One search: its reading, unchanged. Several: the values as an array,
@@ -394,10 +395,8 @@ async function listTransportsInEnvelopes(
       }),
     )(),
   );
-  const configured = first as PhaseResult<
-    IAdtResponse<Array<{ uri: string }>, IAdtError>
-  >;
-  let lists: PhaseResult<IAdtResponse<unknown, IAdtError>>[] = [];
+  const configured = first;
+  let lists: PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>[] = [];
   if (configured.ok && configured.value.ok) {
     const running = configured.value
       .getResult()
@@ -444,7 +443,7 @@ async function listTransportsInEnvelopes(
         if (!listed.ok) {
           return listed;
         }
-        readings.push(listed.getResult().value as AdtReading<unknown>);
+        readings.push(listed.getResult().value);
       }
 
       const merged: AdtReading<unknown> =

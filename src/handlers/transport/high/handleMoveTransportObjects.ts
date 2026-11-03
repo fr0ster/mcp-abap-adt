@@ -97,9 +97,7 @@ function missingArgument(args: MoveTransportObjectsArgs): string | undefined {
   if (args.objects.length === 0) return 'objects must hold at least one entry';
   for (const [index, entry] of args.objects.entries()) {
     for (const field of ENTRY_FIELDS) {
-      const value = (entry as Partial<MoveTransportObjectEntry> | undefined)?.[
-        field
-      ];
+      const value = entry?.[field];
       if (typeof value !== 'string' || value === '') {
         return `objects[${index}].${field} is required`;
       }

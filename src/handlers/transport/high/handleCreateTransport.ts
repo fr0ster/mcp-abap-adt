@@ -21,6 +21,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
+  type ICreatedTransport,
   transportCreated,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -29,7 +30,8 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
+import { verbatim } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -86,10 +88,7 @@ export async function handleCreateTransport(
   // unknown user (400, measured), so the id is sent upper-cased.
   const owner = args.owner?.trim().toUpperCase() || undefined;
 
-  const terseCreatedTransport: Terse<string> = (value) => {
-    const created = // adt-clients 23 moved the reading to adt-strategies as a strategy over
-      // the answer; the body is all it reads.
-      transportCreated({ data: value } as IAdtWireResponse);
+  const terseCreatedTransport = (created: ICreatedTransport) => {
     return {
       success: true,
       transport_number: created.transportNumber,
@@ -106,7 +105,10 @@ export async function handleCreateTransport(
     () =>
       withAdtHeaders(context, 'request.create', (headers) =>
         createAdtClient(connection, logger)
-          .getRequest(resultsFor(transportDocuments))
+          .getRequest({
+            ...resultsFor(transportDocuments),
+            created: createdReading,
+          })
           .create(
             {
               description: args.description,
@@ -117,6 +119,20 @@ export async function handleCreateTransport(
             { headers, analyse: analyseException },
           ),
       ),
-    project(detail, terseCreatedTransport),
+    (reading) =>
+      project(detail, () => terseCreatedTransport(reading.created()))(reading),
   );
+}
+
+/**
+ * `created` read as the table reads it (`verbatim`: the body is the value),
+ * with the created request beside it: adt-strategies' `transportCreated` over
+ * the same answer, asked only by the terse projection — the body is parsed
+ * once it is needed, as it was, and `full` and `raw` read the body alone.
+ */
+function createdReading(answer: IAdtWireResponse) {
+  return {
+    ...verbatim(answer),
+    created: (): ICreatedTransport => transportCreated(answer),
+  };
 }

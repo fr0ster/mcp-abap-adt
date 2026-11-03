@@ -62,6 +62,14 @@ binds, and each step names the spec section it carries out. Every step ends gree
    **Decision (per the decision point above):** item 4 does not hold for the generic entry, so the
    closure parses with the entry's schema: the SDK parses with the listed schema, `call` parses
    again. The batch timing test is to be measured before and after (step 5).
+
+   **Timing of the second parse** (steps 5–7):
+   - The batch timing test (`src/__tests__/integration/batch/batchedReadsTiming.test.ts`) is an
+     integration test on a SAP system; it was not run, before or after. It calls the handlers
+     directly, not an entry's `call`, so it would not time the second parse either.
+   - Measured instead (2026-11-03, the worktree's `dist` after step 7, node, mean of 20 000
+     `safeParse` calls after 2 000 warm-up ones): `GetClass` 0.20 µs, `CreateTableType` 0.45 µs,
+     compact `HandlerGet` 1.23 µs per call. Before step 7 a call had no second parse (0 µs).
 5. **Change the contract.**
    - The new `ToolDefinition`, `HandlerEntry` and `defineTool`, and `registerTool` taking an
      entry.

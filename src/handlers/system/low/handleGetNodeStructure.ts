@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetNodeStructure Handler - Low-level handler for node structure
  *
@@ -76,31 +77,24 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      parent_type: {
-        type: 'string',
-        description: 'Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")',
-      },
-      parent_name: {
-        type: 'string',
-        description: 'Parent object name',
-      },
-      node_id: {
-        type: 'string',
-        description:
-          'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: the server answers it with an empty body.',
-        default: '000000',
-      },
-      with_short_descriptions: {
-        type: 'boolean',
-        description: 'Include short descriptions in response',
-        default: true,
-      },
-    },
-    required: ['parent_type', 'parent_name'],
-  },
+  inputSchema: z.object({
+    parent_type: z
+      .string()
+      .describe('Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")'),
+    parent_name: z.string().describe('Parent object name'),
+    node_id: z
+      .string()
+      .default('000000')
+      .optional()
+      .describe(
+        'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: the server answers it with an empty body.',
+      ),
+    with_short_descriptions: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Include short descriptions in response'),
+  }),
 } as const;
 
 interface GetNodeStructureArgs {

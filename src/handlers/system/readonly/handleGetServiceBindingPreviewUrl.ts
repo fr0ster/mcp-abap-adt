@@ -39,6 +39,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import {
   answer,
   answerFailure,
@@ -82,41 +83,39 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name.',
-      },
-      entity_set: {
-        type: 'string',
-        description:
-          'Entity set to open. Omitted, the first one the service definition exposes is used.',
-      },
-      navigation: {
-        type: 'string',
-        description:
-          'Association or composition to follow. Omitted, the first one of the exposed root view is used.',
-      },
-      target_entity_set: {
-        type: 'string',
-        description:
-          'Entity set the navigation reaches. Omitted, the second exposed entity set is used.',
-      },
-      client: {
-        type: 'string',
-        description:
-          'Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.',
-      },
-      language: {
-        type: 'string',
-        description:
-          'Logon language for the preview. Omitted, the language the system reports is used.',
-      },
-    },
-    required: ['service_binding_name'],
-  },
+  inputSchema: z.object({
+    service_binding_name: z.string().describe('Service binding name.'),
+    entity_set: z
+      .string()
+      .optional()
+      .describe(
+        'Entity set to open. Omitted, the first one the service definition exposes is used.',
+      ),
+    navigation: z
+      .string()
+      .optional()
+      .describe(
+        'Association or composition to follow. Omitted, the first one of the exposed root view is used.',
+      ),
+    target_entity_set: z
+      .string()
+      .optional()
+      .describe(
+        'Entity set the navigation reaches. Omitted, the second exposed entity set is used.',
+      ),
+    client: z
+      .string()
+      .optional()
+      .describe(
+        'Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.',
+      ),
+    language: z
+      .string()
+      .optional()
+      .describe(
+        'Logon language for the preview. Omitted, the language the system reports is used.',
+      ),
+  }),
 } as const;
 
 export async function handleGetServiceBindingPreviewUrl(

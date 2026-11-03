@@ -128,7 +128,7 @@ describe('SearchSource cursor, sequential version', () => {
   });
 
   it('the schema refuses a negative or fractional start_at', () => {
-    const schema = z.object(TOOL_DEFINITION.inputSchema);
+    const schema = TOOL_DEFINITION.inputSchema;
     const ok = { query: 'x', packages: ['Z'] };
     expect(schema.safeParse({ ...ok, start_at: 0 }).success).toBe(true);
     expect(schema.safeParse({ ...ok, start_at: 7 }).success).toBe(true);

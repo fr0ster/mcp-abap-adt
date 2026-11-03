@@ -1,10 +1,11 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -41,23 +42,16 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      sql_query: {
-        type: 'string',
-        description: 'SQL query to execute',
-      },
-      row_number: {
-        type: 'number',
-        description: '[read-only] Maximum number of rows to return',
-        default: 100,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['sql_query'],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    sql_query: z.string().describe('SQL query to execute'),
+    row_number: z
+      .number()
+      .default(100)
+      .optional()
+      .describe('[read-only] Maximum number of rows to return'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleGetSqlQuery(

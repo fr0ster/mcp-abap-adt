@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetTypeInfo: every DDIC kind a type name is (#321).
  *
@@ -40,22 +41,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      type_name: {
-        type: 'string',
-        description: 'Name of the ABAP type',
-      },
-      include_structure_fallback: {
-        type: 'boolean',
-        description:
-          'When true (default), the name is also read as a DDIC structure; false leaves the structure read out.',
-        default: true,
-      },
-    },
-    required: ['type_name'],
-  },
+  inputSchema: z.object({
+    type_name: z.string().describe('Name of the ABAP type'),
+    include_structure_fallback: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'When true (default), the name is also read as a DDIC structure; false leaves the structure read out.',
+      ),
+  }),
 } as const;
 
 /** The kinds a name is read as, in the order they are answered. */

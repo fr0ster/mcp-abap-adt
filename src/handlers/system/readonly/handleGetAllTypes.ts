@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving all valid ADT object types.
  */
@@ -6,7 +8,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 
@@ -15,17 +17,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      validate_type: {
-        type: 'string',
-        description: 'Type name to validate (optional)',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    validate_type: z
+      .string()
+      .optional()
+      .describe('Type name to validate (optional)'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface NamedItem {

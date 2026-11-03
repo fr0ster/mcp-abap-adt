@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import { answerThrown } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { StepThrew } from '../../../lib/strategies/step';
@@ -7,16 +8,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      code: {
-        type: 'string',
-        description: 'ABAP source code to parse',
-      },
-    },
-    required: ['code'],
-  },
+  inputSchema: z.object({
+    code: z.string().describe('ABAP source code to parse'),
+  }),
 } as const;
 
 // Simplified AST generator that doesn't depend on ANTLR until it's properly set up

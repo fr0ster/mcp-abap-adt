@@ -26,7 +26,6 @@ import {
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { eligible } from '../../../lib/batch/eligibility';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -1074,7 +1073,7 @@ describe('RuntimeListFeeds', () => {
   });
 
   it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {
-    const schema = z.object(jsonSchemaToZod(RUNTIME_LIST_FEEDS.inputSchema));
+    const schema = RUNTIME_LIST_FEEDS.inputSchema;
     const listed = schema.parse({ feed_types: PAGED });
     expect(listed).toEqual({ feed_types: PAGED });
     const fake = system();

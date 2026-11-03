@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import type { AdtCodes, TableMainOf } from '../../../lib/adtProjections';
 import {
   answerCaught,
@@ -14,7 +15,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import { return_error } from '../../../lib/utils';
 import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
@@ -25,17 +26,12 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      code: {
-        type: 'string',
-        description: 'ABAP source code to analyze and resolve symbols for',
-      },
-    },
-    required: ['code'],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    code: z
+      .string()
+      .describe('ABAP source code to analyze and resolve symbols for'),
+  }),
 } as const;
 
 interface AbapSymbolInfo {

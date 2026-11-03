@@ -1,35 +1,28 @@
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import * as z from 'zod';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 export const TOOL_DEFINITION = {
   name: 'DescribeByList',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
     "[read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone.",
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      objects: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            name: {
-              type: 'string',
-              description:
-                '[read-only] Object name (required, must be valid ABAP object name or mask)',
-            },
-            type: {
-              type: 'string',
-              description:
-                '[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)',
-            },
-          },
-        },
-      },
-    },
-    required: ['objects'],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    objects: z.array(
+      z.object({
+        name: z
+          .string()
+          .optional()
+          .describe(
+            '[read-only] Object name (required, must be valid ABAP object name or mask)',
+          ),
+        type: z
+          .string()
+          .optional()
+          .describe('[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)'),
+      }),
+    ),
+  }),
 } as const;
 
 // DescribeByList: Batch description for a list of ABAP objects

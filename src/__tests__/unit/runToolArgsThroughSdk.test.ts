@@ -17,7 +17,7 @@ import { TOOL_DEFINITION as RunFunctionModuleUnitTest } from '../../handlers/uni
 import { TOOL_DEFINITION as RunProgramUnitTest } from '../../handlers/unit_test/high/handleRunProgramUnitTest';
 import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { runnerOf, runnerWaitOf } from '../../handlers/unit_test/shared/runner';
-import { jsonSchemaToZod } from '../../lib/handlers/utils/schemaUtils';
+import { registeredSchema } from '../../lib/handlers/utils/schemaUtils';
 
 const RUNNER_TOOLS = [
   { tool: RunUnitTest, args: { class_name: 'ZCL_A' } },
@@ -38,7 +38,7 @@ async function received(
   const server = new McpServer({ name: 'probe', version: '1.0.0' });
   server.registerTool(
     tool.name,
-    { inputSchema: jsonSchemaToZod(tool.inputSchema) },
+    { inputSchema: registeredSchema(tool.inputSchema) },
     async (given: unknown): Promise<CallToolResult> => {
       seen = given;
       return { content: [{ type: 'text', text: 'ok' }] };

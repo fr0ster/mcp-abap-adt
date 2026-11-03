@@ -1,8 +1,9 @@
 import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -13,17 +14,10 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the properties of the ABAP transaction (t-code) named by transaction_name in one request. Answers the transaction under `object` (name, text, type, package) and its facets under `properties`, in the order the system gives them — the application component chain, the package chain, type, owner, language, creation and the others the system names — each entry with its facet, name, displayName and text.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transaction_name: {
-        type: 'string',
-        description: 'Name of the ABAP transaction',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transaction_name'],
-  },
+  inputSchema: z.object({
+    transaction_name: z.string().describe('Name of the ABAP transaction'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** The workbench uri ADT knows a transaction by. */

@@ -1,17 +1,14 @@
+import * as z from 'zod';
 export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present, reading the active version of the object it names.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_type: { type: 'string', description: '[read-only] Object type' },
-      object_name: { type: 'string', description: '[read-only] Object name' },
-      tech_name: { type: 'string', description: '[read-only] Technical name' },
-    },
-    required: ['object_type', 'object_name', 'tech_name'],
-  },
+  inputSchema: z.object({
+    object_type: z.string().describe('[read-only] Object type'),
+    object_name: z.string().describe('[read-only] Object name'),
+    tech_name: z.string().describe('[read-only] Technical name'),
+  }),
 } as const;
 
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available

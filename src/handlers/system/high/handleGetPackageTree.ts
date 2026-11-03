@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { TIMEOUT_FIELD } from '../../../lib/longTools';
 /**
  * GetPackageTree Handler - High-level handler for package tree structure
  *
@@ -18,7 +20,7 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { withLongToolAdvice } from '../../../lib/longTools';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   assembleTree,
@@ -42,47 +44,46 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      package_name: {
-        type: 'string',
-        description: 'Package name (give this or package_names)',
-      },
-      package_names: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Several package names, read together (give this or package_name)',
-      },
-      include_subpackages: {
-        type: 'boolean',
-        description:
-          'Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true',
-        default: true,
-      },
-      max_depth: {
-        type: 'integer',
-        description:
-          'Maximum depth for recursive package traversal. Default: 5',
-        default: 5,
-      },
-      include_descriptions: {
-        type: 'boolean',
-        description:
-          "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
-        default: false,
-      },
-      debug: {
-        type: 'boolean',
-        description:
-          'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
-        default: false,
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    package_name: z
+      .string()
+      .optional()
+      .describe('Package name (give this or package_names)'),
+    package_names: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Several package names, read together (give this or package_name)',
+      ),
+    include_subpackages: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true',
+      ),
+    max_depth: z
+      .number()
+      .int()
+      .default(5)
+      .optional()
+      .describe('Maximum depth for recursive package traversal. Default: 5'),
+    include_descriptions: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
+      ),
+    debug: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
+      ),
+  }),
 } as const;
 
 interface GetPackageTreeArgs {

@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import { answerThrown } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { StepThrew } from '../../../lib/strategies/step';
@@ -7,16 +8,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      code: {
-        type: 'string',
-        description: 'ABAP source code to analyze',
-      },
-    },
-    required: ['code'],
-  },
+  inputSchema: z.object({
+    code: z.string().describe('ABAP source code to analyze'),
+  }),
 } as const;
 
 interface AbapSymbolInfo {

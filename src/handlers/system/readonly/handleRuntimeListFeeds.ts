@@ -9,6 +9,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import {
   answer,
   answerThrown,
@@ -23,7 +24,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
@@ -43,82 +44,79 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      feed_type: {
-        type: 'string',
-        enum: [
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    feed_type: z
+      .enum([
+        'descriptors',
+        'variants',
+        'dumps',
+        'system_messages',
+        'gateway_errors',
+      ])
+      .optional()
+      .describe(
+        'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
+      ),
+    feed_types: z
+      .array(
+        z.enum([
           'descriptors',
           'variants',
           'dumps',
           'system_messages',
           'gateway_errors',
-        ],
-        description:
-          'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
-      },
-      feed_types: {
-        type: 'array',
-        items: {
-          type: 'string',
-          enum: [
-            'descriptors',
-            'variants',
-            'dumps',
-            'system_messages',
-            'gateway_errors',
-          ],
-        },
-        description:
-          'Several feeds, read together with the same filters (give this or feed_type).',
-      },
-      user: {
-        type: 'string',
-        description: 'Entries of this SAP user (exact match).',
-      },
-      runtime_error: {
-        type: 'string',
-        description:
-          'Dumps whose runtime error contains this text, in any case.',
-      },
-      exception: {
-        type: 'string',
-        description:
-          'Dumps whose exception class contains this text, in any case.',
-      },
-      object_name: {
-        type: 'string',
-        description:
-          'Dumps whose terminated object name contains this text, in any case.',
-      },
-      package: {
-        type: 'string',
-        description:
-          'Dumps whose object package contains this text, in any case.',
-      },
-      component: {
-        type: 'string',
-        description:
-          'Dumps whose application component contains this text, in any case.',
-      },
-      max_results: {
-        type: 'number',
-        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
-      },
-      from: {
-        type: 'string',
-        description: 'Start of time range in YYYYMMDDHHMMSS format.',
-      },
-      to: {
-        type: 'string',
-        description:
-          'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
-      },
-    },
-    required: [],
-  },
+        ]),
+      )
+      .optional()
+      .describe(
+        'Several feeds, read together with the same filters (give this or feed_type).',
+      ),
+    user: z
+      .string()
+      .optional()
+      .describe('Entries of this SAP user (exact match).'),
+    runtime_error: z
+      .string()
+      .optional()
+      .describe('Dumps whose runtime error contains this text, in any case.'),
+    exception: z
+      .string()
+      .optional()
+      .describe('Dumps whose exception class contains this text, in any case.'),
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        'Dumps whose terminated object name contains this text, in any case.',
+      ),
+    package: z
+      .string()
+      .optional()
+      .describe('Dumps whose object package contains this text, in any case.'),
+    component: z
+      .string()
+      .optional()
+      .describe(
+        'Dumps whose application component contains this text, in any case.',
+      ),
+    max_results: z
+      .number()
+      .optional()
+      .describe(
+        `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
+      ),
+    from: z
+      .string()
+      .optional()
+      .describe('Start of time range in YYYYMMDDHHMMSS format.'),
+    to: z
+      .string()
+      .optional()
+      .describe(
+        'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
+      ),
+  }),
 } as const;
 
 interface RuntimeListFeedsArgs {

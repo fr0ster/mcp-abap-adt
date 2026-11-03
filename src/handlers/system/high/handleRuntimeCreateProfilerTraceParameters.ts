@@ -22,6 +22,7 @@
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
@@ -36,29 +37,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      description: {
-        type: 'string',
-        description: 'Human-readable trace description.',
-      },
-      all_misc_abap_statements: { type: 'boolean' },
-      all_procedural_units: { type: 'boolean' },
-      all_internal_table_events: { type: 'boolean' },
-      all_dynpro_events: { type: 'boolean' },
-      aggregate: { type: 'boolean' },
-      explicit_on_off: { type: 'boolean' },
-      with_rfc_tracing: { type: 'boolean' },
-      all_system_kernel_events: { type: 'boolean' },
-      sql_trace: { type: 'boolean' },
-      all_db_events: { type: 'boolean' },
-      max_size_for_trace_file: { type: 'number' },
-      amdp_trace: { type: 'boolean' },
-      max_time_for_tracing: { type: 'number' },
-    },
-    required: ['description'],
-  },
+  inputSchema: z.object({
+    description: z.string().describe('Human-readable trace description.'),
+    all_misc_abap_statements: z.boolean().optional(),
+    all_procedural_units: z.boolean().optional(),
+    all_internal_table_events: z.boolean().optional(),
+    all_dynpro_events: z.boolean().optional(),
+    aggregate: z.boolean().optional(),
+    explicit_on_off: z.boolean().optional(),
+    with_rfc_tracing: z.boolean().optional(),
+    all_system_kernel_events: z.boolean().optional(),
+    sql_trace: z.boolean().optional(),
+    all_db_events: z.boolean().optional(),
+    max_size_for_trace_file: z.number().optional(),
+    amdp_trace: z.boolean().optional(),
+    max_time_for_tracing: z.number().optional(),
+  }),
 } as const;
 
 interface RuntimeCreateProfilerTraceParametersArgs {

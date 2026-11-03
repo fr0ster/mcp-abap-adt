@@ -34,11 +34,19 @@ export function isBackgroundTool(name: string): boolean {
 }
 
 /** The `background` property of a full run tool's JSON Schema. */
+const BACKGROUND_WORDS =
+  'When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.';
+
 export const BACKGROUND_PROPERTY = {
   type: 'boolean',
-  description:
-    'When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.',
+  description: BACKGROUND_WORDS,
 } as const;
+
+/** The `background` field of a full run tool's zod input schema. */
+export const BACKGROUND_FIELD = z
+  .boolean()
+  .optional()
+  .describe(BACKGROUND_WORDS);
 
 /**
  * `definition` without its `background` parameter, on every variant it
@@ -80,11 +88,19 @@ function schemaWithoutBackground(
 }
 
 /** The `background` property of compact's run tool. */
+const COMPACT_BACKGROUND_WORDS =
+  'When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.';
+
 export const COMPACT_BACKGROUND_PROPERTY = {
   type: 'boolean',
-  description:
-    'When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.',
+  description: COMPACT_BACKGROUND_WORDS,
 } as const;
+
+/** The `background` field of compact's run tool's zod input schema. */
+export const COMPACT_BACKGROUND_FIELD = z
+  .boolean()
+  .optional()
+  .describe(COMPACT_BACKGROUND_WORDS);
 
 /**
  * The call's `background`: `true` asks for a background run; `undefined` or

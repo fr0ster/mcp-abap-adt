@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
  */
@@ -7,7 +9,7 @@ import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -17,21 +19,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      objecttype: {
-        type: 'string',
-        description: 'ADT object type (e.g. DDLS/DF)',
-      },
-      objectname: {
-        type: 'string',
-        description: 'ADT object name (e.g. /CBY/ACQ_DDL)',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['objecttype', 'objectname'],
-  },
+  inputSchema: z.object({
+    objecttype: z.string().describe('ADT object type (e.g. DDLS/DF)'),
+    objectname: z.string().describe('ADT object name (e.g. /CBY/ACQ_DDL)'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface FlatObjectStructureNode {

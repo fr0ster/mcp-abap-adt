@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { TIMEOUT_FIELD } from '../../../lib/longTools';
 /**
  * WhereUsed handler using AdtClient utilities
  * Endpoint: /sap/bc/adt/repository/informationsystem/usageReferences
@@ -51,7 +53,7 @@ import {
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { withLongToolAdvice } from '../../../lib/longTools';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
@@ -85,60 +87,55 @@ function whereUsedTypeDescription(variant: ProjectionVariant): string {
 
 /** GetWhereUsed's input on `variant`. */
 function whereUsedSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      object_name: {
-        type: 'string',
-        description:
-          "Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).",
-      },
-      object_type: {
-        type: 'string',
-        description: whereUsedTypeDescription(variant),
-      },
-      objects: {
-        type: 'array',
-        description:
-          'Several objects, read together (give this or object_name and object_type). The type filters apply to every object.',
-        items: {
-          type: 'object',
-          properties: {
-            object_name: {
-              type: 'string',
-              description:
-                "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
-            },
-            object_type: {
-              type: 'string',
-              description: 'Type of the ABAP object, as object_type takes it',
-            },
-          },
-          required: ['object_name', 'object_type'],
-        },
-      },
-      enable_all_types: {
-        type: 'boolean',
-        description:
-          "If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.",
-        default: false,
-      },
-      enable_only_types: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.",
-      },
-      disable_types: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
-      },
-    },
-    required: [],
-  } as const;
+  return z.object({
+    timeout: TIMEOUT_FIELD,
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        "Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).",
+      ),
+    object_type: z
+      .string()
+      .optional()
+      .describe(whereUsedTypeDescription(variant)),
+    objects: z
+      .array(
+        z.object({
+          object_name: z
+            .string()
+            .describe(
+              "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
+            ),
+          object_type: z
+            .string()
+            .describe('Type of the ABAP object, as object_type takes it'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Several objects, read together (give this or object_name and object_type). The type filters apply to every object.',
+      ),
+    enable_all_types: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        "If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.",
+      ),
+    enable_only_types: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.",
+      ),
+    disable_types: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
+      ),
+  });
 }
 
 interface WhereUsedArgs {

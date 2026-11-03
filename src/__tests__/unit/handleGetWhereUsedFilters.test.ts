@@ -45,6 +45,7 @@ import {
   TOOL_DEFINITION,
 } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -56,11 +57,11 @@ describe('GetWhereUsed type-filter params', () => {
   });
 
   it('exposes enable_only_types and disable_types as string arrays in the input schema', () => {
-    const props = TOOL_DEFINITION.inputSchema.properties as Record<string, any>;
-    expect(props.enable_only_types?.type).toBe('array');
-    expect(props.enable_only_types?.items?.type).toBe('string');
-    expect(props.disable_types?.type).toBe('array');
-    expect(props.disable_types?.items?.type).toBe('string');
+    const schema = listedJson(TOOL_DEFINITION.inputSchema);
+    expect(jsonAt(schema, 'enable_only_types').type).toBe('array');
+    expect(jsonAt(schema, 'enable_only_types', '[]').type).toBe('string');
+    expect(jsonAt(schema, 'disable_types').type).toBe('array');
+    expect(jsonAt(schema, 'disable_types', '[]').type).toBe('string');
   });
 
   it('forwards in-scope enable_only_types/disable_types to getWhereUsed, scoped', async () => {

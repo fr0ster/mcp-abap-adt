@@ -1,6 +1,7 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
@@ -11,31 +12,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      dump_id: {
-        type: 'string',
-        description:
-          "The dump's id, or its URI as a dumps feed entry carries it.",
-      },
-      view: {
-        type: 'string',
-        enum: ['default', 'summary', 'formatted'],
-        description:
-          'Dump view mode: default payload, summary section, or formatted long text.',
-        default: 'default',
-      },
-      response_mode: {
-        type: 'string',
-        enum: ['payload', 'summary', 'both'],
-        description:
-          'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.',
-        default: 'both',
-      },
-    },
-    required: ['dump_id'],
-  },
+  inputSchema: z.object({
+    dump_id: z
+      .string()
+      .describe("The dump's id, or its URI as a dumps feed entry carries it."),
+    view: z
+      .enum(['default', 'summary', 'formatted'])
+      .default('default')
+      .optional()
+      .describe(
+        'Dump view mode: default payload, summary section, or formatted long text.',
+      ),
+    response_mode: z
+      .enum(['payload', 'summary', 'both'])
+      .default('both')
+      .optional()
+      .describe(
+        'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.',
+      ),
+  }),
 } as const;
 
 interface RuntimeGetDumpByIdArgs {

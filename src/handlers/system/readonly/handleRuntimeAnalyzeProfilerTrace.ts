@@ -1,8 +1,9 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -12,30 +13,24 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      trace_id_or_uri: {
-        type: 'string',
-        description: 'Profiler trace ID or full trace URI.',
-      },
-      view: {
-        type: 'string',
-        enum: ['hitlist', 'statements', 'db_accesses'],
-        default: 'hitlist',
-      },
-      top: {
-        type: 'number',
-        description: 'Number of top rows for summary. Default: 10.',
-      },
-      with_system_events: {
-        type: 'boolean',
-        description: 'Include system events.',
-      },
-    },
-    required: ['trace_id_or_uri'],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    trace_id_or_uri: z
+      .string()
+      .describe('Profiler trace ID or full trace URI.'),
+    view: z
+      .enum(['hitlist', 'statements', 'db_accesses'])
+      .default('hitlist')
+      .optional(),
+    top: z
+      .number()
+      .optional()
+      .describe('Number of top rows for summary. Default: 10.'),
+    with_system_events: z
+      .boolean()
+      .optional()
+      .describe('Include system events.'),
+  }),
 } as const;
 
 interface RuntimeAnalyzeProfilerTraceArgs {

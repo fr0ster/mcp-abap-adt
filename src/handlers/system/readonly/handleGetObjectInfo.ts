@@ -5,6 +5,7 @@ import type {
   IAdtFailure,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
@@ -23,7 +24,7 @@ import {
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import {
   type MetadataTarget,
   metadataKeyOf,
@@ -48,56 +49,54 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      parent_type: {
-        type: 'string',
-        description:
-          '[read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects',
-      },
-      parent_name: {
-        type: 'string',
-        description: '[read-only] Parent object name',
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several objects, read together (give this or parent_type and parent_name)',
-        items: {
-          type: 'object',
-          properties: {
-            object_type: {
-              type: 'string',
-              description: 'Object type (e.g. DEVC/K, CLAS/OC, PROG/P)',
-            },
-            object_name: { type: 'string', description: 'Object name' },
-          },
-          required: ['object_type', 'object_name'],
-        },
-      },
-      maxDepth: {
-        type: 'integer',
-        description:
-          "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
-        default: 1,
-      },
-      enrich: {
-        type: 'boolean',
-        description:
-          '[read-only] Whether to add description and package via SearchObject (default true)',
-        default: true,
-      },
-      include_descriptions: {
-        type: 'boolean',
-        description:
-          "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
-        default: false,
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    parent_type: z
+      .string()
+      .optional()
+      .describe(
+        '[read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects',
+      ),
+    parent_name: z
+      .string()
+      .optional()
+      .describe('[read-only] Parent object name'),
+    objects: z
+      .array(
+        z.object({
+          object_type: z
+            .string()
+            .describe('Object type (e.g. DEVC/K, CLAS/OC, PROG/P)'),
+          object_name: z.string().describe('Object name'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or parent_type and parent_name)',
+      ),
+    maxDepth: z
+      .number()
+      .int()
+      .default(1)
+      .optional()
+      .describe(
+        "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
+      ),
+    enrich: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        '[read-only] Whether to add description and package via SearchObject (default true)',
+      ),
+    include_descriptions: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
+      ),
+  }),
 } as const;
 
 function getDefaultDepth(parent_type: string): number {

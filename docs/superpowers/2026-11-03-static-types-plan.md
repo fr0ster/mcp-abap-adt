@@ -32,6 +32,36 @@ binds, and each step names the spec section it carries out. Every step ends gree
      and after.
 
    Record the outcome in this plan.
+
+   **Outcome** (measured 2026-11-03 with zod 4.6.7, `@modelcontextprotocol/sdk` 1.32.1,
+   TypeScript 6.0.3; `src/__tests__/typecheck/toolArgs.typecheck.ts`, compiled by `test:check`):
+   - **1 holds.** `z.output` of a `z.object` is the argument type, not `any`.
+   - **2 holds.** `defineTool<S extends z.ZodObject>(definition, handler)` answers an entry whose
+     `call(context, args: Readonly<Record<string, unknown>>)` parses with
+     `definition.inputSchema.safeParse(args)`: its `data` is typed `z.output<S>` inside the generic
+     closure, so the handler is called with no cast. Entries of different argument types share one
+     `HandlerEntry[]`, and a handler of another schema, or of a wrong argument type, is refused.
+   - **3 holds for a schema of a known type, not inside a generic `defineTool`.** With a concrete
+     schema, `registerTool`'s callback gets `z.output` of it, typed. With the generic `S`, the
+     callback is refused: `error TS2345: Argument of type '(args: z.output<S>) => Promise<…>' is
+     not assignable to parameter of type 'BaseToolCallback<…>'` (the SDK's `ToolCallback<S>` is a
+     conditional type left unresolved for a generic `S`); unannotated, `args` is
+     `Record<string, unknown>` and `handler(context, args)` is refused: `Argument of type
+     'Record<string, unknown>' is not assignable to parameter of type 'output<S>'`.
+   - **4 holds for a schema of a known type, not for a generic one.** Concrete: the output after
+     `.extend({ state_handle })`, `.omit({ background, timeout })` and both reaches the handler typed
+     (`state_handle` taken out by destructuring). Generic: after `.extend` the rest is
+     `{ [x: string]: unknown; }` and after `.omit` `Record<string, unknown>`, each refused as the
+     handler's argument: `error TS2345: Argument of type '{ [x: string]: unknown; }' is not
+     assignable to parameter of type 'output<S>'`. A generic `.omit` also takes a key the schema
+     does not have, unchecked; a concrete one refuses it (`TS2353`).
+   - **What compiles for the registry:** the entry's schema held as `z.ZodObject`, edited by
+     `.extend` / `.omit` as `z.ZodObject`, registered with a callback whose `args` (a record of
+     unknown values, not `any`) go to `entry.call`, which parses with the entry's own schema.
+
+   **Decision (per the decision point above):** item 4 does not hold for the generic entry, so the
+   closure parses with the entry's schema: the SDK parses with the listed schema, `call` parses
+   again. The batch timing test is to be measured before and after (step 5).
 5. **Change the contract.**
    - The new `ToolDefinition`, `HandlerEntry` and `defineTool`, and `registerTool` taking an
      entry.

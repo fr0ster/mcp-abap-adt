@@ -1,4 +1,5 @@
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdateDataElement Handler - Update ABAP Data Element Properties
  *
@@ -57,26 +58,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      data_element_name: {
-        type: 'string',
-        description: 'Data element name. Data element must already exist.',
-      },
-      properties: {
-        type: 'object',
-        description:
-          'Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-    },
-    required: ['data_element_name', 'properties', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    data_element_name: z
+      .string()
+      .describe('Data element name. Data element must already exist.'),
+    properties: z
+      .any()
+      .describe(
+        'Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.',
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+  }),
 } as const;
 
 interface UpdateDataElementArgs {

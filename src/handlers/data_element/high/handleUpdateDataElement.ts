@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateDataElement Handler - Update Existing ABAP Data Element
  *
@@ -45,7 +47,7 @@ import {
   type DataElementChanges,
   patchDataElementXml,
 } from '../../../lib/strategies/dataElementPatch';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -62,96 +64,78 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      data_element_name: {
-        type: 'string',
-        description: 'Data element name to update',
-      },
-      description: {
-        type: 'string',
-        description: 'New data element description',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      type_kind: {
-        type: 'string',
-        description:
-          'Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType',
-        enum: [
-          'domain',
-          'predefinedAbapType',
-          'refToPredefinedAbapType',
-          'refToDictionaryType',
-          'refToClifType',
-        ],
-        default: 'domain',
-      },
-      type_name: {
-        type: 'string',
-        description:
-          'Type name: domain name, data element name, or class name (depending on type_kind)',
-      },
-      data_type: {
-        type: 'string',
-        description:
-          'Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType',
-      },
-      length: {
-        type: 'number',
-        description:
-          'Length - for predefinedAbapType or refToPredefinedAbapType',
-      },
-      decimals: {
-        type: 'number',
-        description:
-          'Decimals - for predefinedAbapType or refToPredefinedAbapType',
-      },
-      field_label_short: {
-        type: 'string',
-        description: 'Short field label (max 10 chars)',
-      },
-      field_label_medium: {
-        type: 'string',
-        description: 'Medium field label (max 20 chars)',
-      },
-      field_label_long: {
-        type: 'string',
-        description: 'Long field label (max 40 chars)',
-      },
-      field_label_heading: {
-        type: 'string',
-        description: 'Heading field label (max 55 chars)',
-      },
-      search_help: {
-        type: 'string',
-        description: 'Search help name',
-      },
-      search_help_parameter: {
-        type: 'string',
-        description: 'Search help parameter',
-      },
-      set_get_parameter: {
-        type: 'string',
-        description: 'Set/Get parameter ID',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate data element after update (default: true)',
-        default: true,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['data_element_name', 'package_name'],
-  },
+  inputSchema: z.object({
+    data_element_name: z.string().describe('Data element name to update'),
+    description: z.string().optional().describe('New data element description'),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    type_kind: z
+      .enum([
+        'domain',
+        'predefinedAbapType',
+        'refToPredefinedAbapType',
+        'refToDictionaryType',
+        'refToClifType',
+      ])
+      .default('domain')
+      .optional()
+      .describe(
+        'Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType',
+      ),
+    type_name: z
+      .string()
+      .optional()
+      .describe(
+        'Type name: domain name, data element name, or class name (depending on type_kind)',
+      ),
+    data_type: z
+      .string()
+      .optional()
+      .describe(
+        'Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType',
+      ),
+    length: z
+      .number()
+      .optional()
+      .describe('Length - for predefinedAbapType or refToPredefinedAbapType'),
+    decimals: z
+      .number()
+      .optional()
+      .describe('Decimals - for predefinedAbapType or refToPredefinedAbapType'),
+    field_label_short: z
+      .string()
+      .optional()
+      .describe('Short field label (max 10 chars)'),
+    field_label_medium: z
+      .string()
+      .optional()
+      .describe('Medium field label (max 20 chars)'),
+    field_label_long: z
+      .string()
+      .optional()
+      .describe('Long field label (max 40 chars)'),
+    field_label_heading: z
+      .string()
+      .optional()
+      .describe('Heading field label (max 55 chars)'),
+    search_help: z.string().optional().describe('Search help name'),
+    search_help_parameter: z
+      .string()
+      .optional()
+      .describe('Search help parameter'),
+    set_get_parameter: z.string().optional().describe('Set/Get parameter ID'),
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Activate data element after update (default: true)'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DataElementArgs {

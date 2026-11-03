@@ -1,5 +1,6 @@
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -15,18 +16,15 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Lists the available service binding types (for example ODataV2/ODataV4) from the ADT Business Services endpoint, in the response_format given.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      response_format: {
-        type: 'string',
-        enum: ['xml', 'json', 'plain'],
-        default: 'xml',
-        description:
-          'Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.',
-      },
-    },
-  },
+  inputSchema: z.object({
+    response_format: z
+      .enum(['xml', 'json', 'plain'])
+      .default('xml')
+      .optional()
+      .describe(
+        'Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.',
+      ),
+  }),
 } as const;
 
 interface ListServiceBindingTypesArgs {

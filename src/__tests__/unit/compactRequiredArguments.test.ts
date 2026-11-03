@@ -31,6 +31,7 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 jest.setTimeout(60_000);
@@ -294,7 +295,7 @@ describe('HandlerValidate and HandlerCheckRun take a table type', () => {
  */
 describe('ValidateServiceBinding requires package_name', () => {
   it('the schema requires it', () => {
-    expect(ValidateServiceBinding.inputSchema.required).toContain(
+    expect(listedJson(ValidateServiceBinding.inputSchema).required).toContain(
       'package_name',
     );
   });

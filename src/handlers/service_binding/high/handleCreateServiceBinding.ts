@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateServiceBinding Handler - Create an ABAP service binding; when asked,
  * activate it and read the service group it publishes.
@@ -42,7 +44,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -55,77 +57,66 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name.',
-      },
-      service_definition_name: {
-        type: 'string',
-        description: 'Referenced service definition name.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'ABAP package name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Optional description. Defaults to service_binding_name when omitted.',
-      },
-      binding_variant: {
-        type: 'string',
-        enum: [
-          'ODATA_V2_UI',
-          'ODATA_V2_WEB_API',
-          'ODATA_V4_UI',
-          'ODATA_V4_WEB_API',
-        ],
-        description:
-          'Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.',
-        default: 'ODATA_V4_UI',
-      },
-      service_name: {
-        type: 'string',
-        description:
-          'Published service name. Default: service_binding_name if omitted.',
-      },
-      service_version: {
-        type: 'string',
-        description: 'Published service version. Default: 0001.',
-      },
-      transport_request: {
-        type: 'string',
-        description: 'Optional transport request for transport checks.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate the service binding after create, then read its service group. Default: true.',
-        default: true,
-      },
-      response_format: {
-        type: 'string',
-        enum: ['xml', 'json', 'plain'],
-        default: 'xml',
-        description:
-          'Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [
-      'service_binding_name',
-      'service_definition_name',
-      'package_name',
-    ],
-  },
+  inputSchema: z.object({
+    service_binding_name: z.string().describe('Service binding name.'),
+    service_definition_name: z
+      .string()
+      .describe('Referenced service definition name.'),
+    package_name: z.string().describe('ABAP package name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Optional description. Defaults to service_binding_name when omitted.',
+      ),
+    binding_variant: z
+      .enum([
+        'ODATA_V2_UI',
+        'ODATA_V2_WEB_API',
+        'ODATA_V4_UI',
+        'ODATA_V4_WEB_API',
+      ])
+      .default('ODATA_V4_UI')
+      .optional()
+      .describe(
+        'Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.',
+      ),
+    service_name: z
+      .string()
+      .optional()
+      .describe(
+        'Published service name. Default: service_binding_name if omitted.',
+      ),
+    service_version: z
+      .string()
+      .optional()
+      .describe('Published service version. Default: 0001.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe('Optional transport request for transport checks.'),
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'Activate the service binding after create, then read its service group. Default: true.',
+      ),
+    response_format: z
+      .enum(['xml', 'json', 'plain'])
+      .default('xml')
+      .optional()
+      .describe(
+        'Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateServiceBindingArgs {

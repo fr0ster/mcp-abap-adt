@@ -19,18 +19,23 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type * as z from 'zod';
 import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { COMPACT_DELETE, supported } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import type { compactDeleteSchema } from '../../../lib/compact/compactSchemas';
 import {
   DELETION_CHECK_TYPES,
   DELETION_NAME_FIELDS,
   EMPTIED_INCLUDE_TYPES,
 } from '../../../lib/compact/compactSchemas';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type {
+  HandlerContext,
+  ToolArgs,
+} from '../../../lib/handlers/interfaces';
 import {
   LOCK_NOT_HELD_WORDS,
   lockHeldHere,
@@ -45,9 +50,12 @@ import { return_error } from '../../../lib/utils';
 import { DELETION_TARGETS } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
 
-type Args = Record<string, unknown> & {
-  object_type?: string;
-  lock_handle?: string;
+/**
+ * HandlerDelete's arguments, as its schema parses them; `object_type` as any
+ * string, since the boundary below reads the value as given (`acceptedOf`).
+ */
+type Args = Omit<z.output<typeof compactDeleteSchema>, 'object_type'> & {
+  readonly object_type?: string;
 };
 
 const text = (value: unknown): string | undefined =>
@@ -129,7 +137,8 @@ export async function handleDeleteOnly(
   }
   const target = DELETION_TARGETS[removed];
   const nameField = DELETION_NAME_FIELDS[removed];
-  const name = text(args[nameField]);
+  const given: ToolArgs = args;
+  const name = text(given[nameField]);
   if (name === undefined) {
     return return_error(new Error(`${nameField} is required`));
   }

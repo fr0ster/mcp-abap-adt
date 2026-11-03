@@ -343,16 +343,25 @@ describe('HandlerUpdate is one write under lock_handle', () => {
     async (objectType, fields) => {
       // A service binding's publication runs under the empty handle its
       // lock may answer; every other type needs one.
-      const absent =
-        objectType === 'SERVICE_BINDING' ? [undefined] : [undefined, ''];
-      for (const lock_handle of absent) {
+      // Absent, the schema refuses it (it requires the key); empty, the
+      // handler does.
+      const absent: Array<[string | undefined, string]> = [
+        [
+          undefined,
+          'Input validation error: Invalid arguments for tool HandlerUpdate: Invalid input: expected string, received undefined at lock_handle',
+        ],
+      ];
+      if (objectType !== 'SERVICE_BINDING') {
+        absent.push(['', 'lock_handle is required']);
+      }
+      for (const [lock_handle, words] of absent) {
         const answered = await run(
           'answered',
           update(objectType, { ...fields, lock_handle }),
         );
         expect(answered.sent).toEqual([]);
         expect(answered.answer?.isError).toBe(true);
-        expect(textOf(answered.answer)).toContain('lock_handle is required');
+        expect(textOf(answered.answer)).toContain(words);
       }
     },
   );
@@ -366,6 +375,36 @@ describe('HandlerUpdate is one write under lock_handle', () => {
       );
       expect(answered.sent).toEqual([]);
       expect(textOf(answered.answer)).toContain('source_code is required');
+    },
+  );
+
+  // A type whose write is a target tool's is parsed with that tool's
+  // schema: a name it requires, absent, is refused in its words, naming the
+  // target, before any request (spec §3).
+  it.each([
+    ['TABLE', 'table_name', 'UpdateTableLow'],
+    ['STRUCTURE', 'structure_name', 'UpdateStructureLow'],
+    ['DDL', 'ddl_name', 'UpdateDdlLow'],
+    ['CLASS', 'class_name', 'UpdateClassLow'],
+    ['PROGRAM', 'program_name', 'UpdateProgramLow'],
+    ['INTERFACE', 'interface_name', 'UpdateInterfaceLow'],
+    ['FUNCTION_MODULE', 'function_module_name', 'UpdateFunctionModuleLow'],
+    ['BEHAVIOR_DEFINITION', 'name', 'UpdateBehaviorDefinitionLow'],
+    ['METADATA_EXTENSION', 'name', 'UpdateMetadataExtensionLow'],
+  ])(
+    "%s without %s: refused by %s's schema, before any request",
+    async (objectType, name, target) => {
+      const fields = TYPES.find(([type]) => type === objectType)?.[1] ?? {};
+      const answered = await run(
+        'answered',
+        update(objectType, underLock({ ...fields, [name]: undefined })),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        `Input validation error: Invalid arguments for tool ${target}: `,
+      );
+      expect(textOf(answered.answer)).toContain(` at ${name}`);
     },
   );
 
@@ -424,6 +463,7 @@ describe('HandlerUpdate part: the include’s source or its metadata', () => {
     expect(held.sent[0].data).toBe(document);
   });
 
+  // A part the schema does not list is refused by the parse, in its words.
   it('INCLUDE with a part of no such name: refused before any request', async () => {
     const answered = await run(
       'answered',
@@ -432,7 +472,7 @@ describe('HandlerUpdate part: the include’s source or its metadata', () => {
     expect(answered.sent).toEqual([]);
     expect(answered.answer?.isError).toBe(true);
     expect(textOf(answered.answer)).toContain(
-      'part is source or metadata for INCLUDE',
+      'Input validation error: Invalid arguments for tool HandlerUpdate: Invalid option: expected one of "source"|"metadata" at part',
     );
   });
 

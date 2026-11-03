@@ -368,8 +368,8 @@ describe('HandlerCreate is one POST', () => {
   });
 
   // An include is its own resource (`HandlerCreate INCLUDE`): a program
-  // create with program_type include is refused before any request — today
-  // by adt-clients' guard, whose words reach the answer.
+  // create with program_type include is refused before any request — by
+  // CreateProgram's schema, whose program types do not hold it.
   it('PROGRAM with program_type include: no request, an error', async () => {
     for (const mode of ['pending', 'answered'] as const) {
       const answered = await run(
@@ -384,11 +384,52 @@ describe('HandlerCreate is one POST', () => {
       if (mode === 'answered') {
         expect(answered.answer?.isError).toBe(true);
         expect(textOf(answered.answer)).toContain(
-          "programType 'include' is not a program",
+          'Invalid arguments for tool CreateProgram: Invalid option: expected one of "executable"|"module_pool"|"function_group"|"class_pool"|"interface_pool" at program_type',
         );
       }
     }
   });
+
+  // A type whose create is a target tool's is parsed with that tool's
+  // schema: what the target requires or lists is refused in its words,
+  // naming the target, before any request (spec §3).
+  it.each([
+    ['PACKAGE', { super_package: undefined }, 'CreatePackage', 'super_package'],
+    ['PACKAGE', { package_type: 'X' }, 'CreatePackage', 'package_type'],
+    ['TRANSPORT', { description: undefined }, 'CreateTransport', 'description'],
+    ['TABLE', { table_name: undefined }, 'CreateTable', 'table_name'],
+    ['DDL', { ddl_name: undefined }, 'CreateDdl', 'ddl_name'],
+    ['CLASS', { class_name: undefined }, 'CreateClass', 'class_name'],
+    ['PROGRAM', { program_name: undefined }, 'CreateProgram', 'program_name'],
+    ['PROGRAM', { program_type: 'X' }, 'CreateProgram', 'program_type'],
+    [
+      'INTERFACE',
+      { interface_name: undefined },
+      'CreateInterface',
+      'interface_name',
+    ],
+    [
+      'FUNCTION_MODULE',
+      { function_module_name: undefined },
+      'CreateFunctionModule',
+      'function_module_name',
+    ],
+    ['INCLUDE', { include_name: undefined }, 'CreateInclude', 'include_name'],
+  ])(
+    "%s with %o: refused by %s's schema at %s, before any request",
+    async (objectType, change, target, at) => {
+      const answered = await run(
+        'answered',
+        create(objectType, { ...fieldsOf(objectType), ...change }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        `Input validation error: Invalid arguments for tool ${target}: `,
+      );
+      expect(textOf(answered.answer)).toContain(` at ${at}`);
+    },
+  );
 
   it.each(CHAINS)(
     '%s: its create is a chain — refused before any request, pointing to %s',
@@ -494,6 +535,7 @@ const SAMPLE: Record<string, unknown> = {
   transport_type: 'workbench',
   binding_variant: 'ODATA_V4_UI',
   program_type: 'executable',
+  package_type: 'development',
   implementation_type: 'Managed',
   record_changes: true,
   final: true,
@@ -503,7 +545,8 @@ const SAMPLE: Record<string, unknown> = {
 
 /**
  * Every argument a caller of 18 could give `HandlerCreate` (its schema then)
- * and a few no create names: what no create sends is refused, schema or not.
+ * and a few no create names: what the schema declares and no create sends is
+ * refused; what it does not declare is dropped by the parse (spec §3).
  */
 const KNOWN: Record<string, 'string' | 'boolean' | 'number' | 'array'> = {
   activate: 'boolean',
@@ -529,11 +572,26 @@ const KNOWN: Record<string, 'string' | 'boolean' | 'number' | 'array'> = {
 
 const schemaJson = listedJson(compactCreateSchema);
 
+/** The arguments the schema declares. */
+const DECLARED = new Set(Object.keys(schemaJson.properties ?? {}));
+
 const kindOf = (name: string) =>
   KNOWN[name] ?? jsonFind(schemaJson, name)?.type;
 
-/** A value of `name`'s kind and its empty one (`false`, `0`, `''`, `[]`). */
+/** The values `name`'s schema lists, when it lists them. */
+const listedOf = (name: string) => jsonFind(schemaJson, name)?.enum;
+
+/**
+ * A value of `name`'s kind and its empty one (`false`, `0`, `''`, `[]`); for
+ * an argument with listed values, the first of them (any other is refused by
+ * the schema: see `ENUM_CASES`).
+ */
 function valuesOf(name: string): Array<[string, unknown]> {
+  const listed = listedOf(name);
+  if (listed !== undefined) {
+    const first = listed[0];
+    return [[`'${String(first)}'`, first]];
+  }
   switch (kindOf(name)) {
     case 'boolean':
       return [
@@ -563,12 +621,8 @@ type NotSentCase = [string, string, string, unknown];
 /** Per type, every argument its create does not send, with each value tried. */
 function notSentCases(objectType: string): NotSentCase[] {
   const accepted = new Set([...ACCEPTED_EVERYWHERE, ...CARRIES[objectType]]);
-  const names = new Set([
-    ...Object.keys(schemaJson.properties ?? {}),
-    ...Object.keys(KNOWN),
-  ]);
   const cases: NotSentCase[] = [];
-  for (const name of names) {
+  for (const name of DECLARED) {
     if (accepted.has(name)) continue;
     for (const [shown, value] of valuesOf(name)) {
       cases.push([objectType, name, shown, value]);
@@ -580,6 +634,21 @@ function notSentCases(objectType: string): NotSentCase[] {
 const NOT_SENT_CASES = TYPES.flatMap(([objectType]) =>
   notSentCases(objectType),
 );
+
+/** Per type, each argument of {@link KNOWN} the schema does not declare. */
+const UNDECLARED_CASES = TYPES.flatMap(([objectType]) =>
+  Object.keys(KNOWN)
+    .filter((name) => !DECLARED.has(name))
+    .map((name): NotSentCase => {
+      const [shown, value] = valuesOf(name)[0] ?? ['undefined', undefined];
+      return [objectType, name, shown, value];
+    }),
+);
+
+/** Per type, every argument with listed values its create does not send. */
+const ENUM_CASES = NOT_SENT_CASES.filter(
+  ([, name]) => listedOf(name) !== undefined,
+).map(([objectType, name]) => [objectType, name]);
 
 const TYPE_FIELDS = new Map(TYPES);
 const fieldsOf = (objectType: string) => TYPE_FIELDS.get(objectType) ?? {};
@@ -605,18 +674,47 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
     },
   );
 
+  it.each(ENUM_CASES)(
+    '%s with %s outside its listed values: refused by the schema before any request, naming it',
+    async (objectType, name) => {
+      const answered = await run(
+        'answered',
+        create(objectType, { ...fieldsOf(objectType), [name]: 'X' }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        'Input validation error: Invalid arguments for tool HandlerCreate: Invalid option',
+      );
+      expect(textOf(answered.answer)).toContain(`at ${name}`);
+    },
+  );
+
+  it.each(UNDECLARED_CASES)(
+    '%s with %s = %s, which the schema does not declare: dropped, the one create sent',
+    async (objectType, name, _shown, value) => {
+      const held = await run(
+        'pending',
+        create(objectType, { ...fieldsOf(objectType), [name]: value }),
+      );
+      expect(held.sent).toHaveLength(1);
+      expect(held.sent[0].method).toBe('POST');
+    },
+  );
+
+  // Named in the schema's order: the parse hands the handler its arguments so.
   it('names every argument it does not send', async () => {
     const answered = await run(
       'answered',
       create('STRUCTURE', {
         ...fieldsOf('STRUCTURE'),
-        fields: [],
-        activate: false,
+        application: 'S',
+        program_type: 'executable',
       }),
     );
     expect(answered.sent).toEqual([]);
     expect(textOf(answered.answer)).toContain(
-      'HandlerCreate sends the create request alone: fields, activate are not sent',
+      'HandlerCreate sends the create request alone: program_type, application are not sent',
     );
   });
 

@@ -53,10 +53,10 @@ function withBeside(
   return beside === undefined ? payload : { ...payload, ...beside };
 }
 
-export interface McpResult {
+export type McpResult = {
   isError: boolean;
   content: Array<{ type: 'text'; text: string }>;
-}
+};
 
 function text(value: string, isError = false): McpResult {
   return { isError, content: [{ type: 'text', text: value }] };

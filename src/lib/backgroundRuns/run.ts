@@ -142,10 +142,7 @@ export async function startBackgroundRun(
     // Its instance closed while it connected: the close cut it.
     refuseIfClosed(options.instance);
     // Stateless: a fresh connection is, and a host's factory's is made so.
-    const typed = connection as { setSessionType?: (type: string) => void };
-    if (typeof typed.setSessionType === 'function') {
-      typed.setSessionType('stateless');
-    }
+    connection.setSessionType('stateless');
 
     const startedAt = now().toISOString();
     const started = await strategy.start(options.caller, {

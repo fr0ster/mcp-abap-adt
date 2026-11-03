@@ -171,14 +171,13 @@ async function connectedOrClosed(
   fresh: IAbapConnection,
   logger: Logger,
 ): Promise<IAbapConnection> {
-  const connectable = fresh as { connect?: () => Promise<void> };
   // Right before the connect, with no await between: a close that ended this
   // connection after it was recorded (its instance's sweep, or the cut of the
   // background runs that instance started) leaves nothing to connect.
   if (isEnded(fresh)) throw new ClosedInstanceRefusal(isLatched());
   refuseWhenClosed(fresh);
   try {
-    if (typeof connectable.connect === 'function') await connectable.connect();
+    await fresh.connect();
   } catch (error) {
     await closeQuietly(fresh, logger, 'A fresh connection');
     // A connect its instance's close cut short: the close's refusal.

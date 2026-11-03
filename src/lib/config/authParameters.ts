@@ -25,6 +25,7 @@ import {
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
+import { entries, isElement, isList } from '../xml/tree';
 import type { TlsConfig } from './IServerConfig.js';
 
 /** A start the parameters refuse, in words that name parameters only. */
@@ -141,10 +142,8 @@ function yamlAt(
   if (!yaml || dotted === undefined) return undefined;
   let node: unknown = yaml;
   for (const segment of dotted.split('.')) {
-    if (node === null || typeof node !== 'object' || Array.isArray(node)) {
-      return undefined;
-    }
-    node = (node as Record<string, unknown>)[segment];
+    if (!isElement(node)) return undefined;
+    node = node[segment];
   }
   return node;
 }
@@ -166,7 +165,7 @@ function removedYamlHits(
       if (key in yaml) {
         found.push({
           form: `${key} (config file)`,
-          value: (yaml as Record<string, unknown>)[key],
+          value: yaml[key],
           removed,
         });
       }
@@ -427,10 +426,10 @@ const SECRET_KEY_FRAGMENTS = [
 export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
   if (value === null || typeof value !== 'object') return [];
   const found: string[] = [];
-  const entries: [string, unknown][] = Array.isArray(value)
+  const members: [string, unknown][] = isList(value)
     ? value.map((v, i) => [String(i), v])
-    : Object.entries(value as Record<string, unknown>);
-  for (const [key, inner] of entries) {
+    : entries(value);
+  for (const [key, inner] of members) {
     const path = prefix ? `${prefix}.${key}` : key;
     const lower = key.toLowerCase();
     if (
@@ -794,13 +793,18 @@ export function tlsRows(yamlPrefix: 'http' | 'sse'): readonly Parameter[] {
   ];
 }
 
+/** A text parameter's value; any other kind is none. */
+function textValue(value: ParameterValue | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
 /** The TLS configuration of the read values: cert and key together, or no TLS. */
 export function tlsConfigOf(
   values: Record<string, ParameterValue>,
 ): TlsConfig | undefined {
-  const cert = values.tlsCert as string | undefined;
-  const key = values.tlsKey as string | undefined;
-  const ca = values.tlsCa as string | undefined;
+  const cert = textValue(values.tlsCert);
+  const key = textValue(values.tlsKey);
+  const ca = textValue(values.tlsCa);
   if (cert === undefined && key === undefined && ca === undefined) {
     return undefined;
   }

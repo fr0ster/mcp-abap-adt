@@ -21,6 +21,7 @@ import {
 import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
+import { child } from '../../xml/tree';
 import type {
   HandlerEntry,
   IHandlerGroup,
@@ -133,7 +134,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         inputSchema,
         ...search,
       },
-      async (given: any) => {
+      async (given: Record<string, unknown>) => {
         try {
           // A run tool's `background` is the server instance's to serve: a
           // group registered on its own has no strategy, so a background run
@@ -142,18 +143,12 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           if (isBackgroundTool(toolName)) {
             const background = readBackground(given);
             if (background === null) {
-              return return_error(new Error(BACKGROUND_INVALID_WORDS)) as {
-                isError: true;
-                content: { type: 'text'; text: string }[];
-              };
+              return return_error(new Error(BACKGROUND_INVALID_WORDS));
             }
             if (background) {
               return return_error(
                 new ServerRefusal('background_runs_unavailable'),
-              ) as {
-                isError: true;
-                content: { type: 'text'; text: string }[];
-              };
+              );
             }
             args = withoutBackground(given);
           }
@@ -163,18 +158,12 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const read = listed && isLongRead(toolName, args);
           if (listed && !read && readTimeout(args) !== undefined) {
             // A listed tool's run mode takes no `timeout`.
-            return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
-              isError: true;
-              content: { type: 'text'; text: string }[];
-            };
+            return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS));
           }
           // A long read's `timeout`, cutting the read.
           const timeoutSeconds = read ? readTimeout(args) : undefined;
           if (timeoutSeconds === null) {
-            return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
-              isError: true;
-              content: { type: 'text'; text: string }[];
-            };
+            return return_error(new Error(TIMEOUT_INVALID_WORDS));
           }
           // The call's context, asked for now: the group's own, or one made
           // for this call (its provider's connection). Its rejection is
@@ -187,7 +176,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // handler it hands out (`inStatedScope`).
           const withParameters = <T>(fn: () => Promise<T>) =>
             inStatedScope(context, args, fn);
-          let result: any;
+          let result: unknown;
           if (read) {
             // A listed long tool: a read on a connection of its
             // own, its `timeout` cutting the read.
@@ -199,10 +188,10 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
                 timeoutSeconds,
                 run: (own) => {
                   stateSystemKind(own, context.systemType);
-                  const ownContext = {
+                  const ownContext: HandlerContext = {
                     ...context,
                     connection: own,
-                  } as HandlerContext;
+                  };
                   return call(ownContext, withoutTimeout(args));
                 },
               }),
@@ -218,16 +207,13 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const content = normalizeToolContent(result);
 
           // A failed tool returns an isError result — it does not throw.
-          if (result.isError) {
+          if (child(result, 'isError')) {
             return { content, isError: true };
           }
 
           return { content };
         } catch (error) {
-          return return_error(error) as {
-            isError: true;
-            content: { type: 'text'; text: string }[];
-          };
+          return return_error(error);
         }
       },
     );

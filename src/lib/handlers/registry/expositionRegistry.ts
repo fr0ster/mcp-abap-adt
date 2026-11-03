@@ -18,12 +18,13 @@ import { RuntimeRunHandlersGroup } from '../groups/RuntimeRunHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
 import type { HandlerContext, IHandlerGroup } from '../interfaces.js';
+import { noConnection } from '../noConnection.js';
 import { CompositeHandlersRegistry } from './CompositeHandlersRegistry.js';
 
 /** The context a registry is built against before any connection exists. */
 export function noConnectionContext(): HandlerContext {
   return {
-    connection: undefined as never,
+    connection: noConnection,
     logger: undefined,
   } satisfies HandlerContext;
 }

@@ -22,6 +22,7 @@ import type {
   IHandlersRegistry,
   SapEnvironment,
 } from './interfaces.js';
+import { noConnection } from './noConnection.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
 import { type CallContext, inStatedScope } from './utils/handlerCall.js';
 
@@ -161,7 +162,7 @@ export class HandlerExporter {
     // getConnection()) or made per call by registerOnServer (its provider's
     // connection).
     const dummyContext: HandlerContext = {
-      connection: null as any,
+      connection: noConnection,
       logger: this.logger,
       ...(options?.systemType !== undefined && {
         systemType: options.systemType,

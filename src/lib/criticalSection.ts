@@ -15,15 +15,12 @@
  * completion instead of being aborted. We bracket the whole mutating handler
  * with it — begin before it runs, end in a `finally`.
  *
- * The methods are feature-detected via a structural cast, so this degrades to a
+ * The methods are feature-detected (`hasMethod`), so this degrades to a
  * no-op against an older connection that lacks them (no hard dependency on the
  * IAbapConnection interface shape).
  */
 
-interface CriticalSectionCapable {
-  beginCriticalSection?: () => void;
-  endCriticalSection?: () => void;
-}
+import { hasMethod } from './capability';
 
 /**
  * Wrap a handler so the connection is held in an uninterruptible critical
@@ -38,12 +35,12 @@ export function withCriticalSection<A extends unknown[], R>(
   getConnection: () => unknown,
 ): (...args: A) => Promise<R> {
   return async (...args: A) => {
-    const conn = getConnection() as CriticalSectionCapable | null | undefined;
-    conn?.beginCriticalSection?.();
+    const conn = getConnection();
+    if (hasMethod(conn, 'beginCriticalSection')) conn.beginCriticalSection();
     try {
       return await handler(...args);
     } finally {
-      conn?.endCriticalSection?.();
+      if (hasMethod(conn, 'endCriticalSection')) conn.endCriticalSection();
     }
   };
 }

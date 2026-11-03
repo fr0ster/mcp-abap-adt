@@ -15,15 +15,19 @@ import {
   type ILogger,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
-
 import {
   type AbapSystemKind,
   declaredSystemKindOf,
   statedSystemKind,
 } from './systemKind';
+import { child, childAt, entries } from './xml/tree';
 
 export type { AbapSystemKind } from './systemKind';
 export { statedSystemKind } from './systemKind';
@@ -192,9 +196,7 @@ function clip(value: unknown, ceiling: number): string {
 function safeHeaders(headers: unknown): string {
   if (headers === null || typeof headers !== 'object') return '';
   const out: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(
-    headers as Record<string, unknown>,
-  )) {
+  for (const [name, value] of entries(headers)) {
     out[name] = REDACTED.test(name) ? '[redacted]' : value;
   }
   return JSON.stringify(out);
@@ -205,15 +207,14 @@ function safeHeaders(headers: unknown): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
-function withHttpWireLog<T>(connection: T): T {
+function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
-  const target = connection as unknown as {
-    makeAdtRequest: (options: Record<string, unknown>) => Promise<unknown>;
-  };
-  const original = target.makeAdtRequest.bind(target);
+  const original = connection.makeAdtRequest.bind(connection);
   let n = 0;
-  target.makeAdtRequest = async (options) => {
+  connection.makeAdtRequest = async <R, D>(
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse<R, D>> => {
     n += 1;
     const id = n;
     process.stderr.write(
@@ -235,32 +236,24 @@ function withHttpWireLog<T>(connection: T): T {
       );
     }
     try {
-      const answer = (await original(options)) as {
-        status?: number;
-        statusText?: string;
-        data?: unknown;
-      };
+      const answer = await original<R, D>(options);
       process.stderr.write(
-        `[WIRE ${id}] → ${String(answer?.status ?? '?')} ${String(answer?.statusText ?? '')}\n`,
+        `[WIRE ${id}] → ${String(answer.status ?? '?')} ${String(answer.statusText ?? '')}\n`,
       );
-      if (answer?.data !== undefined) {
+      if (answer.data !== undefined) {
         process.stderr.write(
           `[WIRE ${id}] → body ${clip(answer.data, bodyChars)}\n`,
         );
       }
       return answer;
     } catch (error: unknown) {
-      const e = error as {
-        message?: string;
-        response?: { status?: number; data?: unknown };
-      };
+      const status = childAt(error, 'response', 'status');
+      const body = childAt(error, 'response', 'data');
       process.stderr.write(
-        `[WIRE ${id}] → threw ${String(e?.response?.status ?? '')} ${String(e?.message ?? error)}\n`,
+        `[WIRE ${id}] → threw ${String(status ?? '')} ${String(child(error, 'message') ?? error)}\n`,
       );
-      if (e?.response?.data !== undefined) {
-        process.stderr.write(
-          `[WIRE ${id}] → body ${clip(e.response.data, bodyChars)}\n`,
-        );
+      if (body !== undefined) {
+        process.stderr.write(`[WIRE ${id}] → body ${clip(body, bodyChars)}\n`);
       }
       throw error;
     }
@@ -393,7 +386,7 @@ export function createAbapConnection(
     );
   })();
 
-  records.set(built as unknown as object, {
+  records.set(built, {
     settings,
     credential,
     logger,

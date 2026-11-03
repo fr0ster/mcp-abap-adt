@@ -54,10 +54,7 @@ export async function runLongCall<R>(
   const connection = await openFreshConnection(options.connection, logger);
   own(connection, { role: 'long' });
   // Stateless: a fresh connection is, and a host's factory's is made so.
-  const typed = connection as { setSessionType?: (type: string) => void };
-  if (typeof typed.setSessionType === 'function') {
-    typed.setSessionType('stateless');
-  }
+  connection.setSessionType('stateless');
 
   const work = options.run(connection);
   // The logoff once the call's work settled — on every path, whoever waits.
@@ -75,12 +72,15 @@ export async function runLongCall<R>(
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const waitEnded = new Promise<'timed-out'>((resolve) => {
-    timer = setTimeout(() => resolve('timed-out'), timeoutSeconds * 1000);
+  const waitEnded = new Promise<{ readonly done: false }>((resolve) => {
+    timer = setTimeout(() => resolve({ done: false }), timeoutSeconds * 1000);
   });
   try {
-    const first = await Promise.race([work, waitEnded]);
-    if (first === 'timed-out') {
+    const first = await Promise.race([
+      work.then((value) => ({ done: true as const, value })),
+      waitEnded,
+    ]);
+    if (!first.done) {
       // The read is cut: its session is logged off now, under the request.
       logger?.info(`${name}: the read was cut by its timeout`);
       await endConnection(connection, () => {
@@ -89,7 +89,7 @@ export async function runLongCall<R>(
       return timedOutAnswer(timeoutSeconds);
     }
     await ended;
-    return first as R;
+    return first.value;
   } catch (error) {
     await ended;
     throw error;

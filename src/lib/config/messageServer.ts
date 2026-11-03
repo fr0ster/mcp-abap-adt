@@ -7,20 +7,24 @@ import { rfcParamsFrom, type SapConfig } from '@mcp-abap-adt/connection';
  * connection's), no check (connection refuses `mshost` with neither
  * `msserv` nor `sysid`, naming both).
  */
+/** The five fields, in a fixed order. */
+export const MESSAGE_SERVER_FIELDS = [
+  'mshost',
+  'msserv',
+  'sysid',
+  'group',
+  'saprouter',
+] as const;
+
+export type MessageServerField = (typeof MESSAGE_SERVER_FIELDS)[number];
+
 export const MESSAGE_SERVER_ENV = {
   mshost: 'SAP_MSHOST',
   msserv: 'SAP_MSSERV',
   sysid: 'SAP_SYSID',
   group: 'SAP_GROUP',
   saprouter: 'SAP_SAPROUTER',
-} as const;
-
-export type MessageServerField = keyof typeof MESSAGE_SERVER_ENV;
-
-/** The five fields, in a fixed order. */
-export const MESSAGE_SERVER_FIELDS = Object.keys(
-  MESSAGE_SERVER_ENV,
-) as readonly MessageServerField[];
+} as const satisfies Record<MessageServerField, string>;
 
 /**
  * Sets each field `env` states on `config`, trimmed as `SAP_CLIENT` is; a
@@ -44,7 +48,12 @@ export function applyMessageServerFields(
  */
 const RFC_ADDRESS_REFUSALS: readonly string[] = (() => {
   const words: string[] = [];
-  for (const probe of [{ mshost: 'probe' }, {}] as SapConfig[]) {
+  // An empty url is no url to connection, as an absent one was.
+  const probes: SapConfig[] = [
+    { url: '', authType: 'basic', mshost: 'probe' },
+    { url: '', authType: 'basic' },
+  ];
+  for (const probe of probes) {
     try {
       rfcParamsFrom(probe);
     } catch (error) {

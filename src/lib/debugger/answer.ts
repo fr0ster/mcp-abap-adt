@@ -39,11 +39,11 @@ export async function debugAnswer<T>(
     const merged = !hasExtra
       ? projected
       : projected && typeof projected === 'object' && !Array.isArray(projected)
-        ? { ...(projected as Record<string, unknown>), ...extra }
+        ? { ...projected, ...extra }
         : { value: projected, ...extra };
     return { isError: false, content: [asText(merged)] };
   } catch (error) {
-    const failed = return_error(error) as McpResult;
+    const failed = return_error(error);
     const extra = failureExtraOf();
     return Object.keys(extra).length > 0
       ? { ...failed, content: [...failed.content, asText(extra)] }
@@ -81,10 +81,7 @@ export async function debugStateAnswer(
     (s) => {
       if (s.state !== 'stopped') return s;
       // Everything a start added beside the stop (breakpoints placed and refused, reconciliation) stays.
-      const { stop, ...rest } = s as Stopped & { stop: StopView } & Record<
-          string,
-          unknown
-        >;
+      const { stop, ...rest } = s;
       return {
         ...rest,
         ...terseStop(stop.debuggee, stop.stack, stop.attach),

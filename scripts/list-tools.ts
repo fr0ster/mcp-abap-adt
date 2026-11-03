@@ -9,7 +9,7 @@
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import * as z from 'zod';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import type { HandlerContext } from '../src/handlers/interfaces.js';
+import { noConnectionContext } from '../src/lib/handlers/index.js';
 import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
@@ -26,11 +26,9 @@ import {
   type ToolSet,
 } from '../src/lib/toolSet.js';
 
-// Groups only read `connection` when a handler runs; listing never runs one.
-const ctx = {
-  connection: null,
-  logger: undefined,
-} as unknown as HandlerContext;
+// Groups only read `connection` when a handler runs; listing never runs one,
+// and a context built for registration refuses any use of its connection.
+const ctx = noConnectionContext();
 
 const groups = {
   // Default arguments on purpose: an empty overriding set and NoDedupStrategy,

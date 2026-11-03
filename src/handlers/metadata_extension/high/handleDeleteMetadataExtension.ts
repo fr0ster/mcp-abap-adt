@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension via its
  * own URL
@@ -33,7 +35,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import {
   project,
   terseDeletion,
@@ -47,22 +49,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      metadata_extension_name: {
-        type: 'string',
-        description: 'MetadataExtension name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['metadata_extension_name'],
-  },
+  inputSchema: z.object({
+    metadata_extension_name: z.string().describe('MetadataExtension name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DeleteMetadataExtensionArgs {

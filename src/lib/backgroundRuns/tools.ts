@@ -12,6 +12,7 @@
 
 import * as z from 'zod';
 import type { ToolDefinition } from '../handlers/interfaces.js';
+import { child } from '../xml/tree';
 
 /** The tools that take `background`, with the names of the tools that read and discard their runs. */
 export const BACKGROUND_TOOLS: Readonly<
@@ -93,19 +94,18 @@ export const COMPACT_BACKGROUND_FIELD = z
  * `false` is an ordinary run; `null` is a value that is not a boolean.
  */
 export function readBackground(args: unknown): boolean | null {
-  const value = (args as { background?: unknown } | null | undefined)
-    ?.background;
+  const value = child(args, 'background');
   if (value === undefined) return false;
   return typeof value === 'boolean' ? value : null;
 }
 
 /** The arguments a run tool's handler receives: `background` is the wrapper's. */
-export function withoutBackground<T>(args: T): T {
-  if (args === null || typeof args !== 'object' || !('background' in args)) {
-    return args;
-  }
-  const { background: _taken, ...rest } = args as Record<string, unknown>;
-  return rest as T;
+export function withoutBackground(
+  args: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  if (!('background' in args)) return args;
+  const { background: _taken, ...rest } = args;
+  return rest;
 }
 
 /** The fixed words of a `background` that is not a boolean. */
@@ -113,19 +113,14 @@ export const BACKGROUND_INVALID_WORDS = 'background must be true or false.';
 
 /** What a run tool's call runs: its class or program, upper case; `''` when none is named. */
 export function backgroundObjectOf(args: unknown): string {
-  const named = args as
-    | {
-        class_name?: unknown;
-        program_name?: unknown;
-        target_type?: unknown;
-      }
-    | null
-    | undefined;
+  const targetType = child(args, 'target_type');
+  const className = child(args, 'class_name');
+  const programName = child(args, 'program_name');
   const pick =
-    named?.target_type === 'PROGRAM'
-      ? named.program_name
-      : named?.target_type === 'CLASS'
-        ? named.class_name
-        : (named?.class_name ?? named?.program_name);
+    targetType === 'PROGRAM'
+      ? programName
+      : targetType === 'CLASS'
+        ? className
+        : (className ?? programName);
   return typeof pick === 'string' ? pick.trim().toUpperCase() : '';
 }

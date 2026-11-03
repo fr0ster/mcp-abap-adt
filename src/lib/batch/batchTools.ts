@@ -1,3 +1,4 @@
+import { child } from '../xml/tree';
 import type { BatchKind } from './InstanceBatch';
 
 /**
@@ -46,19 +47,14 @@ export function runsBesideBatch(tool: string): boolean {
 
 /** Whether `args` ask for numbers: `number` or `numbers` given. */
 export function asksNumbers(args: unknown): boolean {
-  if (args === null || typeof args !== 'object') return false;
-  const given = args as { number?: unknown; numbers?: unknown };
-  return given.number !== undefined || given.numbers !== undefined;
+  return (
+    child(args, 'number') !== undefined || child(args, 'numbers') !== undefined
+  );
 }
 
 /** Whether `args` name `action: 'end'` and ask for no numbers. */
 function endAction(args: unknown): boolean {
-  return (
-    args !== null &&
-    typeof args === 'object' &&
-    (args as { action?: unknown }).action === 'end' &&
-    !asksNumbers(args)
-  );
+  return child(args, 'action') === 'end' && !asksNumbers(args);
 }
 
 /**

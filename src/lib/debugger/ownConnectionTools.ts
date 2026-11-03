@@ -14,6 +14,8 @@
  * handler to that. The memory-snapshot tools (`MemorySnapshotList`, `…Get`,
  * `…Delta`) read the instance's connection and stay in the flow.
  */
+
+import { child } from '../xml/tree';
 export const DEBUGGER_OWN_CONNECTION_TOOLS: readonly string[] = [
   'AmdpDebugCancel',
   'AmdpDebugGetTable',
@@ -78,9 +80,7 @@ const COMPACT_READS = new Set([
 
 /** `args[name]`, when `args` is an object. */
 function argument(args: unknown, name: string): unknown {
-  return args !== null && typeof args === 'object'
-    ? (args as Record<string, unknown>)[name]
-    : undefined;
+  return child(args, name);
 }
 
 /**

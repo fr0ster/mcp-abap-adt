@@ -14,6 +14,7 @@ import * as z from 'zod';
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
 import type { HandlerContext } from '../../handlers/index';
+import { child } from '../../xml/tree';
 
 /**
  * `HandlerBatch`'s description: the same sentences, one per action, naming
@@ -64,10 +65,7 @@ type BatchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * refused for its arguments is refused before any is taken.
  */
 export function batchActionIsConnectionless(args: unknown): boolean {
-  const action =
-    args !== null && typeof args === 'object'
-      ? (args as { action?: unknown }).action
-      : undefined;
+  const action = child(args, 'action');
   return action !== 'end' || asksNumbers(args);
 }
 

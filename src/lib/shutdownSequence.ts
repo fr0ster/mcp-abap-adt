@@ -156,7 +156,7 @@ export function installShutdownSequence(
   let failed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const forced = new AbortController();
-  let finished!: () => void;
+  let finished: () => void = () => {};
   const done = new Promise<void>((resolve) => {
     finished = resolve;
   });

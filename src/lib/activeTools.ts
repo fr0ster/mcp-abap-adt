@@ -65,7 +65,7 @@ export function registerActiveTool(
   entry: ActiveToolEntry = {},
 ): (() => void) | undefined {
   if (isLatched(entry.instance)) return undefined;
-  let end!: () => void;
+  let end: () => void = () => {};
   const ended = new Promise<void>((resolve) => {
     end = resolve;
   });

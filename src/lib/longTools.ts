@@ -11,6 +11,7 @@
  */
 
 import * as z from 'zod';
+import { child } from './xml/tree';
 
 /**
  * The approved list, by tool name: the same names as
@@ -74,9 +75,8 @@ const NOT_A_READ: Readonly<
 export function isLongRead(tool: string, args: unknown): boolean {
   const rules = NOT_A_READ[tool];
   if (rules === undefined) return true;
-  const given = args as Record<string, unknown> | null | undefined;
   return !rules.some((rule) => {
-    const value = given?.[rule.argument];
+    const value = child(args, rule.argument);
     return (
       typeof value === 'string' && rule.equals.includes(value.toUpperCase())
     );
@@ -152,7 +152,7 @@ export const TIMEOUT_INVALID_WORDS = `timeout must be a whole number of seconds 
  * given and invalid.
  */
 export function readTimeout(args: unknown): number | undefined | null {
-  const value = (args as { timeout?: unknown } | null | undefined)?.timeout;
+  const value = child(args, 'timeout');
   if (value === undefined) return undefined;
   return typeof value === 'number' &&
     Number.isInteger(value) &&
@@ -163,12 +163,12 @@ export function readTimeout(args: unknown): number | undefined | null {
 }
 
 /** The arguments a handler receives: the call's own `timeout` is the wrapper's, not the handler's. */
-export function withoutTimeout<T>(args: T): T {
-  if (args === null || typeof args !== 'object' || !('timeout' in args)) {
-    return args;
-  }
-  const { timeout: _taken, ...rest } = args as Record<string, unknown>;
-  return rest as T;
+export function withoutTimeout(
+  args: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  if (!('timeout' in args)) return args;
+  const { timeout: _taken, ...rest } = args;
+  return rest;
 }
 
 /** A listed tool's description, with the advice every listed tool carries. */

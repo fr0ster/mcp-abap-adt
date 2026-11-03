@@ -48,6 +48,7 @@
  * takes; the long call's own `timeout`, when given, cuts it by logging its
  * connection off.
  */
+
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -60,6 +61,7 @@ import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
+import { sessionOf } from './sessionOf';
 
 /** One item's settlement in a phase. */
 export type PhaseResult<R> =
@@ -111,17 +113,15 @@ function outerStatusWatch(connection: IAbapConnection): {
   let outer: number | undefined;
   let sent = 0;
   let refused: Error | undefined;
-  const typed = connection as {
-    getSessionType?: () => Session;
-    getSessionMode?: () => Session;
-  };
   const forwarding = {
     connect: () => connection.connect(),
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
     setSessionType: (type: Session) => connection.setSessionType(type),
     getSessionType: (): Session =>
-      typed.getSessionType?.() ?? typed.getSessionMode?.() ?? 'stateless',
+      sessionOf(connection, 'getSessionType') ??
+      sessionOf(connection, 'getSessionMode') ??
+      'stateless',
     makeAdtRequest<T = unknown, D = unknown>(
       request: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
@@ -233,7 +233,7 @@ async function correctPhaseParts(
   });
   const waits = corrected.map(({ invocation, pair }) => {
     invocation.port?.remember(invocation.operation, pair);
-    let signal!: () => void;
+    let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });
@@ -296,7 +296,7 @@ export async function runPhase<I, R>(
     const invocation = adtCallScope.getStore()?.invocation;
     if (invocation !== undefined) invocation.parts += 1;
     const first = settledOf(batch.makeAdtRequest(request));
-    let answer!: (final: PartAnswer) => void;
+    let answer: (final: PartAnswer) => void = () => {};
     const final = new Promise<PartAnswer>((resolve) => {
       answer = resolve;
     });
@@ -306,7 +306,7 @@ export async function runPhase<I, R>(
     );
   };
   const entries = items.map((item) => {
-    let signal!: () => void;
+    let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });

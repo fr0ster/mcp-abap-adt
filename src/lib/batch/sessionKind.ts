@@ -15,7 +15,9 @@
  *   is sent today (only LOCK and UNLOCK go stateful), and it would be a
  *   kind of its own as adt-clients keeps it.
  */
+
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
+import { child } from '../xml/tree';
 
 export type SessionKind = 'lock' | 'unlock' | 'stateless' | 'stateful';
 
@@ -35,14 +37,22 @@ export function requestKind(
   if (endpoint === 'debugger') return 'stateful';
   const action =
     new URL(request.url, 'https://batch.invalid').searchParams.get('_action') ??
-    new URLSearchParams(
-      (request.params ?? {}) as ConstructorParameters<
-        typeof URLSearchParams
-      >[0],
-    ).get('_action');
+    paramAction(request.params);
   if (action === 'LOCK') return 'lock';
   if (action === 'UNLOCK') return 'unlock';
   return 'stateful';
+}
+
+/**
+ * The `_action` of a request's `params`: a query string read as one, an
+ * object's member written out; else none.
+ */
+function paramAction(params: unknown): string | null {
+  if (typeof params === 'string') {
+    return new URLSearchParams(params).get('_action');
+  }
+  const action = child(params, '_action');
+  return action === undefined ? null : String(action);
 }
 
 /** How a kind is named in the refusal's words. */

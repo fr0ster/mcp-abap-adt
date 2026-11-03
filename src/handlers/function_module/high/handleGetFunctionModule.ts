@@ -1,15 +1,16 @@
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readFunctionModuleMetadata } from '../../../lib/strategies/metadataReads';
@@ -22,22 +23,14 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_module_name: {
-        type: 'string',
-        description: 'Function module name.',
-      },
-      function_group_name: {
-        type: 'string',
-        description: 'Function group containing the function module.',
-      },
-      part: READ_PART_PROPERTY,
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['function_module_name', 'function_group_name'],
-  },
+  inputSchema: z.object({
+    function_module_name: z.string().describe('Function module name.'),
+    function_group_name: z
+      .string()
+      .describe('Function group containing the function module.'),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
 interface GetFunctionModuleArgs {

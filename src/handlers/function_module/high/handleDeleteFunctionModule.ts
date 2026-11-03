@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteFunctionModule Handler - Delete ABAP FunctionModule via ADT deletion
  * API
@@ -14,7 +16,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -24,26 +26,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_module_name: {
-        type: 'string',
-        description: 'FunctionModule name.',
-      },
-      function_group_name: {
-        type: 'string',
-        description: 'FunctionGroup name containing the function module.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_module_name', 'function_group_name'],
-  },
+  inputSchema: z.object({
+    function_module_name: z.string().describe('FunctionModule name.'),
+    function_group_name: z
+      .string()
+      .describe('FunctionGroup name containing the function module.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DeleteFunctionModuleArgs {

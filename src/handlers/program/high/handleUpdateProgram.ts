@@ -143,7 +143,7 @@ export async function handleUpdateProgram(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

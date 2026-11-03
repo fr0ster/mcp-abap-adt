@@ -126,7 +126,7 @@ export async function waitForRun(
 ): Promise<IAdtResponse<StartedRun, IAdtError>> {
   const started = await atStep('run', start)();
   if (!started.ok) {
-    return started as unknown as IAdtResponse<StartedRun, IAdtError>;
+    return started;
   }
   const runId = String(started.getResult().value);
   const outcome = wait
@@ -138,7 +138,7 @@ export async function waitForRun(
       )
     : undefined;
   if (outcome !== undefined && !outcome.ok) {
-    return outcome as unknown as IAdtResponse<StartedRun, IAdtError>;
+    return outcome;
   }
   const value: StartedRun =
     outcome === undefined

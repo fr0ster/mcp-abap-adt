@@ -52,7 +52,7 @@ export async function newTraceAfter(
     // into "no trace yet", which is this repository's masking defect in
     // another coat.
     if (!listed.ok) {
-      return listed as unknown as IAdtResponse<string | undefined, IAdtError>;
+      return listed;
     }
 
     const fresh = listed

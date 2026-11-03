@@ -219,7 +219,7 @@ export async function fetchWhereUsedReferences(
       }),
     )();
     if (!scope.ok) {
-      return scope as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
+      return scope;
     }
     const rawScope = scope.getResult().value?.raw ?? '';
     scopeXml = utils.modifyWhereUsedScope(rawScope, {
@@ -237,7 +237,7 @@ export async function fetchWhereUsedReferences(
     }),
   )();
   if (!result.ok) {
-    return result as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
+    return result;
   }
 
   return noResult(parseWhereUsedReferences(result.getResult().value?.value));

@@ -98,7 +98,7 @@ export async function writeClassTests(
       }),
     { type: 'CLASS', name },
   );
-  if (!written.ok) return written as Answer;
+  if (!written.ok) return written;
   return carryCleanup(
     written,
     atStep('activate', () =>
@@ -146,7 +146,7 @@ export async function writeProgramTests(
         { version: 'workingArea', analyse: analyseException },
       ),
     )();
-    if (!metadata.ok) return metadata as unknown as Answer;
+    if (!metadata.ok) return metadata;
     const created = await atStep('create include', () =>
       withAdtHeaders(context, 'include.create', (headers) =>
         include.create(
@@ -160,7 +160,7 @@ export async function writeProgramTests(
         ),
       ),
     )();
-    if (!created.ok) return created as unknown as Answer;
+    if (!created.ok) return created;
   }
 
   const written = await withLock(
@@ -179,7 +179,7 @@ export async function writeProgramTests(
       }),
     { type: 'INCLUDE', name: includeName },
   );
-  if (!written.ok) return written as Answer;
+  if (!written.ok) return written;
 
   // Activate the include, then the report — as one step after the write, so a
   // lock the write could not release still reaches the caller.
@@ -219,10 +219,10 @@ export async function writeProgramTests(
             analyse: analyseException,
           }),
         )();
-        if (!current.ok) return current as unknown as Answer;
+        if (!current.ok) return current;
         const reportSource = current.getResult().value.raw;
         if (pulledIn.test(reportSource)) {
-          return current as unknown as Answer;
+          return current;
         }
         return atStep('update program', () =>
           withAdtHeaders(context, 'program.update', (headers) =>
@@ -244,7 +244,7 @@ export async function writeProgramTests(
         }),
       { type: 'PROGRAM', name },
     );
-    if (!linked.ok) return linked as Answer;
+    if (!linked.ok) return linked;
     return carryCleanup(linked, activateBoth);
   });
 }
@@ -283,7 +283,7 @@ export async function writeFunctionGroupTests(
         ),
       ),
     )();
-    if (!created.ok) return created as unknown as Answer;
+    if (!created.ok) return created;
   }
 
   const written = await withLock(
@@ -300,7 +300,7 @@ export async function writeFunctionGroupTests(
       include.unlock(target, lockHandle, { analyse: analyseException }),
     { type: 'FUNCTION_INCLUDE', name: includeName },
   );
-  if (!written.ok) return written as Answer;
+  if (!written.ok) return written;
 
   return carryCleanup(
     written,
@@ -360,7 +360,7 @@ async function activateWithMainProgram(
         { headers, analyse: analyseException },
       ),
   );
-  if (!started.ok) return started as unknown as Answer;
+  if (!started.ok) return started;
   // Long polls back to back, no timer of ours: the server holds each one
   // until the run moves.
   const outcome = await awaitActivationRun(

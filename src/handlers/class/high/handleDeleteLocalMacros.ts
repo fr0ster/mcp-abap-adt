@@ -95,7 +95,7 @@ export async function handleDeleteLocalMacros(
       );
 
       if (!deleted.ok || !shouldActivate) {
-        return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return deleted;
       }
 
       return carryCleanup(

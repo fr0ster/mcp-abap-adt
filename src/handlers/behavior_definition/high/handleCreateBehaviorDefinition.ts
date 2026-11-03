@@ -152,7 +152,7 @@ export async function handleCreateBehaviorDefinition(
         { type: 'BEHAVIOR_DEFINITION', name: name },
       );
       if (!checked.ok) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
@@ -164,7 +164,7 @@ export async function handleCreateBehaviorDefinition(
         .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       return carryCleanup(

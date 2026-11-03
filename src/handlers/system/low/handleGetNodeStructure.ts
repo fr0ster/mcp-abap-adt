@@ -242,7 +242,7 @@ async function nodeStructure(
           if (!packageRead.ok) {
             // The package's own refusal, named — not a sentence this
             // handler composed about a call it did not make.
-            return packageRead as unknown as IAdtResponse<NodeLevel, IAdtError>;
+            return packageRead;
           }
 
           // The package exists; the blank body was the genuinely-empty

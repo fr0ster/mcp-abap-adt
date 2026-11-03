@@ -283,7 +283,7 @@ export async function handleCreateDomain(
       );
 
       if (!checked.ok || !shouldActivate) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       return carryCleanup(

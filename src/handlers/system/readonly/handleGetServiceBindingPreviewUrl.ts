@@ -235,8 +235,7 @@ export async function handleGetServiceBindingPreviewUrl(
               { analyse: analyseException },
             ),
           )();
-          if (!srvd.ok)
-            return srvd as unknown as IAdtResponse<Found, IAdtError>;
+          if (!srvd.ok) return srvd;
           const exposed = exposedEntitiesOf(
             (srvd.getResult().value as AdtReading<string>).raw,
           );

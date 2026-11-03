@@ -231,7 +231,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
             analyse: analyseException,
           }),
         )();
-        if (!variant.ok) return variant as never;
+        if (!variant.ok) return variant;
         checkVariant = variant.getResult().value;
       }
 
@@ -240,7 +240,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
           analyse: analyseException,
         }),
       )();
-      if (!worklist.ok) return worklist as never;
+      if (!worklist.ok) return worklist;
       const worklistId = worklist.getResult().value;
 
       const run = await atStep('start run', () =>
@@ -250,7 +250,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
           maximumVerdicts,
         }),
       )();
-      if (!run.ok) return run as never;
+      if (!run.ok) return run;
 
       return succeededWith({
         checkVariant,

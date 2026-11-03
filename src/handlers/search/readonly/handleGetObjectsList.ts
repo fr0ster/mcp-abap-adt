@@ -149,7 +149,7 @@ async function collectValidObjects(
         withShortDescriptions,
       }),
   );
-  if (!response.ok) return response as IAdtResponse<FlatObject[], IAdtError>;
+  if (!response.ok) return response;
 
   const level = response.getResult().value as NodeLevel;
   let objects: FlatObject[] = level.objects.map((o) => ({

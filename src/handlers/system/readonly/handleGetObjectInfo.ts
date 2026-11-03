@@ -347,7 +347,7 @@ async function buildTree(
         }),
     );
     if (!rootResponse.ok) {
-      return rootResponse as IAdtResponse<TreeNode, IAdtError>;
+      return rootResponse;
     }
     const root = rootResponse.getResult().value as NodeLevel;
 
@@ -375,7 +375,7 @@ async function buildTree(
           }),
       );
       if (!childResponse.ok) {
-        return childResponse as IAdtResponse<TreeNode, IAdtError>;
+        return childResponse;
       }
       const childLevel = childResponse.getResult().value as NodeLevel;
       for (const o of childLevel.objects) {
@@ -400,7 +400,7 @@ async function buildTree(
           );
           if (ended.answer !== undefined) return subtree;
           if (!subtree.ok) {
-            return subtree as IAdtResponse<TreeNode, IAdtError>;
+            return subtree;
           }
           children.push(subtree.getResult().value);
         } else {

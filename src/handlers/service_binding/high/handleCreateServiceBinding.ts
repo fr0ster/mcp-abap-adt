@@ -192,7 +192,7 @@ export async function handleCreateServiceBinding(
       )();
 
       if (!created.ok || !shouldActivate) {
-        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return created;
       }
 
       const activated = await atStep('activate', () =>
@@ -204,7 +204,7 @@ export async function handleCreateServiceBinding(
         ),
       )();
       if (!activated.ok) {
-        return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return activated;
       }
 
       const group = await atStep('read service group', () =>
@@ -220,13 +220,13 @@ export async function handleCreateServiceBinding(
         ),
       )();
       if (!group.ok) {
-        return group as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return group;
       }
 
       // **The answer is the create's own.** A create, activation and read
       // that all succeed report the create's answer: the service group's
       // document reaches the caller only through a refusal.
-      return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      return created;
     },
     project(detail, terseWrite),
   );

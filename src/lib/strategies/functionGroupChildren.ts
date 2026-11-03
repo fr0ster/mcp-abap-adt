@@ -57,7 +57,7 @@ export async function fetchFunctionGroupChildren(
     withShortDescriptions: true,
   });
   if (!root.ok) {
-    return root as unknown as IAdtResponse<NodeLevel['objects'], IAdtError>;
+    return root;
   }
 
   const child = root
@@ -72,7 +72,7 @@ export async function fetchFunctionGroupChildren(
     withShortDescriptions: true,
   });
   if (!level.ok) {
-    return level as unknown as IAdtResponse<NodeLevel['objects'], IAdtError>;
+    return level;
   }
 
   return okObjects(level.getResult().value.objects);

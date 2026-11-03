@@ -244,7 +244,7 @@ export async function handleCreateStructure(
       );
 
       if (!checked.ok || !shouldActivate) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       return withAdtHeaders(context, 'structure.activate', (headers) =>

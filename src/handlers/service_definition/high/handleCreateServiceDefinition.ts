@@ -137,7 +137,7 @@ export async function handleCreateServiceDefinition(
       )();
 
       if (!created.ok) {
-        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return created;
       }
 
       // The shell was created empty. Write the body, under a lock this call

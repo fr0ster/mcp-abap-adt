@@ -120,7 +120,7 @@ export async function handleUpdateBehaviorDefinition(
           );
 
       if (!written.ok) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.

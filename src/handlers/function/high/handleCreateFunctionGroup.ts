@@ -148,7 +148,7 @@ export async function handleCreateFunctionGroup(
       }
 
       if (!created.ok || !shouldActivate) {
-        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return created;
       }
 
       return atStep('activate', () =>

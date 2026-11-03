@@ -139,7 +139,7 @@ export async function handleUpdateInterface(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

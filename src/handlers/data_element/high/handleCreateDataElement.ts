@@ -321,7 +321,7 @@ export async function handleCreateDataElement(
       );
 
       if (!checked.ok || !shouldActivate) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       return carryCleanup(

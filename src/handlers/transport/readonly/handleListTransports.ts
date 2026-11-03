@@ -274,10 +274,7 @@ async function listTransportsOneByOne(
       // The endpoint's own refusal, forwarded — not a sentence composed here
       // about a call this handler made on the caller's behalf.
       if (!answered.ok) {
-        return answered as unknown as IAdtResponse<
-          AdtReading<unknown>,
-          IAdtError
-        >;
+        return answered;
       }
 
       const configurations = answered.getResult().value;
@@ -303,10 +300,7 @@ async function listTransportsOneByOne(
         // follows, for the same reason: a sentence composed here would stand
         // beside the strategy's own account of the same refusal.
         if (!listed.ok) {
-          return listed as unknown as IAdtResponse<
-            AdtReading<unknown>,
-            IAdtError
-          >;
+          return listed;
         }
         readings.push(listed.getResult().value as AdtReading<unknown>);
       }
@@ -434,10 +428,7 @@ async function listTransportsInEnvelopes(
       if (!configured.ok) throw configured.error;
       const answered = configured.value;
       if (!answered.ok) {
-        return answered as unknown as IAdtResponse<
-          AdtReading<unknown>,
-          IAdtError
-        >;
+        return answered;
       }
 
       const configurations = answered.getResult().value;
@@ -456,10 +447,7 @@ async function listTransportsInEnvelopes(
         if (!result.ok) throw result.error;
         const listed = result.value;
         if (!listed.ok) {
-          return listed as unknown as IAdtResponse<
-            AdtReading<unknown>,
-            IAdtError
-          >;
+          return listed;
         }
         readings.push(listed.getResult().value as AdtReading<unknown>);
       }

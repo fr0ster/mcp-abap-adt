@@ -111,7 +111,7 @@ export async function handleDeleteLocalDefinitions(
       );
 
       if (!deleted.ok || !shouldActivate) {
-        return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return deleted;
       }
 
       return carryCleanup(

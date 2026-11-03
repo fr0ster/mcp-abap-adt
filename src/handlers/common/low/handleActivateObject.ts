@@ -571,7 +571,7 @@ export async function handleActivateObject(
     { tool: 'ActivateObjectLow', detail: 'terse' },
     async () => {
       const started = await startGroupActivation(context, plan.group, preaudit);
-      if (!started.ok) return started as never;
+      if (!started.ok) return started;
       const runId = started.getResult().value;
       const outcome = await awaitActivationRun(
         utils as unknown as ActivationRunSource,

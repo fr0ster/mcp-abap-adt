@@ -104,10 +104,7 @@ export async function readRunOnce<TResult>(
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
   const statusResponse = await atStep(READ_STATUS, getStatus)(runId, true);
   if (!statusResponse.ok) {
-    return statusResponse as unknown as IAdtResponse<
-      RunOutcome<TResult>,
-      IAdtError
-    >;
+    return statusResponse;
   }
   const status = statusResponse.getResult().value;
   const runStatus = runProgressStatus(status.value);
@@ -131,10 +128,7 @@ export async function readRunOnce<TResult>(
   }
   const resultResponse = await atStep('read result', fetchResult)();
   if (!resultResponse.ok) {
-    return resultResponse as unknown as IAdtResponse<
-      RunOutcome<TResult>,
-      IAdtError
-    >;
+    return resultResponse;
   }
   return okOutcome<RunOutcome<TResult>>({
     finished: true,

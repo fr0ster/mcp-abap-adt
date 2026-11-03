@@ -98,7 +98,7 @@ export async function handleUpdateMessageClass(
           { version: 'workingArea', analyse: analyseException },
         ),
       )();
-      if (!current.ok) return current as never;
+      if (!current.ok) return current;
       const edited = patchXmlAttribute(
         String(current.getResult().value.raw),
         'adtcore:description',

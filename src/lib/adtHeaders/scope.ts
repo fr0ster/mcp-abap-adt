@@ -13,18 +13,21 @@ import type {
 import type { AdtHeaderPort } from './AdtHeaderPairs';
 import type { AdtOperation } from './defaultPairs';
 
-/** One `withAdtHeaders` call inside a phase: what the phase needs to record it again. */
-export interface HeaderInvocation {
+/**
+ * One `withAdtHeaders` call inside a phase: what the phase needs to record it
+ * again. `T` is the call's answer: `redone` is `call` made again.
+ */
+export interface HeaderInvocation<T = unknown> {
   readonly operation: AdtOperation;
   /** The pair the call was made with. */
   readonly sent: IAdtHeaders;
   readonly port: AdtHeaderPort | undefined;
   /** The same member call, with another pair. */
-  readonly call: (headers: IAdtHeaders) => Promise<unknown>;
+  readonly call: (headers: IAdtHeaders) => Promise<T>;
   /** How many parts the call recorded in the phase. */
   parts: number;
   /** The call made again with the corrected pair, once the phase made it. */
-  redone: Promise<unknown> | undefined;
+  redone: Promise<T> | undefined;
 }
 
 export interface AdtCallScope {

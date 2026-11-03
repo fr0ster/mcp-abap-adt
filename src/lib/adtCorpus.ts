@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { child, entries, isElement } from './xml/tree';
 
 /**
  * Where the raw ADT corpus lives, resolved in one place.
@@ -30,27 +31,63 @@ export interface AdtCorpusSidecar {
     method: string;
     url: string;
     effectiveUrl?: string;
-    params: Record<string, string> | null;
+    /** Absent where the recording kept none. */
+    params?: Record<string, string> | null;
   };
   response: {
     status: number | string;
     headers: Record<string, string>;
-    bodyFile: string;
+    /** `null` where the exchange recorded no body. */
+    bodyFile: string | null;
   };
 }
 
+/** Whether every member of `value` is text. */
+function isTextRecord(value: unknown): value is Record<string, string> {
+  return (
+    isElement(value) &&
+    entries(value).every(([, member]) => typeof member === 'string')
+  );
+}
+
+/** Whether `value` is a sidecar: every field `AdtCorpusSidecar` declares, of its type. */
+function isSidecar(value: unknown): value is AdtCorpusSidecar {
+  const request = child(value, 'request');
+  const response = child(value, 'response');
+  const effectiveUrl = child(request, 'effectiveUrl');
+  const params = child(request, 'params');
+  const status = child(response, 'status');
+  const bodyFile = child(response, 'bodyFile');
+  return (
+    typeof child(value, 'case') === 'string' &&
+    typeof child(value, 'step') === 'number' &&
+    typeof child(request, 'method') === 'string' &&
+    typeof child(request, 'url') === 'string' &&
+    (effectiveUrl === undefined || typeof effectiveUrl === 'string') &&
+    (params === undefined || params === null || isTextRecord(params)) &&
+    (typeof status === 'number' || typeof status === 'string') &&
+    isTextRecord(child(response, 'headers')) &&
+    (bodyFile === null || typeof bodyFile === 'string')
+  );
+}
+
 export function corpusSidecar(name: string): AdtCorpusSidecar {
-  return JSON.parse(
+  const read: unknown = JSON.parse(
     fs.readFileSync(path.join(ADT_CORPUS_DIR, `${name}.json`), 'utf-8'),
   );
+  if (!isSidecar(read)) {
+    throw new Error(`The corpus sidecar ${name}.json is not one`);
+  }
+  return read;
 }
 
 /** The response body, exactly as it was recorded. */
 export function corpusBody(name: string): string {
-  return fs.readFileSync(
-    path.join(ADT_CORPUS_DIR, corpusSidecar(name).response.bodyFile),
-    'utf-8',
-  );
+  const bodyFile = corpusSidecar(name).response.bodyFile;
+  if (bodyFile === null) {
+    throw new Error(`The corpus exchange ${name} recorded no body`);
+  }
+  return fs.readFileSync(path.join(ADT_CORPUS_DIR, bodyFile), 'utf-8');
 }
 
 /** Every exchange whose case name starts with `prefix`. */

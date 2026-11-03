@@ -1,4 +1,8 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAdtSuccess,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   failureEntry,
   isCredentialFailure,
@@ -12,22 +16,16 @@ import {
   safeRequest,
 } from './safeFields';
 import { atStep, stepOf, withStep } from './step';
+import {
+  cleanupOf,
+  failed,
+  type StepError,
+  type StepResponse,
+  type StepSuccess,
+  succeeded,
+} from './stepResponse';
 
-export interface CleanupCarrier {
-  cleanup?: Cleanup;
-  operation?: 'succeeded';
-}
-
-const failure = <T>(
-  error: IAdtError & CleanupCarrier,
-): IAdtResponse<T, IAdtError> =>
-  ({
-    ok: false,
-    getResult: () => {
-      throw new Error('withLock: asked for the result of a failure');
-    },
-    getError: () => error,
-  }) as unknown as IAdtResponse<T, IAdtError>;
+const failure = (error: StepError) => failed(error, 'withLock');
 
 /** The release, in its three states. Refused and threw are not the same event. */
 type Released =
@@ -125,36 +123,35 @@ export async function withLock<H, T>(
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
   release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
   object: LockedObject,
-): Promise<IAdtResponse<T, IAdtError>> {
+): Promise<StepResponse<T>> {
   // The lock is a step of its own: a refused or thrown lock says so.
   const acquired = await atStep('lock', acquire)();
-  if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
+  if (!acquired.ok) return acquired;
   const handle = acquired.getResult().value;
   // A backstop. Every lock here is given `analyseLock`, which refuses a 2xx
   // naming no handle with SAP's answer beside it (adt-clients 23 answers `''`
   // there and leaves the verdict to the caller, MIGRATION-23 §5). A lock
   // called without it would still stop here rather than write under an empty
   // handle. There is no handle to release.
-  if ((handle as unknown) === '') {
-    return failure<T>({
+  if (handle === '') {
+    return failure({
       message: 'SAP answered the lock request without a lock handle',
       origin: 'refusal',
       step: 'lock',
-    } as IAdtError);
+    });
   }
 
   // Deliberately a catch rather than a `finally`. A `finally` lets the original
   // exception out as soon as the block ends, so a release that ALSO failed has
   // nowhere to go: the caller would hear about a parser defect and never about
   // the lock still held.
-  let answered: IAdtResponse<T, IAdtError> | undefined;
-  let thrown: unknown;
-  let threw = false;
+  let outcome:
+    | { threw: false; answered: IAdtResponse<T, IAdtError> }
+    | { threw: true; thrown: unknown };
   try {
-    answered = await body(handle);
+    outcome = { threw: false, answered: await body(handle) };
   } catch (error) {
-    thrown = error;
-    threw = true;
+    outcome = { threw: true, thrown: error };
   }
 
   const released = await runRelease(release, handle, object);
@@ -162,7 +159,8 @@ export async function withLock<H, T>(
   // A credential failure ends the call as it came, once the release was
   // tried: the body's, else the release's — adt-clients rejects with it, and
   // every further request (an activation, say) would only be refused again.
-  if (threw && isCredentialFailure(thrown)) throw thrown;
+  if (outcome.threw && isCredentialFailure(outcome.thrown))
+    throw outcome.thrown;
   if (released.kind === 'threw' && isCredentialFailure(released.thrown))
     throw released.thrown;
   // A `401` SAP answered to the unlock is the same: the call's failure, the
@@ -171,17 +169,17 @@ export async function withLock<H, T>(
     released.kind === 'refused' &&
     isCredentialPayload(failureEntry(released.error, 'unlock'))
   )
-    return failure<T>(withStep(released.error, 'unlock'));
+    return failure(withStep(released.error, 'unlock'));
 
-  if (threw) {
-    if (released.kind === 'ok') throw thrown;
-    throw new LockNotReleased(thrown, { cleanup: released.carrier });
+  if (outcome.threw) {
+    if (released.kind === 'ok') throw outcome.thrown;
+    throw new LockNotReleased(outcome.thrown, { cleanup: released.carrier });
   }
 
-  const value = answered as IAdtResponse<T, IAdtError>;
+  const value = outcome.answered;
   if (!value.ok) {
     if (released.kind === 'ok') return value;
-    return failure<T>({ ...value.getError(), cleanup: released.carrier });
+    return failure({ ...value.getError(), cleanup: released.carrier });
   }
 
   // **The body succeeded, so the call succeeded.** A release that failed
@@ -201,10 +199,7 @@ export async function withLock<H, T>(
   // answer as `cleanup`, the same shape `answer()` already renders on the
   // failure path, rather than being dropped.
   if (released.kind === 'ok') return value;
-  if (released.kind === 'refused') {
-    return succeededWithCleanup(value, { cleanup: released.carrier });
-  }
-  return succeededWithCleanup(value, { cleanup: released.carrier });
+  return succeededWithCleanup(value, released.carrier);
 }
 
 /**
@@ -215,19 +210,10 @@ export async function withLock<H, T>(
  * cleanup note is added, on a property `answer()` knows how to render.
  */
 function succeededWithCleanup<T>(
-  value: IAdtResponse<T, IAdtError>,
-  carrier: CleanupCarrier,
-): IAdtResponse<T, IAdtError> {
-  if (!value.ok) return value;
-  const result = value.getResult();
-  return {
-    ok: true,
-    getResult: () => result,
-    getError: () => {
-      throw new Error('withLock: asked for the error of a success');
-    },
-    cleanup: carrier.cleanup,
-  } as unknown as IAdtResponse<T, IAdtError>;
+  value: IAdtSuccess<T>,
+  cleanup: Cleanup,
+): StepSuccess<T> {
+  return succeeded(value.getResult().value, 'withLock', cleanup);
 }
 
 /**
@@ -283,11 +269,11 @@ export class LockNotReleased extends Error {
  * that already carries a cleanup of its own keeps it — this only fills a gap.
  */
 export async function carryCleanup<T, U>(
-  from: IAdtResponse<T, IAdtError>,
-  next: () => Promise<IAdtResponse<U, IAdtError>>,
-): Promise<IAdtResponse<U, IAdtError>> {
-  const cleanup = (from as unknown as CleanupCarrier).cleanup;
-  let answered: IAdtResponse<U, IAdtError>;
+  from: StepResponse<T>,
+  next: () => Promise<StepResponse<U>>,
+): Promise<StepResponse<U>> {
+  const cleanup = cleanupOf(from);
+  let answered: StepResponse<U>;
   try {
     answered = await next();
   } catch (error) {
@@ -303,12 +289,12 @@ export async function carryCleanup<T, U>(
  * that have no call left to make — `pair`, building its tuple from scratch.
  */
 export function attachCleanup<T, U>(
-  from: IAdtResponse<T, IAdtError>,
-  onto: IAdtResponse<U, IAdtError>,
-): IAdtResponse<U, IAdtError> {
-  const cleanup = (from as unknown as CleanupCarrier).cleanup;
+  from: StepResponse<T>,
+  onto: StepResponse<U>,
+): StepResponse<U> {
+  const cleanup = cleanupOf(from);
   if (cleanup === undefined) return onto;
-  if ((onto as unknown as CleanupCarrier).cleanup !== undefined) return onto;
-  if (!onto.ok) return failure<U>({ ...onto.getError(), cleanup });
-  return succeededWithCleanup(onto, { cleanup });
+  if (cleanupOf(onto) !== undefined) return onto;
+  if (!onto.ok) return failure({ ...onto.getError(), cleanup });
+  return succeededWithCleanup(onto, cleanup);
 }

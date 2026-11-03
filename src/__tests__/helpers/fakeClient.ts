@@ -43,8 +43,9 @@ type Members = Record<string, (...args: never[]) => unknown>;
  * A client whose every factory answers the same member table.
  *
  * Handlers reach members through `client.getX(results)`, and a test does not
- * care which X. Anything not named answers a success with `undefined`, so a
- * test says only what it is about.
+ * care which X. Anything not named answers a success with an empty reading
+ * (no value, no body, `200`), as `recordAnalyse` does, so a test says only
+ * what it is about.
  *
  * **Known limitation:** The outer proxy ignores the factory name (getX), so every
  * factory accessor returns the same member table. A test can therefore exercise
@@ -54,7 +55,7 @@ type Members = Record<string, (...args: never[]) => unknown>;
 export function fakeClientOf(members: Members) {
   const object = new Proxy(members, {
     get: (target, name: string) =>
-      target[name] ?? (async () => okResponse(undefined)),
+      target[name] ?? (async () => okResponse(reading(undefined, '', 200))),
   });
   return new Proxy({} as Record<string, unknown>, {
     get: () => () => object,
@@ -81,7 +82,7 @@ export function fakeClientOfWithFactory(members: Members) {
   let factory: string | undefined;
   const object = new Proxy(members, {
     get: (target, name: string) =>
-      target[name] ?? (async () => okResponse(undefined)),
+      target[name] ?? (async () => okResponse(reading(undefined, '', 200))),
   });
   const client = new Proxy({} as Record<string, unknown>, {
     get: (_target, name: string) => () => {

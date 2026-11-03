@@ -1,6 +1,7 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { failureOf } from '../auth/failures';
 import { SystemContextMissingError } from '../systemContextGuard';
+import { failed, type StepError, type StepResponse } from './stepResponse';
 
 /**
  * Where a handler's failure arose: the step it was doing.
@@ -44,9 +45,9 @@ export class StepThrew extends Error {
 }
 
 /** The method's error, with the step added unless an inner step already named it. */
-export function withStep(error: IAdtError, step: string): IAdtError {
+export function withStep(error: StepError, step: string): StepError {
   if (stepOf(error) !== undefined) return error;
-  return { ...error, step } as IAdtError;
+  return { ...error, step };
 }
 
 /**
@@ -59,10 +60,10 @@ export function withStep(error: IAdtError, step: string): IAdtError {
  */
 export function atStep<A extends unknown[], T>(
   step: string,
-  call: (...args: A) => Promise<IAdtResponse<T, IAdtError>>,
-): (...args: A) => Promise<IAdtResponse<T, IAdtError>> {
+  call: (...args: A) => Promise<StepResponse<T>>,
+): (...args: A) => Promise<StepResponse<T>> {
   return async (...args: A) => {
-    let answered: IAdtResponse<T, IAdtError>;
+    let answered: StepResponse<T>;
     try {
       answered = await call(...args);
     } catch (thrown) {
@@ -76,22 +77,12 @@ export function atStep<A extends unknown[], T>(
       throw new StepThrew(step, thrown);
     }
     // Only a failure gains a step; anything else is returned as it came.
-    if (
-      answered?.ok !== false ||
-      typeof (answered as { getError?: unknown }).getError !== 'function'
-    ) {
+    if (answered?.ok !== false || typeof answered.getError !== 'function') {
       return answered;
     }
     const error = answered.getError();
     if (stepOf(error) !== undefined) return answered;
-    const stepped = withStep(error, step);
-    return {
-      ok: false,
-      getResult: () => {
-        throw new Error('atStep: asked for the result of a failure');
-      },
-      getError: () => stepped,
-    } as unknown as IAdtResponse<T, IAdtError>;
+    return failed(withStep(error, step), 'atStep');
   };
 }
 

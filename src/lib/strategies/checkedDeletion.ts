@@ -36,15 +36,16 @@ import {
 } from '../adtHeaders/withAdtHeaders';
 import { absentPerCheck, analyseDeletion } from './deletionRefusal';
 import { atStep } from './step';
+import type { StepResponse } from './stepResponse';
 
 export interface CheckedDeletable<C, V> {
   checkDeletion(
     config: C,
-    options: { headers: IAdtHeaders; analyse?: IAnalyse<any> },
-  ): Promise<IAdtResponse<unknown, IAdtError>>;
+    options: { headers: IAdtHeaders; analyse?: IAnalyse },
+  ): Promise<IAdtResponse<V, IAdtError>>;
   delete(
     config: C,
-    options: { headers: IAdtHeaders; analyse?: IAnalyse<any> },
+    options: { headers: IAdtHeaders; analyse?: IAnalyse },
   ): Promise<IAdtResponse<V, IAdtError>>;
 }
 
@@ -56,13 +57,16 @@ export type CheckedDeletableType = AdtObjectWith<'checkDeletion'> &
  * `object`'s deletion check, then its delete when the check permits it —
  * each with the header pair of `objectType`'s member (`withAdtHeaders`).
  */
-export async function deleteIfDeletable<C, V>(
+export async function deleteIfDeletable<
+  C,
+  V extends { readonly raw?: unknown },
+>(
   context: AdtHeadersContext,
   objectType: CheckedDeletableType,
   object: CheckedDeletable<C, V>,
   config: C,
-  deleteAnalyse: IAnalyse<any> = analyseDeletion,
-): Promise<IAdtResponse<V, IAdtError>> {
+  deleteAnalyse: IAnalyse = analyseDeletion,
+): Promise<StepResponse<V>> {
   const check = await atStep('delete check', () =>
     withAdtHeaders(
       context,
@@ -71,16 +75,11 @@ export async function deleteIfDeletable<C, V>(
         object.checkDeletion(config, { headers, analyse: analyseDeletion }),
     ),
   )();
-  if (!check.ok) return check as unknown as IAdtResponse<V, IAdtError>;
+  if (!check.ok) return check;
   // Permitted, but not there: nothing to delete, so no delete is sent. The
   // check's answer is the result — `terseDeletion` reads it as `deleted:
   // false` with the warning. See `absentPerCheck`.
-  const reading = (
-    check.getResult() as { value?: { raw?: unknown } } | undefined
-  )?.value;
-  if (absentPerCheck(reading?.raw)) {
-    return check as unknown as IAdtResponse<V, IAdtError>;
-  }
+  if (absentPerCheck(check.getResult().value.raw)) return check;
   return atStep('delete', () =>
     withAdtHeaders(context, adtOperation(objectType, 'delete'), (headers) =>
       object.delete(config, { headers, analyse: deleteAnalyse }),

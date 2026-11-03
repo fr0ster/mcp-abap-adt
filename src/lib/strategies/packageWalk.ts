@@ -47,7 +47,7 @@ import { atStep, carryingFailure } from './step';
  * than on the whole utility says which side of that line this file is on, and
  * keeps it testable without a client.
  */
-export interface NodeStructureSource {
+export interface NodeStructureSourceOf<R> {
   fetchNodeStructure(
     parentType: AdtTypeCode,
     parentName: string,
@@ -56,8 +56,11 @@ export interface NodeStructureSource {
       withShortDescriptions?: boolean;
       analyse?: typeof analyseException;
     },
-  ): Promise<NodeAnswer>;
+  ): Promise<R>;
 }
+
+/** A source of node structure reads, each answer read as a `NodeAnswer`. */
+export type NodeStructureSource = NodeStructureSourceOf<NodeAnswer>;
 
 /** What one node structure read answers: the level, as the reading read it. */
 export type NodeAnswer = IAdtResponse<unknown, IAdtError>;
@@ -217,10 +220,10 @@ export interface NodeRequest {
 }
 
 /** `request` read on `utils`: one `fetchNodeStructure`. */
-export function readNode(
-  utils: NodeStructureSource,
+export function readNode<R>(
+  utils: NodeStructureSourceOf<R>,
   request: NodeRequest,
-): Promise<NodeAnswer> {
+): Promise<R> {
   return utils.fetchNodeStructure(request.parentType, request.parentName, {
     ...(request.analysed ? { analyse: analyseException } : {}),
     ...(request.nodeId !== undefined ? { nodeId: request.nodeId } : {}),

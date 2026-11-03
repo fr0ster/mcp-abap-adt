@@ -198,13 +198,16 @@ function pagedFeeds(
 ) {
   return new AdtRuntimeClient(connection, logger).getFeeds({
     ...ourFeeds,
-    entries: feedPage(feedEntries as never),
-    systemMessages: feedPage(feedSystemMessages as never),
-    gatewayErrors: feedPage(feedGatewayErrors as never),
-  } as never);
+    entries: feedPage(feedEntries),
+    systemMessages: feedPage(feedSystemMessages),
+    gatewayErrors: feedPage(feedGatewayErrors),
+  });
 }
 
-async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
+async function feedsOf(
+  context: HandlerContext,
+  args: RuntimeListFeedsArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
   const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const feedType = args?.feed_type ?? 'descriptors';
@@ -226,7 +229,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
   } catch (thrown) {
-    return return_error(thrown as Error);
+    return return_error(thrown);
   }
 
   // The request's own filters, the same on every page; `feedPages` supplies
@@ -303,7 +306,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             { keyOf: (entry) => entry.id, stampOf: (entry) => entry.updated },
           ),
@@ -328,7 +331,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             {
               keyOf: (entry) => entry.id,
@@ -349,7 +352,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             {
               keyOf: (entry) => `${entry.transactionId}|${entry.dateTime}`,
@@ -425,7 +428,7 @@ export async function handleRuntimeListFeedPage(
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
   } catch (thrown) {
-    return return_error(thrown as Error);
+    return return_error(thrown);
   }
   const base = { user: args?.user, query, from: args?.from };
   const page = { maxResults: top, to: args?.to };
@@ -448,7 +451,7 @@ export async function handleRuntimeListFeedPage(
         () =>
           atStep(step, () =>
             feeds.dumps({ ...base, ...page, analyse: analyseException }),
-          )() as never,
+          )(),
         (read: FeedPage<{ id: string }>) =>
           shown({
             ...read,
@@ -468,7 +471,7 @@ export async function handleRuntimeListFeedPage(
               ...page,
               analyse: analyseException,
             }),
-          )() as never,
+          )(),
         shown,
       );
     default:
@@ -481,7 +484,7 @@ export async function handleRuntimeListFeedPage(
               ...page,
               analyse: analyseException,
             }),
-          )() as never,
+          )(),
         shown,
       );
   }
@@ -492,6 +495,13 @@ interface Asked {
   request: IAbapRequestOptions;
   resolve: (response: IAdtWireResponse) => void;
   reject: (error: unknown) => void;
+}
+
+/** One feed's read in the rounds: its request waiting, and the signal it was made. */
+interface RoundState {
+  asked: Promise<void>;
+  signal: () => void;
+  pending: Asked | undefined;
 }
 
 /** The fixed words of a request made once the rounds have ended. */
@@ -507,7 +517,11 @@ function roundConnection(
   connection: HandlerContext['connection'],
   ask: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): HandlerContext['connection'] {
-  const view = {
+  // `getSessionType` beside the contract: a connection the server builds
+  // has it, and a reader asks for it (`hasMethod`).
+  const view: HandlerContext['connection'] & {
+    getSessionType(): 'stateful' | 'stateless';
+  } = {
     connect: () => connection.connect(),
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
@@ -521,7 +535,7 @@ function roundConnection(
       return ask(request) as Promise<IAdtWireResponse<T, D>>;
     },
   };
-  return view as HandlerContext['connection'];
+  return view;
 }
 
 /** What the rounds answer: every feed's answer, or the one that ends the call. */
@@ -547,12 +561,13 @@ async function feedsInRounds(
   ) => Promise<McpResult>,
 ): Promise<RoundsOutcome> {
   let ended = false;
-  const states = Array.from({ length: count }, () => {
-    let signal!: () => void;
+  const states = Array.from({ length: count }, (): RoundState => {
+    // Replaced by the promise's resolver, which its executor hands over at once.
+    let signal: () => void = () => {};
     const asked = new Promise<void>((resolve) => {
       signal = resolve;
     });
-    return { asked, signal, pending: undefined as Asked | undefined };
+    return { asked, signal, pending: undefined };
   });
   const settled = states.map((state, i) =>
     (async () =>
@@ -598,16 +613,17 @@ async function feedsInRounds(
         return { ended: result.value };
       }
     }
-    const asking = states.filter((state) => state.pending !== undefined);
-    if (asking.length === 0) break;
-    const round = asking.map((state) => {
-      const asked = state.pending as Asked;
+    const round: Asked[] = [];
+    for (const state of states) {
+      const asked = state.pending;
+      if (asked === undefined) continue;
       state.pending = undefined;
       state.asked = new Promise<void>((resolve) => {
         state.signal = resolve;
       });
-      return asked;
-    });
+      round.push(asked);
+    }
+    if (round.length === 0) break;
     let answers: PhaseResult<IAdtWireResponse>[];
     try {
       answers = await runPhase(context, round, (asked, batch) =>
@@ -690,15 +706,10 @@ export async function handleRuntimeListFeeds(
       context,
       async () => {
         try {
-          const outcome = await feedsInRounds(
-            context,
-            1,
-            (_i, connection) =>
-              feedsOf({ ...context, connection }, args) as Promise<McpResult>,
+          const outcome = await feedsInRounds(context, 1, (_i, connection) =>
+            feedsOf({ ...context, connection }, args),
           );
-          return 'ended' in outcome
-            ? outcome.ended
-            : (outcome.answers[0] as McpResult);
+          return 'ended' in outcome ? outcome.ended : outcome.answers[0];
         } catch (error) {
           // A refusal the connection threw: as `answer()` renders a throw of
           // the sequential version's call.
@@ -706,7 +717,7 @@ export async function handleRuntimeListFeeds(
           return answerThrown(error, ctx);
         }
       },
-      () => feedsOf(context, args) as Promise<McpResult>,
+      () => feedsOf(context, args),
     );
   }
   if (
@@ -721,9 +732,11 @@ export async function handleRuntimeListFeeds(
     );
   }
   const { feed_types: _list, ...rest } = args;
-  const single = (feedType: unknown): RuntimeListFeedsArgs => ({
+  const single = (
+    feedType: RuntimeListFeedsArgs['feed_type'],
+  ): RuntimeListFeedsArgs => ({
     ...rest,
-    feed_type: feedType as RuntimeListFeedsArgs['feed_type'],
+    feed_type: feedType,
   });
   return withSequentialFallback<McpResult>(
     context,
@@ -733,10 +746,7 @@ export async function handleRuntimeListFeeds(
           context,
           listed.length,
           (i, connection) =>
-            feedsOf(
-              { ...context, connection },
-              single(listed[i]),
-            ) as Promise<McpResult>,
+            feedsOf({ ...context, connection }, single(listed[i])),
         );
         return 'ended' in outcome
           ? outcome.ended
@@ -751,7 +761,7 @@ export async function handleRuntimeListFeeds(
       // credential failure ends the call, and nothing after it is read.
       const results: McpResult[] = [];
       for (const feedType of listed) {
-        const result = (await feedsOf(context, single(feedType))) as McpResult;
+        const result = await feedsOf(context, single(feedType));
         if (endsList(result)) return result;
         results.push(result);
       }

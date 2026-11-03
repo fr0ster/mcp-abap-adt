@@ -387,11 +387,16 @@ function groupByLevelAndObject(tools) {
 }
 
 function renderParams(tool) {
-  const props = tool.inputSchema?.properties || {};
+  const { z } = require('zod');
+  const schema =
+    tool.inputSchema instanceof z.ZodObject
+      ? jsonSchemaOf(tool.inputSchema)
+      : tool.inputSchema;
+  const props = schema?.properties || {};
   const keys = Object.keys(props);
   if (keys.length === 0) return '- None\n';
 
-  const required = new Set(tool.inputSchema?.required || []);
+  const required = new Set(schema?.required || []);
   let out = '';
   for (const key of keys.sort((a, b) => a.localeCompare(b))) {
     const p = props[key];

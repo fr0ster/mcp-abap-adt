@@ -20,6 +20,7 @@ import {
   streamableHttpSurface,
   type ToolSet,
 } from '../../../lib/toolSet';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 
 const generator = require('../../../../tools/generate-tools-docs.js');
 const compactGenerator = require('../../../../compact/tools/generate-docs.js');
@@ -58,10 +59,7 @@ describe('the surface a Streamable HTTP binary adds', () => {
       expect([...surface.stdioOnly].sort()).toEqual(stdioOnly);
       expect(surface.stateHandleWords).toBe(STATE_HANDLE_ARGUMENT_WORDS);
       for (const tool of surface.sessionTools) {
-        const schema = tool.inputSchema as {
-          properties: Record<string, unknown>;
-        };
-        expect(schema.properties.state_handle).toEqual({
+        expect(jsonAt(listedJson(tool.inputSchema), 'state_handle')).toEqual({
           type: 'string',
           description: STATE_HANDLE_ARGUMENT_WORDS,
         });

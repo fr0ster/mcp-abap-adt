@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeletePackage Handler - Delete ABAP Package
  *
@@ -30,7 +32,7 @@ import {
   openFreshConnection,
 } from '../../../lib/packageSessions';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -40,27 +42,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server save a package on a session apart from this one, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      force_new_connection: {
-        type: 'boolean',
-        description:
-          'Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['package_name'],
-  },
+  inputSchema: z.object({
+    package_name: z.string().describe('Package name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    force_new_connection: z
+      .boolean()
+      .optional()
+      .describe(
+        'Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DeletePackageArgs {

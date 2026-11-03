@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
-  inputSchema: {
+  inputSchema: z.object({
     package_name: z.string().describe('Package name.'),
     description: z
       .string()
@@ -55,6 +55,7 @@ export const TOOL_DEFINITION = {
       .describe('Parent package name. Required for structure packages.'),
     package_type: z
       .enum(['development', 'structure'])
+      .optional()
       .default('development')
       .describe("Package type: 'development' (default) or 'structure'"),
     software_component: z
@@ -94,7 +95,7 @@ export const TOOL_DEFINITION = {
       .describe(
         'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
       ),
-  },
+  }),
 } as const;
 
 interface CreatePackageArgs {

@@ -1,4 +1,5 @@
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdatePackage Handler - Update ABAP Package Description
  *
@@ -53,35 +54,29 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name. Package must already exist.',
-      },
-      super_package: {
-        type: 'string',
-        description:
-          'Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.',
-      },
-      updated_description: {
-        type: 'string',
-        description: 'New description for the package.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-    },
-    required: ['package_name', 'updated_description', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    package_name: z
+      .string()
+      .describe('Package name. Package must already exist.'),
+    super_package: z
+      .string()
+      .optional()
+      .describe(
+        'Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.',
+      ),
+    updated_description: z
+      .string()
+      .describe('New description for the package.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+  }),
 } as const;
 
 interface UpdatePackageArgs {

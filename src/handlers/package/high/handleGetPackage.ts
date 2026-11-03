@@ -1,11 +1,12 @@
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   packageDetails,
@@ -19,18 +20,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      version: READ_VERSION_PROPERTY,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['package_name'],
-  },
+  inputSchema: z.object({
+    package_name: z.string().describe('Package name.'),
+    version: READ_VERSION_FIELD,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface GetPackageArgs {

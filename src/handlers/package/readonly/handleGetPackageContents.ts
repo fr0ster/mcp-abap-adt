@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time.',
   ),
-  inputSchema: {
+  inputSchema: z.object({
     timeout: timeoutField(),
     package_name: z
       .string()
@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
       .describe(
         "Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)",
       ),
-  },
+  }),
 } as const;
 
 interface GetPackageContentsArgs {

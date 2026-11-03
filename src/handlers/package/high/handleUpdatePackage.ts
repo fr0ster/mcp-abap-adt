@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdatePackage Handler - Update an ABAP package's description, atomically
  *
@@ -22,7 +24,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -39,26 +41,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name. Package must already exist.',
-      },
-      description: {
-        type: 'string',
-        description: 'New description for the package.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['package_name', 'description'],
-  },
+  inputSchema: z.object({
+    package_name: z
+      .string()
+      .describe('Package name. Package must already exist.'),
+    description: z.string().describe('New description for the package.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdatePackageArgs {

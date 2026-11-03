@@ -46,6 +46,7 @@ import {
   type ServedTransport,
   type ToolSet,
 } from '../../../lib/toolSet';
+import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
@@ -171,12 +172,9 @@ describe('where the session tools are served', () => {
     const tool = namesOf(set as ToolSet, 'http').find(
       (d) => d.name === 'HandlerSession',
     );
-    const schema = tool?.inputSchema as {
-      properties: Record<string, { enum?: string[] }>;
-      required?: string[];
-    };
-    expect(schema.properties.action?.enum).toEqual(['open', 'close']);
-    expect(schema.required).toEqual(['action']);
+    const schema = listedJson(tool?.inputSchema);
+    expect(jsonAt(schema, 'action').enum).toEqual(['open', 'close']);
+    expect(declaredRequired(tool?.inputSchema)).toEqual(['action']);
   });
 });
 

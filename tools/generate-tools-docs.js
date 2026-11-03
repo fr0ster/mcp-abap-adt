@@ -228,6 +228,28 @@ function jsonSchemaOf(inputSchema) {
   return z.toJSONSchema(z.object(inputSchema), { io: 'input' });
 }
 
+/**
+ * The arguments a definition requires: a zod schema's fields that are neither
+ * optional nor a default over an optional field, as its JSON Schema stated
+ * them; a JSON Schema's `required`.
+ */
+function requiredOf(inputSchema, schema) {
+  const { z } = require('zod');
+  if (inputSchema instanceof z.ZodObject) {
+    return Object.entries(inputSchema.shape)
+      .filter(
+        ([, field]) =>
+          !(
+            field instanceof z.ZodOptional ||
+            (field instanceof z.ZodDefault &&
+              field.unwrap() instanceof z.ZodOptional)
+          ),
+      )
+      .map(([name]) => name);
+  }
+  return Array.isArray(schema.required) ? [...schema.required] : [];
+}
+
 /** A built JSON-Schema property as the page lists it: type, default, enum, words. */
 function listedProperty(stated) {
   const type = Array.isArray(stated.type)
@@ -271,7 +293,7 @@ function documentedTool(definition, groupName, moduleOf) {
       typeof definition.description === 'string' ? definition.description : '',
     inputSchema: {
       properties,
-      required: Array.isArray(schema.required) ? [...schema.required] : [],
+      required: requiredOf(definition.inputSchema, schema),
     },
     availableIn: Array.isArray(definition.available_in)
       ? [...definition.available_in]
@@ -396,7 +418,11 @@ function renderParams(tool) {
   const keys = Object.keys(props);
   if (keys.length === 0) return '- None\n';
 
-  const required = new Set(schema?.required || []);
+  const required = new Set(
+    tool.inputSchema instanceof z.ZodObject
+      ? requiredOf(tool.inputSchema, schema)
+      : schema?.required || [],
+  );
   let out = '';
   for (const key of keys.sort((a, b) => a.localeCompare(b))) {
     const p = props[key];

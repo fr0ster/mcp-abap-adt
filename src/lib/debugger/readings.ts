@@ -7,7 +7,7 @@
 import { readExceptionSubType } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, isList, listOf } from '../xml/tree';
+import { child, childAt, isElement, isList, listOf } from '../xml/tree';
 import { addressOf, type ObjectAddress } from './objectUri';
 
 const parser = new XMLParser({
@@ -132,38 +132,37 @@ export function readDebuggee(xml: string): DebuggeeReading | undefined {
     'STPDA_DEBUGGEE',
   );
   const row = isList(debuggees) ? debuggees[0] : undefined;
-  if (!row) return undefined;
-  const field = (name: string) => child(row, name);
-  const dumpId = text(field('DUMP_ID'));
-  const dumpUri = text(field('DUMP_URI'));
+  if (!isElement(row)) return undefined;
+  const dumpId = text(row.DUMP_ID);
+  const dumpUri = text(row.DUMP_URI);
   return {
-    debuggeeId: text(field('DEBUGGEE_ID')),
-    user: text(field('DEBUGGEE_USER')),
-    program: text(field('PRG_CURR')),
-    include: text(field('INCL_CURR')),
-    line: num(field('LINE_CURR')),
-    uri: text(field('URI')),
-    objectType: text(field('TYPE')),
-    objectName: text(field('NAME')),
-    instance: text(field('INSTANCE_NAME')),
-    kind: text(field('DBGEE_KIND')),
-    attachImpossible: bool(field('IS_ATTACH_IMPOSSIBLE')),
+    debuggeeId: text(row.DEBUGGEE_ID),
+    user: text(row.DEBUGGEE_USER),
+    program: text(row.PRG_CURR),
+    include: text(row.INCL_CURR),
+    line: num(row.LINE_CURR),
+    uri: text(row.URI),
+    objectType: text(row.TYPE),
+    objectName: text(row.NAME),
+    instance: text(row.INSTANCE_NAME),
+    kind: text(row.DBGEE_KIND),
+    attachImpossible: bool(row.IS_ATTACH_IMPOSSIBLE),
     ...(dumpId || dumpUri
       ? {
           dump: {
             id: dumpId,
             uri: dumpUri,
-            date: text(field('DUMP_DATE')),
-            time: text(field('DUMP_TIME')),
-            host: text(field('DUMP_HOST')),
-            user: text(field('DUMP_UNAME')),
+            date: text(row.DUMP_DATE),
+            time: text(row.DUMP_TIME),
+            host: text(row.DUMP_HOST),
+            user: text(row.DUMP_UNAME),
           },
         }
       : {}),
-    terminalId: text(field('TERMINAL_ID')),
-    ideId: text(field('IDE_ID')),
-    isSameServer: bool(field('IS_SAME_SERVER')),
-    canAdtCrossServer: bool(field('CAN_ADT_CROSS_SERVER')),
+    terminalId: text(row.TERMINAL_ID),
+    ideId: text(row.IDE_ID),
+    isSameServer: bool(row.IS_SAME_SERVER),
+    canAdtCrossServer: bool(row.CAN_ADT_CROSS_SERVER),
   };
 }
 

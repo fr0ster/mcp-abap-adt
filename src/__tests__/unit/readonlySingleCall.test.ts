@@ -20,6 +20,7 @@
  *  - `resolveVersionedObject` — a synchronous resolver, not a handler; it
  *    makes no call of its own.
  */
+
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { handleGetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
@@ -70,6 +71,7 @@ import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
 import { parseStructure, structured } from '../../lib/strategies/reading';
+import { child, listOf } from '../../lib/xml/tree';
 import {
   fakeClientOf,
   fakeClientOfWithFactory,
@@ -652,18 +654,18 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       parent_type: 'DEVC/K',
       node_id: '28',
     });
-    const byTypeRow = objectsListCache
-      .getCache()
-      .objects.find((o: any) => o.OBJECT_NAME === 'ZMCP_SHR_FGRP');
+    const byTypeRow = listOf(
+      child(objectsListCache.getCache(), 'objects'),
+    ).find((o) => child(o, 'OBJECT_NAME') === 'ZMCP_SHR_FGRP');
 
     await handleGetObjectsList(context as any, {
       parent_name: 'ZMCP_SHR_PKG',
       parent_tech_name: 'ZMCP_SHR_PKG',
       parent_type: 'DEVC/K',
     });
-    const listRow = objectsListCache
-      .getCache()
-      .objects.find((o: any) => o.OBJECT_NAME === 'ZMCP_SHR_FGRP');
+    const listRow = listOf(child(objectsListCache.getCache(), 'objects')).find(
+      (o) => child(o, 'OBJECT_NAME') === 'ZMCP_SHR_FGRP',
+    );
 
     const expected = {
       OBJECT_TYPE: 'FUGR/F',

@@ -40,6 +40,7 @@ import type { EventEmitter } from 'node:events';
 import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
 import { forceClose, logoffsAnswered } from './ownedConnections';
+import { child } from './xml/tree';
 
 /**
  * **The logoffs at once** (the process's end — stdio's client close, a
@@ -87,11 +88,7 @@ export const SHUTDOWN_SIGNALS = [
 
 /** Whether `error` says the other end of a pipe is gone (`EPIPE`): the client closed. */
 function pipeGone(error: unknown): boolean {
-  return (
-    error !== null &&
-    typeof error === 'object' &&
-    (error as { code?: unknown }).code === 'EPIPE'
-  );
+  return child(error, 'code') === 'EPIPE';
 }
 
 /** The orderly sequence's report: the stderr lines of what it could not do. */

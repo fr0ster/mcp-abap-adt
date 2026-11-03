@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { child, type Element, isElement, isList } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
   available_in: ['onprem', 'cloud'] as const,
@@ -50,17 +51,14 @@ export async function handleGetObjectNodeFromCache(
     };
   }
   const cache = objectsListCache.getCache();
-  let node: any = null;
-  if (cache && Array.isArray(cache.objects)) {
-    node =
-      (cache.objects as any[]).find(
-        (obj: any) =>
-          obj.OBJECT_TYPE === object_type &&
-          obj.OBJECT_NAME === object_name &&
-          obj.TECH_NAME === tech_name,
-      ) || null;
-  }
-  if (!node) {
+  const cached = child(cache, 'objects');
+  const objects = isList(cached) ? cached : [];
+  const matches = (obj: unknown) =>
+    child(obj, 'OBJECT_TYPE') === object_type &&
+    child(obj, 'OBJECT_NAME') === object_name &&
+    child(obj, 'TECH_NAME') === tech_name;
+  const found = objects.find(matches);
+  if (!isElement(found)) {
     logger?.debug(
       `Node ${object_type}/${object_name}/${tech_name} not found in cache`,
     );
@@ -69,7 +67,9 @@ export async function handleGetObjectNodeFromCache(
       content: [{ type: 'text', text: 'Node not found in cache' }],
     };
   }
-  if (node.OBJECT_URI && !node.object_uri_response) {
+  let node: Element = found;
+  const objectUri = node.OBJECT_URI;
+  if (objectUri && !node.object_uri_response) {
     const buildEndpoint = (uri: string) => {
       if (uri.startsWith('http')) {
         try {
@@ -82,7 +82,7 @@ export async function handleGetObjectNodeFromCache(
       }
       return uri;
     };
-    const endpoint = atActiveVersion(buildEndpoint(node.OBJECT_URI));
+    const endpoint = atActiveVersion(buildEndpoint(String(objectUri)));
     let resp: Awaited<ReturnType<typeof makeAdtRequest>>;
     try {
       // No deadline of the server's: the request waits for SAP's answer.
@@ -98,22 +98,21 @@ export async function handleGetObjectNodeFromCache(
         'read OBJECT_URI',
       );
     }
-    node.object_uri_response =
+    const objectUriResponse =
       typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+    node = { ...node, object_uri_response: objectUriResponse };
 
     // Persist the fetched OBJECT_URI payload back into the cache entry
-    const idx = cache.objects.findIndex(
-      (obj: any) =>
-        obj.OBJECT_TYPE === object_type &&
-        obj.OBJECT_NAME === object_name &&
-        obj.TECH_NAME === tech_name,
-    );
-    if (idx >= 0) {
-      cache.objects[idx] = {
-        ...cache.objects[idx],
-        object_uri_response: node.object_uri_response,
-      };
-      objectsListCache.setCache(cache);
+    const idx = objects.findIndex(matches);
+    if (idx >= 0 && isElement(cache)) {
+      objectsListCache.setCache({
+        ...cache,
+        objects: objects.map((obj, at) =>
+          at === idx && isElement(obj)
+            ? { ...obj, object_uri_response: objectUriResponse }
+            : obj,
+        ),
+      });
     }
   }
   logger?.info(

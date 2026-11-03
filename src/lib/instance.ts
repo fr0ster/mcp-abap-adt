@@ -13,18 +13,30 @@
  * one copy and registers once.
  */
 
+import { child } from './xml/tree';
+
 export interface LibInstance {
   readonly file: string;
 }
 
 const REGISTRY = Symbol.for('@mcp-abap-adt/lib/instances');
 
+/**
+ * Whether `value` is the registry another copy of this module left on the
+ * global: a list of entries, each naming its file.
+ */
+function isRegistry(value: unknown): value is LibInstance[] {
+  return (
+    Array.isArray(value) &&
+    value.every((entry) => typeof child(entry, 'file') === 'string')
+  );
+}
+
 function registry(): LibInstance[] {
-  const holder = globalThis as Record<symbol, unknown>;
-  const found = holder[REGISTRY];
-  if (Array.isArray(found)) return found as LibInstance[];
+  const found: unknown = Reflect.get(globalThis, REGISTRY);
+  if (isRegistry(found)) return found;
   const created: LibInstance[] = [];
-  holder[REGISTRY] = created;
+  Reflect.set(globalThis, REGISTRY, created);
   return created;
 }
 

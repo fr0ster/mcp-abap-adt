@@ -18,6 +18,7 @@ import {
 } from '../strategies/functionGroupStructure';
 import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure, methodFailureOf } from '../strategies/step';
+import { child } from '../xml/tree';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
 /** The version a source read names: the call's, active by default. */
@@ -56,12 +57,14 @@ async function safe<T>(
 ): Promise<T | null> {
   try {
     return await op();
-  } catch (e: any) {
+  } catch (e) {
     // SAP refused a read, or the chain failed it: the failure as it is, with
     // its step — the scan answers it, it is not skipped as if the source were
     // empty.
     if (methodFailureOf(e) !== undefined || failureOf(e) !== undefined) throw e;
-    logger?.debug?.(`[search-source] ${desc} failed: ${e?.message ?? e}`);
+    logger?.debug?.(
+      `[search-source] ${desc} failed: ${String(child(e, 'message') ?? e)}`,
+    );
     return null;
   }
 }
@@ -115,7 +118,7 @@ export async function* readSourceUnits(
   version: SourceVersion = 'active',
 ): AsyncGenerator<SourceUnit> {
   const logger = deps.logger;
-  switch (target.object_type as ScanObjectType) {
+  switch (target.object_type) {
     case 'PROG': {
       const src = await safe(
         () => deps.readProgram(target.object_name, version),
@@ -280,39 +283,50 @@ export function sourceReadKey(read: SourceRead): string {
  * it yields the units exactly as over the connection.
  */
 export function answeredReaderDeps(
-  answers: ReadonlyMap<string, PhaseResult<unknown>>,
+  answers: ReadonlyMap<string, PhaseResult<SourceAnswer>>,
   asked: SourceRead[],
   logger?: ReadSourceUnitsDeps['logger'],
 ): ReadSourceUnitsDeps {
-  const answer = async <T>(read: SourceRead, none: T): Promise<T> => {
+  /** The answer to `read`, or `undefined` (recorded in `asked`) when none came. */
+  const answer = async (
+    read: SourceRead,
+  ): Promise<SourceAnswer | undefined> => {
     const found = answers.get(sourceReadKey(read));
     if (found === undefined) {
       asked.push(read);
-      return none;
+      return undefined;
     }
     if (!found.ok) throw found.error;
-    return found.value as T;
+    return found.value;
+  };
+  /** A source read's answer: its text, or none. */
+  const source = async (read: SourceRead): Promise<string | null> => {
+    const value = await answer(read);
+    return typeof value === 'string' ? value : null;
   };
   return {
     readProgram: (name, version) =>
-      answer<string | null>({ method: 'readProgram', name, version }, null),
+      source({ method: 'readProgram', name, version }),
     readClassMain: (name, version) =>
-      answer<string | null>({ method: 'readClassMain', name, version }, null),
-    readInclude: (name) =>
-      answer<string | null>({ method: 'readInclude', name }, null),
-    fetchFugrStructure: (name) =>
-      answer<FugrChild[]>({ method: 'fetchFugrStructure', name }, []),
-    readFugrFm: (group, name) =>
-      answer<string | null>({ method: 'readFugrFm', group, name }, null),
+      source({ method: 'readClassMain', name, version }),
+    readInclude: (name) => source({ method: 'readInclude', name }),
+    fetchFugrStructure: async (name) => {
+      const value = await answer({ method: 'fetchFugrStructure', name });
+      return Array.isArray(value) ? value : [];
+    },
+    readFugrFm: (group, name) => source({ method: 'readFugrFm', group, name }),
     ...(logger !== undefined ? { logger } : {}),
   };
 }
+
+/** What one read of the source reader answers. */
+export type SourceAnswer = string | null | FugrChild[];
 
 /** `read` on `deps`: one call of its method. */
 function perform(
   deps: ReadSourceUnitsDeps,
   read: SourceRead,
-): Promise<unknown> {
+): Promise<SourceAnswer> {
   switch (read.method) {
     case 'readProgram':
       return deps.readProgram(read.name, read.version);
@@ -335,14 +349,9 @@ function perform(
 export async function readSourcesInPhase(
   ctx: HandlerContext,
   reads: readonly SourceRead[],
-): Promise<Map<string, PhaseResult<unknown>>> {
+): Promise<Map<string, PhaseResult<SourceAnswer>>> {
   const results = await runPhase(ctx, reads, (read, connection) =>
     perform(createSourceReaderDeps({ ...ctx, connection }), read),
   );
-  return new Map(
-    reads.map((read, i) => [
-      sourceReadKey(read),
-      results[i] as PhaseResult<unknown>,
-    ]),
-  );
+  return new Map(reads.map((read, i) => [sourceReadKey(read), results[i]]));
 }

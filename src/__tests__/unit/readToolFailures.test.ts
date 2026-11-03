@@ -29,6 +29,7 @@ import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeI
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
+import { child, listOf } from '../../lib/xml/tree';
 import {
   fakeClientOf,
   okResponse,
@@ -292,7 +293,10 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
     );
     // Nothing of the failure was cached as the node's content.
     expect(
-      (objectsListCache.getCache().objects as any[])[0].object_uri_response,
+      child(
+        listOf(child(objectsListCache.getCache(), 'objects'))[0],
+        'object_uri_response',
+      ),
     ).toBeUndefined();
   });
 });

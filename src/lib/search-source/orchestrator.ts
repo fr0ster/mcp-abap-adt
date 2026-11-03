@@ -37,6 +37,7 @@ import {
   type ReadSourceUnitsDeps,
   readSourcesInPhase,
   readSourceUnits,
+  type SourceAnswer,
   type SourceRead,
   type SourceVersion,
   sourceReadKey,
@@ -117,6 +118,9 @@ export interface OrchestratorDeps {
   now?: () => number;
 }
 
+/** The version a search reads when it names none. */
+const DEFAULT_VERSION: SourceVersion = 'active';
+
 const DEFAULTS = {
   include_subpackages: true,
   object_types: [
@@ -129,7 +133,7 @@ const DEFAULTS = {
   emit_no_hits: false,
   max_objects: 500,
   concurrency: 8,
-  version: 'active' as SourceVersion,
+  version: DEFAULT_VERSION,
 };
 
 /**
@@ -351,7 +355,9 @@ export async function runSearchSource(
   let sourcesScanned = 0;
   let truncatedByObjectCap = false;
   for (let index = 0; index < finished; index++) {
-    const answer = answers[index] as TargetAnswer;
+    const answer = answers[index];
+    // Every answer before the first unfinished one is there.
+    if (answer === undefined) break;
     const target = targets[index];
     sourcesScanned += answer.sources;
     if (answer.capped) truncatedByObjectCap = true;
@@ -567,7 +573,7 @@ async function runSearchSourceInPhases(
   // READS_PER_ENVELOPE. The deadline is checked before every envelope; a
   // chunk it cut answers none of its targets, so the answer holds whole
   // targets, those of the chunks read to the end.
-  const sources = new Map<string, PhaseResult<unknown>>();
+  const sources = new Map<string, PhaseResult<SourceAnswer>>();
   let passed = false;
   let finished = 0;
   chunks: for (let at = 0; at < targets.length; at += TARGETS_PER_CHUNK) {

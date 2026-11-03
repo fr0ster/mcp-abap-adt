@@ -152,10 +152,5 @@ export async function searchPackagesInPhase(
   const results = await runPhase(ctx, asked, (args, connection) =>
     createPackagePatternResolver({ ...ctx, connection })(args),
   );
-  return new Map(
-    asked.map((args, i) => [
-      searchKey(args),
-      results[i] as PhaseResult<string[]>,
-    ]),
-  );
+  return new Map(asked.map((args, i) => [searchKey(args), results[i]]));
 }

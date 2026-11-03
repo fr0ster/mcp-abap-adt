@@ -36,9 +36,8 @@ function headerValue(value: unknown): string {
 export function carriesLockHandle(
   answer: IAdtWireResponse | undefined,
 ): boolean {
-  // `headers` read as possibly absent: adt-clients calls an analyse with
-  // whatever answer it holds, a thrown request's included.
-  if (headerValue(answer?.headers?.['sap-adt-lm-handle'])) return true;
+  // The answer is optional (`IAnalyse`); a wire answer's `headers` are not.
+  if (headerValue(answer?.headers['sap-adt-lm-handle'])) return true;
   const body = typeof answer?.data === 'string' ? answer.data : '';
   return /<LOCK_HANDLE>\s*[^<\s][^<]*<\/LOCK_HANDLE>/.test(body);
 }

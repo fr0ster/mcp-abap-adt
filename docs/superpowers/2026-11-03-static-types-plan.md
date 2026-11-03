@@ -102,3 +102,54 @@ binds, and each step names the spec section it carries out. Every step ends gree
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
     PR description. Then wait for the owner's merge and tag, the publish, and the registry
     check.
+
+## Appendix A — implicit any
+
+Measured (step 2): `"noImplicitAny": false` removed from the 13 tsconfigs that state it (the root
+`tsconfig.json`, and `tsconfig.json` and `tsconfig.test.json` of `background-runs-memory`,
+`responsible-rules`, `server-runtime`, `server`, `http` and `sse`), each package's `test:check` run
+(the root's covers `src`, `scripts`, `server-runtime/src` and every `compact*` and `*-ro` package),
+then switched back. With it off, every `test:check` is clean, so every error below comes from the
+switch. An error a package's run reports in another package's file is counted once, at that file.
+
+| Package | Production: errors (files) | Tests: errors (files) |
+| --- | --- | --- |
+| `@mcp-abap-adt/lib` (`src`, `scripts`) | 5 (3) | 34 (7) |
+| `server-runtime` | 2 (2) | 6 (6) |
+| `http` | 0 | 1 (1) |
+| `sse` | 0 | 1 (1) |
+| `background-runs-memory`, `responsible-rules`, `server` | 0 | 0 |
+| every `compact*` and `*-ro` package | 0 | 0 |
+| **Total** | **7 (5)** | **42 (15)** |
+
+By code: TS7016 (module without types: `express`) 15, TS7053 (implicit `any` index) 5, TS7006
+(implicit `any` parameter) 5, TS2339 24 (one site, below).
+
+Production:
+
+- `src/embeddable/IHttpApplication.ts:1` — TS7016 `express`.
+- `src/lib/httpTransport/dnsRebindingProtection.ts:1` — TS7016 `express`.
+- `src/lib/strategies/projections.ts:176, 202, 230` — TS7053: a key indexed on `{}` (the
+  `Terse<any>` readers' XML values).
+- `server-runtime/src/http/StreamableHttpServer.ts:43` — TS7016 `express`.
+- `server-runtime/src/sse/SseServer.ts:42` — TS7016 `express`.
+
+Tests:
+
+- `src/__tests__/admin/shared-deps/setup.test.ts:1720` — TS2339, 24 errors at one site: a key read
+  from a four-key literal, one error per member of the key's union.
+- `src/__tests__/unit/httpTransport/tlsServer.test.ts:4, 29, 64` — TS7016 `express`, and four TS7006
+  (`_req`, `res`).
+- `src/__tests__/unit/cancel/cancelNothingToSap.test.ts:26`, `src/__tests__/unit/cancel/notToTool.test.ts:25`
+  — TS7016 `express`.
+- `src/__tests__/unit/connectionLoggerChannel.test.ts:31` — TS7053.
+- `src/__tests__/unit/embeddable/plainRegistration.test.ts:546` — TS7006 `e`.
+- `src/__tests__/unit/resultSets.test.ts:29` — TS7053.
+- `server-runtime/src/http/__tests__/{headerCredentials,healthEndpoint,systemContextOrder}.test.ts`,
+  `server-runtime/src/sse/__tests__/{headerCredentials,healthEndpoint,systemContextOrder}.test.ts` —
+  TS7016 `express`, one each.
+- `http/src/__tests__/exports.test.ts:26`, `sse/src/__tests__/exports.test.ts:26` — TS7016 `express`.
+
+Inference, not measured: while `express` has no types, every value typed by it (`Request`,
+`Response`, `NextFunction`, the `express()` app) is `any` without an error, so adding
+`@types/express` (step 12) may show further errors in the files that use them.

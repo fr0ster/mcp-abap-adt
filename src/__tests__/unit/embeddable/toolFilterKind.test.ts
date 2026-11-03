@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The tool filter (`available_in`) never guesses a kind: with a kind stated
  * (the server's `systemType`, else `SAP_SYSTEM_TYPE`) a tool is listed only
@@ -21,7 +22,7 @@ const tool = (name: string, available_in?: SapEnvironment[]) => ({
   toolDefinition: {
     name,
     description: name,
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: z.object({}),
     ...(available_in !== undefined ? { available_in } : {}),
   },
   call: async () => ({ content: [] }),

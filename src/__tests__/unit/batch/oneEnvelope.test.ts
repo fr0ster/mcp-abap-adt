@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * Every batch end sends one envelope (spec §4.1): a batch is homogeneous by
  * session kind — the first recorded call decides LOCK, UNLOCK or stateless,
@@ -261,10 +263,7 @@ function memberOf(steps: Step[]): IHandlerGroup {
         toolDefinition: {
           name: 'GetProgram',
           description: 'GetProgram',
-          inputSchema: {
-            type: 'object',
-            properties: { program_name: { type: 'string' } },
-          },
+          inputSchema: z.object({ program_name: z.string().optional() }),
         },
         call: async (context: HandlerContext, _args: unknown) => {
           const parts: Promise<unknown>[] = [];

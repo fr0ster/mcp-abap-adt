@@ -71,10 +71,7 @@ type Handler = (context: HandlerContext, args: never) => Promise<unknown>;
 function tool(
   name: string,
   handler: Handler,
-  inputSchema: Record<string, unknown> = {
-    type: 'object',
-    properties: { name: { type: 'string' } },
-  },
+  inputSchema: z.ZodObject = z.object({ name: z.string().optional() }),
   extra: Partial<HandlerEntry> = {},
 ): HandlerEntry {
   return {
@@ -327,14 +324,10 @@ describe('recording in batch mode', () => {
             received = args;
             return oneGet('/class')(context, args);
           },
-          {
-            type: 'object',
-            properties: {
-              class_name: { type: 'string' },
-              version: { type: 'string', default: 'active' },
-            },
-            required: ['class_name'],
-          },
+          z.object({
+            class_name: z.string(),
+            version: z.string().default('active').optional(),
+          }),
         ),
       ]),
     ]);
@@ -419,7 +412,10 @@ describe('recording in batch mode', () => {
       registerAllTools(server: McpServer) {
         server.registerTool(
           'OwnTool',
-          { description: 'own', inputSchema: { name: z.string().optional() } },
+          {
+            description: 'own',
+            inputSchema: z.object({ name: z.string().optional() }),
+          },
           own as never,
         );
       },
@@ -497,13 +493,10 @@ describe('recording in batch mode', () => {
             seen = callTransportRequest();
             return oneGet('/program')(context, args);
           },
-          {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              transport_request: { type: 'string' },
-            },
-          },
+          z.object({
+            name: z.string().optional(),
+            transport_request: z.string().optional(),
+          }),
         ),
       ]),
     ]);
@@ -560,13 +553,14 @@ describe('recording in batch mode', () => {
     const s = await stand(
       [
         groupOf([
-          tool('RuntimeRunClass', run as Handler, {
-            type: 'object',
-            properties: {
-              class_name: { type: 'string' },
-              background: { type: 'boolean' },
-            },
-          }),
+          tool(
+            'RuntimeRunClass',
+            run as Handler,
+            z.object({
+              class_name: z.string().optional(),
+              background: z.boolean().optional(),
+            }),
+          ),
         ]),
       ],
       { backgroundRuns: true },

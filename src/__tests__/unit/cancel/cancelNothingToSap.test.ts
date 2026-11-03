@@ -46,6 +46,7 @@ import {
   listenUrl,
   shutdownTools,
 } from '../../helpers/shutdownTools';
+import { toolAnswer } from '../../helpers/toolAnswer';
 
 jest.setTimeout(30_000);
 
@@ -78,13 +79,11 @@ function countedRegistry(runs: Runs): CompositeHandlersRegistry {
     return {
       ...entry,
       call: async (context, args) => {
-        runs.started.push(args.id);
-        const result = (await inner(context, args)) as {
-          content: Array<{ text: string }>;
-          isError?: boolean;
-        };
+        const id = String(args.id);
+        runs.started.push(id);
+        const result = toolAnswer(await inner(context, args));
         runs.answered.push({
-          id: args.id,
+          id,
           text: result.content[0]?.text ?? '',
           isError: result.isError === true,
         });

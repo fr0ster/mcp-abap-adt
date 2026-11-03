@@ -24,6 +24,7 @@ import { corpusBody } from '../../lib/adtCorpus';
 import type {
   HandlerContext,
   HandlerEntry,
+  ToolArgs,
 } from '../../lib/handlers/interfaces';
 import {
   parityConnection,
@@ -79,7 +80,7 @@ function compactTool(connection: unknown, name: string) {
   ];
   const entry = entries.find((e) => e.toolDefinition.name === name);
   if (!entry) throw new Error(name);
-  return (args: unknown) => entry.call(context, args);
+  return (args: ToolArgs) => entry.call(context, args);
 }
 
 describe('UpdatePackage (high)', () => {

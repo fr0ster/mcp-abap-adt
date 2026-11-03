@@ -71,19 +71,9 @@ function shippedDefinitions(): ToolDefinition[] {
   ];
 }
 
-/** Whether a schema declares `timeout`, JSON Schema or a zod raw shape. */
+/** Whether a schema declares `timeout`. */
 function declaresTimeout(definition: ToolDefinition): boolean {
-  if (definition.inputSchema instanceof z.ZodObject) {
-    return Object.hasOwn(definition.inputSchema.shape, 'timeout');
-  }
-  const schema = definition.inputSchema as
-    | { properties?: Record<string, unknown> }
-    | Record<string, unknown>
-    | undefined;
-  if (!schema) return false;
-  const properties =
-    (schema as { properties?: Record<string, unknown> }).properties ?? schema;
-  return Object.hasOwn(properties, 'timeout');
+  return Object.hasOwn(definition.inputSchema.shape, 'timeout');
 }
 
 const carriesAdvice = (definition: ToolDefinition) =>
@@ -182,26 +172,19 @@ describe('the approved list of long tools', () => {
     expect(offending).toEqual([]);
   });
 
-  it('the check sees a timeout in both schema shapes (load-bearing)', () => {
+  it('the check sees a declared timeout (load-bearing)', () => {
     expect(
       declaresTimeout({
         name: 'X',
         description: '',
-        inputSchema: { type: 'object', properties: { timeout: {} } },
+        inputSchema: z.object({ timeout: z.any().optional() }),
       }),
     ).toBe(true);
     expect(
       declaresTimeout({
         name: 'X',
         description: '',
-        inputSchema: { timeout: {} },
-      }),
-    ).toBe(true);
-    expect(
-      declaresTimeout({
-        name: 'X',
-        description: '',
-        inputSchema: { type: 'object', properties: { other: {} } },
+        inputSchema: z.object({ other: z.any().optional() }),
       }),
     ).toBe(false);
   });

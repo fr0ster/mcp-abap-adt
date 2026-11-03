@@ -20,7 +20,6 @@
  * calls, given each of the three values, sends reads that carry exactly it.
  */
 
-import * as z from 'zod';
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type {
@@ -31,7 +30,6 @@ import type {
 import {
   READ_VERSION_FIELD,
   READ_VERSION_FIELD_UNDEFAULTED,
-  READ_VERSION_PROPERTY,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import {
@@ -44,7 +42,11 @@ import {
   countingConnection,
   servedTools,
 } from '../../helpers/batchHarness';
-import { declaredRequired, listedJson } from '../../helpers/listedJson';
+import {
+  declaredRequired,
+  type JsonSchema,
+  listedJson,
+} from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
 
 // The process declares its system type, as every launcher requires.
@@ -394,31 +396,43 @@ const SAMPLES: Readonly<Record<string, Sample>> = {
   },
 };
 
-/** A JSON-schema property's sample value: its first member, else one of its type. */
-function sampleOf(property: ToolDefinition['inputSchema']): unknown {
-  if (Array.isArray(property?.enum)) return property.enum[0];
-  switch (property?.type) {
+/** A listed property's sample value: its first member, else one of its type. */
+function sampleOf(property: JsonSchema | boolean | undefined): unknown {
+  if (typeof property !== 'object') return 'OBJ_A';
+  const [first] = property.enum ?? [];
+  if (first !== undefined) return first;
+  switch (property.type) {
     case 'boolean':
       return false;
     case 'number':
     case 'integer':
       return 1;
-    case 'array':
-      return [sampleOf(property.items)];
+    case 'array': {
+      const items = property.items;
+      return [sampleOf(Array.isArray(items) ? items[0] : items)];
+    }
     case 'object':
-      return requiredOf(property);
+      return listedRequiredOf(property);
     default:
       return 'OBJ_A';
   }
 }
 
-/** An object schema's required arguments, each with a sample value. */
+/** A listed object's required arguments, each with a sample value. */
+function listedRequiredOf(schema: JsonSchema): Record<string, unknown> {
+  const args: Record<string, unknown> = {};
+  for (const name of schema.required ?? []) {
+    args[name] = sampleOf(schema.properties?.[name]);
+  }
+  return args;
+}
+
+/** A tool's required arguments, as its schema declares them, each with a sample value. */
 function requiredOf(
   schema: ToolDefinition['inputSchema'],
 ): Record<string, unknown> {
   const args: Record<string, unknown> = {};
   const listed = listedJson(schema);
-  if (listed.type !== 'object') return args;
   for (const name of declaredRequired(schema)) {
     args[name] = sampleOf(listed.properties?.[name]);
   }
@@ -527,15 +541,10 @@ function callsOf(tool: string, entry: HandlerEntry): Sample[] {
  * or without (`READ_VERSION_PROPERTY_UNDEFAULTED`), the same three values.
  */
 function declaresReadVersion(entry: HandlerEntry): boolean {
-  const schema = entry.toolDefinition.inputSchema;
-  if (schema instanceof z.ZodObject) {
-    const version = schema.shape.version;
-    return (
-      version === READ_VERSION_FIELD ||
-      version === READ_VERSION_FIELD_UNDEFAULTED
-    );
-  }
-  return schema?.properties?.version?.enum === READ_VERSION_PROPERTY.enum;
+  const version = entry.toolDefinition.inputSchema.shape.version;
+  return (
+    version === READ_VERSION_FIELD || version === READ_VERSION_FIELD_UNDEFAULTED
+  );
 }
 
 /** Whether a call of `tool` with `args` reads at the version it is given. */

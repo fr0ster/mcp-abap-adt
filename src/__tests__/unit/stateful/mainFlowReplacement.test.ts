@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A session lost while calls wait in the main flow: a queued
  * call took its connection before it waited, so the call ahead can spend it
@@ -42,11 +43,7 @@ const loseSession: HandlerEntry = {
   toolDefinition: {
     name: 'LoseSession',
     description: 'LoseSession',
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string' } },
-      required: ['id'],
-    },
+    inputSchema: z.object({ id: z.string() }),
   },
   call: (async (
     context: {
@@ -82,11 +79,7 @@ const readAndCheck: HandlerEntry = {
   toolDefinition: {
     name: 'ReadAndCheck',
     description: 'ReadAndCheck',
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string' } },
-      required: ['id'],
-    },
+    inputSchema: z.object({ id: z.string() }),
   },
   call: (async (
     context: { connection: { makeAdtRequest(o: object): Promise<unknown> } },

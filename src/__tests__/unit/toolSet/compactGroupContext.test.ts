@@ -22,6 +22,7 @@ import {
 } from '@mcp-abap-adt/compact-readonly-entries';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { CompactHandlersGroup } from '../../../lib/compact/group';
+import { declareSystemKind } from '../../../lib/systemKind';
 
 /** lib's composition of the two halves, as `compactToolSetOf` builds it for the compact write binaries. */
 class BothHalvesGroup extends CompactHandlersGroup {
@@ -56,19 +57,33 @@ describe('compact groups read the context of the current request', () => {
       (group as unknown as { context: HandlerContext }).context =
         contextNamed('this-request');
 
-      // Any entry will do: the question is which context the closure reads, and
-      // every entry in the group is built the same way. `object_type` is left out
-      // so the router refuses before reaching SAP — the refusal still proves the
-      // handler was called with a context, and the router logs through it.
+      // A create whose type the declared variant serves: the router logs
+      // the route through the context the call was given, before SAP.
       const seen: string[] = [];
       const probe = contextNamed('this-request');
       (probe as unknown as { logger: unknown }).logger = {
         info: (line: string) => seen.push(line),
         warn: (line: string) => seen.push(line),
       };
+      declareSystemKind(probe.connection, 'onprem');
       (group as unknown as { context: HandlerContext }).context = probe;
 
-      await entries[0].call(probe, {});
+      const create = entries.find(
+        (entry) => entry.toolDefinition.name === 'HandlerCreate',
+      );
+      const read = entries.find(
+        (entry) => entry.toolDefinition.name === 'HandlerGet',
+      );
+      if (create !== undefined) {
+        await create
+          .call(probe, { object_type: 'CLASS' })
+          .catch(() => undefined);
+      } else if (read !== undefined) {
+        // `object_type` left out: the router refuses before SAP, through its log.
+        await read.call(probe, {});
+      } else {
+        throw new Error(`${name} serves neither HandlerCreate nor HandlerGet`);
+      }
 
       // The handler logged through the context it was given, so it read the
       // current one rather than the one captured at build time.

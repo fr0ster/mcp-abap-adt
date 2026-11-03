@@ -4,7 +4,7 @@
  * addressed under their function group, so each schema that offers them
  * declares the parent the boundary reads (`parentName`), described as
  * required for those codes. The arguments pass through the schema the server
- * registers (`jsonSchemaToZod`, which drops an undeclared property), then
+ * registers (a zod object, which drops an undeclared property), then
  * the tool's own handler runs over a recording connection declared the
  * variant — real adt-clients code, no SAP.
  */
@@ -32,7 +32,6 @@ import type {
   HandlerContext,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -161,10 +160,9 @@ async function call(
   declareSystemKind(connection, variant);
   // What the server hands the handler: the arguments through the schema it
   // registered for the tool on this variant.
-  const stated = offering.inputSchema(variant);
-  const schema =
-    stated instanceof z.ZodObject ? stated : z.object(jsonSchemaToZod(stated));
-  const registered = schema.parse(offering.args(type, parentName));
+  const registered = offering
+    .inputSchema(variant)
+    .parse(offering.args(type, parentName));
   const answered = await offering
     .handler({ connection }, registered)
     .catch((thrown: unknown) => ({ thrown: String(thrown) }));

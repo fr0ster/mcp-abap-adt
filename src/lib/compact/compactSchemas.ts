@@ -83,20 +83,23 @@ function takesOf<P extends string, M extends string>() {
 
 /**
  * The properties of `properties` some call on `members` takes — in `every`,
- * or in the list of one of `members` — in their declared order.
+ * or in the list of one of `members` — in their declared order, the others
+ * left out. Its type names every property: each a tool may leave out is
+ * optional, so a schema spreading it types a left-out one as an optional
+ * argument no call gives.
  */
 function offered<P extends object, M extends string>(
   properties: P,
   takes: CompactTakes<Extract<keyof P, string>, M>,
   members: readonly M[],
-): Partial<P> {
+): P {
   const taken = new Set<keyof P>([
     ...takes.every,
     ...members.flatMap((member) => takes.members[member] ?? []),
   ]);
-  const kept: Partial<P> = {};
-  for (const key in properties) {
-    if (taken.has(key)) kept[key] = properties[key];
+  const kept = { ...properties };
+  for (const key in kept) {
+    if (!taken.has(key)) delete kept[key];
   }
   return kept;
 }

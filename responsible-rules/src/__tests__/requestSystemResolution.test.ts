@@ -998,7 +998,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
       .getHandlerEntries()[0]
       .call({ connection: cloudConn() }, {});
     expect(lookup).not.toHaveBeenCalled();
-    expect(result.responsible).toBeUndefined();
+    expect(result).toMatchObject({ responsible: undefined });
   });
 });
 

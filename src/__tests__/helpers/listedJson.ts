@@ -4,25 +4,13 @@
  * side). Tests read the listed form through this, never a schema's internals.
  */
 import * as z from 'zod';
-import type { ToolDefinition } from '../../lib/handlers/interfaces';
-import { registeredSchema } from '../../lib/handlers/utils/schemaUtils';
 
 /** One JSON Schema node, as zod renders it. */
 export type JsonSchema = z.core.JSONSchema.BaseSchema;
 
-/**
- * `schema` as a client lists it; a definition not yet in zod is listed as
- * its registration converts it (`registeredSchema`).
- */
-export function listedJson(
-  schema: ToolDefinition['inputSchema'] | z.ZodType,
-): JsonSchema {
-  const listed =
-    schema instanceof z.ZodType ? schema : registeredSchema(schema);
-  return z.toJSONSchema(
-    listed instanceof z.ZodType ? listed : z.object(listed),
-    { target: 'draft-7', io: 'input' },
-  );
+/** `schema` as a client lists it. */
+export function listedJson(schema: z.ZodType): JsonSchema {
+  return z.toJSONSchema(schema, { target: 'draft-7', io: 'input' });
 }
 
 /**
@@ -50,12 +38,7 @@ export function jsonAt(schema: JsonSchema, ...path: string[]): JsonSchema {
  * before it moved to zod: a field neither optional nor a default over an
  * optional one (a default over a required field stays required).
  */
-export function declaredRequired(
-  schema: ToolDefinition['inputSchema'] | z.ZodType,
-): string[] {
-  if (!(schema instanceof z.ZodObject)) {
-    return schema instanceof z.ZodType ? [] : [...(schema.required ?? [])];
-  }
+export function declaredRequired(schema: z.ZodObject): string[] {
   return Object.entries(schema.shape)
     .filter(([, field]) => !optionalField(field))
     .map(([name]) => name);

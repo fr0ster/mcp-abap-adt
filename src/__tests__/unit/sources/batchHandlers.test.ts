@@ -115,7 +115,8 @@ const GROUPS_DIR = path.join(REPO, 'src/lib/handlers/groups');
 /**
  * Whether a group registers `tool` with handler `fn`: a tool the full set
  * names in its group (`name: 'ActivateDomain'`) over a low handler's
- * definition, `handler: withContext(fn)` in the same registration.
+ * definition, `defineTool({ ...definition, name }, fn)` — the handler the
+ * argument after that definition, before the next tool's name.
  */
 function groupRegisters(tool: string, fn: string): boolean {
   for (const file of fs.readdirSync(GROUPS_DIR)) {
@@ -123,17 +124,14 @@ function groupRegisters(tool: string, fn: string): boolean {
     const source = fs.readFileSync(path.join(GROUPS_DIR, file), 'utf8');
     const at = source.indexOf(`name: '${tool}',`);
     if (at === -1) continue;
-    const handlerAt = source.indexOf('call:', at);
     const nextName = source.indexOf('name:', at + 1);
     const registration = source.slice(
-      handlerAt,
-      source.indexOf('\n', handlerAt),
+      at,
+      nextName === -1 ? undefined : nextName,
     );
     if (
-      handlerAt !== -1 &&
-      (nextName === -1 || handlerAt < nextName) &&
-      (registration.includes(`(${fn})`) ||
-        registration.includes(`call: ${fn},`))
+      registration.includes(`},\n        ${fn},\n`) ||
+      registration.includes(`}, ${fn})`)
     ) {
       return true;
     }

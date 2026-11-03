@@ -97,7 +97,10 @@ function ownRegistry(
         name,
         {
           description: 'registered by its own registry',
-          inputSchema: { id: z.string(), background: z.boolean().optional() },
+          inputSchema: z.object({
+            id: z.string(),
+            background: z.boolean().optional(),
+          }),
         },
         async (args: { id: string }, extra: { signal: AbortSignal }) => {
           await sendOn(extra.signal, args.id);

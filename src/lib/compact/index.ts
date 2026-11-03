@@ -25,7 +25,7 @@ export {
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';
-export { DETAIL_PROPERTY } from '../strategies/detail.js';
+export { DETAIL_SHAPE } from '../strategies/detail.js';
 export { byVariant } from '../variantDefinition.js';
 export * from './compactDescriptions.js';
 export {

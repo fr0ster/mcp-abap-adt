@@ -1,8 +1,8 @@
 /**
  * The run tools' arguments as a handler receives them through the MCP SDK.
  *
- * The server registers each tool with the zod shape `jsonSchemaToZod` builds
- * from its JSON schema (`BaseMcpServer.registerHandlers`), and the SDK hands
+ * The server registers each tool with its zod schema
+ * (`BaseMcpServer.registerHandlers`), and the SDK hands
  * the handler the parsed value, so a schema `default` reaches the handler as
  * if the client had sent it. A tool that refuses an argument by its presence
  * (`wait` with `runner: 'sync'`) must therefore carry no `default` for it:
@@ -12,12 +12,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type * as z from 'zod';
 import { TOOL_DEFINITION as RunFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
 import { TOOL_DEFINITION as RunFunctionModuleUnitTest } from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { TOOL_DEFINITION as RunProgramUnitTest } from '../../handlers/unit_test/high/handleRunProgramUnitTest';
 import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { runnerOf, runnerWaitOf } from '../../handlers/unit_test/shared/runner';
-import { registeredSchema } from '../../lib/handlers/utils/schemaUtils';
 
 const RUNNER_TOOLS = [
   { tool: RunUnitTest, args: { class_name: 'ZCL_A' } },
@@ -31,14 +31,14 @@ const RUNNER_TOOLS = [
 
 /** The arguments the tool's handler receives for a client call with `args`. */
 async function received(
-  tool: { name: string; inputSchema: object },
+  tool: { name: string; inputSchema: z.ZodObject },
   args: Record<string, unknown>,
 ): Promise<unknown> {
   let seen: unknown;
   const server = new McpServer({ name: 'probe', version: '1.0.0' });
   server.registerTool(
     tool.name,
-    { inputSchema: registeredSchema(tool.inputSchema) },
+    { inputSchema: tool.inputSchema },
     async (given: unknown): Promise<CallToolResult> => {
       seen = given;
       return { content: [{ type: 'text', text: 'ok' }] };

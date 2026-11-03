@@ -17,6 +17,7 @@ import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { SapEnvironment } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { countingConnection } from '../../helpers/batchHarness';
+import { listedJson } from '../../helpers/listedJson';
 
 const LEFT_OUT = [
   ...new BackgroundRunHandlersGroup(noConnectionContext()).getHandlers(),
@@ -50,7 +51,10 @@ const PATHS: Readonly<
   getHandlerEntries: async (systemType) =>
     exporterFor(systemType)
       .getHandlerEntries()
-      .map((entry) => entry.toolDefinition),
+      .map((entry) => ({
+        name: entry.toolDefinition.name,
+        inputSchema: listedJson(entry.toolDefinition.inputSchema),
+      })),
   'createRegistry().registerAllTools': (systemType) => {
     const server = new McpServer({ name: 'plain', version: '1.0.0' });
     exporterFor(systemType).createRegistry().registerAllTools(server);

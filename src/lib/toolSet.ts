@@ -181,9 +181,7 @@ export function streamableHttpSurface(toolSet: ToolSet): StreamableHttpSurface {
       .filter((entry) => !stdio.has(entry.toolDefinition.name))
       .map((entry) => ({
         ...entry.toolDefinition,
-        inputSchema: withStateHandle(
-          entry.toolDefinition.inputSchema,
-        ) as HandlerEntry['toolDefinition']['inputSchema'],
+        inputSchema: withStateHandle(entry.toolDefinition.inputSchema),
       })),
     stdioOnly: [...stdio].filter((name) => !httpNames.has(name)),
     stateHandleWords: STATE_HANDLE_ARGUMENT_WORDS,

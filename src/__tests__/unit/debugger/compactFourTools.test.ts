@@ -30,6 +30,7 @@ import {
   compactToolSetOf,
 } from '../../../lib/toolSet';
 import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
+import { toolAnswer } from '../../helpers/toolAnswer';
 
 type Mode = 'pending' | 'document' | 'not-found';
 const MODES: Mode[] = ['pending', 'document', 'not-found'];
@@ -164,7 +165,8 @@ function install(
   const call = (name: string, args: Record<string, unknown>): Promise<Answer> =>
     compactDebugEntries()
       .find((e) => e.toolDefinition.name === name)!
-      .call(context, structuredClone(args));
+      .call(context, structuredClone(args))
+      .then(toolAnswer);
   return { wire, state, instance, call };
 }
 

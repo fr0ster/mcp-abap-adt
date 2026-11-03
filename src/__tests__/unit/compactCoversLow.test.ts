@@ -16,6 +16,7 @@ import {
 } from '../../lib/systemContext';
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
+import { toolAnswer } from '../helpers/toolAnswer';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -38,13 +39,17 @@ async function call(
   const entry = tools().get(tool);
   if (!entry) throw new Error(tool);
   const context = { connection, logger: silentLogger } as HandlerContext;
-  const answered = (await entry.call(context, args)) as {
-    isError?: boolean;
-    content?: Array<{ text?: string }>;
-  };
+  // Arguments the tool's schema refuses never reach its handler: the
+  // refusal is the call's answer.
+  const answered = await entry
+    .call(context, args)
+    .then(toolAnswer, (error) => ({
+      isError: true,
+      content: [{ text: String(error) }],
+    }));
   return {
-    isError: answered?.isError,
-    text: answered?.content?.[0]?.text ?? '',
+    isError: answered.isError,
+    text: answered.content[0]?.text ?? '',
     sent: connection.requests.length,
   };
 }
@@ -65,7 +70,9 @@ describe('compact covers what the low set did', () => {
       source_code: 'source text',
     });
     expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('lock_handle is required');
+    expect(answered.text).toContain(
+      'Invalid arguments for tool HandlerUpdate: Invalid input: expected string, received undefined at lock_handle',
+    );
     expect(answered.sent).toBe(0);
   });
 

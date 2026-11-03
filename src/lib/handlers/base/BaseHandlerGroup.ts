@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type * as z from 'zod';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { ServerRefusal } from '../../auth/serverRefusal.js';
 import {
@@ -26,7 +27,6 @@ import type {
   SapEnvironment,
 } from '../interfaces.js';
 import { type CallContext, inStatedScope } from '../utils/handlerCall.js';
-import { registeredSchema } from '../utils/schemaUtils.js';
 
 /**
  * Base class for handler groups
@@ -121,19 +121,16 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     server: McpServer,
     toolName: string,
     description: string,
-    inputSchema: any,
+    inputSchema: z.ZodObject,
     call: HandlerEntry['call'],
     search: { _meta?: Record<string, unknown> } = {},
     callContext: CallContext = () => Promise.resolve(this.context),
   ): void {
-    // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
-    const zodSchema = registeredSchema(inputSchema);
-
     server.registerTool(
       toolName,
       {
         description,
-        inputSchema: zodSchema,
+        inputSchema,
         ...search,
       },
       async (given: any) => {

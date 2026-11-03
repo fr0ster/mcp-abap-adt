@@ -13,12 +13,40 @@ import {
 } from '../../../handlers/debugger/debug/handleDebugWait';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { defineTool } from '../../../lib/handlers/interfaces';
+import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 
 describe('defineTool', () => {
   it('answers the definition and the handler as an entry', () => {
     const entry = defineTool(Wait, handleDebugWait);
     expect(entry.toolDefinition).toBe(Wait);
-    expect(entry.call).toBe(handleDebugWait);
+  });
+
+  it("calls the handler with the arguments as the definition's schema parses them", async () => {
+    const seen: unknown[] = [];
+    const entry = defineTool(Wait, async (_context, args) => {
+      seen.push(args);
+      return 'ran';
+    });
+    await expect(
+      entry.call(noConnectionContext(), { state_handle: 'h', extra: 1 }),
+    ).resolves.toBe('ran');
+    expect(seen).toEqual([
+      { state_handle: 'h', hold_seconds: 10, detail: 'terse' },
+    ]);
+  });
+
+  it('refuses arguments the schema does not parse, naming the tool, and the handler does not run', async () => {
+    const seen: unknown[] = [];
+    const entry = defineTool(Wait, async (_context, args) => {
+      seen.push(args);
+      return 'ran';
+    });
+    await expect(
+      entry.call(noConnectionContext(), { hold_seconds: 'long' }),
+    ).rejects.toThrow(
+      'Input validation error: Invalid arguments for tool DebugWait',
+    );
+    expect(seen).toEqual([]);
   });
 
   it('refuses, at compile time, a handler that takes other arguments', () => {

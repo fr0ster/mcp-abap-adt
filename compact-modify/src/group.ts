@@ -16,8 +16,11 @@
  * binaries serve.
  */
 
-import type { HandlerEntry } from '@mcp-abap-adt/lib/handlers';
-import { BaseHandlerGroup } from '@mcp-abap-adt/lib/handlers';
+import {
+  BaseHandlerGroup,
+  defineTool,
+  type HandlerEntry,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   TOOL_DEFINITION as HandlerActivate_Tool,
   handleHandlerActivate,
@@ -73,54 +76,24 @@ import {
  */
 export function compactModifyEntries(): HandlerEntry[] {
   return [
-    {
-      toolDefinition: HandlerCreate_Tool,
-      call: handleHandlerCreate,
-    },
-    {
-      toolDefinition: HandlerUpdate_Tool,
-      call: handleHandlerUpdate,
-    },
-    {
-      toolDefinition: HandlerDelete_Tool,
-      call: handleHandlerDelete,
-    },
-    {
-      toolDefinition: HandlerActivate_Tool,
-      call: handleHandlerActivate,
-    },
-    {
-      toolDefinition: HandlerTransportCreate_Tool,
-      call: handleHandlerTransportCreate,
-    },
-    {
-      toolDefinition: HandlerTransportSortAndCompress_Tool,
-      call: handleHandlerTransportSortAndCompress,
-    },
-    {
-      toolDefinition: HandlerTransportMoveObjects_Tool,
-      call: handleHandlerTransportMoveObjects,
-    },
-    {
-      toolDefinition: HandlerLock_Tool,
-      call: handleHandlerLock,
-    },
-    {
-      toolDefinition: HandlerUnlock_Tool,
-      call: handleHandlerUnlock,
-    },
-    {
-      toolDefinition: HandlerUnitTestRun_Tool,
-      call: handleHandlerUnitTestRun,
-    },
-    {
-      toolDefinition: HandlerProfileSchedule_Tool,
-      call: handleHandlerProfileSchedule,
-    },
-    {
-      toolDefinition: HandlerProfileRun_Tool,
-      call: handleHandlerProfileRun,
-    },
+    defineTool(HandlerCreate_Tool, handleHandlerCreate),
+    defineTool(HandlerUpdate_Tool, handleHandlerUpdate),
+    defineTool(HandlerDelete_Tool, handleHandlerDelete),
+    defineTool(HandlerActivate_Tool, handleHandlerActivate),
+    defineTool(HandlerTransportCreate_Tool, handleHandlerTransportCreate),
+    defineTool(
+      HandlerTransportSortAndCompress_Tool,
+      handleHandlerTransportSortAndCompress,
+    ),
+    defineTool(
+      HandlerTransportMoveObjects_Tool,
+      handleHandlerTransportMoveObjects,
+    ),
+    defineTool(HandlerLock_Tool, handleHandlerLock),
+    defineTool(HandlerUnlock_Tool, handleHandlerUnlock),
+    defineTool(HandlerUnitTestRun_Tool, handleHandlerUnitTestRun),
+    defineTool(HandlerProfileSchedule_Tool, handleHandlerProfileSchedule),
+    defineTool(HandlerProfileRun_Tool, handleHandlerProfileRun),
   ];
 }
 

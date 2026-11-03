@@ -155,7 +155,11 @@ import {
   handleGetUnitTestResult,
 } from '../../../handlers/unit_test/high/handleGetUnitTestResult';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerContext, HandlerEntry } from '../interfaces.js';
+import {
+  defineTool,
+  type HandlerContext,
+  type HandlerEntry,
+} from '../interfaces.js';
 import {
   type IReadOnlyDedupStrategy,
   NoDedupStrategy,
@@ -202,167 +206,56 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
   private getAllEntries(): HandlerEntry[] {
     return [
       // Existing readonly handlers
-      {
-        toolDefinition: GetTableContents_Tool,
-        call: handleGetTableContents,
-      },
-      {
-        toolDefinition: GetPackageContents_Tool,
-        call: handleGetPackageContents,
-      },
-      {
-        toolDefinition: GetInclude_Tool,
-        call: handleGetInclude,
-      },
-      {
-        toolDefinition: GetIncludesList_Tool,
-        call: handleGetIncludesList,
-      },
-      {
-        toolDefinition: GetMainPrograms_Tool,
-        call: handleGetMainPrograms,
-      },
-      {
-        toolDefinition: GetEnhancements_Tool,
-        call: handleGetEnhancements,
-      },
-      {
-        toolDefinition: GetEnhancementSpot_Tool,
-        call: handleGetEnhancementSpot,
-      },
-      {
-        toolDefinition: GetEnhancementImpl_Tool,
-        call: handleGetEnhancementImpl,
-      },
-      {
-        toolDefinition: GetTransport_Tool,
-        call: handleGetTransport,
-      },
-      {
-        toolDefinition: ListTransports_Tool,
-        call: handleListTransports,
-      },
-      {
-        toolDefinition: ReadTransportObjects_Tool,
-        call: handleReadTransportObjects,
-      },
-      {
-        toolDefinition: ReadTransportActionLog_Tool,
-        call: handleReadTransportActionLog,
-      },
-      {
-        toolDefinition: GetStructuresList_Tool,
-        call: handleGetStructuresList,
-      },
-      {
-        toolDefinition: GetObjectVersions_Tool,
-        call: handleGetObjectVersions,
-      },
-      {
-        toolDefinition: GetObjectVersionSource_Tool,
-        call: handleGetObjectVersionSource,
-      },
-      {
-        toolDefinition: GetObjectVersionDiff_Tool,
-        call: handleGetObjectVersionDiff,
-      },
-      {
-        toolDefinition: ListFunctionGroupIncludes_Tool,
-        call: handleListFunctionGroupIncludes,
-      },
-      {
-        toolDefinition: ListFunctionModules_Tool,
-        call: handleListFunctionModules,
-      },
+      defineTool(GetTableContents_Tool, handleGetTableContents),
+      defineTool(GetPackageContents_Tool, handleGetPackageContents),
+      defineTool(GetInclude_Tool, handleGetInclude),
+      defineTool(GetIncludesList_Tool, handleGetIncludesList),
+      defineTool(GetMainPrograms_Tool, handleGetMainPrograms),
+      defineTool(GetEnhancements_Tool, handleGetEnhancements),
+      defineTool(GetEnhancementSpot_Tool, handleGetEnhancementSpot),
+      defineTool(GetEnhancementImpl_Tool, handleGetEnhancementImpl),
+      defineTool(GetTransport_Tool, handleGetTransport),
+      defineTool(ListTransports_Tool, handleListTransports),
+      defineTool(ReadTransportObjects_Tool, handleReadTransportObjects),
+      defineTool(ReadTransportActionLog_Tool, handleReadTransportActionLog),
+      defineTool(GetStructuresList_Tool, handleGetStructuresList),
+      defineTool(GetObjectVersions_Tool, handleGetObjectVersions),
+      defineTool(GetObjectVersionSource_Tool, handleGetObjectVersionSource),
+      defineTool(GetObjectVersionDiff_Tool, handleGetObjectVersionDiff),
+      defineTool(
+        ListFunctionGroupIncludes_Tool,
+        handleListFunctionGroupIncludes,
+      ),
+      defineTool(ListFunctionModules_Tool, handleListFunctionModules),
       // The object reads, one Get<Type> per type. All but GetFunctionInclude
       // are copies of high-level tools: same name, schema and handler,
       // withheld by getHandlers() when the high group is exposed alongside.
-      {
-        toolDefinition: GetBehaviorDefinition_Tool,
-        call: handleGetBehaviorDefinition,
-      },
-      {
-        toolDefinition: GetBehaviorImplementation_Tool,
-        call: handleGetBehaviorImplementation,
-      },
-      {
-        toolDefinition: GetClass_Tool,
-        call: handleGetClass,
-      },
-      {
-        toolDefinition: GetDataElement_Tool,
-        call: handleGetDataElement,
-      },
-      {
-        toolDefinition: GetDdl_Tool,
-        call: handleGetDdl,
-      },
-      {
-        toolDefinition: GetDomain_Tool,
-        call: handleGetDomain,
-      },
-      {
-        toolDefinition: GetTableType_Tool,
-        call: handleGetTableType,
-      },
-      {
-        toolDefinition: GetFunctionGroup_Tool,
-        call: handleGetFunctionGroup,
-      },
-      {
-        toolDefinition: GetFunctionInclude_Tool,
-        call: handleGetFunctionInclude,
-      },
-      {
-        toolDefinition: GetFunctionModule_Tool,
-        call: handleGetFunctionModule,
-      },
-      {
-        toolDefinition: GetInterface_Tool,
-        call: handleGetInterface,
-      },
-      {
-        toolDefinition: GetMessageClass_Tool,
-        call: handleGetMessageClass,
-      },
-      {
-        toolDefinition: GetMessageClassMessage_Tool,
-        call: handleGetMessageClassMessage,
-      },
-      {
-        toolDefinition: GetMetadataExtension_Tool,
-        call: handleGetMetadataExtension,
-      },
-      {
-        toolDefinition: GetPackage_Tool,
-        call: handleGetPackage,
-      },
-      {
-        toolDefinition: GetProgram_Tool,
-        call: handleGetProgram,
-      },
-      {
-        toolDefinition: GetServiceBinding_Tool,
-        call: handleGetServiceBinding,
-      },
-      {
-        toolDefinition: GetServiceDefinition_Tool,
-        call: handleGetServiceDefinition,
-      },
-      {
-        toolDefinition: GetStructure_Tool,
-        call: handleGetStructure,
-      },
-      {
-        toolDefinition: GetTable_Tool,
-        call: handleGetTable,
-      },
+      defineTool(GetBehaviorDefinition_Tool, handleGetBehaviorDefinition),
+      defineTool(
+        GetBehaviorImplementation_Tool,
+        handleGetBehaviorImplementation,
+      ),
+      defineTool(GetClass_Tool, handleGetClass),
+      defineTool(GetDataElement_Tool, handleGetDataElement),
+      defineTool(GetDdl_Tool, handleGetDdl),
+      defineTool(GetDomain_Tool, handleGetDomain),
+      defineTool(GetTableType_Tool, handleGetTableType),
+      defineTool(GetFunctionGroup_Tool, handleGetFunctionGroup),
+      defineTool(GetFunctionInclude_Tool, handleGetFunctionInclude),
+      defineTool(GetFunctionModule_Tool, handleGetFunctionModule),
+      defineTool(GetInterface_Tool, handleGetInterface),
+      defineTool(GetMessageClass_Tool, handleGetMessageClass),
+      defineTool(GetMessageClassMessage_Tool, handleGetMessageClassMessage),
+      defineTool(GetMetadataExtension_Tool, handleGetMetadataExtension),
+      defineTool(GetPackage_Tool, handleGetPackage),
+      defineTool(GetProgram_Tool, handleGetProgram),
+      defineTool(GetServiceBinding_Tool, handleGetServiceBinding),
+      defineTool(GetServiceDefinition_Tool, handleGetServiceDefinition),
+      defineTool(GetStructure_Tool, handleGetStructure),
+      defineTool(GetTable_Tool, handleGetTable),
       // Copies of high-level tools: same name, schema and handler. Withheld
       // by getHandlers() when the high group is exposed alongside.
-      {
-        toolDefinition: GetUnitTestResult_Tool,
-        call: handleGetUnitTestResult,
-      },
+      defineTool(GetUnitTestResult_Tool, handleGetUnitTestResult),
     ];
   }
 }

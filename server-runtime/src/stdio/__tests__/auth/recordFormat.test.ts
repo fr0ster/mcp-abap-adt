@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Only the chain's own session format. auth-stores 5 refuses a session
  * record that is not of its store's format — `StorageError`, `reason:
@@ -210,7 +211,7 @@ async function toolCall(name: string, over: object) {
         toolDefinition: {
           name: 'StubTool',
           description: 'a tool',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema: z.object({}),
         },
         call: async (_context: unknown, _args: unknown) => {
           reached();

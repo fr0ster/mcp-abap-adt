@@ -135,7 +135,7 @@ describe('the batch tools on the surface', () => {
           const name = entry.toolDefinition.name;
           if (!isBatchTool(name)) continue;
           expect(
-            Object.keys(entry.toolDefinition.inputSchema.properties ?? {}),
+            Object.keys(entry.toolDefinition.inputSchema.shape),
           ).not.toContain('state_handle');
         }
       }

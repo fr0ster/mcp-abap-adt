@@ -128,25 +128,16 @@ function requireFresh(pkg, file = 'index.js') {
 /** `name*` for required, `name` for optional — the same rendering the fixture uses. */
 function parametersOf(schema) {
   const { z } = require('zod');
-  if (schema instanceof z.ZodObject) {
-    // Required as the schema states it: neither optional nor a default over
-    // an optional field; the words as the server lists them.
-    const listed = z.toJSONSchema(schema, { io: 'input' }).properties || {};
-    return Object.entries(schema.shape).map(([name, field]) => ({
-      name,
-      required: !(
-        field instanceof z.ZodOptional ||
-        (field instanceof z.ZodDefault && field.unwrap() instanceof z.ZodOptional)
-      ),
-      description: (listed[name] && listed[name].description) || '',
-    }));
-  }
-  const properties = (schema && schema.properties) || {};
-  const required = new Set((schema && schema.required) || []);
-  return Object.keys(properties).map((name) => ({
+  // Required as the schema states it: neither optional nor a default over
+  // an optional field; the words as the server lists them.
+  const listed = z.toJSONSchema(schema, { io: 'input' }).properties || {};
+  return Object.entries(schema.shape).map(([name, field]) => ({
     name,
-    required: required.has(name),
-    description: (properties[name] && properties[name].description) || '',
+    required: !(
+      field instanceof z.ZodOptional ||
+      (field instanceof z.ZodDefault && field.unwrap() instanceof z.ZodOptional)
+    ),
+    description: (listed[name] && listed[name].description) || '',
   }));
 }
 

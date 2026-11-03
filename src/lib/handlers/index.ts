@@ -13,8 +13,6 @@ import '../instance.js';
 
 /** The variant declared for a connection: what a type argument is checked against. */
 export { variantOf } from '../clients.js';
-// Handler arguments derived from a tool's JSON schema
-export type { ArgsOf } from './argsOf.js';
 // Base classes
 export { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 // Handler groups

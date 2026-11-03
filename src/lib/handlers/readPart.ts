@@ -13,13 +13,6 @@ export type ReadPart = 'source' | 'metadata';
 const READ_PART_WORDS =
   'The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).';
 
-export const READ_PART_PROPERTY = {
-  type: 'string',
-  enum: ['source', 'metadata'],
-  description: READ_PART_WORDS,
-  default: 'source',
-} as const;
-
 /** The `part` field of a `Get<Type>` zod input schema. */
 export const READ_PART_FIELD = z
   .enum(['source', 'metadata'])

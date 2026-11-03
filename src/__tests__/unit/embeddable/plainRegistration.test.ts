@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A plain registration (`registry.registerAllTools(mcpServer)` on an SDK
  * `McpServer`, the `./handlers` export) lists the variant its groups state
@@ -363,7 +364,7 @@ describe('a call on the plain path', () => {
           {
             name: 'VariantProbe',
             description: 'Answers the variant of the call.',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           },
           // Both parameters declared: the form decides how it is called.
           async (context, _args) => ({
@@ -673,7 +674,7 @@ describe('registerTool calls a tool as registerAllTools does', () => {
       const definition = (name: string): ToolDefinition => ({
         name,
         description: 'Answers the variant of the call.',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: z.object({}),
       });
       return [
         defineTool(definition('ContextProbe'), async (context, _args) => ({
@@ -765,7 +766,7 @@ describe('registerTool calls a tool as registerAllTools does', () => {
           toolDefinition: {
             name: 'Elsewhere',
             description: 'Held by no group.',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           },
           call: async () => ({ content: [] }),
         },

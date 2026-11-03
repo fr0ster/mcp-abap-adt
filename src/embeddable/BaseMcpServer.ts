@@ -80,9 +80,9 @@ import type {
   HandlerEntry,
   IHandlersRegistry,
   SapEnvironment,
+  ToolArgs,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
-import { registeredSchema } from '../lib/handlers/utils/schemaUtils.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
   type ClaimedSession,
@@ -1389,7 +1389,7 @@ export abstract class BaseMcpServer extends McpServer {
             );
             continue;
           }
-          const runCall = async (args: unknown, signal: AbortSignal) => {
+          const runCall = async (args: ToolArgs, signal: AbortSignal) => {
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
             if (
@@ -1675,22 +1675,17 @@ export abstract class BaseMcpServer extends McpServer {
           // its own, or one it cannot extend, is registered as it is and
           // its arguments reach the handler as they came.
           const withHandle = this.stateHandleArgument
-            ? (withStateHandle(
-                listed.inputSchema,
-              ) as typeof entry.toolDefinition.inputSchema)
+            ? withStateHandle(listed.inputSchema)
             : listed.inputSchema;
           const declared = withHandle !== listed.inputSchema;
           const inputSchema = withHandle;
 
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
-          const wrappedHandler = (args: unknown) =>
+          const wrappedHandler = (args: ToolArgs) =>
             this.trackCall(toolName, (signal) =>
               runCall(declared ? withoutStateHandle(args) : args, signal),
             );
-          // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
-          const zodSchema = registeredSchema(inputSchema);
-
           // Register wrapped handler via SDK registerTool, with the
           // description the declared variant serves beside its schema.
           // Note: connection is NOT part of MCP tool signature
@@ -1704,7 +1699,7 @@ export abstract class BaseMcpServer extends McpServer {
                       entry.toolDefinition.name,
                     )
                   : listed.description,
-              inputSchema: zodSchema,
+              inputSchema,
               ...listed.search,
             },
             wrappedHandler,
@@ -1785,7 +1780,7 @@ export abstract class BaseMcpServer extends McpServer {
     tool: string;
     call: HandlerEntry['call'];
     context: HandlerContext;
-    args: unknown;
+    args: ToolArgs;
     holdsFlow: boolean;
     runsInBackground: boolean;
     system: ResolvedSystemContext | undefined;
@@ -1845,7 +1840,7 @@ export abstract class BaseMcpServer extends McpServer {
       tool: string;
       call: HandlerEntry['call'];
       context: HandlerContext;
-      args: unknown;
+      args: ToolArgs;
       holdsFlow: boolean;
       system: ResolvedSystemContext | undefined;
     },
@@ -1993,7 +1988,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async runConnectionless(
     call: HandlerEntry['call'],
-    args: unknown,
+    args: ToolArgs,
     signal: AbortSignal,
   ): Promise<{
     content: { type: 'text'; text: string }[];
@@ -2082,7 +2077,7 @@ export abstract class BaseMcpServer extends McpServer {
     tool: string,
     call: HandlerEntry['call'],
     context: HandlerContext,
-    args: unknown,
+    args: ToolArgs,
     signal: AbortSignal,
   ): Promise<unknown> {
     const strategy = this.backgroundRuns;
@@ -2153,7 +2148,7 @@ export abstract class BaseMcpServer extends McpServer {
   private async backgroundAnswer(
     call: HandlerEntry['call'],
     context: HandlerContext,
-    args: unknown,
+    args: ToolArgs,
   ): Promise<BackgroundRunAnswer> {
     try {
       const result = await runWithRequestSignal(
@@ -2598,7 +2593,7 @@ export abstract class BaseMcpServer extends McpServer {
 function callHandler(
   call: HandlerEntry['call'],
   context: HandlerContext,
-  args: unknown,
+  args: ToolArgs,
 ): Promise<unknown> {
   return runWithCallTransport(args, () => call(context, args));
 }

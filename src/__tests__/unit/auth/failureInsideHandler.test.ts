@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * An auth failure inside a handler. A credential SAP refused (its `401`) is
  * the failure adt-clients answers, carrying the connection's own message â€”
@@ -133,7 +134,7 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
           toolDefinition: {
             name: 'CaptureConnection',
             description: 'records the connection a handler is given',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           } as never,
           call: async (context: HandlerContext) => {
             seen = context.connection;

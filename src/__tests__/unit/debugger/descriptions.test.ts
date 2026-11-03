@@ -1,5 +1,6 @@
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import type { ToolDefinition } from '../../../lib/handlers/interfaces';
 import {
   declaredRequired,
   jsonAt,
@@ -8,10 +9,7 @@ import {
 } from '../../helpers/listedJson';
 
 /** A tool's own text and every parameter description, at any depth. */
-const textsOf = (definition: {
-  description: string;
-  inputSchema: unknown;
-}): string[] => {
+const textsOf = (definition: ToolDefinition): string[] => {
   const found: string[] = [definition.description];
   const walk = (node: unknown) => {
     if (Array.isArray(node)) return node.forEach(walk);
@@ -26,14 +24,9 @@ const textsOf = (definition: {
 };
 
 const coreDebugTools = () =>
-  new DebugHandlersGroup({} as never).getHandlers().map(
-    (e) =>
-      e.toolDefinition as {
-        name: string;
-        description: string;
-        inputSchema: unknown;
-      },
-  );
+  new DebugHandlersGroup({} as never)
+    .getHandlers()
+    .map((e) => e.toolDefinition);
 
 const START_TOOLS = ['DebugStartListener', 'DebugTakeOverListener'];
 
@@ -41,14 +34,7 @@ describe('the debugger descriptions', () => {
   it('no breakpoint description says every kind takes a condition', () => {
     for (const tool of [
       ...coreDebugTools(),
-      ...compactDebugEntries().map(
-        (e) =>
-          e.toolDefinition as {
-            name: string;
-            description: string;
-            inputSchema: unknown;
-          },
-      ),
+      ...compactDebugEntries().map((e) => e.toolDefinition),
     ])
       for (const text of textsOf(tool))
         expect({ tool: tool.name, text }).not.toEqual({

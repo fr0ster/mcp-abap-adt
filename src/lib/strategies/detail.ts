@@ -14,15 +14,6 @@ export type { AnswerDetail };
 const DETAIL_WORDS =
   'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).';
 
-export const DETAIL_PROPERTY = {
-  detail: {
-    type: 'string',
-    enum: ['terse', 'full', 'raw'],
-    default: 'terse',
-    description: DETAIL_WORDS,
-  },
-} as const;
-
 /** The `detail` field of a tool's zod input schema. */
 export const DETAIL_SHAPE = {
   detail: z

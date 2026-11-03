@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The idle bound ends a long session (spec §2, "Idle bound"): an open long
  * session is held state, so the bound (`stateIdleMinutes`) arms between
@@ -64,7 +65,7 @@ const slowPartGroup: IHandlerGroup = {
       toolDefinition: {
         name: 'HoldSlowPart',
         description: 'holds a part whose cleanup is slow',
-        inputSchema: { type: 'object', properties: {}, required: [] },
+        inputSchema: z.object({}),
       } as never,
       call: (async (context: HandlerContext, _args: unknown) => {
         context.state?.attach(slowPart());

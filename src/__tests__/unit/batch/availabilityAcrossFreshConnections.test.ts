@@ -16,6 +16,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
 import type {
@@ -56,7 +57,7 @@ const longRead: HandlerEntry = {
   toolDefinition: {
     name: TOOL,
     description: 'reads two items',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: z.object({}),
   } as never,
   call: (async (context: HandlerContext, _args: unknown) => {
     const ran = await withSequentialFallback(

@@ -31,7 +31,7 @@ interface CriticalSectionCapable {
  * lives on the per-request handler context, resolved when the handler runs.
  *
  * Generic over the handler's own signature so the wrapped function keeps the
- * exact arity/return type (and stays assignable to `ToolHandler`).
+ * exact arity/return type (and stays assignable to an entry's `call`).
  */
 export function withCriticalSection<H extends (...args: any[]) => any>(
   handler: H,

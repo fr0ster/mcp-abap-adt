@@ -38,7 +38,7 @@ import {
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
 import {
   READ_VERSION_FIELD,
-  READ_VERSION_PROPERTY,
+  READ_VERSIONS,
 } from '../../../lib/handlers/readVersion';
 import {
   resetSystemContextCache,
@@ -98,7 +98,7 @@ describe('GetTableType', () => {
     expect(GET_TABLE_TYPE.inputSchema.shape.version).toBe(READ_VERSION_FIELD);
   });
 
-  it.each(READ_VERSION_PROPERTY.enum)(
+  it.each(READ_VERSIONS)(
     'reads the version given (%s), and answers it',
     async (version) => {
       const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
@@ -115,7 +115,7 @@ describe('GetTableType', () => {
     },
   );
 
-  it.each(READ_VERSION_PROPERTY.enum)(
+  it.each(READ_VERSIONS)(
     'compact HandlerGet TABLE_TYPE passes its version (%s) to the read',
     async (version) => {
       const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);

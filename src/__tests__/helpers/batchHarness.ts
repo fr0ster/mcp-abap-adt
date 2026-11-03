@@ -29,6 +29,7 @@ import type {
 } from '../../lib/handlers/interfaces';
 import type { BatchEntryCase } from './batchEntryCases';
 import { LOCK_SUCCESS_XML } from './recordingConnection';
+import { toolAnswer } from './toolAnswer';
 
 /** A captured metadata document per ADT address prefix (not a source or include read). */
 const METADATA_DOCUMENTS: Array<[string, string]> = [
@@ -238,7 +239,7 @@ export async function runCase(
   if (!entry) throw new Error(`no served tool ${c.tool}`);
   const counting = countingConnection(mode, c.body, c.headers);
   (context as { connection: IAbapConnection }).connection = counting.connection;
-  const call: Promise<Answer> = entry.call(context, structuredClone(c.args));
+  const call = entry.call(context, structuredClone(c.args)).then(toolAnswer);
   if (mode === 'pending') {
     call.catch(() => undefined);
     await settle();

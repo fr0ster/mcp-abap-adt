@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * `BatchEnd` (spec §5): the open communication batch executed on the
  * connection `BatchEnd` took, every recorded call's answer the one its
@@ -120,13 +122,10 @@ function own(
         toolDefinition: {
           name,
           description: name,
-          inputSchema: {
-            type: 'object',
-            properties: {
-              program_name: { type: 'string' },
-              class_name: { type: 'string' },
-            },
-          },
+          inputSchema: z.object({
+            program_name: z.string().optional(),
+            class_name: z.string().optional(),
+          }),
         },
         call: async (context: HandlerContext, _args: unknown) =>
           handler(context),
@@ -623,10 +622,7 @@ describe('BatchEnd', () => {
           toolDefinition: {
             name: 'GetProgram',
             description: 'GetProgram',
-            inputSchema: {
-              type: 'object',
-              properties: { program_name: { type: 'string' } },
-            },
+            inputSchema: z.object({ program_name: z.string().optional() }),
           },
           // Two parameters: the server hands `(context, args)` by the arity.
           call: async (context: HandlerContext, _args: unknown) => {

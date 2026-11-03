@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * An ADT stand-in on 127.0.0.1 for the transports' credential suites: it
  * answers every request `200` with a CSRF token and a session cookie — or
@@ -357,15 +358,11 @@ export function probeGroup(
         toolDefinition: {
           name: 'ProbeAdt',
           description: 'sends one request on its connection',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              delayMs: { type: 'number' },
-              state_handle: { type: 'string' },
-            },
-            required: ['id'],
-          },
+          inputSchema: z.object({
+            id: z.string(),
+            delayMs: z.number().optional(),
+            state_handle: z.string().optional(),
+          }),
         } as never,
         call: (async (
           context: {

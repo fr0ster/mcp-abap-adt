@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Who creates objects (responsible) and on which system (master system), per
  * session, over SSE, where an on-premise system has no systeminformation
@@ -56,10 +57,7 @@ const whoAmI: IHandlerGroup = {
       toolDefinition: {
         name: 'WhoAmI',
         description: 'reports the context',
-        inputSchema: {
-          type: 'object',
-          properties: { delayMs: { type: 'number' } },
-        },
+        inputSchema: z.object({ delayMs: z.number().optional() }),
       } as never,
       call: (async (_context: unknown, args: { delayMs?: number }) => {
         await new Promise((r) => setTimeout(r, args?.delayMs ?? 0));

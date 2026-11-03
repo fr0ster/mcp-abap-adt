@@ -172,9 +172,10 @@ describe('where the session tools are served', () => {
     const tool = namesOf(set as ToolSet, 'http').find(
       (d) => d.name === 'HandlerSession',
     );
-    const schema = listedJson(tool?.inputSchema);
+    if (tool === undefined) throw new Error('no HandlerSession');
+    const schema = listedJson(tool.inputSchema);
     expect(jsonAt(schema, 'action').enum).toEqual(['open', 'close']);
-    expect(declaredRequired(tool?.inputSchema)).toEqual(['action']);
+    expect(declaredRequired(tool.inputSchema)).toEqual(['action']);
   });
 });
 
@@ -332,7 +333,7 @@ describe('close on an instance', () => {
         toolDefinition: {
           name: 'TakeDebugger',
           description: 'takes the debugger',
-          inputSchema: { type: 'object', properties: {}, required: [] },
+          inputSchema: z.object({}),
         } as never,
         call: (async (
           context: { debugger?: () => unknown },

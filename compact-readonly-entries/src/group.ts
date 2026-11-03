@@ -22,8 +22,11 @@
  * without writing, so they are here.
  */
 
-import type { HandlerEntry } from '@mcp-abap-adt/lib/handlers';
-import { BaseHandlerGroup } from '@mcp-abap-adt/lib/handlers';
+import {
+  BaseHandlerGroup,
+  defineTool,
+  type HandlerEntry,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   TOOL_DEFINITION as HandlerCdsUnitTestResult_Tool,
   handleHandlerCdsUnitTestResult,
@@ -99,74 +102,29 @@ import {
  */
 export function compactReadOnlyEntries(): HandlerEntry[] {
   return [
-    {
-      toolDefinition: HandlerGet_Tool,
-      call: handleHandlerGet,
-    },
-    {
-      toolDefinition: HandlerSearch_Tool,
-      call: handleHandlerSearch,
-    },
-    {
-      toolDefinition: HandlerWhereUsed_Tool,
-      call: handleHandlerWhereUsed,
-    },
-    {
-      toolDefinition: HandlerGetData_Tool,
-      call: handleHandlerGetData,
-    },
-    {
-      toolDefinition: HandlerValidate_Tool,
-      call: handleHandlerValidate,
-    },
-    {
-      toolDefinition: HandlerCheckRun_Tool,
-      call: handleHandlerCheckRun,
-    },
-    {
-      toolDefinition: HandlerDeletionCheck_Tool,
-      call: handleHandlerDeletionCheck,
-    },
-    {
-      toolDefinition: HandlerUnitTestStatus_Tool,
-      call: handleHandlerUnitTestStatus,
-    },
-    {
-      toolDefinition: HandlerUnitTestResult_Tool,
-      call: handleHandlerUnitTestResult,
-    },
-    {
-      toolDefinition: HandlerCdsUnitTestStatus_Tool,
-      call: handleHandlerCdsUnitTestStatus,
-    },
-    {
-      toolDefinition: HandlerCdsUnitTestResult_Tool,
-      call: handleHandlerCdsUnitTestResult,
-    },
-    {
-      toolDefinition: HandlerProfileList_Tool,
-      call: handleHandlerProfileList,
-    },
-    {
-      toolDefinition: HandlerProfileView_Tool,
-      call: handleHandlerProfileView,
-    },
-    {
-      toolDefinition: HandlerDumpList_Tool,
-      call: handleHandlerDumpList,
-    },
-    {
-      toolDefinition: HandlerDumpView_Tool,
-      call: handleHandlerDumpView,
-    },
-    {
-      toolDefinition: HandlerServiceBindingListTypes_Tool,
-      call: handleHandlerServiceBindingListTypes,
-    },
-    {
-      toolDefinition: HandlerServiceBindingValidate_Tool,
-      call: handleHandlerServiceBindingValidate,
-    },
+    defineTool(HandlerGet_Tool, handleHandlerGet),
+    defineTool(HandlerSearch_Tool, handleHandlerSearch),
+    defineTool(HandlerWhereUsed_Tool, handleHandlerWhereUsed),
+    defineTool(HandlerGetData_Tool, handleHandlerGetData),
+    defineTool(HandlerValidate_Tool, handleHandlerValidate),
+    defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),
+    defineTool(HandlerDeletionCheck_Tool, handleHandlerDeletionCheck),
+    defineTool(HandlerUnitTestStatus_Tool, handleHandlerUnitTestStatus),
+    defineTool(HandlerUnitTestResult_Tool, handleHandlerUnitTestResult),
+    defineTool(HandlerCdsUnitTestStatus_Tool, handleHandlerCdsUnitTestStatus),
+    defineTool(HandlerCdsUnitTestResult_Tool, handleHandlerCdsUnitTestResult),
+    defineTool(HandlerProfileList_Tool, handleHandlerProfileList),
+    defineTool(HandlerProfileView_Tool, handleHandlerProfileView),
+    defineTool(HandlerDumpList_Tool, handleHandlerDumpList),
+    defineTool(HandlerDumpView_Tool, handleHandlerDumpView),
+    defineTool(
+      HandlerServiceBindingListTypes_Tool,
+      handleHandlerServiceBindingListTypes,
+    ),
+    defineTool(
+      HandlerServiceBindingValidate_Tool,
+      handleHandlerServiceBindingValidate,
+    ),
   ];
 }
 

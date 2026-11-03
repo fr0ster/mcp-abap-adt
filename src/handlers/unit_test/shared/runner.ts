@@ -14,15 +14,6 @@ export type UnitTestRunner = (typeof UNIT_TEST_RUNNERS)[number];
 const RUNNER_WORDS =
   'async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.';
 
-export const RUNNER_PROPERTY = {
-  runner: {
-    type: 'string',
-    enum: ['async', 'sync'],
-    default: 'async',
-    description: RUNNER_WORDS,
-  },
-} as const;
-
 /** The `runner` field of a full-set run tool's zod input schema. */
 export const RUNNER_FIELD = z
   .enum(['async', 'sync'])
@@ -56,13 +47,6 @@ export function runnerOf(args: unknown): UnitTestRunner | Error {
  */
 const WAIT_WORDS =
   "true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.";
-
-export const WAIT_PROPERTY = {
-  wait: {
-    type: 'boolean',
-    description: WAIT_WORDS,
-  },
-} as const;
 
 /** The `wait` field of a run tool's zod input schema. */
 export const WAIT_FIELD = z.boolean().optional().describe(WAIT_WORDS);
@@ -112,41 +96,6 @@ export interface UnitTestScopeArgs {
   foreign_tests?: boolean;
   add_foreign_tests_as_preview?: boolean;
 }
-
-/**
- * The `scope` property of a full-set run tool: the shape compact
- * `HandlerUnitTestRun` takes, sent to both runners. What is left out is
- * adt-clients' default (own tests, foreign tests as a preview).
- *
- * Measured on premise (BASIS 816, 2026-10-23), a function group whose test
- * class carries `"! @testing FUNC:<module>`, the module's run: `/testruns`
- * with the default scope answered both methods as a preview (`isForeign`,
- * nothing executed) and with `foreign_tests: true` executed them; `/runs`
- * executed them with the default scope and with `foreign_tests: true` alike.
- */
-export const SCOPE_PROPERTY = {
-  scope: {
-    type: 'object',
-    description:
-      "Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.",
-    properties: {
-      own_tests: {
-        type: 'boolean',
-        description: "Include the object's own tests (default true).",
-      },
-      foreign_tests: {
-        type: 'boolean',
-        description:
-          'Execute the foreign tests, those linked by an ABAP Doc @testing relation (default false).',
-      },
-      add_foreign_tests_as_preview: {
-        type: 'boolean',
-        description:
-          'List the foreign tests as a preview, unexecuted (default true).',
-      },
-    },
-  },
-} as const;
 
 /** The `scope` field of a run tool's zod input schema. */
 export const SCOPE_FIELD = z

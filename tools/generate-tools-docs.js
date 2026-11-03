@@ -211,43 +211,29 @@ function moduleIndex() {
     byName.get(definition.name);
 }
 
-/**
- * A definition's input as JSON Schema: a plain object schema as it is, a Zod
- * shape converted as the MCP SDK lists it (input side).
- */
+/** A definition's input as JSON Schema, as the MCP SDK lists it (input side). */
 function jsonSchemaOf(inputSchema) {
   const { z } = require('zod');
-  if (inputSchema instanceof z.ZodObject)
-    return z.toJSONSchema(inputSchema, { io: 'input' });
-  if (
-    inputSchema &&
-    inputSchema.type === 'object' &&
-    typeof inputSchema.properties === 'object'
-  )
-    return inputSchema;
-  return z.toJSONSchema(z.object(inputSchema), { io: 'input' });
+  return z.toJSONSchema(inputSchema, { io: 'input' });
 }
 
 /**
- * The arguments a definition requires: a zod schema's fields that are neither
- * optional nor a default over an optional field, as its JSON Schema stated
- * them; a JSON Schema's `required`.
+ * The arguments a definition requires: its zod schema's fields that are
+ * neither optional nor a default over an optional field, as its JSON Schema
+ * stated them before it moved to zod.
  */
-function requiredOf(inputSchema, schema) {
+function requiredOf(inputSchema) {
   const { z } = require('zod');
-  if (inputSchema instanceof z.ZodObject) {
-    return Object.entries(inputSchema.shape)
-      .filter(
-        ([, field]) =>
-          !(
-            field instanceof z.ZodOptional ||
-            (field instanceof z.ZodDefault &&
-              field.unwrap() instanceof z.ZodOptional)
-          ),
-      )
-      .map(([name]) => name);
-  }
-  return Array.isArray(schema.required) ? [...schema.required] : [];
+  return Object.entries(inputSchema.shape)
+    .filter(
+      ([, field]) =>
+        !(
+          field instanceof z.ZodOptional ||
+          (field instanceof z.ZodDefault &&
+            field.unwrap() instanceof z.ZodOptional)
+        ),
+    )
+    .map(([name]) => name);
 }
 
 /** A built JSON-Schema property as the page lists it: type, default, enum, words. */
@@ -293,7 +279,7 @@ function documentedTool(definition, groupName, moduleOf) {
       typeof definition.description === 'string' ? definition.description : '',
     inputSchema: {
       properties,
-      required: requiredOf(definition.inputSchema, schema),
+      required: requiredOf(definition.inputSchema),
     },
     availableIn: Array.isArray(definition.available_in)
       ? [...definition.available_in]
@@ -420,7 +406,7 @@ function renderParams(tool) {
 
   const required = new Set(
     tool.inputSchema instanceof z.ZodObject
-      ? requiredOf(tool.inputSchema, schema)
+      ? requiredOf(tool.inputSchema)
       : schema?.required || [],
   );
   let out = '';

@@ -148,9 +148,9 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
     '%s',
     (_name, t) => {
       it('declares part source | metadata, default source', () => {
-        const schema = listedJson(
-          tools.get(t.tool)?.toolDefinition.inputSchema,
-        );
+        const entry = tools.get(t.tool);
+        if (entry === undefined) throw new Error(`no served tool ${t.tool}`);
+        const schema = listedJson(entry.toolDefinition.inputSchema);
         expect(jsonAt(schema, 'part')).toMatchObject({
           enum: ['source', 'metadata'],
           default: 'source',
@@ -224,7 +224,9 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
   it.each(METADATA_ONLY)(
     '%s (metadata-only type): one request, no part in the schema',
     async (tool, args) => {
-      const schema = listedJson(tools.get(tool)?.toolDefinition.inputSchema);
+      const entry = tools.get(tool);
+      if (entry === undefined) throw new Error(`no served tool ${tool}`);
+      const schema = listedJson(entry.toolDefinition.inputSchema);
       expect(schema.properties).toBeDefined();
       expect(schema.properties).not.toHaveProperty('part');
       for (const mode of MODES) {
@@ -387,12 +389,12 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
     },
   );
 
-  it('another part is refused before any request, naming the two', async () => {
+  it('another part is refused by the schema before any request, naming the two', async () => {
     const ran = await run({ include_name: 'INCL_A', part: 'urls' }, 'document');
     expect(ran.sent).toEqual([]);
-    expect(ran.answer?.isError).toBe(true);
-    expect(ran.answer?.content?.[0]?.text).toContain(
-      'part must be "source" or "metadata"',
+    expect(ran.answer).toBeUndefined();
+    expect(String(ran.threw)).toContain(
+      'Invalid arguments for tool GetInclude: Invalid option: expected one of "source"|"metadata" at part',
     );
   });
 });

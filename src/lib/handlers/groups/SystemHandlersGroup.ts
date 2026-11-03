@@ -103,7 +103,11 @@ import {
   TOOL_DEFINITION as RuntimeListSystemMessages_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerContext, HandlerEntry } from '../interfaces.js';
+import {
+  defineTool,
+  type HandlerContext,
+  type HandlerEntry,
+} from '../interfaces.js';
 
 /**
  * Handler group for all system-related handlers
@@ -123,120 +127,56 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: GetServiceBindingPreviewUrl_Tool,
-        call: handleGetServiceBindingPreviewUrl,
-      },
-      {
-        toolDefinition: GetTypeInfo_Tool,
-        call: handleGetTypeInfo,
-      },
-      {
-        toolDefinition: GetTransaction_Tool,
-        call: handleGetTransaction,
-      },
-      {
-        toolDefinition: RuntimeListProfilerTraceFiles_Tool,
-        call: (context) => handleRuntimeListProfilerTraceFiles(context),
-      },
-      {
-        toolDefinition: RuntimeGetProfilerTraceData_Tool,
-        call: handleRuntimeGetProfilerTraceData,
-      },
-      {
-        toolDefinition: RuntimeGetDumpById_Tool,
-        call: handleRuntimeGetDumpById,
-      },
+      defineTool(
+        GetServiceBindingPreviewUrl_Tool,
+        handleGetServiceBindingPreviewUrl,
+      ),
+      defineTool(GetTypeInfo_Tool, handleGetTypeInfo),
+      defineTool(GetTransaction_Tool, handleGetTransaction),
+      defineTool(RuntimeListProfilerTraceFiles_Tool, (context) =>
+        handleRuntimeListProfilerTraceFiles(context),
+      ),
+      defineTool(
+        RuntimeGetProfilerTraceData_Tool,
+        handleRuntimeGetProfilerTraceData,
+      ),
+      defineTool(RuntimeGetDumpById_Tool, handleRuntimeGetDumpById),
       // ATC — the run is three calls and the composite is this repository's,
       // which is what `AdtAtc` says in as many words when it explains why it
       // stopped being `IAdtRunnable`. A check run changes nothing in the
       // system (the owner's decision), so the read-only binaries serve it.
-      {
-        toolDefinition: RunATC_Tool,
-        call: handleRunATC,
-      },
-      {
-        toolDefinition: GetATCRunStatus_Tool,
-        call: handleGetATCRunStatus,
-      },
-      {
-        toolDefinition: GetATCFindings_Tool,
-        call: handleGetATCFindings,
-      },
-      {
-        toolDefinition: ListATCResults_Tool,
-        call: handleListATCResults,
-      },
-      {
-        toolDefinition: GetATCResult_Tool,
-        call: handleGetATCResult,
-      },
-      {
-        toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,
-        call: handleRuntimeAnalyzeProfilerTrace,
-      },
-      {
-        toolDefinition: RuntimeListFeeds_Tool,
-        call: handleRuntimeListFeeds,
-      },
-      {
-        toolDefinition: RuntimeListSystemMessages_Tool,
-        call: handleRuntimeListSystemMessages,
-      },
-      {
-        toolDefinition: RuntimeGetGatewayErrorLog_Tool,
-        call: handleRuntimeGetGatewayErrorLog,
-      },
-      {
-        toolDefinition: GetSqlQuery_Tool,
-        call: handleGetSqlQuery,
-      },
-      {
-        toolDefinition: GetWhereUsed_Tool,
-        call: handleGetWhereUsed,
-      },
-      {
-        toolDefinition: GetObjectInfo_Tool,
-        call: handleGetObjectInfo,
-      },
-      {
-        toolDefinition: GetAbapAST_Tool,
-        call: handleGetAbapAST,
-      },
-      {
-        toolDefinition: GetAbapSemanticAnalysis_Tool,
-        call: handleGetAbapSemanticAnalysis,
-      },
-      {
-        toolDefinition: GetAbapSystemSymbols_Tool,
-        call: handleGetAbapSystemSymbols,
-      },
-      {
-        toolDefinition: GetInactiveObjects_Tool,
-        call: handleGetInactiveObjects,
-      },
+      defineTool(RunATC_Tool, handleRunATC),
+      defineTool(GetATCRunStatus_Tool, handleGetATCRunStatus),
+      defineTool(GetATCFindings_Tool, handleGetATCFindings),
+      defineTool(ListATCResults_Tool, handleListATCResults),
+      defineTool(GetATCResult_Tool, handleGetATCResult),
+      defineTool(
+        RuntimeAnalyzeProfilerTrace_Tool,
+        handleRuntimeAnalyzeProfilerTrace,
+      ),
+      defineTool(RuntimeListFeeds_Tool, handleRuntimeListFeeds),
+      defineTool(
+        RuntimeListSystemMessages_Tool,
+        handleRuntimeListSystemMessages,
+      ),
+      defineTool(
+        RuntimeGetGatewayErrorLog_Tool,
+        handleRuntimeGetGatewayErrorLog,
+      ),
+      defineTool(GetSqlQuery_Tool, handleGetSqlQuery),
+      defineTool(GetWhereUsed_Tool, handleGetWhereUsed),
+      defineTool(GetObjectInfo_Tool, handleGetObjectInfo),
+      defineTool(GetAbapAST_Tool, handleGetAbapAST),
+      defineTool(GetAbapSemanticAnalysis_Tool, handleGetAbapSemanticAnalysis),
+      defineTool(GetAbapSystemSymbols_Tool, handleGetAbapSystemSymbols),
+      defineTool(GetInactiveObjects_Tool, handleGetInactiveObjects),
       // Dynamic import handlers
-      {
-        toolDefinition: GetAdtTypes_Tool,
-        call: handleGetAdtTypes,
-      },
-      {
-        toolDefinition: GetObjectStructure_Tool,
-        call: handleGetObjectStructure,
-      },
-      {
-        toolDefinition: GetObjectNodeFromCache_Tool,
-        call: handleGetObjectNodeFromCache,
-      },
-      {
-        toolDefinition: DescribeByList_Tool,
-        call: handleDescribeByList,
-      },
+      defineTool(GetAdtTypes_Tool, handleGetAdtTypes),
+      defineTool(GetObjectStructure_Tool, handleGetObjectStructure),
+      defineTool(GetObjectNodeFromCache_Tool, handleGetObjectNodeFromCache),
+      defineTool(DescribeByList_Tool, handleDescribeByList),
       // High-level handler for package tree
-      {
-        toolDefinition: GetPackageTree_Tool,
-        call: handleGetPackageTree,
-      },
+      defineTool(GetPackageTree_Tool, handleGetPackageTree),
     ];
   }
 }

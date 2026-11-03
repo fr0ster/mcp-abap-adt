@@ -136,7 +136,7 @@ export const TOOL_DEFINITION = {
 interface DomainArgs {
   domain_name: string;
   description?: string;
-  package_name: string;
+  package_name?: string;
   transport_request?: string;
   datatype?: string;
   length?: number;
@@ -161,12 +161,13 @@ export async function handleCreateDomain(
   if (!args?.domain_name) {
     return return_error('Domain name is required');
   }
-  if (!args?.package_name) {
+  const packageName = args?.package_name;
+  if (!packageName) {
     return return_error('Package name is required');
   }
 
   validateTransportRequest(
-    args.package_name,
+    packageName,
     args.transport_request,
     args.super_package,
   );
@@ -188,7 +189,7 @@ export async function handleCreateDomain(
             {
               domainName,
               description: args.description || domainName,
-              packageName: args.package_name,
+              packageName,
             },
             { analyse: analyseException },
           ),
@@ -199,7 +200,7 @@ export async function handleCreateDomain(
               {
                 domainName,
                 description: args.description || domainName,
-                packageName: args.package_name,
+                packageName,
                 transportRequest: args.transport_request,
                 masterLanguage: args.master_language,
               },

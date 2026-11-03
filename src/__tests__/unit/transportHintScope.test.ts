@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The transport hint knows what the call sent even when the failed request's
  * URL does not show it (fr0ster/mcp-abap-adt#314).
@@ -32,6 +33,7 @@ import { project, terseWrite } from '../../lib/strategies/projections';
 import { refusedResponse } from '../helpers/fakeClient';
 import { withSystemInformation } from '../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../helpers/systemKind';
+import { toolAnswer } from '../helpers/toolAnswer';
 
 beforeEach(() => {
   stateSystemKind();
@@ -67,10 +69,7 @@ const STUBS: HandlerEntry[] = [
     toolDefinition: {
       name: 'StubCreate',
       description: 'creates an object',
-      inputSchema: {
-        type: 'object',
-        properties: { transport_request: { type: 'string' } },
-      },
+      inputSchema: z.object({ transport_request: z.string().optional() }),
     },
     call: async (_context: unknown, _args: unknown) => handler(),
   } as unknown as HandlerEntry,
@@ -214,8 +213,10 @@ describe('the other ways a handler is invoked enter the same scope', () => {
     ];
     const [exported] = exporter.getHandlerEntries();
     const args = { transport_request: 'SIDK900001' };
-    const result = await exported?.call(noConnectionContext(), args);
-    expect(JSON.parse(result.content[0].text).hint).toEqual({
+    const result = toolAnswer(
+      await exported?.call(noConnectionContext(), args),
+    );
+    expect(JSON.parse(result.content[0]?.text ?? '{}').hint).toEqual({
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
   });

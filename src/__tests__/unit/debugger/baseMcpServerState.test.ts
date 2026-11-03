@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { MockAbapConnection } from '../../../embeddable/MockAbapConnection';
@@ -55,7 +56,7 @@ class GatedServer extends BaseMcpServer {
         toolDefinition: {
           name: 'Gated',
           description: 'waits for a gate',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema: z.object({}),
         },
         call: async (context: HandlerContext, _args: unknown) => {
           this.seen.push(context);

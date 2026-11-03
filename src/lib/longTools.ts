@@ -103,14 +103,6 @@ export const LONG_TOOL_ADVICE =
 export const TIMEOUT_DESCRIPTION =
   "Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.";
 
-/** The `timeout` property of a listed tool's JSON Schema. */
-export const TIMEOUT_PROPERTY = {
-  type: 'integer',
-  minimum: 1,
-  maximum: MAX_TIMEOUT_SECONDS,
-  description: TIMEOUT_DESCRIPTION,
-} as const;
-
 /** The `timeout` field of a listed tool declared as a zod raw shape. */
 export function timeoutField() {
   return z

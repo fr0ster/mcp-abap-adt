@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The ABAP Cloud system-context lookup (`systeminformation`) is asked once
  * per connection, before the first tool on it runs, inside the main flow
@@ -153,7 +154,7 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
     toolDefinition: {
       name: 'DebugWait',
       description: 'DebugWait',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
     call: (async (_context: unknown, _args: unknown) => ({
       content: [{ type: 'text', text: 'waited' }],
@@ -276,11 +277,7 @@ describe('ABAP Cloud, the lookup refused', () => {
     toolDefinition: {
       name: 'TwoStep',
       description: 'TwoStep',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-      },
+      inputSchema: z.object({ id: z.string() }),
     },
     call: (async (
       context: {
@@ -418,7 +415,7 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
     toolDefinition: {
       name: 'DebugWait',
       description: 'DebugWait',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
     call: (async (_context: unknown, _args: unknown) => {
       ran += 1;
@@ -463,7 +460,7 @@ it('a replacement after a lost session asks no lookup: the same credential on th
     toolDefinition: {
       name: 'LoseSession',
       description: 'LoseSession',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
     call: (async (
       context: { connection: Sender & { isConnected?: () => boolean } },
@@ -482,7 +479,7 @@ it('a replacement after a lost session asks no lookup: the same credential on th
     toolDefinition: {
       name: 'Responsible',
       description: 'Responsible',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
     call: (async (context: { connection: Sender }, _args: unknown) => {
       const { responsible: user } = requireSystemContextForCreate();

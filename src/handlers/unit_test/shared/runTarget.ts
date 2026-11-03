@@ -38,39 +38,6 @@ export interface RunTargetArgs {
   include_subpackages?: boolean;
 }
 
-/** The `target` property of a tool that runs ABAP Unit by a run target. */
-export const RUN_TARGET_PROPERTY = {
-  target: {
-    type: 'object',
-    description:
-      'What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).',
-    properties: {
-      kind: {
-        type: 'string',
-        enum: TARGET_KINDS,
-        description:
-          'object: one object, named by name and type. package: one package, named by name.',
-      },
-      name: {
-        type: 'string',
-        description: 'Name of the object or the package.',
-      },
-      type: {
-        type: 'string',
-        enum: ABAP_UNIT_RUN_OBJECT_TYPES,
-        description:
-          'Run object type of the object (kind object; required there).',
-      },
-      include_subpackages: {
-        type: 'boolean',
-        description:
-          "Whether the run covers the package's subpackages too (kind package; required there).",
-      },
-    },
-    required: ['kind', 'name'],
-  },
-} as const;
-
 const RUN_TARGET_WORDS =
   'What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).';
 

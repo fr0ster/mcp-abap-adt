@@ -1,7 +1,8 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
 import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
@@ -12,17 +13,10 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      run_id: {
-        type: 'string',
-        description: 'Run identifier returned by unit test run.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['run_id'],
-  },
+  inputSchema: z.object({
+    run_id: z.string().describe('Run identifier returned by unit test run.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface GetCdsUnitTestArgs {

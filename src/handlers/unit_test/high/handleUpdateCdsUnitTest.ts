@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateCdsUnitTest — replace the tests in a CDS view's ABAP Unit test class
  * (a global class holding them) and activate it.
@@ -5,7 +7,7 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { writeClassTests } from '../shared/writeTests';
@@ -15,27 +17,23 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Writes test_class_source as the ABAP Unit test classes of the CDS view test class named by class_name. The local test classes in the test class are rewritten, and it is activated.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Test class of the CDS view. Must already exist.',
-      },
-      test_class_source: {
-        type: 'string',
-        description:
-          'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request, not a task. Required for a transportable object.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'test_class_source'],
-  },
+  inputSchema: z.object({
+    class_name: z
+      .string()
+      .describe('Test class of the CDS view. Must already exist.'),
+    test_class_source: z
+      .string()
+      .describe(
+        'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request, not a task. Required for a transportable object.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateCdsUnitTestArgs {

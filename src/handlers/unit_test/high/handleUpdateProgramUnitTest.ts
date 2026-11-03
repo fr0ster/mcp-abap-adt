@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateProgramUnitTest — replace the test classes in a report's test include
  * and activate it and the report.
@@ -5,7 +7,7 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { writeProgramTests } from '../shared/writeTests';
@@ -15,28 +17,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Writes test_class_source as the ABAP Unit test classes of the report named by program_name. The local test classes in its test include are rewritten, and it is activated.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description:
-          'Report whose tests are replaced. Its test include must already exist.',
-      },
-      test_class_source: {
-        type: 'string',
-        description:
-          'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request, not a task. Required for a transportable object.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'test_class_source'],
-  },
+  inputSchema: z.object({
+    program_name: z
+      .string()
+      .describe(
+        'Report whose tests are replaced. Its test include must already exist.',
+      ),
+    test_class_source: z
+      .string()
+      .describe(
+        'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request, not a task. Required for a transportable object.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateProgramUnitTestArgs {

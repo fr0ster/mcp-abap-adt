@@ -13,6 +13,7 @@ import {
   type AbapUnitRunObjectType,
   type AbapUnitRunTarget,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 
 /** Whether `value` is a key of the run registry. */
 function isRunObjectType(value: string): value is AbapUnitRunObjectType {
@@ -69,6 +70,30 @@ export const RUN_TARGET_PROPERTY = {
     required: ['kind', 'name'],
   },
 } as const;
+
+/** The `target` field of a tool that runs ABAP Unit by a run target, as a zod schema; required where it is declared. */
+export const RUN_TARGET_FIELD = z
+  .object({
+    kind: z
+      .enum(TARGET_KINDS)
+      .describe(
+        'object: one object, named by name and type. package: one package, named by name.',
+      ),
+    name: z.string().describe('Name of the object or the package.'),
+    type: z
+      .enum(ABAP_UNIT_RUN_OBJECT_TYPES)
+      .optional()
+      .describe('Run object type of the object (kind object; required there).'),
+    include_subpackages: z
+      .boolean()
+      .optional()
+      .describe(
+        "Whether the run covers the package's subpackages too (kind package; required there).",
+      ),
+  })
+  .describe(
+    'What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).',
+  );
 
 /** A field of a caller's object, as given. */
 export function fieldOf(given: object, field: string): unknown {

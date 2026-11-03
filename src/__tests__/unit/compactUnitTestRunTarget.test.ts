@@ -8,6 +8,10 @@
 
 import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
 import { TOOL_DEFINITION as RUN_ABAP_UNIT } from '../../handlers/unit_test/high/handleRunAbapUnit';
+import {
+  RUN_TARGET_FIELD,
+  RUN_TARGET_PROPERTY,
+} from '../../handlers/unit_test/shared/runTarget';
 import { compactUnitTestRunSchema } from '../../lib/compact/compactSchemas';
 import {
   type RecordedRequest,
@@ -165,8 +169,9 @@ describe('HandlerUnitTestRun: refused before anything is sent', () => {
 describe("HandlerUnitTestRun's schema", () => {
   it("takes target as RunAbapUnit's own schema piece, not a copy", () => {
     expect(compactUnitTestRunSchema.properties.target).toBe(
-      RUN_ABAP_UNIT.inputSchema.properties.target,
+      RUN_TARGET_PROPERTY.target,
     );
+    expect(RUN_ABAP_UNIT.inputSchema.shape.target).toBe(RUN_TARGET_FIELD);
   });
 
   it('requires neither tests nor target by schema: the handler takes exactly one', () => {

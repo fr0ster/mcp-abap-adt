@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateUnitTest — write the ABAP Unit tests of a class: its local test
  * classes, in the class's `testclasses` include, then activate the class.
@@ -6,7 +8,7 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { writeClassTests } from '../shared/writeTests';
@@ -16,27 +18,23 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Class that holds the tests. Must already exist.',
-      },
-      test_class_source: {
-        type: 'string',
-        description:
-          'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request, not a task. Required for a transportable object.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'test_class_source'],
-  },
+  inputSchema: z.object({
+    class_name: z
+      .string()
+      .describe('Class that holds the tests. Must already exist.'),
+    test_class_source: z
+      .string()
+      .describe(
+        'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request, not a task. Required for a transportable object.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateUnitTestArgs {

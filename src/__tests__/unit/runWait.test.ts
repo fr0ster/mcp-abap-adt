@@ -51,6 +51,7 @@ import {
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { corpusBody } from '../../lib/adtCorpus';
+import { declaredRequired, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
   type RecordingConnection,
@@ -449,7 +450,7 @@ describe('the schema', () => {
   ])(
     '$name declares wait: an optional boolean with no schema default (true when absent), and says what each value does',
     (tool) => {
-      const properties: Record<string, unknown> = tool.inputSchema.properties;
+      const properties = listedJson(tool.inputSchema).properties ?? {};
       expect(properties.wait).toEqual({
         type: 'boolean',
         description: expect.stringContaining(
@@ -457,7 +458,7 @@ describe('the schema', () => {
         ),
       });
       expect(properties).not.toHaveProperty('max_status_polls');
-      expect(tool.inputSchema.required).not.toContain('wait');
+      expect(declaredRequired(tool.inputSchema)).not.toContain('wait');
       expect(tool.description).toContain('with wait true (default)');
       expect(tool.description).toContain(
         'with wait false the call answers the run_id right after the start',
@@ -472,8 +473,8 @@ describe('the schema', () => {
   );
 
   it('GetUnitTestResult declares no wait and no max_status_polls', () => {
-    const properties: Record<string, unknown> =
-      GetUnitTestResult_Tool.inputSchema.properties;
+    const properties =
+      listedJson(GetUnitTestResult_Tool.inputSchema).properties ?? {};
     expect(properties).not.toHaveProperty('wait');
     expect(properties).not.toHaveProperty('max_status_polls');
   });

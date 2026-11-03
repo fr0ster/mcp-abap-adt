@@ -48,7 +48,7 @@
     "CreateClass": "class_name*, description, package_name*, transport_request, superclass, final, abstract, create_protected, master_language, detail, state_handle",
     "CreateDataElement": "data_element_name*, description, package_name*, transport_request, data_type, length, decimals, short_label, medium_label, long_label, heading_label, type_kind, type_name, search_help, search_help_parameter, set_get_parameter, master_language, detail, state_handle",
     "CreateDdl": "ddl_name*, package_name*, transport_request, description, master_language, detail, state_handle",
-    "CreateDomain": "domain_name*, description, package_name, transport_request, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, activate, fixed_values, master_language, detail, state_handle",
+    "CreateDomain": "domain_name*, description, package_name*, transport_request, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, activate, fixed_values, master_language, detail, state_handle",
     "CreateFunctionGroup": "function_group_name*, description, package_name*, transport_request, activate, master_language, detail, state_handle",
     "CreateFunctionGroupUnitTest": "function_group_name*, test_class_source*, transport_request, detail, state_handle",
     "CreateFunctionInclude": "function_group_name*, include_name*, description, transport_request, detail, state_handle",

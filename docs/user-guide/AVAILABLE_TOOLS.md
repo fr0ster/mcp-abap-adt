@@ -2468,7 +2468,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
 - `lowercase` (boolean, optional (default: false)) - (optional) Allow lowercase input
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, optional) - (optional) Package name
+- `package_name` (string, required) - Package the domain is created in.
 - `sign_exists` (boolean, optional (default: false)) - (optional) Field has sign (+/-)
 - `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable packages.
 - `value_table` (string, optional) - (optional) Value table name for foreign key relationship

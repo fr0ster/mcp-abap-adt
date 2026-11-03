@@ -65,7 +65,7 @@ export const TOOL_DEFINITION = {
       .describe(
         '(optional) Domain description. If not provided, domain_name will be used.',
       ),
-    package_name: z.string().optional().describe('(optional) Package name'),
+    package_name: z.string().describe('Package the domain is created in.'),
     transport_request: z
       .string()
       .optional()
@@ -136,7 +136,7 @@ export const TOOL_DEFINITION = {
 interface DomainArgs {
   domain_name: string;
   description?: string;
-  package_name?: string;
+  package_name: string;
   transport_request?: string;
   datatype?: string;
   length?: number;

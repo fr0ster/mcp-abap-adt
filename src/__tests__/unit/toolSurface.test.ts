@@ -220,10 +220,14 @@ describe('the MCP tool surface', () => {
       // refused (before, adt-clients failed on it with a TypeError). The
       // schema now says what the handler already required: `package_name`
       // leaves and `package_name*` arrives, this one pair and nothing else.
+      // **A third, decided by the owner (24.0.0).** `CreateDomain` requires
+      // `package_name`: SAP creates no domain without one, and the handler
+      // refused every call without it while the schema said optional.
       const MAY_TIGHTEN_REQUIRED: Record<string, string> = {
         'debug/DebugStartListener': 'breakpoints',
         'debug/DebugTakeOverListener': 'breakpoints',
         'high/ValidateServiceBinding': 'package_name',
+        'high/CreateDomain': 'package_name',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the

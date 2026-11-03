@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateMessageClass Handler - Write a Message Class's own metadata
  *
@@ -31,7 +33,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -45,26 +47,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Updates the header of the ABAP message class named by message_class_name: its description.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Message class name.',
-      },
-      description: {
-        type: 'string',
-        description: 'New short description for the message class.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          '(optional) Transport request number, not a task. Required for transportable objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['message_class_name', 'description'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Message class name.'),
+    description: z
+      .string()
+      .describe('New short description for the message class.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Transport request number, not a task. Required for transportable objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateMessageClassArgs {

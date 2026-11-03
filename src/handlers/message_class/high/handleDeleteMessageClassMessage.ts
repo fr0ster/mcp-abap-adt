@@ -1,4 +1,5 @@
 import { messageDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * DeleteMessageClassMessage Handler - Delete a single message from a Message
  * Class (MSAG) via AdtClient.
@@ -75,25 +76,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Parent message class name.',
-      },
-      msgno: {
-        type: 'string',
-        description: 'Message number to delete (e.g., "001").',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects, optional for local ones.',
-      },
-    },
-    required: ['message_class_name', 'msgno'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Parent message class name.'),
+    msgno: z.string().describe('Message number to delete (e.g., "001").'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects, optional for local ones.',
+      ),
+  }),
 } as const;
 
 interface DeleteMessageClassMessageArgs {

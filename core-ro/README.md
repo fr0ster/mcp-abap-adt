@@ -11,7 +11,8 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 - the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
 - the **system** tools — where-used, type and object information, the ABAP AST and semantic
   analysis, SQL queries, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
-  (`RunATC`, `GetATCRunStatus`, `GetATCFindings`);
+  (`RunATC`, `GetATCRunStatus`, `GetATCFindings`, and the stored results:
+  `ListATCResults`, `GetATCResult`);
 - **search** (`SearchObject`);
 - the **leftover-session list** (`ListLeftoverSessions`): the SAP sessions a killed server
   process left open, only the caller's own. Their logoff (`LogoffLeftoverSession`) releases every

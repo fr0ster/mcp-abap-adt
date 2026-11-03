@@ -354,6 +354,18 @@
     "sends": "GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false"
   },
   {
+    "tool": "ListATCResults",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleListATCResults.ts#handleListATCResults",
+    "sends": "GET /sap/bc/adt/atc/results?createdBy={user}[&centralResult=true][&ageMin=N][&ageMax=N]"
+  },
+  {
+    "tool": "GetATCResult",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleGetATCResult.ts#handleGetATCResult",
+    "sends": "GET /sap/bc/adt/atc/results/{displayId}"
+  },
+  {
     "tool": "RuntimeListProfilerTraceFiles",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts#handleRuntimeListProfilerTraceFiles",

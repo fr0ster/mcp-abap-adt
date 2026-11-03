@@ -18,7 +18,7 @@ are unknown.
 48 cases, 61 exchanges. Captured by `scripts/capture-adt-corpus.ts` (removed in #234; last at
 `f78b9611`) against the ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 Those are the 48 cases and 61 exchanges of that run; later cases were added by hand and are
-listed in their own sections below (the last: `read-metadata-table-type`, 2026-11-01). The files in this
+listed in their own sections below (the last: `atc-result-by-display-id-objects`, 2026-11-03). The files in this
 directory outnumber that run's.
 
 ## Layout
@@ -113,6 +113,17 @@ The body is the answer byte for byte, one line as SAP sent it, except that
 `scripts/capture-adt-corpus.ts`; the response headers were not recorded, and the
 sidecar carries no timestamp. The table-type tests share it (`getTypeInfo`,
 `tableTypePatch`, `tableTypeTools`, `includeTableTypeMetadataReads`).
+
+| Case | What provoked it | What came back |
+|---|---|---|
+| `atc-results-list-central` | `GET /sap/bc/adt/atc/results?centralResult=true&createdBy=*&ageMin=0&ageMax=3650`, Accept `*/*`, the ABAP cloud trial system, 2026-11-02 | 200, `atcresult:resultList` of six `atcresult:result`, each `displayId`, `title`, `checkVariant`, an empty `runSeries`, `createdAt` and `aggregates` (`numPrio1`…`numPrio4`, `numFailure`) |
+| `atc-result-by-display-id` | `GET /sap/bc/adt/atc/results/{displayId}?activeResult=false&includeExemptedFindings=false`, the same system and day | 200, the same `resultList` holding one result with `objects`: one `atcobject:object` (a function group) with three `atcfinding:finding`, each with its documentation `atom:link` and `quickfixes` |
+| `atc-result-by-display-id-objects` | the same read of a run over three objects, the same system, 2026-11-03 | 200, one result with three `atcobject:object` (two classes and a function group) and four findings between them; the generated title names the user, set to `SAPUSER01` |
+| `atc-results-list-empty` | `GET /sap/bc/adt/atc/results?activeResult=true&createdBy=*`, the same system and day | 200, an empty `atcresult:resultList` |
+
+The bodies are the answers byte for byte, except that every SAP user id
+(`author`, `processor`, `lastChangedBy`) was set to `SAPUSER01`. They were
+taken by a direct GET; the response headers were not recorded.
 
 ## Refusals
 

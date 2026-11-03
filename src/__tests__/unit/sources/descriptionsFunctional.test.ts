@@ -305,6 +305,8 @@ describe('tool descriptions are purely functional', () => {
       'RunATC',
       'GetATCRunStatus',
       'GetATCFindings',
+      'ListATCResults',
+      'GetATCResult',
       'GetUnitTestStatus',
       'DiscardBackgroundRun',
       'ListLeftoverSessions',
@@ -473,7 +475,13 @@ const LEFT_THE_READ_ONLY_SETS: Readonly<Record<string, ToolSetKind>> = {
 const READ_ONLY_SETS: readonly ToolSetKind[] = ['core-ro', 'compact-ro'];
 
 /** The tools of a check run the owner keeps read-only. */
-const READ_ONLY_CHECK_RUN = ['RunATC', 'GetATCRunStatus', 'GetATCFindings'];
+const READ_ONLY_CHECK_RUN = [
+  'RunATC',
+  'GetATCRunStatus',
+  'GetATCFindings',
+  'ListATCResults',
+  'GetATCResult',
+];
 
 describe('a read-only set serves only tools that change nothing in the system', () => {
   it.each(READ_ONLY_SETS)(

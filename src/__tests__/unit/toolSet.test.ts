@@ -374,18 +374,24 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
 });
 
 /**
- * The three ATC tools read and run checks, and change no object: the
+ * The ATC tools read and run checks, and change no object: the
  * read-only object-oriented binaries serve them on every transport, as the
  * full ones do. No compact set has an ATC route.
  */
 describe('the ATC tools', () => {
-  const ATC = ['RunATC', 'GetATCRunStatus', 'GetATCFindings'];
+  const ATC = [
+    'RunATC',
+    'GetATCRunStatus',
+    'GetATCFindings',
+    'ListATCResults',
+    'GetATCResult',
+  ];
   const transports: ServedTransport[] = ['stdio', 'http', 'sse'];
 
   it.each([
     ['core', fullToolSet],
     ['core-ro', fullReadOnlyToolSet],
-  ] as const)('%s serves all three on every transport', (kind, set) => {
+  ] as const)('%s serves all of them on every transport', (kind, set) => {
     for (const transport of transports) {
       const names = toolsOf(set, transport);
       expect({

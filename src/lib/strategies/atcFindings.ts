@@ -124,7 +124,9 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-type Element = Record<string, unknown> & { '@'?: Record<string, string> };
+export type Element = Record<string, unknown> & {
+  '@'?: Record<string, string>;
+};
 
 /** One element, several, or none — all three arrive here as a list. */
 function asList(value: unknown): Element[] {
@@ -198,14 +200,30 @@ function quickfixes(finding: Element): AtcQuickfixFlags | undefined {
 }
 
 export function parseAtcWorklist(document: string): AtcWorklistReading {
+  const parsed = parser.parse(document) as Element;
+  const worklist = (parsed.worklist ?? {}) as Element;
+  return readAtcObjects(worklist.objects);
+}
+
+/** The XML parser every ATC document here is read with: SAP's document, unread. */
+export function parseAtcDocument(document: string): unknown {
+  return parser.parse(document);
+}
+
+/** One element, several, or none, as a list: for the readers of other ATC documents. */
+export const atcElements = asList;
+
+/**
+ * The findings of the `objects` element of a worklist or of an ATC result:
+ * both carry `atcobject:object` elements with `atcobject:findings` of
+ * `atcfinding:finding`.
+ */
+export function readAtcObjects(objectsElement: unknown): AtcWorklistReading {
   const findings: AtcFindingFull[] = [];
   const by_priority: Record<string, number> = {};
   let objects_checked = 0;
 
-  const parsed = parser.parse(document) as Element;
-  const worklist = (parsed.worklist ?? {}) as Element;
-
-  for (const objects of asList(worklist.objects)) {
+  for (const objects of asList(objectsElement)) {
     for (const object of asList(objects.object)) {
       // Counted whether or not it found anything: an object with nothing to
       // report still had the checks run over it, and leaving those out would

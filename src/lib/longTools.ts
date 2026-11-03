@@ -33,6 +33,8 @@ export const LONG_TOOLS: readonly string[] = [
   'DescribeByList',
   'GetAbapSystemSymbols',
   'GetATCFindings',
+  'ListATCResults',
+  'GetATCResult',
   'RuntimeGetProfilerTraceData',
   'RuntimeAnalyzeProfilerTrace',
   'HandlerWhereUsed',

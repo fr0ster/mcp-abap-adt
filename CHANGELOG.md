@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [23.1.0] - 2026-11-03
+
+A minor: the stored ATC results. The eighteen packages are at 23.1.0, every sibling range at `^23.1.0`; `@mcp-abap-adt/adt-clients` `^42.1.0`, `@mcp-abap-adt/adt-strategies` `^0.18.2`, `@mcp-abap-adt/interfaces-adt` `^25.1.0`.
+
+### Added
+
+- **`ListATCResults`** (core and core-ro, every transport; on premise and ABAP cloud): lists the ATC results the system holds, newest first (`GET …/atc/results`). `created_by` is required — a user name, or `*` for every user (SAP refuses a list without it, `400`); `central_only: true` lists central results only; `age_min` / `age_max` bound the age in days. Without ages SAP applies a window of its own, which moved between two days on premise (26 central results on 2026-11-02, none on 2026-11-03, while ages 0–3650 listed 159), so a list to rely on states its ages. Answers `results`, each with `display_id`, `title`, `check_variant`, `run_series` (absent when empty), `created_at`, `by_priority` and `failures`. SAP takes no count; the ages bound the list.
+- **`GetATCResult`** (the same binaries and systems): reads one stored result by its `display_id` (`GET …/atc/results/{displayId}`) and answers its `title`, `check_variant`, `created_at`, `objects_checked`, `by_priority` and `findings`, each finding as `GetATCFindings` reads a worklist's (`detail` terse, full or raw). The counts are the findings': the result's own aggregates read zero while it holds findings (measured). An unknown Display ID answers SAP's `404`.
+
 ## [23.0.2] - 2026-11-02
 
 A patch. The eighteen packages are at 23.0.2, every sibling range at `^23.0.2`; `@mcp-abap-adt/adt-clients` `^42.0.0`.

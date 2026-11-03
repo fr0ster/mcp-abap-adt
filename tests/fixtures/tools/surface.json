@@ -252,6 +252,18 @@
     "available_in": "cloud, onprem"
   },
   {
+    "group": "system",
+    "name": "ListATCResults",
+    "inputs": "created_by*, central_only, age_min, age_max",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "system",
+    "name": "GetATCResult",
+    "inputs": "display_id*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
     "group": "high",
     "name": "ActivateObjects",
     "inputs": "objects*, preaudit",

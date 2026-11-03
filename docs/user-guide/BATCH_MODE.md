@@ -398,7 +398,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-182 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+184 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -453,6 +453,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `CreateTransportTask` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/tasks |
 | `GetAdtTypes` | every call | GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider |
 | `GetATCFindings` | every call | GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false |
+| `GetATCResult` | every call | GET /sap/bc/adt/atc/results/{displayId} |
 | `GetATCRunStatus` | every call | GET /sap/bc/adt/atc/runs/{id} |
 | `GetBehaviorDefinition` | every call | one request: GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/bo/behaviordefinitions/{name} (part metadata) |
 | `GetBehaviorDefinitionVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
@@ -518,6 +519,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetTableVersionSource` | every call | GET the content_uri given |
 | `GetTransport` | every call | GET /sap/bc/adt/cts/transportrequests/{number} |
 | `GetWhereUsed` | when enable_all_types is any value but true and enable_only_types is absent and disable_types is absent and objects is absent | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
+| `ListATCResults` | every call | GET /sap/bc/adt/atc/results?createdBy={user}[&centralResult=true][&ageMin=N][&ageMax=N] |
 | `ListServiceBindingTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `MoveTransportObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
 | `ReadTransportActionLog` | every call | GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs |

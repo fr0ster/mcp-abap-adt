@@ -86,6 +86,8 @@ const LONG_BY_REQUESTS: Readonly<
   GetSqlQuery: 'independent',
   GetTableContents: 'independent',
   GetATCFindings: 'independent',
+  ListATCResults: 'independent',
+  GetATCResult: 'independent',
   RuntimeGetProfilerTraceData: 'independent',
   RuntimeAnalyzeProfilerTrace: 'independent',
   HandlerSearch: 'independent',

@@ -468,6 +468,10 @@ describe('the MCP tool surface', () => {
    * **23.0.1: `GetMainPrograms` arrived** (on premise only): an include's main
    * programs, one read of `…/programs/includes/{name}/mainprograms`. Every
    * other row was checked unchanged.
+   *
+   * **23.1.0: `ListATCResults` and `GetATCResult` arrived** (on premise and
+   * cloud): the stored ATC results, `GET …/atc/results` and one by its
+   * Display ID. Every other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

@@ -71,6 +71,8 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
     code: 'CLASS cl_placeholder_class DEFINITION.\nENDCLASS.',
   },
   GetATCFindings: { worklist_id: 'worklist-placeholder-1' },
+  ListATCResults: { created_by: '*' },
+  GetATCResult: { display_id: 'result-placeholder-1' },
   RuntimeGetProfilerTraceData: {
     trace_id_or_uri: 'trace-placeholder-1',
     view: 'hitlist',

@@ -344,6 +344,8 @@ export const TOOLS_WITHOUT_NEED: ReadonlySet<string> = new Set([
   'RunAbapUnit',
   'GetATCRunStatus',
   'GetATCFindings',
+  'ListATCResults',
+  'GetATCResult',
   'ActivateObjects',
   'GetServiceBindingPreviewUrl',
   'GetTypeInfo',

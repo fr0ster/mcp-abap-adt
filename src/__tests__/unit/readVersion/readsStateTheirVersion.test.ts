@@ -85,6 +85,8 @@ const NOT_A_READ = [
   // An include's main programs: the programs that include it, a listing of
   // references with no version of the include's own.
   '/mainprograms',
+  // The stored ATC results: check results, not an object's source.
+  '/atc/results',
 ];
 
 /**
@@ -112,6 +114,7 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   ActivateTable: 'activates',
   ActivateTableType: 'activates',
   GetMainPrograms: "lists an include's main programs (no version to state)",
+  ListATCResults: 'lists the stored ATC results',
   AddTransportObject: 'works on transport requests',
   CheckBehaviorDefinition: 'runs a syntax check',
   CheckClass: 'runs a syntax check',
@@ -180,6 +183,7 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   GetAbapSystemSymbols: 'resolves symbols by repository search',
   GetAdtTypes: 'lists the object types',
   GetATCFindings: 'runs ATC or reads its findings',
+  GetATCResult: 'reads a stored ATC result',
   GetATCRunStatus: 'runs ATC or reads its findings',
   GetBehaviorDefinitionVersionDiff:
     'reads the version list, or a listed version by its own address',

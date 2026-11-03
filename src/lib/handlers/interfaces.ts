@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type * as z from 'zod';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import type { AbapSystemKind } from '../systemKind.js';
 import type { ArgsOf } from './argsOf.js';
@@ -86,7 +87,9 @@ export function defineTool<const D extends ToolDefinition>(
   toolDefinition: D,
   handler: (
     context: HandlerContext,
-    args: ArgsOf<D['inputSchema']>,
+    args: D['inputSchema'] extends z.ZodObject
+      ? z.output<D['inputSchema']>
+      : ArgsOf<D['inputSchema']>,
   ) => Promise<unknown>,
 ): HandlerEntry {
   return { toolDefinition, call: handler };

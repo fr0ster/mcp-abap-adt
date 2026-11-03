@@ -182,7 +182,7 @@ export async function handleScheduleProfilerTraceOnce(
       if (profilerId === '') {
         return failedWith<string>(
           withStep(
-            { message: SCHEDULE_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            { message: SCHEDULE_WITHOUT_ID, origin: 'refusal' },
             SCHEDULE_TRACE,
           ),
         );

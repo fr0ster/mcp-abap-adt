@@ -4,7 +4,7 @@
  * throw — never dressed as SAP's answer (`thrownEntry`). A cleanup that could
  * not undo several things answers each as such an entry, not one text.
  */
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
   failureEntry,
@@ -20,6 +20,7 @@ import {
   noteLeftBehind,
   payloadCarriedBy,
 } from '../strategies/step';
+import { failed } from '../strategies/stepResponse';
 import { failureText } from './readings';
 
 export type DebugFailure = FailureEntry;
@@ -34,13 +35,10 @@ const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * SAP answer is behind it: it is never carried as the method's error to the
  * consumer as if SAP had answered (`isFromThrow`), and its entry is the throw's.
  */
-export function asFailure(e: unknown): IAdtResponse<never> {
-  const error = { origin: 'connection', message: messageOf(e) };
+export function asFailure(e: unknown): IAdtFailure<IAdtError> {
+  const error: IAdtError = { origin: 'connection', message: messageOf(e) };
   thrownBehind.set(error, e);
-  return {
-    ok: false as const,
-    getError: () => error,
-  } as unknown as IAdtResponse<never>;
+  return failed(error);
 }
 
 /** Whether a failed answer's error is a throw `asFailure` read. */
@@ -50,10 +48,10 @@ export function isFromThrow(error: object): boolean {
 
 /** A failed answer as an entry: the method's error as it is, or the throw behind it, with the step. */
 export function failedEntry(
-  answer: IAdtResponse<unknown>,
+  answer: IAdtFailure<IAdtError>,
   step: string,
 ): DebugFailure {
-  const error = (answer as { getError: () => IAdtError }).getError();
+  const error = answer.getError();
   if (thrownBehind.has(error))
     return thrownEntry(thrownBehind.get(error), step);
   return failureEntry(error, step);

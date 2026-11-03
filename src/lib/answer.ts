@@ -21,6 +21,7 @@ import { callTransportRequest } from './callTransport';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
+import type { StepError } from './strategies/stepResponse';
 import {
   isSystemContextRefusal,
   SystemContextMissingError,
@@ -221,7 +222,7 @@ export function transportHint(
  * `detail: 'raw'`.
  */
 export function failurePayload(
-  error: IAdtError & MessageCarrier,
+  error: StepError & MessageCarrier,
   detail?: AnswerDetail,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -234,7 +235,7 @@ export function failurePayload(
   if (step !== undefined) payload.step = step;
   // The status SAP answered with, when SAP answered: what tells a refusal by
   // SAP from a failure with no answer behind it (no status, no `raw_body`).
-  const status = (error.response as { status?: unknown } | undefined)?.status;
+  const status = error.response?.status;
   if (typeof status === 'number') payload.status = status;
   if (error.code !== undefined) payload.code = error.code;
   if (error.adtType !== undefined) payload.adt_type = error.adtType;
@@ -248,9 +249,9 @@ export function failurePayload(
   // What a failed release left behind, and whether the operation itself
   // landed. Both are facts no strategy judged, so they are added beside the
   // failure rather than folded into its message.
-  const cleanup = safeCleanup((error as { cleanup?: unknown }).cleanup);
+  const cleanup = safeCleanup(error.cleanup);
   if (cleanup !== undefined) payload.cleanup = cleanup;
-  if ((error as { operation?: unknown }).operation === 'succeeded') {
+  if (error.operation === 'succeeded') {
     payload.operation = 'succeeded';
   }
 
@@ -327,7 +328,7 @@ export function answerFailure(
   failed: IAdtError,
   ctx?: AnswerContext,
 ): McpResult {
-  const error = failed as IAdtError & MessageCarrier;
+  const error: StepError & MessageCarrier = failed;
   // A failure that carries a refusal: answered as the chain
   // made it, never rebuilt from the error's message.
   const read = failureOf(error);
@@ -355,10 +356,7 @@ export function failureEntry(
 ): FailureEntry {
   const read = failureOf(failed);
   if (read !== undefined) return { ...chainFailurePayload(read), step };
-  return failurePayload(
-    withStep(failed, step) as IAdtError & MessageCarrier,
-    detail,
-  );
+  return failurePayload(withStep(failed, step), detail);
 }
 
 /**
@@ -600,6 +598,14 @@ export function requestFailureOf(
   sent: SentRequest | undefined,
 ): IAdtError | undefined {
   if (failureOf(thrown) !== undefined) return undefined;
+  return requestErrorOf(thrown, sent);
+}
+
+/** A request's throw as its error, as SAP answered it; the chain is not asked. */
+export function requestErrorOf(
+  thrown: unknown,
+  sent: SentRequest | undefined,
+): IAdtError {
   const carried =
     thrown !== null && typeof thrown === 'object'
       ? (thrown as { message?: unknown; response?: unknown })
@@ -636,9 +642,7 @@ export function answerRequestThrown(
 ): McpResult {
   const read = failureOf(thrown);
   if (read !== undefined) return answerRead(read);
-  return answerFailure(
-    withStep(requestFailureOf(thrown, sent) as IAdtError, step),
-  );
+  return answerFailure(withStep(requestErrorOf(thrown, sent), step));
 }
 
 /** A direct request's throw as an entry: the chain's payload, or the request's error, with the step. */
@@ -649,5 +653,5 @@ export function requestThrownEntry(
 ): FailureEntry {
   const read = failureOf(thrown);
   if (read !== undefined) return { ...chainFailurePayload(read), step };
-  return failureEntry(requestFailureOf(thrown, sent) as IAdtError, step);
+  return failureEntry(requestErrorOf(thrown, sent), step);
 }

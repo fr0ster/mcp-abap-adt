@@ -23,6 +23,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAdtSuccess,
   IClassUnitTestRunOptions,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -145,10 +146,11 @@ export async function waitForRun(
       ? { runId }
       : { runId, waited: outcome.getResult().value };
   const answered = outcome ?? started;
-  return {
+  const success: IAdtSuccess<StartedRun> = {
     ...answered,
     getResult: () => ({ ...answered.getResult(), value }),
-  } as unknown as IAdtResponse<StartedRun, IAdtError>;
+  };
+  return success;
 }
 
 /**

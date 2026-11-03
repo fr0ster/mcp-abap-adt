@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
@@ -99,13 +100,7 @@ interface FlatObject {
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value: objects }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<FlatObject[], IAdtError>;
+  return succeeded(objects);
 }
 
 function flatObjects(level: NodeLevel): FlatObject[] {

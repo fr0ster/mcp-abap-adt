@@ -37,14 +37,14 @@ export type StepResponse<T> = StepSuccess<T> | IAdtFailure<StepError>;
  */
 export function succeeded<T>(
   value: T,
-  who: string,
+  who?: string,
   cleanup?: Cleanup,
 ): StepSuccess<T> {
   const success: StepSuccess<T> & { getError(): never } = {
     ok: true,
     getResult: () => ({ value }),
     getError: () => {
-      throw new Error(`${who}: asked for the error of a success`);
+      throw new Error(asked(who, 'the error of a success'));
     },
     ...(cleanup === undefined ? {} : { cleanup }),
   };
@@ -52,15 +52,20 @@ export function succeeded<T>(
 }
 
 /** A failure built here. Its `getResult` throws, naming `who`. */
-export function failed(error: StepError, who: string): IAdtFailure<StepError> {
+export function failed(error: StepError, who?: string): IAdtFailure<StepError> {
   const failure: IAdtFailure<StepError> & { getResult(): never } = {
     ok: false,
     getResult: () => {
-      throw new Error(`${who}: asked for the result of a failure`);
+      throw new Error(asked(who, 'the result of a failure'));
     },
     getError: () => error,
   };
   return failure;
+}
+
+/** The sentinel's words: what was asked for, after `who` when named. */
+function asked(who: string | undefined, what: string): string {
+  return who === undefined ? `asked for ${what}` : `${who}: asked for ${what}`;
 }
 
 /** The cleanup note a success carries, if any. */

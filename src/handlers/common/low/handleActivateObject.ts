@@ -733,7 +733,7 @@ export async function activatePlanOnce(
       if (runId === '') {
         return failedWith<string>(
           withStep(
-            { message: RUN_START_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            { message: RUN_START_WITHOUT_ID, origin: 'refusal' },
             START_ACTIVATION_RUN,
           ),
         );

@@ -40,6 +40,7 @@ import {
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
@@ -114,13 +115,7 @@ interface TreeNode {
 }
 
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  return succeeded(value);
 }
 
 /**

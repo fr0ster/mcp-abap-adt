@@ -11,6 +11,7 @@ import {
 } from '../adtHeaders/withAdtHeaders';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
+import { succeeded } from './stepResponse';
 
 /**
  * `getWhereUsedList`'s replacement, composed — the guide's "Sequences are
@@ -175,15 +176,7 @@ function needsScope(filter: WhereUsedFilter): boolean {
 }
 
 function noResult<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error(
-        'fetchWhereUsedReferences: asked for the error of a success',
-      );
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  return succeeded(value, 'fetchWhereUsedReferences');
 }
 
 /**

@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { TIMEOUT_FIELD } from '../../../lib/longTools';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
  * ListTransports Handler - List user's transport requests via ADT API
  *
@@ -319,13 +320,7 @@ async function listTransportsOneByOne(
               status: readings[0]?.status ?? 200,
             };
 
-      return {
-        ok: true,
-        getResult: () => ({ value: merged }),
-        getError: () => {
-          throw new Error('ListTransports: asked for the error of a success');
-        },
-      } as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      return succeeded(merged, 'ListTransports');
     },
     project(detail, (value) => {
       const parsed = parseTransportListValue(value);
@@ -461,13 +456,7 @@ async function listTransportsInEnvelopes(
               status: readings[0]?.status ?? 200,
             };
 
-      return {
-        ok: true,
-        getResult: () => ({ value: merged }),
-        getError: () => {
-          throw new Error('ListTransports: asked for the error of a success');
-        },
-      } as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      return succeeded(merged, 'ListTransports');
     },
     project(detail, (value) => {
       const parsed = parseTransportListValue(value);

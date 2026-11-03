@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
  * GetNodeStructure Handler - Low-level handler for node structure
  *
@@ -120,13 +121,7 @@ function rawNodeStructureXml(wire: unknown): string {
 function succeededLevel(
   level: NodeLevel & { blank?: string },
 ): IAdtResponse<NodeLevel, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value: level }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<NodeLevel, IAdtError>;
+  return succeeded(level);
 }
 
 /**

@@ -2,6 +2,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { failedWith } from '../../../lib/strategies/sequence';
 import { atStep, withStep } from '../../../lib/strategies/step';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 
 /**
  * Reconstructing what the v18 convenience read did.
@@ -61,13 +62,7 @@ export type RunOutcome<TResult> =
     };
 
 function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('readRunOnce: asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  return succeeded(value, 'readRunOnce');
 }
 
 /** The step a status read is named by. */

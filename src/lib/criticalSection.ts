@@ -33,11 +33,11 @@ interface CriticalSectionCapable {
  * Generic over the handler's own signature so the wrapped function keeps the
  * exact arity/return type (and stays assignable to an entry's `call`).
  */
-export function withCriticalSection<H extends (...args: any[]) => any>(
-  handler: H,
+export function withCriticalSection<A extends unknown[], R>(
+  handler: (...args: A) => Promise<R>,
   getConnection: () => unknown,
-): (...args: Parameters<H>) => Promise<Awaited<ReturnType<H>>> {
-  return async (...args: Parameters<H>) => {
+): (...args: A) => Promise<R> {
+  return async (...args: A) => {
     const conn = getConnection() as CriticalSectionCapable | null | undefined;
     conn?.beginCriticalSection?.();
     try {

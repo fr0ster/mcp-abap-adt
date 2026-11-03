@@ -58,20 +58,21 @@ async function describeOneByOne(context: HandlerContext, args: any) {
   const { connection, logger } = context;
   const objects = args?.objects;
   if (!args || !Array.isArray(objects) || objects.length === 0) {
-    const err = new Error(
-      'Missing or invalid parameters: objects (array) is required and must not be empty.',
-    );
-    // @ts-expect-error
-    err.status = 400;
-    // @ts-expect-error
-    err.body = {
-      error: {
-        message:
-          'Missing or invalid parameters: objects (array) is required and must not be empty.',
-        code: 'INVALID_PARAMS',
+    throw Object.assign(
+      new Error(
+        'Missing or invalid parameters: objects (array) is required and must not be empty.',
+      ),
+      {
+        status: 400,
+        body: {
+          error: {
+            message:
+              'Missing or invalid parameters: objects (array) is required and must not be empty.',
+            code: 'INVALID_PARAMS',
+          },
+        },
       },
-    };
-    throw err;
+    );
   }
   logger?.info(`Describing ${objects.length} objects via search`);
   const results: any[] = [];

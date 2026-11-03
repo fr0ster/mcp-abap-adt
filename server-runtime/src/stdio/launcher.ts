@@ -68,10 +68,10 @@ import {
 } from './shutdown.js';
 
 const stderrLogger: ILogger = {
-  info: (...args: any[]) => console.error(...args),
-  warn: (...args: any[]) => console.error(...args),
-  error: (...args: any[]) => console.error(...args),
-  debug: (...args: any[]) => console.error(...args),
+  info: (...args: unknown[]) => console.error(...args),
+  warn: (...args: unknown[]) => console.error(...args),
+  error: (...args: unknown[]) => console.error(...args),
+  debug: (...args: unknown[]) => console.error(...args),
 };
 
 const silentLogger: ILogger = {

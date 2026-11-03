@@ -709,7 +709,7 @@ export async function makeAdtRequest(
   url: string,
   method: string,
   timeout: number,
-  data?: any,
+  data?: unknown,
   params?: any,
   headers?: Record<string, string>,
 ): Promise<AxiosResponse> {
@@ -953,7 +953,7 @@ export function isAlreadyExistsError(error: any): boolean {
 export async function safeCheckOperation<T>(
   checkOperation: () => Promise<T>,
   objectName: string,
-  logger?: { debug?: (message: string, data?: any) => void },
+  logger?: { debug?: (message: string, data?: unknown) => void },
 ): Promise<T> {
   try {
     return await checkOperation();

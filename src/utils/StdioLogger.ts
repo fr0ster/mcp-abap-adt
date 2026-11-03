@@ -14,7 +14,7 @@ export class StdioLogger {
     // No-op for stdio - MCP protocol requires only JSON-RPC messages on stdout
   }
 
-  error(message: string, ...args: any[]): void {
+  error(message: string, ...args: unknown[]): void {
     // Write errors to stderr for stdio transport
     const errorMsg =
       args.length > 0

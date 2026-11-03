@@ -921,7 +921,8 @@
           "service_version",
           "binding_variant",
           "name",
-          "implementation_type"
+          "implementation_type",
+          "detail"
         ],
         "HandlerDelete": [
           "object_type",
@@ -2159,7 +2160,8 @@
           "service_version",
           "binding_variant",
           "name",
-          "implementation_type"
+          "implementation_type",
+          "detail"
         ],
         "HandlerDelete": [
           "object_type",

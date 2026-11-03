@@ -1194,7 +1194,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
+- `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.
 
 ---
 

@@ -355,6 +355,10 @@ describe('the MCP tool surface', () => {
           'debugging_mode',
           'settings',
         ],
+        // 24.0.0 (plan Appendix B): the result read took them and its schema
+        // dropped them; declared now, both optional.
+        'readonly/GetUnitTestResult': ['format', 'with_navigation_uris'],
+        'high/GetUnitTestResult': ['format', 'with_navigation_uris'],
       };
       const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
       const gainsTimeout = isLong && !had.includes('timeout');

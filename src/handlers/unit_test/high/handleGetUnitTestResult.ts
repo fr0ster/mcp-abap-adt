@@ -16,6 +16,14 @@ export const TOOL_DEFINITION = {
     '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.',
   inputSchema: z.object({
     run_id: z.string().describe('Run id a unit test run answered.'),
+    with_navigation_uris: z
+      .boolean()
+      .optional()
+      .describe('Include navigation URIs in result if supported.'),
+    format: z
+      .enum(['abapunit', 'junit'])
+      .optional()
+      .describe('Result format: abapunit or junit.'),
     ...DETAIL_SHAPE,
   }),
 } as const;

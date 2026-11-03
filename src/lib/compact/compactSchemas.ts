@@ -22,6 +22,7 @@ import { listedValues } from '../handlers/listedValues';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import { TIMEOUT_DESCRIPTION, TIMEOUT_FIELD } from '../longTools';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
+import { DETAIL_SHAPE } from '../strategies/detail';
 
 /**
  * A compact tool's `object_type`: the members it routes on its variant (a
@@ -244,6 +245,7 @@ const CREATE_PROPERTIES = {
     .enum(['Managed', 'Unmanaged', 'Abstract', 'Projection'])
     .optional()
     .describe('Behavior definition implementation type.'),
+  ...DETAIL_SHAPE,
 };
 
 /** A member of `HandlerCreate`'s `object_type`. */
@@ -260,7 +262,13 @@ export const COMPACT_CREATE_TAKES = takesOf<
   'object_type' | keyof typeof CREATE_PROPERTIES,
   CreateMember
 >()({
-  every: ['object_type', 'transport_request', 'package_name', 'description'],
+  every: [
+    'object_type',
+    'transport_request',
+    'package_name',
+    'description',
+    'detail',
+  ],
   members: {
     PACKAGE: [
       'package_name',
@@ -1029,6 +1037,7 @@ export const compactUnitTestResultSchema = z.object({
     .optional()
     .describe('Include ADT navigation URIs in the result payload.'),
   format: z.enum(['abapunit', 'junit']).optional().describe('Result format.'),
+  ...DETAIL_SHAPE,
 });
 
 export const compactCdsUnitTestStatusSchema = compactUnitTestStatusSchema;

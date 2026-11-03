@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -11,16 +12,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve metadata and list of implementations for a specific enhancement spot, at its active version.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      enhancement_spot: {
-        type: 'string',
-        description: 'Name of the enhancement spot',
-      },
-    },
-    required: ['enhancement_spot'],
-  },
+  inputSchema: z.object({
+    enhancement_spot: z.string().describe('Name of the enhancement spot'),
+  }),
 } as const;
 
 /**

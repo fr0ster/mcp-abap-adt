@@ -1,5 +1,6 @@
 import { enhancementDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { tableCodeOf } from '../../../lib/adtTypeCode';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -48,20 +49,12 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve the active source code of a specific enhancement implementation by its name and enhancement spot.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      enhancement_spot: {
-        type: 'string',
-        description: 'Name of the enhancement spot',
-      },
-      enhancement_name: {
-        type: 'string',
-        description: '[read-only] Name of the enhancement implementation',
-      },
-    },
-    required: ['enhancement_spot', 'enhancement_name'],
-  },
+  inputSchema: z.object({
+    enhancement_spot: z.string().describe('Name of the enhancement spot'),
+    enhancement_name: z
+      .string()
+      .describe('[read-only] Name of the enhancement implementation'),
+  }),
 } as const;
 
 /**

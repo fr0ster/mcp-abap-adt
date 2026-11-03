@@ -11,6 +11,7 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
@@ -86,40 +87,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type, read at its active version. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description:
-          'Name of the ABAP object (with object_type; or give objects)',
-      },
-      object_type: {
-        type: 'string',
-        description: '[read-only] Type of the ABAP object',
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several objects, read together (give this or object_name and object_type)',
-        items: {
-          type: 'object',
-          properties: {
-            object_name: {
-              type: 'string',
-              description: 'Name of the ABAP object',
-            },
-            object_type: {
-              type: 'string',
-              description: 'Type of the ABAP object',
-            },
-          },
-          required: ['object_name', 'object_type'],
-        },
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .optional()
+      .describe('Name of the ABAP object (with object_type; or give objects)'),
+    object_type: z
+      .string()
+      .optional()
+      .describe('[read-only] Type of the ABAP object'),
+    objects: z
+      .array(
+        z.object({
+          object_name: z.string().describe('Name of the ABAP object'),
+          object_type: z.string().describe('Type of the ABAP object'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or object_name and object_type)',
+      ),
+  }),
 } as const;
 
 /**

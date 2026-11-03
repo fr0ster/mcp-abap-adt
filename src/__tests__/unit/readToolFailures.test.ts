@@ -374,6 +374,8 @@ describe('GetEnhancements include_nested: the nested walk threw', () => {
       message: 'logger down',
       step: 'list includes',
     });
+    // A partial answer is not a failure, and says so as every answer does.
+    expect(result.isError).toBe(false);
   });
 });
 

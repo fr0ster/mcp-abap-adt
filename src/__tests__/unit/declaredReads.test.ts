@@ -4,6 +4,7 @@
  * schema's parse, so the handler never saw it. Each is declared now, and
  * reaches the handler.
  */
+import { TOOL_DEFINITION as GetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { TOOL_DEFINITION as GetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import {
   compactCdsUnitTestResultSchema,
@@ -23,6 +24,24 @@ describe('the arguments a handler reads are declared by its schema', () => {
       run_id: 'R1',
       with_navigation_uris: true,
       format: 'junit',
+    });
+  });
+
+  it('GetEnhancements takes program, include_nested, detailed and max_includes', () => {
+    expect(
+      GetEnhancements.inputSchema.parse({
+        object_name: 'ZINC',
+        object_type: 'include',
+        program: 'ZPROG',
+        include_nested: true,
+        detailed: true,
+        max_includes: 3,
+      }),
+    ).toMatchObject({
+      program: 'ZPROG',
+      include_nested: true,
+      detailed: true,
+      max_includes: 3,
     });
   });
 

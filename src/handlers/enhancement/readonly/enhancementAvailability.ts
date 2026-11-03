@@ -4,7 +4,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtCodes } from '../../../lib/adtProjections';
 import { isCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 
 /**
@@ -53,7 +52,7 @@ export async function enhancementTypeOf(
     // A search that fails says nothing about the type; the caller keeps the
     // failure it already has.
     if (!searched.ok) return undefined;
-    const raw = (searched.getResult().value as AdtReading<unknown>).raw;
+    const raw = searched.getResult().value.raw;
     const wanted = name.toUpperCase();
     for (const m of String(raw ?? '').matchAll(
       /<adtcore:objectReference ([^>]*)\/?>/g,

@@ -22,11 +22,28 @@ export const TOOL_DEFINITION = {
  */
 export interface EnhancementSpotResponse {
   enhancement_spot: string;
-  metadata: {
-    description?: string;
-    type?: string;
-    status?: string;
-  };
+  metadata: EnhancementSpotMetadata;
+}
+
+/** What the spot's document names: each member only when the document has it. */
+export interface EnhancementSpotMetadata {
+  name?: string;
+  description?: string;
+  type?: string;
+  status?: string;
+  package?: string;
+  interface?: string;
+  badi_definitions?: Array<{
+    name: string | undefined;
+    shorttext: string | undefined;
+    interface: string | undefined;
+  }>;
+  links?: Array<{
+    href: string | undefined;
+    rel: string | undefined;
+    type: string | undefined;
+    title: string | undefined;
+  }>;
 }
 
 /**
@@ -34,8 +51,10 @@ export interface EnhancementSpotResponse {
  * @param xmlData - Raw XML response from ADT
  * @returns Metadata object with description, type, status, and functions (implementations)
  */
-function parseEnhancementSpotMetadata(xmlData: string): any {
-  const metadata: any = {};
+function parseEnhancementSpotMetadata(
+  xmlData: string,
+): EnhancementSpotMetadata {
+  const metadata: EnhancementSpotMetadata = {};
   try {
     // Spot name, description, type, package
     const nameMatch = xmlData.match(/adtcore:name="([^"]*)"/);
@@ -56,11 +75,8 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
     if (ifaceMatch?.[1]) metadata.interface = ifaceMatch[1];
 
     // BAdI definitions
-    const badiDefs: Array<{
-      name: string;
-      shorttext: string;
-      interface: string;
-    }> = [];
+    const badiDefs: NonNullable<EnhancementSpotMetadata['badi_definitions']> =
+      [];
     const badiDefRegex = /<enhs:badiDefinition[\s\S]*?<\/enhs:badiDefinition>/g;
     let badiMatch: RegExpExecArray | null = badiDefRegex.exec(xmlData);
     while (badiMatch !== null) {
@@ -80,7 +96,7 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
     if (badiDefs.length > 0) metadata.badi_definitions = badiDefs;
 
     // All atom:link rels
-    const links: Array<any> = [];
+    const links: NonNullable<EnhancementSpotMetadata['links']> = [];
     const linkRegex = /<atom:link ([^>]+)\/>/g;
     let linkMatch: RegExpExecArray | null = linkRegex.exec(xmlData);
     while (linkMatch !== null) {
@@ -118,7 +134,7 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
  */
 export async function handleGetEnhancementSpot(
   context: HandlerContext,
-  args: any,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   try {

@@ -129,7 +129,7 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
  */
 export async function handleGetEnhancementImpl(
   context: HandlerContext,
-  args: any,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   try {

@@ -11,6 +11,7 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import {
   type AdtHeadersContext,
@@ -44,6 +45,7 @@ import {
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
+import { elements, isList } from '../../../lib/xml/tree';
 
 /**
  * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
@@ -107,8 +109,36 @@ export const TOOL_DEFINITION = {
       .describe(
         '[read-only] Several objects, read together (give this or object_name and object_type)',
       ),
+    program: z
+      .string()
+      .optional()
+      .describe(
+        "[read-only] An include's main program, when its metadata names none",
+      ),
+    include_nested: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] true: also the enhancements of every include of a program or function group',
+      ),
+    detailed: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] true: every enhancement with its whole source; false (default): a short one',
+      ),
+    max_includes: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        '[read-only] With include_nested: how many includes are read (default 50)',
+      ),
   }),
 } as const;
+
+/** The tool's arguments, as its schema parses them. */
+type GetEnhancementsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * Interface for enhancement implementation data
@@ -677,61 +707,79 @@ function credentialFailure(thrown: unknown): boolean {
   );
 }
 
+/** An include whose enhancements SAP refused: its name, the step, the failures as they are. */
+interface IncludeUnread {
+  include: string;
+  step: 'read enhancements';
+  failures: FailureEntry[];
+}
+
+/** The answer with `include_nested`: every object read, the main one first. */
+interface NestedEnhancements {
+  main_object: { name: string; type: EnhancementResponse['object_type'] };
+  include_nested: true;
+  total_objects_analyzed: number;
+  total_enhancements_found: number;
+  objects: EnhancementResponse[];
+  includes_unread?: IncludeUnread[];
+}
+
+/** An enhancement with its source short: whole up to 500 characters, else its first 200. */
+function minimalEnhancement(enh: EnhancementImplementation) {
+  return {
+    name: enh.name,
+    type: enh.type,
+    // Include source code only if it's short (< 500 chars) or first 200 chars
+    sourceCode: enh.sourceCode
+      ? enh.sourceCode.length <= 500
+        ? enh.sourceCode
+        : `${enh.sourceCode.substring(0, 200)}...[truncated]`
+      : undefined,
+  };
+}
+
 /**
- * Filters enhancement response to show minimal information
+ * Filters a nested enhancement response to show minimal information: the
+ * objects with enhancements, each enhancement short.
  */
-function filterMinimalEnhancements(response: any): any {
-  if (response.objects) {
-    // For nested results, filter each object
-    const filteredObjects = response.objects
-      .filter((obj: any) => obj.enhancements && obj.enhancements.length > 0) // Only objects with enhancements
-      .map((obj: any) => ({
-        object_name: obj.object_name,
-        object_type: obj.object_type,
-        enhancements: obj.enhancements.map((enh: any) => ({
-          name: enh.name,
-          type: enh.type,
-          // Include source code only if it's short (< 500 chars) or first 200 chars
-          sourceCode: enh.sourceCode
-            ? enh.sourceCode.length <= 500
-              ? enh.sourceCode
-              : `${enh.sourceCode.substring(0, 200)}...[truncated]`
-            : undefined,
-        })),
-      }));
+function filterMinimalNested(response: NestedEnhancements) {
+  const filteredObjects = response.objects
+    .filter((obj) => obj.enhancements.length > 0) // Only objects with enhancements
+    .map((obj) => ({
+      object_name: obj.object_name,
+      object_type: obj.object_type,
+      enhancements: obj.enhancements.map(minimalEnhancement),
+    }));
 
-    return {
-      ...response,
-      detailed: false,
-      total_objects_with_enhancements: filteredObjects.length,
-      total_objects_analyzed: response.total_objects_analyzed,
-      filtered_out: response.total_objects_analyzed - filteredObjects.length,
-      objects: filteredObjects,
-    };
-  } else {
-    // For single object results
-    const filteredEnhancements = response.enhancements
-      ? response.enhancements.map((enh: any) => ({
-          name: enh.name,
-          type: enh.type,
-          sourceCode: enh.sourceCode
-            ? enh.sourceCode.length <= 500
-              ? enh.sourceCode
-              : `${enh.sourceCode.substring(0, 200)}...[truncated]`
-            : undefined,
-        }))
-      : [];
+  return {
+    ...response,
+    detailed: false,
+    total_objects_with_enhancements: filteredObjects.length,
+    total_objects_analyzed: response.total_objects_analyzed,
+    filtered_out: response.total_objects_analyzed - filteredObjects.length,
+    objects: filteredObjects,
+  };
+}
 
-    return {
-      object_name: response.object_name,
-      object_type: response.object_type,
-      context: response.context,
-      detailed: false,
-      total_enhancements: filteredEnhancements.length,
-      enhancements: filteredEnhancements,
-      ...(response.unreadable ? { unreadable: response.unreadable } : {}),
-    };
-  }
+/** Filters one object's enhancement response to show minimal information. */
+function filterMinimalEnhancements(response: EnhancementResponse) {
+  const filteredEnhancements = response.enhancements.map(minimalEnhancement);
+
+  return {
+    object_name: response.object_name,
+    object_type: response.object_type,
+    context: response.context,
+    detailed: false,
+    total_enhancements: filteredEnhancements.length,
+    enhancements: filteredEnhancements,
+    ...(response.unreadable ? { unreadable: response.unreadable } : {}),
+  };
+}
+
+/** The failures a throw carries as its payload's `failures`, when it carries a list. */
+function carriedFailures(error: unknown): FailureEntry[] | undefined {
+  const failures = payloadCarriedBy(error)?.failures;
+  return isList(failures) ? elements(failures) : undefined;
 }
 
 /**
@@ -746,7 +794,10 @@ function filterMinimalEnhancements(response: any): any {
  *   - max_includes: Optional maximum number of includes to process (default: 50)
  * @returns Response with parsed enhancement data or error
  */
-async function enhancementsOf(context: HandlerContext, args: any) {
+async function enhancementsOf(
+  context: HandlerContext,
+  args: GetEnhancementsArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
   try {
     logger?.info('handleGetEnhancements called with args:', args);
@@ -760,9 +811,7 @@ async function enhancementsOf(context: HandlerContext, args: any) {
     const includeNested = args.include_nested === true; // Optional boolean for recursive include search
     const isDetailed = args.detailed === true; // Optional boolean for detailed output
 
-    const maxIncludes = args.max_includes
-      ? parseInt(args.max_includes, 10)
-      : 50; // Maximum number of includes to process
+    const maxIncludes = args.max_includes ? args.max_includes : 50; // Maximum number of includes to process
 
     logger?.info(`Getting enhancements for object: ${objectName}`, {
       manualProgram: manualProgram || '(not provided)',
@@ -780,17 +829,12 @@ async function enhancementsOf(context: HandlerContext, args: any) {
 
     if (!includeNested) {
       // Return only main object enhancements
-      let response = mainEnhancementResponse;
+      // Apply filtering if not detailed; add the detailed flag for consistency
+      const response = isDetailed
+        ? { ...mainEnhancementResponse, detailed: true }
+        : filterMinimalEnhancements(mainEnhancementResponse);
 
-      // Apply filtering if not detailed
-      if (!isDetailed) {
-        response = filterMinimalEnhancements(response);
-      } else {
-        // Add detailed flag for consistency
-        response = { ...response, detailed: true };
-      }
-
-      const result = {
+      const result: McpResult = {
         isError: false,
         content: [
           {
@@ -829,11 +873,7 @@ async function enhancementsOf(context: HandlerContext, args: any) {
 
       // An include whose request SAP refused is listed, the method's error as
       // it is with the step and the include's name, beside the others' results.
-      const includesUnread: Array<{
-        include: string;
-        step: 'read enhancements';
-        failures: FailureEntry[];
-      }> = [];
+      const includesUnread: IncludeUnread[] = [];
 
       // Collect all enhancement responses
       const allEnhancementResponses: EnhancementResponse[] = [
@@ -860,9 +900,9 @@ async function enhancementsOf(context: HandlerContext, args: any) {
           includesUnread.push({
             include: includeName,
             step: 'read enhancements',
-            failures: (payloadCarriedBy(error)?.failures as
-              | FailureEntry[]
-              | undefined) ?? [thrownEntry(error, 'read enhancements')],
+            failures: carriedFailures(error) ?? [
+              thrownEntry(error, 'read enhancements'),
+            ],
           });
           // Continue with the other includes
         }
@@ -882,7 +922,8 @@ async function enhancementsOf(context: HandlerContext, args: any) {
       if (credentialFailure(error)) throw error; // as it came
       logger?.error('Nested enhancement processing failed:', error);
       // Return partial results with just the main object
-      const fallbackResult = {
+      const fallbackResult: McpResult = {
+        isError: false,
         content: [
           {
             type: 'text',
@@ -912,7 +953,7 @@ async function enhancementsOf(context: HandlerContext, args: any) {
     }
 
     // Create combined response
-    let combinedResponse: any = {
+    const combinedResponse: NestedEnhancements = {
       main_object: {
         name: objectName,
         type: mainEnhancementResponse.object_type,
@@ -927,20 +968,17 @@ async function enhancementsOf(context: HandlerContext, args: any) {
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
 
-    // Apply filtering if not detailed
-    if (!isDetailed) {
-      combinedResponse = filterMinimalEnhancements(combinedResponse);
-    } else {
-      // Add detailed flag for consistency
-      combinedResponse = { ...combinedResponse, detailed: true };
-    }
+    // Apply filtering if not detailed; add the detailed flag for consistency
+    const answered = isDetailed
+      ? { ...combinedResponse, detailed: true }
+      : filterMinimalNested(combinedResponse);
 
-    const result = {
+    const result: McpResult = {
       isError: false,
       content: [
         {
           type: 'text',
-          text: JSON.stringify(combinedResponse),
+          text: JSON.stringify(answered),
         },
       ],
     };
@@ -950,27 +988,32 @@ async function enhancementsOf(context: HandlerContext, args: any) {
   }
 }
 
-/** One read of the batched version: a probe, a host's elements, a node structure. */
-type EnhancementRead =
+/** A read of a node structure level: an object's root node, or its includes node. */
+interface NodeRead {
+  kind: 'node';
+  parentType: AdtTypeCode;
+  parentName: string;
+  nodeId: string;
+}
+
+/** A read answered by a document: a probe, or a host's elements. */
+type DocumentRead =
   | { kind: 'metadata'; host: 'class' | 'program' | 'include'; name: string }
   | {
       kind: 'elements';
-      host: 'class' | 'program' | 'function_group' | 'include';
+      host: 'class' | 'program' | 'function_group';
       name: string;
-      program?: string;
     }
-  | {
-      kind: 'node';
-      parentType: AdtTypeCode;
-      parentName: string;
-      nodeId: string;
-    };
+  | { kind: 'elements'; host: 'include'; name: string; program: string };
+
+/** One read of the batched version: a probe, a host's elements, a node structure. */
+type EnhancementRead = DocumentRead | NodeRead;
 
 const enhancementKey = (read: EnhancementRead): string =>
   read.kind === 'node'
     ? `node:${read.parentType}:${read.parentName}:${read.nodeId}`
     : read.kind === 'elements'
-      ? `elements:${read.host}:${read.name}:${read.program ?? ''}`
+      ? `elements:${read.host}:${read.name}:${read.host === 'include' ? read.program : ''}`
       : `metadata:${read.host}:${read.name}`;
 
 /** The step a read's failure carries, as the sequential version names it. */
@@ -982,12 +1025,53 @@ function enhancementStep(read: EnhancementRead): string {
     : 'read includes node';
 }
 
-/** `read` sent on `connection`, as the sequential version sends it. */
-function sendEnhancementRead(
+/** A node structure level's read, sent on `connection`. */
+function sendNodeRead(
   context: AdtHeadersContext,
-  connection: AbapConnection,
+  connection: IAbapConnection,
+  read: NodeRead,
+) {
+  const client = createAdtClient(connection, logger);
+  return withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
+    client
+      .getUtils(ourUtils)
+      .fetchNodeStructure(read.parentType, read.parentName, {
+        headers,
+        analyse: analyseException,
+        nodeId: read.nodeId,
+        withShortDescriptions: true,
+      }),
+  );
+}
+
+/** A node structure level's answer. */
+type NodeAnswer = Awaited<ReturnType<typeof sendNodeRead>>;
+
+/** A read's answer, by what the read was: a document, or a node structure level. */
+type EnhancementAnswer =
+  | { of: 'document'; response: IAdtResponse<unknown, IAdtError> }
+  | { of: 'node'; response: NodeAnswer };
+
+/** `read` sent on `connection`, as the sequential version sends it. */
+async function sendEnhancementRead(
+  context: AdtHeadersContext,
+  connection: IAbapConnection,
   read: EnhancementRead,
-): Promise<unknown> {
+): Promise<EnhancementAnswer> {
+  if (read.kind === 'node') {
+    return {
+      of: 'node',
+      response: await sendNodeRead(context, connection, read),
+    };
+  }
+  return { of: 'document', response: await sendDocumentRead(connection, read) };
+}
+
+/** A probe's or a host's elements' read, sent on `connection`. */
+function sendDocumentRead(
+  connection: IAbapConnection,
+  read: DocumentRead,
+): Promise<IAdtResponse<unknown, IAdtError>> {
   const client = createAdtClient(connection, logger);
   const analyse = { analyse: analyseException };
   const active: { version: ReadVersion; analyse: typeof analyseException } = {
@@ -1007,39 +1091,27 @@ function sendEnhancementRead(
       .getInclude(includeDocuments)
       .readMetadata({ includeName: read.name }, active);
   }
-  if (read.kind === 'elements') {
-    switch (read.host) {
-      case 'class':
-        return client
-          .getClass(classDocuments)
-          .readEnhancementElements({ className: read.name }, analyse);
-      case 'program':
-        return client
-          .getProgram(programDocuments)
-          .readEnhancementElements({ programName: read.name }, analyse);
-      case 'function_group':
-        return client
-          .getFunctionGroup(functionGroupDocuments)
-          .readEnhancementElements({ functionGroupName: read.name }, analyse);
-      case 'include':
-        return client
-          .getInclude(includeDocuments)
-          .readEnhancementElements(
-            { includeName: read.name },
-            { context: read.program as string, analyse: analyseException },
-          );
-    }
+  switch (read.host) {
+    case 'class':
+      return client
+        .getClass(classDocuments)
+        .readEnhancementElements({ className: read.name }, analyse);
+    case 'program':
+      return client
+        .getProgram(programDocuments)
+        .readEnhancementElements({ programName: read.name }, analyse);
+    case 'function_group':
+      return client
+        .getFunctionGroup(functionGroupDocuments)
+        .readEnhancementElements({ functionGroupName: read.name }, analyse);
+    case 'include':
+      return client
+        .getInclude(includeDocuments)
+        .readEnhancementElements(
+          { includeName: read.name },
+          { context: read.program, analyse: analyseException },
+        );
   }
-  return withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
-    client
-      .getUtils(ourUtils)
-      .fetchNodeStructure(read.parentType, read.parentName, {
-        headers,
-        analyse: analyseException,
-        nodeId: read.nodeId,
-        withShortDescriptions: true,
-      }),
-  );
 }
 
 /** A read the walk needs before it can go on: the next phase sends it. */
@@ -1054,11 +1126,23 @@ class Unanswered {
  * the sequential version throws it at that read.
  */
 function enhancementAnswers(context: HandlerContext) {
-  const answers = new Map<string, PhaseResult<unknown>>();
+  const documents = new Map<
+    string,
+    PhaseResult<IAdtResponse<unknown, IAdtError>>
+  >();
+  const nodes = new Map<string, PhaseResult<NodeAnswer>>();
   return {
-    /** The answer to `read`; `Unanswered` thrown when no phase sent it yet. */
-    answered(read: EnhancementRead): PhaseResult<unknown> {
-      const result = answers.get(enhancementKey(read));
+    /** The answer to a document's read; `Unanswered` thrown when no phase sent it yet. */
+    answered(
+      read: DocumentRead,
+    ): PhaseResult<IAdtResponse<unknown, IAdtError>> {
+      const result = documents.get(enhancementKey(read));
+      if (result === undefined) throw new Unanswered(read);
+      return result;
+    },
+    /** The answer to a node's read; `Unanswered` thrown when no phase sent it yet. */
+    answeredNode(read: NodeRead): PhaseResult<NodeAnswer> {
+      const result = nodes.get(enhancementKey(read));
       if (result === undefined) throw new Unanswered(read);
       return result;
     },
@@ -1066,35 +1150,42 @@ function enhancementAnswers(context: HandlerContext) {
       const asked = new Map<string, EnhancementRead>();
       for (const read of reads) {
         const key = enhancementKey(read);
-        if (!answers.has(key)) asked.set(key, read);
+        if (!documents.has(key) && !nodes.has(key)) asked.set(key, read);
       }
       if (asked.size === 0) return;
       const pending = [...asked.values()];
       const results = await runPhase(context, pending, (read, connection) =>
-        sendEnhancementRead(context, connection as AbapConnection, read),
+        sendEnhancementRead(context, connection, read),
       );
       results.forEach((result, i) => {
-        const read = pending[i] as EnhancementRead;
+        const read = pending[i];
+        const key = enhancementKey(read);
         if (!result.ok) {
           if (endsTheCall(result.error)) throw result.error;
-        } else {
-          const response = result.value as IAdtResponse<unknown, IAdtError>;
-          const step = enhancementStep(read);
-          if (
-            response?.ok === false &&
-            isCredentialPayload(failureEntry(response.getError(), step))
-          ) {
-            const error = response.getError();
-            throw carryingFailure(
-              read.kind === 'elements'
-                ? new EnhancementInputError(error.message)
-                : new Error(error.message),
-              error,
-              step,
-            );
-          }
+          if (read.kind === 'node') nodes.set(key, result);
+          else documents.set(key, result);
+          return;
         }
-        answers.set(enhancementKey(read), result);
+        const answer = result.value;
+        const step = enhancementStep(read);
+        if (
+          answer.response.ok === false &&
+          isCredentialPayload(failureEntry(answer.response.getError(), step))
+        ) {
+          const error = answer.response.getError();
+          throw carryingFailure(
+            read.kind === 'elements'
+              ? new EnhancementInputError(error.message)
+              : new Error(error.message),
+            error,
+            step,
+          );
+        }
+        if (answer.of === 'node') {
+          nodes.set(key, { ok: true, value: answer.response });
+        } else {
+          documents.set(key, { ok: true, value: answer.response });
+        }
       });
     },
   };
@@ -1105,7 +1196,7 @@ type EnhancementAnswers = ReturnType<typeof enhancementAnswers>;
 /** A resolved object: what kind it is, and the read of its elements. */
 interface EnhancementPath {
   type: 'program' | 'include' | 'class' | 'function_group';
-  elements: EnhancementRead;
+  elements: DocumentRead;
   context?: string;
   unreadable?: FailureEntry[];
 }
@@ -1123,33 +1214,33 @@ function pathFromAnswers(
 ): EnhancementPath {
   const name = objectName.toUpperCase();
   const kind = (requestedType ?? '').trim().toUpperCase();
-  const classPath = {
-    type: 'class' as const,
-    elements: { kind: 'elements', host: 'class', name } as EnhancementRead,
+  const classElements: DocumentRead = { kind: 'elements', host: 'class', name };
+  const classPath = { type: 'class' as const, elements: classElements };
+  const programElements: DocumentRead = {
+    kind: 'elements',
+    host: 'program',
+    name,
   };
-  const programPath = {
-    type: 'program' as const,
-    elements: { kind: 'elements', host: 'program', name } as EnhancementRead,
-  };
-  const groupPath = (group: string) => ({
-    type: 'function_group' as const,
-    elements: {
+  const programPath = { type: 'program' as const, elements: programElements };
+  const groupPath = (group: string) => {
+    const elements: DocumentRead = {
       kind: 'elements',
       host: 'function_group',
       name: group,
-    } as EnhancementRead,
-  });
+    };
+    return { type: 'function_group' as const, elements };
+  };
   const saplGroup =
     name.startsWith('SAPL') && name.length > 4 ? name.slice(4) : undefined;
 
   const unreadable: FailureEntry[] = [];
   const withReport = <T extends { type: string }>(path: T) =>
     unreadable.length > 0 ? { ...path, unreadable } : path;
-  const probe = (step: string, read: EnhancementRead): string | undefined => {
+  const probe = (step: string, read: DocumentRead): string | undefined => {
     const result = answers.answered(read);
     try {
       if (!result.ok) throw result.error;
-      const answer = result.value as IAdtResponse<unknown, IAdtError>;
+      const answer = result.value;
       if (answer.ok) return String(answer.getResult().value ?? '');
       const error = answer.getError();
       if (isCredentialPayload(failureEntry(error, step)))
@@ -1192,16 +1283,13 @@ function pathFromAnswers(
         `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`,
       );
     }
-    return {
-      type: 'include' as const,
-      elements: {
-        kind: 'elements',
-        host: 'include',
-        name,
-        program: mainProgram,
-      } as EnhancementRead,
-      context,
+    const elements: DocumentRead = {
+      kind: 'elements',
+      host: 'include',
+      name,
+      program: mainProgram,
     };
+    return { type: 'include' as const, elements, context };
   };
 
   if (spelledAs(kind, HOST_SPELLINGS.class)) {
@@ -1249,7 +1337,8 @@ type Resolved =
 /**
  * Every object's path, probe by probe: each phase sends the next probe of
  * every object still unresolved (class, then program, then include — each
- * only when the earlier answered none), one per object.
+ * only when the earlier answered none), one per object. One path per object,
+ * in the objects' order.
  */
 async function resolvePaths(
   answers: EnhancementAnswers,
@@ -1271,7 +1360,10 @@ async function resolvePaths(
         else resolved[i] = { ok: false, error };
       }
     });
-    if (next.length === 0) return resolved as Resolved[];
+    // With nothing left to send, every object was resolved.
+    if (next.length === 0) {
+      return resolved.flatMap((path) => (path === undefined ? [] : [path]));
+    }
     await answers.phase(next);
   }
 }
@@ -1296,17 +1388,17 @@ function includesNodeRead(
   answers: EnhancementAnswers,
   objectName: string,
   objectType: EnhancementPath['type'],
-): EnhancementRead | undefined {
+): NodeRead | undefined {
   if (objectType === 'class') return undefined;
   const parent = includesParentOf(objectName, objectType);
-  let root: PhaseResult<unknown>;
+  let root: PhaseResult<NodeAnswer>;
   try {
-    root = answers.answered({ kind: 'node', ...parent, nodeId: '000000' });
+    root = answers.answeredNode({ kind: 'node', ...parent, nodeId: '000000' });
   } catch {
     return undefined;
   }
   if (!root.ok) return undefined;
-  const response = root.value as IAdtResponse<NodeLevelLike, IAdtError>;
+  const response = root.value;
   if (!response.ok) return undefined;
   const node = response
     .getResult()
@@ -1314,12 +1406,6 @@ function includesNodeRead(
   return node === undefined
     ? undefined
     : { kind: 'node', ...parent, nodeId: node.nodeId };
-}
-
-/** The part of a node structure level the includes walk reads. */
-interface NodeLevelLike {
-  objects: Array<{ name: string }>;
-  childNodes: Array<{ type: string; nodeId: string }>;
 }
 
 /** `getIncludesListInternal` over the phases' answers: the same names, the same throws. */
@@ -1343,10 +1429,10 @@ function includesFromAnswers(
         `Include processing: assuming parent program for include ${objectName}`,
       );
     }
-    const settled = (read: EnhancementRead) => {
-      const result = answers.answered(read);
+    const settled = (read: NodeRead) => {
+      const result = answers.answeredNode(read);
       if (!result.ok) throw result.error;
-      return result.value as IAdtResponse<NodeLevelLike, IAdtError>;
+      return result.value;
     };
     const rootResponse = settled({ kind: 'node', ...parent, nodeId: '000000' });
     if (!rootResponse.ok) {
@@ -1409,7 +1495,7 @@ function responseFromAnswers(
       `Failed to retrieve enhancements for ${objectName}: ${message}`,
     );
   }
-  const answer = result.value as IAdtResponse<unknown, IAdtError>;
+  const answer = result.value;
   if (!answer.ok) {
     const error = answer.getError();
     throw carryingFailure(
@@ -1438,12 +1524,12 @@ interface EnhancementOptions {
   maxIncludes: number;
 }
 
-function enhancementOptionsOf(args: any): EnhancementOptions {
+function enhancementOptionsOf(args: GetEnhancementsArgs): EnhancementOptions {
   return {
     manualProgram: args.program,
     includeNested: args.include_nested === true,
     isDetailed: args.detailed === true,
-    maxIncludes: args.max_includes ? parseInt(args.max_includes, 10) : 50,
+    maxIncludes: args.max_includes ? args.max_includes : 50,
   };
 }
 
@@ -1474,42 +1560,37 @@ function enhancementsAnswerFrom(
       resolved,
     );
     if (!options.includeNested) {
-      let response: any = mainEnhancementResponse;
-      if (!options.isDetailed) {
-        response = filterMinimalEnhancements(response);
-      } else {
-        response = { ...response, detailed: true };
-      }
-      return answerText(response);
+      return answerText(
+        options.isDetailed
+          ? { ...mainEnhancementResponse, detailed: true }
+          : filterMinimalEnhancements(mainEnhancementResponse),
+      );
     }
     let allEnhancementResponses: EnhancementResponse[];
-    const includesUnread: Array<{
-      include: string;
-      step: 'read enhancements';
-      failures: FailureEntry[];
-    }> = [];
+    const includesUnread: IncludeUnread[] = [];
     try {
-      if (includes === undefined || !Array.isArray(includes)) {
-        throw (includes as { thrown: unknown } | undefined)?.thrown;
-      }
+      // No list: the walk of the includes threw (`undefined` when it did
+      // not run, which the main object's read rules out).
+      const listed = includes ?? { thrown: undefined };
+      if (!Array.isArray(listed)) throw listed.thrown;
       allEnhancementResponses = [mainEnhancementResponse];
-      for (const includeName of includes) {
+      for (const includeName of listed) {
         try {
+          const includePath = includePaths.get(includeName);
+          if (includePath === undefined) {
+            throw new Error(`Include ${includeName} was not resolved.`);
+          }
           allEnhancementResponses.push(
-            responseFromAnswers(
-              answers,
-              includeName,
-              includePaths.get(includeName) as Resolved,
-            ),
+            responseFromAnswers(answers, includeName, includePath),
           );
         } catch (error) {
           if (credentialFailure(error)) throw error;
           includesUnread.push({
             include: includeName,
             step: 'read enhancements',
-            failures: (payloadCarriedBy(error)?.failures as
-              | FailureEntry[]
-              | undefined) ?? [thrownEntry(error, 'read enhancements')],
+            failures: carriedFailures(error) ?? [
+              thrownEntry(error, 'read enhancements'),
+            ],
           });
         }
       }
@@ -1517,6 +1598,7 @@ function enhancementsAnswerFrom(
       if (credentialFailure(error)) throw error;
       logger?.error('Nested enhancement processing failed:', error);
       return {
+        isError: false,
         content: [
           {
             type: 'text',
@@ -1539,9 +1621,9 @@ function enhancementsAnswerFrom(
             ),
           },
         ],
-      } as McpResult;
+      };
     }
-    let combinedResponse: any = {
+    const combinedResponse: NestedEnhancements = {
       main_object: {
         name: objectName,
         type: mainEnhancementResponse.object_type,
@@ -1555,14 +1637,13 @@ function enhancementsAnswerFrom(
       objects: allEnhancementResponses,
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
-    if (!options.isDetailed) {
-      combinedResponse = filterMinimalEnhancements(combinedResponse);
-    } else {
-      combinedResponse = { ...combinedResponse, detailed: true };
-    }
-    return answerText(combinedResponse);
+    return answerText(
+      options.isDetailed
+        ? { ...combinedResponse, detailed: true }
+        : filterMinimalNested(combinedResponse),
+    );
   } catch (error) {
-    return return_error(error) as McpResult;
+    return return_error(error);
   }
 }
 
@@ -1585,7 +1666,7 @@ async function enhancementsInPhases(
   const paths = await resolvePaths(answers, objects, options.manualProgram);
   const second: EnhancementRead[] = [];
   objects.forEach((o, i) => {
-    const resolved = paths[i] as Resolved;
+    const resolved = paths[i];
     if (!resolved.ok) return;
     second.push(resolved.path.elements);
     if (options.includeNested && resolved.path.type !== 'class') {
@@ -1606,7 +1687,7 @@ async function enhancementsInPhases(
     // as in the sequential version.
     const answeredMain = objects.map((o, i) => {
       try {
-        responseFromAnswers(answers, o.name, paths[i] as Resolved);
+        responseFromAnswers(answers, o.name, paths[i]);
         return true;
       } catch {
         return false;
@@ -1614,7 +1695,7 @@ async function enhancementsInPhases(
     });
     const third: EnhancementRead[] = [];
     objects.forEach((o, i) => {
-      const resolved = paths[i] as Resolved;
+      const resolved = paths[i];
       if (!resolved.ok || !answeredMain[i]) return;
       const node = includesNodeRead(answers, o.name, resolved.path.type);
       if (node !== undefined) third.push(node);
@@ -1622,7 +1703,7 @@ async function enhancementsInPhases(
     await answers.phase(third);
     const names = new Set<string>();
     objects.forEach((o, i) => {
-      const resolved = paths[i] as Resolved;
+      const resolved = paths[i];
       if (!resolved.ok || !answeredMain[i]) return;
       try {
         let list = includesFromAnswers(
@@ -1647,7 +1728,7 @@ async function enhancementsInPhases(
       options.manualProgram,
     );
     asked.forEach((name, i) => {
-      includePaths.set(name, resolvedIncludes[i] as Resolved);
+      includePaths.set(name, resolvedIncludes[i]);
     });
     await answers.phase(
       resolvedIncludes.flatMap((r) => (r.ok ? [r.path.elements] : [])),
@@ -1658,7 +1739,7 @@ async function enhancementsInPhases(
       context,
       answers,
       o.name,
-      paths[i] as Resolved,
+      paths[i],
       includes[i],
       includePaths,
       options,
@@ -1695,7 +1776,7 @@ function listAnswer(
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) => {
-    const asked = objects[i] as (typeof objects)[number];
+    const asked = objects[i];
     return result.isError
       ? {
           object_name: asked.object_name,
@@ -1712,12 +1793,13 @@ function listAnswer(
 
 export async function handleGetEnhancements(
   context: HandlerContext,
-  args: any,
+  args: GetEnhancementsArgs,
 ) {
   const listed = args?.objects;
   try {
     if (listed === undefined) {
-      if (!args?.object_name) return await enhancementsOf(context, args);
+      const objectName = args.object_name;
+      if (!objectName) return await enhancementsOf(context, args);
       const options = enhancementOptionsOf(args);
       const kind = String(args.object_type ?? '')
         .trim()
@@ -1735,11 +1817,11 @@ export async function handleGetEnhancements(
           (
             await enhancementsInPhases(
               context,
-              [{ name: args.object_name, type: args.object_type }],
+              [{ name: objectName, type: args.object_type }],
               options,
             )
-          )[0] as McpResult,
-        () => enhancementsOf(context, args) as Promise<McpResult>,
+          )[0],
+        () => enhancementsOf(context, args),
       );
     }
     if (
@@ -1752,9 +1834,9 @@ export async function handleGetEnhancements(
         'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })',
       );
     }
-    const objects = listed.map((o: any) => ({
-      object_name: o?.object_name,
-      object_type: o?.object_type,
+    const objects = listed.map((o) => ({
+      object_name: o.object_name,
+      object_type: o.object_type,
     }));
     const single = (o: (typeof objects)[number]) => {
       const { objects: _list, ...rest } = args;
@@ -1775,8 +1857,8 @@ export async function handleGetEnhancements(
         for (const o of objects) {
           results.push(
             o.object_name
-              ? (answered[at++] as McpResult)
-              : ((await enhancementsOf(context, single(o))) as McpResult),
+              ? answered[at++]
+              : await enhancementsOf(context, single(o)),
           );
         }
         return listAnswer(objects, results);
@@ -1786,10 +1868,7 @@ export async function handleGetEnhancements(
         // credential failure ends the call, and nothing after it is read.
         const results: McpResult[] = [];
         for (const o of objects) {
-          const result = (await enhancementsOf(
-            context,
-            single(o),
-          )) as McpResult;
+          const result = await enhancementsOf(context, single(o));
           if (endsList(result)) return result;
           results.push(result);
         }

@@ -359,6 +359,14 @@ describe('the MCP tool surface', () => {
         // dropped them; declared now, both optional.
         'readonly/GetUnitTestResult': ['format', 'with_navigation_uris'],
         'high/GetUnitTestResult': ['format', 'with_navigation_uris'],
+        // 24.0.0 (static types): GetEnhancements read them and its schema
+        // dropped them; declared now, each optional.
+        'readonly/GetEnhancements': [
+          'detailed',
+          'include_nested',
+          'max_includes',
+          'program',
+        ],
       };
       const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
       const gainsTimeout = isLong && !had.includes('timeout');

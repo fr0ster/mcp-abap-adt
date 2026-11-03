@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`GetEnhancements` takes `program`, `include_nested`, `detailed` and `max_includes`.** The handler read them and the tool's schema did not declare them, so its parse dropped them and a call over MCP never reached them: an include's main program could not be given, and the nested read and the detailed answer could not be asked for. Each is declared now, optional, as the handler reads it (`max_includes` an integer, 50 by default).
+- **`GetEnhancements` with `include_nested`: the partial answer** after the walk of the includes threw carries `isError: false`, as every other answer does; it carried no `isError`.
+
 ## [23.1.0] - 2026-11-03
 
 A minor: the stored ATC results. The eighteen packages are at 23.1.0, every sibling range at `^23.1.0`; `@mcp-abap-adt/adt-clients` `^42.1.0`, `@mcp-abap-adt/adt-strategies` `^0.18.2`, `@mcp-abap-adt/interfaces-adt` `^25.1.0`.

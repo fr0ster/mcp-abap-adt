@@ -314,17 +314,18 @@ describe('the low set → compact mapping table', () => {
 });
 
 /**
- * MIGRATION-19.0's table is rendered from the JSON: the committed text must be
- * the rendering. `WRITE_LOW_TO_COMPACT_TABLE=1` writes it first (refused under CI).
+ * The current low → compact table, in MIGRATION-24.0, is rendered from the
+ * JSON: the committed text must be the rendering. MIGRATION-19.0 is a released
+ * note and keeps its table as released. `WRITE_LOW_TO_COMPACT_TABLE=1` writes it first (refused under CI).
  */
-describe('docs/MIGRATION-19.0.md', () => {
+describe('docs/MIGRATION-24.0.md', () => {
   const file = path.join(
     __dirname,
     '..',
     '..',
     '..',
     'docs',
-    'MIGRATION-19.0.md',
+    'MIGRATION-24.0.md',
   );
   it('holds the low → compact table rendered from tools/low-to-compact.json', () => {
     const text = fs.readFileSync(file, 'utf-8');

@@ -1,5 +1,5 @@
 {
-  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so; an `accepted` with `since` was accepted after MIGRATION-19.0's release and is not rendered into it.",
+  "description": "Each tool of the low set as it stood before 19.0.0 (LowLevelHandlersGroup and the three *Low reads of SystemHandlersGroup), the compact call that replaces it, and the ADT requests the low tool sent for that call (low_requests, captured from the low handler before it was removed). lowToCompact.test.ts sends each compact call to a stand-in and compares; a row with `accepted` differs as its reason says, and only so; an `accepted` with `since` was accepted after MIGRATION-19.0's release, whose table stays as released; the current table is in MIGRATION-24.0.",
   "rows": [
     {
       "tool": "CreatePackageLow",

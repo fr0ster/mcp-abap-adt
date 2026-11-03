@@ -25,8 +25,8 @@ export interface LowToCompactRow {
   compact: Array<{ tool: string; args: Record<string, unknown> }>;
   /**
    * A difference the owner accepted. `since` names the release that accepted
-   * it after MIGRATION-19.0 was released: that note is history, so such a
-   * difference is not rendered into it.
+   * it after MIGRATION-19.0 was released (that note is history and keeps its
+   * table as released); the current mapping, in MIGRATION-24.0, shows it.
    */
   accepted?: { kind: string; reason: string; since?: string };
   note?: string;
@@ -100,7 +100,7 @@ export const silentLogger = {
   debug: () => {},
 };
 
-/** The markers around the table in docs/MIGRATION-19.0.md. */
+/** The markers around the table in docs/MIGRATION-24.0.md. */
 export const TABLE_START =
   '<!-- low-to-compact table: rendered from tools/low-to-compact.json -->';
 export const TABLE_END = '<!-- end of the low-to-compact table -->';
@@ -117,7 +117,7 @@ function callCell(call: {
   return `\`${call.tool}\` (${words.join(', ')})`;
 }
 
-/** The mapping table of docs/MIGRATION-19.0.md, rendered from the rows. */
+/** The mapping table of docs/MIGRATION-24.0.md, rendered from the rows. */
 export function renderLowToCompactTable(rows: LowToCompactRow[]): string {
   const lines = [
     '| Low tool | Compact call | Difference / note |',
@@ -127,9 +127,7 @@ export function renderLowToCompactTable(rows: LowToCompactRow[]): string {
   for (const row of ordered) {
     const calls = row.compact.map(callCell).join(', then ');
     const notes = [
-      row.accepted && row.accepted.since === undefined
-        ? `**accepted:** ${row.accepted.reason}`
-        : '',
+      row.accepted ? `**accepted:** ${row.accepted.reason}` : '',
       row.note ?? '',
     ]
       .filter((n) => n !== '')

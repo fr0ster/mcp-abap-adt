@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateMetadataExtension Handler - ABAP Metadata Extension Update via ADT API
  *
@@ -26,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -40,35 +42,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Metadata Extension name',
-      },
-      source_code: {
-        type: 'string',
-        description: 'New source code',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. If not provided, will attempt to lock internally.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after update. Default: true',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name', 'source_code'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('Metadata Extension name'),
+    source_code: z.string().describe('New source code'),
+    lock_handle: z
+      .string()
+      .optional()
+      .describe(
+        'Lock handle from LockObject. If not provided, will attempt to lock internally.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after update. Default: true'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateMetadataExtensionArgs {

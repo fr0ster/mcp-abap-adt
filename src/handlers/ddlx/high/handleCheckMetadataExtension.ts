@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,29 +27,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the CDS metadata extension (DDLX) named by name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Metadata extension name.',
-      },
-      // **The one knob that is not a knob.** This wrapper deliberately offers
-      // less than its low-tier sibling — no `detail`, no session control — but
-      // `version` is not a refinement a caller may or may not want: ask for
-      // the version an extension does not have and the endpoint answers
-      // `notProcessed` instead of checking the other one, so without it half
-      // the objects in a system cannot be checked from this tier at all.
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        default: 'active',
-        description:
-          "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.",
-      },
-    },
-    required: ['name'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('Metadata extension name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .default('active')
+      .optional()
+      .describe(
+        "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.",
+      ),
+  }),
 } as const;
 
 export async function handleCheckMetadataExtension(

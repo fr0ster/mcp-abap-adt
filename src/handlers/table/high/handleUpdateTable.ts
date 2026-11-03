@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateTable Handler - Update Existing ABAP Table DDL Source
  *
@@ -30,7 +32,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -45,31 +47,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_name: {
-        type: 'string',
-        description: 'Table name. Table must already exist.',
-      },
-      ddl_code: {
-        type: 'string',
-        description:
-          "Complete DDL source code for table. Example: '@EndUserText.label : \\'My Table\\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'",
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate table after source update. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_name', 'ddl_code'],
-  },
+  inputSchema: z.object({
+    table_name: z.string().describe('Table name. Table must already exist.'),
+    ddl_code: z
+      .string()
+      .describe(
+        "Complete DDL source code for table. Example: '@EndUserText.label : \\'My Table\\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'",
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate table after source update. Default: true.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateTableArgs {

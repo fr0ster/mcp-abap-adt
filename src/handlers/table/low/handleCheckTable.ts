@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckTableLow Handler - Syntax check for ABAP Table
  *
@@ -20,7 +22,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -30,34 +32,28 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_name: {
-        type: 'string',
-        description: 'Table name',
-      },
-      ddl_code: {
-        type: 'string',
-        description:
-          'Accepted for compatibility; not sent to the server. The shipped check endpoint takes no source of its own — it checks whatever is already saved.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' selects the last activated version. 'inactive' and 'new' both check the inactive version. Without `version` the active version is checked.",
-        enum: ['active', 'inactive', 'new'],
-      },
-      reporter: {
-        type: 'string',
-        description:
-          "Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.",
-        enum: ['tableStatusCheck', 'abapCheckRun'],
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_name'],
-  },
+  inputSchema: z.object({
+    table_name: z.string().describe('Table name'),
+    ddl_code: z
+      .string()
+      .optional()
+      .describe(
+        'Accepted for compatibility; not sent to the server. The shipped check endpoint takes no source of its own — it checks whatever is already saved.',
+      ),
+    version: z
+      .enum(['active', 'inactive', 'new'])
+      .optional()
+      .describe(
+        "Version to check: 'active' selects the last activated version. 'inactive' and 'new' both check the inactive version. Without `version` the active version is checked.",
+      ),
+    reporter: z
+      .enum(['tableStatusCheck', 'abapCheckRun'])
+      .optional()
+      .describe(
+        "Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.",
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CheckTableArgs {

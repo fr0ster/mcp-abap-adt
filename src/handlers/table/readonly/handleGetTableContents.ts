@@ -19,7 +19,7 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows.',
   ),
-  inputSchema: {
+  inputSchema: z.object({
     timeout: timeoutField(),
     table_name: z.string().describe('Name of the ABAP table'),
     max_rows: z
@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
       .describe(
         'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
       ),
-  },
+  }),
 } as const;
 
 export async function handleGetTableContents(

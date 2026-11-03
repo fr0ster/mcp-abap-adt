@@ -58,6 +58,15 @@ export type McpResult = {
   content: Array<{ type: 'text'; text: string }>;
 };
 
+/**
+ * An answer whose content is a value, not text: the registration serialises
+ * each `json` item to text (`normalizeToolContent`).
+ */
+export type JsonAnswer = {
+  isError: boolean;
+  content: Array<{ type: 'json'; json: unknown }>;
+};
+
 function text(value: string, isError = false): McpResult {
   return { isError, content: [{ type: 'text', text: value }] };
 }

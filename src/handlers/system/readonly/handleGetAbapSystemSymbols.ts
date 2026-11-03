@@ -6,17 +6,15 @@ import {
   failedPayloadOf,
   isCredentialFailure,
   isCredentialPayload,
+  type JsonAnswer,
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
-import {
-  type PhaseResult,
-  runPhase,
-  withSequentialFallback,
-} from '../../../lib/batch/phases';
+import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import { return_error } from '../../../lib/utils';
+import { child, text } from '../../../lib/xml/tree';
 import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';
@@ -83,8 +81,6 @@ type SymbolObjectType =
 const CLASS_SYMBOL: TableMainOf<AdtCodes<'CLAS/OC'>> = 'CLAS';
 /** An interface, by its main type. */
 const INTERFACE_SYMBOL: TableMainOf<AdtCodes<'INTF/OI'>> = 'INTF';
-/** A function module, by this tool's own word for one. */
-const FUNCTION_SYMBOL: SymbolObjectType = 'FUNC';
 
 interface AbapSystemInfo {
   exists: boolean;
@@ -460,7 +456,12 @@ class SimpleAbapSemanticAnalyzer {
 
   private extractMethodParameters(line: string): AbapParameterInfo[] {
     const parameters: AbapParameterInfo[] = [];
-    const paramTypes = ['importing', 'exporting', 'changing', 'returning'];
+    const paramTypes = [
+      'importing',
+      'exporting',
+      'changing',
+      'returning',
+    ] as const;
 
     for (const paramType of paramTypes) {
       const regex = new RegExp(`${paramType}\\s+([a-zA-Z0-9_\\s,]+)`, 'gi');
@@ -471,7 +472,7 @@ class SimpleAbapSemanticAnalyzer {
           if (paramName) {
             parameters.push({
               name: paramName.toUpperCase(),
-              type: paramType as any,
+              type: paramType,
               optional: line.toLowerCase().includes('optional'),
             });
           }
@@ -489,7 +490,7 @@ class SimpleAbapSemanticAnalyzer {
  * (`ExceptionResourceNotFound`) stays what it was: not found.
  */
 function refusalOf(
-  result: { isError?: boolean; content?: unknown } | undefined,
+  result: McpResult | undefined,
   step: string,
 ): FailureEntry | undefined {
   const payload = failedPayloadOf(result, step);
@@ -503,7 +504,7 @@ function refusalOf(
 }
 
 /** The delegated answers that were credential failures, by their entry. */
-const credentialAnswers = new WeakMap<object, unknown>();
+const credentialAnswers = new WeakMap<object, McpResult>();
 
 /**
  * A throw while resolving a symbol: that symbol's failure in the shape of
@@ -520,16 +521,51 @@ function threwAt(
   return { ...symbol, error: thrownEntry(thrown, step) };
 }
 
+/** How many symbols were asked, and how many the system resolved. */
+type ResolutionStats = AbapSystemSymbolsResult['systemResolutionStats'];
+
+/**
+ * What resolving the symbols came to: each symbol and the counts, or the
+ * credential failure's answer, as it came — the call ends with it.
+ */
+type Resolution =
+  | { ended: McpResult }
+  | {
+      ended?: undefined;
+      resolvedSymbols: AbapSymbolInfo[];
+      stats: ResolutionStats;
+    };
+
+/** The counts of a resolution. */
+function statsOf(
+  total: number,
+  resolvedCount: number,
+  failedCount: number,
+): ResolutionStats {
+  return {
+    totalSymbols: total,
+    resolvedSymbols: resolvedCount,
+    failedSymbols: failedCount,
+    resolutionRate: `${((resolvedCount / total) * 100).toFixed(1)}%`,
+  };
+}
+
+/** A delegated read's text, parsed: `{}` when it is none or no JSON. */
+function parsedText(item: { text: string }): unknown {
+  if (!item.text) return {};
+  try {
+    return JSON.parse(item.text);
+  } catch {
+    // If parsing fails, use empty object
+    return {};
+  }
+}
+
 class AbapSystemSymbolResolver {
   public async resolveSymbols(
     context: HandlerContext,
     symbols: AbapSymbolInfo[],
-  ): Promise<{
-    resolvedSymbols: AbapSymbolInfo[];
-    stats: any;
-    /** A credential failure's answer, as it came: the call ends with it. */
-    ended?: unknown;
-  }> {
+  ): Promise<Resolution> {
     const resolvedSymbols: AbapSymbolInfo[] = [];
     let resolvedCount = 0;
     let failedCount = 0;
@@ -540,8 +576,7 @@ class AbapSystemSymbolResolver {
         const ended = resolved.error
           ? credentialAnswers.get(resolved.error)
           : undefined;
-        if (ended !== undefined)
-          return { resolvedSymbols, stats: undefined, ended };
+        if (ended !== undefined) return { ended };
         resolvedSymbols.push(resolved);
         if (resolved.systemInfo?.exists) {
           resolvedCount++;
@@ -554,14 +589,10 @@ class AbapSystemSymbolResolver {
       }
     }
 
-    const stats = {
-      totalSymbols: symbols.length,
-      resolvedSymbols: resolvedCount,
-      failedSymbols: failedCount,
-      resolutionRate: `${((resolvedCount / symbols.length) * 100).toFixed(1)}%`,
+    return {
+      resolvedSymbols,
+      stats: statsOf(symbols.length, resolvedCount, failedCount),
     };
-
-    return { resolvedSymbols, stats };
   }
 
   /**
@@ -575,12 +606,7 @@ class AbapSystemSymbolResolver {
   public async resolveSymbolsInEnvelope(
     context: HandlerContext,
     symbols: AbapSymbolInfo[],
-  ): Promise<{
-    resolvedSymbols: AbapSymbolInfo[];
-    stats: any;
-    /** A credential failure's answer, as it came: the call ends with it. */
-    ended?: unknown;
-  }> {
+  ): Promise<Resolution> {
     const answered = await runPhase(context, symbols, (symbol, batch) =>
       this.resolveSymbol({ ...context, connection: batch }, symbol),
     );
@@ -590,14 +616,13 @@ class AbapSystemSymbolResolver {
 
     for (const [i, symbol] of symbols.entries()) {
       try {
-        const result = answered[i] as PhaseResult<AbapSymbolInfo>;
+        const result = answered[i];
         if (!result.ok) throw result.error;
         const resolved = result.value;
         const ended = resolved.error
           ? credentialAnswers.get(resolved.error)
           : undefined;
-        if (ended !== undefined)
-          return { resolvedSymbols, stats: undefined, ended };
+        if (ended !== undefined) return { ended };
         resolvedSymbols.push(resolved);
         if (resolved.systemInfo?.exists) {
           resolvedCount++;
@@ -610,14 +635,10 @@ class AbapSystemSymbolResolver {
       }
     }
 
-    const stats = {
-      totalSymbols: symbols.length,
-      resolvedSymbols: resolvedCount,
-      failedSymbols: failedCount,
-      resolutionRate: `${((resolvedCount / symbols.length) * 100).toFixed(1)}%`,
+    return {
+      resolvedSymbols,
+      stats: statsOf(symbols.length, resolvedCount, failedCount),
     };
-
-    return { resolvedSymbols, stats };
   }
 
   private async resolveSymbol(
@@ -676,24 +697,17 @@ class AbapSystemSymbolResolver {
         };
       }
       // Parse JSON from text field (handleGetClass returns text with JSON string)
-      let classData: any = {};
-      if ('json' in contentItem) {
-        classData = contentItem.json;
-      } else if ('text' in contentItem && contentItem.text) {
-        try {
-          classData = JSON.parse(contentItem.text);
-        } catch {
-          // If parsing fails, use empty object
-        }
-      }
+      const classData = parsedText(contentItem);
       return {
         ...symbol,
         systemInfo: {
           exists: true,
           objectType: CLASS_SYMBOL,
-          description: classData?.description || `ABAP Class ${symbol.name}`,
-          package: classData?.packageName || 'Unknown',
-          superClass: classData?.superclass || '',
+          description:
+            text(child(classData, 'description')) ||
+            `ABAP Class ${symbol.name}`,
+          package: text(child(classData, 'packageName')) || 'Unknown',
+          superClass: text(child(classData, 'superclass')) || '',
         },
       };
     } catch (error) {
@@ -726,27 +740,13 @@ class AbapSystemSymbolResolver {
           },
         };
       }
-      const contentItem = functionInfo.content[0];
-      if (!contentItem || !('json' in contentItem)) {
-        return {
-          ...symbol,
-          systemInfo: {
-            exists: false,
-            error: 'Invalid response format from GetFunction',
-          },
-        };
-      }
-      const functionData = contentItem.json as Record<string, any> | undefined;
+      // GetFunctionModule answers text: there is no `json` item to read.
       return {
         ...symbol,
         systemInfo: {
-          exists: true,
-          objectType: FUNCTION_SYMBOL,
-          description:
-            functionData?.description || `ABAP Function ${symbol.name}`,
-          package: functionData?.packageName || 'Unknown',
-          techName: functionData?.functionModuleName || '',
-        } as AbapSystemInfo,
+          exists: false,
+          error: 'Invalid response format from GetFunction',
+        },
       };
     } catch (error) {
       return threwAt(symbol, error, 'read function module');
@@ -790,25 +790,17 @@ class AbapSystemSymbolResolver {
         };
       }
       // Parse JSON from text field (handleGetInterface returns text with JSON string)
-      let interfaceData: any = {};
-      if ('json' in contentItem) {
-        interfaceData = contentItem.json;
-      } else if ('text' in contentItem && contentItem.text) {
-        try {
-          interfaceData = JSON.parse(contentItem.text);
-        } catch {
-          // If parsing fails, use empty object
-        }
-      }
+      const interfaceData = parsedText(contentItem);
       return {
         ...symbol,
         systemInfo: {
           exists: true,
           objectType: INTERFACE_SYMBOL,
           description:
-            interfaceData?.description || `ABAP Interface ${symbol.name}`,
-          package: interfaceData?.packageName || 'Unknown',
-        } as AbapSystemInfo,
+            text(child(interfaceData, 'description')) ||
+            `ABAP Interface ${symbol.name}`,
+          package: text(child(interfaceData, 'packageName')) || 'Unknown',
+        },
       };
     } catch (error) {
       return threwAt(symbol, error, 'read interface');
@@ -821,20 +813,24 @@ class AbapSystemSymbolResolver {
   ): Promise<AbapSymbolInfo> {
     // For generic symbols, we don't have a specific handler
     // Return symbol with basic system info indicating it exists locally
-    return {
-      ...symbol,
-      systemInfo: {
-        exists: false,
-        objectType: 'LOCAL',
-        description: `Local ${symbol.type} ${symbol.name}`,
-        package: 'LOCAL',
-        error: 'No system resolution available for this symbol type',
-      } as AbapSystemInfo,
+    const systemInfo: AbapSystemInfo = {
+      exists: false,
+      objectType: 'LOCAL',
+      description: `Local ${symbol.type} ${symbol.name}`,
+      package: 'LOCAL',
+      error: 'No system resolution available for this symbol type',
     };
+    return { ...symbol, systemInfo };
   }
 }
 
-async function systemSymbolsOneByOne(context: HandlerContext, args: any) {
+/** GetAbapSystemSymbols' arguments, as its schema parses them. */
+type SystemSymbolsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+async function systemSymbolsOneByOne(
+  context: HandlerContext,
+  args: SystemSymbolsArgs,
+): Promise<McpResult | JsonAnswer> {
   const { logger } = context;
   try {
     if (!args?.code) {
@@ -848,11 +844,12 @@ async function systemSymbolsOneByOne(context: HandlerContext, args: any) {
 
     // Then, resolve symbols with SAP system information
     const resolver = new AbapSystemSymbolResolver();
-    const { resolvedSymbols, stats, ended } = await resolver.resolveSymbols(
+    const resolution = await resolver.resolveSymbols(
       context,
       semanticResult.symbols,
     );
-    if (ended !== undefined) return ended as McpResult;
+    if (resolution.ended !== undefined) return resolution.ended;
+    const { resolvedSymbols, stats } = resolution;
     logger?.info(
       `Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`,
     );
@@ -865,7 +862,7 @@ async function systemSymbolsOneByOne(context: HandlerContext, args: any) {
       systemResolutionStats: stats,
     };
 
-    const response = {
+    const response: JsonAnswer = {
       isError: false,
       content: [
         {
@@ -877,7 +874,7 @@ async function systemSymbolsOneByOne(context: HandlerContext, args: any) {
 
     return response;
   } catch (error) {
-    logger?.error('Failed to resolve ABAP system symbols', error as any);
+    logger?.error('Failed to resolve ABAP system symbols', error);
     // A credential failure as the chain made it, a carried error as it is,
     // a throw of our own `client_threw` — never its message as bare text.
     return answerCaught(error, {
@@ -893,8 +890,8 @@ async function systemSymbolsOneByOne(context: HandlerContext, args: any) {
  */
 async function systemSymbolsInEnvelope(
   context: HandlerContext,
-  args: any,
-): Promise<McpResult> {
+  args: SystemSymbolsArgs,
+): Promise<McpResult | JsonAnswer> {
   const { logger } = context;
   logger?.debug('Running semantic analysis and system symbol resolution');
 
@@ -902,9 +899,12 @@ async function systemSymbolsInEnvelope(
   const semanticResult = analyzer.analyze(args.code);
 
   const resolver = new AbapSystemSymbolResolver();
-  const { resolvedSymbols, stats, ended } =
-    await resolver.resolveSymbolsInEnvelope(context, semanticResult.symbols);
-  if (ended !== undefined) return ended as McpResult;
+  const resolution = await resolver.resolveSymbolsInEnvelope(
+    context,
+    semanticResult.symbols,
+  );
+  if (resolution.ended !== undefined) return resolution.ended;
+  const { resolvedSymbols, stats } = resolution;
   logger?.info(
     `Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`,
   );
@@ -917,7 +917,7 @@ async function systemSymbolsInEnvelope(
     systemResolutionStats: stats,
   };
 
-  return {
+  const response: JsonAnswer = {
     isError: false,
     content: [
       {
@@ -925,25 +925,23 @@ async function systemSymbolsInEnvelope(
         json: result,
       },
     ],
-  } as unknown as McpResult;
+  };
+  return response;
 }
 
 export async function handleGetAbapSystemSymbols(
   context: HandlerContext,
-  args: any,
+  args: SystemSymbolsArgs,
 ) {
   if (!args?.code) return systemSymbolsOneByOne(context, args);
   try {
-    return await withSequentialFallback<McpResult>(
+    return await withSequentialFallback<McpResult | JsonAnswer>(
       context,
       () => systemSymbolsInEnvelope(context, args),
-      () => systemSymbolsOneByOne(context, args) as Promise<McpResult>,
+      () => systemSymbolsOneByOne(context, args),
     );
   } catch (error) {
-    context.logger?.error(
-      'Failed to resolve ABAP system symbols',
-      error as any,
-    );
+    context.logger?.error('Failed to resolve ABAP system symbols', error);
     return answerCaught(error, {
       tool: 'GetAbapSystemSymbols',
       detail: 'terse',

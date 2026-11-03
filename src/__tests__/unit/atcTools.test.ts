@@ -9,6 +9,7 @@ import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
 import { declareSystemKind } from '../../lib/systemKind';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /**
@@ -358,11 +359,11 @@ describe('RunATC composes the three calls', () => {
 });
 
 describe('RunATC: the object kinds the client checks', () => {
-  const objectSchema = () =>
-    (TOOL_DEFINITION.inputSchema.properties.objects.items as any).properties;
+  const objectSchema = (name: string) =>
+    jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'objects', '[]', name);
 
   it('offers every kind the client builds a URI for', () => {
-    expect([...objectSchema().type.enum].sort()).toEqual(
+    expect([...(objectSchema('type').enum ?? [])].sort()).toEqual(
       [
         'behavior_definition',
         'class',
@@ -377,10 +378,10 @@ describe('RunATC: the object kinds the client checks', () => {
         'table',
       ].sort(),
     );
-    expect([...objectSchema().include_kind.enum].sort()).toEqual(
+    expect([...(objectSchema('include_kind').enum ?? [])].sort()).toEqual(
       ['definitions', 'implementations', 'macros', 'testclasses'].sort(),
     );
-    expect(objectSchema().function_group.type).toBe('string');
+    expect(objectSchema('function_group').type).toBe('string');
   });
 
   const capture = () => {
@@ -491,14 +492,15 @@ describe('RunATC: the object kinds of each variant', () => {
   const stated = (variant: 'onprem' | 'cloud') =>
     TOOL_DEFINITION.variants[variant];
   const typeEnum = (variant: 'onprem' | 'cloud') =>
-    stated(variant).inputSchema.properties.objects.items.properties.type.enum;
+    jsonAt(listedJson(stated(variant).inputSchema), 'objects', '[]', 'type')
+      .enum;
 
   it.each([
     ['onprem', ONPREM],
     ['cloud', CLOUD],
   ] as const)('%s offers exactly its kinds', (variant, kinds) => {
     expect(ATC_OBJECT_TYPES[variant]).toEqual(kinds);
-    expect([...typeEnum(variant)]).toEqual(kinds);
+    expect(typeEnum(variant)).toEqual(kinds);
     const words = stated(variant).description;
     for (const kind of kinds) expect(words).toContain(kind);
   });

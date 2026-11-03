@@ -1,8 +1,9 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import { parseAtcResultList } from '../../../lib/strategies/atcResults';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -21,32 +22,28 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      created_by: {
-        type: 'string',
-        description: 'Whose results: a user name, or * for every user.',
-      },
-      central_only: {
-        type: 'boolean',
-        description:
-          'true lists central results only; absent lists every kind.',
-      },
-      age_min: {
-        type: 'integer',
-        minimum: 0,
-        description: 'Youngest age to list, in days.',
-      },
-      age_max: {
-        type: 'integer',
-        minimum: 0,
-        description: 'Oldest age to list, in days.',
-      },
-    },
-    required: ['created_by'],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    created_by: z
+      .string()
+      .describe('Whose results: a user name, or * for every user.'),
+    central_only: z
+      .boolean()
+      .optional()
+      .describe('true lists central results only; absent lists every kind.'),
+    age_min: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Youngest age to list, in days.'),
+    age_max: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Oldest age to list, in days.'),
+  }),
 } as const;
 
 interface ListATCResultsArgs {

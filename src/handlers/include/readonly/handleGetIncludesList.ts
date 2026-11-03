@@ -5,6 +5,7 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import type {
   IServerAdtClient,
   UtilsApi,
@@ -38,7 +39,7 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
@@ -65,55 +66,51 @@ export const TOOL_DEFINITION = {
 
 /** GetIncludesList's input on `variant`. */
 function includesListSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      object_name: {
-        type: 'string',
-        description:
-          'Name of the ABAP program or include (with object_type; or give objects)',
-      },
-      object_type: {
-        type: 'string',
-        enum: [
-          ...INCLUDES_PARENTS[variant],
-          ...INCLUDES_PARENT_MAIN_TYPES[variant],
-        ],
-        description: `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several objects, read together (give this or object_name and object_type)',
-        items: {
-          type: 'object',
-          properties: {
-            object_name: {
-              type: 'string',
-              description: 'Name of the ABAP program or include',
-            },
-            object_type: {
-              type: 'string',
-              enum: [
-                ...INCLUDES_PARENTS[variant],
-                ...INCLUDES_PARENT_MAIN_TYPES[variant],
-              ],
-              description: `ADT object type. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
-            },
-          },
-          required: ['object_name', 'object_type'],
-        },
-      },
-      detailed: {
-        type: 'boolean',
-        description:
-          '[read-only] If true, returns structured JSON with metadata and raw XML.',
-        default: false,
-      },
-    },
-    required: [],
-  } as const;
+  return z.object({
+    timeout: TIMEOUT_FIELD,
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        'Name of the ABAP program or include (with object_type; or give objects)',
+      ),
+    object_type: z
+      .enum([
+        ...INCLUDES_PARENTS[variant],
+        ...INCLUDES_PARENT_MAIN_TYPES[variant],
+      ])
+      .optional()
+      .describe(
+        `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
+      ),
+    objects: z
+      .array(
+        z.object({
+          object_name: z
+            .string()
+            .describe('Name of the ABAP program or include'),
+          object_type: z
+            .enum([
+              ...INCLUDES_PARENTS[variant],
+              ...INCLUDES_PARENT_MAIN_TYPES[variant],
+            ])
+            .describe(
+              `ADT object type. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
+            ),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or object_name and object_type)',
+      ),
+    detailed: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        '[read-only] If true, returns structured JSON with metadata and raw XML.',
+      ),
+  });
 }
 
 interface IncludeNode {

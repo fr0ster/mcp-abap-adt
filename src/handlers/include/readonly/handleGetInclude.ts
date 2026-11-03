@@ -1,15 +1,16 @@
 import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
 import {
-  READ_VERSION_PROPERTY_UNDEFAULTED,
+  READ_VERSION_FIELD_UNDEFAULTED,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readIncludeMetadata } from '../../../lib/strategies/metadataReads';
@@ -22,18 +23,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      include_name: {
-        type: 'string',
-        description: 'Include name.',
-      },
-      part: READ_PART_PROPERTY,
-      version: READ_VERSION_PROPERTY_UNDEFAULTED,
-    },
-    required: ['include_name'],
-  },
+  inputSchema: z.object({
+    include_name: z.string().describe('Include name.'),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD_UNDEFAULTED,
+  }),
 } as const;
 
 interface GetIncludeArgs {

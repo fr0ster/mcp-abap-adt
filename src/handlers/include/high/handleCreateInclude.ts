@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateInclude Handler - ABAP include creation via ADT
  *
@@ -15,7 +17,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -26,36 +28,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      include_name: {
-        type: 'string',
-        description: 'Include name.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Include description. If not provided, include_name is used.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['include_name', 'package_name'],
-  },
+  inputSchema: z.object({
+    include_name: z.string().describe('Include name.'),
+    package_name: z.string().describe('Package name.'),
+    description: z
+      .string()
+      .optional()
+      .describe('Include description. If not provided, include_name is used.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a

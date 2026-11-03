@@ -1,6 +1,7 @@
 import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -13,16 +14,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     '[read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns main_programs, a list of { name, type, uri } — type PROG/P for a program, FUGR/F for a function group.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      include_name: {
-        type: 'string',
-        description: 'Include name.',
-      },
-    },
-    required: ['include_name'],
-  },
+  inputSchema: z.object({ include_name: z.string().describe('Include name.') }),
 } as const;
 
 interface GetMainProgramsArgs {

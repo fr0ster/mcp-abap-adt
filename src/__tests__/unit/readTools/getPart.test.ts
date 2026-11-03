@@ -314,19 +314,19 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
   it('declares include_name required, part and version', () => {
     // The served definition is the handler's own, read by its declared type.
     expect(tools.get('GetInclude')?.toolDefinition).toBe(GET_INCLUDE);
-    const schema = GET_INCLUDE.inputSchema;
+    const schema = listedJson(GET_INCLUDE.inputSchema);
     expect(schema.type).toBe('object');
     expect(schema.required).toEqual(['include_name']);
-    expect(schema.properties.part).toMatchObject({
+    expect(jsonAt(schema, 'part')).toMatchObject({
       enum: ['source', 'metadata'],
       default: 'source',
     });
-    expect(schema.properties.version.enum).toEqual([
+    expect(jsonAt(schema, 'version').enum).toEqual([
       'active',
       'inactive',
       'workingArea',
     ]);
-    expect(schema.properties.version).not.toHaveProperty('default');
+    expect(jsonAt(schema, 'version')).not.toHaveProperty('default');
   });
 
   it.each([

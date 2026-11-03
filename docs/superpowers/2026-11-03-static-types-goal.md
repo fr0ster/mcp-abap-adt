@@ -30,14 +30,15 @@ task of their own.
 
 ## Invariants
 
-- **Behaviour does not change.** Every tool answers what it answers today. Where a type fix
-  shows a real defect, the defect gets a test and a CHANGELOG line.
+- **A defect the types show is fixed here.** Where a type fix shows that a tool answers wrongly
+  or can fail, that is corrected in this change, with a test that fails before the fix. Every
+  other answer stays as it is today.
 - **Static first.** A runtime check stays only where the compiler cannot see the value: a
   tool's arguments from the model, SAP's answers, parsed documents, the environment. Everything
   else is typed, not checked.
 - **No cast replaces a cast.** `as T`, `as never`, `any` and `unknown` narrowed by hand are not a
-  fix for `as unknown as`. Where none can go, the line stays with a comment saying why, and the
-  owner sees each such line.
+  fix for `as unknown as`. A cast that cannot go without a change elsewhere is solved by that
+  change, not kept.
 - **Contracts are fixed where they live.** A type too narrow or too wide in a package we publish
   is fixed in that package and published first. The packages are interfaces-adt, adt-clients,
   interfaces-utils and connection. This server takes the fix from the registry. Such a fix goes

@@ -17,7 +17,7 @@ import {
   adtSystemKey,
   withoutTrailingSlashes,
 } from '../lib/adtHeaders/systemKey.js';
-import { answerRead } from '../lib/auth/answerFailure.js';
+import { answerRead, type FailureAnswer } from '../lib/auth/answerFailure.js';
 import { CurrentCredential } from '../lib/auth/currentCredential.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 import {
@@ -63,6 +63,7 @@ import {
   withBatchSentence,
 } from '../lib/batch/sentence.js';
 import { runWithCallTransport } from '../lib/callTransport.js';
+import { hasMethod } from '../lib/capability.js';
 import {
   createAbapConnection,
   systemKindOf,
@@ -82,6 +83,7 @@ import type {
   SapEnvironment,
   ToolArgs,
 } from '../lib/handlers/interfaces.js';
+import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
@@ -155,11 +157,9 @@ import {
   systemContextFromConfiguration,
 } from '../lib/systemContext.js';
 import { declareSystemKind } from '../lib/systemKind.js';
-import {
-  normalizeToolContent,
-  type ToolResultLike,
-} from '../lib/toolResult.js';
+import { isErrorResult, normalizeToolContent } from '../lib/toolResult.js';
 import { return_error } from '../lib/utils.js';
+import { child, isElement } from '../lib/xml/tree.js';
 import type {
   ConnectionContext,
   ResolvedConnection,
@@ -260,7 +260,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** What each built connection's source stated about who creates objects. */
   private readonly systemContexts = new WeakMap<
-    AbapConnection,
+    object,
     DestinationSystemContext | undefined
   >();
 
@@ -731,7 +731,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private enterMainFlow(signal: AbortSignal): Promise<() => void> {
     const before = this.mainFlow;
-    let leave!: () => void;
+    let leave: () => void = () => {};
     const mine = new Promise<void>((resolve) => {
       leave = resolve;
     });
@@ -852,7 +852,7 @@ export abstract class BaseMcpServer extends McpServer {
       return { ...statedCallOf(connection, this.systemType), warn };
     }
     return withDestinationSystemContext(
-      this.systemContexts.get(connection as AbapConnection),
+      this.systemContexts.get(connection),
       () => ({
         kind: systemKindOf(connection, process.env, this.systemType),
         responsible: statedResponsibleOf(destination.responsible),
@@ -1111,13 +1111,7 @@ export abstract class BaseMcpServer extends McpServer {
     // The connection presents the credential in force: this one, until a
     // call puts another in force (`getConnection`).
     const current = new CurrentCredential(credential);
-    const entry: BuiltConnection = {
-      credential: current,
-      connection: Promise.resolve() as unknown as Promise<AbapConnection>,
-      users: 0,
-      retired: false,
-    };
-    entry.connection = (async () => {
+    const connecting = (async () => {
       const connection = await birth({ ...resolved, credential: current });
       this.destinationOf.set(connection, destination);
       this.systemContexts.set(connection, resolved.systemContext);
@@ -1139,9 +1133,22 @@ export abstract class BaseMcpServer extends McpServer {
         await failed(connection);
         throw error;
       }
-      entry.ready = connection;
       return connection;
     })();
+    const entry: BuiltConnection = {
+      credential: current,
+      connection: connecting,
+      users: 0,
+      retired: false,
+    };
+    // Ready once connected: set before anyone who waits for the connection
+    // is answered (the first reaction registered on it).
+    connecting.then(
+      (connection) => {
+        entry.ready = connection;
+      },
+      () => undefined,
+    );
     this.built = entry;
     // A completed connect stays the instance's whoever still waits for it
     //; a failed one is not kept: the next call connects again.
@@ -1174,7 +1181,7 @@ export abstract class BaseMcpServer extends McpServer {
     const connection = createAbapConnection(
       resolved.settings,
       resolved.credential,
-    ) as AbapConnection;
+    );
     // The instance's own from here on: it ends with a logoff.
     own(connection, { owner: this, role: 'built' });
     // Establish session (CSRF token + cookies) before first request.
@@ -1229,7 +1236,7 @@ export abstract class BaseMcpServer extends McpServer {
         undefined,
         undefined,
         claimed.cookies,
-      ) as AbapConnection;
+      );
     } catch (error) {
       owner.release(claimed);
       throw error;
@@ -1571,10 +1578,7 @@ export abstract class BaseMcpServer extends McpServer {
                 listed && isLongRead(entry.toolDefinition.name, args);
               if (listed && !read && readTimeout(args) !== undefined) {
                 // A listed tool's run mode takes no `timeout`.
-                return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
-                  isError: true;
-                  content: { type: 'text'; text: string }[];
-                };
+                return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS));
               }
               if (runsInBackground) {
                 // A background run: on a connection of its own, answered at
@@ -1593,10 +1597,7 @@ export abstract class BaseMcpServer extends McpServer {
                 // its own, its `timeout` cutting the read.
                 const timeoutSeconds = readTimeout(args);
                 if (timeoutSeconds === null) {
-                  return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
-                    isError: true;
-                    content: { type: 'text'; text: string }[];
-                  };
+                  return return_error(new Error(TIMEOUT_INVALID_WORDS));
                 }
                 handlerPromise = resolved(() =>
                   runLongCall({
@@ -1607,7 +1608,7 @@ export abstract class BaseMcpServer extends McpServer {
                     run: (own) =>
                       callHandler(
                         entry.call,
-                        { ...context, connection: own as AbapConnection },
+                        { ...context, connection: own },
                         withoutTimeout(args),
                       ),
                   }),
@@ -1626,7 +1627,7 @@ export abstract class BaseMcpServer extends McpServer {
 
               // A failed tool returns an isError result — it does not throw.
               // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
-              if ((result as ToolResultLike | undefined)?.isError) {
+              if (isErrorResult(result)) {
                 // `BatchEnd` answering its own error: every number of its
                 // batch answers the same (spec §5.3).
                 if (this.batch !== undefined && ending !== undefined) {
@@ -1743,15 +1744,9 @@ export abstract class BaseMcpServer extends McpServer {
   } {
     const read = readGuarded((t) => this.readFailure(t), error);
     if (read !== undefined) {
-      return answerRead(read) as {
-        content: { type: 'text'; text: string }[];
-        isError: true;
-      };
+      return answerRead(read);
     }
-    return return_error(error) as {
-      content: { type: 'text'; text: string }[];
-      isError: true;
-    };
+    return return_error(error);
   }
 
   /**
@@ -1855,7 +1850,7 @@ export abstract class BaseMcpServer extends McpServer {
     // taken at its first request, possibly before. Boxed: a promise resolved
     // with the handler's promise would adopt it, and a handler that throws
     // would then reject the answer instead of reaching `recordedAnswer`.
-    let started!: (started: { handler: Promise<unknown> }) => void;
+    let started: (started: { handler: Promise<unknown> }) => void = () => {};
     const handlerStarted = new Promise<{ handler: Promise<unknown> }>(
       (resolve) => {
         started = resolve;
@@ -1887,7 +1882,7 @@ export abstract class BaseMcpServer extends McpServer {
     );
     const recordedContext: HandlerContext = {
       ...call.context,
-      connection: recorder as unknown as AbapConnection,
+      connection: recorder,
       // The debug sessions are bound to the call's own context, whose
       // connection outlives the batch (`requireDebugger`).
       ...(owner.mode() === 'debugger' ? { recordedFrom: call.context } : {}),
@@ -1933,13 +1928,8 @@ export abstract class BaseMcpServer extends McpServer {
       if (recorder.number() !== undefined) return { content: [] };
       // Settled without recording: nothing went into an envelope.
       const result = await handler;
-      const content = normalizeToolContent(result) as {
-        type: 'text';
-        text: string;
-      }[];
-      return (result as ToolResultLike | undefined)?.isError
-        ? { content, isError: true }
-        : { content };
+      const content = normalizeToolContent(result);
+      return isErrorResult(result) ? { content, isError: true } : { content };
     } finally {
       open.target?.point(undefined);
     }
@@ -1966,10 +1956,8 @@ export abstract class BaseMcpServer extends McpServer {
       const result = await handler;
       const refused = otherKind();
       if (refused !== undefined) throw refused;
-      const content = normalizeToolContent(result) as BatchAnswer['content'];
-      answer = (result as ToolResultLike | undefined)?.isError
-        ? { content, isError: true }
-        : { content };
+      const content = normalizeToolContent(result);
+      answer = isErrorResult(result) ? { content, isError: true } : { content };
     } catch (error) {
       answer = this.refusalAnswer(otherKind() ?? error);
     }
@@ -1996,7 +1984,8 @@ export abstract class BaseMcpServer extends McpServer {
   }> {
     try {
       const context: HandlerContext = {
-        connection: undefined as never,
+        // No connection of the instance: its every member refuses in words.
+        connection: noConnection,
         logger: this.logger,
         state: this.state,
         debugger: () => this.takeDebugger(),
@@ -2026,26 +2015,17 @@ export abstract class BaseMcpServer extends McpServer {
         throwIfRequestAborted(signal);
         return callHandler(call, context, args);
       });
-      const content = normalizeToolContent(result) as {
-        type: 'text';
-        text: string;
-      }[];
-      if ((result as ToolResultLike | undefined)?.isError) {
+      const content = normalizeToolContent(result);
+      if (isErrorResult(result)) {
         return { content, isError: true };
       }
       return { content };
     } catch (error) {
       const read = readGuarded((t) => this.readFailure(t), error);
       if (read !== undefined) {
-        return answerRead(read) as {
-          content: { type: 'text'; text: string }[];
-          isError: true;
-        };
+        return answerRead(read);
       }
-      return return_error(error) as {
-        isError: true;
-        content: { type: 'text'; text: string }[];
-      };
+      return return_error(error);
     }
   }
 
@@ -2155,19 +2135,14 @@ export abstract class BaseMcpServer extends McpServer {
         new AbortController().signal,
         () => callHandler(call, context, args),
       );
-      const content = normalizeToolContent(result) as {
-        type: 'text';
-        text: string;
-      }[];
-      return (result as ToolResultLike | undefined)?.isError
-        ? { content, isError: true }
-        : { content };
+      const content = normalizeToolContent(result);
+      return isErrorResult(result) ? { content, isError: true } : { content };
     } catch (error) {
       const read = readGuarded((t) => this.readFailure(t), error);
       if (read !== undefined) {
-        return answerRead(read) as BackgroundRunAnswer;
+        return answerRead(read);
       }
-      return return_error(error) as BackgroundRunAnswer;
+      return return_error(error);
     }
   }
 
@@ -2401,14 +2376,14 @@ export abstract class BaseMcpServer extends McpServer {
   private trackCall<T>(
     name: string,
     run: (signal: AbortSignal) => Promise<T>,
-  ): Promise<T> {
+  ): Promise<T | FailureAnswer> {
     const controller = new AbortController();
     const unregister = registerActiveTool(controller, {
       instance: this,
       name,
     });
     if (unregister === undefined) {
-      return Promise.resolve(shutdownRefusalAnswer() as T);
+      return Promise.resolve(shutdownRefusalAnswer());
     }
     this.state.callStarted();
     const call = runAsOwner(this, () => run(controller.signal));
@@ -2526,7 +2501,9 @@ export abstract class BaseMcpServer extends McpServer {
       return typeof last === 'function'
         ? [
             ...registerArgs.slice(0, -1),
-            track(name, last as (...callbackArgs: unknown[]) => unknown),
+            track(name, (...callbackArgs: unknown[]): unknown =>
+              Reflect.apply(last, undefined, callbackArgs),
+            ),
           ]
         : registerArgs;
     };
@@ -2554,12 +2531,11 @@ export abstract class BaseMcpServer extends McpServer {
         typeof second !== 'function'
       ) {
         // `registerTool(name, config, callback)`.
-        const config = second as { description?: unknown };
-        const description =
-          typeof config.description === 'string' ? config.description : '';
+        const given = child(second, 'description');
+        const description = typeof given === 'string' ? given : '';
         return [
           name,
-          { ...config, description: appended(description) },
+          { ...second, description: appended(description) },
           ...registerArgs.slice(2),
         ];
       }
@@ -2568,15 +2544,18 @@ export abstract class BaseMcpServer extends McpServer {
     return new Proxy(this, {
       get: (target, property) => {
         if (property === 'registerTool' || property === 'tool') {
-          const register = Reflect.get(target, property) as (
-            ...registerArgs: unknown[]
-          ) => unknown;
+          const register: unknown = Reflect.get(target, property);
+          if (typeof register !== 'function') return register;
           // Its search texts are attached whatever the batch owner, in
           // either form (`registerTool` or `tool`), once it is registered.
           return (...registerArgs: unknown[]) =>
             withSearchMeta(
               registerArgs[0],
-              register.apply(target, wrapLast(described(registerArgs))),
+              Reflect.apply(
+                register,
+                target,
+                wrapLast(described(registerArgs)),
+              ),
             );
         }
         const value = Reflect.get(target, property);
@@ -2605,10 +2584,9 @@ function callHandler(
  */
 function isSpent(connection: AbapConnection): boolean {
   if (isEnded(connection)) return true;
-  const aware = connection as { isConnected?: () => boolean };
   try {
-    return typeof aware.isConnected === 'function'
-      ? aware.isConnected() === false
+    return hasMethod(connection, 'isConnected')
+      ? connection.isConnected() === false
       : false;
   } catch {
     return false;
@@ -2729,12 +2707,8 @@ function withSearchMeta(name: unknown, registered: unknown): unknown {
   if (typeof name !== 'string') return registered;
   const search = searchMeta(name)._meta;
   if (search === undefined || registered === null) return registered;
-  if (typeof registered !== 'object') return registered;
-  const tool = registered as {
-    _meta?: Record<string, unknown>;
-    update?: (updates: { _meta?: Record<string, unknown> }) => void;
-  };
-  if (typeof tool.update !== 'function') return registered;
-  tool.update({ _meta: { ...tool._meta, ...search } });
+  if (!hasMethod(registered, 'update')) return registered;
+  const meta = child(registered, '_meta');
+  registered.update({ _meta: { ...(isElement(meta) ? meta : {}), ...search } });
   return registered;
 }

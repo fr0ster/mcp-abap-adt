@@ -40,3 +40,11 @@ export function normalizeToolContent(
     };
   });
 }
+
+/**
+ * Whether a handler's answer says it failed: its `isError`, read as a
+ * condition reads it (any truthy value).
+ */
+export function isErrorResult(result: unknown): boolean {
+  return Boolean(child(result, 'isError'));
+}

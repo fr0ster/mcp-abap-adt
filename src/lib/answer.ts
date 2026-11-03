@@ -15,6 +15,7 @@ import {
 import {
   answerRead,
   failurePayload as chainFailurePayload,
+  type FailureAnswer,
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
@@ -75,6 +76,14 @@ function json(payload: unknown, isError = false): McpResult {
   return text(JSON.stringify(payload, null, 2), isError);
 }
 
+/** A failure's payload as its answer: `isError` always. */
+function failedJson(payload: unknown): FailureAnswer {
+  return {
+    isError: true,
+    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+  };
+}
+
 /**
  * A failure of our own reading, which never borrows an `AdtFailureOrigin`:
  * `connection` and `refusal` are both claims about the server, and neither is true
@@ -85,7 +94,7 @@ function local(
   ctx: AnswerContext,
   message: string,
   thrown?: unknown,
-): McpResult {
+): FailureAnswer {
   const payload: Record<string, unknown> = {
     error: kind,
     tool: ctx.tool,
@@ -105,7 +114,7 @@ function local(
   const step = stepOf(thrown);
   if (step !== undefined) payload.step = step;
 
-  return json(withBeside(payload, ctx), true);
+  return failedJson(withBeside(payload, ctx));
 }
 
 /**
@@ -334,7 +343,7 @@ export function failurePayload(
 export function answerFailure(
   failed: IAdtError,
   ctx?: AnswerContext,
-): McpResult {
+): FailureAnswer {
   const error: StepError & MessageCarrier = failed;
   // A failure that carries a refusal: answered as the chain
   // made it, never rebuilt from the error's message.
@@ -344,7 +353,7 @@ export function answerFailure(
   if (ctx !== undefined && isSystemContextRefusal(error.message)) {
     return local('system_context_missing', ctx, error.message);
   }
-  return json(withBeside(failurePayload(error, ctx?.detail), ctx), true);
+  return failedJson(withBeside(failurePayload(error, ctx?.detail), ctx));
 }
 
 /**
@@ -530,7 +539,10 @@ export function messageCarriedBy(thrown: unknown): string {
  * A throw from a handler's call, as the consumer gets it — the one rendering
  * `answer()` and a handler that works by throws share.
  */
-export function answerThrown(thrown: unknown, ctx: AnswerContext): McpResult {
+export function answerThrown(
+  thrown: unknown,
+  ctx: AnswerContext,
+): FailureAnswer {
   // The failure reader first: a thrown refusal is the chain's.
   const read = failureOf(thrown);
   if (read !== undefined) return answerRead(read);

@@ -13,7 +13,7 @@ import type {
 import { AxiosError, type AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { answerFailure, type McpResult } from './answer';
-import { answerRead } from './auth/answerFailure';
+import { answerRead, type FailureAnswer } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { hasMethod } from './capability';
 import {
@@ -318,7 +318,7 @@ function withoutMcpErrorPrefixes(text: string): string {
   return text.slice(at);
 }
 
-export function return_error(error: unknown): McpResult {
+export function return_error(error: unknown): FailureAnswer {
   // The failure reader first: a chain failure or the server's own
   // refusal is answered as the failure answer — never its message.
   const read = failureOf(error);

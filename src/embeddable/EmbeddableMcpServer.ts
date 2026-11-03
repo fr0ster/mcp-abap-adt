@@ -21,6 +21,7 @@ import type {
   IHandlersRegistry,
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
+import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { registerFreshConnectionFactory } from '../lib/packageSessions.js';
 import type {
@@ -283,10 +284,11 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     logger?: Logger,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
-    // Dummy context - not actually used because BaseMcpServer.registerHandlers()
-    // creates wrapper lambdas that call getConnection() for fresh context
+    // A registration-only context: BaseMcpServer.registerHandlers() gives
+    // every call a context of its own (getConnection()); this connection
+    // refuses any use in words.
     const dummyContext: HandlerContext = {
-      connection: null as unknown as AbapConnection,
+      connection: noConnection,
       logger: logger ?? noopLogger,
     };
 

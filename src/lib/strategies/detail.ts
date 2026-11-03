@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import type { AnswerDetail } from './projections';
 
 export type { AnswerDetail };
@@ -10,15 +11,26 @@ export type { AnswerDetail };
  * the answer is noise on a surface callers read to decide what to call. It
  * shapes the SUCCESS answer only; a failure carries everything at every level.
  */
+const DETAIL_WORDS =
+  'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).';
+
 export const DETAIL_PROPERTY = {
   detail: {
     type: 'string',
     enum: ['terse', 'full', 'raw'],
     default: 'terse',
-    description:
-      'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
+    description: DETAIL_WORDS,
   },
 } as const;
+
+/** The `detail` field of a tool's zod input schema. */
+export const DETAIL_SHAPE = {
+  detail: z
+    .enum(['terse', 'full', 'raw'])
+    .default('terse')
+    .optional()
+    .describe(DETAIL_WORDS),
+};
 
 const LEVELS = new Set<AnswerDetail>(['terse', 'full', 'raw']);
 

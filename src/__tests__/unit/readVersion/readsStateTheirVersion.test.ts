@@ -20,6 +20,7 @@
  * calls, given each of the three values, sends reads that carry exactly it.
  */
 
+import * as z from 'zod';
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type {
@@ -28,6 +29,8 @@ import type {
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
 import {
+  READ_VERSION_FIELD,
+  READ_VERSION_FIELD_UNDEFAULTED,
   READ_VERSION_PROPERTY,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
@@ -41,6 +44,7 @@ import {
   countingConnection,
   servedTools,
 } from '../../helpers/batchHarness';
+import { declaredRequired, listedJson } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
 
 // The process declares its system type, as every launcher requires.
@@ -408,14 +412,15 @@ function sampleOf(property: ToolDefinition['inputSchema']): unknown {
   }
 }
 
-/** A JSON object schema's required arguments, each with a sample value. */
+/** An object schema's required arguments, each with a sample value. */
 function requiredOf(
   schema: ToolDefinition['inputSchema'],
 ): Record<string, unknown> {
   const args: Record<string, unknown> = {};
-  if (schema?.type !== 'object') return args;
-  for (const name of schema.required ?? []) {
-    args[name] = sampleOf(schema.properties?.[name]);
+  const listed = listedJson(schema);
+  if (listed.type !== 'object') return args;
+  for (const name of declaredRequired(schema)) {
+    args[name] = sampleOf(listed.properties?.[name]);
   }
   return args;
 }
@@ -522,8 +527,15 @@ function callsOf(tool: string, entry: HandlerEntry): Sample[] {
  * or without (`READ_VERSION_PROPERTY_UNDEFAULTED`), the same three values.
  */
 function declaresReadVersion(entry: HandlerEntry): boolean {
-  const version = entry.toolDefinition.inputSchema?.properties?.version;
-  return version?.enum === READ_VERSION_PROPERTY.enum;
+  const schema = entry.toolDefinition.inputSchema;
+  if (schema instanceof z.ZodObject) {
+    const version = schema.shape.version;
+    return (
+      version === READ_VERSION_FIELD ||
+      version === READ_VERSION_FIELD_UNDEFAULTED
+    );
+  }
+  return schema?.properties?.version?.enum === READ_VERSION_PROPERTY.enum;
 }
 
 /** Whether a call of `tool` with `args` reads at the version it is given. */

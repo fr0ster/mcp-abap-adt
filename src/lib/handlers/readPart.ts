@@ -5,16 +5,27 @@
  * document asked for.
  */
 
+import * as z from 'zod';
+
 export type ReadPart = 'source' | 'metadata';
 
 /** The `part` property of a `Get<Type>` input schema. */
+const READ_PART_WORDS =
+  'The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).';
+
 export const READ_PART_PROPERTY = {
   type: 'string',
   enum: ['source', 'metadata'],
-  description:
-    'The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).',
+  description: READ_PART_WORDS,
   default: 'source',
 } as const;
+
+/** The `part` field of a `Get<Type>` zod input schema. */
+export const READ_PART_FIELD = z
+  .enum(['source', 'metadata'])
+  .default('source')
+  .optional()
+  .describe(READ_PART_WORDS);
 
 /** The part a call asked for, or an error naming the two values. */
 export function readPartOf(part: unknown): ReadPart | Error {

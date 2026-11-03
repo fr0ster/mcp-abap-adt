@@ -122,6 +122,9 @@ export function timeoutField() {
     .describe(TIMEOUT_DESCRIPTION);
 }
 
+/** The `timeout` field of a listed tool's zod input schema. */
+export const TIMEOUT_FIELD = timeoutField();
+
 /** The fixed words of a read its `timeout` cut. */
 export function timedOutWords(seconds: number): string {
   return `The wait was ended by its timeout (${seconds} s). The request was cancelled; nothing was changed.`;

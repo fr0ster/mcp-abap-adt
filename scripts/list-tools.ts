@@ -75,9 +75,15 @@ const hasIsOptional = (v: unknown): v is { isOptional: () => boolean } =>
 
 const describeInputs = (schema: unknown): ParamInfo[] => {
   if (schema instanceof z.ZodObject) {
+    // Required as the JSON Schema stated it: neither optional nor a default
+    // over an optional field (a default over a required one stays required).
     return Object.entries(schema.shape).map(([name, value]) => ({
       name,
-      required: value.isOptional() ? 'no' : 'yes',
+      required:
+        value instanceof z.ZodOptional ||
+        (value instanceof z.ZodDefault && value.unwrap() instanceof z.ZodOptional)
+          ? 'no'
+          : 'yes',
     }));
   }
   if (isJsonSchemaObject(schema)) {

@@ -47,6 +47,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { adtStandIn } from '../../helpers/adtStandIn';
+import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { clientOf, isClassRun, shippedGroups, silent, until } from './harness';
 
@@ -296,10 +297,8 @@ describe('which tools take background', () => {
     ...compactDebugEntries().map((e) => e.toolDefinition),
   ];
   const declares = (definition: ToolDefinition) => {
-    const schema = definition.inputSchema as {
-      properties?: Record<string, unknown>;
-    };
-    return Object.hasOwn(schema?.properties ?? {}, 'background');
+    const schema = listedJson(definition.inputSchema);
+    return Object.hasOwn(schema.properties ?? {}, 'background');
   };
 
   it('exactly the listed run tools declare it, optional, a boolean with no default', () => {
@@ -308,13 +307,12 @@ describe('which tools take background', () => {
     ].sort();
     expect(declaring).toEqual(Object.keys(BACKGROUND_TOOLS).sort());
     for (const definition of definitions.filter(declares)) {
-      const schema = definition.inputSchema as {
-        properties: Record<string, { type: string; default?: unknown }>;
-        required?: string[];
-      };
-      expect(schema.properties.background?.type).toBe('boolean');
-      expect(schema.properties.background).not.toHaveProperty('default');
-      expect(schema.required ?? []).not.toContain('background');
+      const schema = listedJson(definition.inputSchema);
+      expect(jsonAt(schema, 'background').type).toBe('boolean');
+      expect(jsonAt(schema, 'background')).not.toHaveProperty('default');
+      expect(declaredRequired(definition.inputSchema)).not.toContain(
+        'background',
+      );
     }
   });
 

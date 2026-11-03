@@ -67,6 +67,7 @@ import {
   type ServedTransport,
   type ToolSet,
 } from '../../lib/toolSet';
+import { listedJson } from '../helpers/listedJson';
 
 const context = {
   connection: undefined as never,
@@ -434,7 +435,7 @@ describe('the run tools are the full set’s alone', () => {
       .map((e) => ({
         name: e.toolDefinition.name,
         background: Object.hasOwn(
-          (e.toolDefinition.inputSchema as { properties: object }).properties,
+          listedJson(e.toolDefinition.inputSchema).properties ?? {},
           'background',
         ),
       }));

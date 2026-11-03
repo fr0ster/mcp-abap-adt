@@ -30,6 +30,7 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { listedJson } from '../helpers/listedJson';
 import {
   type LowToCompactRow,
   type ParityRequest,
@@ -182,9 +183,7 @@ function declared(
   entry: HandlerEntry,
   args: Record<string, unknown>,
 ): Record<string, unknown> {
-  const properties = (
-    entry.toolDefinition.inputSchema as { properties?: object }
-  ).properties;
+  const properties = listedJson(entry.toolDefinition.inputSchema).properties;
   const known = new Set(Object.keys(properties ?? {}));
   const undeclared = Object.keys(args).filter((k) => !known.has(k));
   if (undeclared.length > 0) {

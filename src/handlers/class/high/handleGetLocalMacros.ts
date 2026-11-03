@@ -1,10 +1,11 @@
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -16,17 +17,10 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] Reads the local macros include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Parent class name.',
-      },
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Parent class name.'),
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
 interface GetLocalMacrosArgs {

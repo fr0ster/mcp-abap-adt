@@ -22,6 +22,8 @@ import {
   compactDebugBatchEntries,
   compactDebugEntries,
 } from '../../../lib/compact/debug/group';
+import type { ToolDefinition } from '../../../lib/handlers/interfaces';
+import { declaredRequired, listedJson } from '../../helpers/listedJson';
 
 interface Row {
   group: string;
@@ -31,12 +33,9 @@ interface Row {
 }
 
 /** `name*` for a required parameter, `name` for an optional one — the fixture's shape. */
-function inputsOf(schema: unknown): string {
-  const container = schema as
-    | { properties?: Record<string, unknown>; required?: string[] }
-    | undefined;
-  const properties = container?.properties ?? {};
-  const required = new Set(container?.required ?? []);
+function inputsOf(schema: ToolDefinition['inputSchema']): string {
+  const properties = listedJson(schema).properties ?? {};
+  const required = new Set(declaredRequired(schema));
   const names = Object.keys(properties).map((name) =>
     required.has(name) ? `${name}*` : name,
   );

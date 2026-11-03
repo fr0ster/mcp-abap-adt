@@ -30,6 +30,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { type Mode, runCase, servedTools } from '../../helpers/batchHarness';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -147,10 +148,10 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
     '%s',
     (_name, t) => {
       it('declares part source | metadata, default source', () => {
-        const schema = tools.get(t.tool)?.toolDefinition.inputSchema as {
-          properties: Record<string, { enum?: unknown; default?: unknown }>;
-        };
-        expect(schema.properties.part).toMatchObject({
+        const schema = listedJson(
+          tools.get(t.tool)?.toolDefinition.inputSchema,
+        );
+        expect(jsonAt(schema, 'part')).toMatchObject({
           enum: ['source', 'metadata'],
           default: 'source',
         });
@@ -223,9 +224,8 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
   it.each(METADATA_ONLY)(
     '%s (metadata-only type): one request, no part in the schema',
     async (tool, args) => {
-      const schema = tools.get(tool)?.toolDefinition.inputSchema as {
-        properties: Record<string, unknown>;
-      };
+      const schema = listedJson(tools.get(tool)?.toolDefinition.inputSchema);
+      expect(schema.properties).toBeDefined();
       expect(schema.properties).not.toHaveProperty('part');
       for (const mode of MODES) {
         const ran = await run(tool, args, mode);

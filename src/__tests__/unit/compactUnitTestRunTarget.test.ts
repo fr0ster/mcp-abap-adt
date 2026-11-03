@@ -10,9 +10,10 @@ import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/h
 import { TOOL_DEFINITION as RUN_ABAP_UNIT } from '../../handlers/unit_test/high/handleRunAbapUnit';
 import {
   RUN_TARGET_FIELD,
-  RUN_TARGET_PROPERTY,
+  RUN_TARGET_OPTIONAL,
 } from '../../handlers/unit_test/shared/runTarget';
 import { compactUnitTestRunSchema } from '../../lib/compact/compactSchemas';
+import { declaredRequired, jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -167,14 +168,15 @@ describe('HandlerUnitTestRun: refused before anything is sent', () => {
 });
 
 describe("HandlerUnitTestRun's schema", () => {
-  it("takes target as RunAbapUnit's own schema piece, not a copy", () => {
-    expect(compactUnitTestRunSchema.properties.target).toBe(
-      RUN_TARGET_PROPERTY.target,
-    );
+  it("takes target as RunAbapUnit's own schema piece: the same fields and words", () => {
+    expect(compactUnitTestRunSchema.shape.target).toBe(RUN_TARGET_OPTIONAL);
     expect(RUN_ABAP_UNIT.inputSchema.shape.target).toBe(RUN_TARGET_FIELD);
+    expect(jsonAt(listedJson(compactUnitTestRunSchema), 'target')).toEqual(
+      jsonAt(listedJson(RUN_ABAP_UNIT.inputSchema), 'target'),
+    );
   });
 
   it('requires neither tests nor target by schema: the handler takes exactly one', () => {
-    expect(Object.hasOwn(compactUnitTestRunSchema, 'required')).toBe(false);
+    expect(declaredRequired(compactUnitTestRunSchema)).toEqual([]);
   });
 });

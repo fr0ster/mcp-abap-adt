@@ -10,6 +10,7 @@ import {
   compactDeleteSchema,
   compactUpdateSchema,
 } from '../../lib/compact/compactSchemas';
+import { listedJson } from '../helpers/listedJson';
 
 /**
  * The create, update and delete routes are compact's own one-request handlers
@@ -74,7 +75,7 @@ const FACADE = {
 
 for (const op of ['create', 'update', 'delete'] as const) {
   describe(`compact ${op} facade description only advertises schema-backed args`, () => {
-    const props = Object.keys(SCHEMA[op].properties);
+    const props = Object.keys(listedJson(SCHEMA[op]).properties ?? {});
     const advertised = parseDescriptionArgs(FACADE[op].description);
     if (advertised.length === 0) {
       it('(no advertised required args)', () => expect(true).toBe(true));

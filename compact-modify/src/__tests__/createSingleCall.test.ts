@@ -39,6 +39,10 @@ import {
   handleCreateTableType,
   handleCreateTransport,
 } from '@mcp-abap-adt/lib/handlers/write';
+import {
+  jsonFind,
+  listedJson,
+} from '../../../src/__tests__/helpers/listedJson';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
   resetSystemContextCache,
@@ -523,12 +527,10 @@ const KNOWN: Record<string, 'string' | 'boolean' | 'number' | 'array'> = {
   lock_handle: 'string',
 };
 
-const schemaProperties = compactCreateSchema.properties as Record<
-  string,
-  { type?: string }
->;
+const schemaJson = listedJson(compactCreateSchema);
 
-const kindOf = (name: string) => KNOWN[name] ?? schemaProperties[name]?.type;
+const kindOf = (name: string) =>
+  KNOWN[name] ?? jsonFind(schemaJson, name)?.type;
 
 /** A value of `name`'s kind and its empty one (`false`, `0`, `''`, `[]`). */
 function valuesOf(name: string): Array<[string, unknown]> {
@@ -562,7 +564,7 @@ type NotSentCase = [string, string, string, unknown];
 function notSentCases(objectType: string): NotSentCase[] {
   const accepted = new Set([...ACCEPTED_EVERYWHERE, ...CARRIES[objectType]]);
   const names = new Set([
-    ...Object.keys(schemaProperties),
+    ...Object.keys(schemaJson.properties ?? {}),
     ...Object.keys(KNOWN),
   ]);
   const cases: NotSentCase[] = [];
@@ -679,7 +681,9 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
 
 describe('the HandlerCreate schema and description', () => {
   it('create_only is not in the schema', () => {
-    expect(Object.keys(schemaProperties)).not.toContain('create_only');
+    expect(Object.keys(schemaJson.properties ?? {})).not.toContain(
+      'create_only',
+    );
   });
 
   it('names only what some create sends', () => {
@@ -688,7 +692,9 @@ describe('the HandlerCreate schema and description', () => {
       ...Object.values(CARRIES).flat(),
     ]);
     expect(
-      Object.keys(schemaProperties).filter((name) => !sent.has(name)),
+      Object.keys(schemaJson.properties ?? {}).filter(
+        (name) => !sent.has(name),
+      ),
     ).toEqual([]);
   });
 

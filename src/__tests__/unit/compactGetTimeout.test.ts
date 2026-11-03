@@ -7,6 +7,7 @@
 import { COMPACT_READ } from '../../lib/adtProjections';
 import { compactGetSchemaFor } from '../../lib/compact/compactSchemas';
 import { isLongRead } from '../../lib/longTools';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 
 /** `word` stands after a space or a colon and before a comma or a period. */
 function namedInList(words: string, word: string): boolean {
@@ -22,8 +23,9 @@ function namedInList(words: string, word: string): boolean {
 }
 
 describe("HandlerGet's timeout names the reads that take it", () => {
-  const words = compactGetSchemaFor(COMPACT_READ.onprem).properties.timeout
-    .description;
+  const words =
+    jsonAt(listedJson(compactGetSchemaFor(COMPACT_READ.onprem)), 'timeout')
+      .description ?? '';
   const reads = COMPACT_READ.onprem.filter((member) =>
     isLongRead('HandlerGet', { object_type: member }),
   );

@@ -25,6 +25,11 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
+import {
+  declaredRequired,
+  jsonAt,
+  listedJson,
+} from '../../../src/__tests__/helpers/listedJson';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
   resetSystemContextCache,
@@ -459,14 +464,11 @@ describe('HandlerUpdate part: the include’s source or its metadata', () => {
   });
 });
 
-const schemaProperties = compactUpdateSchema.properties as Record<
-  string,
-  unknown
->;
+const schemaProperties = listedJson(compactUpdateSchema).properties ?? {};
 
 describe('the HandlerUpdate schema and description', () => {
   it('requires object_type and lock_handle', () => {
-    expect([...compactUpdateSchema.required].sort()).toEqual([
+    expect([...declaredRequired(compactUpdateSchema)].sort()).toEqual([
       'lock_handle',
       'object_type',
     ]);
@@ -553,7 +555,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
 
   it('their schemas name the service types', () => {
     for (const schema of [compactLockSchema, compactUnlockSchema]) {
-      expect(schema.properties.object_type.enum).toEqual(
+      expect(jsonAt(listedJson(schema), 'object_type').enum).toEqual(
         expect.arrayContaining(['SERVICE_DEFINITION', 'SERVICE_BINDING']),
       );
     }
@@ -594,10 +596,12 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   ])(
     '%s locks a table type on both variants, an include on premise only',
     (_tool, variants) => {
-      const onprem: readonly string[] =
-        variants.onprem.inputSchema.properties.object_type.enum;
-      const cloud: readonly string[] =
-        variants.cloud.inputSchema.properties.object_type.enum;
+      const onprem =
+        jsonAt(listedJson(variants.onprem.inputSchema), 'object_type').enum ??
+        [];
+      const cloud =
+        jsonAt(listedJson(variants.cloud.inputSchema), 'object_type').enum ??
+        [];
       expect(onprem).toEqual(expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']));
       expect(cloud).toContain('TABLE_TYPE');
       expect(cloud).not.toContain('INCLUDE');
@@ -605,9 +609,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   );
 
   it('HandlerUpdate’s schema names every type it writes', () => {
-    const named = (
-      compactUpdateSchema.properties.object_type as { enum?: readonly string[] }
-    ).enum;
+    const named = jsonAt(listedJson(compactUpdateSchema), 'object_type').enum;
     expect(named).toEqual(
       expect.arrayContaining([...new Set(TYPES.map(([t]) => t))]),
     );

@@ -8,6 +8,7 @@
  * Real adt-clients code runs over a recording connection.
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
 import { corpusBody } from '../../../src/lib/adtCorpus';
 import {
@@ -144,8 +145,8 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
     expect(TYPES.map(([t]) => t).sort()).toEqual([...DELETION_TYPES].sort());
     expect(
       [
-        ...(TOOL_DEFINITION.inputSchema.properties.object_type
-          .enum as readonly string[]),
+        ...(jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'object_type')
+          .enum ?? []),
       ].sort(),
     ).toEqual([...DELETION_TYPES].sort());
   });
@@ -228,7 +229,7 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
 
   it('asks about an include and a table type on ABAP cloud too', () => {
     const cloud = TOOL_DEFINITION.variants.cloud;
-    expect(cloud.inputSchema.properties.object_type.enum).toEqual(
+    expect(jsonAt(listedJson(cloud.inputSchema), 'object_type').enum).toEqual(
       expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']),
     );
     expect(cloud.description).toContain('INCLUDE');

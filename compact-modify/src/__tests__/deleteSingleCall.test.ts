@@ -17,6 +17,7 @@
 import { compactDeleteSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
+import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
 import { corpusBody } from '../../../src/lib/adtCorpus';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
@@ -372,10 +373,7 @@ describe('HandlerDelete is one request', () => {
   );
 });
 
-const schemaProperties = compactDeleteSchema.properties as Record<
-  string,
-  unknown
->;
+const schemaProperties = listedJson(compactDeleteSchema).properties ?? {};
 
 describe('the HandlerDelete schema and description', () => {
   it.each(['activate_on_delete', 'force_new_connection', 'activate'])(
@@ -392,15 +390,17 @@ describe('the HandlerDelete schema and description', () => {
       .sort();
     expect(
       [
-        ...(compactDeleteSchema.properties.object_type
-          .enum as readonly string[]),
+        ...(jsonAt(listedJson(compactDeleteSchema), 'object_type').enum ?? []),
       ].sort(),
     ).toEqual(withDelete);
   });
 
   it('deletes a table type on ABAP cloud, and no include there', () => {
-    const members: readonly string[] =
-      TOOL_DEFINITION.variants.cloud.inputSchema.properties.object_type.enum;
+    const members =
+      jsonAt(
+        listedJson(TOOL_DEFINITION.variants.cloud.inputSchema),
+        'object_type',
+      ).enum ?? [];
     expect(members).toContain('TABLE_TYPE');
     expect(members).not.toContain('INCLUDE');
   });

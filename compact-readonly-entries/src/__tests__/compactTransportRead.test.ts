@@ -72,7 +72,7 @@ function recording(document: string = DOCUMENT) {
 describe('HandlerGet with object_type TRANSPORT', () => {
   it('routes to the full set’s ReadTransportObjects, and the matrix says get', () => {
     expect(compactReadRouterMap.TRANSPORT.get).toBe(handleReadTransportObjects);
-    expect(CompactGet.inputSchema.properties.transport_number).toBeDefined();
+    expect(CompactGet.inputSchema.shape.transport_number).toBeDefined();
     expect(CompactGet.description).toContain('TRANSPORT(transport_number*)');
     expect(listedJson(FullRead.inputSchema).required).toEqual([
       'transport_number',

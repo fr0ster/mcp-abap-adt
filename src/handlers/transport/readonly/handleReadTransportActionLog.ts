@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ReadTransportActionLog — what has happened to a transport request.
  *
@@ -14,7 +16,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -24,18 +26,14 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description:
-          'Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe(
+        'Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ReadTransportActionLogArgs {

@@ -11,6 +11,10 @@ import {
   handleMoveTransportObjects,
   handleSortAndCompressTransportTask,
 } from '@mcp-abap-adt/lib/handlers/write';
+import {
+  type JsonSchema,
+  listedJson,
+} from '../../../src/__tests__/helpers/listedJson';
 import { TOOL_DEFINITION as FullMove } from '../../../src/handlers/transport/high/handleMoveTransportObjects';
 import { TOOL_DEFINITION as FullSort } from '../../../src/handlers/transport/high/handleSortAndCompressTransportTask';
 import { compactModifyEntries } from '../group';
@@ -83,11 +87,8 @@ function asCompact(answer: { content: { type: string; text: string }[] }) {
 }
 
 /** The full tool's schema without `detail`, which compact does not offer. */
-function withoutDetail(schema: {
-  properties: Record<string, unknown>;
-  required: readonly string[];
-}) {
-  const { detail: _detail, ...properties } = schema.properties;
+function withoutDetail(schema: JsonSchema): JsonSchema {
+  const { detail: _detail, ...properties } = schema.properties ?? {};
   return { ...schema, properties };
 }
 
@@ -105,11 +106,11 @@ describe('the compact transport sort and move tools', () => {
   });
 
   it("take the full tools' parameters, without detail, where the full tools run", () => {
-    expect(CompactSort.inputSchema).toEqual(
-      withoutDetail(FullSort.inputSchema),
+    expect(listedJson(CompactSort.inputSchema)).toEqual(
+      withoutDetail(listedJson(FullSort.inputSchema)),
     );
-    expect(CompactMove.inputSchema).toEqual(
-      withoutDetail(FullMove.inputSchema),
+    expect(listedJson(CompactMove.inputSchema)).toEqual(
+      withoutDetail(listedJson(FullMove.inputSchema)),
     );
     expect(CompactSort.available_in).toEqual(FullSort.available_in);
     expect(CompactMove.available_in).toEqual(FullMove.available_in);

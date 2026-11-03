@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransport Handler - Create ABAP Transport Request
  *
@@ -26,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -36,33 +38,29 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP transport request in SAP system for development objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_type: {
-        type: 'string',
-        description:
-          "Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)",
-        enum: ['workbench', 'customizing'],
-        default: 'workbench',
-      },
-      description: {
-        type: 'string',
-        description: 'Transport request description (mandatory)',
-      },
-      target_system: {
-        type: 'string',
-        description:
-          "Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'",
-      },
-      owner: {
-        type: 'string',
-        description: 'Transport owner (optional, defaults to current user)',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['description'],
-  },
+  inputSchema: z.object({
+    transport_type: z
+      .enum(['workbench', 'customizing'])
+      .default('workbench')
+      .optional()
+      .describe(
+        "Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)",
+      ),
+    description: z
+      .string()
+      .describe('Transport request description (mandatory)'),
+    target_system: z
+      .string()
+      .optional()
+      .describe(
+        "Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'",
+      ),
+    owner: z
+      .string()
+      .optional()
+      .describe('Transport owner (optional, defaults to current user)'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateTransportArgs {

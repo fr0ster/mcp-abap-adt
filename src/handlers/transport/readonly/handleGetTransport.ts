@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetTransport Handler - Retrieve ABAP transport request information via ADT API
  *
@@ -28,26 +29,21 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description: 'Transport request number, not a task',
-      },
-      include_objects: {
-        type: 'boolean',
-        description: 'Include list of objects in transport (default: true)',
-        default: true,
-      },
-      include_tasks: {
-        type: 'boolean',
-        description: 'Include list of tasks in transport (default: true)',
-        default: true,
-      },
-    },
-    required: ['transport_number'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe('Transport request number, not a task'),
+    include_objects: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Include list of objects in transport (default: true)'),
+    include_tasks: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Include list of tasks in transport (default: true)'),
+  }),
 } as const;
 
 interface GetTransportArgs {

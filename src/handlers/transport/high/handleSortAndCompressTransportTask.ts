@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * SortAndCompressTransportTask — the transport organizer's *Sort and
  * compress* on one task (adt-clients 30.0.0, `sortAndCompress`).
@@ -20,7 +22,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -30,17 +32,12 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description: 'Number of the transport task to sort and compress.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe('Number of the transport task to sort and compress.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface SortAndCompressTransportTaskArgs {

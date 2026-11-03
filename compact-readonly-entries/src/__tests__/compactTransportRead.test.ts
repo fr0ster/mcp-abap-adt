@@ -7,6 +7,7 @@
  * Both run the real client over a recording connection and are compared whole.
  */
 import { handleReadTransportObjects } from '@mcp-abap-adt/lib/handlers/read';
+import { listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { TOOL_DEFINITION as FullRead } from '../../../src/handlers/transport/readonly/handleReadTransportObjects';
 import { compactReadOnlyEntries } from '../group';
 import { compactReadRouterMap } from '../handlers/compactReadRoutes';
@@ -73,7 +74,9 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     expect(compactReadRouterMap.TRANSPORT.get).toBe(handleReadTransportObjects);
     expect(CompactGet.inputSchema.properties.transport_number).toBeDefined();
     expect(CompactGet.description).toContain('TRANSPORT(transport_number*)');
-    expect(FullRead.inputSchema.required).toEqual(['transport_number']);
+    expect(listedJson(FullRead.inputSchema).required).toEqual([
+      'transport_number',
+    ]);
   });
 
   it('is still the one HandlerGet tool', () => {

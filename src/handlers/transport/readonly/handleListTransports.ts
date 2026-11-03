@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { TIMEOUT_FIELD } from '../../../lib/longTools';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ListTransports Handler - List user's transport requests via ADT API
  *
@@ -20,8 +23,8 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { withLongToolAdvice } from '../../../lib/longTools';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
@@ -36,24 +39,22 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers; ADT receives the default search alone.",
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      user: {
-        type: 'string',
-        description:
-          "The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
-      },
-      modifiable_only: {
-        type: 'boolean',
-        description:
-          'Only return modifiable (not yet released) transports; applied client-side. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    timeout: TIMEOUT_FIELD,
+    user: z
+      .string()
+      .optional()
+      .describe(
+        "The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
+      ),
+    modifiable_only: z
+      .boolean()
+      .optional()
+      .describe(
+        'Only return modifiable (not yet released) transports; applied client-side. Default: true.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ListTransportsArgs {

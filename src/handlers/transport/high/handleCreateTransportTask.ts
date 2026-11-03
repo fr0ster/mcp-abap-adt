@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransportTask — a task of your own under a shared request.
  *
@@ -40,7 +42,7 @@ import {
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
@@ -55,30 +57,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description:
-          'The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.',
-      },
-      target_user: {
-        type: 'string',
-        description:
-          'The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
-      },
-      task_type: {
-        type: 'string',
-        enum: TASK_TYPES,
-        default: 'S',
-        description:
-          'S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number', 'target_user'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe(
+        'The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.',
+      ),
+    target_user: z
+      .string()
+      .describe(
+        'The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
+      ),
+    task_type: z
+      .enum(TASK_TYPES)
+      .default('S')
+      .optional()
+      .describe(
+        'S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateTransportTaskArgs {

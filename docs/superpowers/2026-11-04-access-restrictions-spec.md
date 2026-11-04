@@ -206,34 +206,46 @@ no credential is in the line.
 - **Values that send one request are denied together.** Where two or more values of one
   compact tool's dispatching argument send the same request for the same name, denying any one
   of them removes every value of its group from the enum (and from every other form, below):
-  the values are one action at SAP's level, so keeping one would keep the denied action. The
-  groups, from the route tables and the handlers they reach (Appendix C):
-  - `HandlerActivate`: {`CLASS`, `BEHAVIOR_IMPLEMENTATION`}, both `CLAS/OC` in
-    `COMPACT_ACTIVATE_ROUTES` and activated alike (`handleHandlerActivate.ts:128`, no check
-    that the class is a behavior implementation). The only code `COMPACT_ACTIVATE_ROUTES`
-    shares between types (Measured, a sweep of all 18 entries).
-  - `HandlerCreate`, `HandlerLock`, `HandlerUnlock`: {`CLASS`, `BEHAVIOR_IMPLEMENTATION`}. The
-    behavior implementation's `create`, `lock` and `unlock` are the class's own, called with
-    the same name (Measured: adt-clients 42.1.0 `AdtBehaviorImplementation`).
-  - `HandlerDelete`: {`CLASS`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`}, the class's deletion
-    (`deletionTargets.ts`; the behavior implementation's `delete` is the class's, Measured), and
-    {`LOCAL_TEST_CLASS`, `UNIT_TEST`}, the test-class include written empty
-    (`EMPTIED_INCLUDE_TYPES`, `CLASS_INCLUDES` in `handleUpdateUnderLock.ts`). (Measured)
-  - `HandlerDeletionCheck`: {`CLASS`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`}, the same
-    targets as the deletion. (Measured)
-  - `HandlerUpdate`: {`LOCAL_TEST_CLASS`, `UNIT_TEST`, `CDS_UNIT_TEST`}, each a write of the
-    test-class include (`CLASS_INCLUDES`). (Measured)
-  - `HandlerGet`: {`UNIT_TEST`, `CDS_UNIT_TEST`}, two handlers reading a unit-test run's result
-    by `run_id` (Inference that the requests are identical; plan step 1 records both).
-  - Not grouped, since the requests differ (Measured): `HandlerGet` `CLASS` (the main source)
-    and `BEHAVIOR_IMPLEMENTATION` (the implementations include); `HandlerUpdate` `CLASS` and
-    `BEHAVIOR_IMPLEMENTATION` (likewise); `HandlerValidate` `BEHAVIOR_IMPLEMENTATION` (its own
-    object type in the validation). `HandlerCheckRun`, `HandlerWhereUsed`, `HandlerProfileRun`
-    and the `action` / `operation` tools route each value to its own request.
-  - The consequence, in the docs: denying `HandlerActivate.CLASS` also removes the activation
-    of `BEHAVIOR_IMPLEMENTATION`, and the reverse; likewise for each group above. A test fixes
-    the groups by recording the request each value sends for one name, so a route that starts
-    or stops sharing a request shows in a reviewed diff.
+  the values are one action at SAP's level, so keeping one would keep the denied action.
+- **How the groups were found** (Measured): every value of every compact tool with a
+  dispatching argument was run, on both variants, through its tool's `call` against the
+  recording stand-in of the repository's parity test (`parityConnection`: real adt-clients
+  code, every request recorded with its method, URL, headers and body, and the adt-clients
+  frames on its stack), on the static-types base this change builds on, with adt-clients
+  42.1.0 as installed there; `HandlerGet` for each of `part: 'source'` and `'metadata'` the
+  value offers. Two values are one group when the requests are identical, method, URL,
+  `Accept`, `Content-Type` and body alike. The cloud variant sent the same requests as on
+  premise for every value both serve. Appendix C holds the table, one row per value.
+- **The groups:**
+  - `HandlerActivate`, `HandlerCreate`, `HandlerLock`, `HandlerUnlock`, `HandlerGet` (`source`
+    and `metadata`): {`CLASS`, `BEHAVIOR_IMPLEMENTATION`}. A behavior implementation's
+    adt-clients object sends the class's own request for each: `AdtBehaviorImplementation`'s
+    `create`, `lock`, `unlock` call `AdtClass`'s, its `read` and `readMetadata` call
+    `objectSourceWire` / `objectMetadataWire` with `CLAS/OC`, and `HandlerActivate` maps both
+    to `CLAS/OC` (`COMPACT_ACTIVATE_ROUTES`, the only code shared among its 18 types).
+  - `HandlerDelete`: {`CLASS`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`} (the class's
+    deletion), and {`LOCAL_TEST_CLASS`, `UNIT_TEST`} (the test-class include written empty).
+  - `HandlerDeletionCheck`: {`CLASS`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`}.
+  - `HandlerUpdate`: {`LOCAL_TEST_CLASS`, `UNIT_TEST`, `CDS_UNIT_TEST`} (a write of the
+    test-class include), and {`LOCAL_TYPES`, `BEHAVIOR_IMPLEMENTATION`} (a write of the
+    `implementations` include: `AdtLocalTypes.update` and
+    `AdtBehaviorImplementation.update` send the same `PUT`).
+  - `HandlerGet`: {`UNIT_TEST`, `CDS_UNIT_TEST`} (a unit-test run's result by `run_id`).
+  - No group: `HandlerCheckRun`, `HandlerValidate`, `HandlerWhereUsed`, `HandlerProfileRun`,
+    and `HandlerUpdate` `CLASS` (the main source) against `BEHAVIOR_IMPLEMENTATION`. The
+    `action` / `operation` tools route each value to its own server or debugger call
+    (Inference from the code, not run: the debugger needs a debuggee; Appendix C).
+  - The parts of `HandlerGet` that one type alone offers (`contents`, `urls`,
+    `main_programs`, …) were not run; one type's part cannot share a request with another
+    type's value of the same tool by being that type's only (Inference).
+- **The consequence, in the docs:** denying `CLASS` on any of these tools also removes
+  `BEHAVIOR_IMPLEMENTATION` there, and the reverse — the two are one object at SAP's level;
+  likewise for every group above (denying `HandlerUpdate.LOCAL_TYPES` removes the behavior
+  implementation's update, and the reverse).
+- **A test fixes the groups** the same way the trace found them: it runs every value through
+  the stand-in, groups identical requests, and compares with the table, so a route that starts
+  or stops sharing a request shows in a reviewed diff. For {`CLASS`, `BEHAVIOR_IMPLEMENTATION`}
+  in `HandlerGet` it asserts, both ways, the `source` and the `metadata` request.
 - **Every form that names the target is narrowed with the dispatching argument**, so the SDK's
   parse refuses a denied type in every form, with no per-call check (§1, Appendix C):
   - **`HandlerActivate`.** The object types map to codes by `COMPACT_ACTIVATE_ROUTES`
@@ -501,8 +513,10 @@ draft, and no other tool reads it.
   and `object_adt_type` too (an unmapped code kept); each group of values that send one
   request, in each direction: `HandlerActivate.CLASS` denied removes `BEHAVIOR_IMPLEMENTATION`
   from `object_type` and `CLAS/OC` from `objects[].type` and `object_adt_type`, and
-  `HandlerActivate.BEHAVIOR_IMPLEMENTATION` denied removes `CLASS` and `CLAS/OC`; the same both
-  ways for every member of every group in Appendix C; `HandlerGet`'s address parts gone when a value is denied; `HandlerGetData.sql` removing `sql_query` and its mention; a
+  `HandlerActivate.BEHAVIOR_IMPLEMENTATION` denied removes `CLASS` and `CLAS/OC`; for
+  `HandlerGet`, `CLASS` denied removes `BEHAVIOR_IMPLEMENTATION`'s `source` and `metadata`
+  reads and the reverse, each request asserted; the same both ways for every member of every
+  group in Appendix C, and the group table itself against the stand-in (§3.1); `HandlerGet`'s address parts gone when a value is denied; `HandlerGetData.sql` removing `sql_query` and its mention; a
   tool with every value denied absent; each form left absent (no row, an empty variable)
   restricting nothing; each refusal code, its words, and that no handler ran and nothing of the
   call's own was sent (a recording connection); an argument not given passing; a refused call in
@@ -540,7 +554,8 @@ draft, and no other tool reads it.
   start line, what is checked and what is not: reads are not checked; a task is matched as
   given; denying `Activate*` closes only the activation tools, not a write's `activate`;
   values that send one request are denied together (denying `CLASS` also removes
-  `BEHAVIOR_IMPLEMENTATION` where both are one request, and the reverse — the groups of
+  `BEHAVIOR_IMPLEMENTATION` on the tools where both send one request, and the reverse; denying
+  `HandlerUpdate.LOCAL_TYPES` removes the behavior implementation's update — the groups of
   Appendix C); an unmapped activation code goes only with the tool; while a `HandlerActivate`
   value is denied its code arguments take upper-case codes only; the
   paths an embedder takes into its own hands are its own); the tool lists
@@ -565,8 +580,7 @@ draft, and no other tool reads it.
 1. Measure: `workingArea` against `workspace` with two users on premise; the ETag through
    `wireItself`; the versions of every type the draft tool would offer (§5.1); whether an
    include's change moves the main source's inactive ETag (§5); whether a `$batch` response
-   part keeps the ETag header (§5); whether `HandlerGet` `UNIT_TEST` and `CDS_UNIT_TEST` send
-   one request (§3.1); the super-package element of a package's metadata and a
+   part keeps the ETag header (§5); the super-package element of a package's metadata and a
    package read on the real connection while a batch is open (§3.2).
 2. The rows, their readers and the start line.
 3. The deny list at registration, with the twenty builders.
@@ -682,17 +696,251 @@ GetTransport, ReadTransportObjects, ReadTransportActionLog; compact HandlerGet, 
   - none on HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerLock,
     HandlerUnlock, HandlerUpdate, HandlerValidate, HandlerWhereUsed, HandlerProfileRun, or the
     `action` / `operation` tools.
-- **Values that send one request**, denied together (§3.1):
-  - HandlerActivate: CLASS, BEHAVIOR_IMPLEMENTATION;
-  - HandlerCreate: CLASS, BEHAVIOR_IMPLEMENTATION;
-  - HandlerLock: CLASS, BEHAVIOR_IMPLEMENTATION;
-  - HandlerUnlock: CLASS, BEHAVIOR_IMPLEMENTATION;
-  - HandlerDelete: CLASS, CDS_UNIT_TEST, BEHAVIOR_IMPLEMENTATION; and LOCAL_TEST_CLASS,
-    UNIT_TEST;
-  - HandlerDeletionCheck: CLASS, CDS_UNIT_TEST, BEHAVIOR_IMPLEMENTATION;
-  - HandlerUpdate: LOCAL_TEST_CLASS, UNIT_TEST, CDS_UNIT_TEST;
-  - HandlerGet: UNIT_TEST, CDS_UNIT_TEST (Inference, plan step 1);
-  - none on HandlerCheckRun, HandlerValidate, HandlerWhereUsed, HandlerProfileRun, or the
-    `action` / `operation` tools.
+- **Every value traced** (§3.1). Placeholders: `{name}` the object name, `{group}` a
+  function module's group, `{lock}` the lock handle, `{request}` the transport request, `{run}`
+  the run id, `{profiler}` the profiler id. ¹ on premise only. An `Accept` ending in `…` lists
+  more types. `HandlerGet` rows are per `part`. `HandlerGetData` `(table)` is the named-table
+  read; its request is a free SQL `SELECT *`, the same request `sql` sends for that query —
+  which is why a table list does not cover `sql_query` (§6). Measured rows were run against the
+  stand-in; Inference rows are read from the code.
+
+| Tool | Value | adt-clients function | Request | Same request as | Label |
+|---|---|---|---|---|---|
+| HandlerCreate | PACKAGE | `AdtPackage.create` → `createPackage` | `POST /sap/bc/adt/packages?corrNr={request}` Accept `application/vnd.sap.adt.packages.v2+xml…`, Content-Type `application/vnd.sap.adt.packages.v2+xml` |  | Measured |
+| HandlerCreate | DOMAIN | `AdtDomain.create` → `create` | `POST /sap/bc/adt/ddic/domains?corrNr={request}` Accept `application/vnd.sap.adt.domains.v2+xml…`, Content-Type `application/vnd.sap.adt.domains.v2+xml` |  | Measured |
+| HandlerCreate | DATA_ELEMENT | `AdtDataElement.create` → `create` | `POST /sap/bc/adt/ddic/dataelements?corrNr={request}` Accept `application/vnd.sap.adt.dataelements.v1+xml…`, Content-Type `application/vnd.sap.adt.dataelements.v2+xml` |  | Measured |
+| HandlerCreate | TRANSPORT | `AdtRequest.create` → `createTransport` | `POST /sap/bc/adt/cts/transportrequests` Accept `application/vnd.sap.adt.transportorganizer.v1+xml`, Content-Type `text/plain` |  | Measured |
+| HandlerCreate | TABLE | `AdtTable.create` → `createTable` | `POST /sap/bc/adt/ddic/tables?corrNr={request}` Accept `application/vnd.sap.adt.blues.v1+xml…`, Content-Type `application/vnd.sap.adt.tables.v2+xml` |  | Measured |
+| HandlerCreate | STRUCTURE | `AdtStructure.create` → `create` | `POST /sap/bc/adt/ddic/structures?corrNr={request}` Accept `application/vnd.sap.adt.blues.v1+xml…`, Content-Type `application/vnd.sap.adt.structures.v2+xml` |  | Measured |
+| HandlerCreate | TABLE_TYPE | `AdtDdicTableType.create` → `createTableType` | `POST /sap/bc/adt/ddic/tabletypes?corrNr={request}` Accept `application/vnd.sap.adt.tabletype.v1+xml`, Content-Type `application/vnd.sap.adt.tabletype.v1+xml` |  | Measured |
+| HandlerCreate | DDL | `AdtDdl.create` → `createDDLSObject` | `POST /sap/bc/adt/ddic/ddl/sources?corrNr={request}` Accept `application/vnd.sap.adt.ddlSource.v2+xml…`, Content-Type `application/vnd.sap.adt.ddlSource+xml` |  | Measured |
+| HandlerCreate | SERVICE_DEFINITION | `AdtServiceDefinition.create` → `create` | `POST /sap/bc/adt/ddic/srvd/sources?corrNr={request}` Accept `application/vnd.sap.adt.ddic.srvd.v1+xml`, Content-Type `application/vnd.sap.adt.ddic.srvd.v1+xml` |  | Measured |
+| HandlerCreate | SERVICE_BINDING | `AdtServiceBinding.create` → `AdtServiceBinding.createRequest` | `POST /sap/bc/adt/businessservices/bindings` Accept `application/vnd.sap.adt.businessservices.servicebinding.v1+xml…`, Content-Type `application/vnd.sap.adt.businessservices.servicebinding.v2+xml` |  | Measured |
+| HandlerCreate | CLASS | `AdtClass.create` → `create` | `POST /sap/bc/adt/oo/classes?corrNr={request}` Accept `application/vnd.sap.adt.oo.classes.v4+xml`, Content-Type `application/vnd.sap.adt.oo.classes.v4+xml` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerCreate | PROGRAM ¹ | `AdtProgram.create` → `create` | `POST /sap/bc/adt/programs/programs?corrNr={request}` Accept `application/vnd.sap.adt.programs.programs.v2+xml`, Content-Type `application/vnd.sap.adt.programs.programs.v2+xml` |  | Measured |
+| HandlerCreate | INCLUDE ¹ | `AdtInclude.create` → `create` | `POST /sap/bc/adt/programs/includes?corrNr={request}` Accept `application/vnd.sap.adt.programs.includes.v2+xml`, Content-Type `application/vnd.sap.adt.programs.includes.v2+xml` |  | Measured |
+| HandlerCreate | INTERFACE | `AdtInterface.create` → `create` | `POST /sap/bc/adt/oo/interfaces?corrNr={request}` Accept `application/vnd.sap.adt.oo.interfaces.v5+xml`, Content-Type `application/vnd.sap.adt.oo.interfaces.v5+xml` |  | Measured |
+| HandlerCreate | FUNCTION_GROUP | `AdtFunctionGroup.create` → `create` | `POST /sap/bc/adt/functions/groups?corrNr={request}` Accept `application/vnd.sap.adt.functions.groups.v3+xml`, Content-Type `application/vnd.sap.adt.functions.groups.v3+xml` |  | Measured |
+| HandlerCreate | FUNCTION_MODULE | `AdtFunctionModule.create` → `create` | `POST /sap/bc/adt/functions/groups/{group}/fmodules?corrNr={request}` Accept `application/vnd.sap.adt.functions.fmodules+xml`, Content-Type `application/vnd.sap.adt.functions.fmodules+xml`, body names `/sap/bc/adt/functions/groups/{group}` |  | Measured |
+| HandlerCreate | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.create` → `create` | `POST /sap/bc/adt/bo/behaviordefinitions?corrNr={request}` Accept `application/vnd.sap.adt.blues.v1+xml`, Content-Type `application/vnd.sap.adt.blues.v1+xml` |  | Measured |
+| HandlerCreate | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.create` → `create` | `POST /sap/bc/adt/oo/classes?corrNr={request}` Accept `application/vnd.sap.adt.oo.classes.v4+xml`, Content-Type `application/vnd.sap.adt.oo.classes.v4+xml` | CLASS | Measured |
+| HandlerCreate | METADATA_EXTENSION | `AdtMetadataExtension.create` → `createMetadataExtension` | `POST /sap/bc/adt/ddic/ddlx/sources` Accept `application/vnd.sap.adt.ddic.ddlx.v1+xml`, Content-Type `application/vnd.sap.adt.ddic.ddlx.v1+xml` |  | Measured |
+| HandlerUpdate | PACKAGE | `AdtPackage.updateMetadata` → `updatePackage` | `PUT /sap/bc/adt/packages/zpkg?lockHandle={lock}&corrNr={request}` Accept `application/vnd.sap.adt.packages.v2+xml…`, Content-Type `application/vnd.sap.adt.packages.v2+xml` |  | Measured |
+| HandlerUpdate | DOMAIN | `AdtDomain.updateMetadata` → `updateDomain` | `PUT /sap/bc/adt/ddic/domains/{name}?lockHandle={lock}&corrNr={request}` Accept `application/vnd.sap.adt.domains.v2+xml…`, Content-Type `application/vnd.sap.adt.domains.v2+xml` |  | Measured |
+| HandlerUpdate | DATA_ELEMENT | `AdtDataElement.updateMetadata` → `updateDataElement` | `PUT /sap/bc/adt/ddic/dataelements/{name}?lockHandle={lock}&corrNr={request}` Accept `application/vnd.sap.adt.dataelements.v1+xml…`, Content-Type `application/vnd.sap.adt.dataelements.v2+xml` |  | Measured |
+| HandlerUpdate | TABLE_TYPE | `AdtDdicTableType.updateMetadata` → `updateTableType` | `PUT /sap/bc/adt/ddic/tabletypes/{name}?lockHandle={lock}&corrNr={request}` Accept `application/vnd.sap.adt.tabletype.v1+xml`, Content-Type `application/vnd.sap.adt.tabletype.v1+xml` |  | Measured |
+| HandlerUpdate | FUNCTION_GROUP | `AdtFunctionGroup.updateMetadata` → `updateFunctionGroup` | `PUT /sap/bc/adt/functions/groups/{group}?lockHandle={lock}&corrNr={request}` Accept `application/vnd.sap.adt.functions.groups.v3+xml`, Content-Type `application/vnd.sap.adt.functions.groups.v3+xml` |  | Measured |
+| HandlerUpdate | TABLE | `AdtTable.update` → `updateTable` | `PUT /sap/bc/adt/ddic/tables/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | STRUCTURE | `AdtStructure.update` → `upload` | `PUT /sap/bc/adt/ddic/structures/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `application/xml…`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | DDL | `AdtDdl.update` → `updateDdl` | `PUT /sap/bc/adt/ddic/ddl/sources/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | SERVICE_DEFINITION | `AdtServiceDefinition.update` → `updateServiceDefinition` | `PUT /sap/bc/adt/ddic/srvd/sources/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | CLASS | `AdtClass.update` → `updateClass` | `PUT /sap/bc/adt/oo/classes/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | LOCAL_TEST_CLASS | `AdtLocalTestClass.update` → `updateClassTestInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/testclasses?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | UNIT_TEST, CDS_UNIT_TEST | Measured |
+| HandlerUpdate | LOCAL_TYPES | `AdtLocalTypes.update` → `updateClassInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/implementations?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerUpdate | LOCAL_DEFINITIONS | `AdtLocalDefinitions.update` → `updateClassInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/definitions?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | LOCAL_MACROS | `AdtLocalMacros.update` → `updateClassInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/macros?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | UNIT_TEST | `AdtLocalTestClass.update` → `updateClassTestInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/testclasses?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | LOCAL_TEST_CLASS, CDS_UNIT_TEST | Measured |
+| HandlerUpdate | CDS_UNIT_TEST | `AdtLocalTestClass.update` → `updateClassTestInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/testclasses?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | LOCAL_TEST_CLASS, UNIT_TEST | Measured |
+| HandlerUpdate | PROGRAM ¹ | `AdtProgram.update` → `uploadProgramSource` | `PUT /sap/bc/adt/programs/programs/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | INCLUDE ¹ | `AdtInclude.update` → `uploadIncludeSource` | `PUT /sap/bc/adt/programs/includes/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | INTERFACE | `AdtInterface.update` → `upload` | `PUT /sap/bc/adt/oo/interfaces/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | FUNCTION_MODULE | `AdtFunctionModule.update` → `update` | `PUT /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.update` → `update` | `PUT /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.update` → `updateBehaviorImplementation` | `PUT /sap/bc/adt/oo/classes/{name}/includes/implementations?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | LOCAL_TYPES | Measured |
+| HandlerUpdate | METADATA_EXTENSION | `AdtMetadataExtension.update` → `updateMetadataExtension` | `PUT /sap/bc/adt/ddic/ddlx/sources/{name}/source/main?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerUpdate | SERVICE_BINDING | `AdtServiceBinding.update` → `AdtServiceBinding.publishByServiceType` | `POST /sap/bc/adt/businessservices/odatav2/publishjobs` Accept `application/xml…`, Content-Type `application/xml` |  | Measured |
+| HandlerDelete | PACKAGE | `AdtPackage.delete` → `deletePackage` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/packages/zpkg` |  | Measured |
+| HandlerDelete | DOMAIN | `AdtDomain.delete` → `deleteDomain` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/domains/{name}` |  | Measured |
+| HandlerDelete | DATA_ELEMENT | `AdtDataElement.delete` → `deleteDataElement` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/dataelements/{name}` |  | Measured |
+| HandlerDelete | TABLE | `AdtTable.delete` → `deleteTable` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/tables/{name}` |  | Measured |
+| HandlerDelete | STRUCTURE | `AdtStructure.delete` → `deleteStructure` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/structures/{name}` |  | Measured |
+| HandlerDelete | TABLE_TYPE | `AdtDdicTableType.delete` → `deleteTableType` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/tabletypes/{name}` |  | Measured |
+| HandlerDelete | DDL | `AdtDdl.delete` → `deleteDdl` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/ddl/sources/{name}` |  | Measured |
+| HandlerDelete | SERVICE_DEFINITION | `AdtServiceDefinition.delete` → `deleteServiceDefinition` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/ddic/srvd/sources/{name}` |  | Measured |
+| HandlerDelete | SERVICE_BINDING | `AdtServiceBinding.delete` → `AdtServiceBinding.deleteRequest` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/businessservices/bindings/{name}` |  | Measured |
+| HandlerDelete | CLASS | `AdtClass.delete` → `deleteClass` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CDS_UNIT_TEST, BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerDelete | CDS_UNIT_TEST | `AdtClass.delete` → `deleteClass` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CLASS, BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerDelete | PROGRAM ¹ | `AdtProgram.delete` → `deleteProgram` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/programs/programs/{name}` |  | Measured |
+| HandlerDelete | INCLUDE ¹ | `AdtInclude.delete` → `deleteInclude` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/programs/includes/{name}` |  | Measured |
+| HandlerDelete | INTERFACE | `AdtInterface.delete` → `deleteInterface` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/oo/interfaces/{name}` |  | Measured |
+| HandlerDelete | FUNCTION_GROUP | `AdtFunctionGroup.delete` → `deleteFunctionGroup` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/functions/groups/{group}` |  | Measured |
+| HandlerDelete | FUNCTION_MODULE | `AdtFunctionModule.delete` → `deleteFunctionModule` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/functions/groups/{group}/fmodules/{name}` |  | Measured |
+| HandlerDelete | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.delete` → `deleteBehaviorDefinition` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/bo/behaviordefinitions/{name}` |  | Measured |
+| HandlerDelete | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.delete` → `deleteClass` | `POST /sap/bc/adt/deletion/delete` Accept `application/vnd.sap.adt.deletion.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.request.v1+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CLASS, CDS_UNIT_TEST | Measured |
+| HandlerDelete | METADATA_EXTENSION | `AdtMetadataExtension.delete` → `deleteMetadataExtension` | `DELETE /sap/bc/adt/ddic/ddlx/sources/{name}?corrNr={request}` Accept `application/xml`, Content-Type `application/xml` |  | Measured |
+| HandlerDelete | LOCAL_TEST_CLASS | `AdtLocalTestClass.update` → `updateClassTestInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/testclasses?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | UNIT_TEST | Measured |
+| HandlerDelete | LOCAL_TYPES | `AdtLocalTypes.update` → `updateClassInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/implementations?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerDelete | LOCAL_DEFINITIONS | `AdtLocalDefinitions.update` → `updateClassInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/definitions?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerDelete | LOCAL_MACROS | `AdtLocalMacros.update` → `updateClassInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/macros?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` |  | Measured |
+| HandlerDelete | UNIT_TEST | `AdtLocalTestClass.update` → `updateClassTestInclude` | `PUT /sap/bc/adt/oo/classes/{name}/includes/testclasses?lockHandle={lock}&corrNr={request}` Accept `text/plain`, Content-Type `text/plain` | LOCAL_TEST_CLASS | Measured |
+| HandlerActivate | CLASS | `AdtClass.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/oo/classes/{name}` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerActivate | PROGRAM ¹ | `AdtProgram.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/programs/programs/{name}` |  | Measured |
+| HandlerActivate | INCLUDE ¹ | `AdtUtils.activateObjectsGroup` → `activateObjectsGroup` | `POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/programs/includes/{name}` |  | Measured |
+| HandlerActivate | INTERFACE | `AdtInterface.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/oo/interfaces/{name}` |  | Measured |
+| HandlerActivate | FUNCTION_GROUP | `AdtFunctionGroup.activate` → `activateFunctionGroup` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/functions/groups/{name}`, `/sap/bc/adt/functions/groups/{name}/source/main` |  | Measured |
+| HandlerActivate | TABLE | `AdtTable.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/ddic/tables/{name}` |  | Measured |
+| HandlerActivate | STRUCTURE | `AdtStructure.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/ddic/structures/{name}` |  | Measured |
+| HandlerActivate | TABLE_TYPE | `AdtUtils.activateObjectsGroup` → `activateObjectsGroup` | `POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/ddic/tabletypes/{name}` |  | Measured |
+| HandlerActivate | DDL | `AdtDdl.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/ddic/ddl/sources/{name}` |  | Measured |
+| HandlerActivate | DOMAIN | `AdtDomain.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/ddic/domains/{name}` |  | Measured |
+| HandlerActivate | DATA_ELEMENT | `AdtDataElement.activate` → `activateDataElement` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/ddic/dataelements/{name}` |  | Measured |
+| HandlerActivate | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/bo/behaviordefinitions/{name}` |  | Measured |
+| HandlerActivate | METADATA_EXTENSION | `AdtMetadataExtension.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/ddic/ddlx/sources/{name}` |  | Measured |
+| HandlerActivate | PACKAGE | `AdtUtils.activateObjectsGroup` → `activateObjectsGroup` | `POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/packages/{name}` |  | Measured |
+| HandlerActivate | SERVICE_DEFINITION | `AdtUtils.activateObjectsGroup` → `activateObjectsGroup` | `POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/ddic/srvd/sources/{name}` |  | Measured |
+| HandlerActivate | SERVICE_BINDING | `AdtUtils.activateObjectsGroup` → `activateObjectsGroup` | `POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/businessservices/bindings/{name}` |  | Measured |
+| HandlerActivate | FUNCTION_MODULE | `AdtUtils.activateObjectsGroup` → `activateObjectsGroup` | `POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/xml`, body names `/sap/bc/adt/functions/groups/{group}/fmodules/{name}` |  | Measured |
+| HandlerActivate | BEHAVIOR_IMPLEMENTATION | `AdtClass.activate` → `activateObjectInSession` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true` Accept `application/xml`, Content-Type `application/vnd.sap.adt.activation+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CLASS | Measured |
+| HandlerLock | CLASS | `AdtClass.lock` → `lockClass` | `POST /sap/bc/adt/oo/classes/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerLock | PROGRAM ¹ | `AdtProgram.lock` → `lockProgram` | `POST /sap/bc/adt/programs/programs/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | INCLUDE ¹ | `AdtInclude.lock` → `lockInclude` | `POST /sap/bc/adt/programs/includes/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | INTERFACE | `AdtInterface.lock` → `lockInterface` | `POST /sap/bc/adt/oo/interfaces/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | FUNCTION_GROUP | `AdtFunctionGroup.lock` → `lockFunctionGroup` | `POST /sap/bc/adt/functions/groups/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | FUNCTION_MODULE | `AdtFunctionModule.lock` → `lockFunctionModule` | `POST /sap/bc/adt/functions/groups/{group}/fmodules/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | TABLE | `AdtTable.lock` → `lockTable` | `POST /sap/bc/adt/ddic/tables/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | STRUCTURE | `AdtStructure.lock` → `lockStructure` | `POST /sap/bc/adt/ddic/structures/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | TABLE_TYPE | `AdtDdicTableType.lock` → `lockTableType` | `POST /sap/bc/adt/ddic/tabletypes/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | DDL | `AdtDdl.lock` → `lockDDLS` | `POST /sap/bc/adt/ddic/ddl/sources/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | DOMAIN | `AdtDomain.lock` → `lockDomain` | `POST /sap/bc/adt/ddic/domains/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | DATA_ELEMENT | `AdtDataElement.lock` → `lockDataElement` | `POST /sap/bc/adt/ddic/dataelements/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | PACKAGE | `AdtPackage.lock` → `lockPackage` | `POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.lock` → `lock` | `POST /sap/bc/adt/bo/behaviordefinitions/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…`, Content-Type `application/xml` |  | Measured |
+| HandlerLock | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.lock` → `lockClass` | `POST /sap/bc/adt/oo/classes/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` | CLASS | Measured |
+| HandlerLock | METADATA_EXTENSION | `AdtMetadataExtension.lock` → `lockMetadataExtension` | `POST /sap/bc/adt/ddic/ddlx/sources/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | SERVICE_DEFINITION | `AdtServiceDefinition.lock` → `lockServiceDefinition` | `POST /sap/bc/adt/ddic/srvd/sources/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerLock | SERVICE_BINDING | `AdtServiceBinding.lock` → `lockServiceBinding` | `POST /sap/bc/adt/businessservices/bindings/{name}?_action=LOCK&accessMode=MODIFY` Accept `application/vnd.sap.as+xml…` |  | Measured |
+| HandlerUnlock | CLASS | `AdtClass.unlock` → `unlockClass` | `POST /sap/bc/adt/oo/classes/{name}?_action=UNLOCK&lockHandle={lock}` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerUnlock | PROGRAM ¹ | `AdtProgram.unlock` → `unlockProgram` | `POST /sap/bc/adt/programs/programs/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | INCLUDE ¹ | `AdtInclude.unlock` → `unlockInclude` | `POST /sap/bc/adt/programs/includes/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | INTERFACE | `AdtInterface.unlock` → `unlockInterface` | `POST /sap/bc/adt/oo/interfaces/{name}?_action=UNLOCK&lockHandle={lock}` Content-Type `application/x-www-form-urlencoded` |  | Measured |
+| HandlerUnlock | FUNCTION_GROUP | `AdtFunctionGroup.unlock` → `unlockFunctionGroup` | `POST /sap/bc/adt/functions/groups/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | FUNCTION_MODULE | `AdtFunctionModule.unlock` → `unlockFunctionModule` | `POST /sap/bc/adt/functions/groups/{group}/fmodules/{name}?_action=UNLOCK&lockHandle={lock}` Accept `application/xml` |  | Measured |
+| HandlerUnlock | TABLE | `AdtTable.unlock` → `unlockTable` | `POST /sap/bc/adt/ddic/tables/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | STRUCTURE | `AdtStructure.unlock` → `unlockStructure` | `POST /sap/bc/adt/ddic/structures/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | TABLE_TYPE | `AdtDdicTableType.unlock` → `unlockTableType` | `POST /sap/bc/adt/ddic/tabletypes/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | DDL | `AdtDdl.unlock` → `unlockDDLS` | `POST /sap/bc/adt/ddic/ddl/sources/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | DOMAIN | `AdtDomain.unlock` → `unlockDomain` | `POST /sap/bc/adt/ddic/domains/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | DATA_ELEMENT | `AdtDataElement.unlock` → `unlockDataElement` | `POST /sap/bc/adt/ddic/dataelements/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | PACKAGE | `AdtPackage.unlock` → `unlockPackage` | `POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.unlock` → `unlock` | `POST /sap/bc/adt/bo/behaviordefinitions/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.unlock` → `unlockClass` | `POST /sap/bc/adt/oo/classes/{name}?_action=UNLOCK&lockHandle={lock}` | CLASS | Measured |
+| HandlerUnlock | METADATA_EXTENSION | `AdtMetadataExtension.unlock` → `unlockMetadataExtension` | `POST /sap/bc/adt/ddic/ddlx/sources/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | SERVICE_DEFINITION | `AdtServiceDefinition.unlock` → `unlockServiceDefinition` | `POST /sap/bc/adt/ddic/srvd/sources/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerUnlock | SERVICE_BINDING | `AdtServiceBinding.unlock` → `unlockServiceBinding` | `POST /sap/bc/adt/businessservices/bindings/{name}?_action=UNLOCK&lockHandle={lock}` |  | Measured |
+| HandlerProfileRun | CLASS | `ClassExecutor.runWithProfiler` | `POST /sap/bc/adt/oo/classrun/{name}?profilerId={profiler}` Accept `text/plain` |  | Measured |
+| HandlerProfileRun | PROGRAM ¹ | `ProgramExecutor.runWithProfiler` | `POST /sap/bc/adt/programs/programrun/{name}?profilerId={profiler}` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | PACKAGE | `AdtPackage.readMetadata` → `getPackage` | `GET /sap/bc/adt/packages/zpkg?version=active` Accept `application/vnd.sap.adt.packages.v2+xml…` |  | Measured |
+| HandlerGet `metadata` | DOMAIN | `AdtDomain.readMetadata` → `getDomain` | `GET /sap/bc/adt/ddic/domains/{name}?version=active` Accept `application/vnd.sap.adt.domains.v2+xml…` |  | Measured |
+| HandlerGet `metadata` | DATA_ELEMENT | `AdtDataElement.readMetadata` → `getDataElement` | `GET /sap/bc/adt/ddic/dataelements/{name}?version=active` Accept `application/vnd.sap.adt.dataelements.v1+xml…` |  | Measured |
+| HandlerGet `source` | TABLE | `AdtTable.read` → `objectSourceWire` | `GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | TABLE | `AdtTable.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/ddic/tables/{name}?version=active` Accept `application/vnd.sap.adt.blues.v1+xml…` |  | Measured |
+| HandlerGet `source` | STRUCTURE | `AdtStructure.read` → `objectSourceWire` | `GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | STRUCTURE | `AdtStructure.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/ddic/structures/{name}?version=active` Accept `application/vnd.sap.adt.structures.v2+xml…` |  | Measured |
+| HandlerGet `metadata` | TABLE_TYPE | `AdtDdicTableType.readMetadata` → `getTableTypeMetadata` | `GET /sap/bc/adt/ddic/tabletypes/{name}?version=active` Accept `application/vnd.sap.adt.tabletype.v1+xml` |  | Measured |
+| HandlerGet `source` | DDL | `AdtDdl.read` → `objectSourceWire` | `GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | DDL | `AdtDdl.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/ddic/ddl/sources/{name}?version=active` Accept `application/vnd.sap.adt.ddlSource+xml` |  | Measured |
+| HandlerGet `source` | SERVICE_DEFINITION | `AdtServiceDefinition.read` → `getServiceDefinitionSource` | `GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | SERVICE_DEFINITION | `AdtServiceDefinition.readMetadata` → `getServiceDefinition` | `GET /sap/bc/adt/ddic/srvd/sources/{name}?version=active` Accept `application/vnd.sap.adt.ddic.srvd.v1+xml` |  | Measured |
+| HandlerGet `source` | SERVICE_BINDING | `AdtServiceBinding.read` → `AdtServiceBinding.readRequest` | `GET /sap/bc/adt/businessservices/bindings/{name}` Accept `application/vnd.sap.adt.businessservices.servicebinding.v1+xml…` |  | Measured |
+| HandlerGet `metadata` | SERVICE_BINDING | `AdtServiceBinding.readMetadata` → `AdtServiceBinding.readRequest` | `GET /sap/bc/adt/businessservices/bindings/{name}` Accept `application/vnd.sap.adt.businessservices.servicebinding.v1+xml…` |  | Measured |
+| HandlerGet `source` | CLASS | `AdtClass.read` → `objectSourceWire` | `GET /sap/bc/adt/oo/classes/{name}/source/main?version=active` Accept `text/plain` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerGet `metadata` | CLASS | `AdtClass.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/oo/classes/{name}?version=active` Accept `application/vnd.sap.adt.oo.classes.v4+xml…` | BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerGet `source` | LOCAL_TEST_CLASS | `AdtLocalTestClass.read` → `getClassTestClassesInclude` | `GET /sap/bc/adt/oo/classes/{name}/includes/testclasses?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `source` | LOCAL_TYPES | `AdtLocalTypes.read` → `getClassImplementationsInclude` | `GET /sap/bc/adt/oo/classes/{name}/includes/implementations?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `source` | LOCAL_DEFINITIONS | `AdtLocalDefinitions.read` → `getClassDefinitionsInclude` | `GET /sap/bc/adt/oo/classes/{name}/includes/definitions?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `source` | LOCAL_MACROS | `AdtLocalMacros.read` → `getClassMacrosInclude` | `GET /sap/bc/adt/oo/classes/{name}/includes/macros?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `source` | PROGRAM | `AdtProgram.read` → `objectSourceWire` | `GET /sap/bc/adt/programs/programs/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | PROGRAM | `AdtProgram.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/programs/programs/{name}?version=active` Accept `application/vnd.sap.adt.programs.programs.v2+xml…` |  | Measured |
+| HandlerGet `source` | INCLUDE | `AdtInclude.read` → `getIncludeSource` | `GET /sap/bc/adt/programs/includes/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | INCLUDE | `AdtInclude.readMetadata` → `getIncludeMetadata` | `GET /sap/bc/adt/programs/includes/{name}?version=active` Accept `application/vnd.sap.adt.programs.includes.v2+xml` |  | Measured |
+| HandlerGet `source` | INTERFACE | `AdtInterface.read` → `objectSourceWire` | `GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | INTERFACE | `AdtInterface.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/oo/interfaces/{name}?version=active` Accept `application/vnd.sap.adt.oo.interfaces.v5+xml…` |  | Measured |
+| HandlerGet `metadata` | FUNCTION_GROUP | `AdtFunctionGroup.readMetadata` → `getFunctionGroup` | `GET /sap/bc/adt/functions/groups/{group}?version=active` Accept `*/*` |  | Measured |
+| HandlerGet `source` | FUNCTION_MODULE | `AdtFunctionModule.read` → `objectSourceWire` | `GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | FUNCTION_MODULE | `AdtFunctionModule.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=active` Accept `application/vnd.sap.adt.functions.fmodules+xml…` |  | Measured |
+| HandlerGet `source` | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.read` → `readSource` | `GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.readMetadata` → `read` | `GET /sap/bc/adt/bo/behaviordefinitions/{name}?version=active` Accept `application/vnd.sap.adt.blues.v1+xml` |  | Measured |
+| HandlerGet `source` | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.read` → `objectSourceWire` | `GET /sap/bc/adt/oo/classes/{name}/source/main?version=active` Accept `text/plain` | CLASS | Measured |
+| HandlerGet `metadata` | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.readMetadata` → `objectMetadataWire` | `GET /sap/bc/adt/oo/classes/{name}?version=active` Accept `application/vnd.sap.adt.oo.classes.v4+xml…` | CLASS | Measured |
+| HandlerGet `source` | METADATA_EXTENSION | `AdtMetadataExtension.read` → `readMetadataExtensionSource` | `GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main?version=active` Accept `text/plain` |  | Measured |
+| HandlerGet `metadata` | METADATA_EXTENSION | `AdtMetadataExtension.readMetadata` → `readMetadataExtension` | `GET /sap/bc/adt/ddic/ddlx/sources/{name}?version=active` Accept `application/vnd.sap.adt.ddic.ddlx.v1+xml` |  | Measured |
+| HandlerGet `source` | UNIT_TEST | `ClassTestRunner.getResult` → `getUnitTestRunResult` | `GET /sap/bc/adt/abapunit/results/{run}` Accept `application/vnd.sap.adt.api.abapunit.run-result.v1+xml` | CDS_UNIT_TEST | Measured |
+| HandlerGet `source` | CDS_UNIT_TEST | `ClassTestRunner.getResult` → `getUnitTestRunResult` | `GET /sap/bc/adt/abapunit/results/{run}` Accept `application/vnd.sap.adt.api.abapunit.run-result.v1+xml` | UNIT_TEST | Measured |
+| HandlerGet `source` | TRANSPORT | `AdtRequest.readObjects` → `readTransportObjects` | `GET /sap/bc/adt/cts/transportrequests/TRK` Accept `application/vnd.sap.adt.transportorganizer.v1+xml` |  | Measured |
+| HandlerWhereUsed | CLASS | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | INTERFACE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Foo%2Finterfaces%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | PROGRAM | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | INCLUDE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fincludes%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | FUNCTION_GROUP | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | FUNCTION_MODULE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2F{group}%2Ffmodules%2F{group}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | PACKAGE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fpackages%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | TABLE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Ftables%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | STRUCTURE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fstructures%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | DOMAIN | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fdomains%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | DATA_ELEMENT | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fdataelements%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | DDL | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fddl%2Fsources%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerWhereUsed | TABLE_TYPE | `AdtUtils.getWhereUsed` → `getWhereUsed` | `POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Ftabletypes%2F{name}` Accept `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`, Content-Type `application/vnd.sap.adt.repository.usagereferences.request.v1+xml` |  | Measured |
+| HandlerValidate | CLASS | `AdtClass.validate` → `validateClassName` | `POST /sap/bc/adt/oo/validation/objectname?objname={name}&objtype=CLAS%2FOC&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | PROGRAM ¹ | `AdtProgram.validate` → `validateProgramName` | `POST /sap/bc/adt/programs/validation?objname={name}&objtype=PROG%2FP&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | INCLUDE ¹ | `AdtInclude.validate` | `POST /sap/bc/adt/includes/validation?objname={name}&objtype=PROG%2FI&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | INTERFACE | `AdtInterface.validate` → `validateInterfaceName` | `POST /sap/bc/adt/oo/validation/objectname?objname={name}&objtype=INTF%2FOI&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | FUNCTION_GROUP | `AdtFunctionGroup.validate` → `validateFunctionGroupName` | `POST /sap/bc/adt/functions/validation?objtype=FUGR%2FF&objname={name}&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | FUNCTION_MODULE | `AdtFunctionModule.validate` → `validateFunctionModuleName` | `POST /sap/bc/adt/functions/validation?objtype=FUGR%2FFF&objname={name}&fugrname={group}&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | TABLE | `AdtTable.validate` → `validateTableName` | `POST /sap/bc/adt/ddic/tables/validation?objtype=tabldt&objname={name}&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | STRUCTURE | `AdtStructure.validate` → `validateStructureName` | `POST /sap/bc/adt/ddic/structures/validation?objtype=stru&objname={name}&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | TABLE_TYPE | `AdtDdicTableType.validate` → `validateTableTypeName` | `POST /sap/bc/adt/ddic/tabletypes/validation?objtype=ttypda&objname={name}&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | DDL | `AdtDdl.validate` → `validateDdlName` | `POST /sap/bc/adt/ddic/ddl/validation?objtype=ddls&objname={name}&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | DOMAIN | `AdtDomain.validate` → `validateDomainName` | `POST /sap/bc/adt/ddic/domains/validation?objtype=doma&objname={name}&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | DATA_ELEMENT | `AdtDataElement.validate` → `validateDataElementName` | `POST /sap/bc/adt/ddic/dataelements/validation?objtype=dtel&objname={name}&packagename=ZPKG&description=D` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | PACKAGE | `AdtPackage.validate` → `validatePackageBasic` | `POST /sap/bc/adt/packages/validation?objname={name}&packagename=ZSUP&description=D&packagetype=development&checkmode=basic` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.validate` → `validate` | `POST /sap/bc/adt/bo/behaviordefinitions/validation?objname={name}&rootEntity=ZRE&description=D&package=ZPKG&implementationType=Managed` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.validate` → `validateBehaviorImplementationName` | `POST /sap/bc/adt/oo/validation/objectname?objname={name}&objtype=CLAS%2FOC&packagename=ZPKG&description=D&behaviorDefinition=ZBD` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | METADATA_EXTENSION | `AdtMetadataExtension.validate` → `validateMetadataExtension` | `POST /sap/bc/adt/ddic/ddlx/sources/validation?objtype=ddlxex&objname={name}&description=D&packagename=ZPKG` Accept `application/vnd.sap.as+xml` |  | Measured |
+| HandlerValidate | SERVICE_BINDING | `AdtServiceBinding.validate` → `AdtServiceBinding.transportCheckRequest` | `POST /sap/bc/adt/cts/transportchecks` Accept `application/vnd.sap.as+xml`, Content-Type `application/vnd.sap.as+xml` |  | Measured |
+| HandlerCheckRun | CLASS | `answering` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/oo/classes/{name}` |  | Measured |
+| HandlerCheckRun | PROGRAM | `AdtProgram.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/programs/programs/{name}` |  | Measured |
+| HandlerCheckRun | INTERFACE | `AdtInterface.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/oo/interfaces/{name}` |  | Measured |
+| HandlerCheckRun | FUNCTION_GROUP | `answering` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/functions/groups/{name}` |  | Measured |
+| HandlerCheckRun | FUNCTION_MODULE | `AdtFunctionModule.check` → `checkFunctionModule` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/functions/groups/{group}/fmodules/{name}` |  | Measured |
+| HandlerCheckRun | TABLE | `AdtTable.check` → `runTableCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/tables/{name}` |  | Measured |
+| HandlerCheckRun | STRUCTURE | `AdtStructure.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/structures/{name}` |  | Measured |
+| HandlerCheckRun | TABLE_TYPE | `AdtDdicTableType.check` → `runTableTypeCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/tabletypes/{name}` |  | Measured |
+| HandlerCheckRun | DDL | `AdtDdl.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/ddl/sources/{name}` |  | Measured |
+| HandlerCheckRun | DOMAIN | `AdtDomain.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/domains/{name}` |  | Measured |
+| HandlerCheckRun | DATA_ELEMENT | `AdtDataElement.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/dataelements/{name}` |  | Measured |
+| HandlerCheckRun | PACKAGE | `AdtPackage.check` → `checkPackage` | `POST /sap/bc/adt/checkruns` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/packages/{name}` |  | Measured |
+| HandlerCheckRun | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.check` → `check` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/bo/behaviordefinitions/{name}` |  | Measured |
+| HandlerCheckRun | METADATA_EXTENSION | `AdtMetadataExtension.check` → `runCheckRun` | `POST /sap/bc/adt/checkruns?reporters=abapCheckRun` Accept `application/vnd.sap.adt.checkmessages+xml`, Content-Type `application/vnd.sap.adt.checkobjects+xml`, body names `/sap/bc/adt/ddic/ddlx/sources/{name}` |  | Measured |
+| HandlerDeletionCheck | PACKAGE | `AdtPackage.checkDeletion` → `checkPackageDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/packages/{name}` |  | Measured |
+| HandlerDeletionCheck | DOMAIN | `AdtDomain.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/domains/{name}` |  | Measured |
+| HandlerDeletionCheck | DATA_ELEMENT | `AdtDataElement.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/dataelements/{name}` |  | Measured |
+| HandlerDeletionCheck | TABLE | `AdtTable.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/tables/{name}` |  | Measured |
+| HandlerDeletionCheck | STRUCTURE | `AdtStructure.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/structures/{name}` |  | Measured |
+| HandlerDeletionCheck | TABLE_TYPE | `AdtDdicTableType.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/tabletypes/{name}` |  | Measured |
+| HandlerDeletionCheck | DDL | `AdtDdl.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/ddl/sources/{name}` |  | Measured |
+| HandlerDeletionCheck | SERVICE_DEFINITION | `AdtServiceDefinition.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/srvd/sources/{name}` |  | Measured |
+| HandlerDeletionCheck | SERVICE_BINDING | `AdtServiceBinding.checkDeletion` → `AdtServiceBinding.deletionCheckRequest` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/businessservices/bindings/{name}` |  | Measured |
+| HandlerDeletionCheck | CLASS | `AdtClass.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CDS_UNIT_TEST, BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerDeletionCheck | CDS_UNIT_TEST | `AdtClass.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CLASS, BEHAVIOR_IMPLEMENTATION | Measured |
+| HandlerDeletionCheck | PROGRAM | `AdtProgram.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/programs/programs/{name}` |  | Measured |
+| HandlerDeletionCheck | INCLUDE | `AdtInclude.checkDeletion` → `checkDeletionByUri` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/programs/includes/{name}` |  | Measured |
+| HandlerDeletionCheck | INTERFACE | `AdtInterface.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/oo/interfaces/{name}` |  | Measured |
+| HandlerDeletionCheck | FUNCTION_GROUP | `AdtFunctionGroup.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/functions/groups/{name}` |  | Measured |
+| HandlerDeletionCheck | FUNCTION_MODULE | `AdtFunctionModule.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/functions/groups/{group}/fmodules/{name}` |  | Measured |
+| HandlerDeletionCheck | BEHAVIOR_DEFINITION | `AdtBehaviorDefinition.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/bo/behaviordefinitions/{name}` |  | Measured |
+| HandlerDeletionCheck | BEHAVIOR_IMPLEMENTATION | `AdtBehaviorImplementation.checkDeletion` → `checkDeletion` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/oo/classes/{name}` | CLASS, CDS_UNIT_TEST | Measured |
+| HandlerDeletionCheck | METADATA_EXTENSION | `AdtMetadataExtension.checkDeletion` → `checkDeletionByUri` | `POST /sap/bc/adt/deletion/check` Accept `application/vnd.sap.adt.deletion.check.response.v1+xml`, Content-Type `application/vnd.sap.adt.deletion.check.request.v1+xml`, body names `/sap/bc/adt/ddic/ddlx/sources/{name}` |  | Measured |
+| HandlerGetData | (table) | `AdtUtils.getSqlQuery` → `getSqlQuery` | `POST /sap/bc/adt/datapreview/freestyle?rowNumber=100` Accept `application/xml…`, Content-Type `text/plain`, body `SELECT * FROM {name}` |  | Measured |
+| HandlerGetData | sql | `AdtUtils.getSqlQuery` → `getSqlQuery` | `POST /sap/bc/adt/datapreview/freestyle?rowNumber=100` Accept `application/xml…`, Content-Type `text/plain`, body `SELECT * FROM {name}` |  | Measured |
+| HandlerBatch | begin | `beginBatch` | none: the server enters batch mode |  | Inference |
+| HandlerBatch | end | `endBatch` | the recorded calls in one ADT `$batch` envelope |  | Inference |
+| HandlerBatch | answers | `answersOf` | none: answers kept parts |  | Inference |
+| HandlerDebugBatch | begin / end / answers | `beginDebugBatch` / `endDebugBatch` / `answersOf` | as HandlerBatch, for the debugger's calls; each its own |  | Inference |
+| HandlerSession | open / close | `openLongSession` / `closeLongSession` | a long session opened / logged off; each its own |  | Inference |
+| HandlerDebugSession | each of its 13 operations | one debugger method each (`d.abap.checkListenerOnce`, `listenOnce`, `stopListenerOnce`, `attachOnce`, `detachOnce`, `terminateDebuggeeOnce`, `terminateDebuggerOnce`, `setDebuggerSettingsOnce`; `d.amdp.startOnce`, `getEventsOnce`, `stopOnce`, `deleteDebuggeeOnce`; `end` the logoffs) | each method's own request |  | Inference |
+| HandlerDebugStep | each of its 7 operations | `d.abap.stepOnce(STEPS[op])` (4 step kinds), `stepToLineOnce(op, uri)` (2), `setStackPositionOnce`; amdp `stepOnce(…, 'over' / 'continue')` | the step kind or operation is in the request |  | Inference |
+| HandlerDebugBreakpoints | each of its operations | `setBreakpointsOnce`, `syncBreakpointsOnce`, `deleteBreakpointOnce`, `createWatchpoint`, `listWatchpoints`, `deleteWatchpoint`; amdp `syncBreakpointsOnce` | each method's own request |  | Inference |
+| HandlerDebugMaintain | each of its operations | `getStack`, `getVariables`, `getChildVariables`, `getMemorySizes`, `createMemorySnapshot`, `setVariable`; amdp `getDataPreviewOnce` | each method's own request |  | Inference |
+
 - Every other tool, full set included, takes `Tool` only; `Tool.value` on it matches nothing
   and is ignored (named in the start line).

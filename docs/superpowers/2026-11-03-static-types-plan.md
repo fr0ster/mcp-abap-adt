@@ -933,6 +933,27 @@ transport case and of C13. The measurement runs as a temporary Jest case under
   to the owner before C6.
 - [ ] **Step 5:** Commit the record as `docs: the transport delete path, measured`.
 
+**Record — on premise (measured 2026-11-04; the cloud is pending: the trial session is to be
+refreshed first).**
+- `CreateTransport` (owner the test user, the configured request's target) was accepted, and
+  the system made one task with the request; `CreateTransportTask` under it was accepted.
+- An object created in the configured package on the configured request landed on exactly one
+  task of it (the test user's).
+- `MoveTransportObjects` from that task to the created task was accepted: re-read, the configured
+  request no longer held the object, the created request held it once. The move back was
+  accepted too: the configured request held it once again, the created request nothing.
+- Cleanup in the one order: the object's delete was accepted; it left one entry on the
+  configured request, whose `RemoveTransportObject` was accepted; the configured request then
+  read back exactly as it was (the counted list of its entries) and the created request empty.
+- `getRequest().delete` by number, tasks first, the later created first: the created task's
+  delete was accepted, then the task the system made with the request, then the request. The
+  same `DELETE` removes a task by the task's number. Whether an empty task must go before its
+  request was not tried: deleting the tasks first was accepted throughout.
+- `GetTransport` of each deleted number (task or request) answers `404`
+  `ExceptionResourceNotFound` (step "read transport request"), which `expectAbsent` reads as
+  absent. A read-only check afterwards found no request of the run's description left and
+  no entry of the object on the configured request.
+
 ### C2b. Measure long polling of activation runs (live, before C2c and C2d)
 
 The owner's condition for (a) and (b): "verify it really long-polls". A prerequisite of C2c
@@ -2366,6 +2387,10 @@ C16's (server-dispatched).
 
 **Prerequisite:** C2a (the measured delete path and move); the cleanup below follows its
 recorded order.
+Measured on premise (C2a's record): the move between two requests is accepted both ways; the
+system makes a task with each request it creates, which the test records and deletes too;
+the deletes go task by task (the later created first), then the request, each read `404`
+after. The cloud's answer is pending.
 
 **Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
 

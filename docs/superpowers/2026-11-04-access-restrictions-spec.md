@@ -436,7 +436,9 @@ draft, and no other tool reads it.
 - **Arguments.** As `GetObjectVersions` names an object: `object_type*`, `object_name*`,
   `function_group_name` (a function module's group). `object_type` lists only the types §5.1
   admits, per variant. Compact: `HandlerGet`'s `object_type` and its name arguments, the
-  `draft` part offered for the same types.
+  `draft` part offered only for the admitted types already in `HandlerGet`'s `object_type`
+  enum, which is not widened; an admitted type outside that enum (a message class, say) is
+  served by `GetObjectDraft` alone, and the docs say so.
 - **What it sends.** Three reads of each source part at `version` `active`, `inactive` and the
   caller's working version, each answer's ETag taken through a client built with the
   `wireItself` reading (§1). The reads depend on nothing, and it is not a long tool.

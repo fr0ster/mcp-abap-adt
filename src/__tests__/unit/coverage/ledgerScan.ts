@@ -28,6 +28,8 @@ import {
   isDimension,
   isTypelessPart,
   keyOf,
+  OPERATIONAL_ARGUMENTS,
+  readerOf,
   requiredKeys,
   SENDS_NOTHING,
 } from './coverageKeys';
@@ -38,6 +40,8 @@ export type Problem =
   | 'not-executable'
   | 'skipped'
   | 'only'
+  | 'failing'
+  | 'concurrent'
   // pin rows
   | 'rows-not-array'
   | 'row-not-literal'
@@ -63,7 +67,8 @@ export type Problem =
   | 'suite-systems-not-literal'
   | 'delete-no-check'
   | 'delete-wrong-check'
-  | 'delete-check-other-object';
+  | 'delete-check-other-object'
+  | 'delete-check-wrong-tool';
 
 /** One `pinCases` row. */
 export interface PinRef {
@@ -138,7 +143,7 @@ const isSystemKind = (value: string | undefined): value is SystemKind =>
 // Jest scope
 
 type JestBase = 'describe' | 'test' | 'hook' | 'suite';
-type Modifier = 'skip' | 'only' | 'todo' | undefined;
+type Modifier = 'skip' | 'only' | 'todo' | 'failing' | 'concurrent' | undefined;
 
 const BASES: Readonly<Record<string, readonly [JestBase, Modifier]>> = {
   describe: ['describe', undefined],
@@ -160,8 +165,10 @@ const MODIFIERS: Readonly<Record<string, Modifier>> = {
   skip: 'skip',
   only: 'only',
   todo: 'todo',
-  concurrent: undefined,
-  failing: undefined,
+  // Neither is a plain test: a failing test passes when its body fails, and
+  // a concurrent one shares its hooks with others running at once.
+  concurrent: 'concurrent',
+  failing: 'failing',
 };
 
 /** What Jest call `call` is: its base and modifier; `undefined` for any other call. */
@@ -230,16 +237,23 @@ function collected(call: ts.CallExpression): boolean {
   return collected(outer);
 }
 
-/** Whether any Jest call around `node` is skipped (`skip`, `x…`, `todo`). */
-function skippedAround(node: ts.Node): boolean {
+/** Whether any Jest call around `node` carries `modifiers`. */
+function modifiedAround(
+  node: ts.Node,
+  modifiers: readonly Modifier[],
+): boolean {
   for (let at = node.parent; at !== undefined; at = at.parent) {
     if (ts.isCallExpression(at)) {
       const kind = jestCall(at);
-      if (kind?.modifier === 'skip' || kind?.modifier === 'todo') return true;
+      if (kind !== undefined && modifiers.includes(kind.modifier)) return true;
     }
   }
   return false;
 }
+
+/** Whether any Jest call around `node` is skipped (`skip`, `x…`, `todo`). */
+const skippedAround = (node: ts.Node): boolean =>
+  modifiedAround(node, ['skip', 'todo']);
 
 /** Whether the file holds any `.only` (or `fit`, `fdescribe`). */
 function hasOnly(file: ts.SourceFile): boolean {
@@ -278,6 +292,8 @@ const lineOf = (file: ts.SourceFile, node: ts.Node): number =>
 function placeProblems(call: ts.CallExpression, only: boolean): Problem[] {
   const problems: Problem[] = [];
   if (skippedAround(call)) problems.push('skipped');
+  if (modifiedAround(call, ['failing'])) problems.push('failing');
+  if (modifiedAround(call, ['concurrent'])) problems.push('concurrent');
   if (only) problems.push('only');
   return problems;
 }
@@ -520,34 +536,52 @@ function deleteProblem(
       ts.isIdentifier(call.expression) && call.expression.text === wanted,
   );
   if (right.length === 0) return 'delete-wrong-check';
+  // The read names the deleted object: every argument of the delete that
+  // names it (its type, part and names — all but the operational ones) is
+  // in the read with the same expression; and the read is the tool that
+  // reads that object.
   const deleted =
     deleteArgs !== undefined && ts.isObjectLiteralExpression(deleteArgs)
       ? propertiesOf(deleteArgs)
       : undefined;
-  const sameObject = right.some((call) => {
+  const identity =
+    deleted === undefined
+      ? []
+      : [...deleted.keys()].filter((name) => !OPERATIONAL_ARGUMENTS.has(name));
+  const reads = right.map((call) => {
     const [read] = call.arguments;
-    if (read === undefined || !ts.isObjectLiteralExpression(read)) return false;
-    const readArgs = initializerOf(propertiesOf(read)?.get('args'));
-    if (
-      deleted === undefined ||
-      readArgs === undefined ||
-      !ts.isObjectLiteralExpression(readArgs)
-    ) {
-      return false;
-    }
-    const reading = propertiesOf(readArgs);
-    if (reading === undefined) return false;
-    const shared = [...reading.keys()].filter((name) => deleted.has(name));
+    const fields =
+      read !== undefined && ts.isObjectLiteralExpression(read)
+        ? propertiesOf(read)
+        : undefined;
+    const readArgs = initializerOf(fields?.get('args'));
+    return {
+      tool: literalText(initializerOf(fields?.get('tool'))),
+      args:
+        readArgs !== undefined && ts.isObjectLiteralExpression(readArgs)
+          ? propertiesOf(readArgs)
+          : undefined,
+    };
+  });
+  const names = (read: (typeof reads)[number]): boolean => {
+    const reading = read.args;
     return (
-      shared.length > 0 &&
-      shared.every(
+      deleted !== undefined &&
+      reading !== undefined &&
+      identity.some((name) => name !== 'object_type' && name !== 'part') &&
+      identity.every(
         (name) =>
+          reading.has(name) &&
           initializerOf(reading.get(name))?.getText(file) ===
-          initializerOf(deleted.get(name))?.getText(file),
+            initializerOf(deleted.get(name))?.getText(file),
       )
     );
-  });
-  return sameObject ? undefined : 'delete-check-other-object';
+  };
+  const named = reads.filter(names);
+  if (named.length === 0) return 'delete-check-other-object';
+  return named.some((read) => read.tool === readerOf(key))
+    ? undefined
+    : 'delete-check-wrong-tool';
 }
 
 /** The enclosing `liveSuite` of a collected test call, and its systems. */

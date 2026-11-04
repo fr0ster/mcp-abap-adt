@@ -10,7 +10,7 @@
 			"**",
 			"!!**/dist",
 			"!src/__tests__/unit/sources/__fixtures__",
-			"!src/__tests__/unit/coverage/__fixtures__",
+			"!src/__tests__/unit/coverage/__fixtures__/coverage",
 			"!scripts/**/__fixtures__"
 		]
 	},

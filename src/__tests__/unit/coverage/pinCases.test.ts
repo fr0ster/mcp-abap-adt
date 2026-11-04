@@ -249,6 +249,45 @@ describe('pinCases', () => {
     ).rejects.toThrow('two recordings of the case differ at request 0: url');
   });
 
+  it("a thrown case's recording leaves out its before steps, on both stands", async () => {
+    const before = stub('StubBefore', async (context) => {
+      await context.connection.makeAdtRequest({
+        url: '/sap/bc/adt/stub/before',
+        method: 'GET',
+        timeout: 1,
+      });
+      return textAnswer('{}');
+    });
+    const throws = stub('StubThrows', async () => {
+      throw new Error(
+        'Input validation error: Invalid arguments for tool StubThrows: x',
+      );
+    });
+    for (const stand of ['recording', 'adtStandIn'] as const) {
+      const recorded = await recordCase(
+        {
+          tool: 'StubThrows',
+          variant: 'onprem',
+          stand,
+          before: [{ tool: 'StubBefore', args: {} }],
+          args: {},
+          refusal: 'thrown',
+          expected: 'nothing-sent',
+        },
+        { port: PORT, entries: entries(before, throws) },
+      );
+      expect({
+        stand,
+        thrown: recorded.thrown instanceof Error,
+        requests: recorded.requests,
+      }).toEqual({
+        stand,
+        thrown: true,
+        requests: [],
+      });
+    }
+  });
+
   it('a binding reads the earlier answer', async () => {
     const seen: ToolArgs[] = [];
     const start = stub('StubStart', async () =>

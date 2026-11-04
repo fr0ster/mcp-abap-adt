@@ -174,6 +174,7 @@ export function outcomesOf(
 
 /** Names what a run left behind for the owner to remove (the run report). */
 function reportLeftover(what: string): void {
+  if (leftovers().includes(what)) return;
   fs.appendFileSync(leftoversFile(), `${JSON.stringify({ leftover: what })}\n`);
 }
 
@@ -480,18 +481,32 @@ export function recordCreated(deleteTool: string, args: ToolArgs): void {
   created.push({ tool: deleteTool, args });
 }
 
-/** Deletes only what was recorded, children before parents (reverse creation order). */
+/**
+ * Deletes only what was recorded, children before parents (reverse creation
+ * order). A record goes only once its delete succeeded (or the object is
+ * already gone): a failed delete keeps it, and a refused send (the marker)
+ * keeps every one not yet deleted. Whatever is kept is named in the
+ * leftovers report, and the cleanup fails.
+ */
 export async function deleteRecorded(): Promise<void> {
   const failures: string[] = [];
-  while (created.length > 0) {
-    const last = created.pop();
-    if (last === undefined) break;
-    const answer = await send(last.tool, last.args);
-    if (answer.isError && !isNotFound(answer)) {
-      failures.push(
-        `${last.tool} ${JSON.stringify(last.args)}: ${answer.text}`,
-      );
+  const kept: Array<{ tool: string; args: ToolArgs }> = [];
+  try {
+    for (let at = created.length - 1; at >= 0; at -= 1) {
+      const record = created[at];
+      if (record === undefined) continue;
+      const answer = await send(record.tool, record.args);
+      if (answer.isError && !isNotFound(answer)) {
+        kept.unshift(record);
+        failures.push(
+          `${record.tool} ${JSON.stringify(record.args)}: ${answer.text}`,
+        );
+      }
+      created.splice(at, 1);
     }
+  } finally {
+    created.push(...kept);
+    if (created.length > 0) reportRemaining();
   }
   if (failures.length > 0) {
     throw new Error(`cleanup failed:\n${failures.join('\n')}`);
@@ -518,6 +533,9 @@ const journal: Array<{
   object: TransportObjectRef;
 }> = [];
 
+/** The configured requests' entries as they were before the run touched them. */
+const configured = new Map<string, ReadonlySet<string>>();
+
 /** Records a request or task number the test created. */
 export function recordCreatedRequest(transportNumber: string): void {
   if (!createdRequests.includes(transportNumber)) {
@@ -534,16 +552,38 @@ export function recordTransportEntry(entry: {
   journal.push(entry);
 }
 
-/** The objects a request (or task) holds, with their task and position. */
-async function transportObjects(transportNumber: string): Promise<
-  Array<{
-    name: string;
-    type: string;
-    pgmid: string;
-    position: string;
-    task: string;
-  }>
-> {
+/**
+ * Names in the leftovers report everything still recorded — objects,
+ * requests and tasks, journalled entries — for the owner to remove.
+ */
+function reportRemaining(): void {
+  for (const record of created) {
+    reportLeftover(`object ${record.tool} ${JSON.stringify(record.args)}`);
+  }
+  for (const transportNumber of createdRequests) {
+    reportLeftover(`request ${transportNumber}`);
+  }
+  for (const entry of journal) {
+    reportLeftover(
+      `entry ${entry.request}/${entry.task} ${entry.object.type} ${entry.object.name}`,
+    );
+  }
+}
+
+/** One entry a request (or task) holds. */
+interface HeldEntry {
+  name: string;
+  type: string;
+  pgmid: string;
+  position: string;
+  task: string;
+}
+
+const entryText = (held: HeldEntry): string =>
+  `${held.pgmid} ${held.type} ${held.name}`;
+
+/** The entries a request (or task) holds, with their task and position. */
+async function transportObjects(transportNumber: string): Promise<HeldEntry[]> {
   const answer = await send('ReadTransportObjects', {
     transport_number: transportNumber,
   });
@@ -572,79 +612,120 @@ async function transportObjects(transportNumber: string): Promise<
   });
 }
 
-const sameObject = (
-  a: { name: string; type: string },
-  b: TransportObjectRef,
-): boolean => a.name === b.name && a.type === b.type;
+/**
+ * Reads a configured request's entries before the run changes it: the
+ * state `deleteRecordedRequests` restores and verifies. Call it before the
+ * first entry the test makes on that request.
+ */
+export async function rememberConfiguredRequest(
+  transportNumber: string,
+): Promise<void> {
+  if (configured.has(transportNumber)) return;
+  configured.set(
+    transportNumber,
+    new Set((await transportObjects(transportNumber)).map(entryText)),
+  );
+}
+
+/** The object names a recorded delete names: its `…_name` arguments, upper-cased. */
+function recordedNames(): Set<string> {
+  const names = new Set<string>();
+  for (const record of created) {
+    for (const [field, value] of Object.entries(record.args)) {
+      if (field.endsWith('_name') && typeof value === 'string') {
+        names.add(value.toUpperCase());
+      }
+    }
+  }
+  return names;
+}
 
 /**
  * Cleans up what the test did to transport requests, in this order:
  * 1. the recorded objects deleted (`deleteRecorded`);
- * 2. every entry of a journalled object detached (`RemoveTransportObject`)
- *    from every task it is on — the journalled ones and any the delete
- *    added — across the journalled requests and the created ones;
- * 3. the final state read (`ReadTransportObjects`): no journalled object on
- *    a journalled request, the created ones empty;
+ * 2. every entry of a recorded object (journalled or not) detached
+ *    (`RemoveTransportObject`) from every task it is on — the journalled
+ *    ones and any the delete added — across the configured requests and
+ *    the created ones; an entry a configured request held before the run
+ *    stays;
+ * 3. the final state read (`ReadTransportObjects`): each configured request
+ *    back as it was (`rememberConfiguredRequest`), the created ones empty;
  * 4. only then the recorded tasks and requests deleted, the later created
  *    first (a task before its request), each asserted absent with
  *    `GetTransport`. The order of step 4 is provisional until measured on
  *    the system (plan C2a).
+ * A record goes only once its step succeeded; when a step fails, or a send
+ * is refused, everything still recorded is named in the leftovers report.
  */
 export async function deleteRecordedRequests(): Promise<void> {
-  await deleteRecorded();
-  const requests = new Set([
-    ...journal.map((entry) => entry.request),
-    ...createdRequests,
-  ]);
-  for (const request of requests) {
-    for (const held of await transportObjects(request)) {
-      if (!journal.some((entry) => sameObject(held, entry.object))) continue;
-      const answer = await send('RemoveTransportObject', {
-        transport_number: held.task,
-        object_name: held.name,
-        object_type: held.type,
-        position: held.position,
-        pgmid: held.pgmid,
-      });
-      if (answer.isError) {
+  try {
+    const names = recordedNames();
+    for (const entry of journal) names.add(entry.object.name.toUpperCase());
+    await deleteRecorded();
+    for (const entry of journal) {
+      if (
+        !configured.has(entry.request) &&
+        !createdRequests.includes(entry.request)
+      ) {
         throw new Error(
-          `RemoveTransportObject ${held.task} ${held.name}: ${answer.text}`,
+          `request ${entry.request} was not remembered before the run changed it (rememberConfiguredRequest)`,
         );
       }
     }
-  }
-  for (const request of requests) {
-    const left = (await transportObjects(request)).filter(
-      (held) =>
-        createdRequests.includes(request) ||
-        journal.some((entry) => sameObject(held, entry.object)),
-    );
-    if (left.length > 0) {
-      throw new Error(
-        `request ${request} still holds ${left.map((held) => held.name).join(', ')}`,
+    const requests = [...configured.keys(), ...createdRequests];
+    for (const request of requests) {
+      const before = configured.get(request) ?? new Set<string>();
+      for (const held of await transportObjects(request)) {
+        if (!names.has(held.name.toUpperCase())) continue;
+        if (before.has(entryText(held))) continue;
+        const answer = await send('RemoveTransportObject', {
+          transport_number: held.task,
+          object_name: held.name,
+          object_type: held.type,
+          position: held.position,
+          pgmid: held.pgmid,
+        });
+        if (answer.isError) {
+          throw new Error(
+            `RemoveTransportObject ${held.task} ${held.name}: ${answer.text}`,
+          );
+        }
+      }
+    }
+    for (const request of requests) {
+      const now = (await transportObjects(request)).map(entryText).sort();
+      const was = [...(configured.get(request) ?? [])].sort();
+      if (JSON.stringify(now) !== JSON.stringify(was)) {
+        throw new Error(
+          `request ${request} is not back as it was: it holds ${now.join(', ') || 'nothing'}, it held ${was.join(', ') || 'nothing'}`,
+        );
+      }
+    }
+    journal.length = 0;
+    while (createdRequests.length > 0) {
+      const transportNumber = createdRequests[createdRequests.length - 1];
+      if (transportNumber === undefined) break;
+      refuseAfterMarker(`the delete of ${transportNumber}`);
+      const connection = current().connection();
+      const deleted = await withAdtHeaders({}, 'request.delete', (headers) =>
+        createAdtClient(connection)
+          .getRequest(resultsFor(transportDocuments))
+          .delete({ transportNumber }, { headers }),
       );
+      if (!deleted.ok) {
+        throw new Error(`the delete of ${transportNumber} was refused`);
+      }
+      const read = await send('GetTransport', {
+        transport_number: transportNumber,
+      });
+      if (!isNotFound(read)) {
+        throw new Error(`${transportNumber} still reads after its delete`);
+      }
+      createdRequests.pop();
     }
-  }
-  journal.length = 0;
-  while (createdRequests.length > 0) {
-    const transportNumber = createdRequests.pop();
-    if (transportNumber === undefined) break;
-    refuseAfterMarker(`the delete of ${transportNumber}`);
-    const connection = current().connection();
-    const deleted = await withAdtHeaders({}, 'request.delete', (headers) =>
-      createAdtClient(connection)
-        .getRequest(resultsFor(transportDocuments))
-        .delete({ transportNumber }, { headers }),
-    );
-    if (!deleted.ok) {
-      throw new Error(`the delete of ${transportNumber} was refused`);
-    }
-    const read = await send('GetTransport', {
-      transport_number: transportNumber,
-    });
-    if (!isNotFound(read)) {
-      throw new Error(`${transportNumber} still reads after its delete`);
-    }
+  } catch (error) {
+    reportRemaining();
+    throw error;
   }
 }
 
@@ -683,6 +764,21 @@ async function modifiableRequests(): Promise<Map<string, string>> {
     }
   }
   return out;
+}
+
+/** A request's description, from its own document (`GetTransport`). */
+async function descriptionOf(transportNumber: string): Promise<string> {
+  const answer = await send('GetTransport', {
+    transport_number: transportNumber,
+  });
+  if (answer.isError) {
+    throw new Error(`GetTransport ${transportNumber}: ${answer.text}`);
+  }
+  const description = member(
+    member(jsonOf(answer), 'transport'),
+    'description',
+  );
+  return typeof description === 'string' ? description : '';
 }
 
 /** A request's task numbers. */
@@ -748,10 +844,13 @@ export async function reconcileRequestCreate(
       `the create was refused for the credential; look for "${plan.description}"`,
     );
   }
-  const found = [...(await modifiableRequests())].filter(
-    ([number, description]) =>
-      !plan.inventory.has(number) && description === plan.description,
-  );
+  const found: Array<[string, string]> = [];
+  for (const [number, listed] of await modifiableRequests()) {
+    if (plan.inventory.has(number)) continue;
+    // A listing that carries no description: the request's own document says.
+    const description = listed !== '' ? listed : await descriptionOf(number);
+    if (description === plan.description) found.push([number, description]);
+  }
   for (const [number] of found) recordCreatedRequest(number);
   if (found.length === 0) {
     reportLeftover(plan.description);
@@ -817,6 +916,14 @@ export function leftovers(): string[] {
       const value = member(JSON.parse(line), 'leftover');
       return typeof value === 'string' ? [value] : [];
     });
+}
+
+/** Forgets every record of this module: for the live helpers' own tests, between cases. */
+export function resetLiveRecords(): void {
+  created.length = 0;
+  createdRequests.length = 0;
+  journal.length = 0;
+  configured.clear();
 }
 
 /** The numbers recorded as created, in creation order: for the tests. */

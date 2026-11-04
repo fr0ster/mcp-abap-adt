@@ -25,6 +25,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { InMemoryBackgroundRuns } from '../../../background-runs-memory/src/InMemoryBackgroundRuns';
 import { compactToolSet } from '../../../compact/src/launcher';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
@@ -53,7 +54,7 @@ export const PIN_USER = 'PIN_USER';
 const PIN_PID = 222;
 
 /** What must exist before the server starts. */
-export type PinSetup = 'leftover-session' | 'background-run-store';
+export type PinSetup = 'leftover-session';
 
 export interface PinServer {
   call(tool: string, args: ToolArgs): Promise<McpResult>;
@@ -95,30 +96,21 @@ function groupsOf(toolSet: ToolSet) {
   return [...stdio, ...httpOnly];
 }
 
-/** An answer as the MCP client hands it back, in the tool's result shape. */
-function resultOf(answer: unknown): McpResult {
-  const isError =
-    typeof answer === 'object' &&
-    answer !== null &&
-    'isError' in answer &&
-    answer.isError === true;
-  const content: unknown =
-    typeof answer === 'object' && answer !== null && 'content' in answer
-      ? answer.content
-      : undefined;
-  const items: unknown[] = Array.isArray(content) ? content : [];
+/** A tool call's answer as the MCP client declares it. */
+type CallAnswer = Awaited<ReturnType<Client['callTool']>>;
+
+/**
+ * An answer in the tool's result shape, its text items. `callTool` declares
+ * a union with the legacy `toolResult` form; the SDK's own
+ * `CallToolResultSchema` reads it as the result it is.
+ */
+function resultOf(answer: CallAnswer): McpResult {
+  const result = CallToolResultSchema.parse(answer);
   return {
-    isError,
-    content: items.map((item) => ({
-      type: 'text',
-      text:
-        typeof item === 'object' &&
-        item !== null &&
-        'text' in item &&
-        typeof item.text === 'string'
-          ? item.text
-          : '',
-    })),
+    isError: result.isError === true,
+    content: result.content.flatMap((item) =>
+      item.type === 'text' ? [{ type: 'text' as const, text: item.text }] : [],
+    ),
   };
 }
 

@@ -27,6 +27,7 @@ import {
   callLog,
   credentialRefused,
   deleteRecorded,
+  deleteRecordedRequests,
   expectNameFree,
   type LiveRunner,
   leftovers,
@@ -38,7 +39,11 @@ import {
   reconcileRequestCreate,
   reconcileTaskCreate,
   recordCreated,
+  recordCreatedRequest,
   recordedRequests,
+  recordTransportEntry,
+  rememberConfiguredRequest,
+  resetLiveRecords,
   softRunner,
   useLiveRunner,
 } from '../../integration/helpers/live';
@@ -62,6 +67,7 @@ const settingsOf = (url: string): SapConfig => ({
 });
 
 beforeEach(async () => {
+  resetLiveRecords();
   // A communication batch builds its connection for the kind the
   // environment states, as a launcher's does.
   savedKind = process.env.SAP_SYSTEM_TYPE;
@@ -125,6 +131,27 @@ describe('liveCall and the refusal stop', () => {
     await expect(deleteRecorded()).rejects.toThrow(
       'a credential was refused earlier in this run',
     );
+    // Kept, not dropped: a second cleanup still has it, and the report names it.
+    await expect(deleteRecorded()).rejects.toThrow(
+      'a credential was refused earlier in this run',
+    );
+    expect(leftovers()).toEqual([
+      'object DeleteProgram {"program_name":"ZLIVE_ONE"}',
+    ]);
+    recordCreatedRequest('K900090');
+    recordTransportEntry({
+      request: 'K900091',
+      task: 'K900092',
+      object: { name: 'ZLIVE_ONE', type: 'PROG' },
+    });
+    await expect(deleteRecordedRequests()).rejects.toThrow(
+      'a credential was refused earlier in this run',
+    );
+    expect(leftovers()).toEqual([
+      'object DeleteProgram {"program_name":"ZLIVE_ONE"}',
+      'request K900090',
+      'entry K900091/K900092 PROG ZLIVE_ONE',
+    ]);
     expect(stand.requests.length).toBe(before);
   });
 
@@ -259,6 +286,10 @@ interface StandRequest {
   number: string;
   description: string;
   tasks: string[];
+  /** The entries on its first task. */
+  objects?: Array<{ name: string; type: string }>;
+  /** The listing leaves its description out (the request's own document has it). */
+  undescribed?: boolean;
 }
 
 const escapeXml = (value: string): string =>
@@ -294,7 +325,7 @@ function organizer(requests: StandRequest[]): void {
       text: `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="${USER}" xmlns:tm="${TM}" xmlns:adtcore="${ADTCORE}"><tm:workbench tm:category="Workbench"><tm:modifiable tm:status="Modifiable">${requests
         .map(
           (request) =>
-            `<tm:request tm:number="${request.number}" tm:owner="${USER}" tm:desc="${escapeXml(request.description)}" tm:type="K" tm:status="D"/>`,
+            `<tm:request tm:number="${request.number}" tm:owner="${USER}"${request.undescribed === true ? '' : ` tm:desc="${escapeXml(request.description)}"`} tm:type="K" tm:status="D"/>`,
         )
         .join('')}</tm:modifiable></tm:workbench></tm:root>`,
     }),
@@ -313,14 +344,51 @@ function organizer(requests: StandRequest[]): void {
           `/sap/bc/adt/cts/transportrequests/${each.number}`,
         ),
       );
+      const entries = (known?.objects ?? [])
+        .map(
+          (object, index) =>
+            `<tm:abap_object tm:pgmid="R3TR" tm:type="${object.type}" tm:name="${object.name}" tm:position="${String(index + 1).padStart(6, '0')}"/>`,
+        )
+        .join('');
       const tasks = (known?.tasks ?? [])
-        .map((task) => `<tm:task tm:number="${task}" tm:owner="${USER}"/>`)
+        .map(
+          (task, index) =>
+            `<tm:task tm:number="${task}" tm:owner="${USER}">${index === 0 ? entries : ''}</tm:task>`,
+        )
         .join('');
       return {
         status: 200,
         text: `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="${known?.number ?? ''}" xmlns:tm="${TM}" xmlns:adtcore="${ADTCORE}"><tm:request tm:number="${known?.number ?? ''}" tm:owner="${USER}" tm:desc="${escapeXml(known?.description ?? '')}">${tasks}</tm:request></tm:root>`,
       };
     },
+  );
+}
+
+/** A request the organizer does not hold reads `404`; a `DELETE` removes one. */
+function deletions(requests: StandRequest[]): void {
+  const numberOf = (url: string): string =>
+    url
+      .slice('/sap/bc/adt/cts/transportrequests/'.length)
+      .split('/')[0]
+      ?.split('?')[0] ?? '';
+  stand.respond(
+    (request) =>
+      request.method === 'DELETE' &&
+      request.url.startsWith('/sap/bc/adt/cts/transportrequests/K'),
+    (request) => {
+      const at = requests.findIndex(
+        (each) => each.number === numberOf(request.url),
+      );
+      if (at >= 0) requests.splice(at, 1);
+      return { status: 200, text: '' };
+    },
+  );
+  stand.respond(
+    (request) =>
+      request.method === 'GET' &&
+      request.url.startsWith('/sap/bc/adt/cts/transportrequests/K') &&
+      !requests.some((each) => each.number === numberOf(request.url)),
+    () => ({ status: 404, text: '' }),
   );
 }
 
@@ -441,6 +509,27 @@ describe('a refused transport request create is reconciled', () => {
     expect(leftovers()).toEqual([plan.description]);
   });
 
+  it('a leftover the listing does not describe is found by its own document', async () => {
+    const requests: StandRequest[] = [];
+    organizer(requests);
+    const plan = await prepareRequestCreate();
+    refuseCreates(() =>
+      requests.push({
+        number: 'K900008',
+        description: plan.description,
+        tasks: [],
+        undescribed: true,
+      }),
+    );
+    const answer = await liveCall('CreateTransport', {
+      description: plan.description,
+    });
+    await expect(reconcileRequestCreate(plan, answer)).rejects.toThrow(
+      'its leftover is journalled',
+    );
+    expect(recordedRequests()).toContain('K900008');
+  });
+
   it('after a credential refusal nothing is listed and the description is reported', async () => {
     organizer([]);
     const plan = await prepareRequestCreate();
@@ -454,5 +543,76 @@ describe('a refused transport request create is reconciled', () => {
     );
     expect(sentSince(from)).toEqual([]);
     expect(leftovers()).toEqual([plan.description]);
+  });
+});
+
+describe('the transport cleanup', () => {
+  it('deletes only the recorded requests, each asserted absent, the configured one back as it was', async () => {
+    const configured: StandRequest = {
+      number: 'K900010',
+      description: 'configured',
+      tasks: ['K900011'],
+      objects: [{ name: 'ZLIVE_KEEP', type: 'PROG' }],
+    };
+    const own: StandRequest = {
+      number: 'K900012',
+      description: 'own',
+      tasks: [],
+    };
+    const other: StandRequest = {
+      number: 'K900013',
+      description: 'other',
+      tasks: [],
+    };
+    const requests = [configured, own, other];
+    deletions(requests);
+    organizer(requests);
+    await rememberConfiguredRequest(configured.number);
+    recordCreatedRequest(own.number);
+    await deleteRecordedRequests();
+    expect(requests.map((request) => request.number)).toEqual([
+      configured.number,
+      other.number,
+    ]);
+    expect(recordedRequests()).toEqual([]);
+    expect(leftovers()).toEqual([]);
+  });
+
+  it('a configured request not back as it was fails, and every record is reported', async () => {
+    const configured: StandRequest = {
+      number: 'K900020',
+      description: 'configured',
+      tasks: ['K900021'],
+      objects: [{ name: 'ZLIVE_KEEP', type: 'PROG' }],
+    };
+    const requests = [configured];
+    deletions(requests);
+    organizer(requests);
+    await rememberConfiguredRequest(configured.number);
+    // Someone else's entry arrives on it: not ours to remove.
+    configured.objects?.push({ name: 'ZLIVE_FOREIGN', type: 'PROG' });
+    recordTransportEntry({
+      request: configured.number,
+      task: 'K900021',
+      object: { name: 'ZLIVE_OURS', type: 'PROG' },
+    });
+    await expect(deleteRecordedRequests()).rejects.toThrow(
+      'request K900020 is not back as it was',
+    );
+    expect(leftovers()).toEqual(['entry K900020/K900021 PROG ZLIVE_OURS']);
+  });
+
+  it('an entry on a request never remembered fails before anything is removed', async () => {
+    organizer([]);
+    recordTransportEntry({
+      request: 'K900030',
+      task: 'K900031',
+      object: { name: 'ZLIVE_OURS', type: 'PROG' },
+    });
+    const from = stand.requests.length;
+    await expect(deleteRecordedRequests()).rejects.toThrow(
+      'request K900030 was not remembered',
+    );
+    expect(sentSince(from)).toEqual([]);
   });
 });

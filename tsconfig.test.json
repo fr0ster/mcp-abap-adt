@@ -89,6 +89,6 @@
     "dist",
     // The coverage guard's refusal fixtures: source the guard reads as text
     // with the compiler API, each wrong on purpose — never compiled.
-    "src/__tests__/unit/coverage/__fixtures__"
+    "src/__tests__/unit/coverage/__fixtures__/coverage"
   ]
 }

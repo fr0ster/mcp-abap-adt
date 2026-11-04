@@ -226,6 +226,8 @@ describe('the coverage ledger guard', () => {
         'delete-no-check',
         'delete-wrong-check',
         'delete-check-other-object',
+        'delete-check-wrong-tool',
+        'delete-check-wrong-tool',
       ),
     ).toEqual([]);
   });
@@ -239,7 +241,16 @@ describe('the coverage ledger guard', () => {
   });
 
   it('no registration is skipped', () => {
-    expect(of(findings, 'not-executable', 'skipped', 'only')).toEqual([]);
+    expect(
+      of(
+        findings,
+        'not-executable',
+        'skipped',
+        'only',
+        'failing',
+        'concurrent',
+      ),
+    ).toEqual([]);
   });
 
   it('every finding is one of the checks above', () => {
@@ -282,6 +293,8 @@ describe('the coverage ledger guard', () => {
       'not-executable',
       'skipped',
       'only',
+      'failing',
+      'concurrent',
     ]);
     expect(codes(findings).filter((check) => !named.has(check))).toEqual([]);
   });
@@ -363,6 +376,8 @@ function checkNamed(name: string): Check {
     'not-executable',
     'skipped',
     'only',
+    'failing',
+    'concurrent',
     'bind-key-field',
     'typeless-part-typed',
     'expected-empty',
@@ -377,6 +392,7 @@ function checkNamed(name: string): Check {
     'delete-no-check',
     'delete-wrong-check',
     'delete-check-other-object',
+    'delete-check-wrong-tool',
   ];
   const found = known.find((check) => check === name);
   if (found === undefined) throw new Error(`no check is named ${name}`);

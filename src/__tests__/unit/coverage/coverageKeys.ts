@@ -295,3 +295,32 @@ export function deleteCheckOf(
   if (!tool.startsWith('Delete')) return undefined;
   return CLEARING_DELETES.has(tool) ? 'expectCleared' : 'expectAbsent';
 }
+
+/** Deletes whose object is read back by a tool not named `Get<Type>`. */
+const READERS: Readonly<Record<string, string>> = {
+  // Writes the class's test include empty; the class stays.
+  DeleteUnitTest: 'GetLocalTestClass',
+  // Removes the CDS unit test's test class (`deletionTargets.ts`).
+  DeleteCdsUnitTest: 'GetClass',
+};
+
+/**
+ * The tool that reads back what a delete key deleted: `HandlerGet` for
+ * `HandlerDelete` (on the same `object_type`), else `Get<Type>` for
+ * `Delete<Type>` (`READERS` naming the exceptions); `undefined` for a key
+ * that is no delete.
+ */
+export function readerOf(key: CoverageKey): string | undefined {
+  const [tool = ''] = key.split('#');
+  if (deleteCheckOf(key) === undefined) return undefined;
+  if (tool === 'HandlerDelete') return 'HandlerGet';
+  return READERS[tool] ?? `Get${tool.slice('Delete'.length)}`;
+}
+
+/** A call's arguments that say how it runs, not which object it names. */
+export const OPERATIONAL_ARGUMENTS: ReadonlySet<string> = new Set([
+  'transport_request',
+  'lock_handle',
+  'detail',
+  'timeout',
+]);

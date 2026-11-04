@@ -405,7 +405,8 @@ async function runCalls(
   c: PinCase,
   call: (tool: string, args: ToolArgs) => Promise<McpResult>,
   sent: () => number,
-): Promise<{ from: number; answer: McpResult }> {
+  mark: { from: number },
+): Promise<McpResult> {
   const answers: McpResult[] = [];
   for (const step of c.before ?? []) {
     answers.push(
@@ -413,8 +414,9 @@ async function runCalls(
     );
   }
   const args = withBindings(c.args, c.bind, answers);
-  const from = sent();
-  return { from, answer: await call(c.tool, args) };
+  // The case's own requests begin here, whether its call answers or throws.
+  mark.from = sent();
+  return call(c.tool, args);
 }
 
 /**
@@ -435,20 +437,22 @@ export async function recordCase(
         resultOf(
           await entryOf(tool, c.variant, options).call({ connection }, args),
         );
+      const mark = { from: connection.requests.length };
       try {
-        const { from, answer } = await runCalls(
+        const answer = await runCalls(
           c,
           call,
           () => connection.requests.length,
+          mark,
         );
         return {
-          requests: connection.requests.slice(from).map(toPinned),
+          requests: connection.requests.slice(mark.from).map(toPinned),
           answer,
           thrown: undefined,
         };
       } catch (thrown) {
         return {
-          requests: connection.requests.map(toPinned),
+          requests: connection.requests.slice(mark.from).map(toPinned),
           answer: undefined,
           thrown,
         };
@@ -489,15 +493,14 @@ export async function recordCase(
           await entryOf(tool, c.variant, options).call({ connection }, args),
         );
     }
-    let from = stand.requests.length;
+    const mark = { from: stand.requests.length };
     try {
-      const ran = await runCalls(c, call, () => stand.requests.length);
-      from = ran.from;
-      const requests = stand.requests.slice(from).map(toPinned);
-      return { requests, answer: ran.answer, thrown: undefined };
+      const answer = await runCalls(c, call, () => stand.requests.length, mark);
+      const requests = stand.requests.slice(mark.from).map(toPinned);
+      return { requests, answer, thrown: undefined };
     } catch (thrown) {
       return {
-        requests: stand.requests.slice(from).map(toPinned),
+        requests: stand.requests.slice(mark.from).map(toPinned),
         answer: undefined,
         thrown,
       };

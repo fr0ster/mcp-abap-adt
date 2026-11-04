@@ -43,8 +43,25 @@ controller is marked **controller's call**.
   arguments with the zod object built from the listed schema. That object drops undeclared
   keys, and an `enum` becomes `z.enum`. So a value removed from an enum, or a property removed
   from a schema, never reaches the handler. (Measured: `schemaUtils.ts`)
-- **The compact tools dispatch on one argument**, and only `object_type` / `target_type` is
-  projected per variant. (Measured)
+- **A compact tool has one dispatching argument, but two of them name their target in other
+  forms too** (Measured: a sweep of every handler in `compact-modify/src/handlers/` and
+  `compact-readonly-entries/src/handlers/` for an argument other than the dispatching one that
+  names an object's type):
+  - `HandlerActivate` (`compact-modify/src/handlers/handleHandlerActivate.ts`) dispatches
+    `objects[]` first (line 76), then `object_adt_type` (line 92), and `object_type` only when
+    neither is given. `objects[].type` and `object_adt_type` are free strings in the listed
+    schema (`compactSchemas.ts`, `activateProperties`), read at the handler's boundary by
+    `acceptedCodeOf` (`src/lib/adtTypeCode.ts`), which takes a code of `ACTIVATION_CODES` in
+    either case, a main type, a search name or a friendly name (`TYPE_NAMES`: `class`,
+    `func`, …). So `{ objects: [{ name: "ZCLASS", type: "CLAS/OC" }] }` activates a class
+    whatever `object_type`'s enum holds.
+  - `HandlerGet` (`compact-readonly-entries/src/handlers/handleHandlerGet.ts:47-82`): the
+    parts `object_structure` and `node_structure` read an object by `object_adt_type` (a free
+    string, read by `tableTypeOf`: any code of the variant's ADT type table) and
+    `object_name`, without `object_type`. `virtual_folders` lists the repository by search
+    pattern and facets and reads no object.
+  - Every other compact tool with a dispatching argument names its target only through it.
+- **Only `object_type` / `target_type` is projected per variant.** (Measured)
   - `object_type` (eleven tools) and `target_type` (`HandlerProfileRun`): stated per variant
     through `byVariant` (`src/lib/variantDefinition.ts`), each variant's members, enum and
     description built by a builder that takes the variant (`compactDescriptions.ts`: twelve
@@ -177,6 +194,8 @@ no credential is in the line.
   (§1, Measured that none takes one today):
   - the twelve `object_type` / `target_type` builders of `compactDescriptions.ts` take the
     remaining members instead of the variant (the variant's members minus the denied ones);
+    `HandlerActivate`'s also names only the codes left, and `HandlerGet`'s (with its `part`
+    description) leaves out the address parts when they are removed (below);
   - **controller's call:** eight new builders, for the tools whose values are fixed today:
     `HandlerBatch`, `HandlerDebugBatch`, `HandlerSession`, `HandlerDebugSession`,
     `HandlerDebugStep`, `HandlerDebugBreakpoints`, `HandlerDebugMaintain` (each value's
@@ -184,6 +203,31 @@ no credential is in the line.
     `HandlerGetData`, whose `object_name` description names `sql_query`;
   - so twenty builders in all. The definition with nothing denied is byte-identical to today's
     (§7).
+- **Every form that names the target is narrowed with the dispatching argument**, so the SDK's
+  parse refuses a denied type in every form, with no per-call check (§1, Appendix C):
+  - **`HandlerActivate`.** The object types map to codes by `COMPACT_ACTIVATE_ROUTES`
+    (`src/lib/adtProjections.ts:728`), 18 types to 17 codes. The map back is not one to one
+    (Measured): `CLAS/OC` stands for `CLASS` and `BEHAVIOR_IMPLEMENTATION`; every other mapped
+    code stands for exactly one type. Of `ACTIVATION_CODES`, 11 on premise (10 on cloud) map to
+    no object type: `FUGR/I`, `VIEW/DV`, `DCLS/DL`, `DSFD/SCF`, `DSFI/SFI`, `XSLT/VT`,
+    `FTG2/FT` (on premise only), `AUTH`, `ENHO/XHH`, `ENHO/XHB`, `ENHS/XSB`. When at least one
+    `HandlerActivate` value is denied, `objects[].type` and `object_adt_type` become an `enum`
+    of the codes still allowed:
+    - a mapped code is kept only when every type it stands for is allowed (denying `CLASS` or
+      `BEHAVIOR_IMPLEMENTATION` removes `CLAS/OC`);
+    - an unmapped code is kept: no `HandlerActivate.<value>` names it, so only denying the
+      tool removes it, and the docs say so;
+    - the enum holds the codes as the table writes them, upper case. The other spellings
+      `acceptedCodeOf` takes today (lower case, a main type, a search or friendly name) are
+      refused while a value of the tool is denied: an enum cannot hold them, and a pattern
+      would be a regex over the input. The docs say so. With nothing denied the two arguments
+      stay free strings, as today.
+  - **`HandlerGet`.** Its object types map to APIs (`COMPACT_READ_ROUTES`), not to codes, so a
+    code given in `object_adt_type` cannot be mapped back to an object type (Measured). When at
+    least one `HandlerGet` value is denied, `object_structure` and `node_structure` are removed
+    from `part`'s enum (and from its description), and `object_adt_type` with them.
+    `virtual_folders` and the activation-run parts stay: they read no object by type.
+  - The full set's `ActivateObjects` (`objects[].type`) has no values; it is denied as a tool.
 - **`HandlerGetData.sql`** is an action: denying it removes `sql_query` from the listed schema
   at registration, and the description no longer names it; the read of a named table stays.
 - No call checks a deny list. On paths 1 and 2 a denied value cannot pass the SDK's parse of the
@@ -213,9 +257,16 @@ One interface, given by the host, decides every call-time check:
     }
 
 - **`AccessCall`** is what the arguments say, as given: the tool, the value of its dispatching
-  argument when it has one, the packages named (`{ argument, value }`), the parent the call
-  itself gives a package (a call naming both `package_name` and `super_package` states
-  `super_package` as `package_name`'s parent), the requests named and the tables named.
+  argument when it has one, the packages named (`{ argument, value }`), the requests named,
+  the tables named, and whether the call is a **package create** (below).
+- **A package create** is a call whose handler creates the package `package_name` under
+  `super_package`: `CreatePackage` (`src/handlers/package/high/handleCreatePackage.ts`, which
+  requires `super_package` and sends it as the new package's `superPackage`) and
+  `HandlerCreate` with `object_type: 'PACKAGE'` (routed to the same create,
+  `compactWriteRoutes.ts:46`). These two only; the set is fixed by a test. Every other call
+  naming both arguments is not one: `CheckPackage` declares `super_package` and never uses it
+  (`handleCheckPackage.ts:36-48`, Measured), so trusting it would let
+  `{ package_name: "ZOUTSIDE", super_package: "ZALLOWED" }` pass `ZALLOWED/**`.
 - **`IPackageReader`** is the one means a strategy has to read SAP. The wrapper creates it per
   checked call, holding no connection. Its first read takes the call's connection (and, on
   path 1, its turn in the main flow) exactly as the wrapper would next, and the wrapper then
@@ -271,10 +322,14 @@ The tree strategy matches exact names and prefixes first, without reading. Only 
 matches and a subtree entry `X/**` exists does it read:
 
 - the package is `X`: it matches;
-- else its parent is taken from the call when the call gives one (a package create names the
-  new package and its `super_package`; the new package cannot be read yet), and from
-  `superPackageOf` otherwise; the walk goes up until it meets `X` (match) or the top
-  (`undefined`: no match, `package_not_allowed`);
+- else its parent is read through `superPackageOf`, with one exception: for a package create
+  (§3.2) the parent of the new `package_name` is the call's `super_package`, since the new
+  package cannot be read yet; `super_package` is itself checked as a named package, by the
+  same walk. For every other call the call's `super_package` is never taken as anyone's
+  parent; it is checked only as a package it names. The walk goes up until it meets `X`
+  (match) or the top (`undefined`: no match, `package_not_allowed`). A package that does not
+  exist yet outside a create (a `CheckPackage` of a new name) cannot be read, so it passes only
+  an exact or prefix entry;
 - a read that rejects, or a package met twice on the walk, refuses the call
   `package_tree_unreadable`. The call is refused, never let through, when the tree cannot be
   read.
@@ -322,8 +377,8 @@ matches and a subtree entry `X/**` exists does it read:
   `FUNCTION_GROUP`) may carry a package inside its text; the text is not analysed (the checks
   are formal).
 - **A create of a package** names two packages, the new one (`package_name`) and its parent
-  (`super_package`); both are checked, and the tree strategy takes the parent from the call
-  (§3.3).
+  (`super_package`); both are checked, and the tree strategy takes the new package's parent
+  from the call, for a package create only (§3.2, §3.3).
 - **A test fixes the derived table** against Appendix B, so a tool that gains or loses such an
   argument shows in a reviewed diff.
 
@@ -410,14 +465,18 @@ draft, and no other tool reads it.
   in each of CLI, environment and YAML; both table lists together; the start line for nothing
   configured, for each row, and with an unmatched entry; a denied tool absent from
   `tools/list`; a denied value absent from the enum, the description and the search members,
-  for each of the twenty builders; `HandlerGetData.sql` removing `sql_query` and its mention; a
+  for each of the twenty builders; a denied `HandlerActivate` type refused in `objects[].type`
+  and `object_adt_type` too (`CLAS/OC` gone when `CLASS` or `BEHAVIOR_IMPLEMENTATION` is
+  denied, an unmapped code kept); `HandlerGet`'s address parts gone when a value is denied; `HandlerGetData.sql` removing `sql_query` and its mention; a
   tool with every value denied absent; each form left absent (no row, an empty variable)
   restricting nothing; each refusal code, its words, and that no handler ran and nothing of the
   call's own was sent (a recording connection); an argument not given passing; a refused call in
   batch mode taking no number; path 3 refusing a denied tool.
 - **The strategies, unit:** the simple one refusing a subtree entry; the tree one matching
   without a read on an exact or prefix entry, walking up through a recording reader, taking a
-  package create's parent from the call, refusing on a rejected read and on a cycle; no
+  package create's parent from the call and reading it for every other call (`CheckPackage`
+  with a `super_package` inside a subtree and a `package_name` outside it refused), refusing on
+  a rejected read and on a cycle; no
   connection taken when the strategy reads nothing; the launcher choosing the strategy by the
   presence of a subtree entry.
 - **The draft tool, unit:** each answer from recorded ETag triples (`none`, `own`, `other`,
@@ -574,5 +633,14 @@ GetTransport, ReadTransportObjects, ReadTransportActionLog; compact HandlerGet, 
 - `operation`: HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints,
   HandlerDebugMaintain (fixed enums today).
 - `sql`: HandlerGetData's `sql_query` mode, a pseudo-value whose denial removes the argument.
+- **Other forms naming the target**, narrowed with the dispatching argument (§3.1); the sweep
+  covered every compact handler (§1):
+  - HandlerActivate: `objects[].type` and `object_adt_type` (ADT codes), narrowed to the codes
+    of the allowed object types when a value is denied;
+  - HandlerGet: `part` `object_structure` / `node_structure` with `object_adt_type`, removed
+    when a value is denied;
+  - none on HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerLock,
+    HandlerUnlock, HandlerUpdate, HandlerValidate, HandlerWhereUsed, HandlerProfileRun, or the
+    `action` / `operation` tools.
 - Every other tool, full set included, takes `Tool` only; `Tool.value` on it matches nothing
   and is ignored (named in the start line).

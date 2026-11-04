@@ -28,7 +28,14 @@ const DT_RUNPATH = 29n;
 const DT_AUXILIARY = 0x7ffffffdn;
 const DT_FILTER = 0x7fffffffn;
 // The dynamic entries whose value is an offset into the string table.
-const STRING_TAGS = new Set([DT_NEEDED, DT_SONAME, DT_RPATH, DT_RUNPATH, DT_AUXILIARY, DT_FILTER]);
+const STRING_TAGS = new Set([
+  DT_NEEDED,
+  DT_SONAME,
+  DT_RPATH,
+  DT_RUNPATH,
+  DT_AUXILIARY,
+  DT_FILTER,
+]);
 
 function patchRunpath(bytes, oldPath, newPath) {
   if (Buffer.byteLength(newPath) > Buffer.byteLength(oldPath)) {
@@ -36,9 +43,12 @@ function patchRunpath(bytes, oldPath, newPath) {
   }
   const needle = Buffer.from(`\0${oldPath}\0`);
   const at = bytes.indexOf(needle);
-  if (at < 0) throw new Error(`RUNPATH "${oldPath}" not found in the RFC addon`);
+  if (at < 0)
+    throw new Error(`RUNPATH "${oldPath}" not found in the RFC addon`);
   if (bytes.indexOf(needle, at + 1) >= 0) {
-    throw new Error(`RUNPATH "${oldPath}" occurs more than once in the RFC addon`);
+    throw new Error(
+      `RUNPATH "${oldPath}" occurs more than once in the RFC addon`,
+    );
   }
   const out = Buffer.from(bytes);
   const start = at + 1;
@@ -61,7 +71,8 @@ function readImage(bytes) {
   const sections = [];
   for (let i = 0; i < shnum; i++) {
     const at = shoff + i * shentsize;
-    if (at + 64 > bytes.length) throw new Error('the RFC addon has a truncated section table');
+    if (at + 64 > bytes.length)
+      throw new Error('the RFC addon has a truncated section table');
     sections.push({
       type: bytes.readUInt32LE(at + 4),
       offset: Number(bytes.readBigUInt64LE(at + 0x18)),
@@ -71,21 +82,27 @@ function readImage(bytes) {
     });
   }
   const section = (i) => {
-    if (sections[i] === undefined) throw new Error('the RFC addon names a section it does not have');
+    if (sections[i] === undefined)
+      throw new Error('the RFC addon names a section it does not have');
     return sections[i];
   };
   const dynamics = [];
   for (const dynamic of sections) {
     if (dynamic.type !== SHT_DYNAMIC) continue;
     const strings = section(dynamic.link);
-    for (let at = dynamic.offset; at + 16 <= dynamic.offset + dynamic.size; at += 16) {
+    for (
+      let at = dynamic.offset;
+      at + 16 <= dynamic.offset + dynamic.size;
+      at += 16
+    ) {
       const tag = bytes.readBigInt64LE(at);
       if (tag === DT_NULL) break;
       const entry = { tag, at, strings: dynamic.link };
       if (STRING_TAGS.has(tag)) {
         entry.start = strings.offset + Number(bytes.readBigUInt64LE(at + 8));
         entry.end = bytes.indexOf(0, entry.start);
-        if (entry.end < 0) throw new Error('the RFC addon has an unterminated dynamic string');
+        if (entry.end < 0)
+          throw new Error('the RFC addon has an unterminated dynamic string');
       }
       dynamics.push(entry);
     }
@@ -100,7 +117,8 @@ function nameStarts(bytes, image, index) {
   const strings = image.section(index);
   const starts = [];
   for (const entry of image.dynamics) {
-    if (entry.start !== undefined && entry.strings === index) starts.push(entry.start);
+    if (entry.start !== undefined && entry.strings === index)
+      starts.push(entry.start);
   }
   for (const s of image.sections) {
     if (s.link !== index) continue;
@@ -144,17 +162,26 @@ function nameStarts(bytes, image, index) {
 // sap-rfc-lite's prebuilt bindings (0.3.0 and later) do: addRunpath gives it one.
 function readRunpath(bytes) {
   const found = readImage(bytes)
-    .dynamics.filter((entry) => entry.tag === DT_RUNPATH || entry.tag === DT_RPATH)
+    .dynamics.filter(
+      (entry) => entry.tag === DT_RUNPATH || entry.tag === DT_RPATH,
+    )
     .map((entry) => bytes.toString('utf8', entry.start, entry.end));
-  if (found.length > 1) throw new Error('the RFC addon carries more than one RUNPATH/RPATH');
+  if (found.length > 1)
+    throw new Error('the RFC addon carries more than one RUNPATH/RPATH');
   return found[0];
 }
 
 // A RUNPATH for an addon that carries none, in place of its SONAME (see the top).
 function addRunpath(bytes, newPath) {
   const image = readImage(bytes);
-  if (image.dynamics.some((entry) => entry.tag === DT_RUNPATH || entry.tag === DT_RPATH)) {
-    throw new Error('the RFC addon already carries a RUNPATH/RPATH: it is rewritten, not added');
+  if (
+    image.dynamics.some(
+      (entry) => entry.tag === DT_RUNPATH || entry.tag === DT_RPATH,
+    )
+  ) {
+    throw new Error(
+      'the RFC addon already carries a RUNPATH/RPATH: it is rewritten, not added',
+    );
   }
   const sonames = image.dynamics.filter((entry) => entry.tag === DT_SONAME);
   if (sonames.length !== 1) {
@@ -165,7 +192,9 @@ function addRunpath(bytes, newPath) {
   const [soname] = sonames;
   const name = bytes.toString('utf8', soname.start, soname.end);
   if (Buffer.byteLength(newPath) > soname.end - soname.start) {
-    throw new Error(`the new RUNPATH "${newPath}" is longer than the SONAME "${name}" it replaces`);
+    throw new Error(
+      `the new RUNPATH "${newPath}" is longer than the SONAME "${name}" it replaces`,
+    );
   }
   // Any other name whose bytes overlap the SONAME's string — beginning inside
   // it or at its start, or ending in it (a linker tail-merges a name into a
@@ -175,7 +204,9 @@ function addRunpath(bytes, newPath) {
     return start <= soname.end && (end < 0 || end >= soname.start);
   });
   if (others.length !== 1) {
-    throw new Error(`the SONAME "${name}" of the RFC addon shares its string with another name: no RUNPATH is added`);
+    throw new Error(
+      `the SONAME "${name}" of the RFC addon shares its string with another name: no RUNPATH is added`,
+    );
   }
   const out = Buffer.from(bytes);
   out.writeBigInt64LE(DT_RUNPATH, soname.at);

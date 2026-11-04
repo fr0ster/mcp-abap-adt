@@ -7,9 +7,8 @@
  * Type-checked by `npm run test:check`.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import * as z from 'zod';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import { noConnectionContext } from '../src/lib/handlers/index.js';
+import * as z from 'zod';
 import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
@@ -18,6 +17,7 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../src/lib/handlers/groups/index.js';
+import { noConnectionContext } from '../src/lib/handlers/index.js';
 import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,

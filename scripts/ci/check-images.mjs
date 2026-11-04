@@ -24,7 +24,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repo = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../..',
+);
 
 /** variant → the checkout directory of its package, its transport. */
 const VARIANTS = {
@@ -55,7 +58,9 @@ for (let i = 0; i < argv.length; i++) {
   else if (arg === '--keep-images') keepImages = true;
   else if (Object.hasOwn(VARIANTS, arg)) chosen.push(arg);
   else {
-    console.error(`unknown argument ${arg}; variants: ${Object.keys(VARIANTS).join(', ')}`);
+    console.error(
+      `unknown argument ${arg}; variants: ${Object.keys(VARIANTS).join(', ')}`,
+    );
     process.exit(2);
   }
 }
@@ -74,18 +79,29 @@ const released = new Set(
     .filter((file) => file.endsWith('.tgz'))
     .map(
       (file) =>
-        JSON.parse(execFileSync('tar', ['-xzOf', path.join(tarballs, file), 'package/package.json'], { encoding: 'utf8' }))
-          .name,
+        JSON.parse(
+          execFileSync(
+            'tar',
+            ['-xzOf', path.join(tarballs, file), 'package/package.json'],
+            { encoding: 'utf8' },
+          ),
+        ).name,
     ),
 );
 if (!released.has(RUNTIME)) {
-  console.error(`no tarball of ${RUNTIME} in ${tarballs}: every image needs it, and it would come from the registry`);
+  console.error(
+    `no tarball of ${RUNTIME} in ${tarballs}: every image needs it, and it would come from the registry`,
+  );
   process.exit(2);
 }
 
 // ---- docker ----
 const docker = (args, options = {}) =>
-  execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
+  execFileSync('docker', args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    ...options,
+  }).trim();
 const containers = new Set();
 const network = `mcp-abap-adt-check-${process.pid}`;
 let networkMade = false;
@@ -117,17 +133,33 @@ process.on('SIGTERM', () => {
 let failed = 0;
 const results = [];
 function check(variant, label, ok, detail) {
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${variant}: ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'ok  ' : 'FAIL'} ${variant}: ${label}${detail ? ` — ${detail}` : ''}`,
+  );
   if (!ok) failed++;
   results.push({ variant, label, ok });
 }
 
 /** Writes tools: change an object, a transport or a variable (the -ro sets serve none). */
-const WRITE_VERBS = ['Create', 'Update', 'Delete', 'Activate', 'Lock', 'Unlock', 'Add', 'Remove', 'Move', 'SortAndCompress'];
+const WRITE_VERBS = [
+  'Create',
+  'Update',
+  'Delete',
+  'Activate',
+  'Lock',
+  'Unlock',
+  'Add',
+  'Remove',
+  'Move',
+  'SortAndCompress',
+];
 function isWriteTool(name) {
   let rest = name.startsWith('Handler') ? name.slice('Handler'.length) : name;
   if (rest.startsWith('Transport')) rest = rest.slice('Transport'.length);
-  return WRITE_VERBS.some((verb) => rest.startsWith(verb)) || rest === 'DebugSetVariable';
+  return (
+    WRITE_VERBS.some((verb) => rest.startsWith(verb)) ||
+    rest === 'DebugSetVariable'
+  );
 }
 
 /**
@@ -137,20 +169,41 @@ function isWriteTool(name) {
  * copy of a released package must be a tarball, and the runtime must be there.
  */
 function checkProvenance(variant, image) {
-  const lock = JSON.parse(docker(['run', '--rm', '--entrypoint', 'cat', image, '/opt/mcp-abap-adt/package-lock.json']));
+  const lock = JSON.parse(
+    docker([
+      'run',
+      '--rm',
+      '--entrypoint',
+      'cat',
+      image,
+      '/opt/mcp-abap-adt/package-lock.json',
+    ]),
+  );
   const copies = Object.entries(lock.packages ?? {})
-    .map(([at, entry]) => ({ at, name: at.slice(at.lastIndexOf('node_modules/') + 'node_modules/'.length), entry }))
+    .map(([at, entry]) => ({
+      at,
+      name: at.slice(at.lastIndexOf('node_modules/') + 'node_modules/'.length),
+      entry,
+    }))
     .filter(({ at, name }) => at !== '' && released.has(name));
   const foreign = copies.filter(({ entry }) => {
     const resolved = String(entry.resolved ?? '');
-    return !(resolved.startsWith('file:') && resolved.includes('/tarballs/') && resolved.endsWith('.tgz'));
+    return !(
+      resolved.startsWith('file:') &&
+      resolved.includes('/tarballs/') &&
+      resolved.endsWith('.tgz')
+    );
   });
   check(
     variant,
     'every package of the release came from its tarball',
     copies.length > 0 && foreign.length === 0,
     foreign.length > 0
-      ? foreign.map(({ at, entry }) => `${at} ← ${entry.resolved ?? '(no resolved)'}`).join(', ')
+      ? foreign
+          .map(
+            ({ at, entry }) => `${at} ← ${entry.resolved ?? '(no resolved)'}`,
+          )
+          .join(', ')
       : `${copies.length} packages`,
   );
   const runtime = copies.filter(({ name }) => name === RUNTIME);
@@ -158,22 +211,45 @@ function checkProvenance(variant, image) {
     variant,
     `${RUNTIME} is installed, from its tarball`,
     runtime.length > 0 && runtime.every((copy) => !foreign.includes(copy)),
-    runtime.map(({ at, entry }) => `${at} ← ${entry.resolved ?? '(no resolved)'}`).join(', ') || 'absent',
+    runtime
+      .map(({ at, entry }) => `${at} ← ${entry.resolved ?? '(no resolved)'}`)
+      .join(', ') || 'absent',
   );
 }
 
 function checkToolList(variant, names) {
-  check(variant, 'tools/list answers', names.length > 0, `${names.length} tools`);
+  check(
+    variant,
+    'tools/list answers',
+    names.length > 0,
+    `${names.length} tools`,
+  );
   const writes = names.filter(isWriteTool);
-  if (variant.endsWith('-ro')) check(variant, 'lists no write tool', writes.length === 0, writes.join(' '));
-  else check(variant, 'lists write tools (the -ro check bites)', writes.length > 0, `${writes.length}`);
+  if (variant.endsWith('-ro'))
+    check(
+      variant,
+      'lists no write tool',
+      writes.length === 0,
+      writes.join(' '),
+    );
+  else
+    check(
+      variant,
+      'lists write tools (the -ro check bites)',
+      writes.length > 0,
+      `${writes.length}`,
+    );
 }
 
 const initialize = {
   jsonrpc: '2.0',
   id: 1,
   method: 'initialize',
-  params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'image-check', version: '0' } },
+  params: {
+    protocolVersion: '2025-06-18',
+    capabilities: {},
+    clientInfo: { name: 'image-check', version: '0' },
+  },
 };
 const initialized = { jsonrpc: '2.0', method: 'notifications/initialized' };
 const toolsList = { jsonrpc: '2.0', id: 2, method: 'tools/list' };
@@ -193,14 +269,29 @@ const BASIC = `Basic ${Buffer.from(`${USER}:${PASSWORD}`).toString('base64')}`;
 function stdioToolList(image, name) {
   return new Promise((resolve, reject) => {
     containers.add(name);
-    const child = spawn('docker', ['run', '-i', '--rm', '--name', name, '-e', 'SAP_SYSTEM_TYPE=onprem', image], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const child = spawn(
+      'docker',
+      [
+        'run',
+        '-i',
+        '--rm',
+        '--name',
+        name,
+        '-e',
+        'SAP_SYSTEM_TYPE=onprem',
+        image,
+      ],
+      {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
     let out = '';
     let err = '';
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`no tools/list answer in 60 s; stderr: ${err.slice(-400)}`));
+      reject(
+        new Error(`no tools/list answer in 60 s; stderr: ${err.slice(-400)}`),
+      );
     }, 60_000);
     child.stdout.on('data', (chunk) => {
       out += chunk;
@@ -210,7 +301,9 @@ function stdioToolList(image, name) {
         if (line.trim() === '') continue;
         const message = JSON.parse(line);
         if (message.id === 1) {
-          child.stdin.write(`${JSON.stringify(initialized)}\n${JSON.stringify(toolsList)}\n`);
+          child.stdin.write(
+            `${JSON.stringify(initialized)}\n${JSON.stringify(toolsList)}\n`,
+          );
         } else if (message.id === 2) {
           clearTimeout(timer);
           child.stdin.end();
@@ -254,8 +347,10 @@ function eventReader(body) {
         let event = 'message';
         let data = '';
         for (const line of block.split('\n')) {
-          if (line.startsWith('event:')) event = line.slice('event:'.length).trim();
-          else if (line.startsWith('data:')) data += line.slice('data:'.length).trim();
+          if (line.startsWith('event:'))
+            event = line.slice('event:'.length).trim();
+          else if (line.startsWith('data:'))
+            data += line.slice('data:'.length).trim();
         }
         return { event, data };
       }
@@ -294,21 +389,56 @@ async function checkListener(variant, image, transport) {
   const server = `${network}-${variant}`;
   containers.add(adt);
   docker([
-    'run', '-d', '--rm', '--name', adt, '--network', network, '-p', '127.0.0.1::8080',
-    '-v', `${path.join(repo, 'scripts/ci/adt-stand-in.mjs')}:/stand-in.mjs:ro`,
-    '--entrypoint', 'node', image, '/stand-in.mjs', '8080',
+    'run',
+    '-d',
+    '--rm',
+    '--name',
+    adt,
+    '--network',
+    network,
+    '-p',
+    '127.0.0.1::8080',
+    '-v',
+    `${path.join(repo, 'scripts/ci/adt-stand-in.mjs')}:/stand-in.mjs:ro`,
+    '--entrypoint',
+    'node',
+    image,
+    '/stand-in.mjs',
+    '8080',
   ]);
   const inner = transport === 'http' ? 3000 : 3001;
   containers.add(server);
   docker([
-    'run', '-d', '--rm', '--name', server, '--network', network, '-e', 'SAP_SYSTEM_TYPE=onprem',
-    '-p', `127.0.0.1::${inner}`, image,
+    'run',
+    '-d',
+    '--rm',
+    '--name',
+    server,
+    '--network',
+    network,
+    '-e',
+    'SAP_SYSTEM_TYPE=onprem',
+    '-p',
+    `127.0.0.1::${inner}`,
+    image,
   ]);
   const base = `http://127.0.0.1:${publishedPort(server, inner)}`;
   const adtBase = `http://127.0.0.1:${publishedPort(adt, 8080)}`;
 
-  check(variant, `/mcp/health on ${inner} answers 200`, (await untilHealthy(`${base}/mcp/health`)) === 200);
-  const test = JSON.parse(docker(['image', 'inspect', '--format', '{{json .Config.Healthcheck.Test}}', image]));
+  check(
+    variant,
+    `/mcp/health on ${inner} answers 200`,
+    (await untilHealthy(`${base}/mcp/health`)) === 200,
+  );
+  const test = JSON.parse(
+    docker([
+      'image',
+      'inspect',
+      '--format',
+      '{{json .Config.Healthcheck.Test}}',
+      image,
+    ]),
+  );
   let healthy = false;
   try {
     if (test?.[0] === 'CMD') {
@@ -316,7 +446,12 @@ async function checkListener(variant, image, transport) {
       healthy = true;
     }
   } catch {}
-  check(variant, "the image's HEALTHCHECK passes", healthy, JSON.stringify(test?.[0]));
+  check(
+    variant,
+    "the image's HEALTHCHECK passes",
+    healthy,
+    JSON.stringify(test?.[0]),
+  );
 
   await untilHealthy(`${adtBase}/__requests`);
   const headers = {
@@ -331,20 +466,37 @@ async function checkListener(variant, image, transport) {
     const post = (body) =>
       fetch(`${base}/mcp/stream/http`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers },
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          ...headers,
+        },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(60_000),
       });
     list = await rpcAnswer(await post(toolsList), 2);
     const res = await post(callOf(variant));
-    check(variant, 'tools/call with x-sap-* answers 200', res.status === 200, `${res.status}`);
+    check(
+      variant,
+      'tools/call with x-sap-* answers 200',
+      res.status === 200,
+      `${res.status}`,
+    );
     call = await rpcAnswer(res, 3);
   } else {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120_000);
     try {
-      const res = await fetch(`${base}/sse`, { headers, signal: controller.signal });
-      check(variant, 'GET /sse with x-sap-* opens the stream', res.status === 200, `${res.status}`);
+      const res = await fetch(`${base}/sse`, {
+        headers,
+        signal: controller.signal,
+      });
+      check(
+        variant,
+        'GET /sse with x-sap-* opens the stream',
+        res.status === 200,
+        `${res.status}`,
+      );
       const next = eventReader(res.body);
       let opened = await next();
       while (opened.event !== 'endpoint') opened = await next();
@@ -360,34 +512,61 @@ async function checkListener(variant, image, transport) {
         return answers.get(id);
       };
       const post = (body) =>
-        fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
       await post(initialize);
       await answer(1);
       await post(initialized);
       await post(toolsList);
       list = await answer(2);
       const accepted = await post(callOf(variant));
-      check(variant, 'tools/call is accepted (202)', accepted.status === 202, `${accepted.status}`);
+      check(
+        variant,
+        'tools/call is accepted (202)',
+        accepted.status === 202,
+        `${accepted.status}`,
+      );
       call = await answer(3);
     } finally {
       clearTimeout(timer);
       controller.abort();
     }
   }
-  checkToolList(variant, (list?.result?.tools ?? []).map((tool) => tool.name));
-  check(variant, `tools/call ${callOf(variant).params.name} answers`, call?.result !== undefined, call?.error ? JSON.stringify(call.error) : undefined);
+  checkToolList(
+    variant,
+    (list?.result?.tools ?? []).map((tool) => tool.name),
+  );
+  check(
+    variant,
+    `tools/call ${callOf(variant).params.name} answers`,
+    call?.result !== undefined,
+    call?.error ? JSON.stringify(call.error) : undefined,
+  );
   const seen = await (await fetch(`${adtBase}/__requests`)).json();
   // Every ADT request carries the headers' credential, the search among them;
   // the logoff goes with the session cookie alone. No other credential at all.
-  const adtRequests = seen.filter((request) => request.url.startsWith('/sap/bc/adt/'));
+  const adtRequests = seen.filter((request) =>
+    request.url.startsWith('/sap/bc/adt/'),
+  );
   check(
     variant,
     'the call reached the ADT stand-in with the x-sap-* credential',
-    adtRequests.some((request) => request.url.startsWith('/sap/bc/adt/repository/informationsystem/search')) &&
+    adtRequests.some((request) =>
+      request.url.startsWith('/sap/bc/adt/repository/informationsystem/search'),
+    ) &&
       adtRequests.every((request) => request.authorization === BASIC) &&
-      seen.every((request) => request.authorization === null || request.authorization === BASIC),
+      seen.every(
+        (request) =>
+          request.authorization === null || request.authorization === BASIC,
+      ),
     seen
-      .map((r) => `${r.method} ${r.url.split('?')[0]} ${r.authorization === BASIC ? 'basic' : r.authorization === null ? 'none' : 'OTHER'}`)
+      .map(
+        (r) =>
+          `${r.method} ${r.url.split('?')[0]} ${r.authorization === BASIC ? 'basic' : r.authorization === null ? 'none' : 'OTHER'}`,
+      )
       .join(', '),
   );
   for (const name of [server, adt]) {
@@ -400,15 +579,26 @@ const images = [];
 try {
   for (const variant of variants) {
     const { dir, transport } = VARIANTS[variant];
-    const version = JSON.parse(fs.readFileSync(path.join(repo, dir, 'package.json'), 'utf8')).version;
+    const version = JSON.parse(
+      fs.readFileSync(path.join(repo, dir, 'package.json'), 'utf8'),
+    ).version;
     const image = `mcp-abap-adt-test/${variant}:${tag}`;
     console.log(`\n== ${variant} (${transport}) → ${image}`);
     try {
       execFileSync(
         'docker',
         [
-          'build', '--quiet', '--build-arg', `VARIANT=${variant}`, '--build-arg', 'PACKAGE_SOURCE=tarballs',
-          '--build-context', `tarballs=${tarballs}`, '-t', image, path.join(repo, 'docker'),
+          'build',
+          '--quiet',
+          '--build-arg',
+          `VARIANT=${variant}`,
+          '--build-arg',
+          'PACKAGE_SOURCE=tarballs',
+          '--build-context',
+          `tarballs=${tarballs}`,
+          '-t',
+          image,
+          path.join(repo, 'docker'),
         ],
         { stdio: ['ignore', 'ignore', 'inherit'] },
       );
@@ -421,14 +611,27 @@ try {
     try {
       checkProvenance(variant, image);
       const answered = docker(['run', '--rm', image, '--version']);
-      check(variant, `--version answers ${version}`, answered === version, answered);
+      check(
+        variant,
+        `--version answers ${version}`,
+        answered === version,
+        answered,
+      );
       if (transport === 'stdio') {
-        checkToolList(variant, await stdioToolList(image, `${network}-${variant}`));
+        checkToolList(
+          variant,
+          await stdioToolList(image, `${network}-${variant}`),
+        );
       } else {
         await checkListener(variant, image, transport);
       }
     } catch (error) {
-      check(variant, 'the checks ran to their end', false, String(error?.message ?? error).split('\n')[0]);
+      check(
+        variant,
+        'the checks ran to their end',
+        false,
+        String(error?.message ?? error).split('\n')[0],
+      );
     }
     cleanup();
   }
@@ -447,6 +650,8 @@ console.log('\n== summary');
 for (const variant of variants) {
   const own = results.filter((result) => result.variant === variant);
   const bad = own.filter((result) => !result.ok);
-  console.log(`${bad.length === 0 ? 'ok  ' : 'FAIL'} ${variant}: ${own.length - bad.length}/${own.length} checks${bad.length ? ` — failed: ${bad.map((r) => r.label).join('; ')}` : ''}`);
+  console.log(
+    `${bad.length === 0 ? 'ok  ' : 'FAIL'} ${variant}: ${own.length - bad.length}/${own.length} checks${bad.length ? ` — failed: ${bad.map((r) => r.label).join('; ')}` : ''}`,
+  );
 }
 process.exit(failed === 0 ? 0 : 1);

@@ -55,7 +55,9 @@ function parseArgs(argv, here = currentPlatform()) {
     throw new Error(`unknown server "${opts.which}": full, compact or all`);
   }
   if (opts.version !== undefined && !VERSION.test(opts.version)) {
-    throw new Error(`"${opts.version}" is not a version: a semver (1.2.3) or a dist-tag (latest)`);
+    throw new Error(
+      `"${opts.version}" is not a version: a semver (1.2.3) or a dist-tag (latest)`,
+    );
   }
   if (!PLATFORMS[here] && opts.platform === here) {
     throw new Error(

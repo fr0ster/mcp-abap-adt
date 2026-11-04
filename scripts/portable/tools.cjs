@@ -17,8 +17,15 @@ function npmCommand({
   if (fromNpm && /\.c?js$/.test(fromNpm) && exists(fromNpm)) {
     return { cmd: execPath, args: [fromNpm] };
   }
-  const beside = path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-  if (platform === 'win32' && exists(beside)) return { cmd: execPath, args: [beside] };
+  const beside = path.join(
+    path.dirname(execPath),
+    'node_modules',
+    'npm',
+    'bin',
+    'npm-cli.js',
+  );
+  if (platform === 'win32' && exists(beside))
+    return { cmd: execPath, args: [beside] };
   return { cmd: 'npm', args: [] };
 }
 
@@ -49,10 +56,15 @@ function withoutSdk(value, library, exists = fs.existsSync) {
 function smokeEnv(parent, library, exists = fs.existsSync) {
   const env = { ...parent };
   for (const key of Object.keys(env)) {
-    if (/^(SAP|MCP)_/i.test(key) || /^(SAPNWRFC_HOME|AUTH_BROKER_PATH)$/i.test(key)) delete env[key];
+    if (
+      /^(SAP|MCP)_/i.test(key) ||
+      /^(SAPNWRFC_HOME|AUTH_BROKER_PATH)$/i.test(key)
+    )
+      delete env[key];
   }
   for (const key of ['PATH', 'Path', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH']) {
-    if (env[key] !== undefined) env[key] = withoutSdk(env[key], library, exists);
+    if (env[key] !== undefined)
+      env[key] = withoutSdk(env[key], library, exists);
   }
   return env;
 }
@@ -66,7 +78,8 @@ const BUILD_TOOLS = ['esbuild', 'postject'];
 function buildToolSpecs(manifest) {
   const dev = manifest.devDependencies || {};
   return BUILD_TOOLS.map((name) => {
-    if (!dev[name]) throw new Error(`package.json declares no ${name} in devDependencies`);
+    if (!dev[name])
+      throw new Error(`package.json declares no ${name} in devDependencies`);
     return `${name}@${dev[name]}`;
   });
 }
@@ -75,7 +88,9 @@ const TOOLS_MARK = '.tools.json';
 
 function toolsInstalled(dir, specs) {
   try {
-    const marked = JSON.parse(fs.readFileSync(path.join(dir, TOOLS_MARK), 'utf8'));
+    const marked = JSON.parse(
+      fs.readFileSync(path.join(dir, TOOLS_MARK), 'utf8'),
+    );
     return JSON.stringify(marked) === JSON.stringify(specs);
   } catch {
     return false;
@@ -86,4 +101,12 @@ function markToolsInstalled(dir, specs) {
   fs.writeFileSync(path.join(dir, TOOLS_MARK), `${JSON.stringify(specs)}\n`);
 }
 
-module.exports = { npmCommand, tarCommand, withoutSdk, smokeEnv, buildToolSpecs, toolsInstalled, markToolsInstalled };
+module.exports = {
+  npmCommand,
+  tarCommand,
+  withoutSdk,
+  smokeEnv,
+  buildToolSpecs,
+  toolsInstalled,
+  markToolsInstalled,
+};

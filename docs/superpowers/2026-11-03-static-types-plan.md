@@ -137,7 +137,8 @@ binds, and each step names the spec section it carries out. Every step ends gree
 
 The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a and C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
-and open items") and applied in the tasks; none is still open.
+and open items") and applied in the tasks; O1–O12 are decided, and two findings, (a) and (b),
+are still open for the owner.
 
 **Global constraints.** Every task's requirements include these:
 - **Commands.** npm scripts only. Never `npx`, `npm exec`, `node_modules/.bin` or `ts-node`.
@@ -424,6 +425,12 @@ and live specifics.
   - `'each row names exactly the systems its key requires'`.
   - `'each unit reference is a pinCases row of that key'`: `scanUnitFile(row.unit)` holds a ref
     whose `keyOf(tool, args)` equals the key, with a variant per required kind.
+  - `'each unit reference is a test file the default unit command runs'`: the list of files
+    `npm test` runs is taken from Jest's own discovery — `jest-config`'s `readConfig` of the
+    root configuration, then `@jest/core`'s `SearchSource` (`roots`, `testMatch`
+    `**/__tests__/**/*.test.ts`, minus `testPathIgnorePatterns` `__tests__/admin/`,
+    `__tests__/integration/`) — and every `unit` path of the ledger must be in it. No pattern
+    of our own is evaluated.
   - `'each live reference is an awaited liveCall of that key in an it, inside a liveSuite naming the system'`.
   - `'a delete key's live case awaits expectAbsent or expectCleared on the deleted object'`:
     the delete's contract (spec §8) chooses which, and the read's object and part literals
@@ -459,7 +466,9 @@ and live specifics.
   - an absence check on another object than the one deleted;
   - `expectAbsent` on a delete that empties a part (and `expectCleared` on one that removes);
   - an orphan `liveCall`;
-  - a unit file under `integration/`.
+  - a unit file under `integration/`;
+  - a helper file that is not a test (`*.ts`, not `*.test.ts`) holding a top-level `pinCases`;
+  - a test file under an ignored path (`__tests__/admin/`).
 - [ ] **Step 3: Write `pinCases`' own unit tests** (`src/__tests__/unit/coverage/pinCases.test.ts`).
   - `'refuses an empty expected'`.
   - `'refuses a tool the variant does not serve'`.
@@ -505,14 +514,19 @@ and live specifics.
   - `tests/test-config.yaml.template`: `environment.expected_realm: ""` with its comment.
   - The Jest configuration: add `globalTeardown` for the integration runs.
   - `package.json`: the script `test:coverage-family` (C1's global constraints), the
-    reporter added to it and to `test:integration`, `build:test-reporter` and the two `pre…`
-    scripts that run it.
+    reporter added to it and to `test:integration`, `build:test-reporter` and the three
+    `pre…` scripts that run it (`pretest`, `pretest:integration`, `pretest:coverage-family`).
   - `tsconfig.reporter.json` (new) and `.gitignore` (`build/test-reporter/`).
 - Create:
   - `src/__tests__/integration/helpers/realmCheck.ts`
   - `src/__tests__/integration/helpers/runReport.ts`
   - `src/__tests__/integration/globalTeardown.ts`
-  - `src/__tests__/integration/coverageReporter.ts`
+  - `src/__tests__/integration/coverageReport/coverageReporter.ts` and
+    `src/__tests__/integration/coverageReport/reportFormat.ts` (the run report's shape, which
+    `runReport.ts` imports): the reporter imports nothing else of the repository, so
+    `tsconfig.reporter.json` has `rootDir` `src/__tests__/integration/coverageReport` and
+    `outDir` `build/test-reporter` — the output is exactly
+    `build/test-reporter/coverageReporter.js`, no nested path.
 
 **Interfaces:**
 - **`realmCheck.ts`**
@@ -525,14 +539,15 @@ and live specifics.
   - `reportPath(): string`, under the OS temp directory and named per run, never in the
     repository.
   - `recordOutcome(key: CoverageKey, kind: SystemKind, outcome: 'passed' | 'failed' | 'skipped'): void`
-- **`src/__tests__/integration/coverageReporter.ts`** — a Jest reporter, named in
+- **`src/__tests__/integration/coverageReport/coverageReporter.ts`** — a Jest reporter, named in
   `test:integration` and `test:coverage-family` (`--reporters=default
   --reporters=./build/test-reporter/coverageReporter.js`).
   - **Compiled before it is loaded.** Node loads a reporter itself, outside ts-jest, and
     `src/__tests__` is not in the build. So `npm run build:test-reporter`
     (`tsc -p tsconfig.reporter.json`: this one file and what it imports, out to the gitignored
-    `build/test-reporter/`) runs first, as the `pretest:integration` and
-    `pretest:coverage-family` scripts. No ts-node, no npx.
+    `build/test-reporter/`) runs first, as the `pretest:integration`,
+    `pretest:coverage-family` and root `pretest` scripts — the last because `npm test` runs
+    C2's reporter fixture tests, which load the compiled file. No ts-node, no npx.
   - `onTestCaseResult(test, result)` joins the test's full name with the call log and records
     each key's outcome from Jest's **completed** result (`result.status`) — after the test's
     `afterEach` hooks and after `expect.assertions` is checked, which a hook of the test
@@ -570,19 +585,35 @@ and live specifics.
   - `'a refusal on a connected path latches before the next send'`: the connection is made,
     the stand-in then answers `401` to a tool call; the next `liveCall`, read-back, cleanup
     request and debugger-helper request each send nothing, and the marker exists;
+  - `'within one tool call nothing follows a refused request'`: an update under a lock on
+    `adtStandIn` — LOCK answered, the `PUT` answered `401` — records exactly LOCK and PUT:
+    no UNLOCK (`withLock.ts` tries one after the body's failure), no activation, no logoff
+    over the refused session; the call fails and the marker exists;
   - the same with the first refusal on a read and on a cleanup request.
 - [ ] **Step 4: Implement.**
   - `globalSetup` calls `realmCheck` before it builds the factory, and rethrows a credential
     refusal after writing the marker. A setup without config still returns at once.
   - Every connection-creation helper checks the marker first, and writes it on a logon refusal
     (a `401` at logon, a broker refusal).
+  - **The interception sits at the connection.** Every connection the test helpers create
+    (`openConnections.ts`, the testers, `sessionHelpers.ts`, `debuggerCleanup.ts`, C2a's
+    measurement connection, the in-process live server `liveCall` uses) is wrapped once by
+    `refusalGuardedConnection(connection: IAbapConnection): IAbapConnection` (new, in
+    `src/__tests__/integration/helpers/refusalGuard.ts`, typed by the interface, no cast):
+    each sending member — `makeAdtRequest` and every other member of `IAbapConnection` that
+    sends, its logoff included — first checks the marker and refuses without sending once it
+    exists, and latches it when its own answer is a credential refusal (a `401`, a broker
+    refusal). So within one tool call nothing more is sent after the refusal, whatever the
+    handler tries next.
   - `liveCall`, `deleteRecorded`, `expectNameFree`, `expectAbsent`, `expectCleared` and the
-    debugger and session helpers check it before each request, and **latch** it when a request
-    they sent on an established connection is refused for its credential (a `401`, a broker
-    refusal) — not only at logon.
+    debugger and session helpers still check the marker before they start.
   - `globalTeardown` compares the run report with `coverage-ledger.json` for the configured
     system kind, in the scope of the running script.
-- [ ] **Step 5: Run the tests above:** PASS. Then verify the family script's selection:
+- [ ] **Step 5: Run the tests above:** PASS. Then check the reporter's clean build: delete
+  `build/test-reporter/`, run `npm run build:test-reporter`, and confirm the one emitted file
+  is `build/test-reporter/coverageReporter.js` (plus `reportFormat.js`), with nothing nested,
+  and that Node loads it: `node -e "require('./build/test-reporter/coverageReporter.js')"`
+  exits 0. Then verify the family script's selection:
   `npm run test:coverage-family -- --listTests src/__tests__/integration/high/class/ClassHighHandlers.test.ts`
   lists exactly that one file (no `DebuggerHandlers.test.ts`, nothing else); repeat with two
   files and expect exactly two. Without a config, `npm run test:integration` still
@@ -656,31 +687,39 @@ activation answer is a corpus activation result.
     and filters messages with a regex — against the no-built-in-timeouts, no-retries and
     no-regex rules; it is test code in this PR, so it is fixed in the same step, before C3's
     live cases:
-    - write first a unit test on `adtStandIn`: `'activateAndConfirm waits for the result with
-      no attempt count and no interval'` (the stand answers "inactive" three times, then not
-      listed; the helper reads exactly four times, with no timer between reads) and
-      `'activateAndConfirm refuses an error message without a regex'`;
-    - **two flows, by what the activation answered:**
+    - **two flows, by how many objects:**
       - **single object** (`handleActivateObject`'s `activateSingle`; `createView` uses it):
         the answer carries an inline verdict and no run id — confirmed from that verdict
         alone: `activated` stated, and no message of type `E`, `A` or `X` (compared in plain
         code);
-      - **asynchronous run** (several objects): the answer carries the run id; the helper
-        waits with the client's **long polling** — `getUtils().getActivationRun(runId,
+      - **asynchronous run** (several objects): the helper starts it with the one-request
+        start path, `getUtils().activateObjectsGroup(objects, preaudit, { headers })` (one
+        `POST`, `202`, the run id in `Location`), not through `handleActivateObject`'s group
+        path, which waits with its own bounded loop (see open item (b)); then it waits with
+        the client's **long polling** — `getUtils().getActivationRun(runId,
         { withLongPolling: true })` on the test's own connection, which sends
         `GET /sap/bc/adt/activation/runs/<id>?withLongPolling=true` and is held open by the
         server — once per answer until `runs:status` is terminal; no attempt count, no
-        interval, bounded only by the Jest test timeout. `finished` → it reads the run's
-        results and refuses an `E`/`A`/`X` message; `error` / `failed` → it reads the results
-        and fails with their messages.
+        interval, bounded only by the Jest test timeout. Then it reads the run's results
+        (`getActivationResults`) and judges the **activation verdict**, not the run status: a
+        `finished` run can still not activate — `activationExecuted="false"` with only a `W`
+        message, "Activation was cancelled." (`activationCancelled.test.ts`). It confirms only
+        when `activationExecuted` is true and no message is `E`/`A`/`X`; `error` / `failed`, a
+        cancelled run, or an `E`/`A`/`X` message fails with the messages.
+      - The single-object verdict is judged the same way: `activated` must be stated true
+        (`activationExecuted` not false), whatever its messages.
       - `HandlerGet#-#activation_status` (`handleGetActivationRun.ts`) passes only `analyse`,
         no long polling; whether the tool should expose it is reported to the controller, and
         the tool's behaviour is not changed here.
-    - the prerequisite unit tests cover both flows on `adtStandIn`: `'single: an inline
-      verdict with an error message fails, nothing more is sent'`, `'single: an inline verdict
-      without one confirms'`, `'run: every status read carries withLongPolling=true'` (a
-      request assertion on the recorded URL), `'run: finished then results'`, `'run: error
-      fails with the results' messages'`;
+    - the prerequisite unit tests, written first, cover both flows on `adtStandIn` and
+      replace the old poll's: `'single: an inline verdict with an error message fails,
+      nothing more is sent'`, `'single: a cancelled inline verdict with no error message
+      fails'`, `'single: an executed verdict confirms'`, `'run: started with one POST'`,
+      `'run: every status read carries withLongPolling=true, one after another with no
+      timer'` (request assertions on the recorded URLs, the stand answering "running" twice,
+      then "finished"), `'run: finished and executed confirms'`, `'run: finished but
+      cancelled with only a W message fails'`, `'run: error fails with the results'
+      messages'`;
     - its callers (`BehaviorDefinitionAndImplementationHighHandlers.test.ts`,
       `admin/shared-deps/setup.test.ts`) drop the two arguments.
 - **Assertions.** After the activation, `GetInactiveObjects` no longer lists the object, and
@@ -1219,7 +1258,16 @@ This covers the four compact handlers no test runs today.
   | `coverage_sessions` | a free probe class name; `launch_http: true` for the long sessions |
   | `debugger_handlers` | `second_user_env` (a second user's session file) for the other-user case |
 
-**Nothing is still open.**
+**Still open (awaiting the owner):**
+- **(a) Long polling in `HandlerGet#-#activation_status`.** `handleGetActivationRun.ts` passes
+  only `analyse` to `getActivationRun`, so the tool answers a run's status at once and cannot
+  wait. Whether the tool should offer `withLongPolling` is the owner's decision; the test
+  helper waits with the client directly and the tool is not changed here.
+- **(b) The production activation wait.** `handleActivateObject`'s group path waits for a run
+  in `awaitActivationRun` (`src/lib/strategies/activationRun.ts`): `attempts = 6`,
+  `delayMs = 1000`, a `setTimeout` between long-poll reads — a built-in bounded wait and
+  interval, against the no-built-in-timeouts rule. Recorded as a finding for the owner; not
+  changed in this stage.
 
 ### Where each decision is needed first
 

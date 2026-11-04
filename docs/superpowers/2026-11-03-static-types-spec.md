@@ -314,7 +314,9 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
        row of an unserved tool.
      - Each key's `live` systems equal its required kinds exactly.
      - Files are read with the TypeScript compiler API, never matched as text.
-   - **The unit file** must hold a `pinCases([...])` call **in executable Jest scope**: a
+   - **The unit file** is one the default unit command runs (Jest's own discovery of the root
+     configuration: `testMatch`, minus `testPathIgnorePatterns`), and must hold a
+     `pinCases([...])` call **in executable Jest scope**: a
      statement of the module's top level or of a `describe` callback the module calls at
      collection — never inside a function nothing calls, and never skipped (`describe.skip`,
      `xdescribe`, `it.skip`, `test.skip`, `xit`, `xtest`, `.todo`, or any skipped enclosing

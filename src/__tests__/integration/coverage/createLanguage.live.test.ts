@@ -4,8 +4,8 @@
  * the create body's (measured on ABAP cloud), so a create given
  * `master_language` sends it as `sap-language` too (adt-clients 43).
  *
- * The cloud system only: the on-premise test system offers no logon language
- * but `EN`, so a create sent with `DE` is created in `EN` there (measured).
+ * The cloud system only: the on-premise test system does not offer `DE` or `ES`
+ * for logon, so a create sent with `DE` is created in `EN` there (measured).
  *
  * A class is created with `master_language: 'DE'` (its name read free
  * first, recorded for cleanup before its create), its metadata read back —

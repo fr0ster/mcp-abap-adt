@@ -9,7 +9,7 @@ code. Go through the section that fits how you use the server; the [CHANGELOG](.
 every item.
 
 The packages are the eighteen of 23.1.x, all at **24.0.0**, every sibling range at `^24.0.0`. The
-ADT dependencies move to `@mcp-abap-adt/adt-clients` 43, `@mcp-abap-adt/adt-strategies` 0.19 and
+ADT dependencies move to `@mcp-abap-adt/adt-clients` 43.0.1, `@mcp-abap-adt/adt-strategies` 0.19.1 and
 `@mcp-abap-adt/interfaces-adt` 26 (`@mcp-abap-adt/compact-modify` too): what that changes for a
 caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
 `@mcp-abap-adt/server-runtime` now.

@@ -1347,9 +1347,16 @@ that repository's own review and CI. The release itself is the owner's.
   target; a customizing request is type `W`. Measured: `W` with `LOCAL` or an empty target
   answers `201`. Fix: `customizing` → `W`, `workbench` → `K`. Test: the type pinned per
   request kind.
-- **The profiler's auto-drill-down threshold (D2 addition):** `runtime/traces/profiler.js`
-  sends `Math.trunc(autoDrillDownThreshold)`, so `0.1` goes out as `0`. Fix: send the value
-  as given. Test: `0.1` is sent as `0.1`.
+- **The profiler's auto-drill-down threshold (D2 addition):** `runtime/traces/profiler.js`'
+  `getTraceStatements` (the GET behind the statements view) sends
+  `Math.trunc(autoDrillDownThreshold)`, so `0.1` goes out as `0`. Fix: send the value as
+  given. Test on `getTraceStatements`: the query carries `autoDrillDownThreshold=0.1`.
+- **The behaviour pool's implementations member (for D17):** `AdtBehaviorImplementation` has
+  no member exposing `getBehaviorImplementationImplementations` (`read` is `source/main`,
+  `readMetadata` the metadata). Add one member — `readImplementations(config, version?,
+  options?)`, one endpoint (`/sap/bc/adt/oo/classes/<pool>/includes/implementations`), one
+  method — with its tests: the request (URL, version query, Accept) and a structured
+  reading of a captured CCIMP.
 - **The `MoveTransportObjects` doc comment** (D18): SAP moves by name, not by position.
 - **#3's run id (from D8):** `core/shared/abapUnit.js` interpolates the run id raw into the
   status URL (`/abapunit/runs/{id}`) and the result URL (`/abapunit/results/{id}`). It is
@@ -1386,8 +1393,8 @@ that repository's own review and CI. The release itself is the owner's.
   - `CheckTable` with `ddl_code` (the source in the body);
   - `CreateTransport` with `transport_type: 'customizing'` (`tm:type="W"`) and
     `'workbench'` (`K`);
-  - the profiler's trace parameters with `auto_drill_down_threshold: 0.1` (sent as given),
-    through the tool that schedules or creates them.
+  - `RuntimeGetProfilerTraceData` with `view: 'statements'` and the threshold `0.1`: the
+    statements GET's query carries `autoDrillDownThreshold=0.1` unchanged.
 
   Each pin is red before the bump and green after. Add CHANGELOG lines.
 - [ ] Step 7: Commit (`fix(deps): adt-clients <version> — escaped create bodies, abstract,
@@ -1901,9 +1908,9 @@ itself — the handler and saver classes (`lhc_…`, `lsc_…`) — sits in the 
   and for `HandlerGet#BEHAVIOR_IMPLEMENTATION#implementations`, each pinning the one GET of
   `…/includes/implementations`; an answer test over a corpus or captured CCIMP; the default
   part still pins `source/main`.
-- [ ] **Step 2:** Add the part to both schemas and route it to the adt-clients reader through
-  the reachable member. If no `AdtBehaviorImplementation` member exposes it, the member is
-  added in the D2 release (one endpoint, one method).
+- [ ] **Step 2:** Add the part to both schemas and route it to the published
+  `AdtBehaviorImplementation.readImplementations` member (added in the D2 release, which
+  comes before this task's pins).
 - [ ] **Step 3: Live case** (C8's file, both systems): the `implementations` part of the
   behavior pool C3 creates over its own root, or of a shared fixture pool, holds a
   `lhc_` class.

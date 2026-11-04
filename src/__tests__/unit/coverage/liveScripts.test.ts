@@ -54,6 +54,18 @@ describe('the live scripts', () => {
     }
   });
 
+  it('the family script takes the files named after it: it ends on a flag that takes no value', () => {
+    // `npm run test:coverage-family -- <file>` appends the file to the
+    // script. An array option last (`--reporters=…`) took the file as one
+    // more reporter (measured); a boolean flag last cannot take it.
+    const command = scripts().get('test:coverage-family') ?? '';
+    expect(command).toBe(
+      "jest --reporters=default --reporters=./build/test-reporter/coverageReporter.js --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit",
+    );
+    const words = command.split(' ');
+    expect(['--runInBand', '--forceExit']).toContain(words[words.length - 1]);
+  });
+
   it('the unit run is not live, and a new live script would be seen', () => {
     expect(selectsLiveSuites(scripts().get('test') ?? '')).toBe(false);
     expect(

@@ -412,32 +412,51 @@ and live specifics.
     `deleteRecordedRequests(): Promise<void>`: deletes only recorded request and task numbers
     through `createAdtClient(connection).getRequest().delete` on the test's own connection, in
     the order C2a measured, then asserts each absent with `GetTransport`.
-  - **Reconciliation of a refused create.**
-    `createRequestReconciled(create: (description: string) => Promise<LiveAnswer>, kind: 'request' | 'task', parent?: string): Promise<LiveAnswer>`
-    is the one way a test creates a request or a task. adt-clients' `AdtRequest.create` is one
-    `POST` carrying the request and its first task; when SAP refuses the task part it still
-    keeps the request header — empty, with no task — and the call answers the refusal with no
-    number (measured on premise, `AdtRequest.d.ts`), so the number never reaches the journal.
-    So the helper:
-    1. gives each create a **unique run description** — the run id (random per run, written
-       in the run report) and a per-create counter, nothing else (no user, no system);
-    2. before the create, takes an **inventory**: for a request, the test user's modifiable
-       requests through the served tool `ListTransports` (`user`, `modifiable_only: true` —
-       both declared in its listed schema); for a task, the parent's tasks through
-       `GetTransport` on the parent;
-    3. calls `create(description)`; on success records the returned number at once
-       (`recordCreatedRequest`);
-    4. on a **non-credential** failure, lists again, and journals only the requests (or
-       tasks) that are **new against the inventory AND carry that exact description** — the
-       description read from the listing if it carries one, else from `GetTransport` of each
-       new number (checked at the step) — then they are cleaned up in the standard order;
-       the failure itself still fails the case;
-    5. after a **credential** refusal, sends nothing more and writes the description to the
-       run report, so a person can find what may be left.
-    Tests (`live.test.ts`, on `adtStandIn`): `'a refused create leaves an empty request that
-    is found by its description and journalled'`, `'a new request with another description is
-    never journalled'`, `'after a credential refusal nothing is listed and the description is
-    reported'`.
+  - **Reconciliation of a refused create — prepare, call, reconcile.** adt-clients'
+    `AdtRequest.create` is one `POST` carrying the request and its first task; when SAP
+    refuses the task part it still keeps the request header — empty, with no task — and the
+    call answers the refusal with no number (measured on premise, `AdtRequest.d.ts`), so the
+    number never reaches the journal. The create itself stays a directly awaited `liveCall`
+    in the test body (the guard's rule is unchanged); the helpers sit around it:
+    - `prepareRequestCreate(): Promise<RequestCreatePlan>` — before a **request** create: a
+      **unique run description** (the run id, random per run and written in the run report,
+      and a per-create counter; no user, no system) and an **inventory** of the test user's
+      modifiable requests through the served tool `ListTransports` (`user`,
+      `modifiable_only: true`), whose answer carries each request's description.
+    - `prepareTaskCreate(parent: string): Promise<TaskCreatePlan>` — before a **task**
+      create, only under a test-owned, journalled parent request: the parent's task numbers
+      through `GetTransport(parent)`. Tasks carry no description (`CreateTransportTask` has
+      no description argument; the client's task `POST` sends the parent, the user and the
+      action), so no description is matched for them.
+    - the test body then awaits `liveCall('CreateTransport', { description: plan.description,
+      … })` (or the task / compact create) directly.
+    - `reconcileRequestCreate(plan, answer): Promise<void>` and
+      `reconcileTaskCreate(plan, answer): Promise<void>` — on success, record the returned
+      number at once (`recordCreatedRequest`). On a **non-credential** failure:
+      - a request: list again and journal only requests that are **new against the
+        inventory AND carry that exact description** (the description from the listing, or
+        from `GetTransport` of a new number);
+      - a task: `GetTransport(parent)` again and journal only the task numbers that are new
+        against the parent's earlier list;
+      - what is journalled is cleaned up in the standard order; the failure still fails the
+        case.
+      After a **credential** refusal: nothing more is sent, and the description (for a task,
+      the parent's number) goes to the run report.
+    - **Best effort, stated.** Reconciliation claims no completeness and adds no search
+      machinery: it looks only at `ListTransports(user, modifiable_only)` and the parent's
+      task delta. If a refused request create leaves nothing identifiable there, the case
+      **fails** and the run report names the unique description so the owner can remove what
+      is left. This limit goes into the PR description's debts list (step 20).
+    Tests (`live.test.ts`, on `adtStandIn`):
+    - `'a refused request create leaves an empty request that is found by its description
+      and journalled'`;
+    - `'a new request with another description is never journalled'`;
+    - `'a pre-existing request whose description merely looks like the run's is never
+      journalled'` (it is in the inventory);
+    - `'a refused task create's leftover task is found by the parent's task delta and
+      journalled'`;
+    - `'an unidentifiable leftover fails the case and reports the description'`;
+    - `'after a credential refusal nothing is listed and the description is reported'`.
   - `recordTransportEntry(entry: { request: string; task: string; object: TransportObjectRef }): void`
     — the **journal** of every transport entry the test made (an object added to a task, an
     entry moved), recorded at once when the call that made it succeeds. Deleting an object
@@ -880,10 +899,11 @@ transport case and of C13. The measurement runs as a temporary Jest case under
 
 - [ ] **Step 1:** With the owner's go, after the realm check, on the on-premise system, then
   on the cloud (where the discovery offers the transport endpoints, O7 / O8): create one
-  request and one task in it through `CreateTransport` / `CreateTransportTask`, each through
-  `createRequestReconciled` (unique description, inventory first, a refused create's
-  leftover found and journalled), recording each returned number at once, before anything
-  reads it.
+  request and one task in it through `CreateTransport` / `CreateTransportTask` — each a
+  directly awaited `liveCall` between `prepareRequestCreate` / `prepareTaskCreate` (the
+  task under the journalled request just created) and `reconcileRequestCreate` /
+  `reconcileTaskCreate` — so each returned number is recorded at once, before anything reads
+  it, and a refused create's leftover is found and journalled.
 - [ ] **Step 1a: Arm the failure cleanup before the move.** An `afterAll` of the measurement,
   whatever happened, deletes the recorded object first, then detaches every entry of it
   (journalled by `recordTransportEntry` when the add or move succeeded, and any the delete
@@ -1413,7 +1433,8 @@ chains are built per operation, not from one type list:
 **Prerequisite:** C2a, for the `HandlerCreate#TRANSPORT` live case.
 
 **Owner's decision applied:** O4 / O5 — `HandlerCreate#TRANSPORT`'s live case creates its own
-request through `createRequestReconciled` and records it; `deleteRecordedRequests` deletes it, in C2a's measured order, and
+request — `prepareRequestCreate`, the awaited `liveCall('HandlerCreate', { object_type:
+'TRANSPORT', … })`, `reconcileRequestCreate` — and records it; `deleteRecordedRequests` deletes it, in C2a's measured order, and
 asserts it absent.
 
 **Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. **Every operation × type key
@@ -1667,9 +1688,10 @@ recorded order.
   verified, created tasks and requests deleted and asserted absent).
 - **New: `coverage/transport.live.test.ts`,** section `coverage_transport`.
   - **Creates.** `CreateTransport`, `CreateTransportTask`, `HandlerTransportCreate` each create
-    their own request or task through `createRequestReconciled` and **record the returned
-    number at once**, before any read-back or assertion (a refused create's empty request is
-    found by its run description and journalled); then assert it reads back
+    their own request or task — prepare, the directly awaited `liveCall`, reconcile; a task
+    only under a test-owned, journalled request — and **record the returned number at once**,
+    before any read-back or assertion (a refused request create's empty request is found by
+    its run description, a refused task create's leftover by the parent's task delta); then assert it reads back
     (`GetTransport`). Cleanup deletes only recorded numbers, in the measured order, then
     asserts each absent.
   - **Everything else** works on `coverage_transport.request`: an object the test creates in the
@@ -1962,7 +1984,9 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     Then run Codex review and CI, and get the owner's review.
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
     PR description: the owner's decisions (O1–O12), the exceptions the owner granted (none so
-    far), the accepted residual of launched servers (C2 Step 4a: one follow-up request a child
+    far), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
+    unidentifiable leftover fails its case and is named by its description), the accepted
+    residual of launched servers (C2 Step 4a: one follow-up request a child
     server may still send inside a refused call), the measured transport delete path, the per-system run counts and the config
     sections the owner's file needed. Then wait for the owner's merge and tag, the publish,
     and the registry check.

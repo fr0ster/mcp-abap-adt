@@ -74,8 +74,10 @@ When both lists are configured, each name the call gives is checked against its 
   denied, or to create objects elsewhere, is a matter for SAP's authorization, not this server.
 - **A denied action the binary does not have is ignored.** Denying a tool or action that is not
   registered in this binary changes nothing, so one list fits every binary.
-- **A malformed configuration stops the start.** A malformed entry or an unreadable list is
-  never ignored.
+- **An absent configuration is no restriction.** A list that is not given, or a list file that
+  does not exist, restricts nothing, and the server starts as today.
+- **A malformed entry stops the start.** A list that is there but cannot be parsed is never
+  ignored.
 
 ## Open for the spec
 

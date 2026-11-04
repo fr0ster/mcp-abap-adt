@@ -738,8 +738,37 @@ and live specifics.
     kind: `server-runtime/src/http/launcher.ts` exits before listening without it ("the
     system kind is required, never guessed: stated by `--system-type`, `SAP_SYSTEM_TYPE` or
     YAML `system-type`"). Every child — stdio and HTTP, full and compact — gets
-    `--system-type=<kind>` with the configured kind (`environment.system_type`, or the
-    session's kind as `getSystemType()` reads it), never a default.
+    `--system-type=<kind>` from `statedSystemKind()`, never a default.
+  - **The kind resolver has no default.** `getSystemType()` (`configHelpers.ts`, around line
+    804) ends `return isCloudConnection() ? 'cloud' : 'onprem'` — a silent `onprem` when
+    nothing states the kind, a test-code defect fixed in this step:
+    - new `statedSystemKind(): SystemKind | 'legacy' | undefined` in `configHelpers.ts`
+      returns the kind only from stated facts — `environment.system_type`, then
+      `SAP_SYSTEM_TYPE` in the environment or the session file, then a JWT session (cloud) —
+      and `undefined` otherwise;
+    - the spawning path (`hardMode.ts`, `launchedServers.ts`) uses it and refuses before
+      spawning when it answers `undefined`, naming what to set;
+    - `getSystemType()` becomes `statedSystemKind()` or a thrown refusal with the same words —
+      no default for any caller. Its callers, which get the same no-default treatment and are
+      checked in this step (each skips with its reason, or fails, where no kind is stated —
+      never runs as onprem by default): `configHelpers.ts`' `isTestAvailableForSystem`;
+      `helpers/sharedObjects.ts`; `helpers/testers/HighTester.ts`,
+      `helpers/testers/LambdaTester.ts`; `batch/batchedReadsTiming.test.ts`;
+      `debugger/DebuggerHandlers.test.ts`; `high/class/ClassCrudClientDirect.test.ts`,
+      `high/class/ClassLocalIncludesHandlers.test.ts`;
+      `high/function/FunctionHighHandlers.test.ts`,
+      `high/function/FunctionIncludeHighHandlers.test.ts`;
+      `high/include/IncludeHighHandlers.test.ts`;
+      `high/table_type/TableTypeHighHandlers.test.ts`;
+      `high/transport/TransportedObjectCrud.test.ts`;
+      `readOnly/function/FunctionIncludeReadOnlyHandlers.test.ts`,
+      `readOnly/function/GetFunctionModuleHandlers.test.ts`;
+      `readOnly/structure/GetStructuresListHandler.test.ts`;
+      `readOnly/system/AbapSystemSymbolsHandler.test.ts`; `admin/shared-deps/check.test.ts`,
+      `admin/shared-deps/setup.test.ts`. `liveSuite` (C1) uses `statedSystemKind()` too.
+    - Tests: `'statedSystemKind answers nothing when nothing states the kind'`, `'a JWT
+      session states cloud'`, `'getSystemType refuses instead of defaulting to onprem'`,
+      `'hard mode refuses to spawn without a stated kind'`.
   - **Credentials, as the server's own code and docs define them:** stdio from its
     destination configuration — `--env=<name>` / `--env-path=<file>` / `--mcp=<destination>`
     with `--auth-broker-path`, as `hardMode.ts` already maps the test config; HTTP from each
@@ -761,9 +790,11 @@ and live specifics.
       prints its listening line and a header-authenticated HandlerGet call reaches the
       stand'`;
     - the system kind: every check above runs once per kind — `--system-type=onprem` and
-      `--system-type=cloud` — and asserts the child started with that kind (the tool list it
-      answers is that variant's: `GetAdtTypes`' or `HandlerGet`'s listed schema equals the
-      variant's in `listed-schemas.json`); `'an HTTP child without a system kind is not
+      `--system-type=cloud` — and asserts the child started with that kind by its **complete
+      `tools/list`**: every tool's name and listed schema equal the projection of
+      `listed-schemas.json` for that binary and kind (the tools whose `listedBy` names
+      `<kind> <binary>`, with their schema there). One tool's schema is not proof:
+      `GetAdtTypes`' is the same on both kinds; `'an HTTP child without a system kind is not
       started by hard mode'` — `hardMode.ts` refuses before launching when no kind is
       configured.
     - Each child is stopped by `SIGTERM` and its exit awaited (Step 4b).
@@ -1434,11 +1465,17 @@ This covers the four compact handlers no test runs today.
   each case runs through `pinServer`, on the transport the tool is served on: the long-session
   tools on Streamable HTTP, the leftover tools on stdio (an in-memory transport for the stdio
   server), the rest on stdio.
-- **State and handles.** `before` makes the state: `BatchBegin` before `BatchEnd` /
-  `BatchAnswers`; a `RuntimeRunClass` with `background: true` before the background-run get,
-  list and discard; `SessionOpen` before `SessionClose`; a leftover session written by
-  `leftoverSession.ts` before the leftover list and logoff. The state handle, run id, session
-  handle and leftover id come from those answers.
+- **State and handles, per set — each case seeds its state through tools its own server
+  serves:**
+
+  | State | Full set | Compact set |
+  | --- | --- | --- |
+  | an open batch, before `BatchEnd` / `BatchAnswers` / `HandlerBatch#end` / `#answers` | `BatchBegin` | `HandlerBatch` `action: 'begin'` |
+  | a background run, before its get / list / discard | `RuntimeRunClass` `background: true` | `HandlerProfileRun` `background: true` |
+  | a long session, before its close | `SessionOpen` | `HandlerSession` `action: 'open'` |
+  | a leftover session, before its list / logoff | `setup: 'leftover-session'` (`leftoverSession.ts`) | the same setup |
+
+  The state handle, run id, session handle and leftover id come from those answers (`bind`).
 - **Zero-request rows.** `BatchBegin`, `BatchAnswers`, and the background-run get, list and
   discard (full and compact) answer from server state: `expected: 'none'`, with `ran`
   asserting the tool's own result (the state handle; the run's record; the list holding the
@@ -1451,8 +1488,14 @@ This covers the four compact handlers no test runs today.
 - **Batch.** Two reads in one envelope, both answered.
 - **Long sessions.** The HTTP launcher (`launch_http`). The session is opened, used for one
   read and closed, then the closed handle is refused.
-- **Background runs.** `RuntimeRunClass` with `background: true` on a probe class the test
-  creates. The run is got, listed and discarded, and the discarded run is absent from the list.
+- **Background runs.** Full set: `RuntimeRunClass` with `background: true` on a probe class the
+  test creates; compact set: `HandlerProfileRun` with `background: true` on the same class.
+  The run is got, listed and discarded through the set's own tools, and the discarded run is
+  absent from the list.
+- **Batch and long sessions per set.** The compact cases open the batch with
+  `HandlerBatch` `action: 'begin'` and the long session with `HandlerSession`
+  `action: 'open'` on the compact binary; the full cases with `BatchBegin` and `SessionOpen`
+  on the full binary.
 - **Leftover sessions** (O10). By design a stdio start adopts the sole leftover of its
   destination (`claimTheOne`, the owner's rule), so the cases use an **isolated runtime
   store**: every process of the case runs with `AUTH_BROKER_PATH` set to a temporary

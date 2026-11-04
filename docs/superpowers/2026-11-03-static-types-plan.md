@@ -933,8 +933,7 @@ transport case and of C13. The measurement runs as a temporary Jest case under
   to the owner before C6.
 - [ ] **Step 5:** Commit the record as `docs: the transport delete path, measured`.
 
-**Record — on premise (measured 2026-11-04; the cloud is pending: the trial session is to be
-refreshed first).**
+**Record — on premise (measured 2026-11-04).**
 - `CreateTransport` (owner the test user, the configured request's target) was accepted, and
   the system made one task with the request; `CreateTransportTask` under it was accepted.
 - An object created in the configured package on the configured request landed on exactly one
@@ -953,6 +952,15 @@ refreshed first).**
   `ExceptionResourceNotFound` (step "read transport request"), which `expectAbsent` reads as
   absent. A read-only check afterwards found no request of the run's description left and
   no entry of the object on the configured request.
+
+**Record — cloud (measured 2026-11-04; no move, the owner's decision: `coverage_transport.request`
+is empty there, the package `ZADT_BLD_PKG03`).**
+- `CreateTransport` was accepted, and the system made one task with the request, as on premise;
+  `CreateTransportTask` under it was accepted.
+- `getRequest().delete` by number, in the same order — the created task, then the task the system
+  made, then the request — each accepted.
+- `GetTransport` of each deleted number answers `404` `ExceptionResourceNotFound`, as on premise.
+  A read-only check afterwards found no request of the run's description left.
 
 ### C2b. Measure long polling of activation runs (live, before C2c and C2d)
 
@@ -2408,7 +2416,8 @@ recorded order.
 Measured on premise (C2a's record): the move between two requests is accepted both ways; the
 system makes a task with each request it creates, which the test records and deletes too;
 the deletes go task by task (the later created first), then the request, each read `404`
-after. The cloud's answer is pending.
+after. The cloud answers the same for the creates and the deletes (no move was measured
+there: no configured request).
 
 **Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
 

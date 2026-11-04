@@ -78,7 +78,7 @@ The probe is a Jest file that runs only where `MCP_MEASURE_ONPREM_WRITER_ENV`, `
 - [ ] **Step 5:** Record in the Measurement record: per type, whether the three ETags tell `none`, `own` and `other` apart (the type is offered only if so); whether `workingArea` answers as `workspace` for the reader (equal ETags in (b)); whether an include write moves the main source's `inactive` ETag; the ETag shape per type.
 - [ ] **Step 6:** Decide by the spec's fallbacks, recorded beside the results:
   - `workingArea` ≠ `workspace` for the reader → Task 1a runs before Task 11.
-  - An include write moves the main ETag → the draft tool reads the main source only; it does not → the tool reads every source part (Task 11, per-part answer; see Open items).
+  - An include write moves the main ETag → the draft tool reads the main source only; it does not → **stop**: the finding goes to the owner, and Task 11 does not start until the owner has decided the per-part answer's shape (no shape is decided in this plan).
   - The offered type list = the types whose ETags told the three states apart; the others go to the docs' "not offered" list.
 - [ ] **Step 7:** Delete the probe file; commit the record: `docs(plan): draft version measurements`.
 
@@ -290,7 +290,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 - Consumes: `readAccessRestrictions`, `registryOf(…, denied)`, `unmatchedEntries`, `accessChecksFor`.
 - Produces: `accessStartLine(restrictions: AccessRestrictions, unmatched: readonly string[], tree: boolean): string`.
 
-- [ ] **Step 1: Write the failing tests:** `accessStartLine` with nothing → `[MCP] Access restrictions: none`; with four deny entries of which `DebugStep` unmatched, three packages with a subtree, two requests → `[MCP] Access restrictions: deny-actions 4 (matching nothing here: DebugStep), allowed-packages 3 (package tree read), allowed-requests 2`; denied tables → clause `denied-tables N`; allowed tables → `allowed-tables N`; the simple strategy's packages clause per the Open items' answer. Launcher tests (stdio, http, sse): the line written once through `deps.stderr`; an http pool's second instance writes none; `--deny-actions=DeleteClass` leaves `DeleteClass` out of `tools/list`; `--allowed-packages=Z*` gives every instance the same strategy object; a malformed entry ends the start `1` with `[MCP] <words>`.
+- [ ] **Step 1: Write the failing tests:** `accessStartLine` with nothing → `[MCP] Access restrictions: none`; with four deny entries of which `DebugStep` unmatched, three packages with a subtree, two requests → `[MCP] Access restrictions: deny-actions 4 (matching nothing here: DebugStep), allowed-packages 3 (package tree read), allowed-requests 2`; denied tables → clause `denied-tables N`; allowed tables → `allowed-tables N`; under the simple strategy the packages clause carries no strategy words (`allowed-packages 2`); `(package tree read)` appears only for the tree strategy. Launcher tests (stdio, http, sse): the line written once through `deps.stderr`; an http pool's second instance writes none; `--deny-actions=DeleteClass` leaves `DeleteClass` out of `tools/list`; `--allowed-packages=Z*` gives every instance the same strategy object; a malformed entry ends the start `1` with `[MCP] <words>`.
 - [ ] **Step 2:** Run them. Expected: FAIL.
 - [ ] **Step 3:** Implement; read the rows with the table, pass `denied` to `registryOf` and the strategy through the server options.
 - [ ] **Step 4:** `npm test -- src/__tests__/unit/access server-runtime/src/__tests__`. Expected: PASS.
@@ -308,14 +308,14 @@ Same guards, connections, logoff and realm checks as Task 1.
   - `type DraftState = 'none' | 'own' | 'other' | 'undetermined'`
   - `interface DraftEtags { readonly active: string | null; readonly inactive: string | null; readonly workspace: string | null }`
   - `interface DraftAnswer { readonly draft: DraftState; readonly changed_at: string | null; readonly age_seconds: number | null; readonly etags: DraftEtags }`
-  - `draftOf(etags: DraftEtags, now: Date): DraftAnswer` — `undetermined` when any ETag is `null` or not led by 14 ASCII digits; `none` when `active` = `inactive`; `own` when `inactive` ≠ `active` and `workspace` = `inactive`; `other` when `workspace` = `active` ≠ `inactive`; else `undetermined`; `changed_at` = the `inactive` ETag's 14 digits as `YYYY-MM-DDTHH:MM:SSZ`, `age_seconds` from `now` (rounding per Open items); both `null` for `none` and `undetermined`
+  - `draftOf(etags: DraftEtags, now: Date): DraftAnswer` — `undetermined` when any ETag is `null` or not led by 14 ASCII digits; `none` when `active` = `inactive`; `own` when `inactive` ≠ `active` and `workspace` = `inactive`; `other` when `workspace` = `active` ≠ `inactive`; else `undetermined`; `changed_at` = the `inactive` ETag's 14 digits as `YYYY-MM-DDTHH:MM:SSZ`, `age_seconds` = floor((`now` − `changed_at`) in seconds), whole seconds; both `null` for `none` and `undetermined`
   - `readDraftEtags(connection: AbapConnection, object: DraftObject, signal: AbortSignal): Promise<DraftEtags>` — three reads (`active`, `inactive`, the working version Task 1 settled), each through a client built with `wireItself`; a failed read rejects with that read's failure as the tool's reads report it
   - `GetObjectDraft` arguments: `object_type` (`z.enum` of the types Task 1 admitted, per variant via `byVariant`), `object_name`, `function_group_name` optional; no `detail`
 - Description (functional): reads the active, inactive and working versions of the named object and answers whether it has an unactivated change and whose (none, the caller's, another user's), with that change's time and age by the server's clock and the three ETags; another user's lock is not visible to it.
 
 - [ ] **Step 1: Write the failing tests.**
   - `draftOf.test.ts` (ETag shape from the spec, `20261104101500` + `0011` / `0001`): `active = inactive = workspace = '202611041015000011'` → `none`, `changed_at: null`, `age_seconds: null`; `active '…0011'`, `inactive = workspace = '202611041030000001'` → `own`, `changed_at: '2026-11-04T10:30:00Z'`, `age_seconds` against a fixed `now` of `2026-11-04T10:31:00Z` → `60`; `workspace = active ≠ inactive` → `other`, same time fields; three distinct → `undetermined`, both `null`; `inactive: null` → `undetermined`, `etags.inactive: null`; an ETag `'W/"abc"'` → `undetermined`.
-  - `getObjectDraft.test.ts` (recording connection answering three reads with ETag headers): the three requests carry `version=active`, `version=inactive` and the settled working version; the answer of `GetObjectDraft` and of `HandlerGet` `{ part: 'draft' }` for the same object deep-equal; a `404` on the active read answers as `GetClass` answers a `404` (Review Focus 5); in batch mode: recorded in one batch with three parts (ETag kept) or refused `batch_not_recordable` (lost), per Task 2; `listedTool` of `GetObjectDraft` on `legacy`: `listed: false`; per-part answers if Task 1 decided every part (shape per Open items).
+  - `getObjectDraft.test.ts` (recording connection answering three reads with ETag headers): the three requests carry `version=active`, `version=inactive` and the settled working version; the answer of `GetObjectDraft` and of `HandlerGet` `{ part: 'draft' }` for the same object deep-equal; a `404` on the active read answers as `GetClass` answers a `404` (Review Focus 5); in batch mode: recorded in one batch with three parts (ETag kept) or refused `batch_not_recordable` (lost), per Task 2; `listedTool` of `GetObjectDraft` on `legacy`: `listed: false`; a fixed `now` of `2026-11-04T10:31:00.900Z` gives `age_seconds: 60` (floor).
 - [ ] **Step 2:** `npm test -- src/__tests__/unit/draft`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run. Expected: PASS.
@@ -373,11 +373,11 @@ Same guards, connections, logoff and realm checks as Task 1.
 
 ---
 
-## Open items (not decided by the spec; answer before the task that needs them)
+## Decisions on the spec's silences (the owner's rulings)
 
-1. **The start line's packages clause under the simple strategy** (Task 10). The spec gives the tree's words, `(package tree read)`, and says the clause names the strategy, but not the simple one's words.
-2. **`age_seconds` rounding** (Task 11). ETag times are whole seconds; the spec says "now minus `changed_at`" without saying whole or fractional seconds.
-3. **The per-part answer's shape** (Task 11), if Task 1 finds an include change does not move the main ETag: the spec says "answers per part" without the shape (which key names a part, and whether the top-level fields remain).
+1. The start line's packages clause names the strategy only for the tree strategy, `(package tree read)`; under the simple strategy it carries no strategy words.
+2. `age_seconds` is whole seconds: the floor of (now − `changed_at`); the ETag timestamp has second precision.
+3. The per-part answer's shape is a gate, not a decision: if Task 1 finds an include change does not move the main source's ETag, the work stops and the finding goes to the owner before Task 11.
 
 ## Measurement record
 

@@ -189,7 +189,8 @@ process (a pooled http server writes it once, not per instance):
 
 - nothing configured: `[MCP] Access restrictions: none`;
 - else one clause per configured row, with its count, the strategy, and the deny entries that
-  match nothing in this binary:
+  match nothing in this binary; the strategy is named only for the tree strategy,
+  `(package tree read)`, and the simple strategy's packages clause carries no strategy words:
   `[MCP] Access restrictions: deny-actions 4 (matching nothing here: DebugStep), allowed-packages 3 (package tree read), allowed-requests 2`.
 
 The line names counts, not entries, except the unmatched deny entries. The entries hold no
@@ -442,7 +443,8 @@ draft, and no other tool reads it.
 - **Multi-part objects. Controller's call:** plan step 1 measures whether an unactivated change
   in a class include (local types, local definitions, test classes, macros) or a function
   group include moves the main source's inactive ETag. If it does, the tool reads the main
-  source only. If not, the tool reads every source part of the object and answers per part.
+  source only. If not, the tool reads every source part of the object and answers per part;
+  the per-part answer's shape is then the owner's to decide, before the tool is built.
 - **Batch. Controller's call:** plan step 1 measures whether an ADT `$batch` response part keeps
   the ETag header. If it does, the tool is recordable (an entry in `tools/batch-handlers.json`).
   If not, it is not recordable: no batch entry, and in batch mode it is refused
@@ -453,7 +455,8 @@ draft, and no other tool reads it.
     none of these);
   - `changed_at`: for `own` and `other`, the `inactive` ETag's first 14 digits as a UTC time
     (ISO 8601), the draft's last write; `null` for `none` and `undetermined`;
-  - `age_seconds`: for `own` and `other`, now (UTC, the server's clock) minus `changed_at`;
+  - `age_seconds`: for `own` and `other`, now (UTC, the server's clock) minus `changed_at`, in
+    whole seconds (the floor; the ETag timestamp has second precision);
     `null` for `none` and `undetermined`;
   - `etags`: `active`, `inactive` and `workspace`, each the ETag of that version's answer as
     read, `null` when that answer carried none.

@@ -762,45 +762,6 @@ export async function getSystemInformation(): Promise<{
 }
 
 /**
- * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
- * In v2 architecture, config must come from connection provider/broker, not from getConfig()
- */
-export function isCloudConnection(config?: SapConfig): boolean {
-  try {
-    // If config provided as parameter, use it
-    if (config) {
-      return config.authType === 'jwt';
-    }
-
-    // Try to get config from session context (v2 architecture)
-    const context = sessionContext.getStore();
-    if (context?.sapConfig) {
-      return context.sapConfig.authType === 'jwt';
-    }
-
-    // Try to get config from overrideConfig (set by connection provider)
-    if (overrideConfig) {
-      return overrideConfig.authType === 'jwt';
-    }
-
-    // Try to get config from cached connection
-    if (cachedConnection) {
-      const connectionConfig = hasMethod(cachedConnection, 'getConfig')
-        ? cachedConnection.getConfig()
-        : undefined;
-      if (connectionConfig) {
-        return child(connectionConfig, 'authType') === 'jwt';
-      }
-    }
-
-    // If no config available, cannot determine - return false for safety
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
  * @param response - AxiosResponse from validation endpoint

@@ -35,7 +35,7 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
@@ -80,14 +80,6 @@ export async function handleUpdateProgram(
   if (!args.program_name || !args.source_code) {
     return return_error(
       new Error('Missing required parameters: program_name and source_code'),
-    );
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
     );
   }
 

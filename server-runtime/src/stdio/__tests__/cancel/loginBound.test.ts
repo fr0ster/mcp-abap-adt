@@ -46,6 +46,7 @@ describe('through the server', () => {
 
   it('--login-timeout=1 ends the login with the chain words and the server sentence', async () => {
     s = await stand({
+      kind: 'cloud',
       auth: 'jwt',
       loginTimeoutMs: 1_000,
       loginTimeoutStated: statedLoginTimeout(1, '--login-timeout'),
@@ -77,6 +78,7 @@ describe('through the server', () => {
     const refused = deferred();
     const answer = deferred();
     s = await stand({
+      kind: 'cloud',
       auth: 'jwt',
       loginTimeoutMs: 500,
       loginTimeoutStated: statedLoginTimeout(1, '--login-timeout'),
@@ -122,7 +124,7 @@ describe('through the server', () => {
   });
 
   it('without --login-timeout the login waits — a cancel aborts nothing — until the session ends it', async () => {
-    s = await stand({ auth: 'jwt' });
+    s = await stand({ kind: 'cloud', auth: 'jwt' });
     s.browser.answering(false);
     const r1 = s.call('r1');
     await s.browser.opened(1);

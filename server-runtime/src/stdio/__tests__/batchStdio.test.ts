@@ -26,6 +26,7 @@ afterEach(() => jest.restoreAllMocks());
 it("stdio: the batch is the one instance's; the client's close drops it with nothing sent", async () => {
   const owner = new InstanceBatch({ keepRawParts: false });
   const s = await stand({
+    kind: 'onprem',
     batch: owner,
     groups: [
       new HighLevelHandlersGroup(placeholder),

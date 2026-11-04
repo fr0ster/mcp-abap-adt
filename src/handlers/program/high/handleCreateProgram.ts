@@ -23,7 +23,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -94,14 +94,6 @@ export async function handleCreateProgram(
   if (!args.program_name || !args.package_name) {
     return return_error(
       new Error('Missing required parameters: program_name and package_name'),
-    );
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
     );
   }
 

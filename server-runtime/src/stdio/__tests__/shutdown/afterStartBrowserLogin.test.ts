@@ -35,7 +35,7 @@ const triggers: [string, (st: Stand) => void][] = [
 it.each(triggers)(
   '%s while a connect waits for its browser login: the login ends aborted, exit 0 once, nothing owned, the callback port free',
   async (_name, trigger) => {
-    s = await stand({ auth: 'jwt', shutdown: {} });
+    s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
     s.browser.answering(false);
     const r1 = s.call('r1');
     // The connect is in its login: the browser was given its URL, the
@@ -77,7 +77,7 @@ it.each(triggers)(
 it.each(triggers)(
   "%s while a long read's fresh connection waits in its connect for a browser login: the login ends aborted, exit 0 once, nothing owned, the callback port free",
   async (_name, trigger) => {
-    s = await stand({ auth: 'jwt', shutdown: {} });
+    s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
     // The instance's connection logs on: the user answers the first login.
     expect(await s.call('r0').done).toEqual({ text: 'r0', isError: false });
     expect(s.logins).toEqual(['ok']);
@@ -124,7 +124,7 @@ it.each(triggers)(
 );
 
 it("the client's transport close (the session's end) while a long read's fresh connection waits in its connect for a browser login: the login ends aborted, nothing owned, the callback port free", async () => {
-  s = await stand({ auth: 'jwt', shutdown: {} });
+  s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
   expect(await s.call('r0').done).toEqual({ text: 'r0', isError: false });
   s.browser.answering(false);
   s.tokens.refuseRefresh(true);

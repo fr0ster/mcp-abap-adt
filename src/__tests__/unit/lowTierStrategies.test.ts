@@ -36,6 +36,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
@@ -65,9 +66,15 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
-import { handleActivateProgram } from '../../handlers/program/low/handleActivateProgram';
+import {
+  TOOL_DEFINITION as ActivateProgramLowTool,
+  handleActivateProgram,
+} from '../../handlers/program/low/handleActivateProgram';
 import { handleCheckProgram } from '../../handlers/program/low/handleCheckProgram';
-import { handleUpdateProgram } from '../../handlers/program/low/handleUpdateProgram';
+import {
+  handleUpdateProgram,
+  TOOL_DEFINITION as UpdateProgramLowTool,
+} from '../../handlers/program/low/handleUpdateProgram';
 import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
 import { handleActivateServiceDefinition } from '../../handlers/service_definition/low/handleActivateServiceDefinition';
 import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
@@ -80,6 +87,7 @@ import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { corpusBody } from '../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { listedTool } from '../../lib/listedTool';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
@@ -701,20 +709,21 @@ describe('program', () => {
     });
   });
 
-  // `ProgramLow` tools declare `available_in: ['onprem', 'legacy']` —
-  // cloud excluded. That field is a registration-time hint only:
-  // `BaseHandlerGroup.registerHandlers` (the path `LowLevelHandlersGroup`
-  // uses) forwards just the name, description and schema to
-  // `server.registerTool`, never `available_in` — so on that path every
-  // one of these tools stays registered and callable on a cloud system
-  // regardless of what it declares. The runtime refusal below is the only
-  // thing standing between a cloud caller and a real ADT request; drop it
-  // and nothing in the tool surface itself notices. Driven through
-  // `sessionContext` — the same store `isCloudConnection()` reads first —
-  // rather than stubbing the handler's own guard call, so that removing
-  // the guard makes the cloud row fail for the right reason.
-  describe('the cloud guard — declared in available_in, enforced here', () => {
-    const cloudStore = { sapConfig: { authType: 'jwt' } } as any;
+  // The credential is not the system kind (the owner's rule): what a
+  // variant offers is decided where it is listed — `listedTool`, which both
+  // registration paths apply (`BaseHandlerGroup.registerOneTool`,
+  // `CompositeHandlersRegistry`) — on the declared kind: the variant's ADT
+  // type table and the tool's `available_in`. Nothing in a handler reads the
+  // credential to refuse. Driven with a JWT credential in `sessionContext`
+  // (the store the removed `isCloudConnection()` read first).
+  describe('the declared kind, not the credential, decides what is offered', () => {
+    const jwtStore: { sapConfig: SapConfig } = {
+      sapConfig: {
+        url: 'https://example.com',
+        authType: 'jwt',
+        jwtToken: 'pin-token',
+      },
+    };
 
     const rows: Array<
       [string, (...args: any[]) => unknown, string, Record<string, unknown>]
@@ -734,37 +743,31 @@ describe('program', () => {
     ];
 
     it.each(rows)(
-      '%s refuses on a cloud connection and never reaches the client',
+      '%s with a JWT credential reaches its member',
       async (_name, handler, member, args) => {
-        const result: any = await sessionContext.run(cloudStore, () =>
-          handler(context as any, args),
-        );
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain(
-          'Programs are not available on cloud systems',
-        );
-        // The half that matters: a handler that explains and calls anyway
-        // is the same bug wearing a message.
-        expect(callTo(member)).toBeUndefined();
-      },
-    );
-
-    it.each(rows)(
-      '%s proceeds on a non-cloud connection and reaches its member',
-      async (_name, handler, member, args) => {
-        await handler(context as any, args);
+        await sessionContext.run(jwtStore, () => handler(context, args));
         expect(callTo(member)).toBeDefined();
       },
     );
 
+    it('the program writes are listed where onprem is declared, not where cloud is', () => {
+      for (const definition of [ActivateProgramLowTool, UpdateProgramLowTool]) {
+        expect({
+          tool: definition.name,
+          onprem: listedTool(definition, 'onprem').listed,
+          cloud: listedTool(definition, 'cloud').listed,
+        }).toEqual({ tool: definition.name, onprem: true, cloud: false });
+      }
+    });
+
     // A program's check is served on cloud (`ADT_TYPES_CLOUD` lists it), and
-    // `CheckProgram` delegates here: no refusal stands in its way.
-    it('CheckProgramLow reaches its member on a cloud connection', async () => {
+    // `CheckProgram` delegates here.
+    it('CheckProgramLow reaches its member with a JWT credential', async () => {
       const typedContext: HandlerContext = {
         connection: recordingConnection(),
         logger: undefined,
       };
-      await sessionContext.run(cloudStore, () =>
+      await sessionContext.run(jwtStore, () =>
         handleCheckProgram(typedContext, { program_name: 'Z_X' }),
       );
       expect(callTo('check')).toBeDefined();

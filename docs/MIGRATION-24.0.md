@@ -87,6 +87,21 @@ arguments first.
   `use` has another signature implements the two forms.
 - The logger adapters take `unknown` beside the message, as `ILogger` does.
 
+## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
+
+**Removed: `isCloudConnection`.** It reported an on-premise system with JWT authentication as
+cloud: it read the credential type as the system kind. Keeping it would keep that wrong answer, so
+it is removed although that is breaking. The program create, update and activate tools, which
+refused on its answer, now run wherever they are offered.
+
+**What you use instead:** the system kind you declared — `--system-type`, `SAP_SYSTEM_TYPE`, or
+your own configuration.
+
+**The rule:** nothing is derived from the authorization — not from the credential type, the token
+or its claims; only the connection settings count. The one exception is the responsible user and
+the system id, read from the system when its information is available, otherwise from the
+settings.
+
 ## Callers of `CreateDomain`: `package_name` is required
 
 `CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed

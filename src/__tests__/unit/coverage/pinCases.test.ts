@@ -372,6 +372,19 @@ describe('pinCases', () => {
     ).toThrow('the recorded request carries timeout');
   });
 
+  // adt-clients hands a LOCK and an UNLOCK `data: null`; an HTTP client
+  // sends no body for it, as for `undefined`.
+  it('toPinned reads a null body as none', () => {
+    expect(
+      toPinned({ method: 'POST', url: '/sap/bc/adt/x', data: null }),
+    ).toEqual({
+      method: 'POST',
+      url: '/sap/bc/adt/x',
+      headers: {},
+      body: undefined,
+    });
+  });
+
   it('toPinned keeps the query, every header and the body', async () => {
     const headers = { 'x-one': '1', 'x-two': '2', 'x-three': '3' };
     const connection = recordingConnection();

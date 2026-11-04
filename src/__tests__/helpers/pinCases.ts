@@ -117,9 +117,9 @@ const STAND_WIRE = new Set(['method', 'url', 'headers', 'body']);
 
 const RECORDED_WIRE = new Set(['method', 'url', 'data', 'params', 'headers']);
 
-/** A recorded body as sent: a string, a buffer's text, or none. */
+/** A recorded body as sent: a string, a buffer's text, or none (`undefined`, `null`). */
 function bodyOf(data: unknown): string | undefined {
-  if (data === undefined) return undefined;
+  if (data === undefined || data === null) return undefined;
   if (typeof data === 'string') return data;
   if (Buffer.isBuffer(data)) return data.toString('utf8');
   throw new Error(

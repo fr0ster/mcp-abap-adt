@@ -27,7 +27,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgramLow',
@@ -70,14 +70,6 @@ export async function handleUpdateProgram(
   if (!program_name || !source_code || !lock_handle) {
     return return_error(
       new Error('program_name, source_code, and lock_handle are required'),
-    );
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
     );
   }
 

@@ -34,9 +34,9 @@ export interface IServerConfig {
 
   /**
    * SAP system type: onprem | cloud | legacy (`--system-type`, `SAP_SYSTEM_TYPE`).
-   * The tools offered default to cloud. The connector, and whether the master
-   * system is asked of the system, default to cloud for a jwt destination and
-   * on-premise otherwise — stated, never guessed from the URL.
+   * Stated, never defaulted: a connection is not built without it
+   * (`system_type_required`). It is never read from the credential (a JWT
+   * reaches an on-premise system as well) nor guessed from the URL.
    */
   systemType?: 'onprem' | 'cloud' | 'legacy';
   /**

@@ -1488,13 +1488,18 @@ that repository's own review and CI. The release itself is the owner's.
   - An answer test over D1's captured documents.
 - [ ] **Step 2:** Delete the three tools and add the outline tool. Run: PASS.
 - [ ] **Step 3: How the model reads a range of source.** The positions name lines, but every
-  source read today returns the whole source. **Owner decision (open item DO1):**
-  - (a) an optional line range on the `Get<Type>` source reads (`start_line`, `end_line`),
-    cut by the server after its one GET;
-  - (b) leave it to the model to read the whole source and use the positions.
-
-  The recommendation is (a), because the model then reads only the part it needs. Either
-  way the outline tool itself does not change.
+  source read today returns the whole source. **Owner decision (DO1): the cut is the
+  server's.** The `Get<Type>` source reads take an optional line range (`start_line`,
+  `end_line`); the server sends its one GET as today and answers only those lines.
+  Measured on E19 (2026-11-04): ADT serves no part of a source — `Range: bytes=…`,
+  `Range: lines=…`, `?start/end`, `?startLine/endLine` and a `#start=…;end=…` fragment each
+  answer `200` with the whole text and no `Accept-Ranges` / `Content-Range`, and no
+  discovery template of a `source` resource has a range parameter (`/source/main` takes
+  `corrNr`, `lockHandle`, `version`). Tests: the pinned request is the unchanged GET; the
+  answer holds exactly the asked lines; a range outside the source, `end_line` before
+  `start_line` and a non-positive line are refused by the schema or by the handler with
+  zero requests where the schema cannot express it. The outline tool itself does not
+  change.
 - [ ] **Step 4: Live cases** (`coverage/system.live.test.ts` or C8's file, both systems): the
   outline of a class the test creates lists its methods with positions, and those lines in
   the source hold the method.
@@ -1527,15 +1532,15 @@ that repository's own review and CI. The release itself is the owner's.
   literals, `URL` / `URLSearchParams`, a linear glob matcher for package patterns, character
   tests by char code, set membership for SAP's message-type letters, `trimEnd`, and a
   lower-cased set for the redaction names.
-- [ ] **Step 3: The source scans in kept tools — owner decision (open item DO2):**
+- [ ] **Step 3: The source scans in kept tools — owner decision (DO2: SAP-backed where D1
+  shows SAP states it, otherwise a plain line scanner):**
   - `GetIncludesList` (the INCLUDE statements of a program's source);
   - `GetStructuresList` (DDL `include` / `extend type`);
   - service-binding facts (the CDS `expose` lines).
 
-  The choice is (a) a plain line scanner without regex, keeping today's readings; or (b) a
-  SAP-backed reading (the outline of D1/D5, the where-used list, or the object structure),
-  as the owner chose for the ABAP parsers. The recommendation is (b) where D1 shows SAP
-  states it, otherwise (a).
+  Each reading comes from SAP (the outline of D1/D5, the where-used list, or the object
+  structure) where D1 shows SAP states it; otherwise a plain line scanner without regex
+  keeps today's reading.
 - [ ] **Step 4: Widen the guard.** `src/__tests__/unit/sources/noRegexOverInput.test.ts`
   scans every git-tracked production file of every package (`src`, `scripts`, `tools`, as the
   inventory did: `.ts`, `.js`, `.mjs`, `.cjs` outside `__tests__`) for a regular-expression
@@ -1632,22 +1637,20 @@ reach them.
 
 ### D12. Service definitions, bindings, message classes, transports (#10, #12, #16, #17, #18)
 
-- [ ] **#10 `CreateServiceDefinition` without `source_code` — owner decision (DO3):** (a)
-  write the promised template, or (b) the description stops promising it, and an empty
-  definition is created as SAP does. The recommendation is (b): the server invents no
-  content. Test and CHANGELOG follow the decision.
+- [ ] **#10 `CreateServiceDefinition` without `source_code` — owner decision (DO3):** the
+  description stops promising a template, and an empty definition is created as SAP does:
+  the server invents no content. A test of the description, and CHANGELOG.
 - [ ] **#12 message class.**
   - **Fixed now:** `DeleteMessageClass` and `DeleteMessageClassMessage` relay SAP's answer
     instead of a constant success. Failing tests over the corpus answers (an unknown class,
     an unknown number).
-  - **Owner decision (DO4):** SAP answers `201` to a duplicate class or a bad package and
-    creates nothing, and a message create and update are one upsert. Fixable only by reads
-    of ours:
+  - **Owner decision (DO4): add the reads.** SAP answers `201` to a duplicate class or a
+    bad package and creates nothing, and a message create and update are one upsert:
     - a read after `CreateMessageClass` that refuses when the class is absent;
     - a read before `CreateMessageClassMessage` that refuses an existing number;
     - a read before `UpdateMessageClassMessage` that refuses an unknown number.
 
-    The recommendation is to add them, each one pinned GET.
+    Each is one pinned GET, with a failing test first.
 - [ ] **#16 `GetTransport` counts:** `object_count` and `task_count` are read from the request
   document even when `include_objects` / `include_tasks` are false. Failing test over the
   corpus document, then the fix.
@@ -1678,16 +1681,14 @@ reach them.
 
 ### D14. Remaining contract fixes (#26, the doubts)
 
-- [ ] **#26 `GetAdtTypes`' `validate_type` — owner decision (DO5):** implement it or remove
-  it. The recommendation is to remove it, since it does nothing. Either way: listed-schema
-  fixture, MIGRATION if removed, CHANGELOG.
-- [ ] **`HandlerGetData` with both `object_name` and `sql_query` — owner decision (DO6):**
-  refuse the pair, or document that `sql_query` wins. The recommendation is to refuse it:
-  the model should not be silently ignored. The test follows the decision.
+- [ ] **#26 `GetAdtTypes`' `validate_type` — owner decision (DO5): removed,** since it does
+  nothing. Listed-schema fixture, MIGRATION, CHANGELOG.
+- [ ] **`HandlerGetData` with both `object_name` and `sql_query` — owner decision (DO6): the
+  pair is refused,** with zero requests: the model is not silently ignored. Failing test,
+  then the fix.
 - [ ] **`GetObjectNodeFromCache` — owner decision (DO7):** its cache is a process-wide module
-  global, shared by every session, against the owner's MCP rule. Either (a) instance-scoped
-  state behind an explicit owner, or (b) remove the tool (the campaign found it always
-  answers "not in cache"). The recommendation is (b), with MIGRATION.
+  global, shared by every session, against the owner's MCP rule, and the campaign found it
+  always answers "not in cache": the tool is removed, with MIGRATION.
 - [ ] **`GetServiceBinding` `response_format: json`:** answers the parsed document as JSON,
   not the raw XML string. Failing test, then the fix.
 - [ ] **Profiler:** `RuntimeAnalyzeProfilerTrace`'s `top` of 0 or less, and a negative
@@ -1695,23 +1696,20 @@ reach them.
   Failing tests, then the fix. CHANGELOG and the listed-schema fixture.
 - [ ] Commit per item.
 
-### Defect-stage open items (owner decisions; none decided silently)
+### Defect-stage owner decisions (decided 2026-11-04)
 
-- **DO1:** how the model reads a range of source (D5). The recommendation is an optional line
-  range on the source reads.
-- **DO2:** the source scans in kept tools (D6). The recommendation is SAP-backed where D1
-  shows SAP states it, otherwise a plain line scanner.
-- **DO3:** the SRVD template (D12). The recommendation is that the description stops
-  promising it.
-- **DO4:** the message-class reads before and after writes (D12). The recommendation is to add
-  them.
-- **DO5:** `validate_type` (D14). The recommendation is to remove it.
-- **DO6:** `HandlerGetData` with both arguments (D14). The recommendation is to refuse the
-  pair.
-- **DO7:** `GetObjectNodeFromCache` (D14). The recommendation is to remove it.
-- **DO8:** the outline tool's name (D5). The proposal is `GetObjectOutline`.
-- **DO9:** the prose guard's form (D3). It recognises SAP-derived values by type and flow,
-  with no allowlist. Its limit: values that cross modules are left to review.
+- **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
+  no part of a source, measured).
+- **DO2:** the source scans in kept tools are SAP-backed where D1 shows SAP states it,
+  otherwise a plain line scanner.
+- **DO3:** the SRVD description stops promising a template.
+- **DO4:** the message-class reads before and after writes are added.
+- **DO5:** `validate_type` is removed.
+- **DO6:** `HandlerGetData` refuses `object_name` together with `sql_query`.
+- **DO7:** `GetObjectNodeFromCache` is removed.
+- **DO8:** the outline tool is `GetObjectOutline`.
+- **DO9:** the prose guard recognises SAP-derived values by type and flow, with no allowlist;
+  values that cross modules are left to review.
 
 ## Test coverage — the families
 

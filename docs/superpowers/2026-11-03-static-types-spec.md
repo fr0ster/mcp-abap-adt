@@ -450,8 +450,17 @@ requests:
 - #9: `CheckTable`'s source is sent;
 - the outline method.
 
-**Owner decisions still open** are listed in the plan's D-stage open items. None is decided
-silently.
+**Owner decisions (2026-11-04)**, listed in the plan's D stage:
+- the source reads take an optional line range (`start_line`, `end_line`), cut by the server
+  after its one GET — ADT serves no part of a source (measured on E19);
+- the source scans kept in `GetIncludesList`, `GetStructuresList` and the service-binding
+  facts are SAP-backed where SAP states the reading, otherwise a plain line scanner;
+- `CreateServiceDefinition`'s description stops promising a template;
+- the message-class reads around create and update are added;
+- `GetAdtTypes`' `validate_type` and the `GetObjectNodeFromCache` tool are removed;
+- `HandlerGetData` refuses `object_name` together with `sql_query`;
+- the outline tool is `GetObjectOutline`;
+- the prose guard recognises SAP-derived values by type and flow, with no allowlist.
 
 ### What is SAP's and stays
 
@@ -460,8 +469,8 @@ These are SAP's answers, relayed as they are:
 - #19, #20, #21;
 - #23 — the deletion check's own text, relayed faithfully;
 - #4's release on a bogus handle within one session;
-- #12's `201` on a duplicate or unknown package. A read after the create is ours to add; that
-  is an owner decision.
+- #12's `201` on a duplicate or unknown package. The read after the create is ours, and is
+  added.
 
 ### Acceptance
 

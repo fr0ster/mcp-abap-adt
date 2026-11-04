@@ -182,7 +182,16 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
   - for a compact tool whose listed schema has an `object_type` enum, the tool and one value of
     it (`HandlerLock#CLASS`);
   - for `HandlerGet`, the tool, an `object_type` and a `part`, as the handler's own route tables
-    serve them (`compactReadRoutes`, `compactPartRoutes`; not the product of the two enums).
+    serve them (`compactReadRoutes`, `compactPartRoutes`; not the product of the two enums);
+  - for `HandlerGet`'s typeless parts, the tool and the part with `-` for the type
+    (`HandlerGet#-#object_structure`): the address parts `object_structure`, `node_structure`,
+    `virtual_folders` and the run parts `activation_status`, `activation_results`, which
+    `handleHandlerGet` routes before any `object_type` is read.
+
+  **The key is derived from the call, never from a label.** A pin row's key is read from its
+  `tool` and from the `object_type` / `part` inside its `args` literal; a live key from
+  `liveCall`'s tool argument and the same fields of its `args` literal. A row has no separate
+  `object_type` or `part` field that could disagree with what it sends.
 
   A key requires a system kind when a binary of that variant lists it: `onprem` means the
   on-premise system, `cloud` the BTP trial system. A tool that declares no `available_in` is
@@ -191,8 +200,21 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
   - It runs real adt-clients code on the parity stand-in: `recordingConnection`, or `adtStandIn`
     for a tool that opens connections of its own (the debugger listener, long sessions, leftover
     sessions, background runs, the batch envelope).
-  - It calls the tool through its registered entry, found by name in the variant's entries
-    (`entry.call(context, args)`), so the schema parse is part of the case.
+  - It calls the tool where its call is dispatched. For most tools that is its registered
+    entry, found by name in the variant's entries (`entry.call(context, args)`), so the schema
+    parse is part of the case. The background dispatch, the batch, the debugger, the long
+    sessions and the leftover sessions are dispatched by the server
+    (`src/embeddable/BaseMcpServer.ts`, the background branch of its call dispatch), not by the
+    entry; their cases run through an in-process server on an in-memory MCP transport, as the
+    existing suites of those tools do, with the state they need (an open batch, a listener, a
+    run) made by earlier calls of the same case and its handles read from those answers.
+  - A schema refusal is asserted as `entry.call` throws it (`invalidArgumentsWords`,
+    `src/lib/handlers/interfaces.ts`), not as an answer.
+  - **A tool that sends nothing is pinned as such.** `BatchBegin`, `BatchAnswers`, the
+    background-run get, list and discard (full and compact) answer from server state only. Their
+    row states `expected: 'none'` and the case asserts zero recorded requests **and** that the
+    tool ran: its answer carries the tool's own result (the handle, the run list, the discard
+    outcome). A row that records nothing because the tool never ran fails.
   - It asserts the whole recorded request list: order, count, and per request the method, the
     URL with its query, the headers adt-clients set (as the connection records them) and the
     body (`undefined` when none).
@@ -210,8 +232,20 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
   - a write is read back;
   - an activation is seen in the inactive-objects list or the activation result;
   - a run's result is read;
-  - **a delete is asserted** by `expectAbsent`, which reads the object afterwards and expects
-    "not found".
+  - **a delete is asserted** by its contract, on the object it deleted:
+    - an object a delete removes: `expectAbsent(read)` reads that object afterwards and expects
+      "not found";
+    - a delete that empties a part and keeps its object — `DeleteLocalDefinitions`,
+      `DeleteLocalMacros`, `DeleteLocalTypes`, `DeleteLocalTestClass` (each writes its class
+      include empty under the class's lock) and `DeleteUnitTest` (writes the test include empty
+      and activates; the class stays), per their handlers: `expectCleared(read)` reads the
+      part back and expects it empty, while the object still reads. Every other delete in
+      the inventory removes its object.
+    The read names the same object (and part) as the delete's `args`; the guard compares the
+    two literals.
+  - **The call is awaited and executes.** `liveCall` is awaited in the test body; a live key is
+    recorded as covered only after the enclosing test has passed all its assertions (the run
+    report is written from the test's result, not from the call).
 
   Each case states where it runs (`liveSuite(systems, title, body)`). It runs on the on-premise
   system and the BTP trial system wherever the key requires them, and elsewhere skips naming
@@ -235,8 +269,11 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
 - **Never:** SM12 (a lock left behind is a failure, and the session's logoff releases it), and
   never release a transport.
 - **Debugger cases** stop their listener and log off their session in `afterAll`.
-- **Any credential refusal stops everything.** The first one writes a run marker. Every later
-  `liveCall` refuses before it sends, and the run fails.
+- **Any credential refusal stops everything.** It is detected wherever a request can go: in
+  `globalSetup` (a refusal there is fatal; today it is logged and the run goes on), at every
+  connection creation, and on every sending path the helpers own (`liveCall`, the
+  name-free reads, cleanup, the debugger and session helpers). The first one writes a run marker;
+  every later request of the run refuses before it is sent, and the run fails.
 - **Where objects go.**
   - On premise: `$TMP`.
   - On the cloud: the configured development package (`environment.default_package`). The
@@ -254,34 +291,49 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
      checked against the tools the binaries serve: `tools/list` of every binary and variant,
      gathered as the listed-schema test gathers it.
    - **Why it cannot pass by accident:**
-     - The served list is first asserted against `listed-schemas.json` (315 names), so an empty
-       or partial list fails.
+     - The served list is first asserted against `listed-schemas.json`'s `schemas`: the same 315
+       tool names, and for each tool exactly the binaries and variants its `listedBy` names. An
+       empty or partial list, or a tool served by another binary set, fails.
      - The ledger's keys equal the required keys exactly. A missing row fails, and so does a
        row of an unserved tool.
      - Each key's `live` systems equal its required kinds exactly.
      - Files are read with the TypeScript compiler API, never matched as text.
    - **The unit file** must hold a `pinCases([...])` call:
-     - one element's `tool` (and `object_type` / `part`) is a string literal equal to the key;
-     - its `expected` is a non-empty array literal;
+     - one element's `tool` is a string literal, and its `args` an object literal whose
+       `object_type` / `part` (when present) are string literals; together they equal the key;
+     - its `expected` is a non-empty array literal, or the literal `'none'` for a tool the
+       spec names as sending nothing;
      - each request in it is an object literal of exactly `method`, `url`, `headers` and `body`,
        with `url` a string literal.
    - **The live file** lies under `src/__tests__/integration/` and holds a
-     `liveCall('<tool>', …)`:
+     `liveCall('<tool>', { … })`:
+     - its tool and its `args` literal give the key, as for a pin;
+     - it is the operand of an `await` that is a statement (or initialiser) of the test
+       callback's own body — not inside a nested function, an un-awaited promise or a callback
+       that is never invoked;
      - its nearest enclosing Jest call is `it` or `test`;
      - it sits inside a `liveSuite` whose first argument is an array literal naming the system;
-     - for a delete key, the same `it` calls `expectAbsent` after it.
+     - for a delete key, the same body awaits `expectAbsent` / `expectCleared` after it, with
+       the same object (and part) literals in its read as in the delete's `args`.
    - **No orphans.** A `pinCases` row or `liveCall` in a scanned file whose key the ledger
      lacks fails.
    - **At run time** `pinCases` refuses a tool the variant does not serve, and an empty
      `expected`.
    - **Each check is load-bearing.** One fixture per refusal under `__fixtures__/coverage/`
-     proves it.
+     proves it, among them: a pin whose `tool` or `args` disagree with its ledger key (a
+     relabelled pin); a `liveCall` not awaited; a `liveCall` inside a callback the test never
+     invokes; an absence check on another object than the one deleted; a `'none'` row of a tool
+     that sends; a `'none'` case whose tool never ran.
 3. **The live run proves the ledger.**
    - The integration run's `globalTeardown` compares the keys that ran and passed on that
      system with the keys the ledger requires there. The run report is written outside the
      repository.
    - A required key that was skipped or failed fails the run, so a missing config section
      cannot pass as a skip.
+   - **This completeness check is mandatory only for the full acceptance run** (plan step 18).
+     A targeted run of one family (an npm-script-controlled run of its files, during C3–C16)
+     reports its own keys and fails on its own keys only; it does not require the whole ledger.
+   - The run's exit status is Jest's own: nothing in the pipeline masks it.
 4. **A defect is fixed here.** A defect a pin or a live case shows is fixed in this PR, with a
    test that fails first (the goal's first invariant), and gets a CHANGELOG line. Tests alone
    change no user-visible behaviour and touch neither CHANGELOG nor MIGRATION.

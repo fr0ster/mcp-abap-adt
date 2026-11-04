@@ -753,18 +753,21 @@ and live specifics.
     kind: `server-runtime/src/http/launcher.ts` exits before listening without it ("the
     system kind is required, never guessed: stated by `--system-type`, `SAP_SYSTEM_TYPE` or
     YAML `system-type`"). Every child — stdio and HTTP, full and compact — gets
-    `--system-type=<kind>` from `statedSystemKind()`, never a default.
+    `--system-type=<kind>` from `configuredSystemKind()`, never a default.
   - **The kind resolver has no default.** `getSystemType()` (`configHelpers.ts`, around line
     804) ends `return isCloudConnection() ? 'cloud' : 'onprem'` — a silent `onprem` when
     nothing states the kind, a test-code defect fixed in this step:
-    - new `statedSystemKind(): SystemKind | 'legacy' | undefined` in `configHelpers.ts`
+    - new `configuredSystemKind(): SystemKind | 'legacy' | undefined` in `configHelpers.ts`
+      (named apart from production's `statedSystemKind(value)` in `src/lib/systemKind.ts`,
+      which maps `legacy` to `onprem` and stays untouched; the test helper keeps `legacy`
+      distinct)
       returns the kind only from explicit statements — `environment.system_type`, then
       `SAP_SYSTEM_TYPE` in the environment or the session file — and `undefined` otherwise. A
       credential type is not a statement of the kind: a JWT session states nothing (the
       owner's rule, configuration is never guessed);
     - the spawning path (`hardMode.ts`, `launchedServers.ts`) uses it and refuses before
       spawning when it answers `undefined`, naming what to set;
-    - `getSystemType()` becomes `statedSystemKind()` or a thrown refusal with the same words —
+    - `getSystemType()` becomes `configuredSystemKind()` or a thrown refusal with the same words —
       no default for any caller. Its callers, which get the same no-default treatment and are
       checked in this step (each skips with its reason, or fails, where no kind is stated —
       never runs as onprem by default): `configHelpers.ts`' `isTestAvailableForSystem`;
@@ -781,17 +784,17 @@ and live specifics.
       `readOnly/function/GetFunctionModuleHandlers.test.ts`;
       `readOnly/structure/GetStructuresListHandler.test.ts`;
       `readOnly/system/AbapSystemSymbolsHandler.test.ts`; `admin/shared-deps/check.test.ts`,
-      `admin/shared-deps/setup.test.ts`. `liveSuite` (C1) uses `statedSystemKind()` too.
+      `admin/shared-deps/setup.test.ts`. `liveSuite` (C1) uses `configuredSystemKind()` too.
     - **No credential path remains in the test helpers (owner's decision):**
       `configHelpers.ts`' `isCloudConnection()` is retired (it read the library's function,
       `SAP_JWT_TOKEN` and the session file's `SAP_JWT_TOKEN=`); `LambdaTester.ts`'
       `isCloudSystem` (from `authType === 'jwt'`, around line 285, and hardcoded `false` in
-      hard mode, around lines 251 and 362) becomes `statedSystemKind() === 'cloud'`, the
+      hard mode, around lines 251 and 362) becomes `configuredSystemKind() === 'cloud'`, the
       tester refusing to start without a stated kind; `ClassCrudClientDirect.test.ts`' `isCloud`
       (around line 162) the same; the readers of `context.isCloudSystem`
       (`RuntimeProfilingAndDumpsHandlers.test.ts`, `RuntimeFeedHandlers.test.ts`) get it from
       there. C2e lists every site checked.
-    - Tests: `'statedSystemKind answers nothing when nothing states the kind'`, `'a JWT
+    - Tests: `'configuredSystemKind answers nothing when nothing states the kind'`, `'a JWT
       session without SAP_SYSTEM_TYPE gives undefined'`, `'getSystemType refuses instead of
       defaulting to onprem'`, `'hard mode refuses to spawn without a stated kind'`,
       `'LambdaTester skips with its reason when no kind is stated'`, `'JWT credential with
@@ -1001,7 +1004,7 @@ test helpers too, the `exp` helper included.
 
 **Why here.** It changes four program handlers (`ActivateProgram` is C3's, `CreateProgram` and
 `UpdateProgram` C5's, the compact `PROGRAM` rows C6's), so their pins must be written on the
-fixed code: it goes before C3. It needs C2's `statedSystemKind()` for the test side, so it
+fixed code: it goes before C3. It needs C2's `configuredSystemKind()` for the test side, so it
 comes after C2; it is independent of C2a–C2d.
 
 **Inventory (grep at `d98becd9`, every package's production `src`, `scripts`, `tools`, and

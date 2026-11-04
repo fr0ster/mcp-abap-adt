@@ -1603,10 +1603,11 @@ it or with it, and #346 bumps both from the registry.
   language applies." A description test per create tool. CHANGELOG: "Fixed: #348 — a
   created object's original language is the one given (or the session's), sent as the
   logon language SAP takes it from."
-- [ ] **Step 6c: Live check of #348 on the trial** (owner's go, realm check, the cloud
-  system only — the on-premise test system offers only `EN` for logon, checked by the owner):
-  create a class with `master_language: 'DE'` through `liveCall`, read its metadata and
-  assert the original language `DE`, then delete it and assert it absent.
+- [ ] **Step 6c: Live check of #348** (owner's go, realm check on each system): create a class
+  in a language the system offers for logon, read its metadata and assert that original
+  language, then delete it and assert it absent — on the cloud system with `DE`, on premise
+  with `RU`. Measured on premise: `RU` is taken and an object created with it reads back `RU`;
+  `DE` and `ES` fall back to `EN` over HTTP without a refusal, and the object gets `EN`.
 - [ ] Step 7: Commit (`fix(deps): adt-clients <major> — escaped create bodies, create
   language, validation, table check, outline; abstract and program type removed`).
 

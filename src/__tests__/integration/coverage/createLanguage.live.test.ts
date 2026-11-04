@@ -4,12 +4,15 @@
  * the create body's (measured on ABAP cloud), so a create given
  * `master_language` sends it as `sap-language` too (adt-clients 43).
  *
- * The cloud system only: the on-premise test system offers only `EN` for logon, so a create sent with `DE` is created in `EN` there (measured).
+ * The language must be one the system offers for logon. Measured on
+ * premise: `RU` is taken, and an object created with it reads back `RU`;
+ * `DE` and `ES` fall back to `EN` over HTTP without a refusal. So the cloud
+ * case creates in `DE`, the on-premise case in `RU`.
  *
- * A class is created with `master_language: 'DE'` (its name read free
- * first, recorded for cleanup before its create), its metadata read back —
- * the original language `DE` — then deleted and read absent. Every step is
- * a `livePrepare`: `CreateClass` stands for its key in the class family's
+ * A class is created with that `master_language` (its name read free first,
+ * recorded for cleanup before its create), its metadata read back — that
+ * original language — then deleted and read absent. Every step is a
+ * `livePrepare`: `CreateClass` stands for its key in the class family's
  * live file (C3–C16), where the ledger names it on both systems.
  */
 import { randomBytes } from 'node:crypto';
@@ -27,8 +30,6 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
-
-const NAME = `ZCL_MCP_LANG_${randomBytes(3).toString('hex').toUpperCase()}`;
 
 /** The answer, or the case fails naming the step and what was answered. */
 function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
@@ -62,43 +63,53 @@ function masterLanguageOf(document: string): unknown {
   return Reflect.get(element, '@adtcore:masterLanguage');
 }
 
-liveSuite(['cloud'], 'a create states its language (#348)', () => {
-  const recorded: string[] = [];
+/** The suite of `system`: a class created in `language`, read back, deleted. */
+function languageSuite(system: 'onprem' | 'cloud', language: string): void {
+  liveSuite([system], `a create states its language (#348), ${system}`, () => {
+    const name = `ZCL_MCP_LANG_${randomBytes(3).toString('hex').toUpperCase()}`;
+    const recorded: string[] = [];
 
-  afterAll(async () => {
-    await deleteRecorded();
-    for (const name of recorded) {
-      await expectAbsent({ tool: 'GetClass', args: { class_name: name } });
-    }
-  });
+    afterAll(async () => {
+      await deleteRecorded();
+      for (const each of recorded) {
+        await expectAbsent({ tool: 'GetClass', args: { class_name: each } });
+      }
+    });
 
-  it('creates a class in DE given master_language DE', async () => {
-    const request = resolveTransportRequest();
-    const onRequest =
-      request === undefined || request === ''
-        ? {}
-        : { transport_request: request };
-    await expectNameFree({ tool: 'GetClass', args: { class_name: NAME } });
-    recordCreated('DeleteClass', { class_name: NAME, ...onRequest });
-    recorded.push(NAME);
-    succeeded(
-      `CreateClass ${NAME}`,
-      await livePrepare('CreateClass', {
-        class_name: NAME,
-        package_name: resolvePackageName(),
-        description: 'MCP create language',
-        master_language: 'DE',
-        ...onRequest,
-      }),
-    );
-    const metadata = succeeded(
-      `HandlerGet metadata ${NAME}`,
-      await livePrepare('HandlerGet', {
-        object_type: 'CLASS',
-        class_name: NAME,
-        part: 'metadata',
-      }),
-    );
-    expect(masterLanguageOf(metadataOf(metadata))).toBe('DE');
+    it(`creates a class in ${language} given master_language ${language}`, async () => {
+      // `$TMP` on premise; the configured package on the cloud, which has none.
+      const packageName = system === 'onprem' ? '$TMP' : resolvePackageName();
+      const request =
+        system === 'onprem' ? undefined : resolveTransportRequest();
+      const onRequest =
+        request === undefined || request === ''
+          ? {}
+          : { transport_request: request };
+      await expectNameFree({ tool: 'GetClass', args: { class_name: name } });
+      recordCreated('DeleteClass', { class_name: name, ...onRequest });
+      recorded.push(name);
+      succeeded(
+        `CreateClass ${name}`,
+        await livePrepare('CreateClass', {
+          class_name: name,
+          package_name: packageName,
+          description: 'MCP create language',
+          master_language: language,
+          ...onRequest,
+        }),
+      );
+      const metadata = succeeded(
+        `HandlerGet metadata ${name}`,
+        await livePrepare('HandlerGet', {
+          object_type: 'CLASS',
+          class_name: name,
+          part: 'metadata',
+        }),
+      );
+      expect(masterLanguageOf(metadataOf(metadata))).toBe(language);
+    });
   });
-});
+}
+
+languageSuite('cloud', 'DE');
+languageSuite('onprem', 'RU');

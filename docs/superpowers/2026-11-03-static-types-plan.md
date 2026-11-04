@@ -1746,50 +1746,21 @@ where it constructs each instance), each beside how `StreamableHttpServer.ts` cr
   (measured); a pre-check is not added.
 - [ ] Commit per item.
 
-### D13. Version tools (#24, #25)
+### D13. Version lists of an unknown object (#24)
 
-**What the code shows.** The source and diff tools do not name an object today:
-`GetObjectVersionSource` takes `object_type` and `content_uri`; `GetObjectVersionDiff`
-`object_type`, `content_uri_from`, `content_uri_to`; the generated `Get<Type>VersionSource`
-take `content_uri` alone and `Get<Type>VersionDiff` `content_uri_from` / `content_uri_to`.
-Each resolves a placeholder identity `'X'` (`resolveVersionedObject(client, type, 'X', 'X')`)
-and calls `getVersionSource` with the given URI; the diff callers
-(`handleGetObjectVersionDiff.ts`, the generated diff builders in `objectVersionTools.ts`)
-call it directly. So "the named object" must first be named.
+**Owner decision (#25):** `content_uri` comes from the object's version list and is read as
+given. The version source and diff tools keep their contracts (`content_uri`, and
+`object_type` where they take it); nothing in the URI is checked.
 
 **Files:** `src/handlers/common/readonly/resolveVersionedObject.ts`
-(`analyseUnsupportedStatus([404, 406], …)`), `handleGetObjectVersionSource.ts`,
-`handleGetObjectVersionDiff.ts`, `src/handlers/common/high/objectVersionTools.ts` (the
-generated source and diff tools), their zod schemas, the listed-schema and surface fixtures,
-`MIGRATION-24.0.md`, `CHANGELOG.md`.
+(`analyseUnsupportedStatus([404, 406], …)`).
 
-**Contract change (from the owner's #25 decision):** each version source and diff tool takes
-the object's identity, typed in its schema — `GetObjectVersionSource` /
-`GetObjectVersionDiff`: a required `object_name` (and `function_group_name` for a function
-module), as `GetObjectVersions` already does; each generated `Get<Type>VersionSource` /
-`Get<Type>VersionDiff`: its type's own required name argument (`class_name`, …, and
-`function_group_name` for function modules), as its `Get<Type>Versions` sibling takes.
-`resolveVersionedObject` is called with that identity, never `'X'`. MIGRATION-24.0: the
-added required argument, per tool.
-
-- [ ] **Step 1: Failing tests:**
-  - `'a version list of an unknown object answers not found'`: the 404 body's exception type
-    (`ExceptionResourceNotFound`, from the corpus or a live capture) read with the parser; a
-    406 stays "no version history";
-  - for `GetObjectVersionSource`, each generated `Get<Type>VersionSource`,
-    `GetObjectVersionDiff` (both URIs) and each generated `Get<Type>VersionDiff` (both
-    URIs): `'a content_uri that is not a version URI of the named object is refused before
-    sending'` — another object's version URI, a `../` path, an absolute URL and a URI of the
-    right object outside its versions path are each refused with zero requests;
-  - `'the identity argument is required'`: a call without it is refused by the schema
-    (`refusal: 'thrown'`, `'nothing-sent'`);
-  - the object's own version URI goes on (pinned), for each tool.
-- [ ] **Step 2:** Add the identity arguments to the schemas, and pass the identity to
-  `resolveVersionedObject`. Read the exception type, not the status alone. Check each
-  `content_uri` with plain string code against the named object's own versions path, built
-  from the same resolution the version list uses.
-- [ ] **Step 3:** Update the listed-schema and surface fixtures (the added arguments only).
-  MIGRATION and CHANGELOG (Fixed). Commit.
+- [ ] **Step 1: Failing test** `'a version list of an unknown object answers not found'`: the
+  404 body's exception type (`ExceptionResourceNotFound`, from the corpus or a live capture)
+  is read with the parser and answers "not found"; a 406 stays "no version history"; a 404
+  without that exception type is relayed as SAP answered it.
+- [ ] **Step 2:** Read the exception type through the parser, not the status alone.
+- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
 
 ### D14. Remaining contract fixes (#26, the doubts)
 
@@ -1820,6 +1791,8 @@ added required argument, per tool.
 - **DO6:** `HandlerGetData` refuses `object_name` together with `sql_query`.
 - **DO7:** `GetObjectNodeFromCache` is removed.
 - **DO8:** the outline tool is `GetObjectOutline`.
+- **DO10 (#25):** `content_uri` comes from the object's version list and is read as given;
+  the version tools' contracts do not change.
 - **DO9:** the prose guard recognises SAP-derived values by type and flow, with no allowlist;
   values that cross modules are left to review.
 

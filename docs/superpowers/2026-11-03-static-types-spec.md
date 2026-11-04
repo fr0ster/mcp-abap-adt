@@ -437,7 +437,6 @@ on-premise system disagree, the live measurement holds.
 - **#17.** The description of `CreateFunctionGroup`'s `activate` is fixed.
 - **#18.** `DeleteServiceBinding` names the binding in its answer.
 - **#24.** A version list's 404 is read by its exception type and answers "not found".
-- **#25.** `content_uri` must be a version URI of the named object.
 - **Doubts the owner listed:** `GetServiceBinding`'s json format; the profiler's `top` of 0
   or less is refused.
 
@@ -469,6 +468,8 @@ These are SAP's answers, relayed as they are:
 - #19, #20, #21;
 - #23 — the deletion check's own text, relayed faithfully;
 - #4's release on a bogus handle within one session;
+- #25 — `content_uri` comes from the object's version list and is read as given (the
+  owner's decision); the version tools' contracts do not change;
 - #12's `201` on a duplicate or unknown package. The read after the create is ours, and is
   added.
 

@@ -63,6 +63,7 @@ import {
 import { getTestDestination } from './authHelpers';
 import { configuredSystemKind } from './configHelpers';
 import { NO_KIND_STATED } from './configuredSystemKind';
+import { closeEvery } from './launchedServers';
 import { endTestConnection, trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
 import {
@@ -266,21 +267,9 @@ function hardRunner(
     call: async (tool, args) =>
       liveAnswerOf(await (await launchOf(setOf(tool))).call(tool, args)),
     close: async () => {
-      const closed = await Promise.allSettled(
-        [...launches.values()].map(async (launched) =>
-          (await launched).close(),
-        ),
-      );
+      const launched = [...launches.values()];
       launches.clear();
-      const failed = closed.flatMap((outcome) =>
-        outcome.status === 'rejected' ? [outcome.reason] : [],
-      );
-      if (failed.length > 0) {
-        throw new AggregateError(
-          failed,
-          `${failed.length} hard-mode server(s) failed to launch or stop`,
-        );
-      }
+      await closeEvery(launched);
     },
   };
 }

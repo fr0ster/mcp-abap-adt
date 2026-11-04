@@ -83,9 +83,14 @@ import {
   NO_KIND_STATED,
   sessionVariables,
 } from '../configuredSystemKind';
-import { type LaunchedServer, launchGuarded } from '../launchedServers';
+import {
+  guardedServer,
+  type LaunchedServer,
+  launchGuarded,
+} from '../launchedServers';
 import { endTestConnection } from '../openConnections';
-import { guardedTestConnection } from '../refusalGuard';
+import { guardedTestConnection, refuseAfterMarker } from '../refusalGuard';
+import { createTestConnectionAndSession } from '../sessionHelpers';
 
 /** The repository root. */
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
@@ -389,27 +394,41 @@ export interface Child {
   readonly process: ChildProcess;
   /** What it wrote on stderr so far. */
   stderr(): string;
+  /** What it wrote on stdout so far, every byte (frames or not). */
+  stdout(): string;
   /** Rejects when it exits, with its exit code and its stderr. */
   readonly exited: Promise<never>;
-  /** Ends it with `SIGTERM` and waits for its exit event; no timer. */
-  stop(): Promise<void>;
+  /** Ends it with `SIGTERM` and waits for its exit; its exit code. No timer. */
+  stop(): Promise<number | null>;
+  /** Ends its stdin (the stdio server's own shutdown trigger) and waits for its exit; its exit code. */
+  end(): Promise<number | null>;
 }
 
-/** Starts `script` with `args` under this Node, its stdin and stdout piped, its stderr captured. */
+/**
+ * Starts `script` with `args` under this Node, its stdio piped, its stdout
+ * and stderr captured. Exported for the launcher's own fake-child tests
+ * only: an integration test reaches a server through a guarded launch
+ * (`launchSites.test.ts` keeps it so).
+ */
 export function startChild(
   script: string,
   args: readonly string[],
   env: Record<string, string>,
+  cwd: string = REPO,
 ): Child {
   const child = spawn(process.execPath, [script, ...args], {
-    cwd: REPO,
+    cwd,
     env,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let captured = '';
+  let written = '';
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', (chunk: string) => {
     captured += chunk;
+  });
+  child.stdout.on('data', (chunk: Buffer) => {
+    written += chunk.toString('utf8');
   });
   const exited = new Promise<never>((_, reject) => {
     // `close`, not `exit`: its stderr has been read whole by then.
@@ -423,17 +442,25 @@ export function startChild(
   });
   // Observed here: an exit after readiness is the stop's, not a failure.
   exited.catch(() => undefined);
+  // Its exit code once it closed (stdout and stderr drained).
+  const closed = new Promise<number | null>((resolve) => {
+    child.once('close', (code) => resolve(code));
+  });
+  const running = (): boolean =>
+    child.exitCode === null && child.signalCode === null;
   return {
     process: child,
     stderr: () => captured,
+    stdout: () => written,
     exited,
-    stop: () =>
-      child.exitCode !== null || child.signalCode !== null
-        ? Promise.resolve()
-        : new Promise<void>((resolve) => {
-            child.once('exit', () => resolve());
-            child.kill('SIGTERM');
-          }),
+    stop: () => {
+      if (running()) child.kill('SIGTERM');
+      return closed;
+    },
+    end: () => {
+      if (running()) child.stdin.end();
+      return closed;
+    },
   };
 }
 
@@ -447,13 +474,23 @@ class ChildStdioTransport implements Transport {
   constructor(private readonly child: ChildProcess) {}
 
   async start(): Promise<void> {
+    // A broken pipe would otherwise be an unhandled 'error' event; its
+    // message is the system's, so only fixed words go on.
+    this.child.stdin?.on('error', () =>
+      this.onerror?.(new Error('writing to the server stdin failed')),
+    );
     this.child.stdout?.on('data', (chunk: Buffer) => {
       this.buffer.append(chunk);
-      for (
-        let message = this.buffer.readMessage();
-        message !== null;
-        message = this.buffer.readMessage()
-      ) {
+      for (;;) {
+        let message: JSONRPCMessage | null;
+        try {
+          message = this.buffer.readMessage();
+        } catch {
+          // A stray line on stdout is not a frame: skipped here, counted by
+          // whoever reads the child's stdout.
+          continue;
+        }
+        if (message === null) break;
         this.onmessage?.(message);
       }
     });
@@ -624,6 +661,91 @@ export function launchHttp(spec: HttpLaunch): Promise<LaunchedServer> {
   return launchGuarded({ logOn: spec.logOn, launch: () => startHttp(spec) });
 }
 
+/** A server started from a script: a binary, or a source entry under tsx. */
+export interface ScriptLaunch {
+  /** What runs under this Node: the script, then its arguments. */
+  argv: readonly [string, ...string[]];
+  env: Record<string, string>;
+  /** Its working directory; the repository when absent. */
+  cwd?: string;
+  /** The parent's own guarded logon with the same credentials, right before the launch. */
+  logOn: () => Promise<void>;
+}
+
+/** Launches a stdio server from a script, guarded; ready once it answered `initialize`. */
+export function launchStdioScript(spec: ScriptLaunch): Promise<LaunchedServer> {
+  return launchGuarded({
+    logOn: spec.logOn,
+    launch: async () => {
+      const [script, ...args] = spec.argv;
+      const child = startChild(script, args, spec.env, spec.cwd);
+      try {
+        return await served(await stdioReady(child), child);
+      } catch (error) {
+        await child.stop();
+        throw error;
+      }
+    },
+  });
+}
+
+/** A Streamable HTTP server launched from a script: one child, a guarded session per set of headers. */
+export interface GuardedHttpServer {
+  readonly child: Child;
+  /** A session with `headers`, its answers read for a credential refusal; its close closes it alone. */
+  session(headers: Record<string, string>): Promise<LaunchedServer>;
+  /** Closes every session and stops the child; its exit code. */
+  close(): Promise<number | null>;
+}
+
+/**
+ * Launches a Streamable HTTP server from a script, guarded: the parent logs
+ * on first, the child is ready at its listening line, and every session's
+ * answers are read — a refusal on any stops the child and the sessions.
+ */
+export async function launchHttpScript(
+  spec: ScriptLaunch & { url: URL },
+): Promise<GuardedHttpServer> {
+  refuseAfterMarker('a launch');
+  await spec.logOn();
+  refuseAfterMarker('a launch');
+  const [script, ...args] = spec.argv;
+  const child = startChild(script, args, spec.env, spec.cwd);
+  try {
+    await httpReady(child);
+  } catch (error) {
+    await child.stop();
+    throw error;
+  }
+  const sessions: McpSession[] = [];
+  const close = async (): Promise<number | null> => {
+    const code = await child.stop();
+    await Promise.allSettled(sessions.map((each) => each.close()));
+    return code;
+  };
+  return {
+    child,
+    session: async (headers) => {
+      refuseAfterMarker('a session');
+      const session = new McpSession(
+        new StreamableHTTPClientTransport(spec.url, {
+          requestInit: { headers },
+        }),
+      );
+      sessions.push(session);
+      await session.initialize();
+      const plain = await served(session, undefined);
+      // A refusal stops the child and every session; closing one session
+      // closes only it.
+      const guarded = guardedServer(plain, async () => {
+        await close();
+      });
+      return { ...guarded, close: () => session.close() };
+    },
+    close,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // From the test config
 
@@ -717,6 +839,17 @@ function launchKind(cfg: unknown): ConfiguredSystemKind {
     throw new Error(`hard mode launches nothing: ${NO_KIND_STATED}`);
   }
   return kind;
+}
+
+/**
+ * The parent's own logon with the test config's own connection
+ * (`createTestConnectionAndSession`: the destination, or `environment.env`),
+ * guarded, logged off again — for a server launched with that same
+ * destination.
+ */
+export async function testConnectionLogOn(): Promise<void> {
+  const { connection } = await createTestConnectionAndSession();
+  await endTestConnection(connection);
 }
 
 /**

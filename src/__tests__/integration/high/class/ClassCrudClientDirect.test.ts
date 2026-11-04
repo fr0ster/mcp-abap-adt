@@ -340,30 +340,6 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           transportRequest: transportRequest || undefined,
         });
 
-        // Check connection refresh token before create
-        if (connection) {
-          const connectionWithRefresh = connection as any;
-          if (
-            connectionWithRefresh.getConfig &&
-            connectionWithRefresh.canRefreshToken
-          ) {
-            const connConfig = connectionWithRefresh.getConfig();
-            const canRefresh = connectionWithRefresh.canRefreshToken();
-            if (process.env.DEBUG_TESTS === 'true') {
-              testLogger?.debug(
-                `[DEBUG] Before createClass - Connection refresh check:`,
-                {
-                  canRefresh,
-                  hasRefreshToken: !!connConfig?.refreshToken,
-                  hasUaaUrl: !!connConfig?.uaaUrl,
-                  hasUaaClientId: !!connConfig?.uaaClientId,
-                  hasUaaClientSecret: !!connConfig?.uaaClientSecret,
-                },
-              );
-            }
-          }
-        }
-
         const createParams = {
           className,
           description,

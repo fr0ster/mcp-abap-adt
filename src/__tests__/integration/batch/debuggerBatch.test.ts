@@ -57,16 +57,11 @@
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */
 
-import type { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-} from '@modelcontextprotocol/sdk/client/stdio.js';
+import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
 import type { HandlerContext } from '../../../handlers/interfaces';
@@ -88,6 +83,10 @@ import {
   readSessionTrace,
   SESSION_TRACE_PREAMBLE,
 } from '../helpers/sessionTrace';
+import {
+  launchStdioScript,
+  testConnectionLogOn,
+} from '../helpers/testers/hardMode';
 import { createHandlerContext } from '../helpers/testHelpers';
 
 const testLogger = createTestLogger('debugger-batch');
@@ -260,48 +259,43 @@ async function serve(kind: Kind): Promise<Served> {
     }
   }
 
-  const transport = new StdioClientTransport({
-    command: process.execPath,
-    args,
-    cwd: REPO,
-    env,
-    stderr: 'pipe',
-  });
+  // Guarded: the parent logs on first, and every answer is read for a
+  // credential refusal (launchStdioScript); no SDK client, no timer.
   const tail: string[] = [];
   const traced: string[] = [];
+  let server: Awaited<ReturnType<typeof launchStdioScript>>;
+  try {
+    server = await launchStdioScript({
+      argv: [args[0] ?? '', ...args.slice(1)],
+      env,
+      logOn: testConnectionLogOn,
+    });
+  } catch (error) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw new Error(`the server did not start: ${String(error)}`);
+  }
+  const child = server.child;
+  if (child === undefined) throw new Error('the server process did not start');
   let pending = '';
-  transport.stderr?.on('data', (chunk: Buffer) => {
-    const text = pending + chunk.toString('utf8');
-    const lines = text.split('\n');
+  const keep = (text: string): void => {
+    const lines = (pending + text).split('\n');
     pending = lines.pop() ?? '';
     for (const line of lines)
       if (line.startsWith('session-trace\t')) traced.push(line);
       else tail.push(line);
     if (tail.length > 200) tail.splice(0, tail.length - 200);
-  });
-  const client = new Client({ name: 'debugger-batch', version: '1.0.0' });
-  try {
-    await client.connect(transport);
-  } catch (error) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    throw new Error(
-      `the server did not start (${String(error)}):\n${tail.join('\n')}`,
-    );
-  }
-  const child = (transport as unknown as { _process?: ChildProcess })._process;
-  if (child === undefined) throw new Error('the server process did not start');
-  const exited = new Promise<number | null>((resolve) => {
-    child.once('exit', (code) => resolve(code));
-  });
+  };
+  keep(child.stderr());
+  child.process.stderr?.on('data', (chunk: Buffer | string) =>
+    keep(chunk.toString()),
+  );
 
   return {
-    call: async (name, callArgs = {}) =>
-      (await client.callTool({ name, arguments: callArgs })) as Answer,
+    call: (name, callArgs = {}) => server.call(name, callArgs),
     stop: async () => {
       // stdin's end is the shutdown's trigger: every session logged off, then exit.
-      child.stdin?.end();
-      const code = await exited;
-      await client.close().catch(() => undefined);
+      const code = await child.end();
+      await server.close();
       fs.rmSync(dir, { recursive: true, force: true });
       return code;
     },

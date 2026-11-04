@@ -45,24 +45,14 @@ export interface LaunchedServer {
 }
 
 /**
- * Launches a server once the parent's own connection logged on, and reads
- * each of its answers for a credential refusal.
+ * `launched`, its answers read: a credential refusal answered latches the
+ * marker and runs `stop` (the child, and whatever else shares it); every
+ * later call refuses before it is sent.
  */
-export async function launchGuarded(options: {
-  /** The parent's own guarded logon with the same credentials. */
-  logOn: () => Promise<void>;
-  launch: () => Promise<LaunchedServer>;
-}): Promise<LaunchedServer> {
-  refuseAfterMarker('a launch');
-  await options.logOn();
-  refuseAfterMarker('a launch');
-  const launched = await options.launch();
-  let stopped = false;
-  const stop = async (): Promise<void> => {
-    if (stopped) return;
-    stopped = true;
-    await launched.close();
-  };
+export function guardedServer(
+  launched: LaunchedServer,
+  stop: () => Promise<void>,
+): LaunchedServer {
   return {
     toolNames: launched.toolNames,
     child: launched.child,
@@ -82,4 +72,46 @@ export async function launchGuarded(options: {
     },
     close: stop,
   };
+}
+
+/**
+ * Launches a server once the parent's own connection logged on, and reads
+ * each of its answers for a credential refusal.
+ */
+export async function launchGuarded(options: {
+  /** The parent's own guarded logon with the same credentials. */
+  logOn: () => Promise<void>;
+  launch: () => Promise<LaunchedServer>;
+}): Promise<LaunchedServer> {
+  refuseAfterMarker('a launch');
+  await options.logOn();
+  refuseAfterMarker('a launch');
+  const launched = await options.launch();
+  let stopped = false;
+  return guardedServer(launched, async () => {
+    if (stopped) return;
+    stopped = true;
+    await launched.close();
+  });
+}
+
+/**
+ * Closes every launch — the ones that resolved, whatever the others did —
+ * then throws one `AggregateError` naming each launch or close that failed.
+ */
+export async function closeEvery(
+  launches: Iterable<Promise<Pick<LaunchedServer, 'close'>>>,
+): Promise<void> {
+  const closed = await Promise.allSettled(
+    [...launches].map(async (launched) => (await launched).close()),
+  );
+  const failed = closed.flatMap((outcome) =>
+    outcome.status === 'rejected' ? [outcome.reason] : [],
+  );
+  if (failed.length > 0) {
+    throw new AggregateError(
+      failed,
+      `${failed.length} hard-mode server(s) failed to launch or stop`,
+    );
+  }
 }

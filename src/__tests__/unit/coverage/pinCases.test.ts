@@ -144,7 +144,7 @@ describe('pinCases', () => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/stub',
         method: 'GET',
-        timeout: 1,
+        timeout: 0,
       });
       throw new Error(
         'Input validation error: Invalid arguments for tool StubSends: late',
@@ -224,7 +224,7 @@ describe('pinCases', () => {
       await context.connection.makeAdtRequest({
         url: `/sap/bc/adt/stub/${sent}`,
         method: 'GET',
-        timeout: 1,
+        timeout: 0,
       });
       return textAnswer('{}');
     });
@@ -254,7 +254,7 @@ describe('pinCases', () => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/stub/before',
         method: 'GET',
-        timeout: 1,
+        timeout: 0,
       });
       return textAnswer('{}');
     });
@@ -298,7 +298,7 @@ describe('pinCases', () => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/stub/read',
         method: 'GET',
-        timeout: 1,
+        timeout: 0,
       });
       return textAnswer('{}');
     });
@@ -378,7 +378,7 @@ describe('pinCases', () => {
     await connection.makeAdtRequest({
       url: '/sap/bc/adt/x',
       method: 'POST',
-      timeout: 1,
+      timeout: 0,
       params: { b: 'two words', a: '1' },
       headers,
       data: '<x/>',

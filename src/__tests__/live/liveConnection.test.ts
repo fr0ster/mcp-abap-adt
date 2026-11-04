@@ -25,21 +25,23 @@
  * is a JSON-RPC frame — a stray line there corrupts the protocol. It reports
  * only those facts: no path, no `.env` value, no answer text, no stderr.
  */
-import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import {
-  ReadBuffer,
-  serializeMessage,
-} from '@modelcontextprotocol/sdk/shared/stdio.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
+import * as dotenv from 'dotenv';
+import { AuthBrokerFactory } from '../../../server-runtime/src/stdio/auth/brokerFactory';
+import { statedSystemKind } from '../../lib/systemKind';
 import {
   installedFile,
   installPackedRelease,
 } from '../helpers/installedRelease';
+import { endTestConnection } from '../integration/helpers/openConnections';
+import {
+  guardedSend,
+  guardedTestConnection,
+} from '../integration/helpers/refusalGuard';
+import { launchStdioScript } from '../integration/helpers/testers/hardMode';
 
 const ENV_PATHS = (process.env.MCP_LIVE_ENV_PATHS ?? '')
   .split(delimiter)
@@ -48,58 +50,6 @@ const ENV_PATHS = (process.env.MCP_LIVE_ENV_PATHS ?? '')
 const EXTRA_ARGS = (process.env.MCP_LIVE_ARGS ?? '')
   .split(/\s+/)
   .filter((arg) => arg !== '');
-
-/**
- * A client transport over a child this test spawned itself, so the test owns
- * the shutdown (the SDK's stdio transport sends its own signals on close) and
- * sees every stdout byte, frame or not.
- */
-class ChildStdioTransport implements Transport {
-  onclose?: () => void;
-  onerror?: (error: Error) => void;
-  onmessage?: (message: JSONRPCMessage) => void;
-  private readonly buffer = new ReadBuffer();
-
-  constructor(private readonly child: ChildProcess) {}
-
-  async start(): Promise<void> {
-    // A broken pipe would otherwise be an unhandled 'error' event; its message
-    // is the system's, so only a fixed text goes on.
-    this.child.stdin?.on('error', () =>
-      this.onerror?.(new Error('writing to the server stdin failed')),
-    );
-    this.child.stdout?.on('data', (chunk: Buffer) => {
-      this.buffer.append(chunk);
-      for (;;) {
-        let message: JSONRPCMessage | null;
-        try {
-          message = this.buffer.readMessage();
-        } catch (error) {
-          this.onerror?.(error as Error);
-          continue;
-        }
-        if (message === null) break;
-        this.onmessage?.(message);
-      }
-    });
-    this.child.on('exit', () => this.onclose?.());
-  }
-
-  send(message: JSONRPCMessage): Promise<void> {
-    const failed = () => new Error('writing to the server stdin failed');
-    const stdin = this.child.stdin;
-    if (!stdin?.writable) return Promise.reject(failed());
-    return new Promise((resolve, reject) => {
-      stdin.write(serializeMessage(message), (error) =>
-        error ? reject(failed()) : resolve(),
-      );
-    });
-  }
-
-  async close(): Promise<void> {
-    // The test triggers the shutdown itself and asserts on it.
-  }
-}
 
 /**
  * Runs one protocol step and, if it throws, fails with a fixed text: a JSON-RPC
@@ -113,8 +63,70 @@ async function step<T>(label: string, run: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Startup may log on, so every request gets the same generous bound. */
-const REQUEST = { timeout: 180_000 };
+/** What a launcher argument states, `--name=value`; undefined when none does. */
+const statedArg = (name: string): string | undefined =>
+  EXTRA_ARGS.find((arg) => arg.startsWith(`--${name}=`))?.slice(
+    name.length + 3,
+  );
+
+/** Nothing opens a browser here: a destination that needs a login fails its logon. */
+const noBrowser = (): IAuthorizationStrategy<string> => ({
+  authorize: async () => {
+    throw new Error('the live connection test opens no browser login');
+  },
+  dispose: async () => {},
+});
+
+const silent = { info() {}, debug() {}, warn() {}, error() {} };
+
+/**
+ * The parent's own logon with the destination of `envPath`, as the server
+ * reads it (`--env-path`), on a guarded connection logged off again: a
+ * refusal latches the run's marker and nothing is launched.
+ */
+function envFileLogOn(envPath: string): () => Promise<void> {
+  return async () => {
+    const stated = dotenv.parse(readFileSync(envPath, 'utf8'));
+    const kind = statedSystemKind(
+      statedArg('system-type') ?? stated.SAP_SYSTEM_TYPE,
+    );
+    const connectionType =
+      statedArg('connection-type') ?? stated.SAP_CONNECTION_TYPE;
+    if (kind === undefined) {
+      throw new Error(
+        'the destination states no system kind (--system-type in MCP_LIVE_ARGS, or SAP_SYSTEM_TYPE)',
+      );
+    }
+    if (connectionType !== 'http' && connectionType !== 'rfc') {
+      throw new Error(
+        'the destination states no connection type (--connection-type in MCP_LIVE_ARGS, or SAP_CONNECTION_TYPE)',
+      );
+    }
+    const factory = new AuthBrokerFactory({
+      envFile: { path: envPath, source: '--env-path' },
+      unsafe: false,
+      connectionType,
+      browserStrategy: noBrowser,
+      promptLogger: silent,
+    });
+    const settings = await factory.settingsFor('default');
+    const credential = await guardedSend("the destination's credential", () =>
+      factory.getProvider('default'),
+    );
+    const own = guardedTestConnection(settings, credential, { kind });
+    await own.connect();
+    await endTestConnection(own);
+  };
+}
+
+/** This process's environment, as strings. */
+function plainEnvironment(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined) env[name] = value;
+  }
+  return env;
+}
 
 /** Every non-empty stdout line must be a JSON-RPC 2.0 frame. */
 const strayLines = (stdout: string): number =>
@@ -178,66 +190,46 @@ if (ENV_PATHS.length === 0) {
           envFileExists: existsSync(envPath),
         }).toEqual({ destination: index + 1, envFileExists: true });
 
-        const child = spawn(
-          process.execPath,
-          [bin, `--env-path=${envPath}`, ...EXTRA_ARGS],
-          { cwd: workdir, stdio: ['pipe', 'pipe', 'pipe'] },
+        // Guarded: the parent logs on with the same destination first, and
+        // every answer is read for a credential refusal; no SDK client, no
+        // timer — Jest's test timeout is the only deadline.
+        const server = await step('initialize', () =>
+          launchStdioScript({
+            argv: [bin, `--env-path=${envPath}`, ...EXTRA_ARGS],
+            env: plainEnvironment(),
+            cwd: workdir,
+            logOn: envFileLogOn(envPath),
+          }),
         );
-        const stdout: Buffer[] = [];
-        child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
-        // Drained, never printed: it may carry what the .env holds.
-        child.stderr.resume();
-        // 'close', not 'exit': it fires once stdout has drained too, so the
-        // stray-line count below sees every byte the server wrote.
-        const closed = new Promise<number | null>((resolve) =>
-          child.on('close', (code) => resolve(code)),
-        );
-
-        const client = new Client({
-          name: 'live-connection-test',
-          version: '1',
-        });
+        const child = server.child;
+        if (child === undefined) throw new Error('the server did not start');
+        let code: number | null;
         try {
-          await step('initialize', () =>
-            client.connect(new ChildStdioTransport(child), REQUEST),
-          );
-
-          const listed = await step('tools/list', () =>
-            client.listTools(undefined, REQUEST),
-          );
-          const tools = listed.tools.map((t) => t.name);
+          const listed = await step('tools/list', () => server.listTools());
+          const tools = listed.map((t) => t.name);
           expect(tools).toContain('GetAdtTypes');
 
           const result = await step('tools/call GetAdtTypes', () =>
-            client.callTool(
-              { name: 'GetAdtTypes', arguments: {} },
-              undefined,
-              REQUEST,
-            ),
+            server.call('GetAdtTypes', {}),
           );
-          const content = Array.isArray(result.content) ? result.content : [];
           expect({
             tool: 'GetAdtTypes',
-            isError: result.isError === true,
-            answered: content.length > 0,
+            isError: result.isError,
+            answered: result.content.length > 0,
           }).toEqual({ tool: 'GetAdtTypes', isError: false, answered: true });
         } finally {
           // The shutdown a client would trigger: SIGTERM where signals reach a
           // child; on Windows the end of stdin, which the server also obeys.
-          if (process.platform === 'win32') child.stdin.end();
-          else child.kill('SIGTERM');
+          code =
+            process.platform === 'win32'
+              ? await child.end()
+              : await child.stop();
+          await server.close();
         }
 
-        const code = await Promise.race([
-          closed,
-          new Promise<string>((resolve) =>
-            setTimeout(() => resolve('no exit within 60 s'), 60_000).unref(),
-          ),
-        ]);
-        if (code === 'no exit within 60 s') child.kill('SIGKILL');
         expect({ exitCode: code }).toEqual({ exitCode: 0 });
         expect({
-          strayStdoutLines: strayLines(Buffer.concat(stdout).toString('utf8')),
+          strayStdoutLines: strayLines(child.stdout()),
         }).toEqual({
           strayStdoutLines: 0,
         });

@@ -36,13 +36,10 @@
  * Run: npm test -- src/__tests__/integration/batch/amdpHttpHandle.test.ts --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
  */
 
-import { type ChildProcess, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import * as dotenv from 'dotenv';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
@@ -65,6 +62,11 @@ import {
   readSessionTrace,
   SESSION_TRACE_PREAMBLE,
 } from '../helpers/sessionTrace';
+import {
+  type HardModeClient,
+  launchHttpScript,
+  testConnectionLogOn,
+} from '../helpers/testers/hardMode';
 import { createHandlerContext } from '../helpers/testHelpers';
 
 const REPO = path.resolve(__dirname, '../../../..');
@@ -184,9 +186,12 @@ async function serveHttp(systemType: string) {
     ].join('\n'),
   );
   const port = await freePort();
-  const child: ChildProcess = spawn(
-    process.execPath,
-    [
+  const url = new URL(`http://127.0.0.1:${port}/mcp/stream/http`);
+  // Guarded: the parent logs on first, the child is ready at its listening
+  // line, and every session's answers are read for a credential refusal
+  // (launchHttpScript); no SDK client, no timer, no polling.
+  const server = await launchHttpScript({
+    argv: [
       path.join(REPO, 'node_modules/tsx/dist/cli.mjs'),
       '--tsconfig',
       path.join(REPO, 'tsconfig.test.json'),
@@ -195,46 +200,45 @@ async function serveHttp(systemType: string) {
       '--host=127.0.0.1',
       `--system-type=${systemType}`,
     ],
-    { cwd: REPO, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
-  );
+    env: environment(),
+    url,
+    logOn: testConnectionLogOn,
+  });
   const traced: string[] = [];
   const tail: string[] = [];
   let pending = '';
-  child.stderr?.on('data', (chunk: Buffer) => {
-    const lines = (pending + chunk.toString('utf8')).split('\n');
+  const keep = (text: string): void => {
+    const lines = (pending + text).split('\n');
     pending = lines.pop() ?? '';
     for (const line of lines)
       if (line.startsWith('session-trace\t')) traced.push(line);
       else tail.push(line);
     if (tail.length > 200) tail.splice(0, tail.length - 200);
-  });
-  child.stdout?.resume();
-  const exited = new Promise<number | null>((resolve) =>
-    child.once('exit', (code) => resolve(code)),
+  };
+  keep(server.child.stderr());
+  server.child.process.stderr?.on('data', (chunk: Buffer | string) =>
+    keep(chunk.toString()),
   );
-  for (let i = 0; i < 240; i++) {
-    const listening = await new Promise<boolean>((resolve) => {
-      const s = net.connect(port, '127.0.0.1', () => {
-        s.end();
-        resolve(true);
-      });
-      s.on('error', () => resolve(false));
-    });
-    if (listening) break;
-    await new Promise((r) => setTimeout(r, 500));
-  }
   return {
-    url: new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
+    session: (headers: Record<string, string>) => server.session(headers),
     trace: () => [...traced],
     tail: () => tail.join('\n'),
     /** SIGTERM (tsx forwards it to the server): the graceful shutdown; the exit code. */
     stop: async (): Promise<number | null> => {
-      child.kill('SIGTERM');
-      const code = await exited;
+      const code = await server.close();
       fs.rmSync(dir, { recursive: true, force: true });
       return code;
     },
   };
+}
+
+/** The environment the server runs with: this process's own, as strings. */
+function environment(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined) env[name] = value;
+  }
+  return env;
 }
 
 async function readSystemInformation(connection: any): Promise<FixtureRead> {
@@ -305,25 +309,18 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
       if ('fail' in verdict) throw new Error(verdict.fail);
 
       const served = await serveHttp(where.systemType);
-      const clients: Client[] = [];
+      const clients: HardModeClient[] = [];
       const clientWith = async (extra: Record<string, string> = {}) => {
-        const client = new Client({
-          name: 'amdp-http-handle',
-          version: '1.0.0',
-        });
-        await client.connect(
-          new StreamableHTTPClientTransport(served.url, {
-            requestInit: { headers: { ...where.headers, ...extra } },
-          }),
-        );
+        const client = await served.session({ ...where.headers, ...extra });
         clients.push(client);
         return client;
       };
-      const call = async (client: Client, name: string, args = {}) => {
-        const answer = (await client.callTool({
-          name,
-          arguments: args,
-        })) as Answer;
+      const call = async (
+        client: HardModeClient,
+        name: string,
+        args: Record<string, unknown> = {},
+      ) => {
+        const answer: Answer = await client.call(name, args);
         say(name, {
           isError: answer.isError === true,
           answer: withoutHandles(textOf(answer)).slice(0, 400),
@@ -331,7 +328,7 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         return answer;
       };
       let handle: string | undefined;
-      let held: Client | undefined;
+      let held: HardModeClient | undefined;
       let batchOpen = false;
       let failure: unknown;
       try {
@@ -348,7 +345,7 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         const eventOf = async (kinds: string[], rounds: number) => {
           for (let i = 0; i < rounds; i++) {
             const waited = payloadOf(
-              await call(held as Client, 'AmdpDebugWait', {
+              await call(held as HardModeClient, 'AmdpDebugWait', {
                 state_handle: handle,
                 hold_seconds: 30,
               }),

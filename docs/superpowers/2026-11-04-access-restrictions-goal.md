@@ -54,7 +54,8 @@ When both lists are configured, each name the call gives is checked against its 
 ## Invariants
 
 - **Nothing configured, nothing changes.** Every restriction is off unless configured. Then
-  every tool, answer and listed schema is as today.
+  every tool, answer and listed schema is as today, except the draft tool, which is always
+  there: the model decides whether to call it.
 - **Denied actions are decided once, at the start.** A denied tool is not registered. No call
   checks a deny list.
 - **The binary stays the ceiling.** A configuration only narrows what the binary offers. It
@@ -67,8 +68,9 @@ When both lists are configured, each name the call gives is checked against its 
 - **The checks run at the handler's start.** A handler is allowed or refused as a whole, before
   it changes anything; no check sits inside its steps (lock, write, activation).
 - **The checks are a strategy.** One interface, given to the server by the host, decides every
-  check at a handler's start. A shipped strategy applies the configured lists. An embedder can
-  give its own.
+  check at a handler's start. Two strategies are shipped, both applying the configured lists:
+  a simple one, which matches a package by name and prefix only, and one that also matches a
+  `ZFOO/**` entry by reading the package tree from SAP. An embedder can give its own.
 - **The model decides about a draft.** The draft tool answers facts only: whose draft and its
   age. No setting, limit or check of the server's acts on a draft.
 - **The checks are formal.** They read the call's own target: the tool, the object, its package

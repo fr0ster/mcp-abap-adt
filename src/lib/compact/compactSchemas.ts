@@ -442,6 +442,12 @@ const GET_PROPERTIES = {
     .describe(
       'Run id: a unit test run (UNIT_TEST, CDS_UNIT_TEST) or an activation run (parts activation_status, activation_results).',
     ),
+  with_long_polling: z
+    .boolean()
+    .optional()
+    .describe(
+      'With part activation_status: when true, the status read is held by SAP until the activation run ends, and answers its final status.',
+    ),
   response_format: z
     .enum(['xml', 'json', 'plain'])
     .optional()
@@ -534,6 +540,7 @@ export const COMPACT_READ_TAKES = takesOf<
     'object_type',
     'part',
     'run_id',
+    'with_long_polling',
     'object_adt_type',
     'object_name',
     'node_id',

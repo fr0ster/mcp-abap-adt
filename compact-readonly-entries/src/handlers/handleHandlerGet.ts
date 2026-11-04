@@ -197,11 +197,12 @@ export async function handleHandlerGet(
     return routeAddressPart(context, requested, args);
   }
   if (typeof requested === 'string' && RUN_PARTS.includes(requested)) {
-    const read =
-      requested === 'activation_status'
-        ? handleGetActivationStatus
-        : handleGetActivationResults;
-    return read(context, { run_id: args.run_id });
+    return requested === 'activation_status'
+      ? handleGetActivationStatus(context, {
+          run_id: args.run_id,
+          with_long_polling: args.with_long_polling,
+        })
+      : handleGetActivationResults(context, { run_id: args.run_id });
   }
   if (!isCompactReadPart(requested)) {
     return return_error(

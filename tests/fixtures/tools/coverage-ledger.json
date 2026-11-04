@@ -1,1 +1,9 @@
-{}
+{
+  "HandlerGet#-#activation_status": {
+    "unit": "src/__tests__/unit/pins/activate.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activate.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activate.live.test.ts"
+    }
+  }
+}

@@ -5,6 +5,8 @@
  *
  * - `liveSuite(systems, title, body)` states where its cases run; without a
  *   config, or on a system it does not name, it skips and logs the reason.
+ * - `livePrepare(tool, args)` makes a case's prerequisite through a tool,
+ *   its key not recorded;
  * - `liveCall(tool, args)` calls the tool — soft mode: the registered
  *   entry's `call` on the live connection, or an in-process server for the
  *   server-dispatched tools; hard mode: the MCP tool — and records its key
@@ -379,6 +381,19 @@ export async function liveCall(
   const answer = await run.call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
   return answer;
+}
+
+/**
+ * A call that prepares a case — a prerequisite the test creates or writes
+ * before the call under test: the marker checked, a credential refusal
+ * latched, its key not recorded (the key a case stands for is its
+ * `liveCall`'s). Await it in the test body.
+ */
+export async function livePrepare(
+  tool: string,
+  args: ToolArgs,
+): Promise<LiveAnswer> {
+  return send(tool, args);
 }
 
 /** A read: the tool and its arguments. */

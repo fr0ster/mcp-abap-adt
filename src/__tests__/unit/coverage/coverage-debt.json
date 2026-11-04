@@ -396,7 +396,6 @@
   "HandlerDumpList",
   "HandlerDumpView",
   "HandlerGet#-#activation_results",
-  "HandlerGet#-#activation_status",
   "HandlerGet#-#node_structure",
   "HandlerGet#-#object_structure",
   "HandlerGet#-#virtual_folders",

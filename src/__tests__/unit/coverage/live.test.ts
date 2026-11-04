@@ -33,6 +33,7 @@ import {
   type LiveRunner,
   leftovers,
   liveCall,
+  livePrepare,
   markCredentialRefused,
   prepareRequestCreate,
   prepareTaskCreate,
@@ -152,6 +153,21 @@ describe('liveCall and the refusal stop', () => {
       'request K900090',
       'entry K900091/K900092 PROG ZLIVE_ONE',
     ]);
+    expect(stand.requests.length).toBe(before);
+  });
+
+  it('livePrepare sends the call, records no key, and sends nothing after the marker', async () => {
+    const from = stand.requests.length;
+    await livePrepare('GetProgram', { program_name: 'ZLIVE_ONE' });
+    expect(sentSince(from).some(isGet('/sap/bc/adt/programs/programs/'))).toBe(
+      true,
+    );
+    expect(callLog()).toEqual([]);
+    markCredentialRefused();
+    const before = stand.requests.length;
+    await expect(
+      livePrepare('GetProgram', { program_name: 'ZLIVE_TWO' }),
+    ).rejects.toThrow('a credential was refused earlier in this run');
     expect(stand.requests.length).toBe(before);
   });
 

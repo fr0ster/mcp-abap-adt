@@ -50,6 +50,7 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 
 - **Public surface:** `ToolArgs`, `invalidArgumentsWords` (`@mcp-abap-adt/lib`, `@mcp-abap-adt/lib/handlers`); `READ_DEFINITIONS` (`@mcp-abap-adt/lib/handlers/read`); `ResponseText`, `child`, `childAt`, `isElement`, `isList`, `Element` (`@mcp-abap-adt/lib/utils`); `jsonOf`, `child`, `isElement`, `isList`, `Element` (`@mcp-abap-adt/lib/compact-shared`); `packageManifestOf`, `PackageManifest`, `textValue`, `numberValue`, `flagValue`, `listValue`, `wordValue` (`@mcp-abap-adt/lib/config`); `debugState`, `PlacedBreakpoint`, `BREAKPOINT_ITEM`, `BREAKPOINTS_WORDS`, `LINE_WORDS`, `SETTINGS_OBJECT` (`@mcp-abap-adt/lib/debugger`); `SYSTEM_TYPES` (`@mcp-abap-adt/responsible-rules`).
 - **`GetAbapSystemSymbols` answers a function module's `functionGroup`** (see Fixed).
+- **`HandlerGet`'s `activation_status` part can wait for the run to end** (`with_long_polling`, optional): when `true`, the status read is a long poll (`?withLongPolling=true`) that SAP holds until the activation run ends, and it answers the final status (measured on premise and on ABAP cloud). Omitted, the read answers at once, as before.
 
 ### Fixed
 

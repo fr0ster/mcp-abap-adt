@@ -26,7 +26,9 @@ import { ServerRefusal } from './auth/serverRefusal';
 import {
   type AbapSystemKind,
   declaredSystemKindOf,
+  declareSystemKind,
   statedSystemKind,
+  stateSystemKind,
 } from './systemKind';
 import { child, childAt, entries } from './xml/tree';
 
@@ -301,6 +303,19 @@ export function systemKindOf(
   // A plain registration stated none: no kind, the environment not read.
   if (stated === 'none') return undefined;
   return stated ?? statedSystemKind(env.SAP_SYSTEM_TYPE);
+}
+
+/**
+ * Gives `view` — a connection built over `outer` (a batch connection, a
+ * forwarding or recording view) — the system kind `outer` has
+ * (`systemKindOf`). An `outer` with no kind gives the view none, and nothing
+ * (`SAP_SYSTEM_TYPE` above all) is read for the view later. Answers `view`.
+ */
+export function withSystemKindOf<V extends object>(view: V, outer: object): V {
+  const kind = systemKindOf(outer);
+  if (kind !== undefined) declareSystemKind(view, kind);
+  else stateSystemKind(view, undefined);
+  return view;
 }
 
 /**

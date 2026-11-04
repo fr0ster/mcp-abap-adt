@@ -18,6 +18,8 @@ jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   // The connect's system lookup asks the kind: on-premise sends nothing.
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';

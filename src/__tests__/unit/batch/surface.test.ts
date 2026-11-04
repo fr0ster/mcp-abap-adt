@@ -8,6 +8,8 @@ jest.mock('../../../lib/connectionFactory', () => ({
     throw new Error('no connection may be built here');
   }),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';

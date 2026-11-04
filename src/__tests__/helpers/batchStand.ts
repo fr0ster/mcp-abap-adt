@@ -16,6 +16,7 @@
  *   jest.mock('../../../lib/connectionFactory', () => ({
  *     createAbapConnection: jest.fn(),
  *     systemKindOf: jest.fn(() => 'onprem'),
+ *     withSystemKindOf: jest.fn((view: object) => view),
  *   }));
  */
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';

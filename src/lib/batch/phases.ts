@@ -60,6 +60,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
+import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 import { sessionOf } from './sessionOf';
 
@@ -142,7 +143,11 @@ function outerStatusWatch(connection: IAbapConnection): {
       );
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  return { forwarding, outer: () => outer, refused: () => refused };
+  return {
+    forwarding: withSystemKindOf(forwarding, connection),
+    outer: () => outer,
+    refused: () => refused,
+  };
 }
 
 /**
@@ -178,7 +183,7 @@ function itemView(
       return answer;
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  return view;
+  return withSystemKindOf(view, batch);
 }
 
 /** A part's answer: SAP's response, or the failure it was rejected with. */
@@ -227,10 +232,13 @@ async function correctPhaseParts(
   });
   if (corrected.length === 0) return;
   const watch = outerStatusWatch(context.connection);
-  const batch = new AdtBatchConnection(watch.forwarding, {
-    endpoint: 'communication',
-    ...(context.logger !== undefined ? { logger: context.logger } : {}),
-  });
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
   const waits = corrected.map(({ invocation, pair }) => {
     invocation.port?.remember(invocation.operation, pair);
     let signal: () => void = () => {};
@@ -285,10 +293,13 @@ export async function runPhase<I, R>(
   read: (item: I, batch: IAbapConnection) => Promise<R>,
 ): Promise<PhaseResult<R>[]> {
   const watch = outerStatusWatch(context.connection);
-  const batch = new AdtBatchConnection(watch.forwarding, {
-    endpoint: 'communication',
-    ...(context.logger !== undefined ? { logger: context.logger } : {}),
-  });
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
   let sealed = false;
   const parts: RecordedPart[] = [];
   // A part's answer reaches its read once the correction is made.

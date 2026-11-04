@@ -67,6 +67,7 @@ import { hasMethod } from '../lib/capability.js';
 import {
   createAbapConnection,
   systemKindOf,
+  withSystemKindOf,
 } from '../lib/connectionFactory.js';
 import { isRfcConnection } from '../lib/connectionKind.js';
 import {
@@ -1882,7 +1883,8 @@ export abstract class BaseMcpServer extends McpServer {
     );
     const recordedContext: HandlerContext = {
       ...call.context,
-      connection: recorder,
+      // The call's connection's kind, as the server declared it for it.
+      connection: withSystemKindOf(recorder, connection),
       // The debug sessions are bound to the call's own context, whose
       // connection outlives the batch (`requireDebugger`).
       ...(owner.mode() === 'debugger' ? { recordedFrom: call.context } : {}),

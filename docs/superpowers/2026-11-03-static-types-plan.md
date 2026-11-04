@@ -296,13 +296,51 @@ and live specifics.
     - `'nothing-sent'` is legal only with `refusal: 'thrown'`: the call throws with
       `invalidArgumentsWords`' text and nothing is recorded. It needs no `ran`, is exempt from
       the request-free list, and never counts for its key.
-    - **Deterministic wire.** Before a case sends, `pinCases` fixes every input the wire would
-      otherwise vary on, so the whole recorded request stays the literal:
-      - `node:crypto`'s `randomUUID` is replaced, for the case only, by a seeded sequence
-        (`seedUuids(caseKey)`): the connection's `sap-adt-request-id`
-        (`AbstractAbapConnection`), adt-clients' batch boundary and request ids
-        (`batch/wire.js`), discovery's request id, and any id the server makes (an AMDP
-        breakpoint id) come out the same on every run;
+    - **Deterministic inputs.** Before a case sends, `pinCases` fixes every clock and random
+      source the case can reach, and restores each after the case (`afterEach`, also on a
+      failure), so the whole recorded request stays the literal:
+      - **Clock.** `jest.useFakeTimers({ now: PIN_EPOCH, doNotFake: [every timer API but
+        'Date'] })` fixes `Date` (`Date.now()`, `new Date()`) and leaves timers, ticks and
+        I/O real; `jest.useRealTimers()` restores it. `PIN_EPOCH` is one constant in
+        `pinCases.ts`.
+      - **Random ids and bytes.** `jest.spyOn` on the `node:crypto` module object replaces
+        `randomUUID` and `randomBytes` with seeded sequences (`seededCrypto(caseKey)`), and
+        on `Math` replaces `random`; `jest.restoreAllMocks()` restores them. Each replacement
+        is typed against the function's own declared type (`typeof randomUUID`, the
+        `randomBytes(size): Buffer` overload, `typeof Math.random`) with no cast; if an
+        overload cannot be replaced without one, the case stops and is reported to the
+        controller. The spies reach the call sites because each calls through the module
+        object (`node_crypto_1.randomUUID(...)` in the compiled packages, `crypto_1.…` in the
+        server compiled by ts-jest).
+      - **Repeat recording.** Every case runs twice — a fresh stand, the same seeds — and the
+        two recordings must be byte-equal (method, URL, every header, body bytes) before
+        either is compared with `expected`. A pin whose two recordings differ fails, naming
+        the first differing field.
+      - **The sources found** (grep of `node_modules/@mcp-abap-adt/*/dist` and of every
+        package's production `src`, at `755f2605`, for `Date.now(`, `new Date(`,
+        `Math.random`, `randomBytes`, `randomUUID`, `getRandomValues`, `performance.now`,
+        `process.hrtime`):
+        - reaching the wire: `connection` — `AbstractAbapConnection.js` (`sap-adt-request-id`,
+          session id), `HttpTransport.js` (`sap-adt-request-id`; a cookie-expiry `Date.now()`),
+          `CloudHttpTransport.js:88` (`?_=Date.now()`), `RfcTransport.js` (conversation id);
+          `adt-clients` — `core/shared/discovery.js` (request id), `batch/wire.js` (boundary,
+          request ids), `utils/systemInfo.js:100` (`_: Date.now()`),
+          `runtime/debugger/passport.js:43` (`randomBytes`), `clients/AdtClientsWS.js`
+          (correlation id, timestamps); the server — `src/lib/systemInformation.ts:75`
+          (`_: Date.now()`), `src/lib/debugger/ids.ts:23` (`randomBytes`),
+          `src/lib/debugger/AmdpSession.ts` (`randomUUID` client ids),
+          `src/lib/state/InstanceState.ts` (`randomBytes`, injectable),
+          `background-runs-memory` (`randomBytes` handles),
+          `src/lib/leftoverSessions/LeftoverSessions.ts` (`randomBytes` ids; `now` injectable),
+          `src/lib/backgroundRuns/run.ts` (`now` injectable),
+          `src/lib/search-source/orchestrator.ts` (a `Date.now()` time budget),
+          `src/lib/utils.ts` (a fallback session id);
+        - not reaching the wire, fixed all the same by the same fakes: log timestamps
+          (`src/lib/logger.ts`, `src/lib/utils.ts`), `auth-providers` (token expiry, PKCE,
+          SAML ids, replay store), `auth-stores` (file lock, temp file names), `auth-broker`
+          (expiry), `feedPages.ts` (a date computed from its input).
+        - `performance.now` and `process.hrtime`: no use found.
+        A new source a later dependency adds shows as a failing repeat recording.
       - `adtStandIn` binds a port fixed per pin file (a constant in the file, one per file,
         from a range kept for pins), so the `Host` header is constant; a busy port fails the
         case — no retry, no fallback port;
@@ -340,8 +378,9 @@ and live specifics.
     - soft mode: the entry's `call`; for the server-dispatched tools, an in-process server on
       the live connection; hard mode: the MCP tool;
     - it refuses before sending once the run's credential-refusal marker exists;
-    - it marks the key as called in the current test. The key is reported covered by an
-      `afterEach` reading the test's own result, only when the test passed.
+    - it records the key against the current test's full name
+      (`expect.getState().currentTestName`) in the run's call log. Whether the key passed is
+      not decided here: see `coverageReporter.ts`.
   - `expectAbsent(read: { tool: string; args: ToolArgs }): Promise<void>`: the object reads
     "not found".
   - `expectCleared(read: { tool: string; args: ToolArgs }): Promise<void>`: the part reads
@@ -383,6 +422,10 @@ and live specifics.
     `HandlerBatch#begin`, `HandlerBatch#answers`. Any other key found sending nothing when it
     is pinned joins this list only with the reason read from its handler, in the same commit.
   - `'no pinCases row or liveCall in a scanned file lacks a ledger row'`.
+  - `'no registration is skipped'`: `ledgerScan` refuses a `pinCases`, `liveSuite` or
+    `liveCall` under `describe.skip`, `xdescribe`, `it.skip`, `test.skip`, `xit`, `xtest`,
+    `it.todo` / `test.todo`, or inside any enclosing suite that is skipped, and refuses any
+    `.only` in a scanned file (it skips the rest).
 - [ ] **Step 2: Write one fixture per refusal and a test that each is refused,** each by its
   own check alone. The refusals:
   - a missing row; an extra row; a missing system; an extra system;
@@ -391,6 +434,9 @@ and live specifics.
     key;
   - a relabelled pin: the ledger key differs from `keyOf(tool, args)`;
   - a dormant registration: `pinCases` (or `liveSuite`) inside a function nothing calls;
+  - a skipped registration, one fixture each: `describe.skip`, `xdescribe`, `it.skip`,
+    `test.skip`, `xit`, `xtest`, `.todo`, a `pinCases` / `liveSuite` nested in a skipped outer
+    `describe`, and an `.only` beside it;
   - a key covered only by a `refusal` row;
   - a typeless `HandlerGet` part pinned under a typed key;
   - `'none'` on a tool not named as sending nothing;
@@ -442,11 +488,13 @@ and live specifics.
     `debuggerCleanup.ts`).
   - `tests/test-config.yaml.template`: `environment.expected_realm: ""` with its comment.
   - The Jest configuration: add `globalTeardown` for the integration runs.
-  - `package.json`: the script `test:coverage-family` (C1's global constraints).
+  - `package.json`: the script `test:coverage-family` (C1's global constraints), and the
+    reporter added to it and to `test:integration`.
 - Create:
   - `src/__tests__/integration/helpers/realmCheck.ts`
   - `src/__tests__/integration/helpers/runReport.ts`
   - `src/__tests__/integration/globalTeardown.ts`
+  - `src/__tests__/integration/coverageReporter.ts`
 
 **Interfaces:**
 - **`realmCheck.ts`**
@@ -459,6 +507,13 @@ and live specifics.
   - `reportPath(): string`, under the OS temp directory and named per run, never in the
     repository.
   - `recordOutcome(key: CoverageKey, kind: SystemKind, outcome: 'passed' | 'failed' | 'skipped'): void`
+- **`src/__tests__/integration/coverageReporter.ts`** — a Jest reporter, named in
+  `test:integration` and `test:coverage-family` (`--reporters=default --reporters=<path>`).
+  - `onTestCaseResult(test, result)` joins the test's full name with the call log and records
+    each key's outcome from Jest's **completed** result (`result.status`) — after the test's
+    `afterEach` hooks and after `expect.assertions` is checked, which a hook of the test
+    itself cannot see.
+  - `globalTeardown` reads what the reporter wrote.
   - `markCredentialRefused(): void`
   - `credentialRefused(): boolean`
 
@@ -473,7 +528,10 @@ and live specifics.
   - `'the full run fails when a required key of this system was skipped'`;
   - `'the full run passes when every required key passed'`;
   - `'a family run checks only the keys of its own files'`;
-  - `'a key whose test failed after the call is reported failed'`.
+  - `'a key whose test failed after the call is reported failed'`;
+  - `'a key whose afterEach cleanup fails is reported failed'`;
+  - `'a key whose test misses its expect.assertions count is reported failed'`.
+  These run the reporter on a Jest run of fixture test files (`runCLI` in process, no SAP).
 - [ ] **Step 3: Write the refusal-stop tests** (`src/__tests__/unit/coverage/refusalStop.test.ts`,
   on `adtStandIn` answering `401`):
   - `'a credential refusal in globalSetup fails the setup'`: today it is logged and the run goes
@@ -509,7 +567,12 @@ transport case and of C13. The measurement runs as a temporary Jest case under
 
 - [ ] **Step 1:** With the owner's go, after the realm check, on the on-premise system, then
   on the cloud (where the discovery offers the transport endpoints, O7 / O8): create one
-  request and one task in it through `CreateTransport` / `CreateTransportTask`.
+  request and one task in it through `CreateTransport` / `CreateTransportTask`, and record each
+  returned number at once (`recordCreatedRequest`), before anything reads it.
+- [ ] **Step 1a: Arm the failure cleanup before the move.** An `afterAll` of the measurement
+  deletes the recorded numbers (and the recorded object, `deleteRecorded`) whatever happened,
+  through the same delete path, reporting what it did; the credential-refusal stop applies to
+  it as to every helper — after a refusal it sends nothing and names what is left.
 - [ ] **Step 2:** Move an object the measurement creates in the configured transportable
   package from the configured request's task to the created task, then back
   (`MoveTransportObjects`); read both requests after each move. Remove the entry; delete the
@@ -557,6 +620,23 @@ activation answer is a corpus activation result.
     that fails still leaves the view to cleanup. The same for the BDEF and the class.
   - Cleanup deletes in reverse order of creation: behavior implementation, BDEF, then the
     root view (`deleteView`).
+  - **Activation without built-in limits (a prerequisite step of C3).** `rapFixtures.ts`'
+    `activateAndConfirm` polls `GetInactiveObjects` with `attempts = 8` and `waitMs = 2000`,
+    and filters messages with a regex — against the no-built-in-timeouts, no-retries and
+    no-regex rules; it is test code in this PR, so it is fixed in the same step, before C3's
+    live cases:
+    - write first a unit test on `adtStandIn`: `'activateAndConfirm waits for the result with
+      no attempt count and no interval'` (the stand answers "inactive" three times, then not
+      listed; the helper reads exactly four times, with no timer between reads) and
+      `'activateAndConfirm refuses an error message without a regex'`;
+    - the helper then activates, refuses an error message by comparing the message type with
+      the list `E`, `A`, `X` in plain code, and, if the object is still listed inactive,
+      reads the activation run's own status (`HandlerGet#-#activation_status`, by the run id
+      the activation answered) once per answer until it states the run finished — each read
+      sent when the previous answer arrives; no attempt count, no interval of the helper's
+      choosing; bounded only by the Jest test timeout;
+    - its callers (`BehaviorDefinitionAndImplementationHighHandlers.test.ts`,
+      `admin/shared-deps/setup.test.ts`) drop the two arguments.
 - **Assertions.** After the activation, `GetInactiveObjects` no longer lists the object, and
   the activation result has no error.
 - **Cleanup.** `deleteRecorded`.
@@ -885,9 +965,10 @@ recorded order.
 - **The existing `TransportObjectToolsCrud`** moves to `liveCall`.
 - **New: `coverage/transport.live.test.ts`,** section `coverage_transport`.
   - **Creates.** `CreateTransport`, `CreateTransportTask`, `HandlerTransportCreate` each create
-    their own request or task, assert it reads back (`GetTransport`), and record the number
-    (`recordCreatedRequest`). Cleanup deletes only recorded numbers, in the measured order,
-    then asserts each absent.
+    their own request or task and **record the returned number at once**
+    (`recordCreatedRequest`), before any read-back or assertion; then assert it reads back
+    (`GetTransport`). Cleanup deletes only recorded numbers, in the measured order, then
+    asserts each absent.
   - **Everything else** works on `coverage_transport.request`: an object the test creates in the
     section's transportable package is added, read in the request's objects and action log,
     sorted and compressed in that request's task, then removed — the request is left as it

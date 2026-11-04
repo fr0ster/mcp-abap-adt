@@ -316,7 +316,9 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
      - Files are read with the TypeScript compiler API, never matched as text.
    - **The unit file** must hold a `pinCases([...])` call **in executable Jest scope**: a
      statement of the module's top level or of a `describe` callback the module calls at
-     collection — never inside a function nothing calls. The same holds for `liveSuite`.
+     collection — never inside a function nothing calls, and never skipped (`describe.skip`,
+     `xdescribe`, `it.skip`, `test.skip`, `xit`, `xtest`, `.todo`, or any skipped enclosing
+     suite; no `.only` in the file). The same holds for `liveSuite` and `liveCall`.
      - a two-dimension tool's key is one of its declared table (`HandlerGet`'s routes,
        `HandlerUpdate`'s legal parts); no enum product;
      - one element's `tool` is a string literal, and its `args` an object literal whose
@@ -324,8 +326,10 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
        together they equal the key;
      - an element with `refusal` (its `expected` the literal `'nothing-sent'`) does not count
        for its key;
-     - the whole recorded request is the literal: the inputs that would vary it (generated
-       ids, the stand's port) are fixed before sending, never removed from the record;
+     - the whole recorded request is the literal: the inputs that would vary it (the clock,
+       random ids and bytes, the stand's port) are fixed per case and restored after, never
+       removed from the record, and every pin records twice and compares the two byte for
+       byte;
      - its `expected` is a non-empty array literal, or the literal `'none'` for a tool the
        spec names as sending nothing;
      - each request in it is an object literal of exactly `method`, `url`, `headers` and `body`,
@@ -351,7 +355,9 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
      that sends; a `'none'` case whose tool never ran; a `pinCases` call inside a function
      nothing calls (a dormant registration); a key covered only by a refusal pin.
 3. **The live run proves the ledger.**
-   - The integration run's `globalTeardown` compares the keys that ran and passed on that
+   - A key's outcome is Jest's completed test-case result (a reporter's `onTestCaseResult`,
+     after the test's hooks and `expect.assertions`), never the test's own hook. The
+     integration run's `globalTeardown` compares the keys that ran and passed on that
      system with the keys the ledger requires there. The run report is written outside the
      repository.
    - A required key that was skipped or failed fails the run, so a missing config section

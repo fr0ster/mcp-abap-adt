@@ -488,6 +488,20 @@ export function recordCreatedRequest(transportNumber: string): void {
   }
 }
 
+/**
+ * Forgets one recorded request or task number, once the test's own delete of
+ * it succeeded and it reads absent: the cleanup then does not ask for it again.
+ */
+export function forgetRecordedRequest(transportNumber: string): void {
+  const at = createdRequests.indexOf(transportNumber);
+  if (at >= 0) createdRequests.splice(at, 1);
+}
+
+/** The live runner of the suite now running: its user and its connection. */
+export function currentLiveRunner(): LiveRunner {
+  return current();
+}
+
 /** Records a transport entry the test made, once the call that made it succeeded. */
 export function recordTransportEntry(entry: {
   request: string;

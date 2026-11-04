@@ -29,6 +29,7 @@ import {
   deleteRecorded,
   deleteRecordedRequests,
   expectNameFree,
+  forgetRecordedRequest,
   type LiveRunner,
   leftovers,
   liveCall,
@@ -598,6 +599,33 @@ describe('the transport cleanup', () => {
       'request K900020 is not back as it was',
     );
     expect(leftovers()).toEqual(['entry K900020/K900021 PROG ZLIVE_OURS']);
+  });
+
+  it('a number forgotten after its own delete is not asked for again', async () => {
+    const own: StandRequest = {
+      number: 'K900040',
+      description: 'own',
+      tasks: [],
+    };
+    const deleted: StandRequest = {
+      number: 'K900041',
+      description: 'deleted by the test itself',
+      tasks: [],
+    };
+    const requests = [own];
+    deletions(requests);
+    organizer(requests);
+    recordCreatedRequest(own.number);
+    recordCreatedRequest(deleted.number);
+    forgetRecordedRequest(deleted.number);
+    expect(recordedRequests()).toEqual([own.number]);
+    const from = stand.requests.length;
+    await deleteRecordedRequests();
+    expect(
+      sentSince(from).some((request) => request.url.includes(deleted.number)),
+    ).toBe(false);
+    expect(requests).toEqual([]);
+    expect(leftovers()).toEqual([]);
   });
 
   it('an entry on a request never remembered fails before anything is removed', async () => {

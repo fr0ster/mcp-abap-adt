@@ -1658,9 +1658,12 @@ every compact tool whose `object_type` enum has `FUNCTION_MODULE`):**
 - [ ] **Step 2:** One shared check, `checkFunctionModuleGroup(context, group, module)`, in
   `src/lib/strategies/functionModuleGroup.ts` (new), reads the module's metadata (one GET)
   and refuses when the given group differs from `adtcore:containerRef`'s name. Every path
-  above calls it before anything else — for `CheckFunctionModule` in the low handler, before
-  its `.check`, so the full tool and `HandlerCheckRun` share it; for `GetFunctionModule`'s
-  metadata part, that read is the answer itself.
+  above calls it before anything else. The two check paths do not share a handler, so each
+  calls it: `CheckFunctionModule` in its low handler
+  (`src/handlers/function/low/handleCheckFunctionModule.ts`) before its `.check`, and
+  `HandlerCheckRun` `FUNCTION_MODULE` in `src/handlers/common/low/handleCheckObject.ts`
+  before its own `.check`; each keeps its own mismatch and match pins. For
+  `GetFunctionModule`'s metadata part, that read is the answer itself.
 - [ ] **Step 3: Compact.** The compact tools take the group (`function_group_name`, or
   `GROUP|MODULE` in `object_name`) and reach the paths above, so they check it the same way;
   their pins gain the metadata GET first.

@@ -171,8 +171,9 @@ nothing is open.
   to the new helpers' production-style code, and tests add none.
 - **Committed text.** Tool descriptions stay functional. No system name, system id, transport
   number or user name in a committed file.
-- **Every task ends green,** except the guard test of C1. It is red from C1 until C16 lands and
-  lists the keys still missing (O1, decided). Each family is pushed as it lands. Green means:
+- **Every task ends green,** the guard test included: it is a ratchet over
+  `src/__tests__/unit/coverage/coverage-debt.json`, the keys still missing (O1, decided). Each
+  family is pushed as it lands. Green means:
   - build, `npm run test:check` and the root `npm test`;
   - every package's `lint:check` and `test:check`.
 - **Expected request literals** come from running the code on the stand-in. They are reviewed
@@ -214,12 +215,14 @@ and live specifics.
 - [ ] **Add the ledger rows.** Add the family's rows to `coverage-ledger.json`. Run
   `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts`: none of the family's keys is
   reported missing or orphaned.
+- [ ] **Remove its covered keys from `coverage-debt.json`.** Delete the family's keys from the
+  list. Run the guard again: PASS, the ratchet naming no key.
 - [ ] **Run the family live.** With the owner's go, after the realm check (C2), run
   `npm run test:coverage-family -- <live file> > <log outside the repository> 2>&1` on the
   on-premise system, then on the cloud system. The exit status is 0, the family's keys are
   reported passed, and nothing the test did not create is touched.
 - [ ] **Commit** the family as `test(coverage): <family> pinned and live`. Push it at once (O1): the
-  guard stays red until C16.
+  guard is green with the shorter debt.
 
 ### C1. The guard ledger (red)
 
@@ -2603,17 +2606,23 @@ This covers the four compact handlers no test runs today.
     processes, the temporary store — is ended or removed.
 
 **Steps:** the family steps, then:
-- [ ] Turn the guard green: `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts`
-  PASS with no key missing.
+- [ ] End the ratchet: `coverage-debt.json` is now empty. Delete the file, `checkDebt` and its
+  fixtures (`__fixtures__/coverage-debt/`), and assert `missing-row` empty again, so the guard
+  requires every key: `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts` PASS with
+  no key missing.
 - [ ] Commit.
 
-8 steps in all.
+9 steps in all.
 
 ### Owner's decisions and open items
 
 **Decided by the owner (binding), applied in the tasks named:**
-- **O1 — the guard stays red.** It is red from C1 until C16 turns it green: no list of
-  uncovered keys, no `test.failing`. Each family is pushed as it lands (C1, every family task).
+- **O1 — the guard is a ratchet (owner 2026-11-04: red CI is a failure).** The keys without a
+  ledger row must be exactly `coverage-debt.json`, a sorted list: a missing key not listed fails,
+  and so does a listed key that is covered or no longer served. Every family task removes its
+  keys; C16 empties the list and deletes it and the ratchet, so the guard requires full
+  coverage. No `test.failing`, no skip, no switch. Each family is pushed as it lands (C1, every
+  family task).
 - **O2 — re-pin by literal: yes.** Every key is pinned in `pinCases` by literal; the parity
   tests (`createSingleCall`, `metadataReads`, `lowToCompact`, …) stay. Applied from C3 on.
 - **O3 — versions: yes.** Read-only objects that already have versions, named in

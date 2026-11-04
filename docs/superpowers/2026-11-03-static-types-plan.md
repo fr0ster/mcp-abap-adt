@@ -1391,6 +1391,116 @@ The owner gave his go. It runs as a temporary Jest case under
   cleanup runs in the standard order.
 - [ ] **Step 5: Commit** the record (`docs: the outline endpoints, measured`).
 
+**Record — on premise and on the trial (measured 2026-11-04).** Objects the test created and
+recorded: a class (public type, instance/static/constant attributes, an event, public,
+protected and private methods with every parameter kind, an implemented interface); a second
+class with a local type and a local class in its definitions include, implemented in its
+implementations include; an interface (type, attribute, event, method); two structures, the
+second including the first; a function group with one module; on premise also a program with a
+local class, a type, a variable, START-OF-SELECTION, a FORM, and an `INCLUDE` of an include
+program holding a second FORM. The cloud got the same objects but the program and its include
+(it has none). Everything was deleted in reverse creation order and each read `404` after.
+Every answer below was the same on both systems, byte for byte apart from the object names,
+unless it says otherwise.
+
+*Endpoints (Measured).* Each object's metadata answer links its outline as
+`rel="http://www.sap.com/adt/relations/objectstructure"`,
+`type="application/vnd.sap.adt.objectstructure.v2+xml"` — for the class, the interface, the
+program and the function group; the function module's and the include's metadata carry no
+such link. The discovery document lists no per-object `objectstructure` (only a bare
+`/sap/bc/adt/repository/objectstructure` collection with no template).
+
+| Object | `GET` | Accept answered `200` | Other Accepts |
+| --- | --- | --- | --- |
+| Class | `/sap/bc/adt/oo/classes/{name}/objectstructure` | `…objectstructure.v2+xml` | `…objectstructure+xml` and `application/xml` also `200`, the same body |
+| Interface | `/sap/bc/adt/oo/interfaces/{name}/objectstructure` | `…objectstructure.v2+xml` | the same as the class |
+| Program (on premise) | `/sap/bc/adt/programs/programs/{name}/objectstructure` | `…objectstructure.v2+xml` only | `406`, "Accepted content types: application/vnd.sap.adt.objectstructure.v2+xml" |
+| Include (on premise) | `/sap/bc/adt/programs/includes/{name}/objectstructure` | `…objectstructure.v2+xml` only | `406`; the answer is its main program's whole outline, also with `?context=<program uri>` |
+| Function group | `/sap/bc/adt/functions/groups/{name}/objectstructure` | `…objectstructure.v2+xml` only | `406` |
+| Function module | `…/groups/{group}/fmodules/{name}/objectstructure` | — | `404` with every Accept |
+| Structure, service definition | `…/ddic/structures/{name}/objectstructure`, `…/ddic/srvd/sources/{name}/objectstructure` | — | `404` |
+| Class local includes | `…/classes/{name}/includes/definitions/objectstructure` and `…/includes/implementations/objectstructure` | — | `404` (their elements are in the class's own outline) |
+
+`version=active` and `version=inactive` changed nothing in the elements (only `xml:base`; the
+objects were active). `withShortDescriptions=true` adds `description="…"` to the elements that
+have one: the class and interface outlines had none to add; the program's include element, the
+function group's module and its `UXX` include got theirs. `/sap/bc/adt/repository/objectstructure`
+answered `400` "Parameter objectname could not be found" with `?uri=`, and `500` "Object type
+OU is not defined" with `?objectname=&objecttype=CLAS/OC` — not a usable outline endpoint.
+
+*The answer's shape (Measured).* One root `abapsource:objectStructureElement`
+(`xmlns:abapsource="http://www.sap.com/adt/abapsource"`) with `adtcore:name`, `adtcore:type`,
+nested `abapsource:objectStructureElement` children, each with `atom:link`s whose `rel` ends
+in `definitionIdentifier`, `implementationIdentifier`, `definitionBlock` or
+`implementationBlock`.
+
+- **Class / interface:** root `CLAS/OC` (`visibility`, `final`) / `INTF/OI`. Children:
+  `CLAS/OT` / `INTF/IT` types (`visibility`); `CLAS/OA` / `INTF/IA` attributes (`level`
+  `instance`|`static`, `visibility`, `constant="true"` and `readOnly="true"` on a constant);
+  `CLAS/OE` / `INTF/IE` events (`level`, `visibility`, `clif_name`); `CLAS/OM` / `INTF/IO`
+  methods (`level`, `visibility`, `clif_name`); `CLAS/OR` for an implemented interface, and its
+  methods as `CLAS/OM` named `INTF~METHOD`; `CLAS/OCL` local class with `CLAS/OLD` local
+  methods (`clif_name` the local class) and `CLAS/OLT` local types; `CLAS/OCX` text elements
+  (`isExternalRef="true"`, its link the text-elements URI, no position).
+- **Visibility:** on every class and interface component (`public`|`protected`|`private`).
+- **Signatures: not carried.** No element states a parameter, its kind, its type or a
+  `RAISING`; a method's signature is only the text its `definitionBlock` spans.
+- **Positions (class and interface):** `href="./source/main#start=l,c;end=l,c"` relative to the
+  object URI; for local components `./includes/definitions#…` and
+  `./includes/implementations#…`. A method has all four links (definition and implementation
+  identifier and block); a type, an attribute or an event the two definition links; an
+  implemented interface method has no `definitionBlock`, its `definitionIdentifier` pointing at
+  the `INTERFACES` statement.
+- **Program (on premise):** root `PROG/P`; children `PROG/PL` local class with `PROG/PLM`
+  methods, `PROG/PY` type, `PROG/PD` data, `PROG/PE` event block, `PROG/PU` FORM, `PROG/I`
+  include, `PROG/PX` text elements. **No line positions:** each link names its target by
+  fragment, `…/source/main#type=PROG%2FPU;name=MAIN_FORM` (a local method's name is the class
+  name padded to 30 characters followed by the method name, URL-encoded). A FORM in an include
+  points into that include: `/sap/bc/adt/programs/includes/{inc}/source/main?context=<program
+  uri>#type=PROG%2FPU;name=…`. Only a local method carries `visibility`.
+- **Function group:** root `FUGR/F`; children `FUGR/I` includes (top and `UXX`), `FUGR/FF`
+  modules, `FUGR/PX` text elements; each link is the object's source URI, no fragment, no
+  position. The module's parameters are not carried.
+
+*Positions checked (Step 3, Measured).* Every `#start=l,c;end=l,c` of both classes and the
+interface was cut from the source read at the include it names (`source/main`,
+`includes/definitions`, `includes/implementations`): lines 1-based, columns 0-based, `end`
+exclusive. Each identifier span is exactly the component's name as written (lower case in the
+source); each block span runs from the statement's first keyword to the end of its last token,
+without the period (`METHODS pub … TYPE i`, `CLASS … ENDCLASS`, `METHOD pub. … ENDMETHOD`).
+
+*What the trial lacks (Measured).* Programs and includes only. Class, interface, local class
+and function group answers are identical to the on-premise ones.
+
+*Other readings, for D6 Step 3 (Measured unless marked).*
+- **(a) A program's INCLUDEs — SAP states them.** The program's outline carries each include
+  as a `PROG/I` element with its source URI; `POST
+  /sap/bc/adt/repository/nodestructure?parent_type=PROG/P&parent_name={name}` lists it as
+  well (`PROG/I`, with `TECH_NAME` and URI). The function group's outline lists its includes as
+  `FUGR/I`. On premise only (the trial has no program). Where-used of the fresh include
+  (`usageReferences`) answered `200` with no result; Inference: the where-used index did not
+  yet hold the new include.
+- **(b) A structure's `include` — SAP states it; `extend type` — not seen.**
+  `GET /sap/bc/adt/ddic/elementinfo?path={structure}` (Accept
+  `application/vnd.sap.adt.elementinfo+xml`) answers the components in order: an element
+  `adtcore:type="TABL/DS" adtcore:name=".include"` with property `ddicIncludeName` and the
+  included structure's URI, and each included field with `ddicIsPartOfInclude` and
+  `ddicIncludeHierarchyLevel`. Both systems. Where-used of the included structure lists the
+  including one (both systems). For an append (`extend type`): creating one through
+  `CreateStructure` + `UpdateStructure` was refused ("errors in source", the object being a
+  plain structure), so a standard append of an industry-solution namespace was read instead:
+  the base structure's element info lists no append and none of its fields, and the append's
+  own element info is an empty `TABL/DT`; only the append's source states
+  `extend type <base> with <append>` (on premise only). Inference: that append may belong to a
+  switched-off business function, so the absence is one reading, not a rule.
+- **(c) A service definition's exposed entities — SAP states them.**
+  `GET /sap/bc/adt/ddic/srvd/elementinfo?path={srvd}` answers one `DDLS/STOB` element per
+  `expose`, with the entity's name, its DDL source URI and an `alias` property. Read only, on a
+  standard service definition on each system. The SRVD has no outline (`404`), and
+  `nodestructure` with `parent_type=SRVD/SRV` answered an empty body.
+- `nodestructure` with `parent_type=TABL/DS` does not answer the structure: it answers the
+  package's object list.
+
 ### D2. adt-clients release (cross-repository cycle)
 
 **Repository:** `~/prj/mcp-abap-adt-clients`. One issue, one branch, one PR there, through

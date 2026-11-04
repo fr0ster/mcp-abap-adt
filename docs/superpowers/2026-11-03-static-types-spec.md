@@ -380,3 +380,98 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
    an optional `with_long_polling` for `activation_status` (plan C2d, an added optional
    parameter: CHANGELOG, MIGRATION as an addition, the listed-schema fixture updated for that
    key alone). Everything else stays identical.
+
+## 9. Defect fixes
+
+The independent test campaign on 23.1.0 and its check against the 24.0.0 code found defects
+that are ours (the server or adt-clients). The owner decided they are fixed in this change,
+after the system-kind work (plan C2e) and before the coverage families (plan C3–C16), so the
+families pin the fixed behaviour. Where the code reading and the live measurement on the
+on-premise system disagree, the live measurement holds.
+
+### Rules (the owner's, binding)
+
+- **SAP's answers are read by key, never by words.** An answer or error is analysed only by
+  its T100 key (message class and number) and its type. Neither a regex nor a substring is
+  applied to its text. Where SAP gives no key, the structured verdict decides, and SAP's
+  text is relayed as it is.
+- **XML is parsed by a library.** That means fast-xml-parser through the existing
+  `parseStructure`, or adt-clients' structured readings. There are no hand-rolled parsers.
+- **No regular expression in production code.** This covers every package's `src`, plus
+  `scripts/` and `tools/`. Names and arguments are read by plain string code. The guard
+  (`noRegexOverInput.test.ts`) covers all of it, with no allowlist.
+- **What SAP does itself is not re-implemented.** The regex ABAP parsers `GetAbapAST`,
+  `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols` are removed. In their place comes an
+  outline tool backed by SAP: the object structure Eclipse's Outline reads. It is measured
+  first, and its client call goes into adt-clients (one endpoint, one method).
+
+### What changes
+
+**Removed: the deletion check's prose heuristic** (#1, #11).
+- SAP's deletion check words an existing function module, function include or inactive
+  service definition "… does not exist" (W) while stating `isDeletable="true"`.
+- The server read those words as "absent" and never sent the delete. Measured on premise:
+  nothing was deleted, and the answer still said success.
+- After the fix, when the check permits, the delete is sent and its answer is relayed. A case
+  that must be named is named by its T100 key through the delete's analyse strategy (e.g.
+  `SWB_TOOL 029`).
+- The same mechanism caused the inactive-`DeleteServiceBinding` no-op, which is fixed with it.
+
+**Other prose checks become key checks.** These are:
+- `utils.ts`' `isAlreadyCheckedError`, `isAlreadyExistsError` and the validation response
+  reading;
+- `logger.ts`' "does already exist";
+- `handleCreateFunctionGroup`'s "has not been created";
+- the dump's `/termination/` relation, which is matched by its exact relation instead.
+
+**Fixes in our server:**
+- **#2.** The function-module tools check the module's group from its metadata
+  (`adtcore:containerRef`, one GET).
+- **#3.** `GetUnitTestResult` long-polls only a running run.
+- **#4.** Held locks are tracked on stdio too; an unlock with a handle the instance did not
+  issue is refused before anything is sent.
+- **#5.** The compact debug end ends the batch answers.
+- **#6.** The package walk de-duplicates; `GetPackageContents` refuses an unknown package.
+- **#12.** The message-class deletes relay SAP's answer.
+- **#16.** `GetTransport`'s counts are fixed.
+- **#17.** The description of `CreateFunctionGroup`'s `activate` is fixed.
+- **#18.** `DeleteServiceBinding` names the binding in its answer.
+- **#24.** A version list's 404 is read by its exception type and answers "not found".
+- **#25.** `content_uri` must be a version URI of the named object.
+- **Doubts the owner listed:** `GetServiceBinding`'s json format; the profiler's `top` of 0
+  or less is refused.
+
+**Fixes in adt-clients**, a cross-repository cycle released before the families pin those
+requests:
+- #8: every attribute value written into a create body is XML-escaped;
+- #14: the abstract flag of a class;
+- #15: program type words;
+- #22: no `description=undefined` in the validation parameters;
+- #9: `CheckTable`'s source is sent;
+- the outline method.
+
+**Owner decisions still open** are listed in the plan's D-stage open items. None is decided
+silently.
+
+### What is SAP's and stays
+
+These are SAP's answers, relayed as they are:
+- #7 — an ATC run status for a malformed id;
+- #19, #20, #21;
+- #23 — the deletion check's own text, relayed faithfully;
+- #4's release on a bogus handle within one session;
+- #12's `201` on a duplicate or unknown package. A read after the create is ours to add; that
+  is an owner decision.
+
+### Acceptance
+
+- Every fix starts with a test that fails first.
+- Where requests change, they are pinned by literal, and the coverage stage's pins are
+  written on the fixed code.
+- A live case exists wherever §8 requires one.
+- The listed-schema and surface fixtures change only by the removals, the additions and the
+  contract fixes this section names, each visible in the diff.
+- CHANGELOG (24.0.0) records each fix. MIGRATION-24.0 records each contract change: the
+  three removed tools with their replacements, the outline tool, and any argument that is
+  now refused.
+- The ledger (§8) drops the removed tools' keys and adds the outline tool's.

@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e and C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D14 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -1275,6 +1275,446 @@ comes after C2; it is independent of C2a–C2d.
 - [ ] **Step 7: Commit** as `fix(program): the declared system kind, not the credential,
   decides what is offered`.
 
+## Defect fixes (spec §9)
+
+The stage runs after C2e and before C3, so C3–C16 pin the fixed behaviour. Every task ends
+green, under the coverage stage's global constraints:
+- npm scripts only;
+- no casts, no regex in tests, no built-in timeouts or retries;
+- every live run after the realm check, on objects the test creates, with the cleanup and
+  refusal stop of C1–C2.
+
+The owner gave his go for the live measurements in D1. Defect numbers are the campaign's
+(`SUMMARY.md`). Where the code reading and the live measurement on premise differ, the live
+measurement holds.
+
+**Every D task:**
+- writes its failing test first;
+- pins changed requests by literal (`pinCases`);
+- adds a live case where §8 requires one (or notes the family task that will);
+- adds a CHANGELOG line (24.0.0, Fixed / Removed / Added) and a MIGRATION-24.0 line where a
+  contract changes;
+- commits as `fix(<area>): …`.
+
+### D1. Measure the outline endpoints (live, on premise and on the trial)
+
+The owner gave his go. It runs as a temporary Jest case under
+`src/__tests__/integration/coverage/` on C1–C2's helpers (realm check, refusal guard,
+`recordCreated`), and the case is deleted after the record is written.
+
+- [ ] **Step 1: Create the test's own objects** and record them: a class with a local type, a
+  public and a private method, an attribute and an event; an interface; on premise, a program
+  with a FORM and a function group with one module. The cloud has no program; use what each
+  system offers.
+- [ ] **Step 2: Read each object's ADT object structure** — the structure Eclipse's Outline
+  reads. This is Inference until measured:
+  - `GET /sap/bc/adt/oo/classes/{name}/objectstructure`;
+  - its analogues for interfaces (`/oo/interfaces/{name}/objectstructure`), programs and
+    function groups, as the discovery document lists them.
+
+  Record per system: the request (Accept, query, e.g. `version`, `withShortDescriptions`), the
+  status, and the answer's elements. Then check which of these the answer carries:
+  - components: types, attributes, methods, events, forms, modules;
+  - signatures: parameters and their kinds;
+  - visibility;
+  - **source positions**: the links' `#start=l,c;end=l,c`, and which include each points
+    into.
+- [ ] **Step 3: Check the positions.** Read the main source (and each include a position
+  points into) and confirm the lines the positions name.
+- [ ] **Step 4: Record the measurement** in this task, as the D2 outline method's contract:
+  endpoints per object type, Accept, the answer's shape, and what the trial lacks. The
+  cleanup runs in the standard order.
+- [ ] **Step 5: Commit** the record (`docs: the outline endpoints, measured`).
+
+### D2. adt-clients release (cross-repository cycle)
+
+**Repository:** `~/prj/mcp-abap-adt-clients`. One issue, one branch, one PR there, through
+that repository's own review and CI. The release itself is the owner's.
+
+**Contents (each with a failing test first, in adt-clients' own suites):**
+- **#8 — escape every attribute value written into a create body:** `adtcore:description`,
+  the class's superclass and every other value written as an attribute, for class, interface,
+  program, function group, function module, domain, data element, DDL, structure, table,
+  table type, BDEF, DDLX and SRVB. The message class already escapes. The value is escaped
+  **after** its truncation, so an entity is never cut. Test: a description holding `&`, `<`,
+  `"` and `'` gives a well-formed body.
+- **#14:** `class/create.js` writes the abstract attribute Eclipse writes. The attribute is
+  read from an Eclipse capture or the corpus at the step, never guessed.
+- **#15:** program type words as SAP takes them, not letters (`convertProgramType`). The words
+  come from an Eclipse capture (module pool, include, …).
+- **#22:** `validation.js` omits a parameter whose value is `undefined` (domain, data element,
+  authorization field, …). The function-module validation contract takes the parameters SAP
+  requires, as measured (g3: a 400 without `description`).
+- **#9:** `AdtTable.check` sends the given source, as the structure check does.
+- **The outline method,** `getObjectStructure(…)` per object kind (one endpoint, one method),
+  from D1's measured contract, returning a structured reading.
+
+**Cycle:**
+- [ ] Step 1: Open an issue and a branch in adt-clients; write the failing tests there.
+- [ ] Step 2: Fix, then run adt-clients' CI list locally.
+- [ ] Step 3: Open the PR, get its review and CI, and leave the merge to the owner.
+- [ ] Step 4: The owner releases and publishes. Check the registry (`npm view
+  @mcp-abap-adt/adt-clients version`).
+- [ ] Step 5 (in #346): bump `@mcp-abap-adt/adt-clients` to the released version, as a
+  registry range only. `npm install` regenerates the lockfile; check it for `"link": true`
+  and for anything not resolved from the registry. Then run build, `test:check` and the root
+  `npm test`.
+- [ ] Step 6 (in #346): add server-side pins for each changed request:
+  - the create bodies with an escaped description (`CreateClass`, `CreateDomain`, … and
+    compact `HandlerCreate` per type);
+  - `CreateClass` with `abstract: true`;
+  - `CreateProgram` per program type;
+  - `HandlerValidate` without a description (no `description=undefined` in the URL) and for
+    `FUNCTION_MODULE`;
+  - `CheckTable` with `ddl_code` (the source in the body).
+
+  Each pin is red before the bump and green after. Add CHANGELOG lines.
+- [ ] Step 7: Commit (`fix(deps): adt-clients <version> — escaped create bodies, abstract,
+  program types, validation, table check, outline`).
+
+### D3. SAP's answers by key, never by words
+
+**Files:**
+- Modify: `src/lib/strategies/deletionRefusal.ts` (delete `absentPerCheck`),
+  `src/lib/strategies/checkedDeletion.ts`, `src/lib/utils.ts` (`isAlreadyCheckedError`,
+  `isAlreadyExistsError`, `parseValidationResponse`, the `<message>` quote around line 842),
+  `src/lib/logger.ts` (the expected-error test around lines 105–113),
+  `src/handlers/function/high/handleCreateFunctionGroup.ts` (`isInterfaceNotCreated`),
+  `src/handlers/system/readonly/handleRuntimeGetDumpById.ts` (the termination link).
+- Test: `src/__tests__/unit/deletion/sendWhenPermitted.test.ts`,
+  `src/__tests__/unit/answers/keyNotWords.test.ts`, and a guard
+  `src/__tests__/unit/sources/noProseMatching.test.ts`.
+
+**Steps:**
+- [ ] **Step 1: Failing tests,** built from the measured on-premise answers (live file #1, #11)
+  with the deletion check's documents as fixtures.
+  - `'an existing function module whose check says "does not exist" (W) with isDeletable=true
+    is deleted'`: the `deletion/delete` request is pinned and the delete's answer relayed.
+    The same for a function include, an inactive service definition and an inactive service
+    binding.
+  - `'a check with isDeletable=false is refused with its messages and T100 keys, nothing
+    sent'`.
+  - `'a delete refused by SAP is named by its T100 key through the delete's analyse
+    strategy'` (e.g. `SWB_TOOL 029`, the key read at the step from the corpus or a live
+    capture).
+- [ ] **Step 2: Key, not words, for the other sites:**
+  - "already exists" and "already checked" are recognised by the error body's T100 key
+    (message class, number) and type, read with the XML parser. The keys come from the corpus
+    (`tests/fixtures/adt/`) or, where it lacks one, a live capture on premise, recorded here.
+    Where SAP gives no key, the structured verdict decides (the status and the exception type
+    the body names), and SAP's text is relayed.
+  - `logger.ts` decides whether an error is expected by the exception type element, not by
+    words.
+  - `handleCreateFunctionGroup` recognises its "interface not created" case by its T100 key.
+  - The dump reader finds the termination link by its exact relation value, compared as a
+    whole string.
+  - Tests, one per site: the keyed case recognised; the same words with another key not
+    recognised; the same key in another logon language recognised.
+- [ ] **Step 3: Guard `noProseMatching.test.ts`** (compiler API, every package's production
+  `src`, `scripts`, `tools`, no allowlist). It refuses a string-search call — `includes`,
+  `indexOf`, `startsWith`, `endsWith`, `match`, `search`, `split` — or an equality
+  comparison whose literal argument contains a space and whose receiver is typed or flows
+  from an SAP answer: a `IAdtResponse` value, an error's message or body, a parsed document's
+  text. Fixtures: each of the six old sites refused; a key comparison passes; building our own
+  message text passes. Its limit: a value reaching the call through another module is left
+  to review (as C2e's).
+- [ ] **Step 4: Remove `absentPerCheck`.** When the check permits, the delete is sent and its
+  answer relayed. Run the deletion and answer suites: PASS. Mutate each site back: red.
+- [ ] **Step 5: CHANGELOG** (Fixed): "DeleteFunctionModule, DeleteFunctionInclude,
+  DeleteServiceDefinition and DeleteServiceBinding left an existing object in place and
+  answered success when SAP's deletion check worded it 'does not exist'; the delete is now
+  sent whenever the check permits it."
+- [ ] **Step 6: Commit.**
+
+### D4. XML through the parser (the 67 class-A sites)
+
+**Files** (regex inventory, class A): `enhancementAvailability.ts`,
+`handleGetEnhancementImpl.ts`, `handleGetEnhancementSpot.ts`, `handleGetEnhancements.ts`,
+`handleGetIncludesList.ts` (the `class:includeType` sites), `handleGetWhereUsed.ts`,
+`writeTests.ts` (`packageRef`), `debugger/amdpReadings.ts`, `strategies/activationRun.ts`,
+`strategies/feedPages.ts`, `strategies/feedVariants.ts` (with its hand entity decode),
+`strategies/lockAnswer.ts`, `strategies/serviceBindingFacts.ts` (the XML sites),
+`strategies/xmlPatch.ts` (read-modify-write).
+
+**Steps:**
+- [ ] **Step 1: Failing tests first, per file,** over the corpus documents each reads. Each
+  test feeds a document the regex reads wrongly (attributes in another order, a namespace
+  prefix, an entity, CDATA, a self-closing element) and asserts the reading the parser
+  gives.
+- [ ] **Step 2: Move each reader onto `parseStructure`** (`src/lib/strategies/reading.ts`) and
+  the `src/lib/xml/tree.ts` helpers, or onto adt-clients' structured readings where one
+  exists. Requests do not change: the existing pins stay green.
+- [ ] **Step 3: `xmlPatch.ts`** writes by reading the document with the parser, changing the
+  value in the structure, and serialising with fast-xml-parser's builder, with the same
+  options as the reader. If byte-exact output matters to SAP (a reviewed corpus round trip
+  shows), keep the documents' order and declarations, and pin the written body by literal.
+- [ ] **Step 4:** Run `npm test` and `npm run test:check`: PASS.
+- [ ] **Step 5: Commit, one per file group** (enhancements, includes / where-used, debugger,
+  activation, feeds, lock, service binding, xmlPatch).
+
+### D5. Remove the regex ABAP parsers; add the SAP-backed outline tool
+
+**Prerequisites:** D1 (measured), D2 (the outline method released and bumped).
+
+**Files:**
+- Delete: `src/handlers/system/readonly/handleGetAbapAST.ts`,
+  `handleGetAbapSemanticAnalysis.ts`, `handleGetAbapSystemSymbols.ts`, and their
+  registrations (`src/lib/handlers/groups/SystemHandlersGroup.ts`, `src/lib/variantToolSet.ts`,
+  `src/lib/longTools.ts`, `tools/long-handlers.json`), their unit tests, and the integration
+  suite `readOnly/system/AbapSystemSymbolsHandler.test.ts`. #13 and #27 go with them.
+- Create: the outline tool, `GetObjectOutline` (name to be confirmed in review). Its handler
+  is `src/handlers/system/readonly/handleGetObjectOutline.ts`, calling adt-clients' outline
+  method.
+- Modify: `docs/user-guide/AVAILABLE_TOOLS*.md`, `README.md`, `tools/tool-search.json`
+  (generated), the listed-schema and surface fixtures (the removals and the addition only),
+  `MIGRATION-24.0.md`, `CHANGELOG.md`, the coverage ledger (C10 drops the three keys; the
+  outline tool's keys go to C8).
+
+**Interfaces:**
+- `GetObjectOutline` takes `object_type` (the kinds D1 measured: class, interface, and on
+  premise program and function group), `object_name`, and optional `version`.
+- It answers the components: name, kind, visibility, signature (parameters and their kinds),
+  and each one's **source position** (include, start and end line/column) as SAP gives them.
+- Description (functional): "Lists the components of the ABAP object named by object_type and
+  object_name — types, attributes, methods, events, forms or modules — with their
+  visibility, signature and the source lines each occupies, as SAP's object structure
+  states them."
+
+**Steps:**
+- [ ] **Step 1: Failing tests.**
+  - The listed-schema test expects the three tools gone and `GetObjectOutline` listed on the
+    variants D1 found.
+  - A `pinCases` row for each object type, its literal request from D1's measurement.
+  - An answer test over D1's captured documents.
+- [ ] **Step 2:** Delete the three tools and add the outline tool. Run: PASS.
+- [ ] **Step 3: How the model reads a range of source.** The positions name lines, but every
+  source read today returns the whole source. **Owner decision (open item DO1):**
+  - (a) an optional line range on the `Get<Type>` source reads (`start_line`, `end_line`),
+    cut by the server after its one GET;
+  - (b) leave it to the model to read the whole source and use the positions.
+
+  The recommendation is (a), because the model then reads only the part it needs. Either
+  way the outline tool itself does not change.
+- [ ] **Step 4: Live cases** (`coverage/system.live.test.ts` or C8's file, both systems): the
+  outline of a class the test creates lists its methods with positions, and those lines in
+  the source hold the method.
+- [ ] **Step 5: MIGRATION-24.0.** The section names the three removed tools and their
+  replacements:
+  - `GetAbapAST` / `GetAbapSemanticAnalysis` → `GetObjectOutline` for structure, plus the
+    source reads;
+  - `GetAbapSystemSymbols` → `GetObjectOutline` and `GetWhereUsed`, for what an object
+    defines and uses.
+
+  The section states why: they parsed ABAP with regular expressions, and SAP gives the
+  structure itself. CHANGELOG: Removed, and Added.
+- [ ] **Step 6: Commit.**
+
+### D6. No regular expression in production code (the rest)
+
+**Scope:** every site of the regex inventory not removed by D3–D5:
+- class C (36), class D (16) and class B (5): names, arguments, URIs, timestamps, literals;
+- the class E sites outside the removed tools: `handleGetIncludesList.ts`'s INCLUDE line scan,
+  `handleGetStructuresList.ts`' DDL include and `extend type` scan, `serviceBindingFacts.ts`'
+  CDS `expose` / association / redirect scan, `writeTests.ts`' INCLUDE line and
+  `escapeRegExp`, `connectionFactory.ts`' redaction test;
+- `scripts/portable/*` and `tools/*.js`.
+
+**Steps:**
+- [ ] **Step 1: Failing tests per file,** for the inputs the regex mishandles (a CR-only line
+  end, a lower-case keyword, a namespaced name `/NS/NAME`, an empty segment, a glob with
+  `.`), each asserting the plain-code result.
+- [ ] **Step 2: Replace with plain string code:** `indexOf`, `slice`, `split` on fixed
+  literals, `URL` / `URLSearchParams`, a linear glob matcher for package patterns, character
+  tests by char code, set membership for SAP's message-type letters, `trimEnd`, and a
+  lower-cased set for the redaction names.
+- [ ] **Step 3: The source scans in kept tools — owner decision (open item DO2):**
+  - `GetIncludesList` (the INCLUDE statements of a program's source);
+  - `GetStructuresList` (DDL `include` / `extend type`);
+  - service-binding facts (the CDS `expose` lines).
+
+  The choice is (a) a plain line scanner without regex, keeping today's readings; or (b) a
+  SAP-backed reading (the outline of D1/D5, the where-used list, or the object structure),
+  as the owner chose for the ABAP parsers. The recommendation is (b) where D1 shows SAP
+  states it, otherwise (a).
+- [ ] **Step 4: Widen the guard.** `src/__tests__/unit/sources/noRegexOverInput.test.ts`
+  scans every git-tracked production file of every package (`src`, `scripts`, `tools`, as the
+  inventory did: `.ts`, `.js`, `.mjs`, `.cjs` outside `__tests__`) for a regular-expression
+  literal and any `RegExp` construction. There is no allowlist, and the per-file and
+  per-function lists it holds today go. Fixtures: a literal, `new RegExp`, `RegExp(` and a
+  regex in a `.cjs` script are each refused. The scan must find all 211 inventory sites on the
+  code before this stage (red), and zero after.
+- [ ] **Step 5:** Run `npm test`, `npm run test:check` and every package's `lint:check`:
+  PASS. Mutate one regex back in each tree (`src`, `scripts`, `tools`): red.
+- [ ] **Step 6: Commit, per area.**
+
+### D7. Function modules: the group is checked (#2)
+
+**Files:** `src/handlers/function/high/handleUpdateFunctionModule.ts`,
+`src/handlers/function/low/handleUpdateFunctionModule.ts`,
+`src/handlers/function_module/high/handleGetFunctionModule.ts`,
+`src/handlers/function/low/handleActivateFunctionModule.ts`, and the compact routes that
+reach them.
+
+- [ ] **Step 1: Failing tests** on `recordingConnection`, from the live measurement (SAP
+  ignores the group segment):
+  - `'UpdateFunctionModule with another group's name is refused after one metadata read,
+    nothing written'`: requests pinned — exactly the metadata GET, with its
+    `adtcore:containerRef` naming the real group, then nothing;
+  - the same for `GetFunctionModule` and `ActivateFunctionModule`;
+  - the matching group goes on: the metadata GET pinned before the existing requests.
+- [ ] **Step 2:** Each handler reads the module's metadata first (one GET) and refuses when
+  `function_group_name` differs from `adtcore:containerRef`'s name. For `GetFunctionModule`'s
+  metadata part, that read is the answer itself.
+- [ ] **Step 3: Compact.** `HandlerGet`, `HandlerUpdate`, `HandlerActivate`,
+  `HandlerDelete` and `HandlerDeletionCheck` take the group (`function_group_name`, or
+  `GROUP|MODULE` in `object_name`) and route to these handlers, so they check it the same
+  way. Their pins gain the metadata GET.
+- [ ] **Step 4:** CHANGELOG (Fixed): "the function-module tools refuse a function group that
+  does not hold the module". Commit.
+
+### D8. GetUnitTestResult waits only for a running run (#3)
+
+**Files:** `src/handlers/unit_test/shared/resultOnce.ts` (`readRunOnce`),
+`src/handlers/unit_test/shared/pollRun.ts`; the compact result tools that share them.
+
+- [ ] **Step 1: Failing tests** on `recordingConnection`:
+  - `'an unknown run answers NOT_STARTED at once'`: one status read **without**
+    `withLongPolling`, its answer `NOT_STARTED`, no second read;
+  - `'a running run is long-polled'`: the first read without long polling says running, the
+    second carries `withLongPolling=true`;
+  - `'a finished run is read without waiting'`;
+  - `'the run id is encoded in the URL'`.
+- [ ] **Step 2:** `readRunOnce` reads the status first without long polling. It long-polls
+  only a run whose status says it is running, re-reading after each answer with no limit and
+  no timer (SAP holds about 300 s per read, measured).
+- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+
+### D9. Held locks on stdio (#4)
+
+**Files:** `src/lib/state/heldLocks.ts` (`lockHeldHere`), the stdio server's instance setup
+(`server-runtime/src/stdio/…`, beside how `StreamableHttpServer.ts` creates its
+`heldLocks`), `src/handlers/common/low/handleUpdateUnderLock.ts`,
+`handleDeleteOnly.ts`, `compact-modify/src/handlers/handleHandlerUnlock.ts`.
+
+- [ ] **Step 1: Failing tests** (stdio, in process):
+  - `'an unlock with a handle this instance did not issue is refused before sending'`: zero
+    requests;
+  - `'an update under a foreign handle is refused before sending'`;
+  - `'the instance's own handle unlocks'`: the UNLOCK is pinned.
+
+  SAP releases the session's lock on any handle (measured), so the refusal is ours to make.
+- [ ] **Step 2:** The stdio instance owns a `HeldLocks`, as the Streamable HTTP server does.
+  `lockHeldHere` no longer answers true for an absent owner; every transport has one.
+- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+
+### D10. Compact debug end ends the batch answers (#5)
+
+**Files:** `src/lib/compact/debug/shared.ts` (`endAnswer`).
+
+- [ ] Step 1: Failing test, `'HandlerDebugSession end after HandlerDebugBatch ends the debug
+  state and a new session can start'`, on `adtStandIn` through `pinServer`.
+- [ ] Step 2: `endAnswer` calls `endDebugBatchAnswers`. Run: PASS.
+- [ ] Step 3: CHANGELOG (Fixed). Commit.
+
+### D11. Package walks (#6, GetPackageContents' unknown package)
+
+**Files:** `src/lib/strategies/packageWalk.ts` (`walkPackages`, `walkPackage`),
+`src/handlers/package/readonly/handleGetPackageContents.ts`.
+
+- [ ] **Step 1: Failing tests** over the measured node-structure answers (the root and the
+  `DEVC/K` node both list the subpackages):
+  - `'each subpackage is listed once'` (5 entries, not 9);
+  - `'GetPackageContents refuses an unknown package'`: an existence read like
+    `GetPackageTree`'s, pinned, answering not found.
+- [ ] **Step 2:** De-duplicate by object identity (type and name). Read the package's
+  existence first.
+- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+
+### D12. Service definitions, bindings, message classes, transports (#10, #12, #16, #17, #18)
+
+- [ ] **#10 `CreateServiceDefinition` without `source_code` — owner decision (DO3):** (a)
+  write the promised template, or (b) the description stops promising it, and an empty
+  definition is created as SAP does. The recommendation is (b): the server invents no
+  content. Test and CHANGELOG follow the decision.
+- [ ] **#12 message class.**
+  - **Fixed now:** `DeleteMessageClass` and `DeleteMessageClassMessage` relay SAP's answer
+    instead of a constant success. Failing tests over the corpus answers (an unknown class,
+    an unknown number).
+  - **Owner decision (DO4):** SAP answers `201` to a duplicate class or a bad package and
+    creates nothing, and a message create and update are one upsert. Fixable only by reads
+    of ours:
+    - a read after `CreateMessageClass` that refuses when the class is absent;
+    - a read before `CreateMessageClassMessage` that refuses an existing number;
+    - a read before `UpdateMessageClassMessage` that refuses an unknown number.
+
+    The recommendation is to add them, each one pinned GET.
+- [ ] **#16 `GetTransport` counts:** `object_count` and `task_count` are read from the request
+  document even when `include_objects` / `include_tasks` are false. Failing test over the
+  corpus document, then the fix.
+- [ ] **#17 `CreateFunctionGroup`:** the `activate` parameter's description states what
+  happens (SAP creates a function group active). A test of the description, and CHANGELOG.
+- [ ] **#18 `DeleteServiceBinding`:** the answer names the binding, not SAP's internal id.
+  Failing test, then the fix. SAP's acceptance of an unknown service definition stays SAP's
+  (measured); a pre-check is not added.
+- [ ] Commit per item.
+
+### D13. Version tools (#24, #25)
+
+**Files:** `src/handlers/common/readonly/resolveVersionedObject.ts`
+(`analyseUnsupportedStatus([404, 406], …)`), `handleGetObjectVersionSource.ts`,
+`src/handlers/common/high/objectVersionTools.ts`.
+
+- [ ] **Step 1: Failing tests:**
+  - `'a version list of an unknown object answers not found'`: the 404 body's exception type
+    (`ExceptionResourceNotFound`, from the corpus or a live capture) read with the parser; a
+    406 stays "no version history";
+  - `'a content_uri that is not a version URI of the named object is refused before
+    sending'`: another object's URI, a `../` path and an absolute URL are each refused with
+    zero requests;
+  - the object's own version URI goes on (pinned).
+- [ ] **Step 2:** Read the exception type, not the status alone. Check `content_uri` with plain
+  string code against the object's own versions path.
+- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+
+### D14. Remaining contract fixes (#26, the doubts)
+
+- [ ] **#26 `GetAdtTypes`' `validate_type` — owner decision (DO5):** implement it or remove
+  it. The recommendation is to remove it, since it does nothing. Either way: listed-schema
+  fixture, MIGRATION if removed, CHANGELOG.
+- [ ] **`HandlerGetData` with both `object_name` and `sql_query` — owner decision (DO6):**
+  refuse the pair, or document that `sql_query` wins. The recommendation is to refuse it:
+  the model should not be silently ignored. The test follows the decision.
+- [ ] **`GetObjectNodeFromCache` — owner decision (DO7):** its cache is a process-wide module
+  global, shared by every session, against the owner's MCP rule. Either (a) instance-scoped
+  state behind an explicit owner, or (b) remove the tool (the campaign found it always
+  answers "not in cache"). The recommendation is (b), with MIGRATION.
+- [ ] **`GetServiceBinding` `response_format: json`:** answers the parsed document as JSON,
+  not the raw XML string. Failing test, then the fix.
+- [ ] **Profiler:** `RuntimeAnalyzeProfilerTrace`'s `top` of 0 or less, and a negative
+  `max_size_for_trace_file`, are refused by the schema (`refusal: 'thrown'`), not clamped.
+  Failing tests, then the fix. CHANGELOG and the listed-schema fixture.
+- [ ] Commit per item.
+
+### Defect-stage open items (owner decisions; none decided silently)
+
+- **DO1:** how the model reads a range of source (D5). The recommendation is an optional line
+  range on the source reads.
+- **DO2:** the source scans in kept tools (D6). The recommendation is SAP-backed where D1
+  shows SAP states it, otherwise a plain line scanner.
+- **DO3:** the SRVD template (D12). The recommendation is that the description stops
+  promising it.
+- **DO4:** the message-class reads before and after writes (D12). The recommendation is to add
+  them.
+- **DO5:** `validate_type` (D14). The recommendation is to remove it.
+- **DO6:** `HandlerGetData` with both arguments (D14). The recommendation is to refuse the
+  pair.
+- **DO7:** `GetObjectNodeFromCache` (D14). The recommendation is to remove it.
+- **DO8:** the outline tool's name (D5). The proposal is `GetObjectOutline`.
+- **DO9:** the prose guard's form (D3). It recognises SAP-derived values by type and flow,
+  with no allowlist. Its limit: values that cross modules are left to review.
+
+## Test coverage — the families
+
 ### C3. Activate
 
 **Keys:**
@@ -1583,7 +2023,8 @@ answers are corpus documents.
 ### C10. System, search and data readers
 
 **Keys:**
-- `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols`, `GetAdtTypes`,
+- (`GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols` are removed in D5; the
+  outline tool's keys are C8's.) `GetAdtTypes`,
   `GetInactiveObjects`, `GetObjectInfo`, `GetObjectNodeFromCache`, `GetObjectStructure`,
   `GetObjectsByType`, `GetTransaction`, `SearchObject`, `SearchSource`, `GetWhereUsed`,
   `DescribeByList`, `GetSqlQuery`, `GetTableContents`.
@@ -1598,7 +2039,8 @@ not offer is reported to the owner.
 
 **Live:**
 - **Existing suites** move to `liveCall`: `SystemHighHandlers`, `SearchSourceHandler`,
-  `WhereUsedHandlers`, `SqlQueryHandlers`, `TableContentsHandlers`, `AbapSystemSymbolsHandler`.
+  `WhereUsedHandlers`, `SqlQueryHandlers`, `TableContentsHandlers` (`AbapSystemSymbolsHandler`
+  is deleted with its tool in D5).
 - **New: `coverage/system.live.test.ts`,** section `coverage_system`, for the rest. It reads
   shared objects; `GetTransaction` reads a transaction named in the section.
 - **Cloud.** `GetSqlQuery` and `GetTableContents` read a table of the test package on the
@@ -1973,6 +2415,9 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - `tests/README.md` and `tests/test-config.yaml.template`'s header: `expected_realm`, the
       `coverage_*` sections, `$TMP` on premise and the configured package on the cloud;
     - guides and examples that show a test or a config;
+    - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
+      (spec §9: the three removed tools with their replacements, the outline tool, every
+      argument now refused, and the owner's decisions DO1–DO9 as decided);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
       activation waits on long polling with no attempt limit or interval) and C2d's added

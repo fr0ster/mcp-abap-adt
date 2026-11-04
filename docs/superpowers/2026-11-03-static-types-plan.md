@@ -137,8 +137,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
 
 The stage runs after step 17 and before step 18. It is written as tasks C1–C16, each with its
 own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
-and open items") and applied in the tasks; the one item still open there (O4 / O5) waits for him before the
-task that needs it.
+and open items") and applied in the tasks; none is still open.
 
 **Global constraints.** Every task's requirements include these:
 - **Commands.** npm scripts only. Never `npx`, `npm exec`, `node_modules/.bin` or `ts-node`.
@@ -313,6 +312,10 @@ and live specifics.
   - `deleteRecorded(): Promise<void>`, for `afterEach`, children before parents (reverse
     creation order).
   - `expectNameFree(read: { tool: string; args: ToolArgs }): Promise<void>`
+  - `recordCreatedRequest(transportNumber: string): void` and
+    `deleteRecordedRequests(): Promise<void>`: deletes only recorded request and task numbers
+    through `createAdtClient(connection).getRequest().delete` on the test's own connection, in
+    the order C13 measures, then asserts each absent with `GetTransport`.
 - **`ledgerScan.ts`**
   - `scanUnitFile(path: string): readonly PinRef[]`
   - `scanLiveFile(path: string): readonly LiveRef[]`
@@ -562,8 +565,9 @@ chains are built per operation, not from one type list:
   extension; a BDEF over the test's own root view (C3's rule); a service definition before its
   binding. Objects go into `$TMP` or the configured package, which the test does not create.
 
-**Pending:** O4 / O5 (still open) for the `HandlerCreate#TRANSPORT` live case only; its pin
-and every other key do not wait.
+**Owner's decision applied:** O4 / O5 — `HandlerCreate#TRANSPORT`'s live case creates its own
+request and records it; `deleteRecordedRequests` deletes it and asserts it absent (C13's
+delete path).
 
 **Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. **Every operation × type key
 gets its own literal pin, per variant** (O2): `HandlerCreate#<type>` (19 on premise, 17 on the
@@ -793,19 +797,28 @@ C16's (server-dispatched).
 - Compact: `HandlerTransportCreate`, `HandlerTransportMoveObjects`,
   `HandlerTransportSortAndCompress`.
 
-**Pending:** O4 / O5 (still open: the owner prefers one request at all). The pins do not
-wait; the live cases of `CreateTransport`, `CreateTransportTask` and `HandlerTransportCreate`
-are written after his answer.
+**Owner's decision applied:** O4 / O5.
+
+**First, measure the delete path live** (owner's go, realm check, the on-premise system, then
+the cloud): create one request with one task through `CreateTransport` / `CreateTransportTask`,
+then delete through `getRequest().delete` — the task by its number, then the request — and read
+each with `GetTransport`. Record here which order and which numbers ADT accepts; the cleanup
+below follows it.
 
 **Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
 
 **Live:**
 - **The existing `TransportObjectToolsCrud`** moves to `liveCall`.
 - **New: `coverage/transport.live.test.ts`,** section `coverage_transport`.
-  - **Objects.** A transportable package named in the section; `$TMP` cannot be recorded.
-    The test creates a request and a task, and adds and removes an object it created.
-  - **Never** release a request.
-  - **Requests and the cloud:** pending O4 / O5.
+  - **Creates.** `CreateTransport`, `CreateTransportTask`, `HandlerTransportCreate` each create
+    their own request or task, assert it reads back (`GetTransport`), and record the number
+    (`recordCreatedRequest`). Cleanup deletes only recorded numbers, in the measured order,
+    then asserts each absent.
+  - **Everything else** works on `coverage_transport.request`: an object the test creates in the
+    section's transportable package is added, read in the request's objects and action log,
+    moved and sorted within that request's task, then removed — the request is left as it was.
+    The object is deleted by `deleteRecorded`.
+  - **Never** release a request. Cloud cases follow the discovery rule (O7 / O8).
 
 **Steps:** the family steps. 7.
 
@@ -959,6 +972,24 @@ This covers the four compact handlers no test runs today.
   `HandlerDebugStep` 7, `HandlerDebugMaintain` 7 values); `HandlerBatch`, `HandlerDebugBatch`
   (`begin`, `end`, `answers`) and `HandlerSession` (`open`, `close`) use `action`; the
   background-run and leftover tools have neither (C1, C15, C16).
+- **O4 / O5 — transport requests.**
+  - `CreateTransport` and `CreateTransportTask` get live cases: the test creates a new request
+    (and a task in it), records the numbers from the answers, and its cleanup deletes only
+    those, empty and never released, then asserts each absent. No exception list.
+  - The compact `HandlerTransportCreate` and `HandlerCreate#TRANSPORT` create a request the same
+    way and follow the same rule (applied by the controller from the owner's answer, to be
+    confirmed by him in review).
+  - Every other transport case (add and remove an object, read objects, action log, get, list,
+    move, sort and compress) works with **one request named in the config**
+    (`coverage_transport.request`); no request is created for it; nothing is released.
+  - **The delete path.** No tool deletes a request (`HandlerDelete`'s enum has no
+    `TRANSPORT`). adt-clients 42.1.0 has it: `AdtRequest.delete(config, { headers })` and
+    `AdtRequest.checkDeletion(config, { headers })`, reached by
+    `createAdtClient(connection).getRequest()` — `DELETE /sap/bc/adt/cts/transportrequests/<n>`
+    (`core/transport/delete.js`), accepted by ADT only for an empty, unreleased request. The
+    test calls it on its own connection. Whether the same `DELETE` removes a task by the task's
+    number, and whether a request's empty task must go first, is **measured live before C13**
+    (on the request and task one test run creates) and recorded in C13.
 - **O12 — config sections: listed here, supplied by the owner.** The controller does not write
   the owner's `tests/test-config.yaml`. Before the first live run of each task (and before step
   18) the owner adds the sections below from the template, with the values named:
@@ -974,21 +1005,16 @@ This covers the four compact handlers no test runs today.
   | `coverage_versions` | per type, one object with two or more versions, per system |
   | `coverage_system` | a transaction code to read |
   | `coverage_runtime` | free probe class and (on premise) probe program names |
-  | `coverage_transport` | a transportable package on premise (pending O4/O5) |
+  | `coverage_transport` | per system: a transportable package, and `request` — one modifiable request of the test user with a task, used by every transport case but the creates |
   | `coverage_sessions` | a free probe class name; `launch_http: true` for the long sessions |
   | `debugger_handlers` | `second_user_env` (a second user's session file) for the other-user case |
 
-**Still open (not decided):**
-- **O4 / O5. Transport requests — pending the owner's answer.** The owner said it is better to
-  use one request at all. How the `CreateTransport` / `CreateTransportTask` (and
-  `HandlerCreate#TRANSPORT`, `HandlerTransportCreate`) live cases fit that, on premise and on
-  the trial, waits for his answer. C6's transport row and C13 do not start their live cases
-  until then; their pins do not wait.
+**Nothing is still open.**
 
 ### Where each decision is needed first
 
-O4 / O5 (pending) → C6's `HandlerCreate#TRANSPORT` live case, then C13. The decided items
-apply as named above.
+O4 / O5 → C6's `HandlerCreate#TRANSPORT` live case, then C13 (after the delete-path
+measurement). The other decisions apply as named above.
 
 ## Live runs and release
 
@@ -1022,9 +1048,10 @@ apply as named above.
 19. Run CI's full step list locally, including the pack, the install check and the images.
     Then run Codex review and CI, and get the owner's review.
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
-    PR description: the open items' outcomes, the exceptions the owner granted, the per-system
-    run counts and the config sections the owner's file needed. Then wait for the owner's merge and tag, the publish, and the registry
-    check.
+    PR description: the owner's decisions (O1–O12), the exceptions the owner granted (none so
+    far), the measured transport delete path, the per-system run counts and the config
+    sections the owner's file needed. Then wait for the owner's merge and tag, the publish,
+    and the registry check.
 
 ## Appendix A — implicit any
 

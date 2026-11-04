@@ -276,6 +276,11 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
   - Cleanup deletes only names recorded after a successful create.
 - **Never:** SM12 (a lock left behind is a failure, and the session's logoff releases it), and
   never release a transport.
+- **Transport requests** (the owner's decision). A case of a tool that creates a request or a
+  task (`CreateTransport`, `CreateTransportTask`, and the compact `HandlerTransportCreate`,
+  `HandlerCreate#TRANSPORT`) creates its own, records its number, and its cleanup deletes it —
+  only that number, empty and unreleased — then asserts it absent. Every other transport case
+  works on one request named in the config; no request is created for it.
 - **Debugger cases** stop their listener and log off their session in `afterAll`.
 - **Any credential refusal stops everything.** It is detected wherever a request can go: in
   `globalSetup` (a refusal there is fatal; today it is logged and the run goes on), at every

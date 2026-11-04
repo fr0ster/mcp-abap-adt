@@ -63,7 +63,8 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
 - **Lists and docs.** `tools/list`, the variant projections, the docs generator and
   `tool-search.json` read the JSON Schema from zod (`z.toJSONSchema`). A test checks that every
   tool's listed schema stays as it is today, compared with a fixture captured before the change.
-  A difference is a defect of the migration, unless it is one of §4's fixes.
+  A difference is a defect of the migration, unless it is one of §4's fixes or the
+  owner-approved optional `with_long_polling` of `HandlerGet` (§8; plan C2d).
 
 ## 3. Compact routes
 
@@ -373,3 +374,9 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
 4. **A defect is fixed here.** A defect a pin or a live case shows is fixed in this PR, with a
    test that fails first (the goal's first invariant), and gets a CHANGELOG line. Tests alone
    change no user-visible behaviour and touch neither CHANGELOG nor MIGRATION.
+5. **Two owner-approved changes** come with the stage and are the only other exceptions to
+   "every answer stays as it is": a group activation waits for its run on long polling, with
+   no attempt limit or interval (plan C2c, a behaviour fix: CHANGELOG); and `HandlerGet` takes
+   an optional `with_long_polling` for `activation_status` (plan C2d, an added optional
+   parameter: CHANGELOG, MIGRATION as an addition, the listed-schema fixture updated for that
+   key alone). Everything else stays identical.

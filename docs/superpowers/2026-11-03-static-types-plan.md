@@ -597,6 +597,12 @@ and live specifics.
     answered `401` — records exactly LOCK and PUT: no UNLOCK (`withLock.ts` tries one after
     the body's failure), no activation, no logoff over the refused session; the call fails and
     the marker exists;
+  - `'a terminal refusal on a sibling connection stops every connection'`: a guarded
+    connection opens a sibling through `openFreshConnection` (as the debugger listener does);
+    the stand answers the sibling's request `401` with a basic credential; the marker exists,
+    and neither the sibling nor the first connection sends anything after it;
+  - `'a sibling of a guarded connection is guarded'`: `openFreshConnection` on the wrapper
+    succeeds (no `fresh_connection_unavailable`) and returns a guarded connection;
   - `'a renewed credential latches nothing'`: a credential that renews — the `PUT` answered
     `401`, the connection renews and resends, the stand answers `200` — the call succeeds, the
     UNLOCK follows, and no marker exists;
@@ -611,13 +617,30 @@ and live specifics.
     C2b's measurement connections, the in-process live server `liveCall` uses) is wrapped
     once by `refusalGuardedConnection` (new, in
     `src/__tests__/integration/helpers/refusalGuard.ts`).
-    - **Its type.** `IAbapConnection` has no `disconnect`, and the helpers create the concrete
-      connection (`AbstractAbapConnection` of `@mcp-abap-adt/connection`, through
-      `createAbapConnection`). So the guard declares
-      `type GuardedConnection = Pick<AbstractAbapConnection, 'connect' | 'makeAdtRequest' | 'disconnect' | 'flushGoodbye' | <the accessors the helpers read>>`
-      and `refusalGuardedConnection(connection: AbstractAbapConnection): GuardedConnection`
-      builds a plain object delegating each member — no cast, no subclass. The helpers keep
-      the concrete instance they created and pass it, so the type is the class's own.
+    - **Its type.** `IAbapConnection` has no `disconnect`, and `@mcp-abap-adt/connection`
+      19.1.0 does not export `AbstractAbapConnection` from its root. The guard is based on
+      the root's exported `CreatedConnection` (what `createConnection` returns):
+      `type GuardedConnection = Pick<CreatedConnection, 'connect' | 'makeAdtRequest' | 'disconnect' | 'flushGoodbye' | <the accessors the helpers read>>`
+      and `refusalGuardedConnection(connection: CreatedConnection, sibling: () => CreatedConnection): GuardedConnection`
+      builds a plain object delegating each member — no cast, no subclass.
+    - **A step first, so the type reaches the helpers without a cast.** `createAbapConnection`
+      (`src/lib/connectionFactory.ts`) declares `IAbapConnection` as its return type although
+      every branch returns `createConnection(…)` (or `withHttpWireLog(createConnection(…))`).
+      Its declared return type becomes `CreatedConnection` — narrower, so no caller breaks —
+      provided `withHttpWireLog` keeps the type (made generic over its argument if it does
+      not); a test-type check (`__typechecks__`) proves the helpers receive
+      `CreatedConnection`. It is a production type change, named in the CHANGELOG with the
+      rest of 24.0.0's exported types if `createAbapConnection` is exported (it is checked at
+      the step).
+    - **Siblings are guarded too.** `openFreshConnection` (`src/lib/packageSessions.ts`) finds
+      how to make a sibling by the connection object's identity — `siblingRecordOf` for one
+      the factory built, `hostFactories` for an injected one — so a plain wrapper gets
+      `fresh_connection_unavailable`, and the debugger, background runs and package locks open
+      siblings. So `refusalGuardedConnection` registers, for the wrapper object, a fresh
+      factory (`registerFreshConnectionFactory(guarded, factory)`, the exported registry) that
+      builds the sibling through `sibling()` — `createAbapConnection` with the same settings
+      and credential — and returns it wrapped the same way, registered in turn. Every
+      connection a guarded one spawns is guarded.
     - **What it guards.** `connect`, `makeAdtRequest` and `disconnect` explicitly: each first
       checks the marker and refuses without sending once it exists.
     - **When it latches.** When a call **ends** in a credential refusal — after the
@@ -743,8 +766,13 @@ listed schemas have none; `handleGetActivationStatus` is reached only through `H
 
 **Files:**
 - Modify: `src/handlers/common/readonly/handleGetActivationRun.ts`
-  (`handleGetActivationStatus`), `HandlerGet`'s schema in
-  `compact-readonly-entries/src/handlers/handleHandlerGet.ts` (the optional key),
+  (`handleGetActivationStatus`); `HandlerGet`'s schema, which `compactGetSchemaFor` builds in
+  `src/lib/compact/compactSchemas.ts` — the new key in `GET_PROPERTIES` (with its
+  description) and in `COMPACT_READ_TAKES.every`, beside `run_id`, so every variant offers it
+  (`toolSet/variantProperties.test.ts` checks the `every` list); the run-part forwarding in
+  `compact-readonly-entries/src/handlers/handleHandlerGet.ts` (`RUN_PARTS`: today
+  `read(context, { run_id: args.run_id })`), which passes `with_long_polling` to
+  `handleGetActivationStatus` and nothing new to `handleGetActivationResults`;
   `tests/fixtures/tools/listed-schemas.json` and the surface fixtures (the added optional
   parameter — a schema change, fixed in the fixtures in this commit), `docs/` tool docs
   (`npm run docs:tools`), `CHANGELOG.md`.
@@ -762,9 +790,11 @@ listed schemas have none; `handleGetActivationStatus` is reached only through `H
   `/sap/bc/adt/activation/runs/<id>`; with `with_long_polling: true` — URL
   `…/runs/<id>?withLongPolling=true`; both whole-request literals. Run: FAIL (the argument is
   unknown).
-- [ ] **Step 2:** Add the argument and pass it through. Run: PASS; the listed-schema test fails
-  until the fixtures carry the new optional key — update them in the same commit, the diff
-  showing only that key.
+- [ ] **Step 2:** Add `with_long_polling` to `GET_PROPERTIES` and `COMPACT_READ_TAKES.every`,
+  forward it in `handleHandlerGet`'s run-part branch, and pass it in
+  `handleGetActivationStatus`. Run the pins: PASS. Run `variantProperties.test.ts`: PASS. The
+  listed-schema test fails until the fixtures carry the new optional key — update them in the
+  same commit, the diff showing only that key on every compact binary's `HandlerGet`.
 - [ ] **Step 3: Live cases** (in C3's `activate.live.test.ts`, both systems): a run the test
   starts is read with `with_long_polling: true` and answers a terminal status; read without,
   it answers at once.
@@ -832,9 +862,9 @@ activation answer is a corpus activation result.
         cancelled run, or an `E`/`A`/`X` message fails with the messages.
       - The single-object verdict is judged the same way: `activated` must be stated true
         (`activationExecuted` not false), whatever its messages.
-      - `HandlerGet#-#activation_status` (`handleGetActivationRun.ts`) passes only `analyse`,
-        no long polling; whether the tool should expose it is reported to the controller, and
-        the tool's behaviour is not changed here.
+      - `HandlerGet#-#activation_status` gets `with_long_polling` in C2d (decided); C3 depends
+        on C2d. Omitted, the read answers at once as before; with it, SAP holds the read until
+        the run ends. C3's keys pin and run both forms.
     - the prerequisite unit tests, written first, cover both flows on `adtStandIn` and
       replace the old poll's: `'single: an inline verdict with an error message fails,
       nothing more is sent'`, `'single: a cancelled inline verdict with no error message
@@ -1428,8 +1458,11 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - `tests/README.md` and `tests/test-config.yaml.template`'s header: `expected_realm`, the
       `coverage_*` sections, `$TMP` on premise and the configured package on the cloud;
     - guides and examples that show a test or a config;
-    - `CHANGELOG.md` / `MIGRATION-24.0.md`: only for a defect fixed in the stage (spec §8,
-      acceptance 4); confirm none else changed.
+    - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
+      acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
+      activation waits on long polling with no attempt limit or interval) and C2d's added
+      optional parameter (`HandlerGet` `with_long_polling`, in MIGRATION only as an addition
+      an embedder need not act on); confirm nothing else changed.
     Commit as `docs: the test-coverage stage`.
 19. Run CI's full step list locally, including the pack, the install check and the images.
     Then run Codex review and CI, and get the owner's review.

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateUnitTest — write the ABAP Unit tests of a class: its local test
@@ -18,7 +19,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.",
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateUnitTest', {
     class_name: z
       .string()
       .describe('Class that holds the tests. Must already exist.'),

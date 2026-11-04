@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransport Handler - Create ABAP Transport Request
@@ -40,7 +41,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP transport request in SAP system for development objects.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateTransport', {
     transport_type: z
       .enum(['workbench', 'customizing'])
       .default('workbench')

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateFunctionGroupUnitTest — give a function group ABAP Unit tests: create
@@ -18,7 +19,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the ABAP Unit test classes of the function group named by function_group_name, from test_class_source. They are written to a test include, which is activated with the group.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateFunctionGroupUnitTest', {
     function_group_name: z
       .string()
       .describe('Function group that gets the tests. Must already exist.'),

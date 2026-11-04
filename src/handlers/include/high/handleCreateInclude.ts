@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
@@ -29,7 +30,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateInclude', {
     include_name: z.string().describe('Include name.'),
     package_name: z.string().describe('Package name.'),
     description: z

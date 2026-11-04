@@ -75,7 +75,10 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
   `handleDeleteOnly`) take the compact tool's own typed arguments, and each per-type branch calls
   the target's `call`.
 - **This changes answers.** A wrong-typed argument that reaches a handler today is refused with
-  the schema's words, and an undeclared key is dropped. Every such change is a fix, with a
+  the schema's words, and an undeclared key is dropped — except by the create tools (compact
+  `HandlerCreate` and every full `Create*` tool), whose schemas are strict (the owner,
+  2026-11-05): an argument a create schema does not declare is refused before any request, the
+  refusal naming it as not an argument of the tool. Every such change is a fix, with a
   test of the refused case. Before the change, the plan lists every target handler that reads a
   key its own schema does not declare (`object_type` for example), and declares each one.
 

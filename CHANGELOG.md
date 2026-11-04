@@ -38,7 +38,10 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 ### Removed — breaking for a caller of `CreateClass`, `CreateProgram` and compact `HandlerCreate`
 
 - **`abstract` (CreateClass) and `program_type` (CreateProgram, HandlerCreate PROGRAM) are removed: SAP ignores both on create** (measured on premise — a class created `abstract="true"` is not abstract, and a module pool, a subroutine pool, `M` and `F` each gave an executable program). **Migrating:** leave them out; make a class abstract in its source, change a program's type after the create (MIGRATION-24.0).
-- A call that still gives either is parsed as any argument the schema does not declare: dropped, so the create carries no `class:abstract` and no `program:programType`.
+
+### Changed — breaking for a caller of the create tools: an undeclared argument is refused
+
+- **The create tools refuse an argument their schema does not declare** (the owner): compact `HandlerCreate` and every full `Create*` tool parse with a strict schema, so such an argument — `abstract` and `program_type` among them — is refused before any request: `<argument> is not an argument of <Tool>`. It was dropped without a word. `HandlerCreate` hands a delegated type only the arguments its target declares. Other tools are unchanged. **Migrating:** pass only the arguments the tool lists.
 
 ### Changed — the ADT dependencies: adt-clients 43, adt-strategies 0.19, interfaces-adt 26
 

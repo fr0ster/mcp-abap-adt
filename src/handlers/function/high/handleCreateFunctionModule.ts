@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateFunctionModule Handler - ABAP Function Module Creation via ADT API
@@ -35,7 +36,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP function module within an existing function group. Creates the function module in initial state.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateFunctionModule', {
     function_group_name: z.string().describe('Parent function group name'),
     function_module_name: z
       .string()

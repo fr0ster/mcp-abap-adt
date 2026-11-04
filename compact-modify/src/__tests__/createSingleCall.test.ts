@@ -374,21 +374,23 @@ describe('HandlerCreate is one POST', () => {
     expect(textOf(answered.answer)).toContain('has not been created');
   });
 
-  // 24.0.0 (D2): a program create takes no program type — SAP ignores it
-  // on create (measured). One still given is not declared, so the parse
-  // drops it: the one create is sent, carrying no program type.
-  it('PROGRAM with program_type: dropped, the one create sent without one', async () => {
-    const held = await run(
-      'pending',
+  // 24.0.0 (D2, the owner): a program create takes no program type — SAP
+  // ignores it on create (measured). One still given is not an argument of
+  // HandlerCreate: refused before any request, naming it.
+  it('PROGRAM with program_type: refused before any request, naming it', async () => {
+    const answered = await run(
+      'answered',
       create('PROGRAM', {
         program_name: 'ZPROG_A',
         package_name: 'ZPKG_A',
         program_type: 'include',
       }),
     );
-    expect(held.sent).toHaveLength(1);
-    expect(held.sent[0].method).toBe('POST');
-    expect(String(held.sent[0].data)).not.toContain('programType');
+    expect(answered.sent).toEqual([]);
+    expect(answered.answer?.isError).toBe(true);
+    expect(textOf(answered.answer)).toContain(
+      'program_type is not an argument of HandlerCreate',
+    );
   });
 
   // A type whose create is a target tool's is parsed with that tool's
@@ -574,7 +576,8 @@ const SAMPLE: Record<string, unknown> = {
 /**
  * Every argument a caller of 18 could give `HandlerCreate` (its schema then)
  * and a few no create names: what the schema declares and no create sends is
- * refused; what it does not declare is dropped by the parse (spec §3).
+ * refused; what it does not declare is refused by the parse too, naming it
+ * (spec §3, the owner's decision for the create tools).
  */
 const KNOWN: Record<string, 'string' | 'boolean' | 'number' | 'array'> = {
   activate: 'boolean',
@@ -719,14 +722,17 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
   );
 
   it.each(UNDECLARED_CASES)(
-    '%s with %s = %s, which the schema does not declare: dropped, the one create sent',
+    '%s with %s = %s, which the schema does not declare: refused before any request, naming it',
     async (objectType, name, _shown, value) => {
-      const held = await run(
-        'pending',
+      const answered = await run(
+        'answered',
         create(objectType, { ...fieldsOf(objectType), [name]: value }),
       );
-      expect(held.sent).toHaveLength(1);
-      expect(held.sent[0].method).toBe('POST');
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        `${name} is not an argument of HandlerCreate`,
+      );
     },
   );
 
@@ -746,12 +752,26 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
     );
   });
 
+  // A declared argument given as undefined is absent: `superclass` is
+  // declared and DOMAIN's create does not send it. An undeclared one is
+  // refused whatever its value — the strict parse reads the key.
   it('an argument given as undefined is absent', async () => {
     const held = await run(
       'pending',
-      create('DOMAIN', { ...fieldsOf('DOMAIN'), activate: undefined }),
+      create('DOMAIN', { ...fieldsOf('DOMAIN'), superclass: undefined }),
     );
     expect(held.sent).toHaveLength(1);
+  });
+
+  it('an undeclared argument given as undefined is refused, naming it', async () => {
+    const answered = await run(
+      'answered',
+      create('DOMAIN', { ...fieldsOf('DOMAIN'), activate: undefined }),
+    );
+    expect(answered.sent).toEqual([]);
+    expect(textOf(answered.answer)).toContain(
+      'activate is not an argument of HandlerCreate',
+    );
   });
 
   it.each(TYPES.map(([type]) => [type]))(

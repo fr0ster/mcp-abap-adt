@@ -30,6 +30,7 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
@@ -43,7 +44,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreatePackage', {
     package_name: z.string().describe('Package name.'),
     description: z
       .string()

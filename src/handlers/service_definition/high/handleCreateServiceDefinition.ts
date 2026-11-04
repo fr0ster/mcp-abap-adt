@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
@@ -50,7 +51,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a service definition that exposes CDS views as an OData service, in initial state.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateServiceDefinition', {
     service_definition_name: z.string().describe('Service definition name.'),
     description: z
       .string()

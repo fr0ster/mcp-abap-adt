@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateFunctionInclude Handler - ABAP Function Group Include Creation via ADT API
@@ -30,7 +31,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP include within an existing function group. Creates the include in initial state.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateFunctionInclude', {
     function_group_name: z.string().describe('Parent function group name'),
     include_name: z.string().describe('Include name.'),
     description: z

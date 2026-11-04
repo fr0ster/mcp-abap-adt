@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
@@ -63,7 +64,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP structure in SAP system. Creates the structure object in initial state.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateStructure', {
     structure_name: z.string().describe('Structure name.'),
     description: z
       .string()

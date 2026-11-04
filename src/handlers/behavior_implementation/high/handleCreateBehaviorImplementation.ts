@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateBehaviorImplementation Handler - Create ABAP Behavior Implementation Class
@@ -39,7 +40,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateBehaviorImplementation', {
     class_name: z.string().describe('Behavior Implementation class name.'),
     behavior_definition: z
       .string()

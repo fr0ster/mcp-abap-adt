@@ -18,6 +18,7 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
+import { createArguments } from '../handlers/createArguments';
 import { listedValues } from '../handlers/listedValues';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import { TIMEOUT_DESCRIPTION, TIMEOUT_FIELD } from '../longTools';
@@ -319,7 +320,7 @@ export function compactCreateSchemaFor<const M extends readonly CreateMember[]>(
     object_type: objectTypeOf(members),
     ...CREATE_PROPERTIES,
   } as const;
-  return z.object({
+  return createArguments('HandlerCreate', {
     ...offered(properties, COMPACT_CREATE_TAKES, members),
     object_type: requiredField(properties.object_type),
   });

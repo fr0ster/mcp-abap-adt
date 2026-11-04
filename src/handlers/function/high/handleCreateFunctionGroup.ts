@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
@@ -47,7 +48,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateFunctionGroup', {
     function_group_name: z
       .string()
       .describe('Function group name. Up to 26 characters.'),

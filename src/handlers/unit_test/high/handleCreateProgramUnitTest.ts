@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateProgramUnitTest — give a report ABAP Unit tests: create its test
@@ -18,7 +19,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Creates the ABAP Unit test classes of the report named by program_name, from test_class_source. They are written to a test include, which is included into the report, and the report is activated.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateProgramUnitTest', {
     program_name: z
       .string()
       .describe('Report that gets the tests. Must already exist.'),

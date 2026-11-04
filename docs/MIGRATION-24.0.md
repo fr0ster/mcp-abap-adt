@@ -150,8 +150,19 @@ ignores both on create; set them afterwards. Measured on premise: a class create
 module pool, a subroutine pool, `M` or `F` is an executable program. A class is abstract by its
 source's `ABSTRACT`; a program's type is the program's attribute, changed after the create.
 
-A call that still names `abstract` or `program_type` is parsed as any argument the schema does not
-declare: the argument is dropped, and the create carries neither.
+A call that still names `abstract` or `program_type` is refused before any request, as any
+argument a create tool does not declare (below).
+
+## Callers of the create tools: an argument the schema does not declare is refused
+
+Compact `HandlerCreate` and every full `Create*` tool refuse an argument their schema does not
+declare, before any request: `Input validation error: Invalid arguments for tool <Tool>:
+<argument> is not an argument of <Tool>`. 23.x dropped such an argument without a word, so a
+misspelt or removed option (`abstract`, `program_type`) went unnoticed. `HandlerCreate` hands a
+type it delegates (`CLASS`, `PROGRAM`, `PACKAGE`, …) only the arguments the target tool declares.
+The other tools keep dropping an undeclared argument.
+
+**What you do:** pass only the arguments the create tool lists.
 
 **What you do:** leave both out of the create; make the class abstract in its source (`UpdateClass`)
 and change the program's type after it is created.

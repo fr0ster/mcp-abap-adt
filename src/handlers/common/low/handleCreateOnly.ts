@@ -67,6 +67,7 @@ import {
   defineTool,
   type HandlerContext,
   type ToolArgs,
+  type ToolDefinition,
 } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -160,22 +161,46 @@ function notSentRefusal(names: string[]) {
 type Args = z.output<typeof compactCreateSchema>;
 
 /**
+ * A target tool's call over the arguments it declares. `HandlerCreate`'s
+ * own schema has refused every argument it does not declare, and `notSent`
+ * every one the type's create does not carry; what is left that the target
+ * does not declare is `HandlerCreate`'s alone (`object_type`, an argument
+ * every type accepts but this create does not send). The target's schema is
+ * strict, so it is handed only its own.
+ */
+function delegate<S extends z.ZodObject, R>(
+  definition: ToolDefinition<S>,
+  handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
+): (context: HandlerContext, args: ToolArgs) => Promise<R> {
+  const entry = defineTool(definition, handler);
+  return (context, args) =>
+    entry.call(
+      context,
+      Object.fromEntries(
+        Object.entries(args).filter(([name]) =>
+          Object.hasOwn(definition.inputSchema.shape, name),
+        ),
+      ),
+    );
+}
+
+/**
  * The creates a type delegates to: each the target tool's entry, so the
  * arguments are parsed with the target's own schema.
  */
 const create = {
-  PACKAGE: defineTool(CreatePackage_Tool, handleCreatePackage).call,
-  TRANSPORT: defineTool(CreateTransport_Tool, handleCreateTransport).call,
-  TABLE: defineTool(CreateTable_Tool, handleCreateTable).call,
-  DDL: defineTool(CreateDdl_Tool, handleCreateDdl).call,
-  CLASS: defineTool(CreateClass_Tool, handleCreateClass).call,
-  PROGRAM: defineTool(CreateProgram_Tool, handleCreateProgram).call,
-  INCLUDE: defineTool(CreateInclude_Tool, handleCreateInclude).call,
-  INTERFACE: defineTool(CreateInterface_Tool, handleCreateInterface).call,
-  FUNCTION_MODULE: defineTool(
+  PACKAGE: delegate(CreatePackage_Tool, handleCreatePackage),
+  TRANSPORT: delegate(CreateTransport_Tool, handleCreateTransport),
+  TABLE: delegate(CreateTable_Tool, handleCreateTable),
+  DDL: delegate(CreateDdl_Tool, handleCreateDdl),
+  CLASS: delegate(CreateClass_Tool, handleCreateClass),
+  PROGRAM: delegate(CreateProgram_Tool, handleCreateProgram),
+  INCLUDE: delegate(CreateInclude_Tool, handleCreateInclude),
+  INTERFACE: delegate(CreateInterface_Tool, handleCreateInterface),
+  FUNCTION_MODULE: delegate(
     CreateFunctionModule_Tool,
     handleCreateFunctionModule,
-  ).call,
+  ),
 } as const;
 
 const text = (value: unknown): string | undefined =>

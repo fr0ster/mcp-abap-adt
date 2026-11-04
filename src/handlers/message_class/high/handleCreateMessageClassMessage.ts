@@ -1,5 +1,6 @@
 import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 /**
  * CreateMessageClassMessage Handler - Add (upsert) a single message to a
  * Message Class (MSAG)
@@ -41,7 +42,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateMessageClassMessage', {
     message_class_name: z.string().describe('Parent message class name.'),
     msgno: z.string().describe('Message number (e.g., "001").'),
     msgtext: z

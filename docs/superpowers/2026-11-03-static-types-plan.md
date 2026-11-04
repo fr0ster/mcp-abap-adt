@@ -1588,7 +1588,9 @@ it or with it, and #346 bumps both from the registry.
   both on create). Today `CreateClass` takes `abstract` (compact `HandlerCreate` has no
   `abstract`), and `CreateProgram` and compact `HandlerCreate` (`PROGRAM`) take
   `program_type`. Failing tests first: the listed-schema test expects both gone; a call with
-  either is refused by the schema (`refusal: 'thrown'`, `'nothing-sent'`). Then remove them
+  either is refused by the schema before any request, naming it — the create tools' schemas
+  are strict (the owner, 2026-11-05: compact `HandlerCreate` and every full `Create*` tool
+  refuse an argument they do not declare, "<argument> is not an argument of <tool>"; spec §3). Then remove them
   from the schemas and handlers, update the listed-schema and surface fixtures (these
   removals only), and add MIGRATION-24.0 ("`abstract` (CreateClass) and `program_type`
   (CreateProgram, HandlerCreate PROGRAM) are removed: SAP ignores both on create; set them

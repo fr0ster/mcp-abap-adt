@@ -61,7 +61,6 @@ const FULL_CREATES: readonly CreateCase[] = [
     args: {
       data_element_name: 'ZPIN_DTEL',
       package_name: 'ZPIN_PKG',
-      activate: false,
     },
   },
   {

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateCdsUnitTest — give a CDS view ABAP Unit tests, in one call: check the
@@ -32,7 +33,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateCdsUnitTest', {
     cds_view_name: z
       .string()
       .describe(

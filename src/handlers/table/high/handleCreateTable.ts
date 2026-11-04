@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
@@ -36,7 +37,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP table in SAP system. Creates the table object in initial state.',
-  inputSchema: z.object({
+  inputSchema: createArguments('CreateTable', {
     table_name: z.string().describe('Table name.'),
     description: z
       .string()

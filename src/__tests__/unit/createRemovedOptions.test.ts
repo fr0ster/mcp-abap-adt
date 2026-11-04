@@ -3,9 +3,9 @@
  * PROGRAM) are gone (plan D2, step 6a): SAP ignores both on create
  * (measured on premise — an `abstract` create gave a class that is not
  * abstract, and every program type gave an executable program). No listed
- * schema names either, and a call that still gives one is parsed as any
- * argument the schema does not declare: dropped, so the create carries no
- * `class:abstract` and no `program:programType`.
+ * schema names either, and a call that still gives one is refused as any
+ * argument a create schema does not declare (the owner): before any
+ * request, naming it.
  */
 
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
@@ -47,19 +47,19 @@ describe('no listed schema names abstract or program_type', () => {
   });
 });
 
-/** A create given the removed option: the tool, its arguments, the attribute it wrote. */
+/** A create given a removed option: the tool, its arguments, the option. */
 const GIVEN = [
   {
     tool: 'CreateClass',
     variant: 'onprem',
     args: { class_name: 'ZCL_PIN', package_name: 'ZPIN_PKG', abstract: true },
-    attribute: 'class:abstract',
+    option: 'abstract',
   },
   {
     tool: 'CreateClass',
     variant: 'cloud',
     args: { class_name: 'ZCL_PIN', package_name: 'ZPIN_PKG', abstract: true },
-    attribute: 'class:abstract',
+    option: 'abstract',
   },
   {
     tool: 'CreateProgram',
@@ -69,7 +69,7 @@ const GIVEN = [
       package_name: 'ZPIN_PKG',
       program_type: 'module_pool',
     },
-    attribute: 'program:programType',
+    option: 'program_type',
   },
   {
     tool: 'HandlerCreate',
@@ -80,14 +80,14 @@ const GIVEN = [
       package_name: 'ZPIN_PKG',
       program_type: 'module_pool',
     },
-    attribute: 'program:programType',
+    option: 'program_type',
   },
 ] as const;
 
-describe('a call that still gives abstract or program_type: dropped, as any argument the schema does not declare', () => {
+describe('a call that still gives abstract or program_type: refused before any request, naming it', () => {
   it.each(GIVEN)(
     '$tool ($variant) $args',
-    async ({ tool, variant, args, attribute }) => {
+    async ({ tool, variant, args, option }) => {
       const recording = await recordCase({
         tool,
         variant,
@@ -95,12 +95,10 @@ describe('a call that still gives abstract or program_type: dropped, as any argu
         args,
         expected: 'none',
       });
-      expect(recording.thrown).toBeUndefined();
-      const creates = recording.requests.filter(
-        (request) => request.method === 'POST',
-      );
-      expect(creates).toHaveLength(1);
-      expect(creates[0]?.body).not.toContain(attribute);
+      expect(recording.requests).toEqual([]);
+      const message =
+        recording.thrown instanceof Error ? recording.thrown.message : '';
+      expect(message).toContain(`${option} is not an argument of ${tool}`);
     },
   );
 });

@@ -81,86 +81,82 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
   const transport = () =>
     configuredSystemKind() === 'onprem' ? undefined : resolveTransportRequest();
 
-  // A describe of its own: its cleanup runs before liveSuite's own
-  // afterAll ends the runner.
-  describe('one run of five classes', () => {
-    /** The names this run recorded for cleanup: only these are deleted. */
-    const recorded: string[] = [];
+  /** The names this run recorded for cleanup: only these are deleted. */
+  const recorded: string[] = [];
 
-    afterAll(async () => {
-      await deleteRecorded();
-      for (const name of recorded) {
-        await expectAbsent({ tool: 'GetClass', args: { class_name: name } });
-      }
-    });
+  afterAll(async () => {
+    await deleteRecorded();
+    for (const name of recorded) {
+      await expectAbsent({ tool: 'GetClass', args: { class_name: name } });
+    }
+  });
 
-    it('answers at once without with_long_polling, and the final status with it', async () => {
-      const request = transport();
-      const onRequest =
-        request === undefined || request === ''
-          ? {}
-          : { transport_request: request };
-      for (const name of names) {
-        await expectNameFree({ tool: 'GetClass', args: { class_name: name } });
-        recordCreated('DeleteClass', { class_name: name, ...onRequest });
-        recorded.push(name);
-        succeeded(
-          `CreateClass ${name}`,
-          await livePrepare('CreateClass', {
-            class_name: name,
-            package_name: packageName(),
-            description: 'MCP activation run long polling',
-            ...onRequest,
-          }),
-        );
-        succeeded(
-          `UpdateClass ${name}`,
-          await livePrepare('UpdateClass', {
-            class_name: name,
-            source_code: sourceOf(name),
-            activate: false,
-            ...onRequest,
-          }),
-        );
-      }
-      const started = succeeded(
-        'HandlerActivate (group)',
-        await livePrepare('HandlerActivate', {
-          objects: names.map((name) => ({ name, type: 'CLAS/OC' })),
+  it('answers at once without with_long_polling, and the final status with it', async () => {
+    const request = transport();
+    const onRequest =
+      request === undefined || request === ''
+        ? {}
+        : { transport_request: request };
+    for (const name of names) {
+      await expectNameFree({ tool: 'GetClass', args: { class_name: name } });
+      recordCreated('DeleteClass', { class_name: name, ...onRequest });
+      recorded.push(name);
+      succeeded(
+        `CreateClass ${name}`,
+        await livePrepare('CreateClass', {
+          class_name: name,
+          package_name: packageName(),
+          description: 'MCP activation run long polling',
+          ...onRequest,
         }),
       );
-      const runId = fieldOf(started, 'run_id');
-      if (typeof runId !== 'string' || runId === '') {
-        throw new Error(`the run start answered no run id: ${started.text}`);
-      }
+      succeeded(
+        `UpdateClass ${name}`,
+        await livePrepare('UpdateClass', {
+          class_name: name,
+          source_code: sourceOf(name),
+          activate: false,
+          ...onRequest,
+        }),
+      );
+    }
+    const started = succeeded(
+      'HandlerActivate (group)',
+      await livePrepare('HandlerActivate', {
+        objects: names.map((name) => ({ name, type: 'CLAS/OC' })),
+      }),
+    );
+    const runId = fieldOf(started, 'run_id');
+    if (typeof runId !== 'string' || runId === '') {
+      throw new Error(`the run start answered no run id: ${started.text}`);
+    }
 
-      // Without long polling: answered at once, the run still going.
-      const plain = await liveCall('HandlerGet', {
-        part: 'activation_status',
-        run_id: runId,
-      });
-      succeeded('activation_status', plain);
-      const going = fieldOf(plain, 'status');
-      expect(typeof going).toBe('string');
-      expect(TERMINAL.has(String(going))).toBe(false);
-
-      // With it: held until the run ends, answered with the final status.
-      const held = await liveCall('HandlerGet', {
-        part: 'activation_status',
-        run_id: runId,
-        with_long_polling: true,
-      });
-      succeeded('activation_status with_long_polling', held);
-      const ended = fieldOf(held, 'status');
-      expect(TERMINAL.has(String(ended))).toBe(true);
-
-      // Read back: a plain read now answers the same final status.
-      const after = await liveCall('HandlerGet', {
-        part: 'activation_status',
-        run_id: runId,
-      });
-      succeeded('activation_status after the run', after);
-      expect(fieldOf(after, 'status')).toBe(ended);
+    // Without long polling: answered at once, the run still going.
+    const plain = await liveCall('HandlerGet', {
+      part: 'activation_status',
+      run_id: runId,
     });
+    succeeded('activation_status', plain);
+    const going = fieldOf(plain, 'status');
+    expect(typeof going).toBe('string');
+    expect(TERMINAL.has(String(going))).toBe(false);
+
+    // With it: held until the run ends, answered with the final status.
+    const held = await liveCall('HandlerGet', {
+      part: 'activation_status',
+      run_id: runId,
+      with_long_polling: true,
+    });
+    succeeded('activation_status with_long_polling', held);
+    const ended = fieldOf(held, 'status');
+    expect(TERMINAL.has(String(ended))).toBe(true);
+
+    // Read back: a plain read now answers the same final status.
+    const after = await liveCall('HandlerGet', {
+      part: 'activation_status',
+      run_id: runId,
+    });
+    succeeded('activation_status after the run', after);
+    expect(fieldOf(after, 'status')).toBe(ended);
   });
 });

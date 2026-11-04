@@ -339,19 +339,40 @@ export function liveSuite(
     describe.skip(title, body);
     return;
   }
+  liveDescribe(
+    title,
+    () => liveRunner(kind),
+    async (ending) => {
+      await ending.close();
+      await endTestConnection(ending.connection());
+    },
+    body,
+  );
+}
+
+/**
+ * The describe a live suite runs in: the runner opened before its cases and
+ * closed after them. `body` runs in a describe of its own inside it, so a
+ * hook the body declares — a cleanup `afterAll` above all — runs while the
+ * runner is still there, and only then is it dropped and closed. A case's
+ * full name is `<title> cases <case>`.
+ */
+export function liveDescribe(
+  title: string,
+  open: () => Promise<LiveRunner>,
+  close: (ending: LiveRunner) => Promise<void>,
+  body: () => void,
+): void {
   describe(title, () => {
     beforeAll(async () => {
-      useLiveRunner(await liveRunner(kind));
+      useLiveRunner(await open());
     });
     afterAll(async () => {
       const ending = runner;
       useLiveRunner(undefined);
-      if (ending !== undefined) {
-        await ending.close();
-        await endTestConnection(ending.connection());
-      }
+      if (ending !== undefined) await close(ending);
     });
-    body();
+    describe('cases', body);
   });
 }
 

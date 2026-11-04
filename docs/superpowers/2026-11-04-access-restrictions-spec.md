@@ -337,7 +337,9 @@ draft, and no other tool reads it.
   changes nothing): `GetObjectDraft` in the full sets; in the compact sets a part of
   `HandlerGet`, `part: 'draft'`, so compact and compact-ro have it without a new tool. Like
   every tool, it is listed on the variant the system states by the variant rules
-  (`listedTool`); on premise and ABAP cloud it is listed. On the legacy variant, see Questions.
+  (`listedTool`); on premise and ABAP cloud it is listed. On the legacy variant it is registered but not listed, as `GetObjectVersions` is not: the
+  legacy variant is not changed by this work (the owner's decision); what legacy serves is
+  measured first and narrowed afterwards, as its own task.
 - **Arguments.** As `GetObjectVersions` names an object: `object_type*`, `object_name*`,
   `function_group_name` (a function module's group). `object_type` lists only the types §5.1
   admits, per variant. Compact: `HandlerGet`'s `object_type` and its name arguments, the
@@ -475,13 +477,7 @@ draft, and no other tool reads it.
 
 ## Questions for the owner
 
-1. **The draft tool on the legacy variant.** "Always registered" holds for every binary. But
-   every tool is listed on the variant the system states, and on the legacy variant no
-   versioned read is listed today (`GetObjectVersions` and `HandlerGet` are not in its sets,
-   Measured from `variant-surface.json`). Recommendation: register it everywhere and let the
-   variant rule leave it unlisted on legacy, as it leaves `GetObjectVersions`, until the three
-   versions are measured on a legacy system; so "nothing configured" is byte-identical on legacy
-   too.
+None open.
 
 ## Appendix A. Tools that change something
 

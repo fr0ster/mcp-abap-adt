@@ -273,8 +273,10 @@ no credential is in the line.
   options take `deniedActions`, of the same parsed type the server's table produces (lib
   exports the parser). The exporter applies `withoutDenied` to its groups once, in its
   constructor, so `getHandlerEntries()`, `registerOnServer()`, `createRegistry()` and the tool
-  names it lists all start from the same narrowed groups: an embedder and the server narrow
-  identically.
+  names it lists all start from the same narrowed groups. The exporter builds full-set groups
+  only (`HandlerExporter.ts`, Measured), whose tools take `Tool` entries alone (§2.1): a
+  `Tool.value` entry matches nothing there, is ignored, and leaves every definition as it is.
+  Enum narrowing happens on the compact sets, through `registryOf`.
   Handlers an embedder takes into its own hands are its own. The docs state it.
 
 ### 3.2 Packages, requests and tables: the strategy
@@ -450,14 +452,17 @@ draft, and no other tool reads it.
     = `inactive`), `other` (working = `active` ≠ `inactive`), or `undetermined` (the three fit
     none of these);
   - `changed_at`: for `own` and `other`, the `inactive` ETag's first 14 digits as a UTC time
-    (ISO 8601), the draft's last write;
+    (ISO 8601), the draft's last write; `null` for `none` and `undetermined`;
   - `age_seconds`: for `own` and `other`, now (UTC, the server's clock) minus `changed_at`;
-  - `etags`: `active`, `inactive` and `workspace`, the three ETags as read.
+    `null` for `none` and `undetermined`;
+  - `etags`: `active`, `inactive` and `workspace`, each the ETag of that version's answer as
+    read, `null` when that answer carried none.
   - No `detail` argument, on `GetObjectDraft` or on `HandlerGet` `part: 'draft'`: the answer
     always carries these fields, the same on both.
 - **Failures.** A read that fails answers as the tool's reads answer today: SAP's status and
   message (a `404` for an object that does not exist). An ETag missing, or not led by 14
-  digits, answers `draft: 'undetermined'` with what came.
+  digits, answers `draft: 'undetermined'` with what came (that version's ETag `null` when
+  missing).
 - **The clock.** The age uses the server's clock against SAP's ETag time. Both systems measured
   an offset of 0 s; the description and the docs say a skewed server clock skews the age.
   Nothing is kept between calls.
@@ -512,9 +517,10 @@ draft, and no other tool reads it.
   its mention, the table read still listed and callable; HandlerActivate with every name denied
   (the tool listed, a code callable), with every code denied (the tool listed, a name callable)
   and with both (the tool absent); a single-argument tool with every value denied absent;
-  `HandlerExporter` given a denied value and a denied tool: the tool absent from
-  `getHandlerEntries()` and from a server it registers on, the value absent from the exported
-  definition's enum; each form left absent (no row, an empty variable)
+  `HandlerExporter` given a denied tool and a `Tool.value` entry: the tool absent from
+  `getHandlerEntries()` and from a server it registers on, the `Tool.value` entry ignored and
+  every exported definition unchanged (enum narrowing is tested on the compact registry, the
+  cases above); each form left absent (no row, an empty variable)
   restricting nothing; each refusal code, its words, and that no handler ran and nothing of the
   call's own was sent (a recording connection); an argument not given passing; a refused call in
   batch mode taking no number; path 3 refusing a denied tool.
@@ -526,7 +532,9 @@ draft, and no other tool reads it.
   connection taken when the strategy reads nothing; the launcher choosing the strategy by the
   presence of a subtree entry.
 - **The draft tool, unit:** each answer from recorded ETag triples (`none`, `own`, `other`,
-  `undetermined`), a failed read, a missing ETag, the age against a fixed clock, the same
+  `undetermined`), `changed_at` and `age_seconds` `null` for `none` and for `undetermined`, a
+  failed read, a missing ETag (`undetermined`, that ETag `null`), the age against a fixed
+  clock, the same
   fields on `GetObjectDraft` and `HandlerGet` `part: 'draft'`, per part when the multi-part rule applies, and in batch mode as plan step 1 decides
   (recorded in one batch, or refused `batch_not_recordable`).
 - **Nothing configured.** Every fixture — the listed-schema fixture and the surface fixtures —

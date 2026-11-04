@@ -20,7 +20,6 @@
     ],
     "rootDir": "..",
     "outDir": "./dist",
-    "noImplicitAny": false,
     "paths": {
       "@mcp-abap-adt/lib/embeddable": [
         "../src/embeddable/index.ts"

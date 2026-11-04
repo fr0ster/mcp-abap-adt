@@ -36,7 +36,9 @@ import {
  * lets the caller choose `T`, so a connection that records or forwards a
  * request holds only `IAdtWireResponse<unknown>` and must assert the caller's
  * `T`. Once interfaces-adt-connection answers `data: unknown` (the caller reads
- * it) and adt-clients and connection follow, published first, these go.
+ * it) and adt-clients and connection follow, published first, these go — and
+ * with them Biome's `noUnsafeTypeAssertion` override for their files in
+ * `biome.json`, which must name exactly the files listed here.
  */
 const BLOCKED: ReadonlyArray<{ where: string; text: string }> = [
   {
@@ -58,6 +60,53 @@ const isBlocked = (found: Escape) =>
   BLOCKED.some(
     (blocked) => blocked.where === found.where && blocked.text === found.text,
   );
+
+const fileOf = (where: string) => where.slice(0, where.lastIndexOf(':'));
+
+/** A JSON value's member at `keys`, read by shape; absent when any step is not an object. */
+function member(value: unknown, keys: readonly string[]): unknown {
+  let current = value;
+  for (const key of keys) {
+    if (typeof current !== 'object' || current === null || !(key in current)) {
+      return undefined;
+    }
+    current = Reflect.get(current, key);
+  }
+  return current;
+}
+
+function readJson(file: string): unknown {
+  return JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
+}
+
+/** The files `biome.json` exempts from `noUnsafeTypeAssertion`. */
+function biomeAssertionExemptions(): string[] {
+  const overrides = member(readJson('biome.json'), ['overrides']);
+  const exempt: string[] = [];
+  for (const override of Array.isArray(overrides) ? overrides : []) {
+    const rule = member(override, [
+      'linter',
+      'rules',
+      'nursery',
+      'noUnsafeTypeAssertion',
+    ]);
+    const includes = member(override, ['includes']);
+    if (rule !== 'off' || !Array.isArray(includes)) continue;
+    for (const include of includes) {
+      if (typeof include === 'string') exempt.push(include);
+    }
+  }
+  return exempt;
+}
+
+/** The paths a script's first `biome check` names (its words that are not flags). */
+function biomeCheckPaths(script: string): string[] {
+  const command = member(readJson('package.json'), ['scripts', script]);
+  if (typeof command !== 'string') return [];
+  const words = command.split(' && ')[0]?.split(' ') ?? [];
+  if (words[0] !== 'biome' || words[1] !== 'check') return [];
+  return words.slice(2).filter((word) => !word.startsWith('--'));
+}
 
 describe('production sources', () => {
   const directories = productionDirectories();
@@ -103,6 +152,21 @@ describe('production sources', () => {
       expect(escapes).toContainEqual({ rule: 'assertion', ...blocked });
     }
   });
+
+  it("exempts from Biome's assertion rule exactly the tests and the blocked files", () => {
+    const tests = ['**/__tests__/**', '**/*.test.ts', '**/*.spec.ts'];
+    const blockedFiles = BLOCKED.map((blocked) => fileOf(blocked.where));
+    expect(biomeAssertionExemptions().sort()).toEqual(
+      [...new Set([...tests, ...blockedFiles])].sort(),
+    );
+  });
+
+  it.each(['lint', 'lint:check', 'build'])(
+    'the root %s runs Biome over every production directory',
+    (script) => {
+      expect(biomeCheckPaths(script).sort()).toEqual([...directories].sort());
+    },
+  );
 });
 
 describe('the scan refuses each escape, and only those', () => {

@@ -979,6 +979,24 @@ deleted after the record is written.
   tight loop against SAP).
 - [ ] **Step 5:** Commit the record as `docs: activation-run long polling, measured`.
 
+**Record — on premise (measured 2026-11-04; the cloud is pending: the trial session is to be
+refreshed first).**
+- The run: ten classes of 200 methods each, created inactive in `$TMP` by the test and
+  recorded, activated together by one `POST`; then their sources rewritten inactive and a
+  second run started the same way. Each `POST` answered in under half a second.
+- Run 1, the plain read first: sent right after the `POST`, answered in 0.13 s with status
+  `running` (the document carries `progressMessage`, no percentage). The long-poll read sent
+  next was held 37.2 s and answered `finished` (`progressPercentage` 100). A plain read sent
+  right after answered in 0.13 s, `finished`.
+- Run 2, the long-poll read first: sent right after the `POST`, held 36.2 s, answered
+  `finished`; the plain read after it answered in 0.13 s, `finished`.
+- Each run took one long-poll request: none answered a running status, so no re-read was
+  needed. The run document states no end time; the run's end is read from the terminal status
+  — the long poll answered `finished`, and the plain read right after confirms it.
+- Both runs' results: `activationExecuted="true"`, no message.
+- So on premise SAP holds the long-poll read until the run ends, and the plain read answers at
+  once with the status as it stands. The ten classes were deleted and each read `404` after.
+
 ### C2c. `awaitActivationRun` waits on long polling alone (owner's decision (b))
 
 **Prerequisite:** C2b shows the long-poll read is held on both systems.

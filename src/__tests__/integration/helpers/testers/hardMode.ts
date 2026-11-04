@@ -494,7 +494,10 @@ class ChildStdioTransport implements Transport {
         this.onmessage?.(message);
       }
     });
-    this.child.once('exit', () => this.onclose?.());
+    // `close`, as the child's own `exited` reads it: after `exit`, its
+    // stdio drained. `exited` is registered first, so its exit status
+    // settles before the session's "closed".
+    this.child.once('close', () => this.onclose?.());
   }
 
   send(message: JSONRPCMessage): Promise<void> {
@@ -521,7 +524,16 @@ class ChildStdioTransport implements Transport {
  */
 export async function stdioReady(child: Child): Promise<McpSession> {
   const session = new McpSession(new ChildStdioTransport(child.process));
-  await Promise.race([session.initialize(), child.exited]);
+  // A session closed by the child's exit answers with the exit status
+  // (`exited`), whichever of the child's events came first.
+  const initialized = session
+    .initialize()
+    .catch((error: unknown) =>
+      child.process.exitCode !== null || child.process.signalCode !== null
+        ? child.exited
+        : Promise.reject(error),
+    );
+  await Promise.race([initialized, child.exited]);
   return session;
 }
 

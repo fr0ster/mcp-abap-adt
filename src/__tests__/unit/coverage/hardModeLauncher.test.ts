@@ -3,7 +3,9 @@
  * children: small Node scripts this test writes and starts with
  * `process.execPath`. Readiness is the child's own answer — the
  * `initialize` answer over stdio, the listening line over Streamable HTTP —
- * raced against its exit; stopping is `SIGTERM` and its exit event. Jest's
+ * raced against its exit; stopping is `SIGTERM` and its exit event. A fake
+ * is told to go on by a line on its stdin (`{"go":true}`), which every OS
+ * carries — no POSIX-only signal. Jest's
  * fake timers count the timers left pending: a poll or a deadline of the
  * launcher's would leave one.
  */
@@ -26,7 +28,8 @@ const children: Child[] = [];
 
 beforeAll(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hard-mode-fakes-'));
-  // Answers `initialize` once told to (SIGUSR2), after saying it has read it.
+  // Answers `initialize` once told to (a `go` line on stdin), after saying it
+  // has read it.
   fs.writeFileSync(
     path.join(dir, 'stdio-answers.js'),
     `
@@ -39,14 +42,16 @@ const answer = () => {
     capabilities: {}, serverInfo: { name: 'fake', version: '0' } } }) + '\\n');
 };
 let told = false;
-process.on('SIGUSR2', () => { told = true; answer(); });
 process.on('SIGTERM', () => process.exit(0));
 process.stdin.on('data', (chunk) => {
   buffer += chunk;
   for (let end = buffer.indexOf('\\n'); end >= 0; end = buffer.indexOf('\\n')) {
     const message = JSON.parse(buffer.slice(0, end));
     buffer = buffer.slice(end + 1);
-    if (message.method === 'initialize') {
+    if (message.go === true) {
+      told = true;
+      answer();
+    } else if (message.method === 'initialize') {
       pending = message;
       process.stderr.write('read initialize\\n');
       if (told) answer();
@@ -65,14 +70,17 @@ process.stdin.once('data', () => {
 });
 `,
   );
-  // Writes the listening line once told to (SIGUSR2).
+  // Writes the listening line once told to (a `go` line on stdin).
   fs.writeFileSync(
     path.join(dir, 'http-listens.js'),
     `
 process.stderr.write('starting\\n');
-process.on('SIGUSR2', () => process.stderr.write(${JSON.stringify(LISTENING_LINE)} + '127.0.0.1:4711\\n'));
 process.on('SIGTERM', () => process.exit(0));
-process.stdin.resume();
+process.stdin.on('data', (chunk) => {
+  if (String(chunk).includes('"go":true')) {
+    process.stderr.write(${JSON.stringify(LISTENING_LINE)} + '127.0.0.1:4711\\n');
+  }
+});
 `,
   );
   // Exits before any listening line.
@@ -115,6 +123,11 @@ const said = (child: Child, text: string): Promise<void> =>
     check();
   });
 
+/** Tells a fake to go on: a line on its stdin. */
+const go = (child: Child): void => {
+  child.process.stdin?.write('{"go":true}\n');
+};
+
 /** Lets the event loop run once, so a settled promise has run its reactions. */
 const turn = (): Promise<void> => new Promise((r) => setImmediate(r));
 
@@ -138,7 +151,7 @@ describe('stdio readiness', () => {
     expect(ready).toBe(false);
     // The initialize is out and unanswered: no timer is armed for it.
     expect(jest.getTimerCount()).toBe(0);
-    child.process.kill('SIGUSR2');
+    go(child);
     const session = await readiness;
     expect(ready).toBe(true);
     expect(jest.getTimerCount()).toBe(0);
@@ -164,7 +177,7 @@ describe('HTTP readiness', () => {
     await said(child, 'starting');
     await turn();
     expect(ready).toBeUndefined();
-    child.process.kill('SIGUSR2');
+    go(child);
     await readiness;
     expect(ready).toBe('127.0.0.1:4711');
     expect(jest.getTimerCount()).toBe(0);

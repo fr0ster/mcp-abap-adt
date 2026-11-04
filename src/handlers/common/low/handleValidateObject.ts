@@ -114,7 +114,9 @@ export const TOOL_DEFINITION = {
     description: z
       .string()
       .optional()
-      .describe('Optional description for validation'),
+      .describe(
+        'Description sent with the validation. Required for function_module, metadata_extension and behavior_definition; elsewhere optional.',
+      ),
     ...DETAIL_SHAPE,
   }),
 } as const;

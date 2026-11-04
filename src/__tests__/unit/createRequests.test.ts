@@ -273,7 +273,11 @@ describe('a create states its language once (#348)', () => {
     expect(FULL.map((each) => each.c.tool)).toEqual(
       expect.arrayContaining(FULL_CREATES.map((c) => c.tool)),
     );
-    expect(COMPACT.length).toBeGreaterThanOrEqual(COMPACT_CREATES.length);
+    expect(
+      COMPACT_CREATES.filter((c) => !COMPACT.some((each) => each.c === c)).map(
+        (c) => c.args.object_type,
+      ),
+    ).toEqual([]);
   });
 
   it.each(ALL)(

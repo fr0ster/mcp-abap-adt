@@ -170,8 +170,9 @@ and change the program's type after it is created.
   `adtcore:language` / `adtcore:masterLanguage`; given none, the session's language
   (`SAP_LANGUAGE`, or `x-sap-language` over HTTP) is sent the same way; with neither, the create
   states no language and SAP uses its logon language. 23.x wrote `EN` into the body when nothing
-  was given, and SAP took the logon language anyway. An on-premise system whose ICF node fixes the
-  logon language answers in that language whatever is sent.
+  was given, and SAP took the logon language anyway. On premise, one system answered `EN` whatever
+  was sent (measured); that system's ICF node appears to fix the logon language (Inference), and a
+  system so configured would answer in its fixed language.
   **What you do:** to create in a given language, pass `master_language` or state the session's;
   a caller that counted on `EN` passes `master_language: 'EN'`.
 - **A function module's validation takes a description.** `HandlerValidate` `FUNCTION_MODULE`
@@ -228,7 +229,7 @@ ADT requests, except where a row names an accepted difference.
 | `CheckPackageLow` | `HandlerCheckRun` (object_type: PACKAGE, object_name) | the same requests |
 | `CheckProgramLow` | `HandlerCheckRun` (object_type: PROGRAM, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
 | `CheckStructureLow` | `HandlerCheckRun` (object_type: STRUCTURE, object_name, version, source_code) | The low tool's ddl_code is HandlerCheckRun's source_code. |
-| `CheckTableLow` | `HandlerCheckRun` (object_type: TABLE, object_name, version) | CheckTableLow accepted ddl_code and reporter and sent neither. |
+| `CheckTableLow` | `HandlerCheckRun` (object_type: TABLE, object_name, version) | CheckTableLow accepted ddl_code and reporter and sent neither when this row was captured; since 24.0.0 (#9) CheckTable sends ddl_code with the check run. HandlerCheckRun TABLE takes no source_code: it checks the saved version. |
 | `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, implementation_type) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
 | `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, description, package_name, transport_request), then `HandlerLock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, implementation_code, transport_request, lock_handle), then `HandlerUnlock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name, lock_handle) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. With implementation_code, four compact calls, one request each: the create, the lock, the write of the implementations include under the lock_handle the lock answered, the unlock. |
 | `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, create_protected) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |

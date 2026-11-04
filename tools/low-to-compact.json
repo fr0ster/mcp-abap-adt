@@ -943,7 +943,7 @@
           }
         }
       ],
-      "note": "CheckTableLow accepted ddl_code and reporter and sent neither.",
+      "note": "CheckTableLow accepted ddl_code and reporter and sent neither when this row was captured; since 24.0.0 (#9) CheckTable sends ddl_code with the check run. HandlerCheckRun TABLE takes no source_code: it checks the saved version.",
       "low_requests": [
         {
           "method": "POST",

@@ -104,4 +104,60 @@ describe('the live scripts', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('no test file outside the integration and admin suites reads a live destination', () => {
+    // The words of the live-only entry points: a live destination's paths,
+    // the test config's destination, its session file. A word check, not a
+    // proof — the guarantee is that every live test lives under
+    // integration/ or admin/, which the unit run ignores.
+    const words = [
+      'MCP_LIVE_ENV_PATHS',
+      'getTestDestination',
+      'loadTestEnv',
+      'sessionVariables',
+      'testSessionFile',
+    ];
+    const roots = [
+      'src',
+      ...fs
+        .readdirSync(REPO, { withFileTypes: true })
+        .filter(
+          (entry) =>
+            entry.isDirectory() &&
+            fs.existsSync(path.join(REPO, entry.name, 'src')) &&
+            entry.name !== 'node_modules',
+        )
+        .map((entry) => path.join(entry.name, 'src')),
+    ];
+    const self = path.join(
+      'src',
+      '__tests__',
+      'unit',
+      'coverage',
+      'liveScripts.test.ts',
+    );
+    const findings = roots.flatMap((root) =>
+      fs
+        .readdirSync(path.join(REPO, root), {
+          recursive: true,
+          encoding: 'utf8',
+        })
+        .map((name) => path.join(root, name))
+        .filter(
+          (file) =>
+            file.includes(`${path.sep}__tests__${path.sep}`) &&
+            file.endsWith('.ts') &&
+            !file.includes(`__tests__${path.sep}integration${path.sep}`) &&
+            !file.includes(`__tests__${path.sep}admin${path.sep}`) &&
+            file !== self,
+        )
+        .flatMap((file) => {
+          const text = fs.readFileSync(path.join(REPO, file), 'utf8');
+          return words
+            .filter((word) => text.includes(word))
+            .map((word) => `${file}: ${word}`);
+        }),
+    );
+    expect(findings).toEqual([]);
+  });
 });

@@ -1,6 +1,6 @@
 /**
  * Every server a live test launches is launched guarded (plan C2 Step 4a,
- * controller ruling): the integration, admin and live suites reach a child
+ * controller ruling): the integration and admin suites reach a child
  * only through `testers/hardMode.ts`' guarded launches (`launchStdio`,
  * `launchHttp`, `launchStdioScript`, `launchHttpScript`,
  * `createHardModeClient`). None of their files spawns a process, uses the
@@ -51,8 +51,8 @@ function launchFindings(
 }
 
 describe('launch sites', () => {
-  it('no integration, admin or live test file launches a server unguarded', () => {
-    const files = ['integration', 'admin', 'live']
+  it('no integration or admin test file launches a server unguarded', () => {
+    const files = ['integration', 'admin']
       .flatMap((dir) => filesBelow(path.join(TESTS, dir)))
       .filter((file) => file !== LAUNCHER);
     expect(files.length).toBeGreaterThan(0);

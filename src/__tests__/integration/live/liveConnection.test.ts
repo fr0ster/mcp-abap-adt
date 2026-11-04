@@ -2,7 +2,10 @@
  * The installed server connects to a live system over stdio, answers a tool,
  * and shuts down clean.
  *
- * **Where it runs.** Only where `MCP_LIVE_ENV_PATHS` names one or more `.env`
+ * **Where it runs.** Only under its live script,
+ * `npm run test:live-connection` (in band; a run directory and the refusal
+ * marker; never in `npm test`, whose default ignore covers
+ * `src/__tests__/integration/`), and only where `MCP_LIVE_ENV_PATHS` names one or more `.env`
  * files (separated by the platform's path delimiter: `:` on Linux and macOS,
  * `;` on Windows). Each file is one destination; the server is started once per
  * file (a path containing the delimiter is not supported). `MCP_LIVE_ARGS`
@@ -10,6 +13,12 @@
  * (e.g. `--connection-type=rfc`). Without `MCP_LIVE_ENV_PATHS` the
  * suite skips and its test name says why — the default `npm test` and CI never
  * reach a system.
+ *
+ * **The realm check first.** Before the parent's logon, an unauthenticated
+ * discovery `GET` must answer `401`: on premise with the realm
+ * `MCP_LIVE_EXPECTED_REALMS` states for that destination (separated by the
+ * same delimiter, one per `.env`, in order; empty refuses), on the cloud with
+ * the session's JWT not expired.
  *
  * **How the server is started.** The way a user's tree runs it: the library and
  * the core package are packed and installed together into a temporary directory
@@ -30,23 +39,24 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import * as dotenv from 'dotenv';
-import { AuthBrokerFactory } from '../../../server-runtime/src/stdio/auth/brokerFactory';
-import { statedSystemKind } from '../../lib/systemKind';
+import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/brokerFactory';
+import { statedSystemKind } from '../../../lib/systemKind';
 import {
   installedFile,
   installPackedRelease,
-} from '../helpers/installedRelease';
-import { endTestConnection } from '../integration/helpers/openConnections';
-import {
-  guardedSend,
-  guardedTestConnection,
-} from '../integration/helpers/refusalGuard';
-import { launchStdioScript } from '../integration/helpers/testers/hardMode';
+} from '../../helpers/installedRelease';
+import { endTestConnection } from '../helpers/openConnections';
+import { realmCheck } from '../helpers/realmCheck';
+import { guardedSend, guardedTestConnection } from '../helpers/refusalGuard';
+import { launchStdioScript } from '../helpers/testers/hardMode';
 
 const ENV_PATHS = (process.env.MCP_LIVE_ENV_PATHS ?? '')
   .split(delimiter)
   .map((entry) => entry.trim())
   .filter((entry) => entry !== '');
+const EXPECTED_REALMS = (process.env.MCP_LIVE_EXPECTED_REALMS ?? '')
+  .split(delimiter)
+  .map((entry) => entry.trim());
 const EXTRA_ARGS = (process.env.MCP_LIVE_ARGS ?? '')
   .split(/\s+/)
   .filter((arg) => arg !== '');
@@ -84,7 +94,10 @@ const silent = { info() {}, debug() {}, warn() {}, error() {} };
  * reads it (`--env-path`), on a guarded connection logged off again: a
  * refusal latches the run's marker and nothing is launched.
  */
-function envFileLogOn(envPath: string): () => Promise<void> {
+function envFileLogOn(
+  envPath: string,
+  expectedRealm: string,
+): () => Promise<void> {
   return async () => {
     const stated = dotenv.parse(readFileSync(envPath, 'utf8'));
     const kind = statedSystemKind(
@@ -102,6 +115,14 @@ function envFileLogOn(envPath: string): () => Promise<void> {
         'the destination states no connection type (--connection-type in MCP_LIVE_ARGS, or SAP_CONNECTION_TYPE)',
       );
     }
+    // The realm check before anything logs on.
+    const url = stated.SAP_URL;
+    if (url === undefined || url === '') {
+      throw new Error('the destination names no SAP_URL');
+    }
+    await realmCheck(kind, url, expectedRealm, {
+      jwt: stated.SAP_JWT_TOKEN,
+    });
     const factory = new AuthBrokerFactory({
       envFile: { path: envPath, source: '--env-path' },
       unsafe: false,
@@ -198,7 +219,7 @@ if (ENV_PATHS.length === 0) {
             argv: [bin, `--env-path=${envPath}`, ...EXTRA_ARGS],
             env: plainEnvironment(),
             cwd: workdir,
-            logOn: envFileLogOn(envPath),
+            logOn: envFileLogOn(envPath, EXPECTED_REALMS[index] ?? ''),
           }),
         );
         const child = server.child;

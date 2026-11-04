@@ -151,6 +151,7 @@
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit --reporters=default --reporters=./build/test-reporter/coverageReporter.js",
     "pretest:coverage-family": "npm run build:test-reporter",
     "test:coverage-family": "jest --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit --reporters=default --reporters=./build/test-reporter/coverageReporter.js",
+    "test:live-connection": "jest --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit src/__tests__/integration/live/liveConnection.test.ts",
     "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
     "build:test-reporter": "tsc -p tsconfig.reporter.json",

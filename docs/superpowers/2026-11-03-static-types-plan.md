@@ -412,6 +412,32 @@ and live specifics.
     `deleteRecordedRequests(): Promise<void>`: deletes only recorded request and task numbers
     through `createAdtClient(connection).getRequest().delete` on the test's own connection, in
     the order C2a measured, then asserts each absent with `GetTransport`.
+  - **Reconciliation of a refused create.**
+    `createRequestReconciled(create: (description: string) => Promise<LiveAnswer>, kind: 'request' | 'task', parent?: string): Promise<LiveAnswer>`
+    is the one way a test creates a request or a task. adt-clients' `AdtRequest.create` is one
+    `POST` carrying the request and its first task; when SAP refuses the task part it still
+    keeps the request header — empty, with no task — and the call answers the refusal with no
+    number (measured on premise, `AdtRequest.d.ts`), so the number never reaches the journal.
+    So the helper:
+    1. gives each create a **unique run description** — the run id (random per run, written
+       in the run report) and a per-create counter, nothing else (no user, no system);
+    2. before the create, takes an **inventory**: for a request, the test user's modifiable
+       requests through the served tool `ListTransports` (`user`, `modifiable_only: true` —
+       both declared in its listed schema); for a task, the parent's tasks through
+       `GetTransport` on the parent;
+    3. calls `create(description)`; on success records the returned number at once
+       (`recordCreatedRequest`);
+    4. on a **non-credential** failure, lists again, and journals only the requests (or
+       tasks) that are **new against the inventory AND carry that exact description** — the
+       description read from the listing if it carries one, else from `GetTransport` of each
+       new number (checked at the step) — then they are cleaned up in the standard order;
+       the failure itself still fails the case;
+    5. after a **credential** refusal, sends nothing more and writes the description to the
+       run report, so a person can find what may be left.
+    Tests (`live.test.ts`, on `adtStandIn`): `'a refused create leaves an empty request that
+    is found by its description and journalled'`, `'a new request with another description is
+    never journalled'`, `'after a credential refusal nothing is listed and the description is
+    reported'`.
   - `recordTransportEntry(entry: { request: string; task: string; object: TransportObjectRef }): void`
     — the **journal** of every transport entry the test made (an object added to a task, an
     entry moved), recorded at once when the call that made it succeeds. Deleting an object
@@ -854,8 +880,10 @@ transport case and of C13. The measurement runs as a temporary Jest case under
 
 - [ ] **Step 1:** With the owner's go, after the realm check, on the on-premise system, then
   on the cloud (where the discovery offers the transport endpoints, O7 / O8): create one
-  request and one task in it through `CreateTransport` / `CreateTransportTask`, and record each
-  returned number at once (`recordCreatedRequest`), before anything reads it.
+  request and one task in it through `CreateTransport` / `CreateTransportTask`, each through
+  `createRequestReconciled` (unique description, inventory first, a refused create's
+  leftover found and journalled), recording each returned number at once, before anything
+  reads it.
 - [ ] **Step 1a: Arm the failure cleanup before the move.** An `afterAll` of the measurement,
   whatever happened, deletes the recorded object first, then detaches every entry of it
   (journalled by `recordTransportEntry` when the add or move succeeded, and any the delete
@@ -1385,7 +1413,7 @@ chains are built per operation, not from one type list:
 **Prerequisite:** C2a, for the `HandlerCreate#TRANSPORT` live case.
 
 **Owner's decision applied:** O4 / O5 — `HandlerCreate#TRANSPORT`'s live case creates its own
-request and records it; `deleteRecordedRequests` deletes it, in C2a's measured order, and
+request through `createRequestReconciled` and records it; `deleteRecordedRequests` deletes it, in C2a's measured order, and
 asserts it absent.
 
 **Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. **Every operation × type key
@@ -1639,8 +1667,9 @@ recorded order.
   verified, created tasks and requests deleted and asserted absent).
 - **New: `coverage/transport.live.test.ts`,** section `coverage_transport`.
   - **Creates.** `CreateTransport`, `CreateTransportTask`, `HandlerTransportCreate` each create
-    their own request or task and **record the returned number at once**
-    (`recordCreatedRequest`), before any read-back or assertion; then assert it reads back
+    their own request or task through `createRequestReconciled` and **record the returned
+    number at once**, before any read-back or assertion (a refused create's empty request is
+    found by its run description and journalled); then assert it reads back
     (`GetTransport`). Cleanup deletes only recorded numbers, in the measured order, then
     asserts each absent.
   - **Everything else** works on `coverage_transport.request`: an object the test creates in the

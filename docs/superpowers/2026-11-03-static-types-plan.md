@@ -412,6 +412,15 @@ and live specifics.
     `deleteRecordedRequests(): Promise<void>`: deletes only recorded request and task numbers
     through `createAdtClient(connection).getRequest().delete` on the test's own connection, in
     the order C2a measured, then asserts each absent with `GetTransport`.
+  - `recordTransportEntry(entry: { request: string; task: string; object: TransportObjectRef }): void`
+    — the **journal** of every transport entry the test made (an object added to a task, an
+    entry moved), recorded at once when the call that made it succeeds. Deleting an object
+    does not empty its task (`TransportObjectToolsCrud.test.ts`), so `deleteRecordedRequests`
+    first detaches every journalled entry (`RemoveTransportObject`) from every task it is on
+    — the configured request's and the created ones — and verifies both requests' entries
+    (`ReadTransportObjects`): the configured request back as it was, the created ones empty;
+    only then deletes the recorded tasks and requests. The refusal stop applies: after a
+    credential refusal nothing is sent and what is left is named.
 - **`ledgerScan.ts`**
   - `scanUnitFile(path: string): readonly PinRef[]`
   - `scanLiveFile(path: string): readonly LiveRef[]`
@@ -838,10 +847,12 @@ transport case and of C13. The measurement runs as a temporary Jest case under
   on the cloud (where the discovery offers the transport endpoints, O7 / O8): create one
   request and one task in it through `CreateTransport` / `CreateTransportTask`, and record each
   returned number at once (`recordCreatedRequest`), before anything reads it.
-- [ ] **Step 1a: Arm the failure cleanup before the move.** An `afterAll` of the measurement
-  deletes the recorded numbers (and the recorded object, `deleteRecorded`) whatever happened,
-  through the same delete path, reporting what it did; the credential-refusal stop applies to
-  it as to every helper — after a refusal it sends nothing and names what is left.
+- [ ] **Step 1a: Arm the failure cleanup before the move.** An `afterAll` of the measurement,
+  whatever happened, detaches every journalled transport entry (`recordTransportEntry`, each
+  recorded when the add or move succeeded) from both requests, verifies both requests'
+  entries, then deletes the recorded tasks and requests and the recorded object, reporting
+  what it did; the credential-refusal stop applies to it as to every helper — after a refusal
+  it sends nothing and names what is left.
 - [ ] **Step 2:** Move an object the measurement creates in the configured transportable
   package from the configured request's task to the created task, then back
   (`MoveTransportObjects`); read both requests after each move. Remove the entry; delete the
@@ -974,6 +985,14 @@ type, the token or its claims. Only the consumer's information counts: the conne
 settings. One exception: the responsible user and the system id are read from the system
 when a system-information function is available, otherwise from the settings.
 
+**What the rule governs, and what it does not (controller ruling).** The rule governs what
+the server and the libraries derive. The pre-run JWT `exp` check of the realm check (C2,
+`realmCheck.ts`) is a test-run safety step the owner required — never send an expired token
+to the trial — and is kept: it decodes the token's `exp` locally, in its own test helper,
+and derives nothing about the system. So the guard's token-decoding ban covers production
+code only (every package's production `src`, `scripts`, `tools`); the kind check covers the
+test helpers too, the `exp` helper included.
+
 **Why here.** It changes four program handlers (`ActivateProgram` is C3's, `CreateProgram` and
 `UpdateProgram` C5's, the compact `PROGRAM` rows C6's), so their pins must be written on the
 fixed code: it goes before C3. It needs C2's `statedSystemKind()` for the test side, so it
@@ -1006,11 +1025,18 @@ comes after C2; it is independent of C2a–C2d.
 - **Test helpers in other packages, inferring the kind — changed here:**
   `server-runtime/src/stdio/__tests__/helpers/loginStand.ts` (around line 345:
   `stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')`). `StandOptions` gets a
-  required `kind`, stated by each caller independently of its credential:
-  `startBrowserLogin.test.ts`, `debug/noSecretsOut.test.ts`, `discardedRefreshToken.test.ts`,
-  `sessionWrites.test.ts`, `cancel/lateConnect.test.ts`, `shutdown/crash.test.ts`,
-  `shutdown/afterStartBrowserLogin.test.ts`, `mainFlow.test.ts`, `batchStdio.test.ts`,
-  `cancel/loginBound.test.ts` (all under `server-runtime/src/stdio/__tests__/`); a test
+  required `kind`, and `stand(options: StandOptions = {})` (around line 342) loses its `= {}`
+  default, so no call can omit it. Its 24 calls in 14 files (under
+  `server-runtime/src/stdio/__tests__/`, counted by `stand(` call) each state the kind
+  independently of the credential: `batchStdio.test.ts` (1), `mainFlow.test.ts` (1),
+  `sessionWrites.test.ts` (1), `debug/noSecretsOut.test.ts` (4),
+  `cancel/cancelledCallerFirst.test.ts` (1), `cancel/lateConnect.test.ts` (1),
+  `cancel/loginBound.test.ts` (3), `cancel/loginEndsWithRequest.test.ts` (1),
+  `cancel/partyReleased.test.ts` (1), `shutdown/admissionLatch.test.ts` (1),
+  `shutdown/afterStartBrowserLogin.test.ts` (3), `shutdown/crash.test.ts` (2),
+  `shutdown/forcedClose.test.ts` (1), `shutdown/logoffAtOnce.test.ts` (3).
+  (`startBrowserLogin.test.ts` and `discardedRefreshToken.test.ts` import other parts of the
+  helper and call no `stand`.) Then `server-runtime`'s own `test:check` runs clean. A test:
   `'the login stand takes the kind it is given, whatever the credential'`.
 - **Tests, credential handling only — kept:** `integration/helpers/sessionHelpers.ts`
   (passes `authType` through), `integration/helpers/configHelpers.ts`' test credential
@@ -1037,6 +1063,25 @@ comes after C2; it is independent of C2a–C2d.
     destination), `server-runtime/src/stdio/auth/*` (the broker's handler and grant for the
     stated `authType`), `server-runtime/src/stdio/launcher.ts` (the session's token handed to
     the connection), `utils.ts`' configuration summary.
+  - **Reviewed and kept as credential plumbing** (each reads which credential the consumer
+    supplied, or the settings, never a token's contents, and derives no kind):
+    - `src/lib/httpTransport/headerSource.ts` (around 106): the session id `direct-jwt` /
+      `direct-basic` names which credential header the request carried;
+    - `src/lib/utils.ts` (around 575–587): the configuration's credential fields read for the
+      connection;
+    - `src/lib/auth/currentCredential.ts` (around 41–48): the provider for the credential the
+      settings name;
+    - `server-runtime/src/stdio/auth/countedProvider.ts` (around 108–110): counts the
+      provider's renewals by its type;
+    - `tools/runtime-profiling-dumps-explorer.js` (around 242, 273–287, 1065): the settings'
+      username as the default dump user, for a basic destination only — a setting, not a
+      claim;
+    - `tools/debug-runtime-explorer.js` (around 46–57) and `tools/test-package-read.js`
+      (around 15–18): build the credential the settings name;
+    - `src/__tests__/integration/helpers/sessionHelpers.ts` (around 168–191): passes the
+      session's `authType` through to the connection.
+    The guard is not widened for these: it checks kind inference and production token
+    decoding only, and says so.
   - Two comments still describe a credential-to-kind rule and are fixed in this task (and
     checked again in step 18a): `src/lib/config/IServerConfig.ts` (around line 38: "default
     to cloud for a jwt destination") and `src/lib/handlers/interfaces.ts` (around line 14:
@@ -1090,11 +1135,16 @@ comes after C2; it is independent of C2a–C2d.
   `src/__tests__/helpers`, `src/__tests__/integration/helpers`,
   `server-runtime/src/stdio/__tests__/helpers`, and any other) — with the compiler API, as
   `staticTypes.test.ts`. No allowlist: a finding is fixed in the code.
-  - **What a credential read is:** a reference to a property or binding named `authType`,
-    `jwtToken`, `refreshToken`, `authorizationToken`, the environment's `SAP_JWT_TOKEN`, the
-    header `x-sap-jwt-token`, or a value the checker types as a credential provider; and any
-    decode of a token (a `split('.')`, `atob`, `Buffer.from(…, 'base64…')` or `JSON.parse`
-    applied to an expression containing such a read).
+  - **What a credential read is, by declaration, not by name:** an expression the checker
+    types as a credential type — the declared set: the configuration's auth-type type
+    (`SapConfig['authType']`), `AuthType` of the stdio vocabulary, any union of string
+    literals drawn only from the auth-type values (`'basic' | 'jwt'`, as `loginStand`'s
+    `options.auth` is declared), the token fields' declared types on `SapConfig`
+    (`jwtToken`, `refreshToken`) and the connection's `authorizationToken`, and the
+    credential provider interfaces (`IAuthProvider`); plus the environment's
+    `SAP_JWT_TOKEN` and the header `x-sap-jwt-token` read by key. A token decode is a
+    `split('.')`, `atob`, `Buffer.from(…, 'base64…')` or `JSON.parse` applied to an expression
+    containing such a read.
   - **What a kind value is,** recognised by the checker, not by name:
     1. an expression whose type is assignable to `'cloud' | 'onprem' | 'legacy'` (or the
        declared kind types `SapEnvironment`, `SystemKind`);
@@ -1109,15 +1159,21 @@ comes after C2; it is independent of C2a–C2d.
        by a `switch` or conditional on the field itself, which stays allowed).
   - **The rule:** no kind value is produced from a credential read — in an assignment, a
     property initialiser, a call argument, a return, or an inline call — looking through the
-    expression and the same-file functions it calls; and no production code decodes a token
-    at all.
+    expression and the same-file functions it calls (production and every test-helper tree);
+    and no **production** code decodes a token at all (the realm check's `exp` helper is a
+    test helper, outside that ban).
   - **Fixtures, each refused by its own form alone:** an assignment (`kind = authType ===
     'jwt' ? 'cloud' : 'onprem'`); a property (`{ isCloudSystem: authType === 'jwt' }`);
     an argument (`stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')`); an inline
     call (`declare(isJwt(config))` with `isJwt` same-file); a return (the old
     `isCloudConnection`); a `CloudFlag` assigned from a credential comparison; a token decode
-    reading a claim. **Passing fixtures:** a `switch (authType)` choosing a provider; a
-    conditional on `authType` choosing a login header; the configuration summary.
+    reading a claim (production tree); **the real `loginStand` expression** —
+    `stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')` with `auth` declared
+    `'basic' | 'jwt'` — recognised by its declared type. **Passing fixtures:** a
+    `switch (authType)` choosing a provider; a conditional on `authType` choosing a login
+    header; the configuration summary; **the realm check's `exp` helper** — it decodes a token
+    in a test helper (outside the decoding ban) and produces no kind (inside the kind check,
+    passing it).
   - **Its limit, stated:** a credential read reaching a kind through another module, or
     through an untyped value, is beyond this check; left to review, and the PR description
     says so.
@@ -1520,6 +1576,10 @@ C16's (server-dispatched).
 **Live:**
 - **The existing `unitTest/*` suites** move to `liveCall`. `RunAbapUnit` and the compact keys
   get cases there, on the class the suite creates.
+- **`RunProgramUnitTest` on the cloud** (it is listed there): a case in
+  `coverage/unitTests.live.test.ts`, section `coverage_unit_tests`, runs the unit tests of an
+  owner-configured delivered report with tests (`coverage_unit_tests.cloud_program_with_tests`)
+  and reads the result (test count, no failure); nothing is created, updated or deleted.
 - **Their deletes** were added to these suites by C7 (`DeleteUnitTest` then `expectCleared`,
   `DeleteCdsUnitTest` then `expectAbsent`); C12's conversion keeps them at the end of the
   body.
@@ -1560,8 +1620,10 @@ recorded order.
     requests only"; `TransportObjectToolsCrud.test.ts`). So the case moves the object's entry
     from the configured request's task to a task of a request the test itself created (O5),
     reads both (gone from the first, on the second), moves it back and reads both again —
-    success asserted both ways — then removes the entry and deletes the created request and
-    task (`deleteRecordedRequests`, absence asserted). If the measurement (C2a) shows this move
+    success asserted both ways — each add and move journalled at once
+    (`recordTransportEntry`) — then removes the entry from both requests, verifies both
+    requests' entries, and deletes the created request and task (`deleteRecordedRequests`,
+    absence asserted). If the measurement (C2a) shows this move
     refused too, the case asserts SAP's refusal and both requests' entries unchanged, and the
     finding goes to the owner.
   - **Never** release a request. Cloud cases follow the discovery rule (O7 / O8).
@@ -1774,6 +1836,7 @@ This covers the four compact handlers no test runs today.
   | `coverage_versions` | per type, one object with two or more versions, per system |
   | `coverage_system` | a transaction code to read |
   | `coverage_runtime` | free probe class and (on premise) probe program names |
+  | `coverage_unit_tests` | `cloud_program_with_tests`: a delivered report on the cloud system that has ABAP Unit tests (read and run only) |
   | `coverage_transport` | per system: a transportable package, and `request` — one modifiable request of the test user with a task, used by every transport case but the creates |
   | `coverage_sessions` | a free probe class name; `launch_http: true` for the long sessions |
   | `debugger_handlers` | `second_user_env` (a second user's session file) for the other-user case |

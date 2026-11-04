@@ -5,15 +5,13 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  *
  * Uses AdtClient.getTable().check from @mcp-abap-adt/adt-clients 19.
  *
- * **`ddl_code` and `reporter` no longer reach the wire.** The shipped
- * `AdtTable.check()` calls `runTableCheckRun(connection, 'abapCheckRun',
- * name, undefined, version)` — the reporter is hardcoded to `'abapCheckRun'`
- * and the fourth argument (where a source would go) is hardcoded
- * `undefined`, never `config.source`. Unlike `structure`'s sibling member,
- * there is no unsaved-code check here. Both parameters stay on the tool
- * schema (removing an existing parameter is not this migration's job) but
- * neither is forwarded, since forwarding them would say they do something
- * they do not. Verified against `AdtTable.js`, not the declaration file.
+ * **`ddl_code` is the source checked.** Since adt-clients 43,
+ * `AdtTable.check()` sends `config.source` as the check run's artifact, as
+ * the structure check does (#9): given `ddl_code`, the check is of that
+ * source, not only of what is saved.
+ *
+ * **`reporter` does not reach the wire.** `AdtTable.check()` always runs
+ * `'abapCheckRun'`; the parameter stays on the schema, unforwarded.
  */
 
 import { tableDocuments } from '@mcp-abap-adt/adt-clients';
@@ -38,7 +36,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        'Accepted for compatibility; not sent to the server. The shipped check endpoint takes no source of its own — it checks whatever is already saved.',
+        'DDL source to check instead of the saved version: sent with the check run.',
       ),
     version: z
       .enum(['active', 'inactive', 'new'])
@@ -69,7 +67,7 @@ export async function handleCheckTable(
   args: CheckTableArgs,
 ) {
   const { connection, logger } = context;
-  const { table_name, version } = args;
+  const { table_name, version, ddl_code } = args;
 
   if (!table_name) {
     return return_error(new Error('table_name is required'));
@@ -89,7 +87,7 @@ export async function handleCheckTable(
       withAdtHeaders(context, 'table.check', (headers) =>
         createAdtClient(connection, logger)
           .getTable(resultsFor(tableDocuments))
-          .check({ tableName }, checkVersion, {
+          .check({ tableName, source: ddl_code }, checkVersion, {
             headers,
             analyse: analyseException,
           }),

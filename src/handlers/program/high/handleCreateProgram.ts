@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
@@ -10,8 +11,12 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * the status for `terse` while `full`/`raw` answer the document ADT sent
  * instead of discarding it. The pre-migration handler's own `validate()`
  * call is dropped — this is a bare create, matching `CreateProgramLow`.
- * `description`, `programType` and `application` all reach the wire; no
- * source — that is `UpdateProgram`'s job, after `LockProgram`.
+ * `description` and `application` reach the wire; no source — that is
+ * `UpdateProgram`'s job, after `LockProgram`.
+ *
+ * **No program type.** SAP ignores `program:programType` on create (measured
+ * on premise: module pool, subroutine pool, `M` and `F` each gave an
+ * executable program), so the tool takes none.
  */
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
@@ -46,18 +51,6 @@ export const TOOL_DEFINITION = {
       .describe(
         'Transport request number, not a task. Required for transportable packages.',
       ),
-    program_type: z
-      .enum([
-        'executable',
-        'module_pool',
-        'function_group',
-        'class_pool',
-        'interface_pool',
-      ])
-      .optional()
-      .describe(
-        "Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
-      ),
     application: z
       .string()
       .optional()
@@ -67,9 +60,7 @@ export const TOOL_DEFINITION = {
     master_language: z
       .string()
       .optional()
-      .describe(
-        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      ),
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -79,7 +70,6 @@ interface CreateProgramArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  program_type?: string;
   application?: string;
   master_language?: string;
   detail?: 'terse' | 'full' | 'raw';
@@ -114,7 +104,6 @@ export async function handleCreateProgram(
               description: args.description || programName,
               packageName: args.package_name,
               transportRequest: args.transport_request,
-              programType: args.program_type,
               application: args.application,
               masterLanguage: args.master_language,
             },

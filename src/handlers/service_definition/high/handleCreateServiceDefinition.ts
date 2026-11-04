@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateServiceDefinition Handler - ABAP Service Definition Creation via ADT API
@@ -77,9 +78,7 @@ export const TOOL_DEFINITION = {
     master_language: z
       .string()
       .optional()
-      .describe(
-        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      ),
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
     ...DETAIL_SHAPE,
   }),
 } as const;

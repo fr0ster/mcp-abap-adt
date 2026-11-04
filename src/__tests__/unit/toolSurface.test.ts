@@ -233,8 +233,14 @@ describe('the MCP tool surface', () => {
       // **19.0.0, internal batches (spec §11).** A parallelism knob the
       // batched version makes meaningless is removed: `SearchSource`'s
       // `concurrency`, and nothing else.
+      //
+      // **24.0.0, decided by the owner (D2).** SAP ignores both on create
+      // (measured on premise): `CreateClass`'s `abstract` and
+      // `CreateProgram`'s `program_type` are removed, and nothing else.
       const REMOVED: Record<string, string[]> = {
         'search/SearchSource': ['concurrency'],
+        'high/CreateClass': ['abstract'],
+        'high/CreateProgram': ['program_type'],
       };
       const removed = REMOVED[tool] ?? [];
       expect({
@@ -367,6 +373,9 @@ describe('the MCP tool surface', () => {
           'max_includes',
           'program',
         ],
+        // 24.0.0 (D2): each lost one argument (`REMOVED`) and gained none.
+        'high/CreateClass': [],
+        'high/CreateProgram': [],
       };
       const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
       const gainsTimeout = isLong && !had.includes('timeout');

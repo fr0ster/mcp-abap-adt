@@ -599,7 +599,7 @@ describe('structure', () => {
 });
 
 describe('table', () => {
-  it("CheckTableLow defaults the check member's status to 'active' when version is omitted, and forwards no source — runTableCheckRun's source argument is hardcoded undefined", async () => {
+  it("CheckTableLow defaults the check member's status to 'active' when version is omitted, and forwards ddl_code as the source checked", async () => {
     await handleCheckTable(context as any, {
       table_name: 'ZT_X',
       ddl_code: 'define table zt_x { client : abap.clnt; }',
@@ -608,9 +608,12 @@ describe('table', () => {
     expect(call?.factory).toBe('getTable');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
-    // ddl_code is accepted by the tool but never reaches config — unlike
-    // structure's sibling handler, table's check has nothing to forward it to.
-    expect(call?.args[0]).toEqual({ tableName: 'ZT_X' });
+    // adt-clients 43 sends `config.source` with the check run (#9), as the
+    // structure check does: ddl_code reaches it.
+    expect(call?.args[0]).toEqual({
+      tableName: 'ZT_X',
+      source: 'define table zt_x { client : abap.clnt; }',
+    });
     expect(call?.args[1]).toBe('active');
   });
 

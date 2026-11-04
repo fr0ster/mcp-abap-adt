@@ -18,8 +18,8 @@ Each `object_type` enum, and each tool's description, is the declared system typ
 members are those the system type's ADT type table serves (22.0.0) — on cloud the writes offer
 no `PROGRAM` and no `INCLUDE` — and a member outside them is refused naming the list, before
 anything is sent. On cloud a write handler's schema offers only the properties its cloud members
-take (23.0.0): `HandlerCreate` has no `program_name`, `program_type`, `application` or
-`include_name` there, for example.
+take (23.0.0): `HandlerCreate` has no `program_name`, `application` or `include_name` there,
+for example.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP

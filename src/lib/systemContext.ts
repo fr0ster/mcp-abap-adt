@@ -5,7 +5,7 @@ export interface IAdtSystemContext {
   masterSystem?: string;
   responsible?: string;
   client?: string;
-  /** Master/original language for created objects (adtcore:masterLanguage). From SAP_LANGUAGE; library defaults to EN when unset. */
+  /** Original language for created objects, from SAP_LANGUAGE: a create given none states this one (#348); unset, a create states none and SAP takes its logon language. */
   masterLanguage?: string;
 }
 

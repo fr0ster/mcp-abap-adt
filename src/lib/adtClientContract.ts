@@ -773,7 +773,13 @@ export type FunctionModuleApi<
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
+  // The validation names its group and states a description: SAP answers
+  // `400` without one (measured), and adt-clients 43 types it so.
+  IAdtValidatable<
+    IFunctionModuleConfig,
+    ReturnType<R['validation']>,
+    'functionGroupName' | 'description'
+  > &
   IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
   IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
   IAdtLockable<IFunctionModuleConfig> &

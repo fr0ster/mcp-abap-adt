@@ -16,6 +16,15 @@
  * - `version-stated` (23.0.0): every read names its version, so the compact
  *   read sends the low request with `version=active` beside its query; the
  *   low read sent none.
+ * - `language-unstated` (24.0.0, #348): a create given no language states
+ *   none, so the compact create sends the low request without the
+ *   `adtcore:language` and `adtcore:masterLanguage` the low create wrote.
+ * - `program-type-removed` (24.0.0): the same, and without the
+ *   `program:programType` the low program create wrote.
+ * - `language-sent` (24.0.0, #348): a create given a language sends it as
+ *   `sap-language` too, and writes the two language attributes together:
+ *   the low request with the header, its body the same once the language
+ *   attributes are taken out of both, and the compact body writing both.
  */
 
 import * as fs from 'node:fs';
@@ -277,6 +286,88 @@ describe('the low set → compact mapping table', () => {
   );
 
   /**
+   * `data` without the attribute `name="…"` and the space before it, when it
+   * writes one: plain string code over the recorded body.
+   */
+  const withoutAttribute = (data: unknown, name: string): unknown => {
+    if (typeof data !== 'string') return data;
+    const start = data.indexOf(` ${name}="`);
+    if (start < 0) return data;
+    const end = data.indexOf('"', start + name.length + 3);
+    return end < 0 ? data : data.slice(0, start) + data.slice(end + 1);
+  };
+
+  /** The low requests with `names`' attributes taken out of each body. */
+  const withoutAttributes = (row: LowToCompactRow, names: string[]) =>
+    (row.low_requests ?? []).map((request) => ({
+      ...request,
+      data: names.reduce(withoutAttribute, request.data),
+    }));
+
+  const LANGUAGE = ['adtcore:language', 'adtcore:masterLanguage'];
+
+  const unstated = TABLE.rows.filter(
+    (r) => r.accepted?.kind === 'language-unstated',
+  );
+  it.each(unstated.map((r): [string, LowToCompactRow] => [r.tool, r]))(
+    '%s (accepted, language unstated): the low requests without the language attributes',
+    async (_tool, row) => {
+      expect(await compactRequests(row)).toEqual(
+        withoutAttributes(row, LANGUAGE),
+      );
+    },
+  );
+
+  const untyped = TABLE.rows.filter(
+    (r) => r.accepted?.kind === 'program-type-removed',
+  );
+  it.each(untyped.map((r): [string, LowToCompactRow] => [r.tool, r]))(
+    '%s (accepted, program type removed): the low requests without the program type and the language attributes',
+    async (_tool, row) => {
+      expect(await compactRequests(row)).toEqual(
+        withoutAttributes(row, [...LANGUAGE, 'program:programType']),
+      );
+    },
+  );
+
+  const sent = TABLE.rows.filter((r) => r.accepted?.kind === 'language-sent');
+  it.each(sent.map((r): [string, LowToCompactRow] => [r.tool, r]))(
+    '%s (accepted, language sent): the low requests with sap-language, the attributes together',
+    async (_tool, row) => {
+      const given = row.compact[0]?.args.master_language;
+      expect(typeof given).toBe('string');
+      const compact = await compactRequests(row);
+      const low = row.low_requests ?? [];
+      expect(compact).toHaveLength(low.length);
+      for (const [at, request] of compact.entries()) {
+        const before = low[at];
+        expect({
+          ...request,
+          data: withoutAttributes(
+            { ...row, low_requests: [request] },
+            LANGUAGE,
+          )[0]?.data,
+          headers: undefined,
+        }).toEqual({
+          ...before,
+          data: withoutAttributes(
+            { ...row, low_requests: before ? [before] : [] },
+            LANGUAGE,
+          )[0]?.data,
+          headers: undefined,
+        });
+        expect(request.headers).toEqual({
+          ...before?.headers,
+          'sap-language': given,
+        });
+        expect(String(request.data)).toContain(
+          ` adtcore:language="${String(given)}" adtcore:masterLanguage="${String(given)}"`,
+        );
+      }
+    },
+  );
+
+  /**
    * The rows the owner accepted (2026-10-13), each with its kind — fixed
    * here, so a row cannot be marked accepted later, or change its kind,
    * without this test going red. 19.0.0: compact HandlerCreate is the create
@@ -292,14 +383,30 @@ describe('the low set → compact mapping table', () => {
     // 23.0.0 (the owner's ruling): every read names its version.
     ['UpdateDomainLow', 'version-stated'],
     ['UpdateDataElementLow', 'version-stated'],
+    // 24.0.0 (the owner, #348): a create given no language states none.
+    ['CreateBehaviorDefinitionLow', 'language-unstated'],
+    ['CreateBehaviorImplementationLow', 'language-unstated'],
+    ['CreateClassLow', 'language-unstated'],
+    ['CreateDataElementLow', 'language-unstated'],
+    ['CreateDdlLow', 'language-unstated'],
+    ['CreateDomainLow', 'language-unstated'],
+    ['CreateFunctionGroupLow', 'language-unstated'],
+    ['CreateInterfaceLow', 'language-unstated'],
+    // A create given a language sends it as sap-language too.
+    ['CreateMetadataExtensionLow', 'language-sent'],
+    ['CreatePackageLow', 'language-unstated'],
+    ['CreateStructureLow', 'language-unstated'],
+    ['CreateTableLow', 'language-unstated'],
+    // 24.0.0 (the owner): no program type on create, which SAP ignores.
+    ['CreateProgramLow', 'program-type-removed'],
   ];
 
-  it('accepts exactly the 5 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 18 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(5);
+    expect(ACCEPTED).toHaveLength(18);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
@@ -309,7 +416,13 @@ describe('the low set → compact mapping table', () => {
     const kinds = new Set(
       TABLE.rows.flatMap((r) => (r.accepted ? [r.accepted.kind] : [])),
     );
-    expect([...kinds].sort()).toEqual(['activation-run', 'version-stated']);
+    expect([...kinds].sort()).toEqual([
+      'activation-run',
+      'language-sent',
+      'language-unstated',
+      'program-type-removed',
+      'version-stated',
+    ]);
   });
 });
 

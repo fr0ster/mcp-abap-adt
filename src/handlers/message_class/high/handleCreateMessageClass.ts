@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateMessageClass Handler - Create an ABAP Message Class (MSAG) shell
@@ -44,9 +45,7 @@ export const TOOL_DEFINITION = {
     master_language: z
       .string()
       .optional()
-      .describe(
-        '(optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      ),
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
     ...DETAIL_SHAPE,
   }),
 } as const;

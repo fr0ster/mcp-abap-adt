@@ -21,6 +21,7 @@ import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
 import { listedValues } from '../handlers/listedValues';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import { TIMEOUT_DESCRIPTION, TIMEOUT_FIELD } from '../longTools';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../masterLanguage';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
 import { DETAIL_SHAPE } from '../strategies/detail';
 
@@ -146,12 +147,7 @@ const CREATE_PROPERTIES = {
     .string()
     .optional()
     .describe('Transport request id (if required by system).'),
-  master_language: z
-    .string()
-    .optional()
-    .describe(
-      'Original language of the created object; the session language when absent.',
-    ),
+  master_language: z.string().optional().describe(MASTER_LANGUAGE_DESCRIPTION),
   super_package: z
     .string()
     .optional()
@@ -197,10 +193,6 @@ const CREATE_PROPERTIES = {
     .boolean()
     .optional()
     .describe('Protected constructor (CLASS create).'),
-  program_type: z
-    .string()
-    .optional()
-    .describe('ABAP program type (PROGRAM create).'),
   application: z
     .string()
     .optional()
@@ -309,7 +301,7 @@ export const COMPACT_CREATE_TAKES = takesOf<
       'create_protected',
       'master_language',
     ],
-    PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
+    PROGRAM: ['program_name', 'application', 'master_language'],
     INCLUDE: ['include_name', 'master_language'],
     INTERFACE: ['interface_name', 'master_language'],
     FUNCTION_GROUP: ['function_group_name', 'master_language'],
@@ -1348,7 +1340,7 @@ const VALIDATE_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'Object description used during validation. Required for BEHAVIOR_DEFINITION and METADATA_EXTENSION.',
+      'Object description used during validation. Required for FUNCTION_MODULE, BEHAVIOR_DEFINITION and METADATA_EXTENSION.',
     ),
   behavior_definition: z
     .string()

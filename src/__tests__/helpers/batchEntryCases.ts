@@ -876,7 +876,6 @@ const WRITES: BatchEntryCase[] = [
       program_name: 'PROG_A',
       package_name: 'PKG_A',
       description: 'text',
-      program_type: 'executable',
     },
   },
   {

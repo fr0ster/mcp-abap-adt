@@ -31,6 +31,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -85,9 +86,7 @@ export const TOOL_DEFINITION = {
     master_language: z
       .string()
       .optional()
-      .describe(
-        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      ),
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
     detail: z
       .enum(['terse', 'full', 'raw'])
       .optional()

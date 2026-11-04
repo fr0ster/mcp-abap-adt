@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateClass Handler - Create ABAP Class
@@ -13,6 +14,11 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * validate/check/lock/update/unlock/check/activate chain was
  * `AdtClass.create()`'s own internal workflow in adt-clients 18, which v19
  * removed (a member is one request now). Source is `UpdateClass`'s job.
+ *
+ * **No `abstract`.** SAP ignores `class:abstract` on create (measured on
+ * premise: an `abstract="true"` create gave a class that is not abstract,
+ * while `class:final` in the same body was taken), so the tool takes none:
+ * a class is abstract by its source's `ABSTRACT`.
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
@@ -49,10 +55,6 @@ export const TOOL_DEFINITION = {
       .boolean()
       .optional()
       .describe('Mark class as final. Default: false'),
-    abstract: z
-      .boolean()
-      .optional()
-      .describe('Mark class as abstract. Default: false'),
     create_protected: z
       .boolean()
       .optional()
@@ -60,9 +62,7 @@ export const TOOL_DEFINITION = {
     master_language: z
       .string()
       .optional()
-      .describe(
-        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      ),
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -74,7 +74,6 @@ interface CreateClassArgs {
   transport_request?: string;
   superclass?: string;
   final?: boolean;
-  abstract?: boolean;
   create_protected?: boolean;
   master_language?: string;
   detail?: 'terse' | 'full' | 'raw';
@@ -109,7 +108,6 @@ export async function handleCreateClass(
               description: args.description || className,
               superclass: args.superclass,
               final: args.final || false,
-              abstract: args.abstract || false,
               createProtected: args.create_protected || false,
               masterLanguage: args.master_language,
             },

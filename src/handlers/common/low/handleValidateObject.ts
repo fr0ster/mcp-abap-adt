@@ -262,11 +262,22 @@ export async function validateObject(
   }
 
   // A function module is addressed under its group: GROUP|MODULE, as the
-  // lock takes it.
+  // lock takes it, and its validation states a description: SAP answers
+  // `400` without one (measured), so a call without it is refused before
+  // anything is sent.
   // Set for a function module only, and read only for one.
   let functionGroupName = '';
   let functionModuleName = '';
+  let functionModuleDescription = '';
   if (normalizedType === 'function_module') {
+    if (!description) {
+      return return_error(
+        new Error(
+          'Function module validation requires description; missing: description',
+        ),
+      );
+    }
+    functionModuleDescription = description;
     const [group, module] = object_name.toUpperCase().split('|');
     if (!group || !module) {
       return return_error(
@@ -361,7 +372,7 @@ export async function validateObject(
               {
                 functionGroupName,
                 functionModuleName,
-                description: normalizedDescription,
+                description: functionModuleDescription,
               },
               { analyse: analyseException },
             );

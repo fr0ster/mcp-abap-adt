@@ -43,7 +43,12 @@
             "Content-Type": "application/vnd.sap.adt.packages.v2+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidatePackageLow",
@@ -272,7 +277,12 @@
             "Content-Type": "application/vnd.sap.adt.domains.v2+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateDomainLow",
@@ -533,7 +543,12 @@
             "Content-Type": "application/vnd.sap.adt.dataelements.v2+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateDataElementLow",
@@ -819,7 +834,12 @@
             "Content-Type": "application/vnd.sap.adt.tables.v2+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateTableLow",
@@ -1061,7 +1081,12 @@
             "Content-Type": "application/vnd.sap.adt.structures.v2+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateStructureLow",
@@ -1303,7 +1328,12 @@
             "Content-Type": "application/vnd.sap.adt.ddlSource+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateDdlLow",
@@ -1552,7 +1582,12 @@
             "Content-Type": "application/vnd.sap.adt.oo.classes.v4+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateClassLow",
@@ -1785,7 +1820,6 @@
             "description": "Text",
             "package_name": "PKG_TARGET",
             "transport_request": "XXXK900001",
-            "program_type": "executable",
             "application": "S"
           }
         }
@@ -1800,7 +1834,12 @@
             "Content-Type": "application/vnd.sap.adt.programs.programs.v2+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "program-type-removed",
+        "reason": "24.0.0: the create takes no program type, which SAP ignores on create (measured), and given no language states none (#348) — the low create wrote `program:programType`, and `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes none of them.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateProgramLow",
@@ -2040,7 +2079,12 @@
             "Accept": "application/vnd.sap.adt.oo.interfaces.v5+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateInterfaceLow",
@@ -2283,7 +2327,12 @@
             "Content-Type": "application/vnd.sap.adt.functions.groups.v3+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateFunctionGroupLow",
@@ -2751,7 +2800,12 @@
             "Content-Type": "application/vnd.sap.adt.blues.v1+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateBehaviorDefinitionLow",
@@ -3047,7 +3101,12 @@
           "url": "/sap/bc/adt/oo/classes/bimp_a?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
           "data": null
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-unstated",
+        "reason": "24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateBehaviorImplementationLow",
@@ -3145,7 +3204,12 @@
             "Content-Type": "application/vnd.sap.adt.ddic.ddlx.v1+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "language-sent",
+        "reason": "24.0.0 (#348): a create given a language sends it as `sap-language` too — SAP takes the original language from the logon language, not from the body; the body writes `adtcore:language` and `adtcore:masterLanguage` together, after the description.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ValidateMetadataExtensionLow",

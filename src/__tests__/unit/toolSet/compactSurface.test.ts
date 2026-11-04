@@ -11,7 +11,8 @@
  * The rule is the one `toolSurface` applies in `lib`: a tool may gain a parameter
  * (a caller that worked still works), but not lose one, and not lose or rename a
  * tool. The count is asserted first, so a fixture that stopped being read cannot
- * make the rest vacuous.
+ * make the rest vacuous. One loss is decided (`REMOVED`): `HandlerCreate`'s
+ * `program_type` (24.0.0, D2), which SAP ignores on create.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -81,6 +82,12 @@ describe('the compact tool surface', () => {
     );
   });
 
+  /** The parameters a tool lost by decision, by tool. */
+  const REMOVED: Readonly<Record<string, readonly string[]>> = {
+    // 24.0.0, the owner (D2): SAP ignores the program type on create.
+    HandlerCreate: ['program_type'],
+  };
+
   it('loses no parameter and changes none from optional to required', () => {
     const byName = new Map(frozen.map((row) => [row.name, row]));
     for (const row of current) {
@@ -91,7 +98,9 @@ describe('the compact tool surface', () => {
       // Every parameter that existed is still there, with the same requiredness.
       expect({
         tool: row.name,
-        missing: was.filter((p) => !now.includes(p)),
+        missing: was.filter(
+          (p) => !now.includes(p) && !(REMOVED[row.name] ?? []).includes(p),
+        ),
       }).toEqual({ tool: row.name, missing: [] });
     }
   });

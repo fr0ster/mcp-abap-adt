@@ -133,6 +133,9 @@ describe('compact covers what the low set did', () => {
       const answered = await call(tool, {
         object_type: 'FUNCTION_MODULE',
         object_name: 'FM_A',
+        // A validation states a description (SAP answers 400 without one):
+        // given, so the name's form is what is refused.
+        ...(tool === 'HandlerValidate' ? { description: 'Text' } : {}),
       });
       expect(answered.isError).toBe(true);
       expect(answered.text).toContain('GROUP|FM_NAME');

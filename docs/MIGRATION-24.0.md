@@ -9,7 +9,9 @@ code. Go through the section that fits how you use the server; the [CHANGELOG](.
 every item.
 
 The packages are the eighteen of 23.1.x, all at **24.0.0**, every sibling range at `^24.0.0`. The
-ADT dependencies are unchanged. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
+ADT dependencies move to `@mcp-abap-adt/adt-clients` 43, `@mcp-abap-adt/adt-strategies` 0.19 and
+`@mcp-abap-adt/interfaces-adt` 26 (`@mcp-abap-adt/compact-modify` too): what that changes for a
+caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
 `@mcp-abap-adt/server-runtime` now.
 
 ## Embedders: a tool's `inputSchema` is a zod object
@@ -116,8 +118,8 @@ A compact route calls its target tool's entry, so its arguments are parsed with 
 schema before anything is sent: `HandlerGet` (every read and part), `HandlerSearch`,
 `HandlerWhereUsed`, `HandlerGetData`, and the creates and updates `HandlerCreate` and
 `HandlerUpdate` delegate. An argument the target requires that the compact call left out (an
-object's name, `run_id`), or a value outside a list the target declares (`package_type`,
-`program_type`), is refused in the target schema's words, naming the target, where 23.x ran the
+object's name, `run_id`), or a value outside a list the target declares (`package_type`), is
+refused in the target schema's words, naming the target, where 23.x ran the
 target's handler and refused in its words. `HandlerGet` part `virtual_folders` now sends
 `with_versions` and `ignore_short_descriptions` as `false` where it sent none (`GetVirtualFolders`'
 schema defaults).
@@ -139,6 +141,54 @@ wire is the same as in 23.x.
 | You sent | 24.0 |
 |---|---|
 | `HandlerCreate` `{ object_type: 'BEHAVIOR_IMPLEMENTATION', class_name, package_name, … }` | `HandlerCreate` `{ object_type: 'BEHAVIOR_IMPLEMENTATION', class_name, behavior_definition, package_name, … }` |
+
+## Callers of `CreateClass`, `CreateProgram` and compact `HandlerCreate`: `abstract` and `program_type` are removed
+
+`abstract` (CreateClass) and `program_type` (CreateProgram, HandlerCreate PROGRAM) are removed: SAP
+ignores both on create; set them afterwards. Measured on premise: a class created with
+`abstract="true"` is not abstract (the same body's `final` is taken), and a program created as a
+module pool, a subroutine pool, `M` or `F` is an executable program. A class is abstract by its
+source's `ABSTRACT`; a program's type is the program's attribute, changed after the create.
+
+A call that still names `abstract` or `program_type` is parsed as any argument the schema does not
+declare: the argument is dropped, and the create carries neither.
+
+**What you do:** leave both out of the create; make the class abstract in its source (`UpdateClass`)
+and change the program's type after it is created.
+
+| You sent | 24.0 |
+|---|---|
+| `CreateClass` `{ class_name, package_name, abstract: true, … }` | `CreateClass` `{ class_name, package_name, … }`, then `UpdateClass` with a source declaring the class `ABSTRACT` |
+| `CreateProgram` `{ program_name, package_name, program_type, … }` | `CreateProgram` `{ program_name, package_name, … }` (an executable program, as SAP made it before) |
+| `HandlerCreate` `{ object_type: 'PROGRAM', program_name, program_type, … }` | `HandlerCreate` `{ object_type: 'PROGRAM', program_name, … }` |
+
+## Creates, validations, checks and requests: what adt-clients 43 sends
+
+- **A created object's original language (#348).** SAP takes it from the request's logon language
+  and ignores the language written into the create body (measured on ABAP cloud). A create given
+  `master_language` sends it as the request's `sap-language` beside the body's
+  `adtcore:language` / `adtcore:masterLanguage`; given none, the session's language
+  (`SAP_LANGUAGE`, or `x-sap-language` over HTTP) is sent the same way; with neither, the create
+  states no language and SAP uses its logon language. 23.x wrote `EN` into the body when nothing
+  was given, and SAP took the logon language anyway. An on-premise system whose ICF node fixes the
+  logon language answers in that language whatever is sent.
+  **What you do:** to create in a given language, pass `master_language` or state the session's;
+  a caller that counted on `EN` passes `master_language: 'EN'`.
+- **A function module's validation takes a description.** `HandlerValidate` `FUNCTION_MODULE`
+  without `description` is refused before anything is sent ("Function module validation requires
+  description"): SAP answers `400` without one (measured). The other validations no longer send
+  `description=undefined` when no description is given.
+  **What you do:** pass the description the module will be created with.
+- **`CreateTransport` `transport_type: 'customizing'` creates a Customizing Request** (`W`); it sent
+  `T`, a Transport of Copies, which SAP refuses without a real target. `workbench` stays `K`.
+  **What you do:** nothing; a caller that wanted a Transport of Copies creates it in the Transport
+  Organizer.
+- **`CheckTable` / `CheckTableLow` check `ddl_code`** when it is given: the source goes with the
+  check run, as `CheckStructure`'s does; it was accepted and not sent.
+- **`RuntimeGetProfilerTraceData` `statements` sends `auto_drill_down_threshold` as given**
+  (`0.1` was sent as `0`).
+- **A create's description, name, package and references are escaped** in the create body: a
+  description holding `&`, `<` or `"` makes a well-formed request now.
 
 ## Former users of the low set: each low tool and its compact call today
 
@@ -179,20 +229,20 @@ ADT requests, except where a row names an accepted difference.
 | `CheckProgramLow` | `HandlerCheckRun` (object_type: PROGRAM, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
 | `CheckStructureLow` | `HandlerCheckRun` (object_type: STRUCTURE, object_name, version, source_code) | The low tool's ddl_code is HandlerCheckRun's source_code. |
 | `CheckTableLow` | `HandlerCheckRun` (object_type: TABLE, object_name, version) | CheckTableLow accepted ddl_code and reporter and sent neither. |
-| `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, implementation_type) | the same requests |
-| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, description, package_name, transport_request), then `HandlerLock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, implementation_code, transport_request, lock_handle), then `HandlerUnlock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name, lock_handle) | With implementation_code, four compact calls, one request each: the create, the lock, the write of the implementations include under the lock_handle the lock answered, the unlock. |
-| `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, create_protected) | the same requests |
-| `CreateDataElementLow` | `HandlerCreate` (object_type: DATA_ELEMENT, data_element_name, description, package_name, transport_request) | the same requests |
-| `CreateDdlLow` | `HandlerCreate` (object_type: DDL, ddl_name, description, package_name, transport_request) | the same requests |
-| `CreateDomainLow` | `HandlerCreate` (object_type: DOMAIN, domain_name, description, package_name, transport_request) | the same requests |
-| `CreateFunctionGroupLow` | `HandlerCreate` (object_type: FUNCTION_GROUP, function_group_name, description, package_name, transport_request) | On the 400 "Interface SAPL… has not been created" the low tool read the group back; HandlerCreate answers the 400 as it came — read the group with HandlerGet part metadata to see whether it landed. |
+| `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, implementation_type) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, description, package_name, transport_request), then `HandlerLock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, implementation_code, transport_request, lock_handle), then `HandlerUnlock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name, lock_handle) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. With implementation_code, four compact calls, one request each: the create, the lock, the write of the implementations include under the lock_handle the lock answered, the unlock. |
+| `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, create_protected) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateDataElementLow` | `HandlerCreate` (object_type: DATA_ELEMENT, data_element_name, description, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateDdlLow` | `HandlerCreate` (object_type: DDL, ddl_name, description, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateDomainLow` | `HandlerCreate` (object_type: DOMAIN, domain_name, description, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateFunctionGroupLow` | `HandlerCreate` (object_type: FUNCTION_GROUP, function_group_name, description, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. On the 400 "Interface SAPL… has not been created" the low tool read the group back; HandlerCreate answers the 400 as it came — read the group with HandlerGet part metadata to see whether it landed. |
 | `CreateFunctionModuleLow` | `HandlerCreate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, description, transport_request) | the same requests |
-| `CreateInterfaceLow` | `HandlerCreate` (object_type: INTERFACE, interface_name, description, package_name, transport_request) | the same requests |
-| `CreateMetadataExtensionLow` | `HandlerCreate` (object_type: METADATA_EXTENSION, name, description, package_name, transport_request, master_language) | the same requests |
-| `CreatePackageLow` | `HandlerCreate` (object_type: PACKAGE, package_name, super_package, description, package_type, software_component, transport_layer, transport_request, record_changes, application_component) | the same requests |
-| `CreateProgramLow` | `HandlerCreate` (object_type: PROGRAM, program_name, description, package_name, transport_request, program_type, application) | the same requests |
-| `CreateStructureLow` | `HandlerCreate` (object_type: STRUCTURE, structure_name, description, package_name, transport_request) | HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock). |
-| `CreateTableLow` | `HandlerCreate` (object_type: TABLE, table_name, package_name, transport_request) | the same requests |
+| `CreateInterfaceLow` | `HandlerCreate` (object_type: INTERFACE, interface_name, description, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateMetadataExtensionLow` | `HandlerCreate` (object_type: METADATA_EXTENSION, name, description, package_name, transport_request, master_language) | **accepted:** 24.0.0 (#348): a create given a language sends it as `sap-language` too — SAP takes the original language from the logon language, not from the body; the body writes `adtcore:language` and `adtcore:masterLanguage` together, after the description. |
+| `CreatePackageLow` | `HandlerCreate` (object_type: PACKAGE, package_name, super_package, description, package_type, software_component, transport_layer, transport_request, record_changes, application_component) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
+| `CreateProgramLow` | `HandlerCreate` (object_type: PROGRAM, program_name, description, package_name, transport_request, application) | **accepted:** 24.0.0: the create takes no program type, which SAP ignores on create (measured), and given no language states none (#348) — the low create wrote `program:programType`, and `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes none of them. |
+| `CreateStructureLow` | `HandlerCreate` (object_type: STRUCTURE, structure_name, description, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock). |
+| `CreateTableLow` | `HandlerCreate` (object_type: TABLE, table_name, package_name, transport_request) | **accepted:** 24.0.0 (#348): a create given no language states none — the low create wrote `adtcore:language` and `adtcore:masterLanguage` as `EN`; the compact create writes neither, and SAP takes its logon language. |
 | `CreateTransportLow` | `HandlerTransportCreate` (description, transport_type) | the same requests |
 | `DeleteBehaviorDefinitionLow` | `HandlerDelete` (object_type: BEHAVIOR_DEFINITION, behavior_definition_name, transport_request) | the same requests |
 | `DeleteClassLow` | `HandlerDelete` (object_type: CLASS, class_name, transport_request) | the same requests |

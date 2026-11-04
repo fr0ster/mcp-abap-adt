@@ -244,7 +244,8 @@ export function compactValidateDescription(variant: ProjectionVariant): string {
       PROGRAM: 'PROGRAM(object_name*, package_name*)',
       INCLUDE: 'INCLUDE(object_name*, package_name*)',
       TABLE_TYPE: 'TABLE_TYPE(object_name*, description)',
-      FUNCTION_MODULE: 'FUNCTION_MODULE(object_name* as GROUP|MODULE)',
+      FUNCTION_MODULE:
+        'FUNCTION_MODULE(object_name* as GROUP|MODULE, description*)',
       PACKAGE: 'PACKAGE(object_name*, super_package)',
       BEHAVIOR_DEFINITION:
         'BEHAVIOR_DEFINITION(object_name*, package_name*, description*, root_entity*, implementation_type*)',

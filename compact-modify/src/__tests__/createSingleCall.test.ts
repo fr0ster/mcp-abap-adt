@@ -374,27 +374,21 @@ describe('HandlerCreate is one POST', () => {
     expect(textOf(answered.answer)).toContain('has not been created');
   });
 
-  // An include is its own resource (`HandlerCreate INCLUDE`): a program
-  // create with program_type include is refused before any request — by
-  // CreateProgram's schema, whose program types do not hold it.
-  it('PROGRAM with program_type include: no request, an error', async () => {
-    for (const mode of ['pending', 'answered'] as const) {
-      const answered = await run(
-        mode,
-        create('PROGRAM', {
-          program_name: 'ZPROG_A',
-          package_name: 'ZPKG_A',
-          program_type: 'include',
-        }),
-      );
-      expect(answered.sent).toEqual([]);
-      if (mode === 'answered') {
-        expect(answered.answer?.isError).toBe(true);
-        expect(textOf(answered.answer)).toContain(
-          'Invalid arguments for tool CreateProgram: Invalid option: expected one of "executable"|"module_pool"|"function_group"|"class_pool"|"interface_pool" at program_type',
-        );
-      }
-    }
+  // 24.0.0 (D2): a program create takes no program type — SAP ignores it
+  // on create (measured). One still given is not declared, so the parse
+  // drops it: the one create is sent, carrying no program type.
+  it('PROGRAM with program_type: dropped, the one create sent without one', async () => {
+    const held = await run(
+      'pending',
+      create('PROGRAM', {
+        program_name: 'ZPROG_A',
+        package_name: 'ZPKG_A',
+        program_type: 'include',
+      }),
+    );
+    expect(held.sent).toHaveLength(1);
+    expect(held.sent[0].method).toBe('POST');
+    expect(String(held.sent[0].data)).not.toContain('programType');
   });
 
   // A type whose create is a target tool's is parsed with that tool's
@@ -408,7 +402,6 @@ describe('HandlerCreate is one POST', () => {
     ['DDL', { ddl_name: undefined }, 'CreateDdl', 'ddl_name'],
     ['CLASS', { class_name: undefined }, 'CreateClass', 'class_name'],
     ['PROGRAM', { program_name: undefined }, 'CreateProgram', 'program_name'],
-    ['PROGRAM', { program_type: 'X' }, 'CreateProgram', 'program_type'],
     [
       'INTERFACE',
       { interface_name: undefined },
@@ -529,7 +522,7 @@ const CARRIES: Record<string, string[]> = {
     'create_protected',
     'master_language',
   ],
-  PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
+  PROGRAM: ['program_name', 'application', 'master_language'],
   INTERFACE: ['interface_name', 'master_language'],
   FUNCTION_GROUP: ['function_group_name', 'master_language'],
   FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
@@ -570,7 +563,6 @@ const SAMPLE: Record<string, unknown> = {
   transport_request: 'XXXK900001',
   transport_type: 'workbench',
   binding_variant: 'ODATA_V4_UI',
-  program_type: 'executable',
   package_type: 'development',
   implementation_type: 'Managed',
   record_changes: true,
@@ -745,12 +737,12 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
       create('STRUCTURE', {
         ...fieldsOf('STRUCTURE'),
         application: 'S',
-        program_type: 'executable',
+        program_name: 'ZPROG_A',
       }),
     );
     expect(answered.sent).toEqual([]);
     expect(textOf(answered.answer)).toContain(
-      'HandlerCreate sends the create request alone: program_type, application are not sent',
+      'HandlerCreate sends the create request alone: program_name, application are not sent',
     );
   });
 

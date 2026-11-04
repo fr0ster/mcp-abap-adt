@@ -1044,22 +1044,21 @@ comes after C2; it is independent of C2a–C2d.
     system-kind position — a value assigned to a variable or property typed as the kind, or
     returned into one — must not reference, in its body or in a same-file function it calls,
     `authType`, `jwtToken`, `SAP_JWT_TOKEN`, or a credential's type.
-  - **Every `authType` comparison is a reviewed credential site.** Each binary comparison or
-    `switch` on an expression the checker types as the configuration's `authType` (or on the
-    string `'authType'` read through a property helper) must sit in a function named in the
-    guard's own literal table of credential-handling sites (today the three production sites
-    and the test sites kept above), with its purpose; an entry naming a function that no
-    longer exists fails, so the table cannot go stale.
-  - **Fixtures, each refused by its check alone:** a copy of the old `isCloudConnection`; a
+  - There is no table of allowed `authType` sites: credential handling elsewhere (the sites
+    kept above) is not checked by name, and a finding is fixed in the code, never by adding
+    an entry.
+  - **Fixtures, each refused by the check:** a copy of the old `isCloudConnection`; a
     kind-returning function calling a same-file helper that reads `authType`; an
-    `isCloudSystem = authType === 'jwt'` assignment into a kind-typed field; a new
-    `authType` comparison in an unlisted function; a stale table entry.
+    `isCloudSystem = authType === 'jwt'` assignment into a kind-typed field. A fixture of
+    credential handling that produces no kind (the configuration summary's shape) passes,
+    proving the check does not refuse plumbing.
   - **Its limit, stated:** a credential read reaching a kind through another module, or
     through an untyped value, is beyond this check; that is left to review, and the PR
     description says so.
 - [ ] **Step 5:** Run the unit suite, `npm run test:check`, every package's `lint:check`:
-  PASS. Mutate: put one `authType === 'jwt'` kind test back into a kind-producing helper; the
-  guard goes red; revert.
+  PASS. Mutate: put one `authType === 'jwt'` kind test back into a kind-producing helper (and,
+  separately, into a same-file helper a kind function calls); the guard goes red each time;
+  revert.
 - [ ] **Step 6: CHANGELOG** (24.0.0, Fixed): "On-premise systems with JWT authentication were
   refused program create, update and activate: the server took the credential type for the
   system kind. The declared system kind decides what is offered." **MIGRATION-24.0.md:**

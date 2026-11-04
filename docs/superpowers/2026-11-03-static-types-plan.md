@@ -743,9 +743,10 @@ and live specifics.
     804) ends `return isCloudConnection() ? 'cloud' : 'onprem'` — a silent `onprem` when
     nothing states the kind, a test-code defect fixed in this step:
     - new `statedSystemKind(): SystemKind | 'legacy' | undefined` in `configHelpers.ts`
-      returns the kind only from stated facts — `environment.system_type`, then
-      `SAP_SYSTEM_TYPE` in the environment or the session file, then a JWT session (cloud) —
-      and `undefined` otherwise;
+      returns the kind only from explicit statements — `environment.system_type`, then
+      `SAP_SYSTEM_TYPE` in the environment or the session file — and `undefined` otherwise. A
+      credential type is not a statement of the kind: a JWT session states nothing (the
+      owner's rule, configuration is never guessed);
     - the spawning path (`hardMode.ts`, `launchedServers.ts`) uses it and refuses before
       spawning when it answers `undefined`, naming what to set;
     - `getSystemType()` becomes `statedSystemKind()` or a thrown refusal with the same words —
@@ -767,7 +768,7 @@ and live specifics.
       `readOnly/system/AbapSystemSymbolsHandler.test.ts`; `admin/shared-deps/check.test.ts`,
       `admin/shared-deps/setup.test.ts`. `liveSuite` (C1) uses `statedSystemKind()` too.
     - Tests: `'statedSystemKind answers nothing when nothing states the kind'`, `'a JWT
-      session states cloud'`, `'getSystemType refuses instead of defaulting to onprem'`,
+      session without SAP_SYSTEM_TYPE gives undefined'`, `'getSystemType refuses instead of defaulting to onprem'`,
       `'hard mode refuses to spawn without a stated kind'`.
   - **Credentials, as the server's own code and docs define them:** stdio from its
     destination configuration — `--env=<name>` / `--env-path=<file>` / `--mcp=<destination>`

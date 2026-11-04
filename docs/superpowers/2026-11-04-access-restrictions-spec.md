@@ -203,6 +203,37 @@ no credential is in the line.
     `HandlerGetData`, whose `object_name` description names `sql_query`;
   - so twenty builders in all. The definition with nothing denied is byte-identical to today's
     (§7).
+- **Values that send one request are denied together.** Where two or more values of one
+  compact tool's dispatching argument send the same request for the same name, denying any one
+  of them removes every value of its group from the enum (and from every other form, below):
+  the values are one action at SAP's level, so keeping one would keep the denied action. The
+  groups, from the route tables and the handlers they reach (Appendix C):
+  - `HandlerActivate`: {`CLASS`, `BEHAVIOR_IMPLEMENTATION`}, both `CLAS/OC` in
+    `COMPACT_ACTIVATE_ROUTES` and activated alike (`handleHandlerActivate.ts:128`, no check
+    that the class is a behavior implementation). The only code `COMPACT_ACTIVATE_ROUTES`
+    shares between types (Measured, a sweep of all 18 entries).
+  - `HandlerCreate`, `HandlerLock`, `HandlerUnlock`: {`CLASS`, `BEHAVIOR_IMPLEMENTATION`}. The
+    behavior implementation's `create`, `lock` and `unlock` are the class's own, called with
+    the same name (Measured: adt-clients 42.1.0 `AdtBehaviorImplementation`).
+  - `HandlerDelete`: {`CLASS`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`}, the class's deletion
+    (`deletionTargets.ts`; the behavior implementation's `delete` is the class's, Measured), and
+    {`LOCAL_TEST_CLASS`, `UNIT_TEST`}, the test-class include written empty
+    (`EMPTIED_INCLUDE_TYPES`, `CLASS_INCLUDES` in `handleUpdateUnderLock.ts`). (Measured)
+  - `HandlerDeletionCheck`: {`CLASS`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`}, the same
+    targets as the deletion. (Measured)
+  - `HandlerUpdate`: {`LOCAL_TEST_CLASS`, `UNIT_TEST`, `CDS_UNIT_TEST`}, each a write of the
+    test-class include (`CLASS_INCLUDES`). (Measured)
+  - `HandlerGet`: {`UNIT_TEST`, `CDS_UNIT_TEST`}, two handlers reading a unit-test run's result
+    by `run_id` (Inference that the requests are identical; plan step 1 records both).
+  - Not grouped, since the requests differ (Measured): `HandlerGet` `CLASS` (the main source)
+    and `BEHAVIOR_IMPLEMENTATION` (the implementations include); `HandlerUpdate` `CLASS` and
+    `BEHAVIOR_IMPLEMENTATION` (likewise); `HandlerValidate` `BEHAVIOR_IMPLEMENTATION` (its own
+    object type in the validation). `HandlerCheckRun`, `HandlerWhereUsed`, `HandlerProfileRun`
+    and the `action` / `operation` tools route each value to its own request.
+  - The consequence, in the docs: denying `HandlerActivate.CLASS` also removes the activation
+    of `BEHAVIOR_IMPLEMENTATION`, and the reverse; likewise for each group above. A test fixes
+    the groups by recording the request each value sends for one name, so a route that starts
+    or stops sharing a request shows in a reviewed diff.
 - **Every form that names the target is narrowed with the dispatching argument**, so the SDK's
   parse refuses a denied type in every form, with no per-call check (§1, Appendix C):
   - **`HandlerActivate`.** The object types map to codes by `COMPACT_ACTIVATE_ROUTES`
@@ -213,8 +244,9 @@ no credential is in the line.
     `FTG2/FT` (on premise only), `AUTH`, `ENHO/XHH`, `ENHO/XHB`, `ENHS/XSB`. When at least one
     `HandlerActivate` value is denied, `objects[].type` and `object_adt_type` become an `enum`
     of the codes still allowed:
-    - a mapped code is kept only when every type it stands for is allowed (denying `CLASS` or
-      `BEHAVIOR_IMPLEMENTATION` removes `CLAS/OC`);
+    - a mapped code is kept only when every type it stands for is allowed; since `CLASS` and
+      `BEHAVIOR_IMPLEMENTATION` are one group (above), denying either removes both from
+      `object_type` and `CLAS/OC` from the two code arguments;
     - an unmapped code is kept: no `HandlerActivate.<value>` names it, so only denying the
       tool removes it, and the docs say so;
     - the enum holds the codes as the table writes them, upper case. The other spellings
@@ -466,8 +498,11 @@ draft, and no other tool reads it.
   configured, for each row, and with an unmatched entry; a denied tool absent from
   `tools/list`; a denied value absent from the enum, the description and the search members,
   for each of the twenty builders; a denied `HandlerActivate` type refused in `objects[].type`
-  and `object_adt_type` too (`CLAS/OC` gone when `CLASS` or `BEHAVIOR_IMPLEMENTATION` is
-  denied, an unmapped code kept); `HandlerGet`'s address parts gone when a value is denied; `HandlerGetData.sql` removing `sql_query` and its mention; a
+  and `object_adt_type` too (an unmapped code kept); each group of values that send one
+  request, in each direction: `HandlerActivate.CLASS` denied removes `BEHAVIOR_IMPLEMENTATION`
+  from `object_type` and `CLAS/OC` from `objects[].type` and `object_adt_type`, and
+  `HandlerActivate.BEHAVIOR_IMPLEMENTATION` denied removes `CLASS` and `CLAS/OC`; the same both
+  ways for every member of every group in Appendix C; `HandlerGet`'s address parts gone when a value is denied; `HandlerGetData.sql` removing `sql_query` and its mention; a
   tool with every value denied absent; each form left absent (no row, an empty variable)
   restricting nothing; each refusal code, its words, and that no handler ran and nothing of the
   call's own was sent (a recording connection); an argument not given passing; a refused call in
@@ -503,7 +538,11 @@ draft, and no other tool reads it.
 
 - **Docs:** a new `docs/user-guide/ACCESS_RESTRICTIONS.md` (every setting, the grammar, the
   start line, what is checked and what is not: reads are not checked; a task is matched as
-  given; denying `Activate*` closes only the activation tools, not a write's `activate`; the
+  given; denying `Activate*` closes only the activation tools, not a write's `activate`;
+  values that send one request are denied together (denying `CLASS` also removes
+  `BEHAVIOR_IMPLEMENTATION` where both are one request, and the reverse — the groups of
+  Appendix C); an unmapped activation code goes only with the tool; while a `HandlerActivate`
+  value is denied its code arguments take upper-case codes only; the
   paths an embedder takes into its own hands are its own); the tool lists
   (`AVAILABLE_TOOLS*.md`, generated) and a section on `GetObjectDraft` (its answer, the types
   offered, the server clock, first writer wins); `CLI_OPTIONS.md`,
@@ -526,7 +565,8 @@ draft, and no other tool reads it.
 1. Measure: `workingArea` against `workspace` with two users on premise; the ETag through
    `wireItself`; the versions of every type the draft tool would offer (§5.1); whether an
    include's change moves the main source's inactive ETag (§5); whether a `$batch` response
-   part keeps the ETag header (§5); the super-package element of a package's metadata and a
+   part keeps the ETag header (§5); whether `HandlerGet` `UNIT_TEST` and `CDS_UNIT_TEST` send
+   one request (§3.1); the super-package element of a package's metadata and a
    package read on the real connection while a batch is open (§3.2).
 2. The rows, their readers and the start line.
 3. The deny list at registration, with the twenty builders.
@@ -641,6 +681,18 @@ GetTransport, ReadTransportObjects, ReadTransportActionLog; compact HandlerGet, 
     when a value is denied;
   - none on HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerLock,
     HandlerUnlock, HandlerUpdate, HandlerValidate, HandlerWhereUsed, HandlerProfileRun, or the
+    `action` / `operation` tools.
+- **Values that send one request**, denied together (§3.1):
+  - HandlerActivate: CLASS, BEHAVIOR_IMPLEMENTATION;
+  - HandlerCreate: CLASS, BEHAVIOR_IMPLEMENTATION;
+  - HandlerLock: CLASS, BEHAVIOR_IMPLEMENTATION;
+  - HandlerUnlock: CLASS, BEHAVIOR_IMPLEMENTATION;
+  - HandlerDelete: CLASS, CDS_UNIT_TEST, BEHAVIOR_IMPLEMENTATION; and LOCAL_TEST_CLASS,
+    UNIT_TEST;
+  - HandlerDeletionCheck: CLASS, CDS_UNIT_TEST, BEHAVIOR_IMPLEMENTATION;
+  - HandlerUpdate: LOCAL_TEST_CLASS, UNIT_TEST, CDS_UNIT_TEST;
+  - HandlerGet: UNIT_TEST, CDS_UNIT_TEST (Inference, plan step 1);
+  - none on HandlerCheckRun, HandlerValidate, HandlerWhereUsed, HandlerProfileRun, or the
     `action` / `operation` tools.
 - Every other tool, full set included, takes `Tool` only; `Tool.value` on it matches nothing
   and is ignored (named in the start line).

@@ -135,8 +135,8 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1–C16, each with its
-own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a and C3–C16, each with
+its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; none is still open.
 
 **Global constraints.** Every task's requirements include these:
@@ -247,7 +247,19 @@ and live specifics.
   - `requiredKeys(served: readonly ServedTool[]): ReadonlyMap<CoverageKey, ReadonlySet<SystemKind>>`.
     - The `object_type`, `part`, `operation` and `action` values come from each listed
       schema's enums (O11, decided).
+    - **Two-dimension tools have a declared table; no product is taken.** Only `HandlerGet` and
+      `HandlerUpdate` declare two key dimensions (`object_type` and `part`); a third tool that
+      does fails `requiredKeys` until its table is declared.
     - The typed `HandlerGet` pairs come from `compactReadRoutes` / `compactPartRoutes`.
+    - `HandlerUpdate`'s legal keys (`handleUpdateUnderLock.ts`: `partRefusal` refuses a `part`
+      on any type outside `PART_TYPES`, which is `INCLUDE`, and any part but `source` /
+      `metadata`): `HandlerUpdate#<type>` with `part` omitted, for every type of the
+      variant's enum (`INCLUDE` included: it writes the source), plus `HandlerUpdate#INCLUDE#source`
+      and `HandlerUpdate#INCLUDE#metadata` where the variant lists `INCLUDE` (on premise).
+      `coverageKeys.ts` imports `PART_TYPES` and declares the include parts beside it; a test,
+      `'every HandlerUpdate combination outside the table is refused'`, calls the entry with
+      each other type × part on `recordingConnection` and expects the `partRefusal` words and
+      zero requests, so the table cannot drift from the handler.
     - The typeless `HandlerGet` keys are the five parts `handleHandlerGet` routes before a type
       (`object_structure`, `node_structure`, `virtual_folders`, `activation_status`,
       `activation_results`), each where its variant's `part` enum lists it.
@@ -266,11 +278,36 @@ and live specifics.
       (`authorization`, `sessionType`, `cookie`, `contentType`, `accept`) are already in the
       full header map.
     - Any other field the shape has no place for fails the case.
-  - `interface PinCase { tool: string; variant: SystemKind; stand: 'recording' | 'adtStandIn' | 'server'; args: ToolArgs; answers?: ReadonlyArray<Partial<IAdtWireResponse> | undefined>; before?: ReadonlyArray<{ tool: string; args: ToolArgs }>; refusal?: 'answer' | 'thrown'; expected: readonly PinnedRequest[] | 'none'; ran?: (answer: McpResult) => void }`.
+  - `interface PinCase { tool: string; variant: SystemKind; stand: 'recording' | 'adtStandIn' | 'server'; setup?: PinSetup; args: ToolArgs; bind?: Readonly<Record<string, Binding>>; answers?: ReadonlyArray<Partial<IAdtWireResponse> | undefined>; before?: ReadonlyArray<{ tool: string; args: ToolArgs; bind?: Readonly<Record<string, Binding>> }>; refusal?: 'answer' | 'thrown'; expected: readonly PinnedRequest[] | 'none' | 'nothing-sent'; ran?: (answer: McpResult) => void }`.
     - The key is `keyOf(tool, args)`. There is no separate type or part field.
     - `before` holds the calls that make the state the tool needs, in the same server. Their
-      requests are not part of `expected`; their answers give the handles the case passes on.
-    - `ran` is required with `'none'`: it asserts the tool's own result is in the answer.
+      requests are not part of `expected`.
+    - **Response binding.** `interface Binding { from: number; field: string }`: the argument
+      takes the named field of the answer of `before[from]` (a state handle, a run id, a
+      debuggee id, a leftover id). `bind` may never name `object_type`, `part`, `operation` or
+      `action`: key-bearing fields stay in the `args` literal (the guard refuses a fixture
+      that binds one).
+    - **Fixture setup.** `type PinSetup = 'leftover-session' | 'background-run-store'`: a
+      closed list, each made by the existing helper before the server starts
+      (`leftoverSession.ts` writes the leftover file C16 needs; the background-runs memory port
+      for a run's record). A new setup is a new member of the union, in this file.
+    - `'none'` (a tool that sends nothing on success) requires `ran`: it asserts the tool's own
+      result is in the answer, and is legal only for the tools C1 Step 1 lists.
+    - `'nothing-sent'` is legal only with `refusal: 'thrown'`: the call throws with
+      `invalidArgumentsWords`' text and nothing is recorded. It needs no `ran`, is exempt from
+      the request-free list, and never counts for its key.
+    - **Deterministic wire.** Before a case sends, `pinCases` fixes every input the wire would
+      otherwise vary on, so the whole recorded request stays the literal:
+      - `node:crypto`'s `randomUUID` is replaced, for the case only, by a seeded sequence
+        (`seedUuids(caseKey)`): the connection's `sap-adt-request-id`
+        (`AbstractAbapConnection`), adt-clients' batch boundary and request ids
+        (`batch/wire.js`), discovery's request id, and any id the server makes (an AMDP
+        breakpoint id) come out the same on every run;
+      - `adtStandIn` binds a port fixed per pin file (a constant in the file, one per file,
+        from a range kept for pins), so the `Host` header is constant; a busy port fails the
+        case — no retry, no fallback port;
+      - a varying field found while writing a pin that neither covers is reported to the
+        controller before the pin is committed; it is never removed from the recording.
   - `pinCases(cases: readonly PinCase[]): void`
     - It defines one `it('<key> (<variant>) sends the pinned requests')` per case.
     - It finds the tool by name among the variant's served tools. An unserved tool fails.
@@ -282,8 +319,8 @@ and live specifics.
       - `ran(answer)` for `'none'`;
       - the answer's `isError`, `true` only with `refusal: 'answer'`;
       - with `refusal: 'thrown'`, that the call throws with `invalidArgumentsWords`' text **and**
-        that nothing was recorded (`expected: 'none'` is required with it). A refusal row is
-        supplemental: the guard does not count it for its key.
+        that nothing was recorded (`expected: 'nothing-sent'` is required with it). A refusal
+        row is supplemental: the guard does not count it for its key.
     - It must be called in executable Jest scope (top level, or a `describe` callback); the
       guard refuses a call inside a function nothing calls.
 - **`pinServer.ts`**
@@ -293,8 +330,9 @@ and live specifics.
     (`BaseMcpServer`'s, background branch included), on an in-memory MCP transport against the
     stand-in. The existing helpers are reused: `batchHarness.ts`, `batchStand.ts`,
     `leftoverSession.ts`, and the background-runs memory port.
-  - Handles (the batch's state handle, a run id, a listener, a long-session handle) are read
-    from the answers of `before`.
+  - Handles (the batch's state handle, a run id, a listener, a long-session handle) reach a
+    later call only through `bind` from the answers of `before`; `setup` makes what must
+    exist before the server starts.
 - **`live.ts`**
   - `liveSuite(systems: readonly SystemKind[], title: string, body: () => void): void`.
     Without a config, or on a system it does not name, it skips and logs the reason.
@@ -315,7 +353,7 @@ and live specifics.
   - `recordCreatedRequest(transportNumber: string): void` and
     `deleteRecordedRequests(): Promise<void>`: deletes only recorded request and task numbers
     through `createAdtClient(connection).getRequest().delete` on the test's own connection, in
-    the order C13 measures, then asserts each absent with `GetTransport`.
+    the order C2a measured, then asserts each absent with `GetTransport`.
 - **`ledgerScan.ts`**
   - `scanUnitFile(path: string): readonly PinRef[]`
   - `scanLiveFile(path: string): readonly LiveRef[]`
@@ -324,9 +362,12 @@ and live specifics.
 
 **Steps:**
 - [ ] **Step 1: Write `coverageLedger.test.ts`.**
-  - `'the served list is the listed-schema fixture'`: per tool of `fixture.schemas`, the set of
-    binary-and-variant pairs serving it equals its `listedBy`; 315 tools; no served tool outside
-    `fixture.schemas`.
+  - `'the served list is the listed-schema fixture'`: `servedTools()` lists the onprem and
+    cloud variants only, so it is compared with the **onprem/cloud projection** of each tool's
+    `listedBy` in `fixture.schemas` (its `legacy …` entries dropped): per tool, the set of
+    binary-and-variant pairs serving it equals that projection; 315 tools; no served tool
+    outside `fixture.schemas`. The legacy listings stay checked where they are today
+    (`toolSet/listedSchemas.test.ts`), not here.
   - `'every required key has a ledger row'` and `'every ledger row is a required key'`: two set
     differences, each expected `[]`, with the missing keys printed.
   - `'each row names exactly the systems its key requires'`.
@@ -369,7 +410,10 @@ and live specifics.
     anything; `ran` sees no result.
   - `'a none case fails when the tool sends a request'`.
   - `'a thrown refusal is asserted as thrown, with zero requests'`: a case that sends before
-    throwing fails.
+    throwing fails; `'nothing-sent'` without `refusal: 'thrown'` fails.
+  - `'two runs of one case record the same requests'`: the seeded ids and the fixed port make
+    the recording identical.
+  - `'a binding reads the earlier answer'` and `'a binding of a key-bearing field is refused'`.
   - `'toPinned excludes session and nothing else'`.
   - `'toPinned keeps the query, every header and the body'`: one request through each stand,
     with params, three headers and a body, each found in the pinned shape.
@@ -456,6 +500,29 @@ and live specifics.
   returns at once, logging nothing on.
 - [ ] **Step 6: Commit** as `test(coverage): realm check, refusal stop, run report`.
 
+### C2a. Measure transport request deletion and the move (live, before C6)
+
+Runs after C2 and before C6's `HandlerCreate#TRANSPORT` live case; a prerequisite of C6's
+transport case and of C13. The measurement runs as a temporary Jest case under
+`src/__tests__/integration/coverage/` on C1–C2's helpers (`liveCall`, the refusal stop,
+`recordCreated`), deleted after the record is written; nothing else of it is committed.
+
+- [ ] **Step 1:** With the owner's go, after the realm check, on the on-premise system, then
+  on the cloud (where the discovery offers the transport endpoints, O7 / O8): create one
+  request and one task in it through `CreateTransport` / `CreateTransportTask`.
+- [ ] **Step 2:** Move an object the measurement creates in the configured transportable
+  package from the configured request's task to the created task, then back
+  (`MoveTransportObjects`); read both requests after each move. Remove the entry; delete the
+  object.
+- [ ] **Step 3:** Delete through `createAdtClient(connection).getRequest().delete` on the
+  measurement's own connection — first the task by its number, then the request; if the task
+  delete is refused, the request alone — and read each number with `GetTransport` after.
+- [ ] **Step 4:** Record in C13 and in this task: which deletes ADT accepted, in which order,
+  what `GetTransport` answers for a deleted number (the `expectAbsent` read), and whether the
+  move between requests is accepted both ways. A refusal of the move or of every delete goes
+  to the owner before C6.
+- [ ] **Step 5:** Commit the record as `docs: the transport delete path, measured`.
+
 ### C3. Activate
 
 **Keys:**
@@ -481,8 +548,13 @@ activation answer is a corpus activation result.
     function group behind a module.
   - **The BDEF's root is the test's own.** A BDEF carries its root entity's name, so it cannot
     sit on a shared view (`rapFixtures.ts`). The test creates its own root view under
-    `ZMCP_BLD_I_*` (`assertNameAvailable`, `createView`, `activateAndConfirm`), records it,
-    then creates the BDEF over it; the same holds for the behavior implementation's class.
+    `ZMCP_BLD_I_*` and creates the BDEF over it; the same holds for the behavior
+    implementation's class.
+  - **Registered at once.** The root view is recorded for cleanup immediately after its
+    create succeeds — before its source is written and before it is activated
+    (`rapFixtures.ts`' `createView` runs create, write, activate in one call, so the test calls
+    the create, `recordCreated`, then the write and `activateAndConfirm`). A write or activation
+    that fails still leaves the view to cleanup. The same for the BDEF and the class.
   - Cleanup deletes in reverse order of creation: behavior implementation, BDEF, then the
     root view (`deleteView`).
 - **Assertions.** After the activation, `GetInactiveObjects` no longer lists the object, and
@@ -565,14 +637,17 @@ chains are built per operation, not from one type list:
   extension; a BDEF over the test's own root view (C3's rule); a service definition before its
   binding. Objects go into `$TMP` or the configured package, which the test does not create.
 
+**Prerequisite:** C2a, for the `HandlerCreate#TRANSPORT` live case.
+
 **Owner's decision applied:** O4 / O5 — `HandlerCreate#TRANSPORT`'s live case creates its own
-request and records it; `deleteRecordedRequests` deletes it and asserts it absent (C13's
-delete path).
+request and records it; `deleteRecordedRequests` deletes it, in C2a's measured order, and
+asserts it absent.
 
 **Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. **Every operation × type key
 gets its own literal pin, per variant** (O2): `HandlerCreate#<type>` (19 on premise, 17 on the
-cloud), `HandlerLock#<type>` and `HandlerUnlock#<type>` (18 / 16), `HandlerUpdate#<type>`
-(24 / 22) — `HandlerLock#CLASS` included, though `lowToCompact.test.ts` already covers it by
+cloud), `HandlerLock#<type>` and `HandlerUnlock#<type>` (18 / 16), the legal `HandlerUpdate`
+keys of C1's table (24 part-less on premise plus `INCLUDE#source` and `INCLUDE#metadata`;
+22 on the cloud), each with a live case too — `HandlerLock#CLASS` included, though `lowToCompact.test.ts` already covers it by
 parity. The 112 parity rows of `lowToCompact.test.ts`, `createSingleCall`, `updateSingleCall`
 stay unchanged beside them.
 
@@ -666,10 +741,12 @@ where its schema has a `part` enum, each part.
 | `GetClass`, `GetInterface`, `GetProgram`, `GetDdl`, `GetMetadataExtension`, `GetBehaviorDefinition`, `GetBehaviorImplementation`, `GetServiceDefinition`, `GetFunctionModule`, `GetFunctionInclude`, `GetInclude` | `#source`, `#metadata` | source: non-empty text naming the object; metadata: the object's name and ADT type |
 | `GetTable`, `GetStructure` | `#source`, `#metadata` | source: the DDIC source naming the object; metadata: name and type |
 | `GetServiceBinding` | `#source`, `#metadata` | source: the binding's service document; metadata: name and binding type |
-| `GetDomain`, `GetDataElement`, `GetFunctionGroup`, `GetPackage`, `GetTableType`, `GetMessageClass`, `GetEnhancementSpot`, `GetEnhancementImpl` | the tool alone: no source part | the metadata document's name and type (domain: its data type; data element: its type; package: its super package or software component; message class: a message) |
+| `GetDomain`, `GetDataElement`, `GetFunctionGroup`, `GetPackage`, `GetTableType`, `GetMessageClass`, `GetEnhancementSpot` | the tool alone: no source part | the metadata document's name and type (domain: its data type; data element: its type; package: its super package or software component; message class: a message) |
+| `GetEnhancementImpl` | the tool alone | its `source_code` (`handleGetEnhancementImpl.ts`) is non-empty, with `enhancement_spot` and `enhancement_name` the ones asked |
+| `GetIncludesList` | `#<object_type>`, one per value of its enum (`PROG/P`, `PROG/I`, `FUGR/F`, `CLAS/OC`, `FUGR`, `CLAS`) | the list holds an include of the named shared object of that type |
 | `GetLocalDefinitions`, `GetLocalMacros`, `GetLocalTestClass`, `GetLocalTypes` | the tool alone | the include's text is read (it may be empty) and the class still reads |
 | `GetMessageClassMessage` | the tool alone | the message text of the number asked |
-| `GetEnhancements`, `GetIncludesList`, `GetMainPrograms`, `ListFunctionGroupIncludes`, `ListFunctionModules`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetTypeInfo` | the tool alone | the list or tree holds the named shared object (or, `GetTypeInfo`, the type's kind) |
+| `GetEnhancements`, `GetMainPrograms`, `ListFunctionGroupIncludes`, `ListFunctionModules`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetTypeInfo` | the tool alone | the list or tree holds the named shared object (or, `GetTypeInfo`, the type's kind) |
 | `HandlerGet#<type>#source` | per type with a source (not `PACKAGE`, `DOMAIN`, `DATA_ELEMENT`, `FUNCTION_GROUP`, `TABLE_TYPE`) | as the full reader's source |
 | `HandlerGet#<type>#metadata`, `#urls`, `#contents`, `#main_programs` | per type the routes serve | metadata as above; urls: the object's URI; contents: the package's entries; main programs: the include's main program |
 | `HandlerGet#-#object_structure`, `#node_structure`, `#virtual_folders` | typeless | a node of the named object or package |
@@ -799,11 +876,8 @@ C16's (server-dispatched).
 
 **Owner's decision applied:** O4 / O5.
 
-**First, measure the delete path live** (owner's go, realm check, the on-premise system, then
-the cloud): create one request with one task through `CreateTransport` / `CreateTransportTask`,
-then delete through `getRequest().delete` — the task by its number, then the request — and read
-each with `GetTransport`. Record here which order and which numbers ADT accepts; the cleanup
-below follows it.
+**Prerequisite:** C2a (the measured delete path and move); the cleanup below follows its
+recorded order.
 
 **Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
 
@@ -816,8 +890,17 @@ below follows it.
     then asserts each absent.
   - **Everything else** works on `coverage_transport.request`: an object the test creates in the
     section's transportable package is added, read in the request's objects and action log,
-    moved and sorted within that request's task, then removed — the request is left as it was.
-    The object is deleted by `deleteRecorded`.
+    sorted and compressed in that request's task, then removed — the request is left as it
+    was. The object is deleted by `deleteRecorded`.
+  - **Move** (`MoveTransportObjects`, `HandlerTransportMoveObjects`). A move between two tasks
+    of one request is refused by the system (TR 717, "Object can be moved between different
+    requests only"; `TransportObjectToolsCrud.test.ts`). So the case moves the object's entry
+    from the configured request's task to a task of a request the test itself created (O5),
+    reads both (gone from the first, on the second), moves it back and reads both again —
+    success asserted both ways — then removes the entry and deletes the created request and
+    task (`deleteRecordedRequests`, absence asserted). If the measurement (C2a) shows this move
+    refused too, the case asserts SAP's refusal and both requests' entries unchanged, and the
+    finding goes to the owner.
   - **Never** release a request. Cloud cases follow the discovery rule (O7 / O8).
 
 **Steps:** the family steps. 7.
@@ -976,9 +1059,6 @@ This covers the four compact handlers no test runs today.
   - `CreateTransport` and `CreateTransportTask` get live cases: the test creates a new request
     (and a task in it), records the numbers from the answers, and its cleanup deletes only
     those, empty and never released, then asserts each absent. No exception list.
-  - The compact `HandlerTransportCreate` and `HandlerCreate#TRANSPORT` create a request the same
-    way and follow the same rule (applied by the controller from the owner's answer, to be
-    confirmed by him in review).
   - Every other transport case (add and remove an object, read objects, action log, get, list,
     move, sort and compress) works with **one request named in the config**
     (`coverage_transport.request`); no request is created for it; nothing is released.
@@ -988,8 +1068,11 @@ This covers the four compact handlers no test runs today.
     `createAdtClient(connection).getRequest()` — `DELETE /sap/bc/adt/cts/transportrequests/<n>`
     (`core/transport/delete.js`), accepted by ADT only for an empty, unreleased request. The
     test calls it on its own connection. Whether the same `DELETE` removes a task by the task's
-    number, and whether a request's empty task must go first, is **measured live before C13**
-    (on the request and task one test run creates) and recorded in C13.
+    number, and whether a request's empty task must go first, is **measured live in C2a**,
+    after C2 and before C6's transport case, on the request and task that measurement creates.
+  - The rule covers **every tool that creates a request**: `CreateTransport`,
+    `CreateTransportTask`, `HandlerTransportCreate`, `HandlerCreate#TRANSPORT` (the
+    controller's ruling on the owner's rule).
 - **O12 — config sections: listed here, supplied by the owner.** The controller does not write
   the owner's `tests/test-config.yaml`. Before the first live run of each task (and before step
   18) the owner adds the sections below from the template, with the values named:
@@ -1013,8 +1096,8 @@ This covers the four compact handlers no test runs today.
 
 ### Where each decision is needed first
 
-O4 / O5 → C6's `HandlerCreate#TRANSPORT` live case, then C13 (after the delete-path
-measurement). The other decisions apply as named above.
+O4 / O5 → C2a (the delete-path and move measurement), which is a prerequisite of C6's
+`HandlerCreate#TRANSPORT` live case and of C13. The other decisions apply as named above.
 
 ## Live runs and release
 

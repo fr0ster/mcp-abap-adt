@@ -279,8 +279,10 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
 - **Transport requests** (the owner's decision). A case of a tool that creates a request or a
   task (`CreateTransport`, `CreateTransportTask`, and the compact `HandlerTransportCreate`,
   `HandlerCreate#TRANSPORT`) creates its own, records its number, and its cleanup deletes it —
-  only that number, empty and unreleased — then asserts it absent. Every other transport case
-  works on one request named in the config; no request is created for it.
+  only that number, empty and unreleased — then asserts it absent. The delete path is measured
+  live first (plan C2a). Every other transport case works on one request named in the config;
+  no request is created for it, except the move, which needs a second request (TR 717) and
+  uses one the test created.
 - **Debugger cases** stop their listener and log off their session in `afterAll`.
 - **Any credential refusal stops everything.** It is detected wherever a request can go: in
   `globalSetup` (a refusal there is fatal; today it is logged and the run goes on), at every
@@ -315,10 +317,15 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
    - **The unit file** must hold a `pinCases([...])` call **in executable Jest scope**: a
      statement of the module's top level or of a `describe` callback the module calls at
      collection — never inside a function nothing calls. The same holds for `liveSuite`.
+     - a two-dimension tool's key is one of its declared table (`HandlerGet`'s routes,
+       `HandlerUpdate`'s legal parts); no enum product;
      - one element's `tool` is a string literal, and its `args` an object literal whose
        `object_type` / `part` / `operation` / `action` (when present) are string literals;
        together they equal the key;
-     - an element with `refusal` does not count for its key;
+     - an element with `refusal` (its `expected` the literal `'nothing-sent'`) does not count
+       for its key;
+     - the whole recorded request is the literal: the inputs that would vary it (generated
+       ids, the stand's port) are fixed before sending, never removed from the record;
      - its `expected` is a non-empty array literal, or the literal `'none'` for a tool the
        spec names as sending nothing;
      - each request in it is an object literal of exactly `method`, `url`, `headers` and `body`,

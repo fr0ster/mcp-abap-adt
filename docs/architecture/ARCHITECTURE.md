@@ -426,24 +426,30 @@ deployments, a write binary for full access.
 CompositeHandlersRegistry
   └── for each IHandlerGroup:
         └── BaseHandlerGroup.registerHandlers(server)
-              └── for each HandlerEntry:
-                    ├── Convert JSON Schema → Zod
-                    ├── Wrap handler with context injection
-                    └── server.registerTool(name, schema, wrappedHandler)
+              └── for each HandlerEntry { toolDefinition, call }:
+                    ├── The variant's zod schema and description (listedTool)
+                    ├── Wrap entry.call with the call's context
+                    └── server.registerTool(name, { description, inputSchema }, wrappedCall)
 ```
 
 Each handler follows a uniform pattern:
 
 ```typescript
-// Tool definition (static metadata)
+// Tool definition (static metadata); the schema is zod: the arguments' type and their check
 export const TOOL_DEFINITION = {
   name: "GetProgram",
   description: "Retrieve ABAP program source code",
-  inputSchema: { type: "object", properties: { program_name: { type: "string" } }, required: ["program_name"] }
+  inputSchema: z.object({
+    program_name: z.string().describe("Program name."),
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
-// Handler function (receives injected context)
-export async function handleGetProgram(context: HandlerContext, args: GetProgramArgs) {
+// Handler function (receives injected context and the schema's output)
+export async function handleGetProgram(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
   const client = new AdtClient(context.connection, context.logger);
   const result = await client.getProgram().read({ programName: args.program_name }, args.version || 'active');
   return return_response(result);
@@ -586,7 +592,7 @@ graph TD
 4. Handler invocation
    ├── BaseMcpServer resolves tool name → handler function
    ├── Creates HandlerContext { connection: IAbapConnection, logger: ILogger }
-   └── Calls the handler in its form (callInItsForm): handler(context, args), or handler(args) for an args-only one
+   └── Calls the entry: entry.call(context, args) — the arguments parsed with the tool's schema, then the handler
 
 5. ADT operation execution
    ├── Handler creates AdtClient(connection, logger)
@@ -680,7 +686,7 @@ For deeper customization, consumers can build the config directly (`CoreConfig`,
 
 To add new tools:
 
-1. **Create a handler** following the existing pattern (TOOL_DEFINITION + handler function)
+1. **Create a handler** following the existing pattern (TOOL_DEFINITION with a zod `inputSchema` + handler function)
 2. **Create a handler group** implementing `IHandlerGroup`
 3. **Register it** via `CompositeHandlersRegistry.addHandlerGroup()`
 
@@ -690,10 +696,14 @@ class CustomHandlerGroup extends BaseHandlerGroup {
 
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: { name: 'CustomTool', description: '...', inputSchema: { ... } },
-        handler: (context, args) => handleCustomTool(context, args),
-      },
+      defineTool(
+        {
+          name: 'CustomTool',
+          description: '...',
+          inputSchema: z.object({ name: z.string().describe('...') }),
+        },
+        (context, args) => handleCustomTool(context, args), // args: { name: string }
+      ),
     ];
   }
 }
@@ -702,11 +712,15 @@ class CustomHandlerGroup extends BaseHandlerGroup {
 registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 ```
 
-A handler takes the call's context and its arguments, `(context, args)`, or its arguments alone,
-`(args) => handleX(this.context, args)`: `ToolHandler` is the union of the two forms
-(`ContextHandler | ArgsOnlyHandler`). Every registration path tells them apart by the handler's
-parameter count, `isArgsOnly(handler)`, and calls it in its form with `callInItsForm` (both from
-`@mcp-abap-adt/lib/handlers`); code that calls a `HandlerEntry`'s handler itself does the same.
+`defineTool(definition, handler)` (`@mcp-abap-adt/lib/handlers`) pairs a definition with its
+handler, checked by the compiler: the handler takes the call's context and the output of the
+definition's zod schema, `(context, z.output<typeof inputSchema>)`. The entry it answers,
+`HandlerEntry`, is `{ toolDefinition, call(context, args), connectionless? }`; every registration
+path passes the call's context at the call, and `call` parses the arguments with the schema before
+the handler runs — arguments that do not parse are refused, naming each issue
+(`Input validation error: Invalid arguments for tool <Tool>: …`), and the handler does not run. Code
+that calls an entry itself calls `entry.call(context, args)`; `registry.registerTool(server, entry)`
+registers one.
 
 ### 5.5 Architectural Guarantees
 

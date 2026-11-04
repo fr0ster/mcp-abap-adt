@@ -494,10 +494,9 @@ await server.start(); // standalone, or registers its routes on `app` (registerR
   `idle()`. Each handle is unique among those the pool holds.
 - **The declared `state_handle`.** Each instance is built with `stateHandleArgument: true`: every
   tool's input schema gets an optional string `state_handle` (a tool declaring its own keeps it),
-  taken out of the arguments before a handler that did not declare it. **A tool registered with a
-  whole `z.object(...)` schema gets no declared `state_handle`** — the schema is registered as it
-  is, so a model cannot send the handle to it: register your tool with a JSON Schema
-  `inputSchema` or a raw zod shape.
+  taken out of the arguments before a handler that did not declare it. Every tool's `inputSchema`
+  is a `z.object(...)`, and the handle is added to it with `.extend`, so a tool of yours gets it
+  as the server's own do.
 - **The long session.** Each instance carries a `LongSession` state part; the tool sets of
   `@mcp-abap-adt/lib/tool-set` give the `http` transport `SessionOpen` / `SessionClose` (compact:
   `HandlerSession`; `streamableHttpSurface` lists what HTTP adds). Open holds the instance in the pool; once a close call's answer is
@@ -631,7 +630,8 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
 
 - **Registry and groups.** `IHandlersRegistry` is the registry a server takes;
   `CompositeHandlersRegistry` is the one built from handler groups (`IHandlerGroup`:
-  `getName()`, `getHandlers()`, each a `TOOL_DEFINITION` with its handler). The groups are
+  `getName()`, `getHandlers()`, each entry `defineTool(TOOL_DEFINITION, handler)` — the
+  definition with its zod schema, and its `call(context, args)`). The groups are
   `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `SystemHandlersGroup`,
   `SearchHandlersGroup` and `DebugHandlersGroup` (`LowLevelHandlersGroup` is gone since 19.0.0).
 - **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`), fixed by the

@@ -89,9 +89,9 @@ Each call:
    `SAP_SYSTEM_TYPE` is not read for it);
 3. with a `systemContextResolver` (and `systemContextRules`), fills the connection's parameters
    before the handler runs, as `getHandlerEntries()` does;
-4. calls the handler in the form it takes: `handler(context, args)`, or — for an args-only
-   handler (`(args) => handleX(this.context, args)`) — `handler(args)` with its group's context
-   set to the call's for exactly that call, so calls at once each run on their own connection.
+4. calls the entry with the call's context — `entry.call(context, args)` — so calls at once
+   each run on their own connection. The entry parses the arguments with the tool's schema
+   before its handler runs.
 
 A call refused for its arguments (a `timeout` a long tool does not take there) is refused before
 the provider is asked. A listed long tool's read runs on a connection of its own, opened from the
@@ -186,16 +186,18 @@ const toolNames = exporter.getToolNames();
 const entries = exporter.getHandlerEntries();
 for (const entry of entries) {
   console.error(`Tool: ${entry.toolDefinition.name}`);
+  await entry.call(context, {}); // the call's HandlerContext and its arguments
 }
 ```
 
 ### What `getHandlerEntries()` hands back
 
-Each entry's `handler` is wrapped. The wrapper, before the handler runs:
+Each entry is `{ toolDefinition, call(context, args), connectionless? }`
+(`HandlerEntry`); its `toolDefinition.inputSchema` is the tool's zod schema.
+Its `call` is wrapped. The wrapper, before the handler runs:
 
 - states the exporter's `systemType` on the call's connection — the
-  connection of the `context` it is called with, or, for an args-only handler,
-  of its group's context at call time. The handler runs on that kind; with no
+  connection of the `context` it is called with. The handler runs on that kind; with no
   `systemType` stated, the connection has none, and a call that would reach a
   system is refused `system_type_required` before anything is sent.
   `SAP_SYSTEM_TYPE` is not read for it;
@@ -210,9 +212,10 @@ Each entry's `handler` is wrapped. The wrapper, before the handler runs:
 
 Two things follow for an embedder that calls the handlers itself:
 
-- The wrapper preserves the handler's arity: `isArgsOnly(handler)` tells the
-  two forms apart, and `callInItsForm(handler, context, args, inGroupContext)`
-  (both from `@mcp-abap-adt/lib/handlers`) calls a handler in the form it takes.
+- `entry.call(context, args)` parses `args` with the tool's schema, as the SDK does
+  over MCP: arguments that do not parse are refused — an `Error` whose message starts
+  `Input validation error: Invalid arguments for tool <Tool>:` and names each
+  issue — and the handler does not run. A schema default reaches the handler as if given.
 - The wrapper is built per call, so two calls to `getHandlerEntries()` return
   functions that are not identity-equal. Compare tool names, not functions.
 

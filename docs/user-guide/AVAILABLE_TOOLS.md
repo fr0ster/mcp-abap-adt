@@ -581,9 +581,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
 **Parameters:**
+- `detailed` (boolean, optional) - [read-only] true: every enhancement with its whole source; false (default): a short one
+- `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
+- `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)
 - `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects)
 - `object_type` (string, optional) - [read-only] Type of the ABAP object
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
+- `program` (string, optional) - [read-only] An include's main program, when its metadata names none
 
 ---
 
@@ -4630,4 +4634,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-03*
+*Last updated: 2026-11-04*

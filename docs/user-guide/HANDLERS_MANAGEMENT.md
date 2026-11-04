@@ -361,23 +361,30 @@ To add handlers to a specific set:
    - `src/handlers/<domain>/readonly/` for read operations
    - `src/handlers/<domain>/high/` for safe writes
 
-2. Export `TOOL_DEFINITION`:
+2. Export `TOOL_DEFINITION`, its `inputSchema` a zod object (the arguments' type and their check):
    ```typescript
+   import * as z from 'zod';
+
    export const TOOL_DEFINITION = {
-     name: 'my_handler',
+     name: 'MyOperation',
      description: 'Handler description',
-     inputSchema: { /* zod schema */ }
+     inputSchema: z.object({
+       object_name: z.string().describe('The object to read.'),
+     }),
    } as const;
    ```
 
-3. Export handler function:
+3. Export handler function, taking the call's context and the schema's output:
    ```typescript
-   export async function handleMyOperation(args: any, context: HandlerContext) {
+   export async function handleMyOperation(
+     context: HandlerContext,
+     args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+   ) {
      // implementation
    }
    ```
 
-4. Register in appropriate group:
+4. Add its entry, `defineTool(TOOL_DEFINITION, handleMyOperation)`, to the appropriate group:
    - `src/lib/handlers/groups/ReadOnlyHandlersGroup.ts`
    - `src/lib/handlers/groups/HighLevelHandlersGroup.ts`
 

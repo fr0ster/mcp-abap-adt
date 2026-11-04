@@ -1,7 +1,115 @@
 # Migrating to 24.0.0
 
-Go through the section that fits how you use the server; the [CHANGELOG](../CHANGELOG.md) has every
-item.
+24.0.0 lets the compiler check what it can ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)):
+a tool's arguments are a zod schema — their type and the one check of a call — and an entry carries
+its call, typed by that schema. A client over MCP sees the tools as in 23.1.0, except the two
+arguments that become required (below) and the arguments some tools now declare because their
+handlers read them. An embedder that defines, registers or calls tools in TypeScript changes its
+code. Go through the section that fits how you use the server; the [CHANGELOG](../CHANGELOG.md) has
+every item.
+
+The packages are the eighteen of 23.1.x, all at **24.0.0**, every sibling range at `^24.0.0`. The
+ADT dependencies are unchanged. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
+`@mcp-abap-adt/server-runtime` now.
+
+## Embedders: a tool's `inputSchema` is a zod object
+
+`ToolDefinition<S extends z.ZodObject>` (`@mcp-abap-adt/lib/handlers`) takes a `z.object({ … })`
+as `inputSchema` — and so does `VariantToolDefinition.inputSchema`; 23.x typed it `any`, and the
+server's own definitions held a JSON Schema. The JSON Schema a client lists is derived from the zod
+schema (`z.toJSONSchema`), so a description goes on the field with `.describe`.
+
+**What you do:** write your tools' schemas in zod (`zod` 4).
+
+| 23.x | 24.0 |
+|---|---|
+| `inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'The name.' } }, required: ['name'] }` | `inputSchema: z.object({ name: z.string().describe('The name.') })` |
+| an optional property with a default: `{ type: 'boolean', default: false, description: '…' }` | `z.boolean().default(false).optional().describe('…')` |
+| `DETAIL_PROPERTY` (`@mcp-abap-adt/lib/compact-shared`) in `properties` | `...DETAIL_SHAPE` in the `z.object` |
+
+## Embedders: an entry carries its call
+
+`HandlerEntry<R>` is `{ toolDefinition, call(context, args), connectionless? }`; `handler` is
+gone. `defineTool(definition, handler)` builds one, checked by the compiler: the handler takes the
+call's `HandlerContext` and `z.output<typeof definition.inputSchema>`, and the entry answers what
+the handler answers. Its `call` parses the arguments with the definition's schema and runs the
+handler on the result; arguments that do not parse are refused — an `Error` whose message is
+`Input validation error: Invalid arguments for tool <Tool>: <issue> at <path>`, one line per issue
+— and the handler does not run. Over MCP the SDK has already parsed with the same schema, so
+nothing changes there; a direct call (yours, or one of `HandlerExporter.getHandlerEntries()`) that
+23.x ran on whatever it was given is refused now when its arguments do not parse, and a schema
+default reaches the handler as if given.
+
+`connectionless`, when a function, takes `ToolArgs` (`Readonly<Record<string, unknown>>`).
+
+**What you do:**
+
+| 23.x | 24.0 |
+|---|---|
+| `{ toolDefinition, handler: (context, args) => handleX(context, args) }` | `defineTool(toolDefinition, handleX)` — or `defineTool(toolDefinition, (context, args) => handleX(context, args))` |
+| `{ toolDefinition, handler: (args) => handleX(this.context, args) }` (args-only) | `defineTool(toolDefinition, (context, args) => handleX(context, args))`: every handler takes the call's context |
+| `entry.handler(context, args)`, `callInItsForm(entry.handler, context, args, inGroupContext)` | `await entry.call(context, args)` |
+| `isArgsOnly(handler)` | nothing: there is one form |
+| `registry.registerTool(server, name, definition, handler)` | `registry.registerTool(server, defineTool(definition, handler))` |
+
+Removed from `@mcp-abap-adt/lib` and `@mcp-abap-adt/lib/handlers`: `ContextHandler`,
+`ArgsOnlyHandler`, `ToolHandler`, `isArgsOnly`, `callInItsForm`, `InGroupContext`, `ArgsOf`. New:
+`ToolArgs`, `invalidArgumentsWords` (the refusal's words, for a path of your own).
+
+`registerTool` still registers only a tool one of the registry's groups holds, now found by the
+entry's definition name.
+
+## Embedders: the exported handlers take typed arguments
+
+`handleGetTypeInfo`, `handleDescribeByList`, `handleGetAbapAST`, `handleGetAbapSemanticAnalysis`,
+`handleGetAbapSystemSymbols`, `handleGetObjectNodeFromCache`, `handleGetEnhancements`,
+`handleGetEnhancementImpl`, `handleGetEnhancementSpot` and `handleGetIncludesList` took
+`args: any`; each takes its schema's output or its declared interface now, as the other handlers
+did. A tool's handler type is `Parameters<typeof handleX>[1]`.
+
+**What you do:** a direct call with an argument the tool does not declare, or of another type, no
+longer compiles — pass what the schema declares (the tool's listed schema, or its
+`TOOL_DEFINITION.inputSchema`). Calling through the tool's entry (`entry.call`) parses the
+arguments first.
+
+## Embedders: the answer helpers and the HTTP interfaces
+
+- `return_error` (`@mcp-abap-adt/lib/utils`, it takes `unknown`) and `answerFailure`
+  (`@mcp-abap-adt/lib/auth`) answer `FailureAnswer` (`isError: true`), a subtype of `McpResult`;
+  `FailureAnswer` is a `type` now, not an interface. **What you do:** nothing to read it as an
+  `McpResult`; code that extended the interface intersects the type instead.
+- `return_response` takes `ResponseText` (`{ readonly data: string }`) and answers `McpResult`;
+  it took an `AxiosResponse`. **What you do:** pass an answer whose `data` is the text.
+- `IHttpApplication.use` is two overloads, `use(handler)` and `use(path, handler)`, as Express
+  states it, so an Express application is an `IHttpApplication` without a cast; `RouteHandler`
+  and `IHttpApplication` are typed by `@types/express` 5 (their express types read as `any` in
+  23.x, which declared no `@types/express`). **What you do:** an application of your own whose
+  `use` has another signature implements the two forms.
+- The logger adapters take `unknown` beside the message, as `ILogger` does.
+
+## Callers of `CreateDomain`: `package_name` is required
+
+`CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed
+it optional while its handler refused every call without it ("Package name is required"). A call
+without it is refused by the schema now, naming the argument, and nothing is sent.
+
+**What you do:** nothing for a call that worked — it passed `package_name`.
+
+## compact callers: refusals in the target tool's words
+
+A compact route calls its target tool's entry, so its arguments are parsed with the target's own
+schema before anything is sent: `HandlerGet` (every read and part), `HandlerSearch`,
+`HandlerWhereUsed`, `HandlerGetData`, and the creates and updates `HandlerCreate` and
+`HandlerUpdate` delegate. An argument the target requires that the compact call left out (an
+object's name, `run_id`), or a value outside a list the target declares (`package_type`,
+`program_type`), is refused in the target schema's words, naming the target, where 23.x ran the
+target's handler and refused in its words. `HandlerGet` part `virtual_folders` now sends
+`with_versions` and `ignore_short_descriptions` as `false` where it sent none (`GetVirtualFolders`'
+schema defaults).
+
+**What you do:** nothing for a call that worked; a client that matched a refusal's words reads the
+new ones.
+
 
 ## compact users: `HandlerCreate` `BEHAVIOR_IMPLEMENTATION` takes `behavior_definition`
 

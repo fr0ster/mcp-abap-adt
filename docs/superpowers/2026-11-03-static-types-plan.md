@@ -416,11 +416,17 @@ and live specifics.
     — the **journal** of every transport entry the test made (an object added to a task, an
     entry moved), recorded at once when the call that made it succeeds. Deleting an object
     does not empty its task (`TransportObjectToolsCrud.test.ts`), so `deleteRecordedRequests`
-    first detaches every journalled entry (`RemoveTransportObject`) from every task it is on
-    — the configured request's and the created ones — and verifies both requests' entries
-    (`ReadTransportObjects`): the configured request back as it was, the created ones empty;
-    only then deletes the recorded tasks and requests. The refusal stop applies: after a
-    credential refusal nothing is sent and what is left is named.
+    works in this order, because deleting the object may itself add a transport entry
+    (`TransportObjectToolsCrud.test.ts`, around line 362):
+    1. delete the recorded object first (`deleteRecorded`);
+    2. then detach every entry of that object (`RemoveTransportObject`) from every task it is
+       on — the journalled ones and any the delete added — across the configured request
+       and the created ones;
+    3. verify the final state (`ReadTransportObjects`): the configured request back as it
+       was, the created ones empty;
+    4. only then delete the recorded tasks and requests, asserting each absent.
+    The refusal stop applies: after a credential refusal nothing is sent and what is left is
+    named.
 - **`ledgerScan.ts`**
   - `scanUnitFile(path: string): readonly PinRef[]`
   - `scanLiveFile(path: string): readonly LiveRef[]`
@@ -848,10 +854,10 @@ transport case and of C13. The measurement runs as a temporary Jest case under
   request and one task in it through `CreateTransport` / `CreateTransportTask`, and record each
   returned number at once (`recordCreatedRequest`), before anything reads it.
 - [ ] **Step 1a: Arm the failure cleanup before the move.** An `afterAll` of the measurement,
-  whatever happened, detaches every journalled transport entry (`recordTransportEntry`, each
-  recorded when the add or move succeeded) from both requests, verifies both requests'
-  entries, then deletes the recorded tasks and requests and the recorded object, reporting
-  what it did; the credential-refusal stop applies to it as to every helper — after a refusal
+  whatever happened, deletes the recorded object first, then detaches every entry of it
+  (journalled by `recordTransportEntry` when the add or move succeeded, and any the delete
+  added) from both requests, verifies both requests' final entries, then deletes the
+  recorded tasks and requests, asserting each absent, reporting what it did; the credential-refusal stop applies to it as to every helper — after a refusal
   it sends nothing and names what is left.
 - [ ] **Step 2:** Move an object the measurement creates in the configured transportable
   package from the configured request's task to the created task, then back
@@ -1093,7 +1099,7 @@ comes after C2; it is independent of C2a–C2d.
 - Modify: `src/lib/utils.ts` (delete `isCloudConnection`), the four program handlers,
   `src/__tests__/unit/lowTierStrategies.test.ts`, `src/lib/config/IServerConfig.ts` and
   `src/lib/handlers/interfaces.ts` (the two comments),
-  `server-runtime/src/stdio/__tests__/helpers/loginStand.ts` and its ten callers,
+  `server-runtime/src/stdio/__tests__/helpers/loginStand.ts` and its 24 calls in 14 files,
   `CHANGELOG.md`, `MIGRATION-24.0.md`.
 - Create: `src/__tests__/unit/systemKind/programOnJwtOnPremise.test.ts`,
   `src/__tests__/unit/sources/noKindFromCredential.test.ts` and its fixtures under
@@ -1135,16 +1141,22 @@ comes after C2; it is independent of C2a–C2d.
   `src/__tests__/helpers`, `src/__tests__/integration/helpers`,
   `server-runtime/src/stdio/__tests__/helpers`, and any other) — with the compiler API, as
   `staticTypes.test.ts`. No allowlist: a finding is fixed in the code.
-  - **What a credential read is, by declaration, not by name:** an expression the checker
-    types as a credential type — the declared set: the configuration's auth-type type
-    (`SapConfig['authType']`), `AuthType` of the stdio vocabulary, any union of string
-    literals drawn only from the auth-type values (`'basic' | 'jwt'`, as `loginStand`'s
-    `options.auth` is declared), the token fields' declared types on `SapConfig`
-    (`jwtToken`, `refreshToken`) and the connection's `authorizationToken`, and the
-    credential provider interfaces (`IAuthProvider`); plus the environment's
-    `SAP_JWT_TOKEN` and the header `x-sap-jwt-token` read by key. A token decode is a
-    `split('.')`, `atob`, `Buffer.from(…, 'base64…')` or `JSON.parse` applied to an expression
-    containing such a read.
+  - **What a credential read is — by declaration symbol, not by type or name.** A read whose
+    symbol the checker resolves to one of the declared credential properties: `SapConfig`'s
+    `authType`, `jwtToken`, `refreshToken`, `password`, `username`'s credential twin fields
+    (the set read from `SapConfig`'s declaration at the step, each named in the guard by its
+    declaring interface and property), the stdio vocabulary's `AuthType`-typed `authType`,
+    the connection's `authorizationToken`, the members of `IAuthProvider`; the environment
+    key `SAP_JWT_TOKEN` and the header key `x-sap-jwt-token` read by key; and any value
+    declared with a union drawn only from the auth-type literals (`'basic' | 'jwt'`, as
+    `loginStand`'s `options.auth`). A plain `string | undefined` is not a credential by its
+    type — only by flowing from such a read.
+  - **Credential-derived, by direct flow only:** within one function, and into same-file
+    callees through their arguments, a value is credential-derived when it is such a read or
+    is computed directly from one (a comparison, a conditional, a call taking it). No
+    cross-module value-flow analysis: the stated limit covers the rest.
+  - A token decode is a `split('.')`, `atob`, `Buffer.from(…, 'base64…')` or `JSON.parse`
+    applied to a credential-derived value.
   - **What a kind value is,** recognised by the checker, not by name:
     1. an expression whose type is assignable to `'cloud' | 'onprem' | 'legacy'` (or the
        declared kind types `SapEnvironment`, `SystemKind`);
@@ -1167,7 +1179,10 @@ comes after C2; it is independent of C2a–C2d.
     an argument (`stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')`); an inline
     call (`declare(isJwt(config))` with `isJwt` same-file); a return (the old
     `isCloudConnection`); a `CloudFlag` assigned from a credential comparison; a token decode
-    reading a claim (production tree); **the real `loginStand` expression** —
+    reading a claim (production tree); **passing: the real explicit-kind resolver**
+    `src/lib/systemKind.ts`' `statedSystemKind(value: string | undefined)`, unchanged — it
+    maps a stated value to a kind from a plain string, not a credential read; **the real
+    `loginStand` expression** —
     `stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')` with `auth` declared
     `'basic' | 'jwt'` — recognised by its declared type. **Passing fixtures:** a
     `switch (authType)` choosing a provider; a conditional on `authType` choosing a login
@@ -1621,9 +1636,9 @@ recorded order.
     from the configured request's task to a task of a request the test itself created (O5),
     reads both (gone from the first, on the second), moves it back and reads both again —
     success asserted both ways — each add and move journalled at once
-    (`recordTransportEntry`) — then removes the entry from both requests, verifies both
-    requests' entries, and deletes the created request and task (`deleteRecordedRequests`,
-    absence asserted). If the measurement (C2a) shows this move
+    (`recordTransportEntry`) — then cleanup runs `deleteRecordedRequests`' order: the object
+    deleted first, its entries detached from both requests, the final state verified, the
+    created request and task deleted and asserted absent. If the measurement (C2a) shows this move
     refused too, the case asserts SAP's refusal and both requests' entries unchanged, and the
     finding goes to the owner.
   - **Never** release a request. Cloud cases follow the discovery rule (O7 / O8).

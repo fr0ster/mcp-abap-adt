@@ -1575,17 +1575,43 @@ that repository's own review and CI. The release itself is the owner's.
 
 ### D7. Function modules: the group is checked (#2)
 
-**Files (every path that addresses a function module through a group):**
-- full tools: `src/handlers/function/high/handleUpdateFunctionModule.ts`,
-  `src/handlers/function_module/high/handleGetFunctionModule.ts`,
-  `src/handlers/function_module/high/handleDeleteFunctionModule.ts`, and the
-  `ActivateFunctionModule` handler;
-- compact routes: `HandlerUpdate` → `src/handlers/common/low/handleUpdateUnderLock.ts` →
-  `src/handlers/function/low/handleUpdateFunctionModule.ts`; `HandlerActivate` →
-  `src/handlers/function/low/handleActivateFunctionModule.ts`; `HandlerGet` → the
-  `GetFunctionModule` read; **`HandlerDelete` → `src/handlers/common/low/handleDeleteOnly.ts`
-  → its `FUNCTION_MODULE` entry in `deletionTargets.ts`; `HandlerDeletionCheck` →
-  `src/handlers/common/low/handleDeletionCheck.ts` → the same `deletionTargets.ts` entry.**
+**Files (every served path that addresses an existing function module through a group —
+swept over the listed schemas: every tool with `function_group_name` beside a module, and
+every compact tool whose `object_type` enum has `FUNCTION_MODULE`):**
+- **full tools:**
+  - `UpdateFunctionModule` → `src/handlers/function/high/handleUpdateFunctionModule.ts`;
+  - `GetFunctionModule` → `src/handlers/function_module/high/handleGetFunctionModule.ts`;
+  - `DeleteFunctionModule` → `src/handlers/function_module/high/handleDeleteFunctionModule.ts`;
+  - `ActivateFunctionModule` → its handler;
+  - **`CheckFunctionModule`** → `src/handlers/function/high/handleCheckFunctionModule.ts`,
+    which delegates to `src/handlers/function/low/handleCheckFunctionModule.ts`, which sends
+    `.check({ functionModuleName, functionGroupName }, …)` directly;
+  - `GetFunctionModuleVersions` and `GetObjectVersions` with `object_type` `FUNCTION_MODULE`
+    (the version list is read under the given group);
+  - `RunFunctionModuleUnitTest` (both runners address the module under the given group).
+- **compact routes:**
+  - `HandlerUpdate` → `src/handlers/common/low/handleUpdateUnderLock.ts` →
+    `src/handlers/function/low/handleUpdateFunctionModule.ts`;
+  - `HandlerActivate` → `src/handlers/function/low/handleActivateFunctionModule.ts`;
+  - `HandlerGet` → the `GetFunctionModule` read;
+  - `HandlerDelete` → `src/handlers/common/low/handleDeleteOnly.ts` → its `FUNCTION_MODULE`
+    entry in `deletionTargets.ts`;
+  - `HandlerDeletionCheck` → `src/handlers/common/low/handleDeletionCheck.ts` → the same
+    `deletionTargets.ts` entry;
+  - **`HandlerCheckRun`** `FUNCTION_MODULE` → `src/handlers/common/low/handleCheckObject.ts`
+    (`GROUP|MODULE` in `object_name`);
+  - **`HandlerLock` / `HandlerUnlock`** `FUNCTION_MODULE` →
+    `src/handlers/common/low/handleLockObject.ts` / `handleUnlockObject.ts` (`GROUP|MODULE`);
+  - **`HandlerWhereUsed`** `FUNCTION_MODULE` → its where-used read (with
+    `function_group_name`).
+- **Swept and left out, with the reason:** `CreateFunctionModule` and `HandlerCreate`
+  `FUNCTION_MODULE` (the module does not exist yet; the group is the container the create
+  names, so there is no metadata to read); `HandlerValidate` `FUNCTION_MODULE` (validates a
+  prospective name before a create; the same). The function-group tools
+  (`…FunctionGroup…`, `…FunctionInclude…`, `ListFunctionModules`,
+  `ListFunctionGroupIncludes`, `RunFunctionGroupUnitTest`) address the group itself, not a
+  module through it. `HandlerUnitTestRun` addresses its targets by URI, not by group and
+  module name.
 
 - [ ] **Step 1: Failing tests** on `recordingConnection`, from the live measurement (SAP
   ignores the group segment):
@@ -1593,16 +1619,22 @@ that repository's own review and CI. The release itself is the owner's.
     nothing written'`: requests pinned — exactly the metadata GET, with its
     `adtcore:containerRef` naming the real group, then nothing;
   - the same mismatch test, and a matching-group test, for each path above:
-    `GetFunctionModule`, `ActivateFunctionModule`, `DeleteFunctionModule`, and the compact
-    `HandlerGet`, `HandlerUpdate`, `HandlerActivate`, `HandlerDelete` (through
-    `handleDeleteOnly`) and `HandlerDeletionCheck` (through `handleDeletionCheck`);
+    `GetFunctionModule`, `ActivateFunctionModule`, `DeleteFunctionModule`,
+    `CheckFunctionModule` (through its low handler's `.check`), `GetFunctionModuleVersions`,
+    `GetObjectVersions` `FUNCTION_MODULE`, `RunFunctionModuleUnitTest` (each runner), and
+    the compact `HandlerGet`, `HandlerUpdate`, `HandlerActivate`, `HandlerDelete` (through
+    `handleDeleteOnly`), `HandlerDeletionCheck` (through `handleDeletionCheck`),
+    `HandlerCheckRun` (through `handleCheckObject`), `HandlerLock`, `HandlerUnlock` and
+    `HandlerWhereUsed`;
   - in every matching-group test the metadata GET is pinned **first** — before any deletion
-    check, lock or write — then the path's existing requests.
+    check, syntax check, version read, run, lock, unlock, where-used read or write — then the
+    path's existing requests.
 - [ ] **Step 2:** One shared check, `checkFunctionModuleGroup(context, group, module)`, in
   `src/lib/strategies/functionModuleGroup.ts` (new), reads the module's metadata (one GET)
   and refuses when the given group differs from `adtcore:containerRef`'s name. Every path
-  above calls it before anything else; for `GetFunctionModule`'s metadata part, that read is
-  the answer itself.
+  above calls it before anything else — for `CheckFunctionModule` in the low handler, before
+  its `.check`, so the full tool and `HandlerCheckRun` share it; for `GetFunctionModule`'s
+  metadata part, that read is the answer itself.
 - [ ] **Step 3: Compact.** The compact tools take the group (`function_group_name`, or
   `GROUP|MODULE` in `object_name`) and reach the paths above, so they check it the same way;
   their pins gain the metadata GET first.

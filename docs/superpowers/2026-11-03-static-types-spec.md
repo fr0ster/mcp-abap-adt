@@ -442,14 +442,17 @@ on-premise system disagree, the live measurement holds.
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`
   `BEHAVIOR_IMPLEMENTATION` gain the part `implementations`; the descriptions of
   `MoveTransportObjects` and the profiler's `statements` say what SAP does.
+- **Removed, not fixed (#14, #15):** SAP ignores `class:abstract` and
+  `program:programType` on create (measured); `abstract` (CreateClass) and `program_type`
+  (CreateProgram, HandlerCreate PROGRAM) are removed — a MIGRATION entry.
 - **Doubts the owner listed:** `GetServiceBinding`'s json format; the profiler's `top` of 0
   or less is refused.
 
-**Fixes in adt-clients**, a cross-repository cycle released before the families pin those
-requests:
+**Fixes in adt-clients**, a major release in a cross-repository cycle (with adt-strategies'
+`readObjectOutline`), released before the families pin those requests:
 - #8: every attribute value written into a create body is XML-escaped;
-- #14: the abstract flag of a class;
-- #15: program type words;
+- #348: a create's language is written and sent as the `sap-language` header, or neither
+  when none is given (no `'EN'` default);
 - #22: no `description=undefined` in the validation parameters;
 - #9: `CheckTable`'s source is sent;
 - `CreateTransport` `customizing` sends type `W`, not `T`;

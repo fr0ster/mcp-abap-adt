@@ -1504,7 +1504,10 @@ and function group answers are identical to the on-premise ones.
 ### D2. adt-clients release (cross-repository cycle)
 
 **Repository:** `~/prj/mcp-abap-adt-clients`. One issue, one branch, one PR there, through
-that repository's own review and CI. The release itself is the owner's.
+that repository's own review and CI. The release itself is the owner's. **It is a major
+release of adt-clients** (options are removed and defaults change). `@mcp-abap-adt/adt-strategies`,
+which gains `readObjectOutline` (the structured reading of the outline), is published before
+it or with it, and #346 bumps both from the registry.
 
 **Contents (each with a failing test first, in adt-clients' own suites):**
 - **#8 — escape every attribute value written into a create body:** `adtcore:description`,
@@ -1537,16 +1540,23 @@ that repository's own review and CI. The release itself is the owner's.
   status URL (`/abapunit/runs/{id}`) and the result URL (`/abapunit/results/{id}`). It is
   percent-encoded in both. Tests: adversarial ids (`/`, `?`, `#`, `%`, `..`) give the encoded
   path in both URLs.
-- **#14:** `class/create.js` writes the abstract attribute Eclipse writes. The attribute is
-  read from an Eclipse capture or the corpus at the step, never guessed.
-- **#15:** program type words as SAP takes them, not letters (`convertProgramType`). The words
-  come from an Eclipse capture (module pool, include, …).
+- **#14 and #15 are removed, not fixed (owner, measured on premise).** SAP ignores
+  `class:abstract` and `program:programType` on create: an `abstract=true` create gives a
+  non-abstract class, and `modulePool`, `subroutinePool`, `M` and `F` all give an executable
+  program. adt-clients drops both options from its create configs (and `convertProgramType`).
+- **#348, the create language (owner, measured on the trial).** SAP takes a new object's
+  original language from the request's logon language and ignores the body's. Every create
+  given a language writes the language attributes **and** sends the `sap-language` header
+  with the same value; given none, it writes neither and sends no header. The `'EN'`
+  defaults are removed (a body without the attributes was measured accepted). Tests, per
+  create: with a language — attributes and header carry it; without — neither.
 - **#22:** `validation.js` omits a parameter whose value is `undefined` (domain, data element,
   authorization field, …). The function-module validation contract takes the parameters SAP
   requires, as measured (g3: a 400 without `description`).
 - **#9:** `AdtTable.check` sends the given source, as the structure check does.
-- **The outline method,** `getObjectStructure(…)` per object kind (one endpoint, one method),
-  from D1's measured contract, returning a structured reading.
+- **The outline method,** `getObjectOutline(…)` per object kind (one endpoint, one method),
+  from D1's measured contract — not `getObjectStructure`, which is the existing repository
+  object-structure member; its structured reading is adt-strategies' `readObjectOutline`.
 
 **Cycle:**
 - [ ] Step 1: Open an issue and a branch in adt-clients; write the failing tests there.
@@ -1561,8 +1571,10 @@ that repository's own review and CI. The release itself is the owner's.
 - [ ] Step 6 (in #346): add server-side pins for each changed request:
   - the create bodies with an escaped description (`CreateClass`, `CreateDomain`, … and
     compact `HandlerCreate` per type);
-  - `CreateClass` with `abstract: true`;
-  - `CreateProgram` per program type;
+  - **#348, per create tool** (every full `Create<Type>` and compact `HandlerCreate` type that
+    takes `master_language`): `master_language` given → the body's language attributes and
+    the `sap-language` header carry it; not given, and no `SAP_LANGUAGE` / `x-sap-language`
+    stated → neither the attributes nor the header;
   - `HandlerValidate` without a description (no `description=undefined` in the URL) and for
     `FUNCTION_MODULE`;
   - `CheckTable` with `ddl_code` (the source in the body);
@@ -1572,8 +1584,29 @@ that repository's own review and CI. The release itself is the owner's.
     statements GET's query carries `autoDrillDownThreshold=0.1` unchanged.
 
   Each pin is red before the bump and green after. Add CHANGELOG lines.
-- [ ] Step 7: Commit (`fix(deps): adt-clients <version> — escaped create bodies, abstract,
-  program types, validation, table check, outline`).
+- [ ] **Step 6a: Remove `abstract` and `program_type` from the server** (owner: SAP ignores
+  both on create). Today `CreateClass` takes `abstract` (compact `HandlerCreate` has no
+  `abstract`), and `CreateProgram` and compact `HandlerCreate` (`PROGRAM`) take
+  `program_type`. Failing tests first: the listed-schema test expects both gone; a call with
+  either is refused by the schema (`refusal: 'thrown'`, `'nothing-sent'`). Then remove them
+  from the schemas and handlers, update the listed-schema and surface fixtures (these
+  removals only), and add MIGRATION-24.0 ("`abstract` (CreateClass) and `program_type`
+  (CreateProgram, HandlerCreate PROGRAM) are removed: SAP ignores both on create; set them
+  afterwards") and a CHANGELOG entry (Removed). Neither is a coverage key dimension (keys
+  are `object_type`, `part`, `operation`, `action`), so no ledger row goes.
+- [ ] **Step 6b: The language descriptions.** Every `master_language` description says "Defaults
+  to the session language (SAP_LANGUAGE) or EN" (or similar). It becomes what is now true —
+  functional, e.g. "Original language of the created object (e.g. EN, DE). Absent, the
+  session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon
+  language applies." A description test per create tool. CHANGELOG: "Fixed: #348 — a
+  created object's original language is the one given (or the session's), sent as the
+  logon language SAP takes it from."
+- [ ] **Step 6c: Live check of #348 on the trial** (owner's go, realm check, the cloud
+  system only — on premise the logon language is not taken, Inference: a fixed ICF node):
+  create a class with `master_language: 'DE'` through `liveCall`, read its metadata and
+  assert the original language `DE`, then delete it and assert it absent.
+- [ ] Step 7: Commit (`fix(deps): adt-clients <major> — escaped create bodies, create
+  language, validation, table check, outline; abstract and program type removed`).
 
 ### D3. SAP's answers by key, never by words
 
@@ -1672,8 +1705,8 @@ that repository's own review and CI. The release itself is the owner's.
   `src/lib/longTools.ts`, `tools/long-handlers.json`), their unit tests, and the integration
   suite `readOnly/system/AbapSystemSymbolsHandler.test.ts`. #13 and #27 go with them.
 - Create: the outline tool, `GetObjectOutline` (DO8). Its handler
-  is `src/handlers/system/readonly/handleGetObjectOutline.ts`, calling adt-clients' outline
-  method.
+  is `src/handlers/system/readonly/handleGetObjectOutline.ts`, calling adt-clients'
+  `getObjectOutline` and reading the answer with adt-strategies' `readObjectOutline`.
 - Modify: `docs/user-guide/AVAILABLE_TOOLS*.md`, `README.md`, `tools/tool-search.json`
   (generated), the listed-schema and surface fixtures (the removals and the addition only),
   `MIGRATION-24.0.md`, `CHANGELOG.md`, the coverage ledger (C10 drops the three keys; the

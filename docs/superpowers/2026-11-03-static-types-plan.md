@@ -566,6 +566,8 @@ and live specifics.
 - [ ] **Step 6: Run.** `npm test -- src/__tests__/unit/coverage`. The fixtures, `pinCases` and
   `live.ts` tests PASS. The ledger test FAILS, listing every required key as missing (the red
   baseline). Record the count in this plan.
+  - Red baseline (Measured at C1): 620 required keys missing — 589 required on both
+    systems, 31 on premise only; 324 keys of full tools, 296 of compact tools; 315 tools.
 - [ ] **Step 7: Mutate each check.** Delete it, see its fixture's test go red, then revert.
 - [ ] **Step 8: Commit** as `test(coverage): the ledger guard, red`.
 

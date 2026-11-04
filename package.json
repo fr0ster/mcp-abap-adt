@@ -206,6 +206,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "@jest/core": "30.5.2",
     "@mcp-abap-adt/auth-broker": "^5.0.6",
     "@mcp-abap-adt/auth-stores": "^5.0.1",
     "@mcp-abap-adt/interfaces-auth-broker": "^1.3.0",
@@ -216,6 +217,7 @@
     "express": "^5.1.0",
     "husky": "^9.1.7",
     "jest": "^30.5.2",
+    "jest-config": "30.5.2",
     "jest-util": "^30.5.1",
     "lint-staged": "^16.4.0",
     "postject": "^1.0.0-alpha.6",
@@ -378,8 +380,7 @@
   "allowScripts": {
     "@parcel/watcher": false,
     "esbuild": false,
-    "fsevents": false,
-    "unrs-resolver": false
+    "fsevents": false
   },
   "overrides": {
     "js-yaml@^3": {

@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 coverage/
+# The coverage guard's own tests (not Jest's coverage output).
+!src/__tests__/unit/coverage/
+!src/__tests__/unit/coverage/__fixtures__/coverage/
 .smithery/
 *.mcpb
 

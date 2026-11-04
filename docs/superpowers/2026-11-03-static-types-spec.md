@@ -452,7 +452,7 @@ requests:
 
 **Owner decisions (2026-11-04)**, listed in the plan's D stage:
 - the source reads take an optional line range (`start_line`, `end_line`), cut by the server
-  after its one GET — ADT serves no part of a source (measured on E19);
+  after its one GET — ADT serves no part of a source (measured on premise);
 - the source scans kept in `GetIncludesList`, `GetStructuresList` and the service-binding
   facts are SAP-backed where SAP states the reading, otherwise a plain line scanner;
 - `CreateServiceDefinition`'s description stops promising a template;

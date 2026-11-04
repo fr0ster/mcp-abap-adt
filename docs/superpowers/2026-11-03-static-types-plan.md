@@ -1335,9 +1335,17 @@ that repository's own review and CI. The release itself is the owner's.
 - **#8 — escape every attribute value written into a create body:** `adtcore:description`,
   the class's superclass and every other value written as an attribute, for class, interface,
   program, function group, function module, domain, data element, DDL, structure, table,
-  table type, BDEF, DDLX and SRVB. The message class already escapes. The value is escaped
-  **after** its truncation, so an entity is never cut. Test: a description holding `&`, `<`,
-  `"` and `'` gives a well-formed body.
+  table type, BDEF, DDLX, service definition (`core/serviceDefinition/create.js`) and SRVB.
+  The message class already escapes. The value is escaped **after** its truncation, so an
+  entity is never cut. Tests, one per interpolated attribute category, each with `&`, `<`,
+  `"` and `'`: descriptions (every create above); names and references (superclass, package,
+  referenced definitions); responsible and master-system values; and a description long
+  enough to be truncated, whose cut falls on a character that escapes — the body stays
+  well-formed and the entity whole.
+- **#3's run id (from D8):** `core/shared/abapUnit.js` interpolates the run id raw into the
+  status URL (`/abapunit/runs/{id}`) and the result URL (`/abapunit/results/{id}`). It is
+  percent-encoded in both. Tests: adversarial ids (`/`, `?`, `#`, `%`, `..`) give the encoded
+  path in both URLs.
 - **#14:** `class/create.js` writes the abstract attribute Eclipse writes. The attribute is
   read from an Eclipse capture or the corpus at the step, never guessed.
 - **#15:** program type words as SAP takes them, not letters (`convertProgramType`). The words
@@ -1413,11 +1421,17 @@ that repository's own review and CI. The release itself is the owner's.
 - [ ] **Step 3: Guard `noProseMatching.test.ts`** (compiler API, every package's production
   `src`, `scripts`, `tools`, no allowlist). It refuses a string-search call — `includes`,
   `indexOf`, `startsWith`, `endsWith`, `match`, `search`, `split` — or an equality
-  comparison whose literal argument contains a space and whose receiver is typed or flows
-  from an SAP answer: a `IAdtResponse` value, an error's message or body, a parsed document's
-  text. Fixtures: each of the six old sites refused; a key comparison passes; building our own
-  message text passes. Its limit: a value reaching the call through another module is left
-  to review (as C2e's).
+  comparison applied to **text** from an SAP answer, **whatever its argument**: a literal
+  with or without spaces, a single word, or a computed pattern. Text is a value typed or
+  flowing from an `IAdtResponse` body, an error's message or body, or a parsed document's
+  text node / message text — recognised by type and flow (DO9), no allowlist. Still allowed:
+  comparisons on the **structured key and type fields** a reader extracted (message class,
+  message number, message type, exception type, status codes), recognised by their declared
+  fields. Fixtures: each of the old sites refused, including the single-word
+  `msgLower.includes('exist')` (`utils.ts`); a computed pattern (`text.includes(word)`) refused;
+  a message-number comparison passes; a message-type letter comparison passes; building our
+  own message text passes. Its limit: a value reaching the call through another module is
+  left to review (as C2e's).
 - [ ] **Step 4: Remove `absentPerCheck`.** When the check permits, the delete is sent and its
   answer relayed. Run the deletion and answer suites: PASS. Mutate each site back: red.
 - [ ] **Step 5: CHANGELOG** (Fixed): "DeleteFunctionModule, DeleteFunctionInclude,
@@ -1462,7 +1476,7 @@ that repository's own review and CI. The release itself is the owner's.
   registrations (`src/lib/handlers/groups/SystemHandlersGroup.ts`, `src/lib/variantToolSet.ts`,
   `src/lib/longTools.ts`, `tools/long-handlers.json`), their unit tests, and the integration
   suite `readOnly/system/AbapSystemSymbolsHandler.test.ts`. #13 and #27 go with them.
-- Create: the outline tool, `GetObjectOutline` (name to be confirmed in review). Its handler
+- Create: the outline tool, `GetObjectOutline` (DO8). Its handler
   is `src/handlers/system/readonly/handleGetObjectOutline.ts`, calling adt-clients' outline
   method.
 - Modify: `docs/user-guide/AVAILABLE_TOOLS*.md`, `README.md`, `tools/tool-search.json`
@@ -1491,15 +1505,22 @@ that repository's own review and CI. The release itself is the owner's.
   source read today returns the whole source. **Owner decision (DO1): the cut is the
   server's.** The `Get<Type>` source reads take an optional line range (`start_line`,
   `end_line`); the server sends its one GET as today and answers only those lines.
-  Measured on E19 (2026-11-04): ADT serves no part of a source — `Range: bytes=…`,
+  Measured on premise (2026-11-04): ADT serves no part of a source — `Range: bytes=…`,
   `Range: lines=…`, `?start/end`, `?startLine/endLine` and a `#start=…;end=…` fragment each
   answer `200` with the whole text and no `Accept-Ranges` / `Content-Range`, and no
   discovery template of a `source` resource has a range parameter (`/source/main` takes
-  `corrNr`, `lockHandle`, `version`). Tests: the pinned request is the unchanged GET; the
-  answer holds exactly the asked lines; a range outside the source, `end_line` before
-  `start_line` and a non-positive line are refused by the schema or by the handler with
-  zero requests where the schema cannot express it. The outline tool itself does not
-  change.
+  `corrNr`, `lockHandle`, `version`). Tests:
+  - the pinned request is the unchanged source GET, and the answer holds exactly the asked
+    lines;
+  - **refused with zero requests** — only what is known before the GET: a non-positive or
+    non-integer line (by the schema), and `end_line` before `start_line` (by the schema's
+    refinement, else the handler before sending);
+  - **refused after the one unchanged GET** — a range outside the source: its length is known
+    only from the answer, so the case pins the GET, then asserts the refusal naming the
+    source's line count;
+  - for a function module, D7's metadata read comes first, then the one source GET: both
+    pinned, in that order.
+  The outline tool itself does not change.
 - [ ] **Step 4: Live cases** (`coverage/system.live.test.ts` or C8's file, both systems): the
   outline of a class the test creates lists its methods with positions, and those lines in
   the source hold the method.
@@ -1554,41 +1575,67 @@ that repository's own review and CI. The release itself is the owner's.
 
 ### D7. Function modules: the group is checked (#2)
 
-**Files:** `src/handlers/function/high/handleUpdateFunctionModule.ts`,
-`src/handlers/function/low/handleUpdateFunctionModule.ts`,
-`src/handlers/function_module/high/handleGetFunctionModule.ts`,
-`src/handlers/function/low/handleActivateFunctionModule.ts`, and the compact routes that
-reach them.
+**Files (every path that addresses a function module through a group):**
+- full tools: `src/handlers/function/high/handleUpdateFunctionModule.ts`,
+  `src/handlers/function_module/high/handleGetFunctionModule.ts`,
+  `src/handlers/function_module/high/handleDeleteFunctionModule.ts`, and the
+  `ActivateFunctionModule` handler;
+- compact routes: `HandlerUpdate` → `src/handlers/common/low/handleUpdateUnderLock.ts` →
+  `src/handlers/function/low/handleUpdateFunctionModule.ts`; `HandlerActivate` →
+  `src/handlers/function/low/handleActivateFunctionModule.ts`; `HandlerGet` → the
+  `GetFunctionModule` read; **`HandlerDelete` → `src/handlers/common/low/handleDeleteOnly.ts`
+  → its `FUNCTION_MODULE` entry in `deletionTargets.ts`; `HandlerDeletionCheck` →
+  `src/handlers/common/low/handleDeletionCheck.ts` → the same `deletionTargets.ts` entry.**
 
 - [ ] **Step 1: Failing tests** on `recordingConnection`, from the live measurement (SAP
   ignores the group segment):
   - `'UpdateFunctionModule with another group's name is refused after one metadata read,
     nothing written'`: requests pinned — exactly the metadata GET, with its
     `adtcore:containerRef` naming the real group, then nothing;
-  - the same for `GetFunctionModule` and `ActivateFunctionModule`;
-  - the matching group goes on: the metadata GET pinned before the existing requests.
-- [ ] **Step 2:** Each handler reads the module's metadata first (one GET) and refuses when
-  `function_group_name` differs from `adtcore:containerRef`'s name. For `GetFunctionModule`'s
-  metadata part, that read is the answer itself.
-- [ ] **Step 3: Compact.** `HandlerGet`, `HandlerUpdate`, `HandlerActivate`,
-  `HandlerDelete` and `HandlerDeletionCheck` take the group (`function_group_name`, or
-  `GROUP|MODULE` in `object_name`) and route to these handlers, so they check it the same
-  way. Their pins gain the metadata GET.
+  - the same mismatch test, and a matching-group test, for each path above:
+    `GetFunctionModule`, `ActivateFunctionModule`, `DeleteFunctionModule`, and the compact
+    `HandlerGet`, `HandlerUpdate`, `HandlerActivate`, `HandlerDelete` (through
+    `handleDeleteOnly`) and `HandlerDeletionCheck` (through `handleDeletionCheck`);
+  - in every matching-group test the metadata GET is pinned **first** — before any deletion
+    check, lock or write — then the path's existing requests.
+- [ ] **Step 2:** One shared check, `checkFunctionModuleGroup(context, group, module)`, in
+  `src/lib/strategies/functionModuleGroup.ts` (new), reads the module's metadata (one GET)
+  and refuses when the given group differs from `adtcore:containerRef`'s name. Every path
+  above calls it before anything else; for `GetFunctionModule`'s metadata part, that read is
+  the answer itself.
+- [ ] **Step 3: Compact.** The compact tools take the group (`function_group_name`, or
+  `GROUP|MODULE` in `object_name`) and reach the paths above, so they check it the same way;
+  their pins gain the metadata GET first.
 - [ ] **Step 4:** CHANGELOG (Fixed): "the function-module tools refuse a function group that
   does not hold the module". Commit.
 
 ### D8. GetUnitTestResult waits only for a running run (#3)
 
-**Files:** `src/handlers/unit_test/shared/resultOnce.ts` (`readRunOnce`),
-`src/handlers/unit_test/shared/pollRun.ts`; the compact result tools that share them.
+**Files:** `src/handlers/unit_test/shared/pollRun.ts` (`readRunOnce`) and its callers:
+`src/handlers/unit_test/high/handleGetUnitTestResult.ts`, `handleGetCdsUnitTestResult.ts`,
+`handleGetUnitTest.ts`, `handleGetCdsUnitTest.ts`, and `src/handlers/unit_test/shared/runTests.ts`
+(the run tools' wait).
 
-- [ ] **Step 1: Failing tests** on `recordingConnection`:
+**What changes, exactly:** the full result readers (`GetUnitTestResult`,
+`GetCdsUnitTestResult`, `GetUnitTest`, `GetCdsUnitTest`) and the run tools that wait read
+the status first without long polling, then long-poll only a running run. **What stays:**
+the compact result tools (`HandlerUnitTestResult`, `HandlerCdsUnitTestResult`, `HandlerGet`
+`UNIT_TEST` / `CDS_UNIT_TEST`) go through `src/handlers/unit_test/shared/resultOnce.ts`'s
+`readResultOnce`, which reads only the result — no status, no wait — and keep that
+behaviour.
+
+- [ ] **Step 1: Failing tests** on `recordingConnection`, for each full reader above and for
+  `runTests.ts`' wait (through a run tool):
   - `'an unknown run answers NOT_STARTED at once'`: one status read **without**
     `withLongPolling`, its answer `NOT_STARTED`, no second read;
   - `'a running run is long-polled'`: the first read without long polling says running, the
-    second carries `withLongPolling=true`;
+    next carries `withLongPolling=true`;
   - `'a finished run is read without waiting'`;
-  - `'the run id is encoded in the URL'`.
+  - `'the compact result tools still read only the result'`: one result GET, no status read.
+- [ ] **Step 1a: The run id in the URL** is encoded by adt-clients (D2:
+  `core/shared/abapUnit.js` interpolates it raw into the status and the result URL). After
+  D2's bump, pins here assert both URLs with an id holding `/`, `?`, `#` and `%`
+  percent-encoded.
 - [ ] **Step 2:** `readRunOnce` reads the status first without long polling. It long-polls
   only a run whose status says it is running, re-reading after each answer with no limit and
   no timer (SAP holds about 300 s per read, measured).
@@ -1596,20 +1643,37 @@ reach them.
 
 ### D9. Held locks on stdio (#4)
 
+**What the code shows.** The served tools that take or give a lock handle are: `HandlerLock`
+(registers through `heldLocks.hold`), `HandlerUnlock` (checks `lockHeldHere`, releases),
+`HandlerUpdate` (`handleUpdateUnderLock`, checks) and `HandlerDelete` (`handleDeleteOnly`,
+checks) — and the full `UpdateBehaviorDefinition` and `UpdateMetadataExtension`, which take
+an optional `lock_handle` and write under it **without** `lockHeldHere`. `LockObjectLow` and
+`UnlockObjectLow` exist as handlers but are no served tool; they are reached only through
+`HandlerLock` / `HandlerUnlock`, whose wrappers register and release. On stdio every check
+passes, because no `heldLocks` exists there.
+
 **Files:** `src/lib/state/heldLocks.ts` (`lockHeldHere`), the stdio server's instance setup
 (`server-runtime/src/stdio/…`, beside how `StreamableHttpServer.ts` creates its
-`heldLocks`), `src/handlers/common/low/handleUpdateUnderLock.ts`,
-`handleDeleteOnly.ts`, `compact-modify/src/handlers/handleHandlerUnlock.ts`.
+`heldLocks`), `compact-modify/src/handlers/handleHandlerLock.ts`,
+`compact-modify/src/handlers/handleHandlerUnlock.ts`,
+`src/handlers/common/low/handleUpdateUnderLock.ts`, `handleDeleteOnly.ts`,
+`src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`,
+`src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`.
 
-- [ ] **Step 1: Failing tests** (stdio, in process):
-  - `'an unlock with a handle this instance did not issue is refused before sending'`: zero
-    requests;
-  - `'an update under a foreign handle is refused before sending'`;
-  - `'the instance's own handle unlocks'`: the UNLOCK is pinned.
+- [ ] **Step 1: Failing tests** (stdio, in process, and the same on Streamable HTTP):
+  - **registration:** `'HandlerLock registers its handle on stdio'`;
+  - **enforcement, foreign handle refused with zero requests:** `HandlerUnlock`,
+    `HandlerUpdate`, `HandlerDelete`, `UpdateBehaviorDefinition` and
+    `UpdateMetadataExtension` each with a handle this instance did not issue;
+  - **own handle succeeds:** each of the same with the handle `HandlerLock` gave — its
+    request pinned;
+  - **release:** `'HandlerUnlock releases the handle, and a second unlock with it is
+    refused'`.
 
   SAP releases the session's lock on any handle (measured), so the refusal is ours to make.
 - [ ] **Step 2:** The stdio instance owns a `HeldLocks`, as the Streamable HTTP server does.
-  `lockHeldHere` no longer answers true for an absent owner; every transport has one.
+  `lockHeldHere` no longer answers true for an absent owner; every transport has one. The
+  two full updates check `lockHeldHere` before writing under a given `lock_handle`.
 - [ ] **Step 3:** CHANGELOG (Fixed). Commit.
 
 ### D10. Compact debug end ends the batch answers (#5)
@@ -1663,21 +1727,48 @@ reach them.
 
 ### D13. Version tools (#24, #25)
 
+**What the code shows.** The source and diff tools do not name an object today:
+`GetObjectVersionSource` takes `object_type` and `content_uri`; `GetObjectVersionDiff`
+`object_type`, `content_uri_from`, `content_uri_to`; the generated `Get<Type>VersionSource`
+take `content_uri` alone and `Get<Type>VersionDiff` `content_uri_from` / `content_uri_to`.
+Each resolves a placeholder identity `'X'` (`resolveVersionedObject(client, type, 'X', 'X')`)
+and calls `getVersionSource` with the given URI; the diff callers
+(`handleGetObjectVersionDiff.ts`, the generated diff builders in `objectVersionTools.ts`)
+call it directly. So "the named object" must first be named.
+
 **Files:** `src/handlers/common/readonly/resolveVersionedObject.ts`
 (`analyseUnsupportedStatus([404, 406], …)`), `handleGetObjectVersionSource.ts`,
-`src/handlers/common/high/objectVersionTools.ts`.
+`handleGetObjectVersionDiff.ts`, `src/handlers/common/high/objectVersionTools.ts` (the
+generated source and diff tools), their zod schemas, the listed-schema and surface fixtures,
+`MIGRATION-24.0.md`, `CHANGELOG.md`.
+
+**Contract change (from the owner's #25 decision):** each version source and diff tool takes
+the object's identity, typed in its schema — `GetObjectVersionSource` /
+`GetObjectVersionDiff`: a required `object_name` (and `function_group_name` for a function
+module), as `GetObjectVersions` already does; each generated `Get<Type>VersionSource` /
+`Get<Type>VersionDiff`: its type's own required name argument (`class_name`, …, and
+`function_group_name` for function modules), as its `Get<Type>Versions` sibling takes.
+`resolveVersionedObject` is called with that identity, never `'X'`. MIGRATION-24.0: the
+added required argument, per tool.
 
 - [ ] **Step 1: Failing tests:**
   - `'a version list of an unknown object answers not found'`: the 404 body's exception type
     (`ExceptionResourceNotFound`, from the corpus or a live capture) read with the parser; a
     406 stays "no version history";
-  - `'a content_uri that is not a version URI of the named object is refused before
-    sending'`: another object's URI, a `../` path and an absolute URL are each refused with
-    zero requests;
-  - the object's own version URI goes on (pinned).
-- [ ] **Step 2:** Read the exception type, not the status alone. Check `content_uri` with plain
-  string code against the object's own versions path.
-- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+  - for `GetObjectVersionSource`, each generated `Get<Type>VersionSource`,
+    `GetObjectVersionDiff` (both URIs) and each generated `Get<Type>VersionDiff` (both
+    URIs): `'a content_uri that is not a version URI of the named object is refused before
+    sending'` — another object's version URI, a `../` path, an absolute URL and a URI of the
+    right object outside its versions path are each refused with zero requests;
+  - `'the identity argument is required'`: a call without it is refused by the schema
+    (`refusal: 'thrown'`, `'nothing-sent'`);
+  - the object's own version URI goes on (pinned), for each tool.
+- [ ] **Step 2:** Add the identity arguments to the schemas, and pass the identity to
+  `resolveVersionedObject`. Read the exception type, not the status alone. Check each
+  `content_uri` with plain string code against the named object's own versions path, built
+  from the same resolution the version list uses.
+- [ ] **Step 3:** Update the listed-schema and surface fixtures (the added arguments only).
+  MIGRATION and CHANGELOG (Fixed). Commit.
 
 ### D14. Remaining contract fixes (#26, the doubts)
 
@@ -1959,6 +2050,12 @@ are pinned again here by literal (O2, decided).
   unit-test pairs (C12); and the typeless address parts `HandlerGet#-#object_structure`,
   `HandlerGet#-#node_structure`, `HandlerGet#-#virtual_folders`, which `handleHandlerGet`
   routes before any type. The typeless run parts are C3's.
+- **The outline tool (D5):** `GetObjectOutline#<object_type>`, one key per value of its
+  `object_type` enum on each variant (as D1 measured: class, interface, and on premise
+  program and function group).
+- **The source range (DO1, D5):** `start_line` / `end_line` on the `Get<Type>` source reads are
+  no key dimension (not enums); each source reader's pins and live case include one ranged
+  read beside the whole read.
 
 **Owner's decision applied:** O7 — before a cloud case of `GetEnhancementImpl`,
 `GetEnhancementSpot` or `GetEnhancements` is written, the trial's ADT discovery is read for
@@ -1984,12 +2081,16 @@ where its schema has a `part` enum, each part.
 | `HandlerGet#<type>#source` | per type with a source (not `PACKAGE`, `DOMAIN`, `DATA_ELEMENT`, `FUNCTION_GROUP`, `TABLE_TYPE`) | as the full reader's source |
 | `HandlerGet#<type>#metadata`, `#urls`, `#contents`, `#main_programs` | per type the routes serve | metadata as above; urls: the object's URI; contents: the package's entries; main programs: the include's main program |
 | `HandlerGet#-#object_structure`, `#node_structure`, `#virtual_folders` | typeless | a node of the named object or package |
+| `GetObjectOutline#<object_type>` | per type of its enum | the components of an object the test creates (its methods, attributes, forms or modules, as the type has them), each with visibility and a source position; the source lines at a position hold that component |
+| any `Get<Type>` source reader, ranged | the reader's own key | a read with `start_line` / `end_line` answers exactly those lines of the whole source; one out of range is refused after the one GET |
 
 **Live:**
 - **Existing read suites** move their calls to `liveCall`.
 - **New: `coverage/reads.live.test.ts`,** section `coverage_reads`.
-  - **Objects.** Shared objects only (`shared_dependencies`), read and never written. The
-    enhancement spot and implementation are named in the section, after the discovery check.
+  - **Objects.** Shared objects only (`shared_dependencies`), read and never written; the
+    outline cases read a class (and, on premise, a program and a function group) the test
+    creates and deletes in the standard order. The enhancement spot and implementation are
+    named in the section, after the discovery check.
   - **Assertions.** Per the table above; a source-less type is never asked for `source`.
 
 **Steps:** the family steps. 7.
@@ -2021,9 +2122,10 @@ answers are corpus documents.
 ### C10. System, search and data readers
 
 **Keys:**
-- (`GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols` are removed in D5; the
-  outline tool's keys are C8's.) `GetAdtTypes`,
-  `GetInactiveObjects`, `GetObjectInfo`, `GetObjectNodeFromCache`, `GetObjectStructure`,
+- (`GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols` are removed in D5, and
+  `GetObjectNodeFromCache` in D14 (DO7); the outline tool's keys are C8's.) `GetAdtTypes`
+  (without `validate_type`, DO5),
+  `GetInactiveObjects`, `GetObjectInfo`, `GetObjectStructure`,
   `GetObjectsByType`, `GetTransaction`, `SearchObject`, `SearchSource`, `GetWhereUsed`,
   `DescribeByList`, `GetSqlQuery`, `GetTableContents`.
 - Compact: `HandlerSearch`, `HandlerGetData`, `HandlerWhereUsed#<type>` (its listed schema has

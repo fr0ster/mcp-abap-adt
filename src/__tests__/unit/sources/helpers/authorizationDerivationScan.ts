@@ -5,8 +5,8 @@
  * resolves to, never what it is called.
  *
  * **A credential read** is a read whose symbol the checker resolves to one of
- * the declared credential properties (`CREDENTIAL_MEMBERS`, each by its
- * declaring interface and property), or to a value declared with a union
+ * the declared authorization properties (`CREDENTIAL_DECLARATIONS`: every
+ * member of each declaring interface but its connection settings), or to a value declared with a union
  * drawn only from the auth-type literals (`'basic' | 'jwt'`, `SapAuthType`,
  * the stdio vocabulary's `AuthType`); and the environment key `SAP_JWT_TOKEN`
  * and the header key `x-sap-jwt-token`, read by key. A plain `string` is a
@@ -28,13 +28,17 @@
  *
  * Refused, each reported with its place (`assignment`, `property`,
  * `argument`, `return`, `comparison`, `decode`) and its rule:
- * - `kind`: a derived kind value at an assignment, a property, an argument
- *   or a return, or a derived value compared with a kind value;
+ * - `kind`: a kind value at an assignment, a property, an argument or a
+ *   return that is derived — by data, or by control: chosen in a branch of
+ *   an `if`, a conditional or a `switch` whose condition or discriminant is
+ *   derived —, or a derived value compared with a kind value;
  * - `credential-boolean`: a boolean bound — variable, property, parameter
  *   default, a function's return — to a comparison of a derived value with a
- *   literal: a boolean of the credential type has no use but as a disguised
- *   kind (a credential choice is a `switch` or a conditional on the field
- *   itself, which stays allowed);
+ *   literal or `undefined`, to a presence test of a credential read (`!x`,
+ *   `!!x`, `Boolean(x)`), or to a membership test of one (`[…].includes(x)`,
+ *   `x in table`): a boolean of the credential has no use but as a disguised
+ *   kind; a credential choice is a `switch` or a condition on the field
+ *   itself, used where it stands, which stays allowed;
  * - `decode` (production only): `split('.')`, `atob`, `Buffer.from(…,
  *   'base64…')` or `JSON.parse` applied to a derived value.
  *
@@ -70,33 +74,53 @@ export interface Derivation {
 }
 
 /**
- * The declared credential properties, by declaring interface (or type):
- * `every` names every member. `username` is a setting, not one of them: the
- * owner's exception reads the responsible user from the settings.
+ * The declarations of the authorization, by declaring interface: every
+ * member of each is a credential read, read from the declaration itself,
+ * except the connection settings named beside it — where the system is and
+ * who the user is (`username`, `sysid` are the owner's exception: the
+ * responsible user and the system id come from the settings). Every auth
+ * field the types declare counts, secret or not (`uaaUrl`, `cert*`,
+ * `kerberos*`, `snc*`, `oidc*`, `saml*`, the grant).
  */
-const CREDENTIAL_MEMBERS: ReadonlyMap<string, ReadonlySet<string> | 'every'> =
-  new Map<string, ReadonlySet<string> | 'every'>([
-    [
-      'ISapConfig',
-      new Set([
-        'authType',
-        'password',
-        'jwtToken',
-        'refreshToken',
-        'sessionCookies',
-        'certPassphrase',
-        'uaaClientSecret',
-      ]),
-    ],
-    ['IConnectionConfig', new Set(['authorizationToken', 'password'])],
-    ['ITokenResult', new Set(['authorizationToken', 'refreshToken'])],
-    ['ReportedCredential', new Set(['authorizationToken'])],
-    [
-      'SessionSecret',
-      new Set(['authorizationToken', 'sessionCookies', 'refreshToken']),
-    ],
-    ['IAuthProvider', 'every'],
-  ]);
+export const CREDENTIAL_DECLARATIONS: ReadonlyMap<
+  string,
+  ReadonlySet<string>
+> = new Map<string, ReadonlySet<string>>([
+  [
+    'ISapConfig',
+    new Set([
+      'url',
+      'client',
+      'connectionType',
+      'username',
+      'mshost',
+      'msserv',
+      'sysid',
+      'group',
+      'saprouter',
+    ]),
+  ],
+  [
+    'IConnectionConfig',
+    new Set(['serviceUrl', 'username', 'sapClient', 'language']),
+  ],
+  [
+    'IValidatedAuthConfig',
+    new Set([
+      'sapUrl',
+      'sapClient',
+      'destination',
+      'username',
+      'errors',
+      'warnings',
+    ]),
+  ],
+  ['IAuthorizationConfig', new Set()],
+  ['ITokenResult', new Set()],
+  ['ReportedCredential', new Set()],
+  ['SessionSecret', new Set()],
+  ['IAuthProvider', new Set()],
+]);
 
 /** The environment and header keys of a credential, read by key. */
 const CREDENTIAL_KEYS = new Set(['SAP_JWT_TOKEN', 'x-sap-jwt-token']);
@@ -182,9 +206,34 @@ export function testHelperDirectories(): string[] {
 
 /** The production sources: every package's `src`, `scripts` and `tools`. */
 export function productionSources(): string[] {
-  return [...productionDirectories(), 'tools'].flatMap((dir) =>
+  return productionSourceDirectories().flatMap((dir) =>
     productionFiles(path.join(REPO, dir)),
   );
+}
+
+/**
+ * The production directories: every package's `src`, and its `scripts`
+ * and `tools` (the root's and each package directory's), found on disk.
+ */
+export function productionSourceDirectories(): string[] {
+  const packages = fs
+    .readdirSync(REPO, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        entry.name !== 'node_modules' &&
+        fs.existsSync(path.join(REPO, entry.name, 'package.json')),
+    )
+    .map((entry) => entry.name);
+  const extra = ['tools', 'scripts'].flatMap((leaf) =>
+    ['', ...packages].map((dir) => (dir === '' ? leaf : `${dir}/${leaf}`)),
+  );
+  return [
+    ...new Set([
+      ...productionDirectories(),
+      ...extra.filter((dir) => fs.existsSync(path.join(REPO, dir))),
+    ]),
+  ].sort();
 }
 
 /** The test-helper sources. */
@@ -236,6 +285,7 @@ function strip(expression: ts.Expression): ts.Expression {
 const isStringLiteral = (node: ts.Node): node is ts.StringLiteralLike =>
   ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
 
+/** A literal, or `undefined`: what a presence or value test compares with. */
 function isLiteral(node: ts.Expression): boolean {
   const bare = strip(node);
   return (
@@ -243,7 +293,8 @@ function isLiteral(node: ts.Expression): boolean {
     ts.isNumericLiteral(bare) ||
     bare.kind === ts.SyntaxKind.TrueKeyword ||
     bare.kind === ts.SyntaxKind.FalseKeyword ||
-    bare.kind === ts.SyntaxKind.NullKeyword
+    bare.kind === ts.SyntaxKind.NullKeyword ||
+    (ts.isIdentifier(bare) && bare.text === 'undefined')
   );
 }
 
@@ -352,8 +403,8 @@ class FileScan {
     for (const declaration of symbol.declarations ?? []) {
       const owner = this.ownerName(declaration);
       if (owner === undefined) continue;
-      const listed = CREDENTIAL_MEMBERS.get(owner);
-      if (listed === 'every' || listed?.has(symbol.name) === true) return true;
+      const settings = CREDENTIAL_DECLARATIONS.get(owner);
+      if (settings !== undefined && !settings.has(symbol.name)) return true;
     }
     const declaration = symbol.valueDeclaration;
     if (declaration === undefined) return false;
@@ -567,13 +618,40 @@ class FileScan {
   }
 
   /** A comparison of a derived value with a literal, possibly negated or joined. */
-  private isCredentialComparison(expression: ts.Expression): boolean {
+  /** A credential read itself, its wrappers stripped. */
+  private isDirectRead(expression: ts.Expression): boolean {
+    return this.isCredentialRead(strip(expression));
+  }
+
+  /**
+   * A credential boolean: a comparison of a derived value with a literal or
+   * `undefined`; a presence test of a credential read (`!x`, `!!x`,
+   * `Boolean(x)`); a membership test of one (`[…].includes(x)`,
+   * `x in table`); or `&&` / `||` joining one of them.
+   */
+  private isCredentialBoolean(expression: ts.Expression): boolean {
     const bare = strip(expression);
     if (
       ts.isPrefixUnaryExpression(bare) &&
       bare.operator === ts.SyntaxKind.ExclamationToken
     ) {
-      return this.isCredentialComparison(bare.operand);
+      return (
+        this.isDirectRead(bare.operand) ||
+        this.isCredentialBoolean(bare.operand)
+      );
+    }
+    if (ts.isCallExpression(bare)) {
+      const callee = strip(bare.expression);
+      const [first] = bare.arguments;
+      if (first === undefined) return false;
+      if (ts.isIdentifier(callee) && callee.text === 'Boolean') {
+        return this.isDirectRead(first) || this.isCredentialBoolean(first);
+      }
+      return (
+        ts.isPropertyAccessExpression(callee) &&
+        callee.name.text === 'includes' &&
+        (this.isDirectRead(first) || this.isDirectRead(callee.expression))
+      );
     }
     if (!ts.isBinaryExpression(bare)) return false;
     const operator = bare.operatorToken.kind;
@@ -582,15 +660,53 @@ class FileScan {
       operator === ts.SyntaxKind.BarBarToken
     ) {
       return (
-        this.isCredentialComparison(bare.left) ||
-        this.isCredentialComparison(bare.right)
+        this.isCredentialBoolean(bare.left) ||
+        this.isCredentialBoolean(bare.right)
       );
+    }
+    if (operator === ts.SyntaxKind.InKeyword) {
+      return this.isDirectRead(bare.left);
     }
     if (!COMPARISONS.has(operator)) return false;
     return (
       (this.derived(bare.left) && isLiteral(bare.right)) ||
       (this.derived(bare.right) && isLiteral(bare.left))
     );
+  }
+
+  /**
+   * Whether `node` stands in a branch a derived value chooses: the then or
+   * else of an `if`, a branch of a conditional, or a `case` of a `switch`
+   * whose condition or discriminant is derived — up to its function.
+   */
+  private controlled(node: ts.Node): boolean {
+    let child: ts.Node = node;
+    let parent: ts.Node | undefined = node.parent;
+    while (parent !== undefined && !isFunctionLike(child)) {
+      if (
+        ts.isIfStatement(parent) &&
+        child !== parent.expression &&
+        this.derived(parent.expression)
+      ) {
+        return true;
+      }
+      if (
+        ts.isConditionalExpression(parent) &&
+        child !== parent.condition &&
+        this.derived(parent.condition)
+      ) {
+        return true;
+      }
+      if (
+        (ts.isCaseClause(parent) || ts.isDefaultClause(parent)) &&
+        this.derived(parent.parent.parent.expression)
+      ) {
+        return true;
+      }
+      child = parent;
+      parent = parent.parent;
+    }
+    return false;
   }
 
   private report(
@@ -609,17 +725,22 @@ class FileScan {
     });
   }
 
-  /** A value bound at `form`'s place: a derived kind, or a credential boolean. */
+  /**
+   * A value bound at `form`'s place: a kind value derived, or chosen by a
+   * branch on a derived value; or a credential boolean.
+   */
   private bound(
     form: DerivationForm,
     value: ts.Expression,
     target: ts.TypeNode | undefined,
   ): void {
-    if (!this.derived(value)) return;
-    if (this.isKindValue(value) || this.isKindTarget(target)) {
+    if (
+      (this.derived(value) || this.controlled(value)) &&
+      (this.isKindValue(value) || this.isKindTarget(target))
+    ) {
       this.report(form, 'kind', value);
     }
-    if (this.isCredentialComparison(value)) {
+    if (this.isCredentialBoolean(value)) {
       this.report(form, 'credential-boolean', value);
     }
   }
@@ -751,7 +872,7 @@ class FileScan {
       }
       if (ts.isCallExpression(node)) {
         node.arguments.forEach((argument, index) => {
-          if (!this.derived(argument)) return;
+          if (!this.derived(argument) && !this.controlled(argument)) return;
           if (
             this.isKindValue(argument) ||
             this.isKindTarget(this.argumentTarget(node, index))
@@ -796,4 +917,35 @@ export function scanDerivations(
     out.push(...new FileScan(checker, source, production.has(file)).scan());
   }
   return out;
+}
+
+/**
+ * The members of the interface `owner` the scan reads as the authorization,
+ * and the settings it leaves out, as `program` declares them (every
+ * declaration of that name).
+ */
+export function declaredAuthorization(
+  program: ts.Program,
+  owner: string,
+): { authorization: string[]; settings: string[] } {
+  const settings = CREDENTIAL_DECLARATIONS.get(owner);
+  if (settings === undefined) throw new Error(`${owner} is not listed`);
+  const members = new Set<string>();
+  for (const source of program.getSourceFiles()) {
+    ts.forEachChild(source, function visit(node) {
+      if (ts.isInterfaceDeclaration(node) && node.name.text === owner) {
+        for (const member of node.members) {
+          if (member.name !== undefined && ts.isIdentifier(member.name)) {
+            members.add(member.name.text);
+          }
+        }
+      }
+      if (ts.isModuleDeclaration(node)) ts.forEachChild(node, visit);
+    });
+  }
+  const all = [...members].sort();
+  return {
+    authorization: all.filter((name) => !settings.has(name)),
+    settings: all.filter((name) => settings.has(name)),
+  };
 }

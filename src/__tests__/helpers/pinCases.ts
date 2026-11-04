@@ -18,10 +18,12 @@
  * failure; every case records twice, and the two recordings must be equal
  * byte for byte before either is compared with `expected`.
  *
- * Ports kept for pins: 47100–47199, one per pin file (`PIN_PORTS`).
+ * Ports kept for pins: 47100–47199, one per pin file, each file's own
+ * recorded in `PIN_PORT_OWNERS` and read with `pinPort(__filename)`.
  */
 
 import crypto from 'node:crypto';
+import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { compactToolSet } from '../../../compact/src/launcher';
@@ -54,6 +56,32 @@ export const PIN_EPOCH = Date.UTC(2026, 0, 1);
 
 /** The ports kept for pins' stand-ins: each pin file takes one, as a constant. */
 export const PIN_PORTS = { first: 47100, last: 47199 } as const;
+
+/**
+ * Every pin file that takes a stand-in port, and its port, from
+ * `PIN_PORTS`: one port per file, never shared, so pin files can run in
+ * parallel. A new pin file adds its row here and reads its port with
+ * `pinPort(__filename)`; `pinCases.test.ts` checks the rows.
+ */
+export const PIN_PORT_OWNERS: Readonly<Record<string, number>> = {
+  'src/__tests__/unit/coverage/pinCases.test.ts': 47100,
+  'src/__tests__/unit/systemKind/programOnJwtOnPremise.test.ts': 47101,
+};
+
+/** The repository root, from this helper's place. */
+const PIN_REPO = path.join(__dirname, '..', '..', '..');
+
+/** The port `PIN_PORT_OWNERS` records for the pin file `file`; refused when none. */
+export function pinPort(file: string): number {
+  const owner = path.relative(PIN_REPO, file).split(path.sep).join('/');
+  const port = PIN_PORT_OWNERS[owner];
+  if (port === undefined) {
+    throw new Error(
+      `${owner} has no row in PIN_PORT_OWNERS: add it with a free port`,
+    );
+  }
+  return port;
+}
 
 /** One request as sent: method, path with its query, every header, body. */
 export interface PinnedRequest {
@@ -609,7 +637,7 @@ export const pinKey = (c: PinCase): CoverageKey => keyOf(c.tool, c.args);
  * One `it('<key> (<variant>) sends the pinned requests')` per case. Call it
  * at the top level or in a `describe` callback: the guard refuses a call
  * Jest never collects. `options.port`: the file's fixed stand-in port, from
- * `PIN_PORTS`, for its `adtStandIn` and `server` cases.
+ * `pinPort(__filename)`, for its `adtStandIn` and `server` cases.
  */
 export function pinCases(
   cases: readonly PinCase[],

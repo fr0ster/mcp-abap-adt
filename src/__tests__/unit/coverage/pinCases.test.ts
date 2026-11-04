@@ -5,6 +5,8 @@
  * `pinCases` test runs — so a refusal is asserted as a rejection here.
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as z from 'zod';
 import type {
   HandlerContext,
@@ -18,8 +20,10 @@ import {
 } from '../../helpers/adtStandIn';
 import {
   installPinFakes,
+  PIN_PORT_OWNERS,
   PIN_PORTS,
   type PinCase,
+  pinPort,
   recordCase,
   runPinCase,
   toPinned,
@@ -30,7 +34,7 @@ import { recordingConnection } from '../../helpers/recordingConnection';
 jest.setTimeout(120_000);
 
 /** This file's fixed stand-in port. */
-const PORT = PIN_PORTS.first;
+const PORT = pinPort(__filename);
 
 const getProgram: PinCase = {
   tool: 'GetProgram',
@@ -422,5 +426,61 @@ describe('pinCases', () => {
     } finally {
       await stand.close();
     }
+  });
+});
+
+describe('the pin ports', () => {
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const tests = path.join(repo, 'src', '__tests__');
+
+  /** Every test source under `dir`, fixtures excluded. */
+  function sources(dir: string, out: string[] = []): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== '__fixtures__') sources(full, out);
+      } else if (entry.name.endsWith('.ts')) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+  const repoPath = (file: string) =>
+    path.relative(repo, file).split(path.sep).join('/');
+
+  it('each pin file owns its own port, in the range, and exists', () => {
+    const ports = Object.values(PIN_PORT_OWNERS);
+    expect(new Set(ports).size).toBe(ports.length);
+    for (const [file, port] of Object.entries(PIN_PORT_OWNERS)) {
+      expect({
+        file,
+        inRange: port >= PIN_PORTS.first && port <= PIN_PORTS.last,
+      }).toEqual({ file, inRange: true });
+      expect({ file, exists: fs.existsSync(path.join(repo, file)) }).toEqual({
+        file,
+        exists: true,
+      });
+    }
+  });
+
+  it('every file that takes a pin port is in PIN_PORT_OWNERS, and none reads the range itself', () => {
+    const helper = 'src/__tests__/helpers/pinCases.ts';
+    const self = repoPath(__filename);
+    for (const file of sources(tests)) {
+      const owner = repoPath(file);
+      if (owner === helper || owner === self) continue;
+      const text = fs.readFileSync(file, 'utf8');
+      expect({ owner, readsRange: text.includes('PIN_PORTS') }).toEqual({
+        owner,
+        readsRange: false,
+      });
+      if (text.includes('pinPort(')) {
+        expect(Object.keys(PIN_PORT_OWNERS)).toContain(owner);
+      }
+    }
+    expect(pinPort(__filename)).toBe(PIN_PORT_OWNERS[self]);
+    expect(() => pinPort(path.join(tests, 'unregistered.test.ts'))).toThrow(
+      'src/__tests__/unregistered.test.ts has no row in PIN_PORT_OWNERS',
+    );
   });
 });

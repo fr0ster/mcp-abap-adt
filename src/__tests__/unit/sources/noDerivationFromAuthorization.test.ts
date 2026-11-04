@@ -27,10 +27,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  CREDENTIAL_DECLARATIONS,
   createDerivationProgram,
   type Derivation,
   type DerivationForm,
   type DerivationRule,
+  declaredAuthorization,
   productionSources,
   scanDerivations,
   testHelperDirectories,
@@ -65,6 +67,42 @@ describe('production and the test helpers', () => {
       'server-runtime/src/stdio/__tests__/helpers/loginStand.ts',
     );
     expect(scanned.some((file) => file.startsWith('tools/'))).toBe(true);
+    expect(scanned).toContain('compact/tools/generate-docs.js');
+  });
+
+  it('reads every authorization field of the config types, the settings left out', () => {
+    for (const [owner, settings] of CREDENTIAL_DECLARATIONS) {
+      const declared = declaredAuthorization(program, owner);
+      // Every setting left out is a member the type declares: none is stale.
+      expect({ owner, settings: declared.settings }).toEqual({
+        owner,
+        settings: [...settings].sort(),
+      });
+      expect({ owner, read: declared.authorization.length > 0 }).toEqual({
+        owner,
+        read: true,
+      });
+    }
+    expect(declaredAuthorization(program, 'ISapConfig').authorization).toEqual([
+      'authType',
+      'certKeyPath',
+      'certPassphrase',
+      'certPath',
+      'certPfxPath',
+      'jwtToken',
+      'kerberosService',
+      'kerberosSpn',
+      'password',
+      'refreshToken',
+      'sessionCookies',
+      'sncLib',
+      'sncMyName',
+      'sncPartnerName',
+      'sncQop',
+      'uaaClientId',
+      'uaaClientSecret',
+      'uaaUrl',
+    ]);
   });
 
   it('derives no kind from a credential and decodes no token', () => {
@@ -103,8 +141,23 @@ describe('the scan refuses each form, and only those', () => {
     argument: [{ form: 'argument', rule: 'kind' }],
     inlineCall: [{ form: 'argument', rule: 'kind' }],
     return: [{ form: 'return', rule: 'credential-boolean' }],
-    cloudFlag: [{ form: 'assignment', rule: 'kind' }],
+    cloudFlag: [
+      { form: 'assignment', rule: 'kind' },
+      { form: 'assignment', rule: 'credential-boolean' },
+    ],
     comparison: [{ form: 'comparison', rule: 'kind' }],
+    ifReturn: [{ form: 'return', rule: 'kind' }],
+    switchReturn: [
+      { form: 'return', rule: 'kind' },
+      { form: 'return', rule: 'kind' },
+    ],
+    ifAssign: [{ form: 'assignment', rule: 'kind' }],
+    presenceUndefined: [{ form: 'return', rule: 'credential-boolean' }],
+    doubleNot: [{ form: 'return', rule: 'credential-boolean' }],
+    booleanCall: [{ form: 'return', rule: 'credential-boolean' }],
+    includes: [{ form: 'return', rule: 'credential-boolean' }],
+    inOperator: [{ form: 'return', rule: 'credential-boolean' }],
+    uaaUrl: [{ form: 'return', rule: 'kind' }],
     decode: [
       { form: 'decode', rule: 'decode' },
       { form: 'decode', rule: 'decode' },

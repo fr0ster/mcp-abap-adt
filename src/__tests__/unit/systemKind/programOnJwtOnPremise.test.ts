@@ -22,16 +22,16 @@ import {
 import { sessionContext } from '../../../lib/utils';
 import { jsonFind, listedJson } from '../../helpers/listedJson';
 import {
-  PIN_PORTS,
   type PinCase,
   pinKey,
+  pinPort,
   runPinCase,
   servedEntries,
 } from '../../helpers/pinCases';
 import type { SystemKind } from '../../helpers/servedTools';
 
 /** This file's fixed stand-in port, for its server case. */
-const PORT = PIN_PORTS.last;
+const PORT = pinPort(__filename);
 
 const JWT_SETTINGS: SapConfig = {
   url: 'https://example.com',
@@ -196,6 +196,8 @@ const onPremiseWrites: PinCase[] = [
       },
     ],
   },
+  // A regression pin: the compact activate never went through the removed
+  // credential check, so this row passed before the fix as well.
   {
     tool: 'HandlerActivate',
     variant: 'onprem',
@@ -213,7 +215,11 @@ describe('an on-premise system with a JWT credential', () => {
     });
   }
 
-  it('JWT credential with onprem stated: the program tools are listed and run', async () => {
+  // The listing takes no credential input — the declared kind alone
+  // decides it — so it is the same for a JWT credential (the brief's "JWT
+  // credential with onprem stated: the program tools are listed and run";
+  // they run in the rows above).
+  it('onprem stated: the program tools are listed', async () => {
     const listed = listedNames('onprem');
     for (const tool of ['CreateProgram', 'UpdateProgram', 'ActivateProgram']) {
       expect({ tool, listed: listed.has(tool) }).toEqual({
@@ -228,7 +234,10 @@ describe('an on-premise system with a JWT credential', () => {
 });
 
 describe('a cloud system with a basic credential', () => {
-  it("basic credential with cloud stated: the cloud surface keeps today's program reads and checks, and nothing more", async () => {
+  // The listing takes no credential input — the declared kind alone
+  // decides it — so it is the same for a basic credential (the brief's
+  // "basic credential with cloud stated").
+  it("cloud stated: the cloud surface keeps today's program reads and checks, and nothing more", async () => {
     const listed = listedNames('cloud');
     for (const tool of [
       'CreateProgram',

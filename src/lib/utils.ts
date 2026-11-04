@@ -571,23 +571,6 @@ export function getManagedConnection(): IAbapConnection {
       );
     }
 
-    // Log refresh token availability for debugging
-    const hasRefreshToken = !!config.refreshToken?.trim();
-    const hasUaaUrl = !!config.uaaUrl;
-    const hasUaaClientId = !!config.uaaClientId;
-    const hasUaaClientSecret = !!config.uaaClientSecret;
-    connectionManagerLogger?.debug(
-      `[DEBUG] getManagedConnection - Refresh token config:`,
-      {
-        hasRefreshToken,
-        hasUaaUrl,
-        hasUaaClientId,
-        hasUaaClientSecret,
-        canRefresh:
-          hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret,
-      },
-    );
-
     // The connection it replaces was built here: it ends with its logoff.
     endManaged(cachedConnection, true);
 

@@ -501,11 +501,6 @@ export function forgetRecordedRequest(transportNumber: string): void {
   if (at >= 0) createdRequests.splice(at, 1);
 }
 
-/** The live runner of the suite now running: its user and its connection. */
-export function currentLiveRunner(): LiveRunner {
-  return current();
-}
-
 /** Records a transport entry the test made, once the call that made it succeeded. */
 export function recordTransportEntry(entry: {
   request: string;
@@ -615,9 +610,9 @@ function recordedNames(): Set<string> {
  *    back as it was (`rememberConfiguredRequest`), the created ones empty;
  * 4. only then the recorded tasks and requests deleted, the later created
  *    first (a task before its request), each asserted absent with
- *    `GetTransport`. The order is measured on premise (plan C2a): the
- *    tasks first, the later created first, then the request, each reading
- *    `404` after; the cloud is pending.
+ *    `GetTransport`. The order is measured on premise and on the cloud
+ *    (plan C2a): the tasks first, the later created first, then the
+ *    request, each reading `404` after.
  * A record goes only once its step succeeded; when a step fails, or a send
  * is refused, everything still recorded is named in the leftovers report.
  */

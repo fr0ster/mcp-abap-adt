@@ -133,12 +133,620 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - CHANGELOG with the fixes of §3 in their own lines.
     - README and `docs/` wherever a handler, a definition or `registerTool` is shown.
     - `npm run docs:tools`.
-18. **Live runs**, after a realm check: the existing read-only and CRUD integration suites,
-    once on premise and once on the cloud.
+## Test coverage (spec §8)
+
+The stage runs after step 17 and before step 18. It is written as tasks C1–C16, each with its
+own steps. The open items at the end of this section wait for the owner's decision before the
+task that needs them starts.
+
+**Global constraints.** Every task's requirements include these:
+- **Commands.** npm scripts only. Never `npx`, `npm exec`, `node_modules/.bin` or `ts-node`.
+- **Integration runs.**
+  - Name the files with `npm run test:integration -- --listTests <path>` first. Then run the
+    script with the path, not with another `--testPathPatterns` / `--testPathIgnorePatterns`,
+    because those replace the script's own.
+  - Ask the owner before any run that reaches a SAP system.
+  - Before a run that may log on through a browser, ask which browser and profile to use, and
+    wait for "ready".
+- **Test code.** No regex. No built-in timeout or retry. No cast: the static-types scan applies
+  to the new helpers' production-style code, and tests add none.
+- **Committed text.** Tool descriptions stay functional. No system name, system id, transport
+  number or user name in a committed file.
+- **Every task ends green,** except the guard test of C1. It is red from C1 until C16 lands and
+  lists the keys still missing; see open item O1. Green means:
+  - build, `npm run test:check` and the root `npm test`;
+  - every package's `lint:check` and `test:check`.
+- **Expected request literals** come from running the code on the stand-in. They are reviewed
+  in the diff against the corpus (`tests/fixtures/adt/`) and the ADT contract. There is no
+  freezing harness.
+- **A defect a pin or a live case shows is fixed in this PR,** in this order: a failing test
+  first, then the fix, then a CHANGELOG line (spec §8, acceptance 4).
+
+**Review focus.**
+1. A pin recorded from wrong code becomes the expected value. Read every literal in the diff
+   against the corpus answer of the same endpoint, before accepting it.
+2. Onprem and cloud take different code. A key that requires both systems needs one pin per
+   variant, not one shared case. The guard checks the `variant` field against the key's
+   required kinds.
+3. A live case can pass while asserting nothing: a call that answers `isError: false` on a
+   no-op. Each live case reads its effect back.
+4. A config section missing from the owner's file makes its suites skip. The run report and
+   `globalTeardown` (C2) turn such a skip into a failure.
+5. Cleanup can touch objects a person owns.
+   - Each name is read before its create; a name that already exists fails the case.
+   - Cleanup deletes only recorded names.
+   - C1's `live.ts` tests prove that a name which already existed is never deleted.
+
+**Every family task (C3–C16) follows the same steps.** A task lists only its own files, keys
+and live specifics.
+- [ ] **Write the pin rows red.** Add the family's `pinCases` rows with `expected: []`. Run
+  `npm test -- <unit file>`. It fails: `pinCases` refuses an empty `expected` and prints the
+  recorded requests.
+- [ ] **Fill the literals.** Fill each `expected` from that run, then review each request
+  against the corpus. A request that is wrong is a defect: its own failing test, the fix, a
+  CHANGELOG line.
+- [ ] **Run green.** Run `npm test -- <unit file>`: PASS.
+- [ ] **Write the live cases.** Use `liveSuite`, `liveCall` and `expectAbsent`, plus the
+  family's template section (`enabled: true`, `available_in` as the keys require). Run
+  `npm run test:integration -- <live file>` without a config: every case skips, naming its
+  reason.
+- [ ] **Add the ledger rows.** Add the family's rows to `coverage-ledger.json`. Run
+  `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts`: none of the family's keys is
+  reported missing or orphaned.
+- [ ] **Run the family live.** With the owner's go, after the realm check (C2), run the
+  family's live file on the on-premise system, then on the cloud system. Every required key
+  passes, and nothing the test did not create is touched.
+- [ ] **Commit** the family as `test(coverage): <family> pinned and live`.
+
+### C1. The guard ledger (red)
+
+**Files:**
+- Create:
+  - `src/__tests__/helpers/servedTools.ts`, extracted from `toolSet/listedSchemas.test.ts`.
+    That test then imports it.
+  - `src/__tests__/helpers/pinCases.ts`
+  - `src/__tests__/integration/helpers/live.ts`
+  - `src/__tests__/unit/coverage/coverageKeys.ts`
+  - `src/__tests__/unit/coverage/ledgerScan.ts`
+  - `src/__tests__/unit/coverage/coverageLedger.test.ts`
+  - `src/__tests__/unit/coverage/__fixtures__/coverage/*`
+  - `tests/fixtures/tools/coverage-ledger.json`, starting as `{}`.
+
+**Interfaces (produced):**
+- **`servedTools.ts`**
+  - `type SystemKind = 'onprem' | 'cloud'`
+  - `interface ServedTool { name: string; variant: SystemKind; binary: string; schema: ListedSchema }`
+  - `servedTools(): Promise<readonly ServedTool[]>`: `tools/list` of all twelve binaries for
+    both variants.
+- **`coverageKeys.ts`**
+  - `type CoverageKey = string`, in the form `Tool`, `Tool#OBJECT_TYPE` or
+    `HandlerGet#OBJECT_TYPE#part`.
+  - `requiredKeys(served: readonly ServedTool[]): ReadonlyMap<CoverageKey, ReadonlySet<SystemKind>>`.
+    The `object_type` values come from each listed schema's enum. The `HandlerGet` pairs come
+    from `compactReadRoutes` / `compactPartRoutes`.
+- **`pinCases.ts`**
+  - `interface PinnedRequest { method: string; url: string; headers: Readonly<Record<string, string>>; body: string | undefined }`
+  - `interface PinCase { tool: string; object_type?: string; part?: string; variant: SystemKind; stand: 'recording' | 'adtStandIn'; args: ToolArgs; answers?: ReadonlyArray<Partial<IAdtWireResponse> | undefined>; refusal?: true; expected: readonly PinnedRequest[] }`
+  - `pinCases(cases: readonly PinCase[]): void`
+    - It defines one `it('<key> (<variant>) sends the pinned requests')` per case.
+    - It finds the entry by name among the variant's served entries. An unserved tool fails.
+    - It calls `entry.call(context, args)` over the chosen stand.
+    - It asserts `expected` non-empty, the recorded list `toEqual(expected)`, and the answer's
+      `isError` (`true` only with `refusal`).
+- **`live.ts`**
+  - `liveSuite(systems: readonly SystemKind[], title: string, body: () => void): void`.
+    Without a config, or on a system it does not name, it skips and logs the reason.
+  - `liveCall(tool: string, args: ToolArgs): Promise<LiveAnswer>`
+    - soft mode: the entry's `call`; hard mode: the MCP tool;
+    - it refuses before sending once the run's credential-refusal marker exists;
+    - it records the key and the outcome in the run report.
+  - `expectAbsent(read: { tool: string; args: ToolArgs }): Promise<void>`
+  - `recordCreated(deleteTool: string, args: ToolArgs): void`
+  - `deleteRecorded(): Promise<void>`, for `afterEach`.
+  - `expectNameFree(read: { tool: string; args: ToolArgs }): Promise<void>`
+- **`ledgerScan.ts`**
+  - `scanUnitFile(path: string): readonly PinRef[]`
+  - `scanLiveFile(path: string): readonly LiveRef[]`
+  - Both use the TypeScript compiler API only (`ts.createSourceFile`, a node walk).
+
+**Steps:**
+- [ ] **Step 1: Write `coverageLedger.test.ts`.**
+  - `'the served list is the listed-schema fixture'`: the set of names equals the keys of
+    `listed-schemas.json`, and its size is 315.
+  - `'every required key has a ledger row'` and `'every ledger row is a required key'`: two set
+    differences, each expected `[]`, with the missing keys printed.
+  - `'each row names exactly the systems its key requires'`.
+  - `'each unit reference is a pinCases row of that key'`: `scanUnitFile(row.unit)` holds a ref
+    with an equal key and a variant per required kind.
+  - `'each live reference is a liveCall of that key in an it, inside a liveSuite naming the system'`.
+  - `'a delete key's live case calls expectAbsent after the delete'`.
+  - `'no pinCases row or liveCall in a scanned file lacks a ledger row'`.
+- [ ] **Step 2: Write one fixture per refusal and a test that each is refused,** each by its
+  own check alone. The refusals:
+  - a missing row;
+  - an extra row;
+  - a missing system;
+  - an extra system;
+  - `expected: []`;
+  - a spread or computed request;
+  - a non-literal `url`;
+  - a request with a fifth key;
+  - a `liveCall` in `afterEach`;
+  - a `liveCall` in a cleanup lambda;
+  - a `liveCall` outside `liveSuite`;
+  - a delete without `expectAbsent`;
+  - an orphan `liveCall`;
+  - a unit file under `integration/`.
+- [ ] **Step 3: Write `pinCases`' own unit tests** (`src/__tests__/unit/coverage/pinCases.test.ts`).
+  - `'refuses an empty expected'`.
+  - `'refuses a tool the variant does not serve'`.
+  - `'fails when one request more is recorded than expected'`.
+- [ ] **Step 4: Write `live.ts`' own unit tests** (`src/__tests__/unit/coverage/live.test.ts`), on
+  `adtStandIn`, so nothing reaches SAP:
+  - `'liveCall sends nothing after the refusal marker'`;
+  - `'deleteRecorded deletes only recorded names'`;
+  - `'expectNameFree fails on an existing name and deletes nothing'`.
+- [ ] **Step 5: Implement the six files** to the interfaces above.
+- [ ] **Step 6: Run.** `npm test -- src/__tests__/unit/coverage`. The
+  fixtures, `pinCases` and `live.ts` tests PASS. The ledger test FAILS, listing every required
+  key as missing (the red baseline). Record the count in this plan.
+- [ ] **Step 7: Mutate each check.** Delete it, see its fixture's test go red, then revert.
+- [ ] **Step 8: Commit** as `test(coverage): the ledger guard, red`.
+
+### C2. Live-run safety and the run report
+
+**Files:**
+- Modify:
+  - `src/__tests__/integration/globalSetup.ts`
+  - `tests/test-config.yaml.template`: `environment.expected_realm: ""` with its comment.
+  - The integration Jest configuration: add `globalTeardown`.
+- Create:
+  - `src/__tests__/integration/helpers/realmCheck.ts`
+  - `src/__tests__/integration/helpers/runReport.ts`
+  - `src/__tests__/integration/globalTeardown.ts`
+
+**Interfaces:**
+- **`realmCheck.ts`**
+  - `realmCheck(kind: SystemKind, baseUrl: string, expectedRealm: string, session: SessionFacts): Promise<void>`
+  - It sends an unauthenticated `GET <baseUrl>/sap/bc/adt/discovery` and expects `401`.
+    - On premise, the `WWW-Authenticate` realm must equal `expectedRealm`; empty refuses.
+    - On the cloud, the session's JWT `exp` must lie in the future. It is decoded locally.
+  - Any mismatch throws.
+- **`runReport.ts`**
+  - `reportPath(): string`, under the OS temp directory and named per run, never in the
+    repository.
+  - `recordOutcome(key: CoverageKey, kind: SystemKind, outcome: 'passed' | 'failed' | 'skipped'): void`
+  - `markCredentialRefused(): void`
+  - `credentialRefused(): boolean`
+
+**Steps:**
+- [ ] **Step 1: Write the unit tests** (`src/__tests__/unit/coverage/realmCheck.test.ts`, on a
+  local HTTP stand-in):
+  - `'a wrong realm throws before any credential is sent'`: the stand-in records no
+    `Authorization` header;
+  - `'an empty expected realm refuses'`;
+  - `'an expired JWT refuses with no request'`.
+- [ ] **Step 2: Write the teardown tests** (`src/__tests__/unit/coverage/runReport.test.ts`):
+  - `'teardown fails when a required key of this system was skipped'`;
+  - `'teardown passes when every required key passed'`.
+- [ ] **Step 3: Implement.**
+  - `globalSetup` calls `realmCheck` before it builds the factory.
+  - `liveCall` calls `markCredentialRefused` on a credential refusal: a logon `401`, or a broker
+    refusal.
+  - `globalTeardown` compares the run report with `coverage-ledger.json` for the configured
+    system kind.
+- [ ] **Step 4: Run the tests above:** PASS. Without a config, `npm run test:integration` still
+  returns at once, logging nothing on.
+- [ ] **Step 5: Commit** as `test(coverage): realm check, refusal stop, run report`.
+
+### C3. Activate
+
+**Keys:**
+- `ActivateBehaviorDefinition`, `ActivateClass`, `ActivateDataElement`, `ActivateDdl`,
+  `ActivateDomain`, `ActivateFunctionGroup`, `ActivateFunctionModule`, `ActivateInclude`,
+  `ActivateInterface`, `ActivateMetadataExtension`, `ActivateObjects`, `ActivateProgram`,
+  `ActivateServiceBinding`, `ActivateServiceDefinition`, `ActivateStructure`, `ActivateTable`,
+  `ActivateTableType`: 17.
+- `HandlerActivate#<type>`: 18 types on premise, 16 on the cloud.
+
+**Unit:** `src/__tests__/unit/pins/activate.pins.test.ts`, on `recordingConnection`. Each
+activation answer is a corpus activation result.
+
+**Live:** `src/__tests__/integration/coverage/activate.live.test.ts`, section `coverage_activate`.
+- **Objects.** One inactive object per type, created by the test without activation. Its
+  dependencies are read from `shared_dependencies` and never written: the CDS root of a BDEF,
+  the DDL behind a metadata extension, the service definition behind a binding, the function
+  group behind a module.
+- **Assertions.** After the activation, `GetInactiveObjects` no longer lists the object, and
+  the activation result has no error.
+- **Cleanup.** `deleteRecorded`.
+- **Systems.** Include and program on premise only; the rest on both.
+
+**Steps:** the family steps. 7.
+
+### C4. Check and validate
+
+**Keys:**
+- `CheckBehaviorDefinition`, `CheckClass`, `CheckDataElement`, `CheckDdl`, `CheckDomain`,
+  `CheckFunctionGroup`, `CheckFunctionModule`, `CheckInterface`, `CheckMetadataExtension`,
+  `CheckPackage`, `CheckProgram`, `CheckStructure`, `CheckTable`, `CheckTableType`: 14.
+- `HandlerCheckRun#<type>` and `HandlerValidate#<type>`.
+
+**Unit:** `src/__tests__/unit/pins/check.pins.test.ts`.
+
+**Live:**
+- The existing `high/check/CheckHighHandlers.test.ts` moves its calls to `liveCall`, keeping
+  its sections (`check_*_high`).
+- New: `coverage/check.live.test.ts`, for the compact keys and `CheckTableType`, section
+  `coverage_check`.
+- **Objects.** Shared objects only: read, never written, so nothing is created and no cleanup
+  is needed.
+- **Assertions.** The check-run report is read and has the object's URI.
+
+**Steps:** the family steps. 7.
+
+### C5. Create and update (full)
+
+**Keys:**
+- Every `Create*` and `Update*` full tool but the unit-test, transport and binding-update
+  ones: 21 creates and 25 updates. The unit-test tools are C12's, `CreateTransport` /
+  `CreateTransportTask` are C13's and `UpdateServiceBinding` is C14's.
+- This includes the live gaps: `CreateDdl`, `UpdateDdl`, `CreateMessageClass`,
+  `CreateMessageClassMessage`, `UpdateMessageClass`, `UpdateMessageClassMessage` and
+  `UpdatePackage`.
+
+**Unit:** `src/__tests__/unit/pins/write.pins.test.ts`.
+- Each update is pinned on its whole locked chain: lock, write, unlock.
+- The creates already pinned by parity are pinned again here, by literal (open item O2).
+
+**Live:**
+- **The existing `high/<type>/*HighHandlers.test.ts`.** Create, update and read-back move into
+  the test body through `liveCall`. `HighTester` keeps only the failure cleanup, through
+  `deleteRecorded`.
+- **New: `coverage/ddlAndMessageClass.live.test.ts`,** section `coverage_writes`: a DDL, a
+  message class with one message, and an update of a package the test created.
+- **Assertions.** Every update is read back and compared with what was written.
+
+**Steps:** the family steps. 7.
+
+### C6. Compact writes per object type
+
+**Keys:** `HandlerCreate#<type>`, `HandlerLock#<type>`, `HandlerUpdate#<type>` and
+`HandlerUnlock#<type>`, each over the types its variant's enum lists.
+
+**Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. The 112 rows of
+`lowToCompact.test.ts` stay. The types they leave out get pins here: `TABLE_TYPE`, `INCLUDE`,
+`SERVICE_*`, `BEHAVIOR_*`, `METADATA_EXTENSION`, `TRANSPORT`.
+
+**Live:** `coverage/compactWrites.live.test.ts`, section `coverage_compact_writes`.
+- It is enabled in the template and runs in soft mode. The hard-mode
+  `batch/communicationBatch.test.ts` stays as it is.
+- **Flow.** Per type: create, lock, update, unlock, read back. Each step is a `liveCall` in the
+  body. Every lock is released in the same test.
+- **Assertion.** A lock left behind fails the case. It is never cleared by SM12.
+
+**Steps:** the family steps. 7.
+
+### C7. Deletes
+
+**Keys:**
+- Every `Delete*` full tool: 27, `DeletePackage` included.
+- `HandlerDelete#<type>` and `HandlerDeletionCheck#<type>`.
+
+**Unit:** `src/__tests__/unit/pins/delete.pins.test.ts`. The deletes already pinned by parity
+are pinned again here by literal (O2).
+
+**Live:**
+- **Full tools.** Each `<type>` suite of C5 ends its test body with `liveCall('Delete<Type>', …)`
+  and then `expectAbsent`.
+- **`DeleteServiceDefinition`.** Its local wrapper in `ServiceDefinitionHighHandlers` goes; the
+  test calls the tool.
+- **Compact keys.** `coverage/compactDeletes.live.test.ts`, section `coverage_compact_writes`.
+  Per type it runs `HandlerDeletionCheck`, then `HandlerDelete`, then `expectAbsent`.
+
+**Steps:** the family steps. 7.
+
+### C8. Reads
+
+**Keys:**
+- **`Get<Type>`:** the 25 tools whose metadata part `batch/metadataReads.test.ts` pins by
+  parity (`GetBehaviorDefinition` … `GetTableType`), each listed in the ledger.
+- **Other readers:** `GetEnhancementImpl`, `GetEnhancementSpot`, `GetEnhancements`,
+  `GetInclude`, `GetIncludesList`, `GetFunctionInclude`, `GetPackageContents`,
+  `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetTypeInfo`, `GetLocalDefinitions`,
+  `GetLocalMacros`, `GetLocalTestClass`, `GetLocalTypes`, `GetMessageClassMessage`,
+  `GetMainPrograms`, `ListFunctionGroupIncludes`, `ListFunctionModules`.
+- **Compact:** `HandlerGet#<type>#<part>`, every pair the route tables serve, except the
+  unit-test pairs (C12).
+
+**Unit:** `src/__tests__/unit/pins/read.pins.test.ts`. The source part is pinned by literal as
+well as the metadata part, which `metadataReads.test.ts` pins only by parity.
+
+**Live:**
+- **Existing read suites** move their calls to `liveCall`.
+- **New: `coverage/reads.live.test.ts`,** section `coverage_reads`.
+  - **Objects.** Shared objects only (`shared_dependencies`), read and never written. The
+    enhancement spot and implementation are named in the section; open item O7.
+  - **Assertions.** Each read answers the named object: its name and type in the answer, and
+    the source is not empty.
+
+**Steps:** the family steps. 7.
+
+### C9. Version tools
+
+**Keys:**
+- The 28 generated `Get<Type>Versions` / `Get<Type>VersionSource` / `Get<Type>VersionDiff`.
+- `GetObjectVersions`, `GetObjectVersionSource`, `GetObjectVersionDiff`.
+
+**Unit:** `src/__tests__/unit/pins/versions.pins.test.ts`. The version feed and the source
+answers are corpus documents.
+
+**Live:** `coverage/versions.live.test.ts`, section `coverage_versions`.
+- **Objects.** One object per type with at least two versions, named in the config and only
+  read. Which objects is open item O3.
+- **Assertions.**
+  - The version list has at least two entries.
+  - The source of the newest is not empty.
+  - The diff of the two newest names both.
+
+**Steps:** the family steps. 7.
+
+### C10. System, search and data readers
+
+**Keys:**
+- `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols`, `GetAdtTypes`,
+  `GetInactiveObjects`, `GetObjectInfo`, `GetObjectNodeFromCache`, `GetObjectStructure`,
+  `GetObjectsByType`, `GetTransaction`, `SearchObject`, `SearchSource`, `GetWhereUsed`,
+  `DescribeByList`, `GetSqlQuery`, `GetTableContents`.
+- Compact: `HandlerSearch`, `HandlerGetData`, `HandlerWhereUsed`.
+
+**Unit:** `src/__tests__/unit/pins/system.pins.test.ts`.
+
+**Live:**
+- **Existing suites** move to `liveCall`: `SystemHighHandlers`, `SearchSourceHandler`,
+  `WhereUsedHandlers`, `SqlQueryHandlers`, `TableContentsHandlers`, `AbapSystemSymbolsHandler`.
+- **New: `coverage/system.live.test.ts`,** section `coverage_system`, for the rest. It reads
+  shared objects; `GetTransaction` reads a transaction named in the section.
+- **Cloud.** `GetSqlQuery` and `GetTableContents` are listed on the cloud but run live today on
+  premise only: open item O8.
+
+**Steps:** the family steps. 7.
+
+### C11. ATC and runtime
+
+**Keys:**
+- `RunATC`, `GetATCFindings`, `GetATCResult`, `GetATCRunStatus`, `ListATCResults`,
+  `RuntimeRunClass`, `RuntimeRunProgram`, `RuntimeCreateProfilerTraceParameters`,
+  `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`,
+  `RuntimeAnalyzeProfilerTrace`, `RuntimeListFeeds`, `RuntimeGetDumpById`,
+  `RuntimeGetGatewayErrorLog`, `RuntimeListSystemMessages`.
+- Compact: `HandlerDumpList`, `HandlerDumpView`, `HandlerProfileList`, `HandlerProfileRun`,
+  `HandlerProfileSchedule`, `HandlerProfileView`.
+
+**Unit:** `src/__tests__/unit/pins/runtime.pins.test.ts`.
+
+**Live:**
+- **Existing suites** move to `liveCall`: `AtcHandlers`, `RuntimeFeedHandlers`,
+  `RuntimeProfilingAndDumpsHandlers`.
+- **New: `coverage/runtime.live.test.ts`,** section `coverage_runtime`.
+  - **Objects.** A probe class the test creates and deletes, run through `RuntimeRunClass` and
+    `HandlerProfileRun`. On premise, a probe program as well, run through `RuntimeRunProgram`.
+  - **Assertions.** The run's output is read. The profile appears in `HandlerProfileList` and
+    is read by `HandlerProfileView`.
+  - **Profiler state.** Open item O6.
+
+**Steps:** the family steps. 7.
+
+### C12. Unit tests
+
+**Keys:**
+- `RunAbapUnit`, `RunUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`,
+  `RunFunctionModuleUnitTest`, `RunCdsUnitTest`, `GetUnitTestResult`.
+- `CreateUnitTest`, `UpdateUnitTest`, `CreateCdsUnitTest`, `UpdateCdsUnitTest`,
+  `CreateProgramUnitTest`, `UpdateProgramUnitTest`, `CreateFunctionGroupUnitTest`,
+  `UpdateFunctionGroupUnitTest`.
+- Compact: `HandlerUnitTestRun`, `HandlerUnitTestStatus`, `HandlerUnitTestResult`,
+  `HandlerCdsUnitTestStatus`, `HandlerCdsUnitTestResult`, `HandlerGet#UNIT_TEST#*`,
+  `HandlerGet#CDS_UNIT_TEST#*`.
+
+**Unit:** `src/__tests__/unit/pins/unitTests.pins.test.ts`.
+
+**Live:**
+- **The existing `unitTest/*` suites** move to `liveCall`. `RunAbapUnit` and the compact keys
+  get cases there, on the class the suite creates.
+- **Assertions.** The run's result is read: the test count and that no test failed.
+
+**Steps:** the family steps. 7.
+
+### C13. Transport
+
+**Keys:**
+- `CreateTransport`, `CreateTransportTask`, `AddTransportObject`, `RemoveTransportObject`,
+  `MoveTransportObjects`, `SortAndCompressTransportTask`, `ReadTransportObjects`,
+  `ReadTransportActionLog`, `GetTransport`, `ListTransports`.
+- Compact: `HandlerTransportCreate`, `HandlerTransportMoveObjects`,
+  `HandlerTransportSortAndCompress`.
+
+**Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
+
+**Live:**
+- **The existing `TransportObjectToolsCrud`** moves to `liveCall`.
+- **New: `coverage/transport.live.test.ts`,** section `coverage_transport`.
+  - **Objects.** A transportable package named in the section; `$TMP` cannot be recorded.
+    The test creates a request and a task, and adds and removes an object it created.
+  - **Never** release a request.
+  - **The request and task remain:** open item O4.
+  - **Cloud:** open item O5.
+
+**Steps:** the family steps. 7.
+
+### C14. Service binding
+
+**Keys:**
+- `UpdateServiceBinding`, `ValidateServiceBinding`, `GetServiceBindingPreviewUrl`,
+  `ListServiceBindingTypes`.
+- Compact: `HandlerServiceBindingListTypes`, `HandlerServiceBindingValidate`.
+- `Create`, `Activate`, `Get` and `Delete` of a binding are C5, C3, C8 and C7.
+
+**Unit:** `src/__tests__/unit/pins/serviceBinding.pins.test.ts`.
+
+**Live:**
+- **The existing `ServiceBindingHighHandlers`** calls `UpdateServiceBinding` as its update step,
+  with the publish state read back. It no longer uses `ActivateServiceBinding` for that.
+- The remaining keys go in the same file.
+
+**Steps:** the family steps. 7.
+
+### C15. Debugger, AMDP and memory
+
+**Keys:**
+- **ABAP debugger:** `DebugStartListener`, `DebugStop`, `DebugWait`, `DebugTakeOverListener`,
+  `DebugSetBreakpoints`, `DebugListBreakpoints`, `DebugDeleteBreakpoint`,
+  `DebugCreateWatchpoint`, `DebugListWatchpoints`, `DebugDeleteWatchpoint`, `DebugSetSettings`,
+  `DebugStep`, `DebugStepToLine`, `DebugGetStack`, `DebugSetStackPosition`, `DebugGetVariables`,
+  `DebugSetVariable`, `DebugGetMemorySizes`, `DebugCreateMemorySnapshot`, `DebugTerminate`.
+- **Memory snapshots:** `MemorySnapshotList`, `MemorySnapshotGet`, `MemorySnapshotDelta`.
+- **AMDP:** `AmdpDebugStart`, `AmdpDebugSetBreakpoints`, `AmdpDebugWait`, `AmdpDebugStep`,
+  `AmdpDebugGetTable`, `AmdpDebugCancel`, `AmdpDebugStop`.
+- **Debug batch:** `DebugBatchBegin`, `DebugBatchEnd`.
+- **Compact:** `HandlerDebugSession`, `HandlerDebugBreakpoints`, `HandlerDebugStep`,
+  `HandlerDebugMaintain`, `HandlerDebugBatch`.
+
+**Unit:** `src/__tests__/unit/pins/debugger.pins.test.ts`, on `adtStandIn`: the listener and
+the debuggee run on connections of their own.
+
+**Live:** the existing `debugger/DebuggerHandlers.test.ts` moves to `liveCall` and gains
+cases, section `debugger_handlers`.
+- **New cases:**
+  - watchpoints: create, list, delete;
+  - breakpoint list and delete;
+  - `DebugSetStackPosition`;
+  - `DebugSetVariable`, read back;
+  - `DebugTerminate`;
+  - `MemorySnapshotGet` and `MemorySnapshotDelta`;
+  - `AmdpDebugSetBreakpoints` and `AmdpDebugCancel`;
+  - the compact debug tools.
+- **Objects.** The probe class the suite creates and deletes, and the shared AMDP pair, read
+  only.
+- **Connections.**
+  - The debuggee runs on its own connection.
+  - The take-over case uses a second connection of the same user.
+  - The other-user case uses `second_user_env` on its own connection.
+- **`afterAll`** stops every listener and logs off every session (`debuggerCleanup.ts`).
+- **Open item O9** covers the take-over connection and AMDP without HANA.
+
+**Steps:** the family steps. 7.
+
+### C16. Batch, sessions, background runs, leftover sessions
+
+**Keys:**
+- `BatchBegin`, `BatchEnd`, `BatchAnswers`, `HandlerBatch`.
+- `SessionOpen`, `SessionClose`, `HandlerSession`.
+- `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`, `HandlerBackgroundRunGet`,
+  `HandlerBackgroundRunList`, `HandlerBackgroundRunDiscard`.
+- `ListLeftoverSessions`, `LogoffLeftoverSession`, `HandlerLeftoverSessionList`,
+  `HandlerLeftoverSessionLogoff`.
+
+**Unit:** `src/__tests__/unit/pins/sessions.pins.test.ts`, on `adtStandIn`. This covers the
+four compact handlers no test runs today.
+
+**Live:** `coverage/sessions.live.test.ts`, section `coverage_sessions`.
+- **Batch.** Two reads in one envelope, both answered.
+- **Long sessions.** The HTTP launcher (`launch_http`). The session is opened, used for one
+  read and closed, then the closed handle is refused.
+- **Background runs.** `RuntimeRunClass` with `background: true` on a probe class the test
+  creates. The run is got, listed and discarded, and the discarded run is absent from the list.
+- **Leftover sessions.** Open item O10.
+
+**Steps:** the family steps, then:
+- [ ] Turn the guard green: `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts`
+  PASS with no key missing.
+- [ ] Commit.
+
+8 steps in all.
+
+### Open items (owner's decision before the task that needs them)
+
+- **O1. The guard is red during the stage.**
+  - The plan keeps it red from C1 to C16, so CI on the PR is red that long.
+  - Alternative: land it as `test.failing` and switch it to `test` in C16. CI stays green, but
+    the missing-key list is hidden until then.
+  - Recommendation: keep it red, as the owner asked ("red first"). Push each family as it
+    lands.
+- **O2. Re-pin keys already pinned by parity, by literal.**
+  - `createSingleCall`, `metadataReads`, `lowToCompact` and the other parity files pin "request
+    equals another path's request", not a literal. The guard sees only `pinCases`.
+  - Recommendation: re-pin every key in `pinCases`, keeping the parity tests. This is uniform,
+    cheap from the stand-in run, and closes the half-pinned rows the inventory counts as PINNED.
+  - The alternative, teaching the scanner each parity table, couples the guard to those
+    files' shapes.
+- **O3. Version tools need objects with two or more versions.** We never release a transport,
+  so an object the test creates in `$TMP` has no version history.
+  - Recommendation: read-only objects with a history. On premise, one SAP-delivered object per
+    type, named in `coverage_versions`.
+  - On the cloud this is to be measured first. For a type without such an object, the owner
+    decides.
+- **O4. `CreateTransport` / `CreateTransportTask` leave a request behind.** No tool deletes
+  one, and none may be released.
+  - Recommendation: one request and one task per run, each with a fixed test description and
+    emptied by `RemoveTransportObject`. The run report lists them for the owner.
+- **O5. Transport tools on the cloud trial.** Its development package has no transport, and
+  the existing suite is on premise only.
+  - Recommendation: measure first whether the trial can create a request.
+  - If not, the owner decides whether `available_in: cloud` is a defect to fix (spec §8,
+    acceptance 4) or an exception.
+- **O6. Profiler state.** `RuntimeCreateProfilerTraceParameters` and the profile runs leave
+  trace files and parameters, and no tool deletes them.
+  - Recommendation: accept them as the trace of the test user's own run, listed in the run
+    report. A shared system's other users' traces are never read.
+- **O7. Enhancement reads on the cloud.** `GetEnhancementImpl` / `GetEnhancementSpot` are listed
+  on the cloud.
+  - Recommendation: measure on the trial for an enhancement object to read. If there is none,
+    the owner decides as in O5.
+- **O8. `GetSqlQuery` / `GetTableContents` on the cloud.** Listed there, live on premise only
+  today.
+  - Recommendation: run them on the cloud against a table of the test package. If the trial
+    refuses data preview, decide as in O5.
+- **O9. The debugger's second connection, and AMDP without HANA.**
+  - Take-over needs a second listener of the same user. Recommendation: a second connection of
+    the same user, opened and logged off by the test.
+  - The AMDP keys need HANA. Recommendation: run them on the cloud and on a HANA on-premise
+    system. If the on-premise system is not on HANA, the owner decides whether its AMDP keys
+    are an exception.
+- **O10. Leftover-session tools need a leftover session.**
+  - Recommendation: the test makes its own.
+    1. It starts the stdio binary on its destination and opens a session.
+    2. It ends the process without logoff.
+    3. It lists through a new process and logs off only the session it made, matched by its
+       id. A leftover it did not make is listed, never logged off.
+  - The SAP logoff can take minutes to show, so the test asserts the tool's answer, not SM04.
+- **O11. Compact tools with an `action` enum** (`HandlerDebug*`, `HandlerSession`,
+  `HandlerBatch`, the background-run and leftover tools).
+  - The spec keys them by tool only.
+  - Recommendation: add `action` as a key dimension, read from the listed schema like
+    `object_type`, so each action is pinned and live.
+- **O12. Missing config sections.** The owner's `tests/test-config.yaml` lacks the include,
+  table-type and check sections. Without them those suites skip, and C2's teardown fails the
+  run.
+  - Recommendation: before step 18, copy those sections from the template, plus every
+    `coverage_*` section, with the owner's approval of the values.
+  - Their names go into the PR description.
+
+## Live runs and release
+
+18. **The full integration run on both systems,** after the realm check. Every
+    integration suite, the coverage suites included, runs once on the on-premise system and
+    once on the BTP trial system, each with the owner's go:
+    - `npm run test:integration 2>&1 | tee <log outside the repository>`;
+    - the log and the run report stay outside the repository.
+    - **Pass:** `globalTeardown` reports no required key skipped or failed on that system.
+    - **After a failure:** fix it with a failing test first, then rerun that system whole.
+    - The counts per system go into the PR description, with no system name.
 19. Run CI's full step list locally, including the pack, the install check and the images.
     Then run Codex review and CI, and get the owner's review.
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
-    PR description. Then wait for the owner's merge and tag, the publish, and the registry
+    PR description: the open items' outcomes, the exceptions the owner granted, the per-system
+    run counts and the config sections the owner's file needed. Then wait for the owner's merge and tag, the publish, and the registry
     check.
 
 ## Appendix A — implicit any

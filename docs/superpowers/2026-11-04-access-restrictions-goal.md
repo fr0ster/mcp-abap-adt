@@ -61,7 +61,9 @@ When both lists are configured, each name the call gives is checked against its 
   never adds a tool.
 - **The checks read the arguments.** A package or request given in the call's arguments is
   checked against its list, as given. One not given is not checked, and the call runs; SAP may
-  then refuse it. The server makes no call to SAP to find an object's package or request.
+  then refuse it. The server makes no call to SAP to find an object's package or request. How
+  an entry is matched is the strategy's: a `ZFOO/**` entry may be matched by reading the
+  package tree, if the strategy chooses to.
 - **The checks run at the handler's start.** A handler is allowed or refused as a whole, before
   it changes anything; no check sits inside its steps (lock, write, activation).
 - **The checks are a strategy.** One interface, given to the server by the host, decides every
@@ -82,8 +84,8 @@ When both lists are configured, each name the call gives is checked against its 
 ## Open for the spec
 
 - The settings: their names and format, taking ARC-1's grammar where it fits (`Tool`,
-  `Tool.action`, `Tool.glob*`; a package by name or a `Z*` prefix — ARC-1's `ZFOO/**` subtree
-  needs the package tree from SAP, so it is not taken), and where
+  `Tool.action`, `Tool.glob*`; a package by name, a `Z*` prefix or a `ZFOO/**` subtree), and
+  where
   each transport takes them at start (stdio configuration, http/sse start parameters).
 - Which tools count as a write for the package and request checks: create, update, delete,
   activation, a move to another package, the transport tools, batch and the compact routes.

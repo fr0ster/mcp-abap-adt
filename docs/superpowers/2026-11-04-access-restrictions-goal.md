@@ -14,9 +14,10 @@ Each restriction is optional:
    package tool) runs only when that package is in the list.
 3. **Allowed requests.** A call that names a transport request in its arguments runs only when
    that request is in the list.
-4. **Someone else's draft.** The server finds out whether the object has an unactivated change
-   and whose it is: none, the caller's, or another user's, with its age. The consumer decides
-   what happens: refuse, or write its own version.
+4. **A draft tool.** A read tool in the system set answers whether an object has an
+   unactivated change and whose it is: none, the caller's, or another user's, with its age. It
+   is not a restriction and not a check of other tools: the model calls it when it wants to
+   know, and decides what to do. SAP itself lets the first writer win.
 
 5. **Table data.** The contents of a table or view are read only when the configuration allows
    it: either a list of tables whose data cannot be read, or a list of the only tables whose
@@ -64,11 +65,10 @@ When both lists are configured, each name the call gives is checked against its 
 - **The checks run at the handler's start.** A handler is allowed or refused as a whole, before
   it changes anything; no check sits inside its steps (lock, write, activation).
 - **The checks are a strategy.** One interface, given to the server by the host, decides every
-  check at a handler's start. A shipped strategy applies the configured lists and the draft rule. An
-  embedder can give its own.
-- **The consumer decides about a draft.** The server gives the facts: whose draft, its age. The
-  age limit and what happens on each side of it are the consumer's settings, with no default of
-  the server's. The server keeps no state on its clock.
+  check at a handler's start. A shipped strategy applies the configured lists. An embedder can
+  give its own.
+- **The model decides about a draft.** The draft tool answers facts only: whose draft and its
+  age. No setting, limit or check of the server's acts on a draft.
 - **The checks are formal.** They read the call's own target: the tool, the object, its package
   and request, the table it names. They do not analyse code. A class written to read what is
   denied, or to create objects elsewhere, is a matter for SAP's authorization, not this server.
@@ -80,11 +80,14 @@ When both lists are configured, each name the call gives is checked against its 
 ## Open for the spec
 
 - The settings: their names and format, taking ARC-1's grammar where it fits (`Tool`,
-  `Tool.action`, `Tool.glob*`; a package by name, `Z*` prefix, `ZFOO/**` subtree), and where
+  `Tool.action`, `Tool.glob*`; a package by name or a `Z*` prefix — ARC-1's `ZFOO/**` subtree
+  needs the package tree from SAP, so it is not taken), and where
   each transport takes them at start (stdio configuration, http/sse start parameters).
 - Which tools count as a write for the package and request checks: create, update, delete,
   activation, a move to another package, the transport tools, batch and the compact routes.
 - Which arguments of which tools name a package or a request.
 - For table data: which tools name a table whose rows they answer; whether a deny list and an
   allow list may be configured together.
+- The draft tool: its name, arguments and answer; which object types have versions to compare
+  (source-based objects, and whether XML metadata does too); where it sits in the compact set.
 - The semver of the release.

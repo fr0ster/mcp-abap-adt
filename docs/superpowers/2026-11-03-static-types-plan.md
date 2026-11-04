@@ -692,15 +692,25 @@ and live specifics.
   hard-mode and launched-server case). `src/__tests__/integration/helpers/testers/hardMode.ts`
   waits for health with 120 attempts of 250 ms (around line 163) and kills with a 60 s timer
   (around line 182). Replace both:
-  - **Readiness** from the server's own ready notification — the line it writes when it
-    listens (stdio: its ready line on stderr; HTTP: its listening line) — or the child's exit
-    event, whichever comes first; no attempt count, no sleep; Jest's test timeout is the only
-    deadline.
+  - **Readiness**, raced against the child's exit event; no polling, no timer, no hook in
+    production code; Jest's test timeout is the only deadline:
+    - **stdio:** the server writes no ready line (`StdioServer.start`,
+      `server-runtime/src/stdio/StdioServer.ts`; the launcher), so readiness is the answer to
+      the MCP `initialize` request the test sends over the child's stdin — the child is ready
+      when that answer arrives on stdout;
+    - **HTTP:** the listening line the server already writes, read from the child's captured
+      stderr.
+    An exit before readiness rejects at once with the exit code and the captured stderr.
   - **Termination** at the test's end by a signal (`SIGTERM`), then a wait for the exit
     event; no forced-kill timer.
-  - Tests first, on a fake child (a small node script the test launches via
-    `process.execPath`): `'ready when the ready line arrives, without a timer'`, `'an exit
-    before ready rejects at once'`, `'stop waits for the exit event and sets no timer'`.
+  - Tests first, on fake children (small node scripts the test launches via
+    `process.execPath`):
+    - stdio: `'ready when the initialize answer arrives, without a timer'` (the fake answers
+      the `initialize` it reads on stdin) and `'an exit before the initialize answer rejects
+      at once'`;
+    - HTTP: `'ready when the listening line arrives, without a timer'` and `'an exit before
+      the listening line rejects at once'`;
+    - `'stop waits for the exit event and sets no timer'`.
 - [ ] **Step 5: Run the tests above:** PASS. Then check the reporter's clean build: delete
   `build/test-reporter/`, run `npm run build:test-reporter`, and confirm the one emitted file
   is `build/test-reporter/coverageReporter.js` (plus `reportFormat.js`), with nothing nested,

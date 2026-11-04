@@ -1143,9 +1143,10 @@ comes after C2; it is independent of C2a–C2d.
   `staticTypes.test.ts`. No allowlist: a finding is fixed in the code.
   - **What a credential read is — by declaration symbol, not by type or name.** A read whose
     symbol the checker resolves to one of the declared credential properties: `SapConfig`'s
-    `authType`, `jwtToken`, `refreshToken`, `password`, `username`'s credential twin fields
-    (the set read from `SapConfig`'s declaration at the step, each named in the guard by its
-    declaring interface and property), the stdio vocabulary's `AuthType`-typed `authType`,
+    `authType`, `jwtToken`, `refreshToken`, `password` and the other secret fields of its
+    declaration (read from `SapConfig`'s declaration at the step, each named in the guard by
+    its declaring interface and property; `username` is a setting, not one of them — the
+    owner's exception reads the responsible user from the settings), the stdio vocabulary's `AuthType`-typed `authType`,
     the connection's `authorizationToken`, the members of `IAuthProvider`; the environment
     key `SAP_JWT_TOKEN` and the header key `x-sap-jwt-token` read by key; and any value
     declared with a union drawn only from the auth-type literals (`'basic' | 'jwt'`, as

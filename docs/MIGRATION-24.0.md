@@ -182,8 +182,8 @@ and change the program's type after it is created.
   (`SAP_LANGUAGE`, or `x-sap-language` over HTTP) is sent the same way; with neither, the create
   states no language and SAP uses its logon language. 23.x wrote `EN` into the body when nothing
   was given, and SAP took the logon language anyway. The language must be one the system
-  offers for logon: on an on-premise system without it, a create sent with `DE` answered and created
-  in `EN`, and a logon in `ES` was refused as not an installed language (measured).
+  offers for logon: on an on-premise system offering only `EN` for logon, a create sent with `DE` was
+  created in `EN`, and a logon in `ES` was refused as not an installed language (measured).
   **What you do:** to create in a given language, pass `master_language` or state the session's;
   a caller that counted on `EN` passes `master_language: 'EN'`.
 - **A function module's validation takes a description.** `HandlerValidate` `FUNCTION_MODULE`

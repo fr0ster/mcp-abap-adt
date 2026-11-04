@@ -711,6 +711,37 @@ and live specifics.
     - HTTP: `'ready when the listening line arrives, without a timer'` and `'an exit before
       the listening line rejects at once'`;
     - `'stop waits for the exit event and sets no timer'`.
+- [ ] **Step 4c: The hard-mode launcher starts the real binaries (a defect fixed here).**
+  Today `hardMode.ts` (around line 84) runs `server/dist/launcher.js`, which only exports
+  functions, and both of its branches pass the removed `--transport` flag; HTTP needs its own
+  binary and header credentials. So hard mode cannot start a server at all — a defect of the
+  test code, fixed in this step, with the failing real-binary checks below written first.
+  - **Entrypoints, from the packages' `bin` fields** (read at the step, never guessed): stdio
+    `mcp-abap-adt` → `server/bin/mcp-abap-adt.js` (`@mcp-abap-adt/core`); Streamable HTTP
+    `mcp-abap-adt-http` → `http/bin/mcp-abap-adt-http.js` (`@mcp-abap-adt/http`); SSE
+    `mcp-abap-adt-sse` → `sse/bin/mcp-abap-adt-sse.js`. Each runs from the build
+    (`npm run build` first), started with `process.execPath` and the bin path.
+  - **Arguments:** only what each binary's own help (`--help`) and its launcher's option
+    parser accept, read at the step and listed in `hardMode.ts`' doc comment; no
+    `--transport`.
+  - **Credentials, as the server's own code and docs define them:** stdio from its
+    destination configuration — `--env=<name>` / `--env-path=<file>` / `--mcp=<destination>`
+    with `--auth-broker-path`, as `hardMode.ts` already maps the test config; HTTP from each
+    request's headers (`x-sap-*`, the destination's user and password or `x-sap-jwt-token`,
+    as `docs/` and the HTTP server's header-credential code state), read by the test from the
+    session file at run time. No secret is written into a committed file or a command line
+    the logs keep.
+  - **Real-binary checks** (`src/__tests__/unit/coverage/hardModeBinaries.test.ts`, against
+    `adtStandIn`, beside the fake-child tests):
+    - stdio: `'the stdio binary answers initialize and a tool call reaches the stand'` — the
+      `initialize` answer arrives on stdout, then a `GetAdtTypes` call's request is recorded
+      by the stand with the destination's credential;
+    - HTTP: `'the HTTP binary prints its listening line and an authenticated request reaches
+      the stand'` — the `[StreamableHttpServer] Server started on <host>:<port>` line on
+      stderr, then a tool call with the header credentials reaches the stand carrying them.
+    - Each child is stopped by `SIGTERM` and its exit awaited (Step 4b).
+  - A CHANGELOG line is not needed: the launcher is test code and changes no user-visible
+    behaviour.
 - [ ] **Step 5: Run the tests above:** PASS. Then check the reporter's clean build: delete
   `build/test-reporter/`, run `npm run build:test-reporter`, and confirm the one emitted file
   is `build/test-reporter/coverageReporter.js` (plus `reportFormat.js`), with nothing nested,

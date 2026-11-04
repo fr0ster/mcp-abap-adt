@@ -9,7 +9,8 @@
  * - `any` — the `any` type, anywhere a type is written;
  * - `!` — a non-null assertion (`x!`) and a definite-assignment assertion
  *   (`let x!: T`, `field!: T`);
- * - `@ts-expect-error`, `@ts-expect-error`, `biome-ignore` — in any comment.
+ * - the `ts-ignore`, `ts-expect-error` and `ts-nocheck` directives and
+ *   `biome-ignore` — in any comment.
  */
 
 import * as fs from 'node:fs';
@@ -23,6 +24,7 @@ export type EscapeRule =
   | '!'
   | '@ts-ignore'
   | '@ts-expect-error'
+  | '@ts-nocheck'
   | 'biome-ignore';
 
 export interface Escape {
@@ -33,7 +35,12 @@ export interface Escape {
   readonly text: string;
 }
 
-const DIRECTIVES = ['@ts-ignore', '@ts-expect-error', 'biome-ignore'] as const;
+const DIRECTIVES = [
+  '@ts-ignore',
+  '@ts-expect-error',
+  '@ts-nocheck',
+  'biome-ignore',
+] as const;
 
 const SOURCE_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs'];
 const TEST_SUFFIXES = ['.d.ts', '.test.ts', '.spec.ts', '.typecheck.ts'];

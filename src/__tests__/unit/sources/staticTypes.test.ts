@@ -1,8 +1,9 @@
 /**
  * Production code is checked by the compiler, not by the author's word: no
  * type assertion but `as const`, no `any`, no non-null or definite-assignment
- * `!`, no `@ts-expect-error`, `@ts-expect-error` or `biome-ignore`. The scan
- * (`helpers/typeEscapeScan.ts`) reads the syntax tree of every production
+ * `!`, no `ts-ignore`, `ts-expect-error` or `ts-nocheck` directive, no
+ * `biome-ignore`.
+ * The scan (`helpers/typeEscapeScan.ts`) reads the syntax tree of every production
  * source — the root `src`, `scripts`, and every package's `src`; tests,
  * fixtures and typechecks are outside it. It is what makes `as unknown as`
  * fail the build, since `tsc` accepts it; Biome's three rules
@@ -182,6 +183,7 @@ describe('the scan refuses each escape, and only those', () => {
     ['definiteAssignment', '!'],
     ['tsIgnore', '@ts-ignore'],
     ['tsExpectError', '@ts-expect-error'],
+    ['tsNocheck', '@ts-nocheck'],
     ['biomeIgnore', 'biome-ignore'],
   ];
 
@@ -197,6 +199,7 @@ describe('the scan refuses each escape, and only those', () => {
       '!',
       '@ts-ignore',
       '@ts-expect-error',
+      '@ts-nocheck',
       'biome-ignore',
     ];
     expect(new Set(REFUSED.map(([, rule]) => rule))).toEqual(new Set(rules));

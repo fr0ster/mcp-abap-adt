@@ -137,8 +137,8 @@ binds, and each step names the spec section it carries out. Every step ends gree
 
 The stage runs after step 17 and before step 18. It is written as tasks C1–C16, each with its
 own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
-and open items") and applied in the tasks; the two items still open there wait for him before
-the task that needs them.
+and open items") and applied in the tasks; the one item still open there (O4 / O5) waits for him before the
+task that needs it.
 
 **Global constraints.** Every task's requirements include these:
 - **Commands.** npm scripts only. Never `npx`, `npm exec`, `node_modules/.bin` or `ts-node`.
@@ -162,7 +162,7 @@ the task that needs them.
 - **Committed text.** Tool descriptions stay functional. No system name, system id, transport
   number or user name in a committed file.
 - **Every task ends green,** except the guard test of C1. It is red from C1 until C16 lands and
-  lists the keys still missing, unless the owner chooses otherwise in O1 (still open). Green means:
+  lists the keys still missing (O1, decided). Each family is pushed as it lands. Green means:
   - build, `npm run test:check` and the root `npm test`;
   - every package's `lint:check` and `test:check`.
 - **Expected request literals** come from running the code on the stand-in. They are reviewed
@@ -208,7 +208,8 @@ and live specifics.
   `npm run test:coverage-family -- <live file> > <log outside the repository> 2>&1` on the
   on-premise system, then on the cloud system. The exit status is 0, the family's keys are
   reported passed, and nothing the test did not create is touched.
-- [ ] **Commit** the family as `test(coverage): <family> pinned and live`.
+- [ ] **Commit** the family as `test(coverage): <family> pinned and live`. Push it at once (O1): the
+  guard stays red until C16.
 
 ### C1. The guard ledger (red)
 
@@ -927,6 +928,8 @@ This covers the four compact handlers no test runs today.
 ### Owner's decisions and open items
 
 **Decided by the owner (binding), applied in the tasks named:**
+- **O1 — the guard stays red.** It is red from C1 until C16 turns it green: no list of
+  uncovered keys, no `test.failing`. Each family is pushed as it lands (C1, every family task).
 - **O2 — re-pin by literal: yes.** Every key is pinned in `pinCases` by literal; the parity
   tests (`createSingleCall`, `metadataReads`, `lowToCompact`, …) stay. Applied from C3 on.
 - **O3 — versions: yes.** Read-only objects that already have versions, named in
@@ -976,15 +979,6 @@ This covers the four compact handlers no test runs today.
   | `debugger_handlers` | `second_user_env` (a second user's session file) for the other-user case |
 
 **Still open (not decided):**
-- **O1. The guard is red during C1–C16.** Options before the owner:
-  - keep it red: CI on the PR is red until C16;
-  - `test.failing` until C16: CI green, the missing-key list hidden;
-  - **proposed by the controller:** a committed shrink-only list of uncovered keys
-    (`tests/fixtures/tools/coverage-uncovered.json`). The guard passes when the uncovered keys
-    are exactly that list; a key covered but still listed fails (the list must shrink in the
-    same commit), and a key added to the list fails (it may never grow). C16 deletes the file
-    and the guard then requires every key. CI stays green and every family shows its progress
-    in the diff.
 - **O4 / O5. Transport requests — pending the owner's answer.** The owner said it is better to
   use one request at all. How the `CreateTransport` / `CreateTransportTask` (and
   `HandlerCreate#TRANSPORT`, `HandlerTransportCreate`) live cases fit that, on premise and on
@@ -993,8 +987,8 @@ This covers the four compact handlers no test runs today.
 
 ### Where each decision is needed first
 
-O1 → C1. O4 / O5 (pending) → C6's `HandlerCreate#TRANSPORT` live case, then C13. The decided
-items apply as named above.
+O4 / O5 (pending) → C6's `HandlerCreate#TRANSPORT` live case, then C13. The decided items
+apply as named above.
 
 ## Live runs and release
 

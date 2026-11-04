@@ -5,8 +5,10 @@
  * requires it, a live file that calls it with `liveCall` — and nothing else
  * is in the ledger, and no pin or live call stands outside it.
  *
- * Red by the owner's decision (O1) until the last coverage family lands: it
- * lists every key still missing.
+ * A ratchet by the owner's decision (O1): the keys still without a ledger
+ * row are exactly the keys `coverage-debt.json` lists. A key missing but not
+ * listed fails, and so does a listed key that is covered or no longer
+ * served: the list only shrinks, to empty when the last family lands.
  *
  * The served list is read as a client reads it (`servedTools()`), and is
  * first compared with `listed-schemas.json`: an empty or partial list cannot
@@ -17,7 +19,8 @@
  *
  * Each check is load-bearing: one fixture per refusal under
  * `__fixtures__/coverage/` is refused by its own check alone, and `clean`
- * by none.
+ * by none; under `__fixtures__/coverage-debt/` likewise for the ratchet,
+ * `equal` refused by none.
  */
 
 import * as fs from 'node:fs';
@@ -39,6 +42,7 @@ import {
 import {
   type Check,
   type CheckInput,
+  checkDebt,
   checkLedger,
   type Finding,
   repoReader,
@@ -54,7 +58,9 @@ const LEDGER = path.join(
   'tools',
   'coverage-ledger.json',
 );
+const DEBT = path.join(__dirname, 'coverage-debt.json');
 const FIXTURES = path.join(__dirname, '__fixtures__', 'coverage');
+const DEBT_FIXTURES = path.join(__dirname, '__fixtures__', 'coverage-debt');
 const INTEGRATION = path.join(REPO, 'src', '__tests__', 'integration');
 
 const readJson = (file: string): unknown =>
@@ -122,6 +128,7 @@ describe('the coverage ledger guard', () => {
   let served: readonly ServedTool[] = [];
   let discovered = new Set<string>();
   let findings: Finding[] = [];
+  let debtFindings: Finding[] = [];
 
   beforeAll(async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -136,6 +143,7 @@ describe('the coverage ledger guard', () => {
       read: repoReader(REPO),
     };
     findings = checkLedger(input);
+    debtFindings = checkDebt(input, readJson(DEBT));
   });
 
   afterAll(() => {
@@ -164,8 +172,16 @@ describe('the coverage ledger guard', () => {
     expect(of(findings, 'ledger-shape')).toEqual([]);
   });
 
-  it('every required key has a ledger row', () => {
-    expect(of(findings, 'missing-row')).toEqual([]);
+  it('the required keys without a ledger row are exactly coverage-debt.json: add the tests, or delete the listed keys from it', () => {
+    expect(
+      of(
+        debtFindings,
+        'debt-shape',
+        'debt-new',
+        'debt-covered',
+        'debt-removed',
+      ),
+    ).toEqual([]);
   });
 
   it('every ledger row is a required key', () => {
@@ -300,20 +316,23 @@ describe('the coverage ledger guard', () => {
   });
 });
 
-/** A fixture case: the base inputs with the case's own overrides. */
-function fixtureInput(name: string): { input: CheckInput; expect: Check[] } {
+/** A fixture case under `dir`: the base inputs with the case's own overrides. */
+function fixtureInput(
+  name: string,
+  dir: string = FIXTURES,
+): { input: CheckInput; expect: Check[]; spec: unknown } {
   const base = readJson(path.join(FIXTURES, 'base', 'base.json'));
-  const spec = readJson(path.join(FIXTURES, name, 'case.json'));
+  const spec = readJson(path.join(dir, name, 'case.json'));
   const pick = (key: string): unknown => member(spec, key) ?? member(base, key);
   const files = new Map<string, string>();
-  for (const [dir, source] of [
-    ['base', member(base, 'files')],
-    [name, member(spec, 'files')],
+  for (const [from, source] of [
+    [path.join(FIXTURES, 'base'), member(base, 'files')],
+    [path.join(dir, name), member(spec, 'files')],
   ] as const) {
     if (typeof source !== 'object' || source === null) continue;
     for (const [repo, file] of Object.entries(source)) {
       if (typeof file === 'string') {
-        files.set(repo, path.join(FIXTURES, dir, file));
+        files.set(repo, path.join(from, file));
       }
     }
   }
@@ -357,6 +376,7 @@ function fixtureInput(name: string): { input: CheckInput; expect: Check[] } {
       },
     },
     expect: typeof expected === 'string' ? [checkNamed(expected)] : [],
+    spec,
   };
 }
 
@@ -393,6 +413,10 @@ function checkNamed(name: string): Check {
     'delete-wrong-check',
     'delete-check-other-object',
     'delete-check-wrong-tool',
+    'debt-shape',
+    'debt-new',
+    'debt-covered',
+    'debt-removed',
   ];
   const found = known.find((check) => check === name);
   if (found === undefined) throw new Error(`no check is named ${name}`);
@@ -419,6 +443,37 @@ describe('each refusal fixture is refused by its own check alone', () => {
       checks: expected,
     });
     if (expected.length > 0) expect(found.length).toBeGreaterThan(0);
+  });
+});
+
+const DEBT_CASES = fs
+  .readdirSync(DEBT_FIXTURES, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+describe('each ratchet fixture is refused by its own check alone', () => {
+  it('there is an equal fixture and one per way the debt can drift', () => {
+    expect(DEBT_CASES).toEqual([
+      'covered-listed',
+      'equal',
+      'new-missing',
+      'removed',
+      'repeated',
+    ]);
+  });
+
+  it.each(DEBT_CASES)('%s', (name) => {
+    const { input, expect: expected, spec } = fixtureInput(name, DEBT_FIXTURES);
+    // The ledger checks find nothing but the keys without a row.
+    expect(
+      codes(checkLedger(input)).filter((check) => check !== 'missing-row'),
+    ).toEqual([]);
+    const found = checkDebt(input, member(spec, 'debt'));
+    expect({ name, checks: [...new Set(codes(found))] }).toEqual({
+      name,
+      checks: expected,
+    });
   });
 });
 

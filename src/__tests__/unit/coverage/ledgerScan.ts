@@ -716,7 +716,18 @@ export type Check =
   | 'live-not-integration'
   | 'live-missing'
   | 'orphan'
+  | DebtCheck
   | Problem;
+
+/**
+ * What the ratchet over `coverage-debt.json` reports: the keys without a
+ * ledger row must be exactly the keys the debt lists.
+ */
+export type DebtCheck =
+  | 'debt-shape'
+  | 'debt-new'
+  | 'debt-covered'
+  | 'debt-removed';
 
 export interface Finding {
   readonly check: Check;
@@ -961,6 +972,73 @@ export function checkLedger(input: CheckInput): Finding[] {
           detail: `${ref.file}:${ref.line} ${ref.key}`,
         });
       }
+    }
+  }
+  return findings;
+}
+
+/**
+ * The ratchet (owner, O1): the required keys without a ledger row must be
+ * exactly the keys `coverage-debt.json` lists — a sorted list of distinct
+ * keys. A key missing but not listed is new uncovered surface; a key listed
+ * but covered, or no longer required at all, must leave the list. `[]` when
+ * the ledger is not a ledger: `ledger-shape` reports that.
+ */
+export function checkDebt(
+  input: Pick<CheckInput, 'served' | 'ledger'>,
+  debt: unknown,
+): Finding[] {
+  if (!Array.isArray(debt)) {
+    return [
+      {
+        check: 'debt-shape',
+        detail: 'coverage-debt.json is a sorted list of distinct coverage keys',
+      },
+    ];
+  }
+  const values: readonly unknown[] = debt;
+  const findings: Finding[] = [];
+  const listed: CoverageKey[] = [];
+  for (const [at, each] of values.entries()) {
+    if (typeof each !== 'string') {
+      findings.push({
+        check: 'debt-shape',
+        detail: `coverage-debt.json[${at}] is not a key: the list holds coverage keys only`,
+      });
+      continue;
+    }
+    const before = listed[listed.length - 1];
+    if (before !== undefined && before >= each) {
+      findings.push({
+        check: 'debt-shape',
+        detail: `coverage-debt.json: ${each} follows ${before}: the list is sorted and each key appears once`,
+      });
+    }
+    listed.push(each);
+  }
+  const rows = ledgerRows(input.ledger);
+  if (typeof rows === 'string') return findings;
+  const required = requiredKeys(input.served);
+  const inDebt = new Set(listed);
+  for (const key of required.keys()) {
+    if (!rows.has(key) && !inDebt.has(key)) {
+      findings.push({
+        check: 'debt-new',
+        detail: `${key}: no ledger row and not in coverage-debt.json — add its unit and live tests and its ledger row`,
+      });
+    }
+  }
+  for (const key of inDebt) {
+    if (!required.has(key)) {
+      findings.push({
+        check: 'debt-removed',
+        detail: `${key}: no served tool requires it — delete it from coverage-debt.json`,
+      });
+    } else if (rows.has(key)) {
+      findings.push({
+        check: 'debt-covered',
+        detail: `${key}: has a ledger row — delete it from coverage-debt.json`,
+      });
     }
   }
   return findings;

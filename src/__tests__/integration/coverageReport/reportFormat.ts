@@ -51,9 +51,27 @@ const MARKER = 'credential-refused';
 
 let ownRunDirectory: string | undefined;
 
+/** Set beside the run's directory when `globalSetup` made it: `globalTeardown` removes it. */
+const OWNED_VARIABLE = 'MCP_ABAP_ADT_COVERAGE_RUN_OWNED';
+
 /** A new run directory under the OS temp directory, named per run. */
 export function newRunDirectory(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-coverage-'));
+}
+
+/** Makes the run's directory and names it for the run, owned by the run. */
+export function startRunDirectory(): void {
+  process.env[RUN_VARIABLE] = newRunDirectory();
+  process.env[OWNED_VARIABLE] = '1';
+}
+
+/** Removes the run's directory when the run made it (`startRunDirectory`). */
+export function removeOwnRunDirectory(): void {
+  const named = process.env[RUN_VARIABLE];
+  if (process.env[OWNED_VARIABLE] !== '1' || named === undefined) return;
+  fs.rmSync(named, { recursive: true, force: true });
+  delete process.env[RUN_VARIABLE];
+  delete process.env[OWNED_VARIABLE];
 }
 
 /** Where this run's files live. */
@@ -63,7 +81,14 @@ export function runDirectory(): string {
     fs.mkdirSync(named, { recursive: true });
     return named;
   }
-  ownRunDirectory ??= newRunDirectory();
+  if (ownRunDirectory === undefined) {
+    const made = newRunDirectory();
+    // This process's own directory goes when the process ends.
+    process.once('exit', () => {
+      fs.rmSync(made, { recursive: true, force: true });
+    });
+    ownRunDirectory = made;
+  }
   return ownRunDirectory;
 }
 

@@ -63,7 +63,6 @@ import {
 import { getTestDestination } from './authHelpers';
 import { configuredSystemKind } from './configHelpers';
 import { NO_KIND_STATED } from './configuredSystemKind';
-import { type GuardedLaunch, launchGuarded } from './launchedServers';
 import { endTestConnection, trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
 import {
@@ -76,6 +75,7 @@ import {
 import { testConfigPathFromEnv } from './testConfigPath';
 import {
   createHardModeClient,
+  type HardModeClient,
   type HardModeSet,
   isHardModeEnabled,
 } from './testers/hardMode';
@@ -242,23 +242,20 @@ function setOf(tool: string): HardModeSet {
 /**
  * Hard mode: the MCP tool of a launched server — the full binary for a full
  * tool, the compact one for a compact tool, each launched once its first
- * tool is called, after the parent logged on (`launchGuarded`); the
- * connection is the test's own.
+ * tool is called, guarded (`createHardModeClient`: the parent logs on before
+ * the launch and reads every answer); the connection is the test's own.
+ * Closing stops every launched child, also when another launch failed.
  */
 function hardRunner(
   system: SystemKind,
   user: string,
   connection: IAbapConnection,
-  logOn: () => Promise<void>,
 ): LiveRunner {
-  const launches = new Map<HardModeSet, Promise<GuardedLaunch>>();
-  const launchOf = (set: HardModeSet): Promise<GuardedLaunch> => {
+  const launches = new Map<HardModeSet, Promise<HardModeClient>>();
+  const launchOf = (set: HardModeSet): Promise<HardModeClient> => {
     const known = launches.get(set);
     if (known !== undefined) return known;
-    const launched = launchGuarded({
-      logOn,
-      launch: () => createHardModeClient(set),
-    });
+    const launched = createHardModeClient(set);
     launches.set(set, launched);
     return launched;
   };
@@ -269,8 +266,20 @@ function hardRunner(
     call: async (tool, args) =>
       liveAnswerOf(await (await launchOf(setOf(tool))).call(tool, args)),
     close: async () => {
-      for (const launched of launches.values()) {
-        await (await launched).close();
+      const closed = await Promise.allSettled(
+        [...launches.values()].map(async (launched) =>
+          (await launched).close(),
+        ),
+      );
+      launches.clear();
+      const failed = closed.flatMap((outcome) =>
+        outcome.status === 'rejected' ? [outcome.reason] : [],
+      );
+      if (failed.length > 0) {
+        throw new AggregateError(
+          failed,
+          `${failed.length} hard-mode server(s) failed to launch or stop`,
+        );
       }
     },
   };
@@ -302,15 +311,7 @@ async function liveRunner(system: SystemKind): Promise<LiveRunner> {
   // integration testers state them.
   await primeSystemContext(connection);
   const user = destination.settings.username ?? '';
-  if (isHardModeEnabled()) {
-    // Before each launch, a logon of the parent's own with the same credentials.
-    const logOn = async (): Promise<void> => {
-      const own = open();
-      await own.connect();
-      await endTestConnection(own);
-    };
-    return hardRunner(system, user, connection, logOn);
-  }
+  if (isHardModeEnabled()) return hardRunner(system, user, connection);
   // The in-process server uses the guarded connection as given; its fresh
   // connections are guarded siblings.
   return softRunner({

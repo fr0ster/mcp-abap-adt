@@ -43,7 +43,10 @@ import { createTestLogger } from '../../helpers/loggerHelpers';
 import { trackConnection } from '../../helpers/openConnections';
 import { createDiagnosticsTracker } from '../../helpers/persistenceHelpers';
 import { primeSystemContext } from '../../helpers/primeSystemContext';
-import { guardedTestConnection } from '../../helpers/refusalGuard';
+import {
+  type GuardedConnection,
+  guardedTestConnection,
+} from '../../helpers/refusalGuard';
 import { DEBUG_TESTS, debugLog, delay } from '../../helpers/testHelpers';
 
 // Load environment variables
@@ -85,7 +88,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
 
       // Create a separate connection for this test (not using getManagedConnection)
-      let connection: IAbapConnection | null = null;
+      let connection: GuardedConnection | null = null;
       let client: IServerAdtClient | null = null;
       let diagnosticsTracker: ReturnType<
         typeof createDiagnosticsTracker
@@ -126,33 +129,10 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           }),
         );
 
-        // Check refresh token availability before connecting
-        const connectionWithRefresh = connection as any;
-        if (
-          connectionWithRefresh.getConfig &&
-          connectionWithRefresh.canRefreshToken
-        ) {
-          const connConfig = connectionWithRefresh.getConfig();
-          const canRefresh = connectionWithRefresh.canRefreshToken();
-          if (process.env.DEBUG_TESTS === 'true') {
-            testLogger?.debug(
-              `[DEBUG] Test connection - Connection refresh token check:`,
-              {
-                canRefresh,
-                hasRefreshToken: !!connConfig?.refreshToken,
-                hasUaaUrl: !!connConfig?.uaaUrl,
-                hasUaaClientId: !!connConfig?.uaaClientId,
-                hasUaaClientSecret: !!connConfig?.uaaClientSecret,
-              },
-            );
-          }
-        }
-
-        // connect() is not part of IAbapConnection interface, use type assertion
-        const connectionAny = connection as any;
-        if (connectionAny.connect) {
-          await connectionAny.connect();
-        }
+        // connection 19 has no canRefreshToken() or getSessionState(): the
+        // credential renews inside the connection, and its session is read
+        // from its cookies.
+        await connection.connect();
         // This test builds its own connection, so it states the system context
         // itself — the responsible person and master system a create sends —
         // instead of inheriting whatever an auth-broker setup left in the process.
@@ -162,20 +142,15 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         isCloud = getSystemType() === 'cloud';
 
         // Persist session snapshot for diagnostics
-        const sessionState = (connection as any).getSessionState?.();
-        if (sessionState) {
-          const pseudoSession = {
-            session_id: `crud_direct_${Date.now()}`,
-            session_state: {
-              cookies: sessionState.cookies || '',
-              csrf_token: sessionState.csrfToken || '',
-              cookie_store: sessionState.cookieStore || {},
-            },
-          };
+        const cookies = connection.sessionCookies();
+        if (cookies) {
           diagnosticsTracker = createDiagnosticsTracker(
             'class_crud_direct',
             testCase,
-            pseudoSession as any,
+            {
+              session_id: `crud_direct_${Date.now()}`,
+              session_state: { cookies, csrf_token: '', cookie_store: {} },
+            },
             {
               handler: 'create_class_direct',
               object_name: 'unknown',

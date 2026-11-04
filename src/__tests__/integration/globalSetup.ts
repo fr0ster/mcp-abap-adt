@@ -1,12 +1,15 @@
 /**
  * Jest Global Setup for Integration Tests
  *
- * Runs ONCE before all test suites to ensure a valid session exists.
+ * Runs ONCE before all test suites to ensure a valid session exists — in a
+ * live run only. The running npm script decides (`npm_lifecycle_event`
+ * against `LIVE_SCRIPTS`): a unit run (`npm test`) returns at once, with no
+ * realm check, no logon and no run directory.
  *
  * 1. A family run (`npm run test:coverage-family -- <files>`) is refused
  *    unless every selected path is the exact repository path of an existing
  *    integration test file — before anything is read or sent.
- * 2. An integration run (`test:integration`, `test:coverage-family`) gets its
+ * 2. A live run gets its
  *    run directory under the OS temp directory (`MCP_ABAP_ADT_COVERAGE_RUN`):
  *    the call log, the run report and the refusal marker live there.
  * 3. Without a test config (tests/test-config.yaml, or MCP_TEST_CONFIG) it
@@ -38,12 +41,13 @@ import {
   destinationFailureWords,
   promptLogger,
 } from '@mcp-abap-adt/core/auth';
-import { newRunDirectory, RUN_VARIABLE } from './coverageReport/reportFormat';
+import { RUN_VARIABLE, startRunDirectory } from './coverageReport/reportFormat';
 import {
   configuredSystemKindOf,
   memberOf,
   sessionVariables,
 } from './helpers/configuredSystemKind';
+import { isLiveScript } from './helpers/liveScripts';
 import { endTestConnection } from './helpers/openConnections';
 import { restoreResolution } from './helpers/packageSources';
 import { realmCheck } from './helpers/realmCheck';
@@ -109,6 +113,8 @@ const textAt = (value: unknown, ...keys: string[]): string => {
 };
 
 async function setUp(globalConfig: SetupConfig): Promise<void> {
+  // A unit run does no live work at all.
+  if (!isLiveScript(process.env.npm_lifecycle_event)) return;
   const script = runScriptOf(process.env.npm_lifecycle_event);
   if (script === 'family') {
     refuseSelection(
@@ -116,9 +122,7 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
       globalConfig.rootDir,
     );
   }
-  if (script !== undefined && (process.env[RUN_VARIABLE] ?? '') === '') {
-    process.env[RUN_VARIABLE] = newRunDirectory();
-  }
+  if ((process.env[RUN_VARIABLE] ?? '') === '') startRunDirectory();
 
   const config = loadRunConfig();
   if (config === undefined || config === null) {

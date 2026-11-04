@@ -2,6 +2,12 @@
  * Hard mode: the tests reach a real server as an MCP client — a binary this
  * repository builds, started as a child, or a server already running.
  *
+ * **Every launch is guarded** (plan C2 Step 4a, `launchedServers.ts`): the
+ * parent's own guarded connection with the same credentials logs on right
+ * before the launch, and every answer of the server is read for a credential
+ * refusal. The only way to a server is a guarded launch (`launchStdio`,
+ * `launchHttp`, `createHardModeClient`); the unguarded start is not exported.
+ *
  * **The binaries, from the packages' `bin` fields** (`binaryPath`), started
  * from the build (`npm run build` first) with `process.execPath`:
  * - full set: stdio `mcp-abap-adt` (`server/`), Streamable HTTP
@@ -11,7 +17,8 @@
  * A checkout has none of its own packages installed by name, so a child
  * resolves its siblings through `NODE_PATH` (`siblingModules`): a directory
  * of this process under the OS temp directory whose `@mcp-abap-adt/<name>`
- * entries point at this repository's package directories.
+ * entries point at this repository's package directories; it is removed
+ * when the process exits.
  *
  * **Arguments**, as each binary's `--help` and its launcher's option parser
  * accept them (no `--transport`: a binary is its transport):
@@ -27,10 +34,15 @@
  *   `x-sap-jwt-token`), read from the session file at run time — never
  *   from a committed file or a command line.
  *
- * **Readiness**, raced against the child's exit; no polling, no timer —
- * Jest's test timeout is the only deadline:
- * - stdio: the answer to the MCP `initialize` the client sends over the
- *   child's stdin (`stdioReady`);
+ * **No timer anywhere.** The MCP SDK's `Client` arms a request timer on
+ * every request, so the tests speak JSON-RPC over the SDK's transports
+ * themselves (`McpSession`): a request is answered by its matching
+ * response, or ends with the transport's close.
+ *
+ * **Readiness**, raced against the child's exit — Jest's test timeout is the
+ * only deadline:
+ * - stdio: the answer to the MCP `initialize` sent over the child's stdin
+ *   (`stdioReady`);
  * - Streamable HTTP: the listening line the server writes on stderr
  *   (`httpReady`).
  * An exit before readiness rejects at once with the exit code and the
@@ -43,7 +55,6 @@ import * as fs from 'node:fs';
 import { createServer } from 'node:net';
 import * as os from 'node:os';
 import path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -52,7 +63,18 @@ import {
   serializeMessage,
 } from '@modelcontextprotocol/sdk/shared/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolResultSchema,
+  InitializeResultSchema,
+  isJSONRPCErrorResponse,
+  isJSONRPCResultResponse,
+  type JSONRPCMessage,
+  LATEST_PROTOCOL_VERSION,
+  ListToolsResultSchema,
+  type Tool,
+} from '@modelcontextprotocol/sdk/types.js';
+import type { McpResult } from '../../../../lib/answer';
+import { getTestDestination } from '../authHelpers';
 import { loadTestConfig, testAuthBrokerPath } from '../configHelpers';
 import {
   type ConfiguredSystemKind,
@@ -61,6 +83,9 @@ import {
   NO_KIND_STATED,
   sessionVariables,
 } from '../configuredSystemKind';
+import { type LaunchedServer, launchGuarded } from '../launchedServers';
+import { endTestConnection } from '../openConnections';
+import { guardedTestConnection } from '../refusalGuard';
 
 /** The repository root. */
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
@@ -68,10 +93,8 @@ const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
 export interface HardModeConfig {
   enabled: boolean;
   transport: 'http' | 'sse' | 'stdio';
-  http_url?: string;
-  sse_url?: string;
-  // stdio only: server launch parameters
-  stdio_command?: string;
+  http_url: string;
+  sse_url: string;
   mcp_destination?: string; // --mcp=<dest> (auth-broker / service key)
   env_destination?: string; // --env=<dest> (session .env from default folder)
   env_path?: string; // --env-path=<path> (explicit .env file)
@@ -82,8 +105,11 @@ export interface HardModeConfig {
    * host, its credential in the headers read from the destination's session
    * file, instead of connecting to a server already running at `http_url`.
    */
-  launch_http?: boolean;
+  launch_http: boolean;
 }
+
+/** The server a launched or running hard-mode server is, to the tests. */
+export type HardModeClient = LaunchedServer;
 
 function toPascalCase(value: string): string {
   return value
@@ -93,33 +119,42 @@ function toPascalCase(value: string): string {
     .join('');
 }
 
-export function getHardModeConfig(cfg: any = loadTestConfig()): HardModeConfig {
+/** A parsed document's non-empty string member. */
+function textAt(value: unknown, key: string): string | undefined {
+  const at = memberOf(value, key);
+  return typeof at === 'string' && at.trim() !== '' ? at : undefined;
+}
+
+/** The test config's hard-mode section (parsed YAML, read by shape). */
+export function getHardModeConfig(
+  cfg: unknown = loadTestConfig(),
+): HardModeConfig {
   const hard =
-    cfg?.environment?.integration_hard_mode || cfg?.integration_hard_mode || {};
-
-  const transport = String(hard.transport || 'http').toLowerCase();
-  const normalizedTransport =
-    transport === 'sse' || transport === 'stdio' ? transport : 'http';
-
-  // Build headers map from YAML (supports arbitrary x-sap-* / x-mcp-* headers)
+    memberOf(memberOf(cfg, 'environment'), 'integration_hard_mode') ??
+    memberOf(cfg, 'integration_hard_mode');
+  const transport = (textAt(hard, 'transport') ?? 'http').toLowerCase();
   const headers: Record<string, string> = {};
-  if (hard.headers && typeof hard.headers === 'object') {
-    for (const [k, v] of Object.entries(hard.headers)) {
-      if (typeof v === 'string') headers[k] = v;
+  const given = memberOf(hard, 'headers');
+  if (typeof given === 'object' && given !== null) {
+    for (const [name, value] of Object.entries(given)) {
+      if (typeof value === 'string') headers[name] = value;
     }
   }
-
+  const mcpDestination = textAt(hard, 'mcp_destination');
+  const envDestination = textAt(hard, 'env_destination');
+  const envPath = textAt(hard, 'env_path');
   return {
-    enabled: hard.enabled === true,
-    transport: normalizedTransport,
-    http_url: hard.http_url || 'http://127.0.0.1:3000/mcp/stream/http',
-    sse_url: hard.sse_url || 'http://127.0.0.1:3001/sse',
-    stdio_command: hard.stdio_command || process.execPath,
-    mcp_destination: hard.mcp_destination,
-    env_destination: hard.env_destination,
-    env_path: hard.env_path,
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
-    launch_http: hard.launch_http === true,
+    enabled: memberOf(hard, 'enabled') === true,
+    transport:
+      transport === 'sse' || transport === 'stdio' ? transport : 'http',
+    http_url:
+      textAt(hard, 'http_url') ?? 'http://127.0.0.1:3000/mcp/stream/http',
+    sse_url: textAt(hard, 'sse_url') ?? 'http://127.0.0.1:3001/sse',
+    ...(mcpDestination !== undefined && { mcp_destination: mcpDestination }),
+    ...(envDestination !== undefined && { env_destination: envDestination }),
+    ...(envPath !== undefined && { env_path: envPath }),
+    ...(Object.keys(headers).length > 0 && { headers }),
+    launch_http: memberOf(hard, 'launch_http') === true,
   };
 }
 
@@ -189,11 +224,14 @@ let siblings: string | undefined;
  * A directory for a child's `NODE_PATH`: `@mcp-abap-adt/<name>` → this
  * repository's package of that name, so a binary run from the build resolves
  * its siblings as an installed release would. Made once per process, under
- * the OS temp directory.
+ * the OS temp directory, and removed when the process exits.
  */
 export function siblingModules(): string {
   if (siblings !== undefined) return siblings;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-siblings-'));
+  process.once('exit', () => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
   fs.mkdirSync(path.join(root, '@mcp-abap-adt'));
   for (const dir of PACKAGE_DIRS) {
     const name = memberOf(manifestOf(dir), 'name');
@@ -231,6 +269,116 @@ export function childEnvironment(): Record<string, string> {
       ? `${siblingModules()}${path.delimiter}${inherited}`
       : siblingModules();
   return env;
+}
+
+// ---------------------------------------------------------------------------
+// JSON-RPC over a transport, with no timer
+
+/**
+ * An MCP session spoken over one of the SDK's transports, with no timer: a
+ * request resolves with its matching response and rejects with its error
+ * answer, or when the transport closes.
+ */
+export class McpSession {
+  private next = 1;
+  private readonly pending = new Map<
+    number,
+    { resolve: (result: unknown) => void; reject: (error: Error) => void }
+  >();
+  private closed: Error | undefined;
+  private names: Set<string> = new Set();
+
+  constructor(private readonly transport: Transport) {
+    transport.onmessage = (message: JSONRPCMessage) => {
+      if (isJSONRPCResultResponse(message)) {
+        const waiting = this.take(message.id);
+        waiting?.resolve(message.result);
+      } else if (isJSONRPCErrorResponse(message)) {
+        const waiting =
+          message.id === undefined ? undefined : this.take(message.id);
+        waiting?.reject(
+          new Error(`${message.error.code}: ${message.error.message}`),
+        );
+      }
+    };
+    transport.onclose = () => {
+      this.closed = new Error('the server closed the session');
+      for (const waiting of this.pending.values()) waiting.reject(this.closed);
+      this.pending.clear();
+    };
+  }
+
+  private take(id: string | number) {
+    if (typeof id !== 'number') return undefined;
+    const waiting = this.pending.get(id);
+    this.pending.delete(id);
+    return waiting;
+  }
+
+  /** Sends `method` and resolves with its result. */
+  async request(
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<unknown> {
+    if (this.closed) throw this.closed;
+    const id = this.next++;
+    const answered = new Promise<unknown>((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+    });
+    await this.transport.send({ jsonrpc: '2.0', id, method, params });
+    return answered;
+  }
+
+  /** Starts the transport and completes the MCP handshake. */
+  async initialize(): Promise<void> {
+    await this.transport.start();
+    const result = InitializeResultSchema.parse(
+      await this.request('initialize', {
+        protocolVersion: LATEST_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: { name: 'integration-hard-tester', version: '1.0.0' },
+      }),
+    );
+    this.transport.setProtocolVersion?.(result.protocolVersion);
+    await this.transport.send({
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+    });
+  }
+
+  async listTools(): Promise<Tool[]> {
+    const { tools } = ListToolsResultSchema.parse(
+      await this.request('tools/list', {}),
+    );
+    this.names = new Set(tools.map((tool) => tool.name));
+    return tools;
+  }
+
+  /** The tool names the last `listTools` answered. */
+  toolNames(): ReadonlySet<string> {
+    return this.names;
+  }
+
+  async callTool(
+    name: string,
+    args: Readonly<Record<string, unknown>>,
+  ): Promise<McpResult> {
+    const result = CallToolResultSchema.parse(
+      await this.request('tools/call', { name, arguments: { ...args } }),
+    );
+    return {
+      isError: result.isError === true,
+      content: result.content.flatMap((item) =>
+        item.type === 'text'
+          ? [{ type: 'text' as const, text: item.text }]
+          : [],
+      ),
+    };
+  }
+
+  close(): Promise<void> {
+    return this.transport.close();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -331,15 +479,13 @@ class ChildStdioTransport implements Transport {
 }
 
 /**
- * Ready over stdio: `client` connected through the child's stdin and
- * stdout — the answer to its `initialize` has arrived — raced against the
- * child's exit.
+ * Ready over stdio: an MCP session over the child's stdin and stdout whose
+ * `initialize` has been answered, raced against the child's exit.
  */
-export async function stdioReady(child: Child, client: Client): Promise<void> {
-  await Promise.race([
-    client.connect(new ChildStdioTransport(child.process)),
-    child.exited,
-  ]);
+export async function stdioReady(child: Child): Promise<McpSession> {
+  const session = new McpSession(new ChildStdioTransport(child.process));
+  await Promise.race([session.initialize(), child.exited]);
+  return session;
 }
 
 /** The line the Streamable HTTP server writes once it listens. */
@@ -389,33 +535,22 @@ function freePort(): Promise<number> {
   });
 }
 
-/** A launched server, connected as an MCP client. */
-export interface Launched {
-  client: Client;
-  toolNames: Set<string>;
-  child: Child;
-  /** Closes the client, ends the child with `SIGTERM` and waits for its exit. */
-  close(): Promise<void>;
-}
-
-const newClient = (): Client =>
-  new Client(
-    { name: 'integration-hard-tester', version: '1.0.0' },
-    { capabilities: {} },
-  );
-
-async function listed(
-  client: Client,
-  child: Child,
-): Promise<Omit<Launched, 'client' | 'child'>> {
-  const tools = await client.listTools();
+/** A session and the child it speaks to, as a server the tests call. */
+async function served(
+  session: McpSession,
+  child: Child | undefined,
+): Promise<LaunchedServer> {
+  await session.listTools();
   return {
-    toolNames: new Set(tools.tools.map((t) => t.name)),
+    toolNames: session.toolNames(),
+    listTools: () => session.listTools(),
+    call: (tool, args) => session.callTool(tool, args),
+    child,
     close: async () => {
       try {
-        await child.stop();
+        await child?.stop();
       } finally {
-        await client.close();
+        await session.close();
       }
     },
   };
@@ -427,23 +562,28 @@ export interface StdioLaunch {
   kind: ConfiguredSystemKind;
   /** `--mcp` / `--env` / `--env-path`, `--auth-broker-path`, … */
   args: readonly string[];
+  /** The parent's own guarded logon with the same credentials, right before the launch. */
+  logOn: () => Promise<void>;
 }
 
-/** Starts the stdio binary of `set` for `kind` and connects to it once it answered `initialize`. */
-export async function launchStdio(spec: StdioLaunch): Promise<Launched> {
+/** The stdio binary of `set` for `kind`, once it answered `initialize`. Not exported: unguarded. */
+async function startStdio(spec: StdioLaunch): Promise<LaunchedServer> {
   const child = startChild(
     binaryPath('stdio', spec.set),
     [`--system-type=${spec.kind}`, ...spec.args],
     childEnvironment(),
   );
-  const client = newClient();
   try {
-    await stdioReady(child, client);
-    return { client, child, ...(await listed(client, child)) };
+    return await served(await stdioReady(child), child);
   } catch (error) {
     await child.stop();
     throw error;
   }
+}
+
+/** Launches the stdio binary of `set` for `kind`, guarded (`launchGuarded`). */
+export function launchStdio(spec: StdioLaunch): Promise<LaunchedServer> {
+  return launchGuarded({ logOn: spec.logOn, launch: () => startStdio(spec) });
 }
 
 /** What a Streamable HTTP child is started with besides its kind: the credential headers. */
@@ -451,30 +591,37 @@ export interface HttpLaunch {
   set: HardModeSet;
   kind: ConfiguredSystemKind;
   headers: Record<string, string>;
+  /** The parent's own guarded logon with the same credentials, right before the launch. */
+  logOn: () => Promise<void>;
 }
 
-/** Starts the Streamable HTTP binary of `set` for `kind` and connects once it listens. */
-export async function launchHttp(spec: HttpLaunch): Promise<Launched> {
+/** The Streamable HTTP binary of `set` for `kind`, once it listens. Not exported: unguarded. */
+async function startHttp(spec: HttpLaunch): Promise<LaunchedServer> {
   const port = await freePort();
   const child = startChild(
     binaryPath('http', spec.set),
     [`--system-type=${spec.kind}`, '--host=127.0.0.1', `--port=${port}`],
     childEnvironment(),
   );
-  const client = newClient();
   try {
     await httpReady(child);
-    await client.connect(
+    const session = new McpSession(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
         { requestInit: { headers: spec.headers } },
       ),
     );
-    return { client, child, ...(await listed(client, child)) };
+    await session.initialize();
+    return await served(session, child);
   } catch (error) {
     await child.stop();
     throw error;
   }
+}
+
+/** Launches the Streamable HTTP binary of `set` for `kind`, guarded (`launchGuarded`). */
+export function launchHttp(spec: HttpLaunch): Promise<LaunchedServer> {
+  return launchGuarded({ logOn: spec.logOn, launch: () => startHttp(spec) });
 }
 
 // ---------------------------------------------------------------------------
@@ -485,23 +632,25 @@ export async function launchHttp(spec: HttpLaunch): Promise<Launched> {
  * the stores (`--unsafe`, `--auth-broker-path`), the destination, and the
  * connection type when stated.
  */
-export function destinationArgs(hard: HardModeConfig, cfg: any): string[] {
+export function destinationArgs(hard: HardModeConfig, cfg: unknown): string[] {
+  const broker = memberOf(cfg, 'auth_broker');
   const useUnsafe =
     process.env.MCP_UNSAFE === 'true' ||
-    cfg?.auth_broker?.unsafe === true ||
-    cfg?.auth_broker?.unsafe_session_store === true;
+    memberOf(broker, 'unsafe') === true ||
+    memberOf(broker, 'unsafe_session_store') === true;
   const args = useUnsafe ? ['--unsafe'] : [];
   const brokerPath = testAuthBrokerPath(cfg);
   if (brokerPath) args.push(`--auth-broker-path=${brokerPath}`);
+  const environment = memberOf(cfg, 'environment');
+  const env = textAt(environment, 'env');
   if (hard.mcp_destination) {
     args.push(`--mcp=${hard.mcp_destination}`);
   } else if (hard.env_destination) {
     args.push(`--env=${hard.env_destination}`);
   } else if (hard.env_path) {
-    args.push(`--env-path=${path.resolve(String(hard.env_path))}`);
-  } else if (cfg?.environment?.env) {
+    args.push(`--env-path=${path.resolve(hard.env_path)}`);
+  } else if (env !== undefined) {
     // A sessions-store name goes to the server as --env (resolved there), a path as --env-path.
-    const env = String(cfg.environment.env);
     const isPath =
       env.includes('/') ||
       env.includes('\\') ||
@@ -515,7 +664,7 @@ export function destinationArgs(hard: HardModeConfig, cfg: any): string[] {
       'hard mode needs a destination: integration_hard_mode.mcp_destination, env_destination or env_path, or environment.env',
     );
   }
-  const connectionType = cfg?.environment?.connection_type;
+  const connectionType = memberOf(environment, 'connection_type');
   if (connectionType === 'http' || connectionType === 'rfc') {
     args.push(`--connection-type=${connectionType}`);
   }
@@ -571,53 +720,66 @@ function launchKind(cfg: unknown): ConfiguredSystemKind {
 }
 
 /**
- * The hard-mode client of the test config: the stdio binary of `set`, the
- * Streamable HTTP binary of `set` (`launch_http`), or a server already
- * running (`http_url`, `sse_url`).
+ * The parent's own logon with the test destination's credential: a guarded
+ * connection that connects and logs off again. A refusal latches the marker.
+ */
+function parentLogOn(kind: ConfiguredSystemKind): () => Promise<void> {
+  return async () => {
+    const destination = await getTestDestination();
+    if (destination === null) {
+      throw new Error(
+        "hard mode: the test config names no destination for the parent's logon",
+      );
+    }
+    const own = guardedTestConnection(
+      destination.settings,
+      destination.credential,
+      { kind: kind === 'cloud' ? 'cloud' : 'onprem' },
+    );
+    await own.connect();
+    await endTestConnection(own);
+  };
+}
+
+/**
+ * The hard-mode server of the test config, always guarded: the stdio binary
+ * of `set`, the Streamable HTTP binary of `set` (`launch_http`), or a server
+ * already running (`http_url`, `sse_url`) whose answers are read the same
+ * way.
  */
 export async function createHardModeClient(
   set: HardModeSet,
-  cfg: any = loadTestConfig(),
-): Promise<{
-  client: Client;
-  toolNames: Set<string>;
-  close: () => Promise<void>;
-}> {
+  cfg: unknown = loadTestConfig(),
+): Promise<HardModeClient> {
   const hard = getHardModeConfig(cfg);
+  const kind = launchKind(cfg);
+  const logOn = parentLogOn(kind);
   if (hard.transport === 'stdio') {
-    const kind = launchKind(cfg);
-    return launchStdio({ set, kind, args: destinationArgs(hard, cfg) });
+    return launchStdio({ set, kind, args: destinationArgs(hard, cfg), logOn });
   }
   if (hard.transport === 'http' && hard.launch_http) {
-    const kind = launchKind(cfg);
     return launchHttp({
       set,
       kind,
       headers: hard.headers ?? sessionHeaders(cfg),
+      logOn,
     });
   }
-  const client = newClient();
-  if (hard.transport === 'http') {
-    await client.connect(
-      new StreamableHTTPClientTransport(
-        new URL(hard.http_url ?? ''),
-        hard.headers ? { requestInit: { headers: hard.headers } } : undefined,
-      ),
-    );
-  } else {
-    await client.connect(
-      new SSEClientTransport(
-        new URL(hard.sse_url ?? ''),
-        hard.headers ? { requestInit: { headers: hard.headers } } : undefined,
-      ),
-    );
-  }
-  const tools = await client.listTools();
-  return {
-    client,
-    toolNames: new Set(tools.tools.map((t) => t.name)),
-    close: () => client.close(),
-  };
+  const options = hard.headers
+    ? { requestInit: { headers: hard.headers } }
+    : undefined;
+  return launchGuarded({
+    logOn,
+    launch: async () => {
+      const session = new McpSession(
+        hard.transport === 'http'
+          ? new StreamableHTTPClientTransport(new URL(hard.http_url), options)
+          : new SSEClientTransport(new URL(hard.sse_url), options),
+      );
+      await session.initialize();
+      return served(session, undefined);
+    },
+  });
 }
 
 export function toolCandidates(
@@ -644,31 +806,29 @@ export function toolCandidates(
   return [high];
 }
 
+/** Calls the first candidate the server serves; a failed answer throws its text. */
 export async function callTool(
-  client: Client,
-  toolNames: Set<string>,
+  server: HardModeClient,
   candidates: string[],
   args: Record<string, unknown>,
-) {
-  const selected = candidates.find((name) => toolNames.has(name));
+): Promise<McpResult> {
+  const selected = candidates.find((name) => server.toolNames.has(name));
   if (!selected) {
     throw new Error(
       `No matching tool found. Candidates: ${candidates.join(', ')}`,
     );
   }
-  const result = await client.callTool({ name: selected, arguments: args });
-  if (result?.isError) {
-    const text = ((result.content || []) as any[])
-      .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
-      .join('\n');
+  const result = await server.call(selected, args);
+  if (result.isError) {
+    const text = result.content.map((c) => c.text).join('\n');
     throw new Error(text || `${selected} returned MCP error`);
   }
   return result;
 }
 
-export function parseToolText(result: any): string {
-  return (result?.content || [])
-    .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
+export function parseToolText(result: McpResult): string {
+  return result.content
+    .map((c) => c.text)
     .join('\n')
     .trim();
 }

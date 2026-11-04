@@ -33,6 +33,7 @@ import {
 import {
   callTool,
   createHardModeClient,
+  type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
 import {
@@ -54,11 +55,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-  let mcp: {
-    client: any;
-    toolNames: Set<string>;
-    close: () => Promise<void>;
-  } | null = null;
+  let mcp: HardModeClient | null = null;
 
   beforeAll(async () => {
     try {
@@ -98,7 +95,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       throw new Error('Hard mode MCP client is not initialized');
     }
     try {
-      return await callTool(mcp.client, mcp.toolNames, [toolName], args);
+      return await callTool(mcp, [toolName], args);
     } catch (error: any) {
       return {
         isError: true,

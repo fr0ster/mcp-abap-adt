@@ -16,34 +16,32 @@
  *    it is stopped) may still be sent once after the refusal: the parent
  *    cannot stop it without hooks in production code. It is an accepted
  *    residual, named in the PR description for the owner.
+ *
+ * Hard mode reaches every server through `launchGuarded`
+ * (`testers/hardMode.ts`); its unguarded start is not exported.
  */
 
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { McpResult } from '../../../lib/answer';
-import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import {
   markCredentialRefused,
   refusalAnswered,
   refuseAfterMarker,
 } from './refusalGuard';
-import type { Launched } from './testers/hardMode';
+import type { Child } from './testers/hardMode';
 
-/** A launched server whose answers the parent reads. */
-export interface GuardedLaunch {
-  /** Calls `tool`; a credential refusal answered latches the marker and stops the child. */
-  call(tool: string, args: ToolArgs): Promise<McpResult>;
+/** A server the tests call: launched as a child, or already running. */
+export interface LaunchedServer {
+  /** The tools its `tools/list` answered at the launch. */
+  readonly toolNames: ReadonlySet<string>;
+  listTools(): Promise<Tool[]>;
+  call(
+    tool: string,
+    args: Readonly<Record<string, unknown>>,
+  ): Promise<McpResult>;
+  /** The child process, when it was launched. */
+  readonly child: Child | undefined;
   close(): Promise<void>;
-}
-
-/** A tool call's answer as the MCP client declares it, read as a tool result. */
-function resultOf(answer: unknown): McpResult {
-  const result = CallToolResultSchema.parse(answer);
-  return {
-    isError: result.isError === true,
-    content: result.content.flatMap((item) =>
-      item.type === 'text' ? [{ type: 'text' as const, text: item.text }] : [],
-    ),
-  };
 }
 
 /**
@@ -53,8 +51,8 @@ function resultOf(answer: unknown): McpResult {
 export async function launchGuarded(options: {
   /** The parent's own guarded logon with the same credentials. */
   logOn: () => Promise<void>;
-  launch: () => Promise<Pick<Launched, 'client' | 'close'>>;
-}): Promise<GuardedLaunch> {
+  launch: () => Promise<LaunchedServer>;
+}): Promise<LaunchedServer> {
   refuseAfterMarker('a launch');
   await options.logOn();
   refuseAfterMarker('a launch');
@@ -66,11 +64,15 @@ export async function launchGuarded(options: {
     await launched.close();
   };
   return {
+    toolNames: launched.toolNames,
+    child: launched.child,
+    listTools: () => {
+      refuseAfterMarker('tools/list');
+      return launched.listTools();
+    },
     call: async (tool, args) => {
       refuseAfterMarker(tool);
-      const answer = resultOf(
-        await launched.client.callTool({ name: tool, arguments: { ...args } }),
-      );
+      const answer = await launched.call(tool, args);
       const text = answer.content.map((item) => item.text).join('\n');
       if (refusalAnswered(answer.isError, text)) {
         markCredentialRefused();

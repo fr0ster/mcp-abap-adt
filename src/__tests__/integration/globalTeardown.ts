@@ -7,7 +7,10 @@
  *   configured system must have passed;
  * - `test:coverage-family` — a family run: only the keys whose live file on
  *   that system is one of the files that ran;
- * - anything else (the unit tests' `npm test`) — nothing is checked.
+ * - another live script (`test:high`, `shared:*`) — only the marker;
+ * - anything else (the unit tests' `npm test`) — nothing.
+ * The run report is printed into the run's log, and the run directory
+ * `globalSetup` made is removed.
  *
  * A run whose credential was refused fails. Without a test config nothing
  * ran live, and nothing is checked; with one, the system kind must be stated.
@@ -18,17 +21,18 @@ import {
   readFilesRan,
   readLeftovers,
   readOutcomes,
+  removeOwnRunDirectory,
 } from './coverageReport/reportFormat';
 import {
   configuredSystemKindOf,
   NO_KIND_STATED,
 } from './helpers/configuredSystemKind';
+import { isLiveScript } from './helpers/liveScripts';
 import { loadRunConfig } from './helpers/runConfig';
 import {
   checkRunReport,
   type RunScope,
   readLedger,
-  reportPath,
   runScriptOf,
 } from './helpers/runReport';
 
@@ -40,19 +44,42 @@ export interface TeardownConfig {
 export default async function globalTeardown(
   globalConfig: TeardownConfig,
 ): Promise<void> {
-  const script = runScriptOf(process.env.npm_lifecycle_event);
-  if (script === undefined) return;
+  if (!isLiveScript(process.env.npm_lifecycle_event)) return;
+  try {
+    check(globalConfig, runScriptOf(process.env.npm_lifecycle_event));
+  } finally {
+    removeOwnRunDirectory();
+  }
+}
+
+/** The run's outcomes, printed: the run report reaches the run's log before its directory goes. */
+function printOutcomes(): void {
+  const outcomes = readOutcomes();
+  if (outcomes.length === 0) return;
+  console.log(
+    `[globalTeardown] run report:\n${outcomes
+      .map((o) => `${o.key} ${o.system} ${o.outcome}`)
+      .join('\n')}`,
+  );
+}
+
+function check(
+  globalConfig: TeardownConfig,
+  script: 'full' | 'family' | undefined,
+): void {
   const left = readLeftovers();
   if (left.length > 0) {
     console.log(
       `[globalTeardown] left behind for the owner to remove:\n${left.join('\n')}`,
     );
   }
+  printOutcomes();
   if (markerExists()) {
     throw new Error(
-      `[globalTeardown] a credential was refused in this run; nothing was sent after it (run report: ${reportPath()})`,
+      '[globalTeardown] a credential was refused in this run; nothing was sent after it',
     );
   }
+  if (script === undefined) return;
   const config = loadRunConfig();
   if (config === undefined || config === null) {
     console.log(
@@ -78,7 +105,6 @@ export default async function globalTeardown(
     system: kind,
     scope,
   });
-  console.log(`[globalTeardown] run report: ${reportPath()}`);
   if (problems.length > 0) {
     throw new Error(
       `[globalTeardown] ${problems.length} required key(s) did not pass on ${kind}:\n${problems.join('\n')}`,

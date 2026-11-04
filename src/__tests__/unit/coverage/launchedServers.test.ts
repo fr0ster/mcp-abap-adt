@@ -1,7 +1,8 @@
 /**
  * Launched servers under the refusal stop (plan C2 Step 4a): a real child
  * of the stdio binary (from the build, `npm run build` first) against the
- * ADT stand-in. The parent logs on with the same credential before each
+ * ADT stand-in, launched the only way hard mode launches (`launchStdio`,
+ * guarded by `launchGuarded`). The parent logs on with the same credential before each
  * launch, reads every answer of the child, and on a credential refusal
  * latches the marker, stops the child, and launches and sends nothing more.
  * A credential the child renews (`401`, refreshed, resent, `200`) latches
@@ -30,7 +31,7 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
-import { launchGuarded } from '../../integration/helpers/launchedServers';
+import { endTestConnection } from '../../integration/helpers/openConnections';
 import {
   credentialRefused,
   guardedTestConnection,
@@ -99,15 +100,16 @@ describe('launched servers', () => {
         { kind: 'onprem' },
       );
       await own.connect();
+      await endTestConnection(own);
     });
-    const launch = jest.fn(() =>
+    const launch = () =>
       launchStdio({
         set: 'full',
         kind: 'onprem',
         args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
-      }),
-    );
-    const server = await launchGuarded({ logOn, launch });
+        logOn,
+      });
+    const server = await launch();
     try {
       expect(logOn).toHaveBeenCalledTimes(1);
       const ok = await server.call('GetAdtTypes', {});
@@ -124,11 +126,9 @@ describe('launched servers', () => {
       await expect(server.call('GetAdtTypes', {})).rejects.toThrow(
         REFUSED_AFTER_MARKER,
       );
-      await expect(launchGuarded({ logOn, launch })).rejects.toThrow(
-        REFUSED_AFTER_MARKER,
-      );
+      // The next launch refuses before the parent logs on or spawns.
+      await expect(launch()).rejects.toThrow(REFUSED_AFTER_MARKER);
       expect(logOn).toHaveBeenCalledTimes(1);
-      expect(launch).toHaveBeenCalledTimes(1);
       expect(stand.requests.length).toBe(sent);
     } finally {
       await server.close();
@@ -160,29 +160,26 @@ describe('launched servers', () => {
       );
       const provider = await first.getProvider('default');
       const settings = await first.settingsFor('default');
-      // The parent's own logon with the same credential.
+      // The parent's own logon with the same credential; then the tokens
+      // that first login obtained are written for the child.
       const logOn = async (): Promise<void> => {
         const own = guardedTestConnection(settings, provider, {
           kind: 'onprem',
         });
         await own.connect();
+        await endTestConnection(own);
+        await first.settle();
       };
-      const server = await launchGuarded({
+      const server = await launchStdio({
+        set: 'full',
+        kind: 'onprem',
+        args: [
+          `--env-path=${envFile}`,
+          `--auth-broker-path=${broker.root}`,
+          '--renewal=refresh-only',
+          '--browser=none',
+        ],
         logOn,
-        launch: async () => {
-          // The tokens the first login obtained, written for the child.
-          await first.settle();
-          return launchStdio({
-            set: 'full',
-            kind: 'onprem',
-            args: [
-              `--env-path=${envFile}`,
-              `--auth-broker-path=${broker.root}`,
-              '--renewal=refresh-only',
-              '--browser=none',
-            ],
-          });
-        },
       });
       try {
         const grantsBefore = tokens.grants.length;

@@ -37,6 +37,7 @@ import {
 import { delay } from '../testHelpers';
 import {
   createHardModeClient,
+  type HardModeClient,
   isHardModeEnabled,
   parseToolText,
 } from './hardMode';
@@ -85,11 +86,7 @@ export class LambdaTester {
   protected testSkipped = false;
   /** Why the tester does not run at all: no system kind stated. */
   protected kindSkip: string | undefined;
-  protected hardModeMcp: {
-    client: any;
-    toolNames: Set<string>;
-    close: () => Promise<void>;
-  } | null = null;
+  protected hardModeMcp: HardModeClient | null = null;
 
   /**
    * Constructor
@@ -686,14 +683,9 @@ export class LambdaTester {
       throw new Error(`MCP tool "${toolName}" not found in hard mode`);
     }
 
-    const result = await mcp.client.callTool({
-      name: toolName,
-      arguments: args,
-    });
-    if (result?.isError) {
-      const text = (result.content || [])
-        .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
-        .join('\n');
+    const result = await mcp.call(toolName, args);
+    if (result.isError) {
+      const text = result.content.map((c) => c.text).join('\n');
       return {
         isError: true,
         content: [
@@ -709,7 +701,7 @@ export class LambdaTester {
     };
   }
 
-  protected async getHardModeClient() {
+  protected async getHardModeClient(): Promise<HardModeClient> {
     if (!this.hardModeMcp) {
       this.hardModeMcp = await createHardModeClient('full');
     }

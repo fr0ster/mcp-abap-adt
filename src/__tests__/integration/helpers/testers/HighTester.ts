@@ -80,8 +80,7 @@ export class HighTester extends LambdaTester {
             const mcp = await this.getHardModeClient();
             const deleteArgs = this.buildDeleteArgs(context);
             await callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('delete', entity, 'high', this.handlerName),
               deleteArgs,
             );
@@ -223,8 +222,7 @@ export class HighTester extends LambdaTester {
         await this.retryOnConflict(
           () =>
             callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('create', entity, 'high', this.handlerName),
               args,
             ),
@@ -240,8 +238,7 @@ export class HighTester extends LambdaTester {
         await this.retryOnConflict(
           () =>
             callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('update', entity, 'high', this.handlerName),
               args,
             ),

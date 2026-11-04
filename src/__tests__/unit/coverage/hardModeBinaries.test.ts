@@ -14,12 +14,15 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { type AdtStandIn, adtStandIn, basicOf } from '../../helpers/adtStandIn';
 import type { SystemKind } from '../../helpers/servedTools';
+import { endTestConnection } from '../../integration/helpers/openConnections';
+import { guardedTestConnection } from '../../integration/helpers/refusalGuard';
 import {
   createHardModeClient,
+  type HardModeClient,
   type HardModeSet,
-  type Launched,
   launchHttp,
   launchStdio,
 } from '../../integration/helpers/testers/hardMode';
@@ -77,8 +80,22 @@ function projection(command: string, kind: SystemKind): Map<string, unknown> {
 let stand: AdtStandIn;
 let base: string;
 let envFile: string;
+let runDir: string;
+
+/** The parent's own logon before each launch, with the destination's credential. */
+const logOn = async (): Promise<void> => {
+  const own = guardedTestConnection(
+    { url: stand.url, client: '100', authType: 'basic', username: USER },
+    new BasicAuthProvider(USER, PASSWORD),
+    { kind: 'onprem' },
+  );
+  await own.connect();
+  await endTestConnection(own);
+};
 
 beforeAll(async () => {
+  runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hard-mode-run-'));
+  process.env.MCP_ABAP_ADT_COVERAGE_RUN = runDir;
   stand = await adtStandIn();
   base = fs.mkdtempSync(path.join(os.tmpdir(), 'hard-mode-binaries-'));
   envFile = path.join(base, 'stand.env');
@@ -98,20 +115,22 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await stand.close();
+  delete process.env.MCP_ABAP_ADT_COVERAGE_RUN;
+  fs.rmSync(runDir, { recursive: true, force: true });
   fs.rmSync(base, { recursive: true, force: true });
 });
 
 /** The child's listing against the fixture's, then a call reaching the stand. */
 async function check(
-  launched: Launched,
+  launched: HardModeClient,
   command: string,
   kind: SystemKind,
   set: HardModeSet,
 ): Promise<void> {
   try {
-    const listing = await launched.client.listTools();
+    const listing = await launched.listTools();
     const served = new Map(
-      listing.tools.map((tool) => [tool.name, tool.inputSchema]),
+      listing.map((tool) => [tool.name, tool.inputSchema]),
     );
     const expected = projection(command, kind);
     expect(expected.size).toBeGreaterThan(0);
@@ -120,10 +139,7 @@ async function check(
       expect({ name, schema: served.get(name) }).toEqual({ name, schema });
     }
     const from = stand.requests.length;
-    await launched.client.callTool({
-      name: CALLS[set].name,
-      arguments: CALLS[set].args,
-    });
+    await launched.call(CALLS[set].name, CALLS[set].args);
     const sent = stand.requests.slice(from);
     expect(sent.length).toBeGreaterThan(0);
     expect(
@@ -131,9 +147,10 @@ async function check(
     ).toBeGreaterThan(0);
   } finally {
     await launched.close();
-    expect(
-      launched.child.process.exitCode ?? launched.child.process.signalCode,
-    ).not.toBeNull();
+    const child = launched.child;
+    expect(child?.process.exitCode ?? child?.process.signalCode).toEqual(
+      expect.anything(),
+    );
   }
 }
 
@@ -145,6 +162,7 @@ describe.each(KINDS)('--system-type=%s', (kind) => {
       set: 'full',
       kind,
       args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
+      logOn,
     });
     await check(launched, COMMANDS.stdio.full, kind, 'full');
   });
@@ -159,8 +177,9 @@ describe.each(KINDS)('--system-type=%s', (kind) => {
         'x-sap-login': USER,
         'x-sap-password': PASSWORD,
       },
+      logOn,
     });
-    expect(launched.child.stderr()).toContain(
+    expect(launched.child?.stderr()).toContain(
       '[StreamableHttpServer] Server started on 127.0.0.1:',
     );
     await check(launched, COMMANDS.http.full, kind, 'full');
@@ -171,6 +190,7 @@ describe.each(KINDS)('--system-type=%s', (kind) => {
       set: 'compact',
       kind,
       args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
+      logOn,
     });
     await check(launched, COMMANDS.stdio.compact, kind, 'compact');
   });
@@ -185,8 +205,9 @@ describe.each(KINDS)('--system-type=%s', (kind) => {
         'x-sap-login': USER,
         'x-sap-password': PASSWORD,
       },
+      logOn,
     });
-    expect(launched.child.stderr()).toContain(
+    expect(launched.child?.stderr()).toContain(
       '[StreamableHttpServer] Server started on 127.0.0.1:',
     );
     await check(launched, COMMANDS.http.compact, kind, 'compact');

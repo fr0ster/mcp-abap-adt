@@ -11,7 +11,6 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
   type Child,
   httpReady,
@@ -129,26 +128,26 @@ describe('stdio readiness', () => {
   it('ready when the initialize answer arrives, without a timer', async () => {
     fakeTimers();
     const child = start('stdio-answers.js');
-    const client = new Client({ name: 'fake-test', version: '0' });
     let ready = false;
-    const readiness = stdioReady(child, client).then(() => {
+    const readiness = stdioReady(child).then((session) => {
       ready = true;
+      return session;
     });
     await said(child, 'read initialize');
     await turn();
     expect(ready).toBe(false);
-    child.process.kill('SIGUSR2');
-    await readiness;
-    expect(ready).toBe(true);
-    // The client's own request timer ended with the answer: nothing pending.
+    // The initialize is out and unanswered: no timer is armed for it.
     expect(jest.getTimerCount()).toBe(0);
-    await client.close();
+    child.process.kill('SIGUSR2');
+    const session = await readiness;
+    expect(ready).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+    await session.close();
   });
 
   it('an exit before the initialize answer rejects at once', async () => {
     const child = start('stdio-exits.js');
-    const client = new Client({ name: 'fake-test', version: '0' });
-    await expect(stdioReady(child, client)).rejects.toThrow(
+    await expect(stdioReady(child)).rejects.toThrow(
       'the child exited (4) before it was stopped:\nno answer from this fake',
     );
   });

@@ -142,14 +142,24 @@ and open items") and applied in the tasks; none is still open.
 **Global constraints.** Every task's requirements include these:
 - **Commands.** npm scripts only. Never `npx`, `npm exec`, `node_modules/.bin` or `ts-node`.
 - **Integration runs: two kinds, each by its npm script.**
-  - **Targeted (a family, C3–C16):** `npm run test:coverage-family -- <live file>`, a new
-    script with `test:integration`'s flags. Its `globalTeardown` checks only the keys of the
-    files that ran (spec §8, acceptance 3); the rest of the ledger is not required.
+  - **Targeted (a family, C3–C16):** `npm run test:coverage-family -- <live file> [<live file>…]`.
+    - The new script carries `test:integration`'s flags **except** its
+      `--testPathPatterns=integration` (Jest ORs that with the positional paths, so naming the
+      activation file also selected `DebuggerHandlers.test.ts`) and its `--passWithNoTests`
+      (a path that selects nothing must fail): `jest --testPathIgnorePatterns='__tests__/admin/'
+      --runInBand --forceExit` plus the reporter (C2), the given paths its only selection.
+    - **Allowed paths.** `globalSetup` reads the run's selection (`globalConfig.testPathPatterns`)
+      and refuses to start unless each is the exact repository path of an existing file under
+      `src/__tests__/integration/` ending `.test.ts`, compared as strings (no regex); a
+      directory, a fragment or a pattern is refused before anything logs on.
+    - Its `globalTeardown` checks only the keys of the files that ran (spec §8, acceptance 3);
+      the rest of the ledger is not required.
   - **Full acceptance (step 18 only):** `npm run test:integration`. Its `globalTeardown`
     requires every key the ledger requires on that system.
   - The teardown tells them apart by the running script's name (`npm_lifecycle_event`), so no
     flag or variable chooses the scope.
-  - Name the files with `--listTests` first. Never add `--testPathPatterns` /
+  - Name the files with `--listTests` first, and check the list is exactly the requested files.
+    Never add `--testPathPatterns` /
     `--testPathIgnorePatterns`: they replace the script's own.
   - Never pipe a run through `tee` or anything else that replaces Jest's exit status; redirect
     the output to a file instead (`> <log> 2>&1`).
@@ -298,7 +308,9 @@ and live specifics.
       the request-free list, and never counts for its key.
     - **Deterministic inputs.** Before a case sends, `pinCases` fixes every clock and random
       source the case can reach, and restores each after the case (`afterEach`, also on a
-      failure), so the whole recorded request stays the literal:
+      failure), so the whole recorded request stays the literal. The fakes are installed
+      **before** the stand, the connection and `pinServer` are built: `InstanceState` captures
+      its random source at construction, so a server built first would keep the real one.
       - **Clock.** `jest.useFakeTimers({ now: PIN_EPOCH, doNotFake: [every timer API but
         'Date'] })` fixes `Date` (`Date.now()`, `new Date()`) and leaves timers, ticks and
         I/O real; `jest.useRealTimers()` restores it. `PIN_EPOCH` is one constant in
@@ -457,6 +469,10 @@ and live specifics.
   - `'a none case fails when the tool sends a request'`.
   - `'a thrown refusal is asserted as thrown, with zero requests'`: a case that sends before
     throwing fails; `'nothing-sent'` without `refusal: 'thrown'` fails.
+  - `'the fakes are installed before the server is built'`: `InstanceState` captures its random
+    source at construction (`options.randomSource ?? randomBytes`), so `pinCases` installs the
+    clock and random fakes before it builds the stand, the connection or `pinServer`; a case
+    that builds one first fails its repeat recording.
   - `'two runs of one case record the same requests'`: the seeded ids and the fixed port make
     the recording identical.
   - `'a binding reads the earlier answer'` and `'a binding of a key-bearing field is refused'`.
@@ -488,8 +504,10 @@ and live specifics.
     `debuggerCleanup.ts`).
   - `tests/test-config.yaml.template`: `environment.expected_realm: ""` with its comment.
   - The Jest configuration: add `globalTeardown` for the integration runs.
-  - `package.json`: the script `test:coverage-family` (C1's global constraints), and the
-    reporter added to it and to `test:integration`.
+  - `package.json`: the script `test:coverage-family` (C1's global constraints), the
+    reporter added to it and to `test:integration`, `build:test-reporter` and the two `pre…`
+    scripts that run it.
+  - `tsconfig.reporter.json` (new) and `.gitignore` (`build/test-reporter/`).
 - Create:
   - `src/__tests__/integration/helpers/realmCheck.ts`
   - `src/__tests__/integration/helpers/runReport.ts`
@@ -508,7 +526,13 @@ and live specifics.
     repository.
   - `recordOutcome(key: CoverageKey, kind: SystemKind, outcome: 'passed' | 'failed' | 'skipped'): void`
 - **`src/__tests__/integration/coverageReporter.ts`** — a Jest reporter, named in
-  `test:integration` and `test:coverage-family` (`--reporters=default --reporters=<path>`).
+  `test:integration` and `test:coverage-family` (`--reporters=default
+  --reporters=./build/test-reporter/coverageReporter.js`).
+  - **Compiled before it is loaded.** Node loads a reporter itself, outside ts-jest, and
+    `src/__tests__` is not in the build. So `npm run build:test-reporter`
+    (`tsc -p tsconfig.reporter.json`: this one file and what it imports, out to the gitignored
+    `build/test-reporter/`) runs first, as the `pretest:integration` and
+    `pretest:coverage-family` scripts. No ts-node, no npx.
   - `onTestCaseResult(test, result)` joins the test's full name with the call log and records
     each key's outcome from Jest's **completed** result (`result.status`) — after the test's
     `afterEach` hooks and after `expect.assertions` is checked, which a hook of the test
@@ -531,7 +555,11 @@ and live specifics.
   - `'a key whose test failed after the call is reported failed'`;
   - `'a key whose afterEach cleanup fails is reported failed'`;
   - `'a key whose test misses its expect.assertions count is reported failed'`.
-  These run the reporter on a Jest run of fixture test files (`runCLI` in process, no SAP).
+  These run the **exact reporter command** of the scripts on fixture test files: the
+  compiled `build/test-reporter/coverageReporter.js` (built by `npm run build:test-reporter`
+  first), passed to `runCLI` in process as `reporters: ['default', '<that path>']`, no SAP.
+  - `'globalSetup refuses a selection that is not an exact integration test file'`: a
+    directory, a fragment, a non-test path — each refused before any logon.
 - [ ] **Step 3: Write the refusal-stop tests** (`src/__tests__/unit/coverage/refusalStop.test.ts`,
   on `adtStandIn` answering `401`):
   - `'a credential refusal in globalSetup fails the setup'`: today it is logged and the run goes
@@ -554,7 +582,10 @@ and live specifics.
     refusal) — not only at logon.
   - `globalTeardown` compares the run report with `coverage-ledger.json` for the configured
     system kind, in the scope of the running script.
-- [ ] **Step 5: Run the tests above:** PASS. Without a config, `npm run test:integration` still
+- [ ] **Step 5: Run the tests above:** PASS. Then verify the family script's selection:
+  `npm run test:coverage-family -- --listTests src/__tests__/integration/high/class/ClassHighHandlers.test.ts`
+  lists exactly that one file (no `DebuggerHandlers.test.ts`, nothing else); repeat with two
+  files and expect exactly two. Without a config, `npm run test:integration` still
   returns at once, logging nothing on.
 - [ ] **Step 6: Commit** as `test(coverage): realm check, refusal stop, run report`.
 
@@ -629,12 +660,27 @@ activation answer is a corpus activation result.
       no attempt count and no interval'` (the stand answers "inactive" three times, then not
       listed; the helper reads exactly four times, with no timer between reads) and
       `'activateAndConfirm refuses an error message without a regex'`;
-    - the helper then activates, refuses an error message by comparing the message type with
-      the list `E`, `A`, `X` in plain code, and, if the object is still listed inactive,
-      reads the activation run's own status (`HandlerGet#-#activation_status`, by the run id
-      the activation answered) once per answer until it states the run finished — each read
-      sent when the previous answer arrives; no attempt count, no interval of the helper's
-      choosing; bounded only by the Jest test timeout;
+    - **two flows, by what the activation answered:**
+      - **single object** (`handleActivateObject`'s `activateSingle`; `createView` uses it):
+        the answer carries an inline verdict and no run id — confirmed from that verdict
+        alone: `activated` stated, and no message of type `E`, `A` or `X` (compared in plain
+        code);
+      - **asynchronous run** (several objects): the answer carries the run id; the helper
+        waits with the client's **long polling** — `getUtils().getActivationRun(runId,
+        { withLongPolling: true })` on the test's own connection, which sends
+        `GET /sap/bc/adt/activation/runs/<id>?withLongPolling=true` and is held open by the
+        server — once per answer until `runs:status` is terminal; no attempt count, no
+        interval, bounded only by the Jest test timeout. `finished` → it reads the run's
+        results and refuses an `E`/`A`/`X` message; `error` / `failed` → it reads the results
+        and fails with their messages.
+      - `HandlerGet#-#activation_status` (`handleGetActivationRun.ts`) passes only `analyse`,
+        no long polling; whether the tool should expose it is reported to the controller, and
+        the tool's behaviour is not changed here.
+    - the prerequisite unit tests cover both flows on `adtStandIn`: `'single: an inline
+      verdict with an error message fails, nothing more is sent'`, `'single: an inline verdict
+      without one confirms'`, `'run: every status read carries withLongPolling=true'` (a
+      request assertion on the recorded URL), `'run: finished then results'`, `'run: error
+      fails with the results' messages'`;
     - its callers (`BehaviorDefinitionAndImplementationHighHandlers.test.ts`,
       `admin/shared-deps/setup.test.ts`) drop the two arguments.
 - **Assertions.** After the activation, `GetInactiveObjects` no longer lists the object, and

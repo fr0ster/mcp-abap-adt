@@ -319,9 +319,6 @@ export function functionGroupMainProgram(functionGroupName: string): string {
   return namespaced ? `${namespaced[1]}SAPL${namespaced[2]}` : `SAPL${name}`;
 }
 
-/** How many long polls the activation run is waited for. */
-const ACTIVATION_POLLS = 6;
-
 /**
  * Activate the test include, the group and its main program in one run.
  *
@@ -361,22 +358,25 @@ async function activateWithMainProgram(
   );
   if (!started.ok) return started;
   // Long polls back to back, no timer of ours: the server holds each one
-  // until the run moves.
+  // until the run ends.
   const outcome = await awaitActivationRun(
     utils,
     started.getResult().value,
     analyseException,
-    ACTIVATION_POLLS,
-    0,
   );
   // Reading the run failed: the method's error as it is, with its step.
   if (outcome.failure !== undefined) return failedWith(outcome.failure);
+  if (outcome.runId === '') {
+    // Not SAP's refusal: the start answered no run id, so no run was read.
+    // Said as a failure on our side (the outcome's own words), never dressed
+    // as SAP's answer.
+    throw new Error(outcome.messages.map((m) => m.text).join('; '));
+  }
   const refusals = outcome.messages.filter(isRefusal);
   if (
-    outcome.settled &&
-    (refusals.length > 0 ||
-      outcome.status === 'failed' ||
-      outcome.status === 'error')
+    refusals.length > 0 ||
+    outcome.status === 'failed' ||
+    outcome.status === 'error'
   ) {
     // SAP reported the run failed: its messages as they are.
     return failedWith({
@@ -385,13 +385,6 @@ async function activateWithMainProgram(
         ? `Activation failed: ${refusals.map((m) => m.text).join('; ')}`
         : `Activation run ${outcome.runId} ended with status ${outcome.status}`,
     });
-  }
-  if (!outcome.settled) {
-    // Not SAP's refusal: our wait bound ran out while the run went on. Said
-    // as a failure on our side, never dressed as SAP's answer.
-    throw new Error(
-      `The activation run ${outcome.runId} had not finished after ${ACTIVATION_POLLS} polls — the wait bound ran out (status ${outcome.status || 'unknown'}); the run may still be going on in SAP.`,
-    );
   }
   // The run's results as the reading: a write's terse answer reads the
   // status, and `raw` shows what SAP said about the activation.

@@ -791,11 +791,9 @@ describe('an activation run whose reading was refused', () => {
       source(async () => forbidden()),
       'RUN-1',
       undefined,
-      6,
-      0,
     );
     expect(outcome.messages).toEqual([]);
-    expect(outcome.settled).toBe(false);
+    expect(outcome.status).toBe('');
     expect(outcome.failure).toEqual({
       message: 'No authorization',
       origin: 'refusal',
@@ -836,8 +834,6 @@ describe('an activation run whose reading was refused', () => {
       ),
       'RUN-1',
       undefined,
-      6,
-      0,
     );
     expect(outcome.messages).toEqual([]);
     expect((outcome.failure as { step?: string }).step).toBe(

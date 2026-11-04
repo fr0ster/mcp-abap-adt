@@ -716,10 +716,11 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
     expect(result.isError).toBe(true);
   });
 
-  it('waits on the run with long polls and no timer of its own', async () => {
+  it('waits on the run with long polls and no timer of its own, past six reads', async () => {
     const timer = jest.spyOn(global, 'setTimeout');
     try {
-      // A run that never settles: six long polls, back to back, then a failure.
+      // A run still going for seven reads, then finished: long polls back
+      // to back, no attempt limit, then the results.
       const running = {
         data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="running"/>',
       };
@@ -738,6 +739,10 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
         running,
         running,
         running,
+        running,
+        {
+          data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+        },
         { data: '' },
       ]);
 
@@ -746,24 +751,19 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
         { function_group_name: 'zfg_x', test_class_source: 'x' },
       );
 
-      expect(result.isError).toBe(true);
-      // Not SAP's refusal: our wait bound ran out, said as a failure on our
-      // side — no `origin`, no status SAP never gave.
-      const answered = payload(result);
-      expect(answered.error).toBe('client_threw');
-      expect(answered.origin).toBeUndefined();
-      expect(answered.status).toBeUndefined();
-      expect(answered.step).toBe('activate');
-      expect(answered.message).toMatch(
-        /had not finished after 6 polls — the wait bound ran out/,
-      );
+      expect(result.isError).toBe(false);
       const polls = connection.requests.filter((r) =>
         r.url.includes('/activation/runs/RUN-4?'),
       );
-      expect(polls).toHaveLength(6);
+      expect(polls).toHaveLength(8);
       expect(polls.every((r) => r.url.includes('withLongPolling=true'))).toBe(
         true,
       );
+      expect(
+        connection.requests.some((r) =>
+          r.url.includes('/activation/results/RUN-4'),
+        ),
+      ).toBe(true);
       const ours = timer.mock.calls.filter(([, ms]) => ms === 1000);
       expect(ours).toHaveLength(0);
     } finally {

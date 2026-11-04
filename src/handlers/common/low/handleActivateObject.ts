@@ -584,14 +584,15 @@ export async function handleActivateObject(
       // one. `accepted` says so rather than being hardcoded true.
       const accepted = outcome.runId !== '';
       const refusals = outcome.messages.filter(isRefusal);
-      // `activated` is a verdict now, and `null` only where there genuinely is
-      // none: a run that has not settled within the bounded wait. A settled
-      // run's verdict is SAP's own: its results' `activationExecuted` (false
-      // for a run SAP cancelled, "Activation was cancelled.", whatever the
-      // messages' severity) and no error-severity message; where the results
-      // state no `activationExecuted`, the messages alone decide — the errata
-      // is explicit that only such a message is a failure.
-      const activated = !outcome.settled
+      // `activated` is a verdict, and `null` only where there genuinely is
+      // none: no run id came back, so no run was read. A run is waited for
+      // until it ends, and its verdict is SAP's own: its results'
+      // `activationExecuted` (false for a run SAP cancelled, "Activation was
+      // cancelled.", whatever the messages' severity) and no error-severity
+      // message; where the results state no `activationExecuted`, the
+      // messages alone decide — the errata is explicit that only such a
+      // message is a failure.
+      const activated = !accepted
         ? null
         : outcome.status !== 'failed' &&
           activationVerdict(outcome.executed, outcome.messages);
@@ -612,35 +613,30 @@ export async function handleActivateObject(
           ? `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
             'object(s) — no run id came back, so there is no evidence a run was ' +
             'queued at all.'
-          : activated === null
-            ? `Activation run ${outcome.runId} was accepted for ${activationObjects.length} object(s) and ` +
-              `has not settled yet (runs:status "${outcome.status || 'unknown'}"). Its results carry no ` +
-              'verdict while it runs; ask again, or read GetInactiveObjects — an object still ' +
-              'listed there did not activate.'
-            : activated
-              ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
-                'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
-                'now": an object can stay listed for scope rather than for failure — activating a ' +
-                "function group clears the regenerated include, not the group's own entry."
-              : refusals.length > 0
-                ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
-                  `${activationObjects.length} object(s): ` +
-                  refusals
-                    .map(
-                      (m) =>
-                        `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                    )
-                    .join('; ')
-                : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
-                  'object(s): its results say activationExecuted="false"' +
-                  (outcome.messages.length === 0
-                    ? ', with no message: nothing to activate.'
-                    : `: ${outcome.messages
-                        .map(
-                          (m) =>
-                            `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                        )
-                        .join('; ')}`),
+          : activated
+            ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
+              'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
+              'now": an object can stay listed for scope rather than for failure — activating a ' +
+              "function group clears the regenerated include, not the group's own entry."
+            : refusals.length > 0
+              ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
+                `${activationObjects.length} object(s): ` +
+                refusals
+                  .map(
+                    (m) =>
+                      `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                  )
+                  .join('; ')
+              : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
+                'object(s): its results say activationExecuted="false"' +
+                (outcome.messages.length === 0
+                  ? ', with no message: nothing to activate.'
+                  : `: ${outcome.messages
+                      .map(
+                        (m) =>
+                          `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                      )
+                      .join('; ')}`),
       };
     },
   );

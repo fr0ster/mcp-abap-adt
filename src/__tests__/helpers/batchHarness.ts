@@ -73,6 +73,13 @@ const METADATA_DOCUMENTS: Array<[string, string]> = [
 /** How the fake answers: a document, a `404`, or never. */
 export type Mode = 'document' | 'not-found' | 'pending';
 
+/** Where a started activation run is read. */
+const ACTIVATION_RUNS = '/sap/bc/adt/activation/runs/';
+
+/** An activation run's status once it ended. */
+const RUN_ENDED =
+  '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>';
+
 /**
  * A run's address, as SAP answers a started activation or unit test run in
  * `Location`: a handler that polls the run shows it here.
@@ -125,6 +132,9 @@ export function countingConnection(
   const documentFor = (method: string, url: string): string => {
     if (url.includes('_action=LOCK')) return LOCK_SUCCESS_XML;
     if (body !== undefined) return body;
+    // A started activation run's status: ended, as SAP answers a long poll
+    // once the run is over — a group activation reads its run until then.
+    if (method === 'GET' && url.startsWith(ACTIVATION_RUNS)) return RUN_ENDED;
     const lower = url.toLowerCase();
     if (
       method !== 'GET' ||

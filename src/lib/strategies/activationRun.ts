@@ -35,10 +35,12 @@ import { withStep } from './step';
 export interface ActivationRunOutcome {
   /** The run's id — `''` when the POST answered no `Location`. */
   runId: string;
-  /** `runs:status` as the server last stated it, lowercased. */
+  /**
+   * `runs:status` as the server last stated it, lowercased — `finished`,
+   * `error` or `failed` unless a read failed (then `failure` says which) or
+   * there was no run id (`''`).
+   */
   status: string;
-  /** Whether that status is one this waits for: `finished`, `error`, `failed`. */
-  settled: boolean;
   /** Every message the results document carries, in wire order. */
   messages: ActivationMessage[];
   /**
@@ -219,12 +221,11 @@ export function isRefusal(message: ActivationMessage): boolean {
 /**
  * Wait for a started run, then read what it produced.
  *
- * `withLongPolling` holds each request open on the server, so this is a bounded
- * number of requests rather than a tight loop: `attempts` of them, and the
- * default of six covers the runs measured on a cloud trial. A run that has not
- * settled by then is reported as it stands — `settled: false` — rather than
- * called a failure, because "still running" and "refused" are different answers
- * and only one of them is the caller's problem.
+ * Every status read is a long poll (`withLongPolling=true`): SAP holds it
+ * until the run ends (measured on premise and on the cloud trial,
+ * 2026-11-04), so the wait is one request in practice. A status that is not
+ * terminal is followed by another long poll — no timer of ours, no attempt
+ * limit: the run ends the wait, or SAP's refusal does.
  *
  * Never throws for a refusal: a refused `getActivationRun` or
  * `getActivationResults` comes back as the outcome's `failure` — the method's
@@ -235,14 +236,11 @@ export async function awaitActivationRun(
   utils: ActivationRunSource,
   runId: string,
   analyse: unknown,
-  attempts = 6,
-  delayMs = 1000,
 ): Promise<ActivationRunOutcome> {
   if (runId === '') {
     return {
       runId,
       status: '',
-      settled: false,
       messages: [
         {
           type: 'E',
@@ -253,7 +251,7 @@ export async function awaitActivationRun(
   }
 
   let status = '';
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  while (!SETTLED.has(status)) {
     const answered = await utils.getActivationRun(runId, {
       withLongPolling: true,
       analyse,
@@ -262,18 +260,11 @@ export async function awaitActivationRun(
       return {
         runId,
         status,
-        settled: false,
         messages: [],
         failure: withStep(answered.getError(), 'read activation run'),
       };
     }
     status = runStatusOf(answered.getResult().value);
-    if (SETTLED.has(status)) break;
-    // `delayMs: 0` asks for no pause and no timer: each request is a long
-    // poll the server holds until the run moves, so the next one simply follows.
-    if (attempt < attempts && delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
   }
 
   const produced = await utils.getActivationResults(runId, { analyse });
@@ -281,7 +272,6 @@ export async function awaitActivationRun(
     return {
       runId,
       status,
-      settled: SETTLED.has(status),
       messages: [],
       failure: withStep(produced.getError(), 'read activation results'),
     };
@@ -291,7 +281,6 @@ export async function awaitActivationRun(
   return {
     runId,
     status,
-    settled: SETTLED.has(status),
     messages: activationMessagesOf(value),
     ...(executed === undefined ? {} : { executed }),
     results: readingOf(value).raw || undefined,

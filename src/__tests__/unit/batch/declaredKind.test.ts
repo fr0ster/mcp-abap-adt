@@ -15,13 +15,14 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
+import { roundConnection } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { runPhase } from '../../../lib/batch/phases';
 import {
   createAbapConnection,
   systemKindOf,
 } from '../../../lib/connectionFactory';
-import { declareSystemKind } from '../../../lib/systemKind';
+import { declareSystemKind, stateSystemKind } from '../../../lib/systemKind';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -164,6 +165,34 @@ describe('a batch view keeps the connection’s system kind', () => {
     });
     expect(envelopes).toBeGreaterThan(0);
     expect(directs(from)).toEqual([]);
+  });
+
+  it('a feed’s round connection has the kind of the connection it is over', () => {
+    const connection = plainOver(inner);
+    declareSystemKind(connection, 'onprem');
+    const view = roundConnection(connection, (request) =>
+      inner.makeAdtRequest(request),
+    );
+    expect(systemKindOf(view)).toBe('onprem');
+  });
+
+  it('a connection stated with no kind gives its views none: SAP_SYSTEM_TYPE is not read for them', async () => {
+    // A group registered on a plain McpServer with no systemType states
+    // none; the environment names a kind all the same.
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    const connection = plainOver(inner);
+    stateSystemKind(connection, undefined);
+    const context: HandlerContext = { connection };
+    const results = await runPhase(context, ['one'], async (_item, view) =>
+      systemKindOf(view),
+    );
+    expect(results).toEqual([{ ok: true, value: undefined }]);
+    const from = stand.requests.length;
+    const answer = await handleListTransports(context, { user: 'owner_a' });
+    const text = answer.content.map((part) => part.text).join('\n');
+    expect(answer.isError).toBe(true);
+    expect(text).toContain('system_type_required');
+    expect(stand.requests.slice(from)).toEqual([]);
   });
 
   it('a connection with no kind is still refused system_type_required, nothing sent', async () => {

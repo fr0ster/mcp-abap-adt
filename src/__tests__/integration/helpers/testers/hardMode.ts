@@ -330,7 +330,14 @@ export class McpSession {
     const answered = new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
     });
-    await this.transport.send({ jsonrpc: '2.0', id, method, params });
+    try {
+      await this.transport.send({ jsonrpc: '2.0', id, method, params });
+    } catch (error) {
+      // Never sent: nothing will answer it, and the close must not reject
+      // it unobserved.
+      this.pending.delete(id);
+      throw error;
+    }
     return answered;
   }
 
@@ -416,18 +423,29 @@ export function startChild(
   env: Record<string, string>,
   cwd: string = REPO,
 ): Child {
-  const child = spawn(process.execPath, [script, ...args], {
-    cwd,
-    env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  return childOf(
+    spawn(process.execPath, [script, ...args], {
+      cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }),
+  );
+}
+
+/**
+ * A `Child` over a process already started: its stdout and stderr captured,
+ * its exit observed. `startChild` builds it over what it spawns; the
+ * launcher's own tests build it over a stand-in process, to fire the
+ * process's events in either order.
+ */
+export function childOf(child: ChildProcess): Child {
   let captured = '';
   let written = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', (chunk: string) => {
+  child.stderr?.setEncoding('utf8');
+  child.stderr?.on('data', (chunk: string) => {
     captured += chunk;
   });
-  child.stdout.on('data', (chunk: Buffer) => {
+  child.stdout?.on('data', (chunk: Buffer) => {
     written += chunk.toString('utf8');
   });
   const exited = new Promise<never>((_, reject) => {
@@ -458,7 +476,7 @@ export function startChild(
       return closed;
     },
     end: () => {
-      if (running()) child.stdin.end();
+      if (running()) child.stdin?.end();
       return closed;
     },
   };
@@ -470,15 +488,18 @@ class ChildStdioTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
   private readonly buffer = new ReadBuffer();
+  /** A write to the child's stdin failed: the child is going. */
+  writeFailed = false;
 
   constructor(private readonly child: ChildProcess) {}
 
   async start(): Promise<void> {
     // A broken pipe would otherwise be an unhandled 'error' event; its
     // message is the system's, so only fixed words go on.
-    this.child.stdin?.on('error', () =>
-      this.onerror?.(new Error('writing to the server stdin failed')),
-    );
+    this.child.stdin?.on('error', () => {
+      this.writeFailed = true;
+      this.onerror?.(new Error('writing to the server stdin failed'));
+    });
     this.child.stdout?.on('data', (chunk: Buffer) => {
       this.buffer.append(chunk);
       for (;;) {
@@ -504,12 +525,19 @@ class ChildStdioTransport implements Transport {
     return new Promise((resolve, reject) => {
       const stdin = this.child.stdin;
       if (stdin === null || stdin.destroyed) {
+        this.writeFailed = true;
         reject(new Error('the child has no stdin'));
         return;
       }
-      stdin.write(serializeMessage(message), (error) =>
-        error ? reject(error) : resolve(),
-      );
+      // The system's words stay out: a failed write is fixed words.
+      stdin.write(serializeMessage(message), (error) => {
+        if (error) {
+          this.writeFailed = true;
+          reject(new Error('writing to the server stdin failed'));
+        } else {
+          resolve();
+        }
+      });
     });
   }
 
@@ -523,13 +551,17 @@ class ChildStdioTransport implements Transport {
  * `initialize` has been answered, raced against the child's exit.
  */
 export async function stdioReady(child: Child): Promise<McpSession> {
-  const session = new McpSession(new ChildStdioTransport(child.process));
-  // A session closed by the child's exit answers with the exit status
-  // (`exited`), whichever of the child's events came first.
+  const transport = new ChildStdioTransport(child.process);
+  const session = new McpSession(transport);
+  // A session ended by the child going — its exit seen, or its stdin
+  // refusing the write — answers with the exit status (`exited`, which
+  // settles when the child closes), whichever of its events came first.
   const initialized = session
     .initialize()
     .catch((error: unknown) =>
-      child.process.exitCode !== null || child.process.signalCode !== null
+      transport.writeFailed ||
+      child.process.exitCode !== null ||
+      child.process.signalCode !== null
         ? child.exited
         : Promise.reject(error),
     );

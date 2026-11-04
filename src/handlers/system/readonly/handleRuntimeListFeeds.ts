@@ -23,6 +23,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
+import { withSystemKindOf } from '../../../lib/connectionFactory';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import {
@@ -511,9 +512,10 @@ const ROUNDS_ENDED_WORDS =
 /**
  * A connection for one feed's read whose requests wait for their round:
  * `ask` holds each one until the round sends it, and settles it with the
- * part's answer.
+ * part's answer. It has `connection`'s system kind, as every view over a
+ * connection has (`withSystemKindOf`).
  */
-function roundConnection(
+export function roundConnection(
   connection: HandlerContext['connection'],
   ask: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): HandlerContext['connection'] {
@@ -535,7 +537,7 @@ function roundConnection(
       return ask(request) as Promise<IAdtWireResponse<T, D>>;
     },
   };
-  return view;
+  return withSystemKindOf(view, connection);
 }
 
 /** What the rounds answer: every feed's answer, or the one that ends the call. */

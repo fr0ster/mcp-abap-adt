@@ -10,11 +10,14 @@
  * launcher's would leave one.
  */
 
+import { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 import {
   type Child,
+  childOf,
   httpReady,
   LISTENING_LINE,
   startChild,
@@ -163,6 +166,77 @@ describe('stdio readiness', () => {
     await expect(stdioReady(child)).rejects.toThrow(
       'the child exited (4) before it was stopped:\nno answer from this fake',
     );
+  });
+});
+
+/**
+ * A stand-in process — no real one — whose events the test fires in the
+ * order it chooses: the helper's answer must not depend on the platform's
+ * order of `exit` and `close`.
+ */
+function standIn(stdin: Writable): ChildProcess {
+  const process = new ChildProcess();
+  process.stdin = stdin;
+  process.stdout = new PassThrough();
+  process.stderr = new PassThrough();
+  return process;
+}
+
+/** The stand-in ends with `code`, firing its events in `order`. */
+function endStandIn(
+  process: ChildProcess,
+  code: number,
+  order: ReadonlyArray<'exit' | 'close'>,
+): void {
+  for (const event of order) {
+    if (event === 'exit') {
+      Object.defineProperty(process, 'exitCode', { value: code });
+    }
+    process.emit(event, code, null);
+  }
+}
+
+describe('stdio readiness, whatever the order of the child’s events', () => {
+  it.each<[string, ReadonlyArray<'exit' | 'close'>]>([
+    ['exit, then close', ['exit', 'close']],
+    ['close, then exit', ['close', 'exit']],
+  ])('%s: the exit status', async (_name, order) => {
+    const process = standIn(new PassThrough());
+    const child = childOf(process);
+    const readiness = stdioReady(child);
+    const rejected = expect(readiness).rejects.toThrow(
+      'the child exited (4) before it was stopped:\nno answer',
+    );
+    process.stderr?.emit('data', 'no answer\n');
+    await turn();
+    endStandIn(process, 4, order);
+    await rejected;
+  });
+
+  it('a child that refuses the write: the exit status, none of the system’s words', async () => {
+    const process = standIn(
+      new Writable({
+        write(_chunk, _encoding, done) {
+          done(new Error('EPIPE words of the system'));
+        },
+      }),
+    );
+    const child = childOf(process);
+    let settled: unknown;
+    const readiness = stdioReady(child).catch((error: unknown) => {
+      settled = error;
+    });
+    await turn();
+    await turn();
+    // The write failed, and the child has not closed yet: still waiting.
+    expect(settled).toBeUndefined();
+    process.stderr?.emit('data', 'went away\n');
+    endStandIn(process, 5, ['exit', 'close']);
+    await readiness;
+    expect(String(settled)).toContain(
+      'the child exited (5) before it was stopped:\nwent away',
+    );
+    expect(String(settled)).not.toContain('EPIPE');
   });
 });
 

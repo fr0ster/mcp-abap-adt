@@ -615,8 +615,9 @@ function recordedNames(): Set<string> {
  *    back as it was (`rememberConfiguredRequest`), the created ones empty;
  * 4. only then the recorded tasks and requests deleted, the later created
  *    first (a task before its request), each asserted absent with
- *    `GetTransport`. The order of step 4 is provisional until measured on
- *    the system (plan C2a).
+ *    `GetTransport`. The order is measured on premise (plan C2a): the
+ *    tasks first, the later created first, then the request, each reading
+ *    `404` after; the cloud is pending.
  * A record goes only once its step succeeded; when a step fails, or a send
  * is refused, everything still recorded is named in the leftovers report.
  */
@@ -637,6 +638,9 @@ export async function deleteRecordedRequests(): Promise<void> {
     }
     const requests = [...configured.keys(), ...createdRequests];
     for (const request of requests) {
+      // Membership only: an entry the request held before stays. A count
+      // this misses (the same entry held more often now) fails the final
+      // comparison below, which counts.
       const before = new Set(configured.get(request) ?? []);
       for (const held of await transportObjects(request)) {
         if (!names.has(held.name.toUpperCase())) continue;

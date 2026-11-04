@@ -603,6 +603,27 @@ describe('the transport cleanup', () => {
     expect(leftovers()).toEqual(['entry K900020/K900021 PROG ZLIVE_OURS']);
   });
 
+  it('a configured request holding the same entry twice on one task counts it twice, and reads back as it was', async () => {
+    // The same task, pgmid, type and name, twice: a counted list keeps two,
+    // a set one — and the read afterwards holds two.
+    const configured: StandRequest = {
+      number: 'K900060',
+      description: 'configured',
+      tasks: ['K900061'],
+      objects: [
+        { name: 'ZLIVE_SAME', type: 'PROG' },
+        { name: 'ZLIVE_SAME', type: 'PROG' },
+      ],
+    };
+    const requests = [configured];
+    deletions(requests);
+    organizer(requests);
+    await rememberConfiguredRequest(configured.number);
+    await deleteRecordedRequests();
+    expect(leftovers()).toEqual([]);
+  });
+
+  // Pins the task in the entry's key: one object on two tasks is two entries.
   it('a configured request holding one object on two tasks counts both, and reads back as it was', async () => {
     const configured: StandRequest = {
       number: 'K900050',

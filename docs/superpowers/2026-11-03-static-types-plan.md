@@ -136,8 +136,9 @@ binds, and each step names the spec section it carries out. Every step ends gree
 ## Test coverage (spec §8)
 
 The stage runs after step 17 and before step 18. It is written as tasks C1–C16, each with its
-own steps. The open items at the end of this section wait for the owner's decision before the
-task that needs them starts.
+own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
+and open items") and applied in the tasks; the two items still open there wait for him before
+the task that needs them.
 
 **Global constraints.** Every task's requirements include these:
 - **Commands.** npm scripts only. Never `npx`, `npm exec`, `node_modules/.bin` or `ts-node`.
@@ -161,7 +162,7 @@ task that needs them starts.
 - **Committed text.** Tool descriptions stay functional. No system name, system id, transport
   number or user name in a committed file.
 - **Every task ends green,** except the guard test of C1. It is red from C1 until C16 lands and
-  lists the keys still missing; see open item O1. Green means:
+  lists the keys still missing, unless the owner chooses otherwise in O1 (still open). Green means:
   - build, `npm run test:check` and the root `npm test`;
   - every package's `lint:check` and `test:check`.
 - **Expected request literals** come from running the code on the stand-in. They are reviewed
@@ -236,13 +237,16 @@ and live specifics.
   - `servedTools(): Promise<readonly ServedTool[]>`: `tools/list` of all twelve binaries for
     both variants.
 - **`coverageKeys.ts`**
-  - `type CoverageKey = string`, in the form `Tool`, `Tool#OBJECT_TYPE`,
-    `HandlerGet#OBJECT_TYPE#part` or `HandlerGet#-#part`.
+  - `type CoverageKey = string`: the tool, then one `#value` per enum dimension it declares, in
+    the fixed order `object_type`, `part`, `operation`, `action` (`HandlerLock#CLASS`,
+    `GetClass#source`, `HandlerDebugStep#stepInto`, `HandlerGet#CLASS#source`,
+    `HandlerGet#-#object_structure`).
   - `keyOf(tool: string, args: ToolArgs): CoverageKey`: the one function that turns a call
     into its key, used by `requiredKeys`' callers, `pinCases`, `liveCall` and `ledgerScan`
     alike.
   - `requiredKeys(served: readonly ServedTool[]): ReadonlyMap<CoverageKey, ReadonlySet<SystemKind>>`.
-    - The `object_type` values come from each listed schema's enum.
+    - The `object_type`, `part`, `operation` and `action` values come from each listed
+      schema's enums (O11, decided).
     - The typed `HandlerGet` pairs come from `compactReadRoutes` / `compactPartRoutes`.
     - The typeless `HandlerGet` keys are the five parts `handleHandlerGet` routes before a type
       (`object_structure`, `node_structure`, `virtual_folders`, `activation_status`,
@@ -255,7 +259,13 @@ and live specifics.
     - From `recordingConnection`: `url` joined with `params` in their recorded order, `data`
       as the body.
     - From `adtStandIn`: its full header map and its raw target.
-    - Nothing recorded is dropped: a recorded field the shape has no place for fails the case.
+    - Lossless: every wire field of the record reaches the shape unchanged — method; path and
+      query; every header (the stand's full map, not its selected ones); body.
+    - Excluded by name, and only these: fields the stand adds about itself, never sent —
+      `StandInRequest.session` (its ABAP session label). The derived copies
+      (`authorization`, `sessionType`, `cookie`, `contentType`, `accept`) are already in the
+      full header map.
+    - Any other field the shape has no place for fails the case.
   - `interface PinCase { tool: string; variant: SystemKind; stand: 'recording' | 'adtStandIn' | 'server'; args: ToolArgs; answers?: ReadonlyArray<Partial<IAdtWireResponse> | undefined>; before?: ReadonlyArray<{ tool: string; args: ToolArgs }>; refusal?: 'answer' | 'thrown'; expected: readonly PinnedRequest[] | 'none'; ran?: (answer: McpResult) => void }`.
     - The key is `keyOf(tool, args)`. There is no separate type or part field.
     - `before` holds the calls that make the state the tool needs, in the same server. Their
@@ -271,7 +281,11 @@ and live specifics.
       - the pinned list `toEqual(expected)`, or zero requests for `'none'`;
       - `ran(answer)` for `'none'`;
       - the answer's `isError`, `true` only with `refusal: 'answer'`;
-      - with `refusal: 'thrown'`, that the call throws with `invalidArgumentsWords`' text.
+      - with `refusal: 'thrown'`, that the call throws with `invalidArgumentsWords`' text **and**
+        that nothing was recorded (`expected: 'none'` is required with it). A refusal row is
+        supplemental: the guard does not count it for its key.
+    - It must be called in executable Jest scope (top level, or a `describe` callback); the
+      guard refuses a call inside a function nothing calls.
 - **`pinServer.ts`**
   - `pinServer(variant: SystemKind, stand: AdtStandIn): Promise<PinServer>`, where
     `interface PinServer { call(tool: string, args: ToolArgs): Promise<McpResult>; close(): Promise<void> }`.
@@ -321,7 +335,8 @@ and live specifics.
   - `'a none row is a tool the spec names as sending nothing'`: `BatchBegin`, `BatchAnswers`,
     `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`,
     `HandlerBackgroundRunGet`, `HandlerBackgroundRunList`, `HandlerBackgroundRunDiscard`, and
-    `HandlerBatch` with `action` `begin` / `answers` once O11 decides its keys.
+    `HandlerBatch#begin`, `HandlerBatch#answers`. Any other key found sending nothing when it
+    is pinned joins this list only with the reason read from its handler, in the same commit.
   - `'no pinCases row or liveCall in a scanned file lacks a ledger row'`.
 - [ ] **Step 2: Write one fixture per refusal and a test that each is refused,** each by its
   own check alone. The refusals:
@@ -330,6 +345,8 @@ and live specifics.
   - `expected: []`; a spread or computed request; a non-literal `url`; a request with a fifth
     key;
   - a relabelled pin: the ledger key differs from `keyOf(tool, args)`;
+  - a dormant registration: `pinCases` (or `liveSuite`) inside a function nothing calls;
+  - a key covered only by a `refusal` row;
   - a typeless `HandlerGet` part pinned under a typed key;
   - `'none'` on a tool not named as sending nothing;
   - a `liveCall` in `afterEach`; in a cleanup lambda; outside `liveSuite`;
@@ -347,7 +364,9 @@ and live specifics.
   - `'a none case fails when the tool never ran'`: a stub tool that returns before doing
     anything; `ran` sees no result.
   - `'a none case fails when the tool sends a request'`.
-  - `'a thrown refusal is asserted as thrown'`.
+  - `'a thrown refusal is asserted as thrown, with zero requests'`: a case that sends before
+    throwing fails.
+  - `'toPinned excludes session and nothing else'`.
   - `'toPinned keeps the query, every header and the body'`: one request through each stand,
     with params, three headers and a body, each found in the pinned shape.
 - [ ] **Step 4: Write `live.ts`' own unit tests** (`src/__tests__/unit/coverage/live.test.ts`), on
@@ -413,14 +432,20 @@ and live specifics.
     on (`globalSetup.ts`, the `catch` after `connection.connect()`); afterwards it throws and
     the marker exists;
   - `'no connection is created after the marker'`;
-  - `'cleanup, name-free reads and the debugger and session helpers send nothing after the marker'`.
+  - `'cleanup, name-free reads and the debugger and session helpers send nothing after the marker'`;
+  - `'a refusal on a connected path latches before the next send'`: the connection is made,
+    the stand-in then answers `401` to a tool call; the next `liveCall`, read-back, cleanup
+    request and debugger-helper request each send nothing, and the marker exists;
+  - the same with the first refusal on a read and on a cleanup request.
 - [ ] **Step 4: Implement.**
   - `globalSetup` calls `realmCheck` before it builds the factory, and rethrows a credential
     refusal after writing the marker. A setup without config still returns at once.
   - Every connection-creation helper checks the marker first, and writes it on a logon refusal
     (a `401` at logon, a broker refusal).
   - `liveCall`, `deleteRecorded`, `expectNameFree`, `expectAbsent`, `expectCleared` and the
-    debugger and session helpers check it before each request.
+    debugger and session helpers check it before each request, and **latch** it when a request
+    they sent on an established connection is refused for its credential (a `401`, a broker
+    refusal) — not only at logon.
   - `globalTeardown` compares the run report with `coverage-ledger.json` for the configured
     system kind, in the scope of the running script.
 - [ ] **Step 5: Run the tests above:** PASS. Without a config, `npm run test:integration` still
@@ -439,7 +464,8 @@ and live specifics.
 - `HandlerGet#-#activation_status` and `HandlerGet#-#activation_results`: they read an
   activation run by the `run_id` an activation of this task answers.
 
-**Decisions needed before it starts:** O1, O2, O11, O12 (the first live run).
+**Owner's decisions applied:** O2 (literal pins), O12 (the owner supplies `coverage_activate`
+before the first live run).
 
 **Unit:** `src/__tests__/unit/pins/activate.pins.test.ts`, on `recordingConnection`. Each
 activation answer is a corpus activation result.
@@ -479,9 +505,16 @@ activation answer is a corpus activation result.
   its sections (`check_*_high`).
 - New: `coverage/check.live.test.ts`, for the compact keys and `CheckTableType`, section
   `coverage_check`.
-- **Objects.** Shared objects only: read, never written, so nothing is created and no cleanup
-  is needed.
-- **Assertions.** The check-run report is read and has the object's URI.
+- **Objects.** Checks run on shared objects only: read, never written. Validations run on
+  names.
+- **Check assertions** (`Check<Type>`, `HandlerCheckRun#<type>`): the answer's `ran` is true,
+  its `status_text` is read, and its `messages` list is present (empty or not) — "it ran" is
+  asserted apart from "it found nothing".
+- **Validation assertions** (`HandlerValidate#<type>`): `admissible` is read.
+  - The positive case validates a prospective unused name (`expectNameFree` first; nothing is
+    created) and expects `admissible: true`.
+  - The negative case validates the name of an existing shared object and expects
+    `admissible: false` — an answer, not an error.
 
 **Steps:** the family steps. 7.
 
@@ -497,7 +530,7 @@ activation answer is a corpus activation result.
 
 **Unit:** `src/__tests__/unit/pins/write.pins.test.ts`.
 - Each update is pinned on its whole locked chain: lock, write, unlock.
-- The creates already pinned by parity are pinned again here, by literal (open item O2).
+- The creates already pinned by parity are pinned again here, by literal (O2, decided).
 
 **Live:**
 - **The existing `high/<type>/*HighHandlers.test.ts`.** Create, update and read-back move into
@@ -528,12 +561,15 @@ chains are built per operation, not from one type list:
   extension; a BDEF over the test's own root view (C3's rule); a service definition before its
   binding. Objects go into `$TMP` or the configured package, which the test does not create.
 
-**Decisions needed before it starts:** O4 and O5 (`HandlerCreate#TRANSPORT` creates a
-request).
+**Pending:** O4 / O5 (still open) for the `HandlerCreate#TRANSPORT` live case only; its pin
+and every other key do not wait.
 
-**Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. The 112 rows of
-`lowToCompact.test.ts` stay. The types they leave out get pins here: `TABLE_TYPE`, `INCLUDE`,
-`SERVICE_*`, `BEHAVIOR_*`, `METADATA_EXTENSION`, `TRANSPORT`.
+**Unit:** `src/__tests__/unit/pins/compactWrites.pins.test.ts`. **Every operation × type key
+gets its own literal pin, per variant** (O2): `HandlerCreate#<type>` (19 on premise, 17 on the
+cloud), `HandlerLock#<type>` and `HandlerUnlock#<type>` (18 / 16), `HandlerUpdate#<type>`
+(24 / 22) — `HandlerLock#CLASS` included, though `lowToCompact.test.ts` already covers it by
+parity. The 112 parity rows of `lowToCompact.test.ts`, `createSingleCall`, `updateSingleCall`
+stay unchanged beside them.
 
 **Live:** `coverage/compactWrites.live.test.ts`, section `coverage_compact_writes`.
 - It is enabled in the template and runs in soft mode. The hard-mode
@@ -562,11 +598,16 @@ request).
   include before its program; the package last.
 
 **Unit:** `src/__tests__/unit/pins/delete.pins.test.ts`. The deletes already pinned by parity
-are pinned again here by literal (O2).
+are pinned again here by literal (O2, decided).
 
 **Live:**
 - **Full tools.** Each `<type>` suite of C5 ends its test body with `liveCall('Delete<Type>', …)`
-  and then `expectAbsent`.
+  and then the assertion its contract names: `expectCleared` for `DeleteLocalDefinitions`,
+  `DeleteLocalMacros`, `DeleteLocalTypes`, `DeleteLocalTestClass` (in the class suite, the class
+  still reading); `expectAbsent` for every other delete.
+- **`DeleteUnitTest` and `DeleteCdsUnitTest`** live in C12's unit-test suites, after their runs:
+  `DeleteUnitTest` with `expectCleared` (the test include empty, the class stays),
+  `DeleteCdsUnitTest` with `expectAbsent` (its class is removed). C7 owns their pins only.
 - **`DeleteServiceDefinition`.** Its local wrapper in `ServiceDefinitionHighHandlers` goes; the
   test calls the tool.
 - **Compact keys.** `coverage/compactDeletes.live.test.ts`, section `coverage_compact_writes`.
@@ -605,18 +646,35 @@ are pinned again here by literal (O2).
   `HandlerGet#-#node_structure`, `HandlerGet#-#virtual_folders`, which `handleHandlerGet`
   routes before any type. The typeless run parts are C3's.
 
-**Decisions needed before it starts:** O7.
+**Owner's decision applied:** O7 — before a cloud case of `GetEnhancementImpl`,
+`GetEnhancementSpot` or `GetEnhancements` is written, the trial's ADT discovery is read for
+its endpoint; an endpoint it does not offer is reported to the owner.
 
-**Unit:** `src/__tests__/unit/pins/read.pins.test.ts`. The source part is pinned by literal as
-well as the metadata part, which `metadataReads.test.ts` pins only by parity.
+**Unit:** `src/__tests__/unit/pins/read.pins.test.ts`, one literal pin per key — the tool and,
+where its schema has a `part` enum, each part.
+
+**Parts and assertions per reader** (parts from the listed schemas; source-less types from
+`compactPartRoutes.ts`' `SOURCELESS`):
+
+| Reader | Keys (parts) | Live assertion |
+| --- | --- | --- |
+| `GetClass`, `GetInterface`, `GetProgram`, `GetDdl`, `GetMetadataExtension`, `GetBehaviorDefinition`, `GetBehaviorImplementation`, `GetServiceDefinition`, `GetFunctionModule`, `GetFunctionInclude`, `GetInclude` | `#source`, `#metadata` | source: non-empty text naming the object; metadata: the object's name and ADT type |
+| `GetTable`, `GetStructure` | `#source`, `#metadata` | source: the DDIC source naming the object; metadata: name and type |
+| `GetServiceBinding` | `#source`, `#metadata` | source: the binding's service document; metadata: name and binding type |
+| `GetDomain`, `GetDataElement`, `GetFunctionGroup`, `GetPackage`, `GetTableType`, `GetMessageClass`, `GetEnhancementSpot`, `GetEnhancementImpl` | the tool alone: no source part | the metadata document's name and type (domain: its data type; data element: its type; package: its super package or software component; message class: a message) |
+| `GetLocalDefinitions`, `GetLocalMacros`, `GetLocalTestClass`, `GetLocalTypes` | the tool alone | the include's text is read (it may be empty) and the class still reads |
+| `GetMessageClassMessage` | the tool alone | the message text of the number asked |
+| `GetEnhancements`, `GetIncludesList`, `GetMainPrograms`, `ListFunctionGroupIncludes`, `ListFunctionModules`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetTypeInfo` | the tool alone | the list or tree holds the named shared object (or, `GetTypeInfo`, the type's kind) |
+| `HandlerGet#<type>#source` | per type with a source (not `PACKAGE`, `DOMAIN`, `DATA_ELEMENT`, `FUNCTION_GROUP`, `TABLE_TYPE`) | as the full reader's source |
+| `HandlerGet#<type>#metadata`, `#urls`, `#contents`, `#main_programs` | per type the routes serve | metadata as above; urls: the object's URI; contents: the package's entries; main programs: the include's main program |
+| `HandlerGet#-#object_structure`, `#node_structure`, `#virtual_folders` | typeless | a node of the named object or package |
 
 **Live:**
 - **Existing read suites** move their calls to `liveCall`.
 - **New: `coverage/reads.live.test.ts`,** section `coverage_reads`.
   - **Objects.** Shared objects only (`shared_dependencies`), read and never written. The
-    enhancement spot and implementation are named in the section; open item O7.
-  - **Assertions.** Each read answers the named object: its name and type in the answer, and
-    the source is not empty.
+    enhancement spot and implementation are named in the section, after the discovery check.
+  - **Assertions.** Per the table above; a source-less type is never asked for `source`.
 
 **Steps:** the family steps. 7.
 
@@ -626,14 +684,17 @@ well as the metadata part, which `metadataReads.test.ts` pins only by parity.
 - The 28 generated `Get<Type>Versions` / `Get<Type>VersionSource` / `Get<Type>VersionDiff`.
 - `GetObjectVersions`, `GetObjectVersionSource`, `GetObjectVersionDiff`.
 
-**Decisions needed before it starts:** O3.
+**Owner's decision applied:** O3 — read-only objects that already have versions; on the cloud,
+what exists is measured first.
 
 **Unit:** `src/__tests__/unit/pins/versions.pins.test.ts`. The version feed and the source
 answers are corpus documents.
 
 **Live:** `coverage/versions.live.test.ts`, section `coverage_versions`.
 - **Objects.** One object per type with at least two versions, named in the config and only
-  read. Which objects is open item O3.
+  read: on premise one per type named in `coverage_versions`; on the cloud, the objects found
+  by measuring first (the version feed of candidate objects, read only), then named. A type
+  with none on a system is reported to the owner.
 - **Assertions.**
   - The version list has at least two entries.
   - The source of the newest is not empty.
@@ -651,7 +712,9 @@ answers are corpus documents.
 - Compact: `HandlerSearch`, `HandlerGetData`, `HandlerWhereUsed#<type>` (its listed schema has
   an `object_type` enum, so one key per type).
 
-**Decisions needed before it starts:** O8.
+**Owner's decision applied:** O8 — the cloud cases of `GetSqlQuery` and `GetTableContents` are
+written only after the trial's ADT discovery is read for their endpoints; an endpoint it does
+not offer is reported to the owner.
 
 **Unit:** `src/__tests__/unit/pins/system.pins.test.ts`.
 
@@ -660,8 +723,8 @@ answers are corpus documents.
   `WhereUsedHandlers`, `SqlQueryHandlers`, `TableContentsHandlers`, `AbapSystemSymbolsHandler`.
 - **New: `coverage/system.live.test.ts`,** section `coverage_system`, for the rest. It reads
   shared objects; `GetTransaction` reads a transaction named in the section.
-- **Cloud.** `GetSqlQuery` and `GetTableContents` are listed on the cloud but run live today on
-  premise only: open item O8.
+- **Cloud.** `GetSqlQuery` and `GetTableContents` read a table of the test package on the
+  cloud, once the discovery check passes.
 
 **Steps:** the family steps. 7.
 
@@ -676,7 +739,8 @@ answers are corpus documents.
 - Compact: `HandlerDumpList`, `HandlerDumpView`, `HandlerProfileList`, `HandlerProfileRun`,
   `HandlerProfileSchedule`, `HandlerProfileView`.
 
-**Decisions needed before it starts:** O6.
+**Owner's decision applied:** O6 — the trace files and parameters a run leaves are accepted
+as the test user's own and listed in the run report.
 
 **Unit:** `src/__tests__/unit/pins/runtime.pins.test.ts`. `RuntimeRunClass` and
 `RuntimeRunProgram` without `background` go through the entry; with `background: true` they are
@@ -690,7 +754,8 @@ C16's (server-dispatched).
     `HandlerProfileRun`. On premise, a probe program as well, run through `RuntimeRunProgram`.
   - **Assertions.** The run's output is read. The profile appears in `HandlerProfileList` and
     is read by `HandlerProfileView`.
-  - **Profiler state.** Open item O6.
+  - **Profiler state.** What the run leaves is listed in the run report; another user's traces
+    are never read.
 
 **Steps:** the family steps. 7.
 
@@ -711,6 +776,9 @@ C16's (server-dispatched).
 **Live:**
 - **The existing `unitTest/*` suites** move to `liveCall`. `RunAbapUnit` and the compact keys
   get cases there, on the class the suite creates.
+- **Their deletes live here** (pins in C7): the class unit-test suite ends with
+  `DeleteUnitTest` then `expectCleared` (test include empty, class reads); the CDS unit-test
+  suite ends with `DeleteCdsUnitTest` then `expectAbsent`.
 - **Assertions.** The run's result is read: the test count and that no test failed.
 
 **Steps:** the family steps. 7.
@@ -724,7 +792,9 @@ C16's (server-dispatched).
 - Compact: `HandlerTransportCreate`, `HandlerTransportMoveObjects`,
   `HandlerTransportSortAndCompress`.
 
-**Decisions needed before it starts:** O4, O5 (already settled for C6 if decided there).
+**Pending:** O4 / O5 (still open: the owner prefers one request at all). The pins do not
+wait; the live cases of `CreateTransport`, `CreateTransportTask` and `HandlerTransportCreate`
+are written after his answer.
 
 **Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
 
@@ -734,8 +804,7 @@ C16's (server-dispatched).
   - **Objects.** A transportable package named in the section; `$TMP` cannot be recorded.
     The test creates a request and a task, and adds and removes an object it created.
   - **Never** release a request.
-  - **The request and task remain:** open item O4.
-  - **Cloud:** open item O5.
+  - **Requests and the cloud:** pending O4 / O5.
 
 **Steps:** the family steps. 7.
 
@@ -771,7 +840,8 @@ C16's (server-dispatched).
 - **Compact:** `HandlerDebugSession`, `HandlerDebugBreakpoints`, `HandlerDebugStep`,
   `HandlerDebugMaintain`, `HandlerDebugBatch`.
 
-**Decisions needed before it starts:** O9, O11.
+**Owner's decisions applied:** O9 (AMDP live on both systems, no exception; take-over on a
+second connection of the same user), O11 (one key per `operation` / `action` value).
 
 **Unit:** `src/__tests__/unit/pins/debugger.pins.test.ts`, `stand: 'server'` on `adtStandIn`:
 the debugger is dispatched by the server, and the listener and the debuggee run on connections
@@ -799,7 +869,7 @@ cases, section `debugger_handlers`.
   - The take-over case uses a second connection of the same user.
   - The other-user case uses `second_user_env` on its own connection.
 - **`afterAll`** stops every listener and logs off every session (`debuggerCleanup.ts`).
-- **Open item O9** covers the take-over connection and AMDP without HANA.
+- **AMDP** keys run on both systems (O9): both are HANA.
 
 **Steps:** the family steps. 7.
 
@@ -813,7 +883,8 @@ cases, section `debugger_handlers`.
 - `ListLeftoverSessions`, `LogoffLeftoverSession`, `HandlerLeftoverSessionList`,
   `HandlerLeftoverSessionLogoff`.
 
-**Decisions needed before it starts:** O10, O11.
+**Owner's decisions applied:** O10 (the test makes its own leftover), O11 (one key per
+`action` value).
 
 **Unit:** `src/__tests__/unit/pins/sessions.pins.test.ts`, `stand: 'server'` on `adtStandIn`.
 This covers the four compact handlers no test runs today.
@@ -841,7 +912,10 @@ This covers the four compact handlers no test runs today.
   read and closed, then the closed handle is refused.
 - **Background runs.** `RuntimeRunClass` with `background: true` on a probe class the test
   creates. The run is got, listed and discarded, and the discarded run is absent from the list.
-- **Leftover sessions.** Open item O10.
+- **Leftover sessions** (O10): the test starts the stdio binary on its destination and opens a
+  session, ends the process without logoff, then lists through a new process and logs off only
+  the session it made, by its id; a leftover it did not make is listed, never logged off. It
+  asserts the tool's answer, not SM04.
 
 **Steps:** the family steps, then:
 - [ ] Turn the guard green: `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts`
@@ -850,83 +924,77 @@ This covers the four compact handlers no test runs today.
 
 8 steps in all.
 
-### Open items (owner's decision before the task that needs them)
+### Owner's decisions and open items
 
-- **O1. The guard is red during the stage.**
-  - The plan keeps it red from C1 to C16, so CI on the PR is red that long.
-  - Alternative: land it as `test.failing` and switch it to `test` in C16. CI stays green, but
-    the missing-key list is hidden until then.
-  - Recommendation: keep it red, as the owner asked ("red first"). Push each family as it
-    lands.
-- **O2. Re-pin keys already pinned by parity, by literal.**
-  - `createSingleCall`, `metadataReads`, `lowToCompact` and the other parity files pin "request
-    equals another path's request", not a literal. The guard sees only `pinCases`.
-  - Recommendation: re-pin every key in `pinCases`, keeping the parity tests. This is uniform,
-    cheap from the stand-in run, and closes the half-pinned rows the inventory counts as PINNED.
-  - The alternative, teaching the scanner each parity table, couples the guard to those
-    files' shapes.
-- **O3. Version tools need objects with two or more versions.** We never release a transport,
-  so an object the test creates in `$TMP` has no version history.
-  - Recommendation: read-only objects with a history. On premise, one SAP-delivered object per
-    type, named in `coverage_versions`.
-  - On the cloud this is to be measured first. For a type without such an object, the owner
-    decides.
-- **O4. `CreateTransport` / `CreateTransportTask` leave a request behind.** No tool deletes
-  one, and none may be released.
-  - Recommendation: one request and one task per run, each with a fixed test description and
-    emptied by `RemoveTransportObject`. The run report lists them for the owner.
-- **O5. Transport tools on the cloud trial.** Its development package has no transport, and
-  the existing suite is on premise only.
-  - Recommendation: measure first whether the trial can create a request.
-  - If not, the owner decides whether `available_in: cloud` is a defect to fix (spec §8,
-    acceptance 4) or an exception.
-- **O6. Profiler state.** `RuntimeCreateProfilerTraceParameters` and the profile runs leave
-  trace files and parameters, and no tool deletes them.
-  - Recommendation: accept them as the trace of the test user's own run, listed in the run
-    report. A shared system's other users' traces are never read.
-- **O7. Enhancement reads on the cloud.** `GetEnhancementImpl` / `GetEnhancementSpot` are listed
-  on the cloud.
-  - Recommendation: measure on the trial for an enhancement object to read. If there is none,
-    the owner decides as in O5.
-- **O8. `GetSqlQuery` / `GetTableContents` on the cloud.** Listed there, live on premise only
-  today.
-  - Recommendation: run them on the cloud against a table of the test package. If the trial
-    refuses data preview, decide as in O5.
-- **O9. The debugger's second connection, and AMDP without HANA.**
-  - Take-over needs a second listener of the same user. Recommendation: a second connection of
-    the same user, opened and logged off by the test.
-  - The AMDP keys need HANA. Recommendation: run them on the cloud and on a HANA on-premise
-    system. If the on-premise system is not on HANA, the owner decides whether its AMDP keys
-    are an exception.
-- **O10. Leftover-session tools need a leftover session.**
-  - Recommendation: the test makes its own.
-    1. It starts the stdio binary on its destination and opens a session.
-    2. It ends the process without logoff.
-    3. It lists through a new process and logs off only the session it made, matched by its
-       id. A leftover it did not make is listed, never logged off.
-  - The SAP logoff can take minutes to show, so the test asserts the tool's answer, not SM04.
-- **O11. Compact tools with an operation discriminator** (needed before C1, which computes the
-  keys; then C15, C16). Measured from `listed-schemas.json`:
-  - the compact debugger tools use `operation`: `HandlerDebugSession` (13 values),
-    `HandlerDebugBreakpoints` (6), `HandlerDebugStep` (7), `HandlerDebugMaintain` (7);
-  - `HandlerBatch`, `HandlerDebugBatch` (`begin`, `end`, `answers`) and `HandlerSession`
-    (`open`, `close`) use `action`;
-  - the background-run and leftover tools have neither.
-  - The spec keys them by tool only.
-  - Recommendation: add `operation` and `action` as key dimensions, read from the listed
-    schema like `object_type`, so each is pinned and live.
-- **O12. Missing config sections.** The owner's `tests/test-config.yaml` lacks the include,
-  table-type and check sections. Without them those suites skip, and C2's teardown fails the
-  run.
-  - Recommendation: before step 18, copy those sections from the template, plus every
-    `coverage_*` section, with the owner's approval of the values.
-  - Their names go into the PR description.
+**Decided by the owner (binding), applied in the tasks named:**
+- **O2 — re-pin by literal: yes.** Every key is pinned in `pinCases` by literal; the parity
+  tests (`createSingleCall`, `metadataReads`, `lowToCompact`, …) stay. Applied from C3 on.
+- **O3 — versions: yes.** Read-only objects that already have versions, named in
+  `coverage_versions`. On the cloud, what exists is measured first (C9).
+- **O6 — profiler leftovers: yes.** Trace files and parameters a run leaves are the test user's
+  own, accepted, and listed in the run report (C11).
+- **O7 / O8 — cloud availability by ADT discovery.** Before a cloud case of a tool is written,
+  the trial's ADT discovery (`/sap/bc/adt/discovery`) is read for the tool's endpoint. If the
+  discovery does not offer it, the tool is reported to the owner, who decides defect (its
+  `available_in` is wrong, fixed here) or exception; no cloud case is written until then.
+  Applied to `GetEnhancementImpl`, `GetEnhancementSpot`, `GetEnhancements` (C8),
+  `GetSqlQuery`, `GetTableContents` (C10), and to every other tool listed on the cloud whose
+  cloud case cannot be written on a test object.
+- **O9 — AMDP and take-over.** None of our systems is non-HANA: the on-premise system is
+  S/4HANA and the trial is HANA (a non-HANA 7.40 legacy system is a separate implementation,
+  out of scope). The AMDP keys run live on both systems, with no exception.
+  `DebugTakeOverListener` uses a second connection of the same user, opened and logged off by
+  the test (C15).
+- **O10 — leftover sessions: yes, as recommended.** The test makes its own leftover: it starts
+  the stdio binary on its destination and opens a session, ends the process without logoff,
+  then lists through a new process and logs off only the session it made, matched by its id.
+  A leftover it did not make is listed, never logged off. The test asserts the tool's answer,
+  not SM04 (C16).
+- **O11 — per-value keys: yes.** Each value of a compact tool's `operation` or `action` enum is
+  its own coverage key, read from the listed schema like `object_type`. Measured: the compact
+  debugger tools use `operation` (`HandlerDebugSession` 13, `HandlerDebugBreakpoints` 6,
+  `HandlerDebugStep` 7, `HandlerDebugMaintain` 7 values); `HandlerBatch`, `HandlerDebugBatch`
+  (`begin`, `end`, `answers`) and `HandlerSession` (`open`, `close`) use `action`; the
+  background-run and leftover tools have neither (C1, C15, C16).
+- **O12 — config sections: listed here, supplied by the owner.** The controller does not write
+  the owner's `tests/test-config.yaml`. Before the first live run of each task (and before step
+  18) the owner adds the sections below from the template, with the values named:
 
-### Open items: where each decision is needed first
+  | Section | Values the owner supplies |
+  | --- | --- |
+  | `environment` | `expected_realm` (the on-premise 401 realm); `default_package` `$TMP` on premise, the development package on the cloud |
+  | `create_include`, `include_cloud_read` | an include name free on premise; a delivered include readable on the cloud |
+  | `create_table_type` | a free table-type name |
+  | `check_class_high` … `check_metadata_extension_high` (the 14 `check_*_high`) | as in the template: the shared objects of `shared_dependencies` |
+  | `coverage_activate`, `coverage_check`, `coverage_writes`, `coverage_compact_writes` | free names per type in the `ZMCP_BLD_*` convention (the template proposes them) |
+  | `coverage_reads` | an enhancement spot and an enhancement implementation readable on each system (after the discovery check, O7) |
+  | `coverage_versions` | per type, one object with two or more versions, per system |
+  | `coverage_system` | a transaction code to read |
+  | `coverage_runtime` | free probe class and (on premise) probe program names |
+  | `coverage_transport` | a transportable package on premise (pending O4/O5) |
+  | `coverage_sessions` | a free probe class name; `launch_http: true` for the long sessions |
+  | `debugger_handlers` | `second_user_env` (a second user's session file) for the other-user case |
 
-O1 → C1; O11 → C1 (keys), then C15, C16; O2 → C3; O12 → C3's first live run, and step 18;
-O4, O5 → C6 (`HandlerCreate#TRANSPORT`), then C13; O7 → C8; O3 → C9; O8 → C10; O6 → C11;
-O9 → C15; O10 → C16.
+**Still open (not decided):**
+- **O1. The guard is red during C1–C16.** Options before the owner:
+  - keep it red: CI on the PR is red until C16;
+  - `test.failing` until C16: CI green, the missing-key list hidden;
+  - **proposed by the controller:** a committed shrink-only list of uncovered keys
+    (`tests/fixtures/tools/coverage-uncovered.json`). The guard passes when the uncovered keys
+    are exactly that list; a key covered but still listed fails (the list must shrink in the
+    same commit), and a key added to the list fails (it may never grow). C16 deletes the file
+    and the guard then requires every key. CI stays green and every family shows its progress
+    in the diff.
+- **O4 / O5. Transport requests — pending the owner's answer.** The owner said it is better to
+  use one request at all. How the `CreateTransport` / `CreateTransportTask` (and
+  `HandlerCreate#TRANSPORT`, `HandlerTransportCreate`) live cases fit that, on premise and on
+  the trial, waits for his answer. C6's transport row and C13 do not start their live cases
+  until then; their pins do not wait.
+
+### Where each decision is needed first
+
+O1 → C1. O4 / O5 (pending) → C6's `HandlerCreate#TRANSPORT` live case, then C13. The decided
+items apply as named above.
 
 ## Live runs and release
 

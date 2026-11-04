@@ -179,8 +179,10 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
 
 - **Coverage key.** Each key needs a pin and a live case. A key is one of these:
   - a served tool's name;
-  - for a compact tool whose listed schema has an `object_type` enum, the tool and one value of
-    it (`HandlerLock#CLASS`);
+  - for a tool whose listed schema has an `object_type`, `part`, `operation` or `action` enum,
+    the tool and one value of each such enum it declares (`HandlerLock#CLASS`,
+    `GetClass#source`, `HandlerDebugStep#stepInto`, `HandlerBatch#begin`) — the owner's decision
+    for `operation` and `action` (plan, O11);
   - for `HandlerGet`, the tool, an `object_type` and a `part`, as the handler's own route tables
     serve them (`compactReadRoutes`, `compactPartRoutes`; not the product of the two enums);
   - for `HandlerGet`'s typeless parts, the tool and the part with `-` for the type
@@ -209,7 +211,13 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
     existing suites of those tools do, with the state they need (an open batch, a listener, a
     run) made by earlier calls of the same case and its handles read from those answers.
   - A schema refusal is asserted as `entry.call` throws it (`invalidArgumentsWords`,
-    `src/lib/handlers/interfaces.ts`), not as an answer.
+    `src/lib/handlers/interfaces.ts`), not as an answer, together with zero recorded requests.
+    Such a refusal pin is supplemental: it never stands for its key, which still needs a
+    successful pin.
+  - **The recorded request is kept whole.** Every wire field of the stand's record — method,
+    path and query, every header, body — reaches the pinned shape unchanged. Fields the stand
+    adds about itself and that never went over the wire (`StandInRequest.session`, the ABAP
+    session label of `adtStandIn`) are excluded by name; nothing else is dropped.
   - **A tool that sends nothing is pinned as such.** `BatchBegin`, `BatchAnswers`, the
     background-run get, list and discard (full and compact) answer from server state only. Their
     row states `expected: 'none'` and the case asserts zero recorded requests **and** that the
@@ -271,9 +279,10 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
 - **Debugger cases** stop their listener and log off their session in `afterAll`.
 - **Any credential refusal stops everything.** It is detected wherever a request can go: in
   `globalSetup` (a refusal there is fatal; today it is logged and the run goes on), at every
-  connection creation, and on every sending path the helpers own (`liveCall`, the
-  name-free reads, cleanup, the debugger and session helpers). The first one writes a run marker;
-  every later request of the run refuses before it is sent, and the run fails.
+  connection creation, and at every sending boundary the helpers own **after** the connection
+  exists — a tool call (`liveCall`), a read (name-free reads, read-backs, absence checks), a
+  cleanup request, the debugger and session helpers. The first refusal at any of them latches
+  a run marker; every later request of the run refuses before it is sent, and the run fails.
 - **Where objects go.**
   - On premise: `$TMP`.
   - On the cloud: the configured development package (`environment.default_package`). The
@@ -298,9 +307,13 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
        row of an unserved tool.
      - Each key's `live` systems equal its required kinds exactly.
      - Files are read with the TypeScript compiler API, never matched as text.
-   - **The unit file** must hold a `pinCases([...])` call:
+   - **The unit file** must hold a `pinCases([...])` call **in executable Jest scope**: a
+     statement of the module's top level or of a `describe` callback the module calls at
+     collection — never inside a function nothing calls. The same holds for `liveSuite`.
      - one element's `tool` is a string literal, and its `args` an object literal whose
-       `object_type` / `part` (when present) are string literals; together they equal the key;
+       `object_type` / `part` / `operation` / `action` (when present) are string literals;
+       together they equal the key;
+     - an element with `refusal` does not count for its key;
      - its `expected` is a non-empty array literal, or the literal `'none'` for a tool the
        spec names as sending nothing;
      - each request in it is an object literal of exactly `method`, `url`, `headers` and `body`,
@@ -323,7 +336,8 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
      proves it, among them: a pin whose `tool` or `args` disagree with its ledger key (a
      relabelled pin); a `liveCall` not awaited; a `liveCall` inside a callback the test never
      invokes; an absence check on another object than the one deleted; a `'none'` row of a tool
-     that sends; a `'none'` case whose tool never ran.
+     that sends; a `'none'` case whose tool never ran; a `pinCases` call inside a function
+     nothing calls (a dormant registration); a key covered only by a refusal pin.
 3. **The live run proves the ledger.**
    - The integration run's `globalTeardown` compares the keys that ran and passed on that
      system with the keys the ledger requires there. The run report is written outside the

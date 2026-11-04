@@ -8,9 +8,9 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { runCLI } from '@jest/core';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import { runCLI } from 'jest';
 import { corpusBody } from '../../../lib/adtCorpus';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import {

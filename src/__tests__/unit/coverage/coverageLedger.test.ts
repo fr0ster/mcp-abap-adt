@@ -23,7 +23,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { runCLI } from '@jest/core';
+import { runCLI } from 'jest';
 import { compactModifyEntries } from '../../../../compact-modify/src/group';
 import { PART_TYPES } from '../../../handlers/common/low/handleUpdateUnderLock';
 import { declareSystemKind } from '../../../lib/systemKind';

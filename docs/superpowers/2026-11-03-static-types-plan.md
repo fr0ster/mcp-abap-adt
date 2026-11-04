@@ -721,15 +721,32 @@ and live specifics.
     `mcp-abap-adt-http` → `http/bin/mcp-abap-adt-http.js` (`@mcp-abap-adt/http`); SSE
     `mcp-abap-adt-sse` → `sse/bin/mcp-abap-adt-sse.js`. Each runs from the build
     (`npm run build` first), started with `process.execPath` and the bin path.
+  - **Full or compact, by the tools the case calls.** The full binaries do not serve the
+    compact tools C16 and the compact families need (`HandlerSession`, the compact leftover
+    and background-run tools, every `Handler*`). So `hardMode.ts` takes the set as a choice —
+    `'full' | 'compact'` — and starts the compact binary for the compact set, from the
+    compact packages' `bin` fields: stdio `mcp-abap-adt-compact` →
+    `compact/bin/mcp-abap-adt-compact.js` (`@mcp-abap-adt/compact`); Streamable HTTP
+    `mcp-abap-adt-compact-http` → `compact-http/bin/mcp-abap-adt-compact-http.js`
+    (`@mcp-abap-adt/compact-http`); SSE `mcp-abap-adt-compact-sse` →
+    `compact-sse/bin/mcp-abap-adt-compact-sse.js` (`@mcp-abap-adt/compact-sse`).
   - **Arguments:** only what each binary's own help (`--help`) and its launcher's option
     parser accept, read at the step and listed in `hardMode.ts`' doc comment; no
     `--transport`.
+  - **The system kind, passed explicitly.** `hardMode.ts` (around line 117) drops
+    `SAP_SYSTEM_TYPE` from the child's environment, and an HTTP server does not infer the
+    kind: `server-runtime/src/http/launcher.ts` exits before listening without it ("the
+    system kind is required, never guessed: stated by `--system-type`, `SAP_SYSTEM_TYPE` or
+    YAML `system-type`"). Every child — stdio and HTTP, full and compact — gets
+    `--system-type=<kind>` with the configured kind (`environment.system_type`, or the
+    session's kind as `getSystemType()` reads it), never a default.
   - **Credentials, as the server's own code and docs define them:** stdio from its
     destination configuration — `--env=<name>` / `--env-path=<file>` / `--mcp=<destination>`
     with `--auth-broker-path`, as `hardMode.ts` already maps the test config; HTTP from each
-    request's headers (`x-sap-*`, the destination's user and password or `x-sap-jwt-token`,
-    as `docs/` and the HTTP server's header-credential code state), read by the test from the
-    session file at run time. No secret is written into a committed file or a command line
+    request's headers, by these exact names: `x-sap-url`, optional `x-sap-client`, and either
+    `x-sap-login` with `x-sap-password` or `x-sap-jwt-token` — as `docs/` and the HTTP
+    server's header-credential code state; the values read by the test from the session file
+    at run time. No secret is written into a committed file or a command line
     the logs keep.
   - **Real-binary checks** (`src/__tests__/unit/coverage/hardModeBinaries.test.ts`, against
     `adtStandIn`, beside the fake-child tests):
@@ -739,6 +756,16 @@ and live specifics.
     - HTTP: `'the HTTP binary prints its listening line and an authenticated request reaches
       the stand'` — the `[StreamableHttpServer] Server started on <host>:<port>` line on
       stderr, then a tool call with the header credentials reaches the stand carrying them.
+    - compact, on each transport hard mode uses: `'the compact stdio binary answers
+      initialize and a HandlerGet call reaches the stand'` and `'the compact HTTP binary
+      prints its listening line and a header-authenticated HandlerGet call reaches the
+      stand'`;
+    - the system kind: every check above runs once per kind — `--system-type=onprem` and
+      `--system-type=cloud` — and asserts the child started with that kind (the tool list it
+      answers is that variant's: `GetAdtTypes`' or `HandlerGet`'s listed schema equals the
+      variant's in `listed-schemas.json`); `'an HTTP child without a system kind is not
+      started by hard mode'` — `hardMode.ts` refuses before launching when no kind is
+      configured.
     - Each child is stopped by `SIGTERM` and its exit awaited (Step 4b).
   - A CHANGELOG line is not needed: the launcher is test code and changes no user-visible
     behaviour.

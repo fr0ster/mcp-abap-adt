@@ -284,7 +284,9 @@ Goal: `2026-11-03-static-types-goal.md`. This spec decides what the goal left op
   no request is created for it, except the move, which needs a second request (TR 717) and
   uses one the test created.
 - **Debugger cases** stop their listener and log off their session in `afterAll`.
-- **Any credential refusal stops everything.** It is detected wherever a request can go: in
+- **Any credential refusal stops everything.** A refusal is a call that **ends** refused —
+  after the connection's own renewal and resend failed or was impossible; a renewal that
+  succeeds is not one. It is detected wherever a request can go: in
   `globalSetup` (a refusal there is fatal; today it is logged and the run goes on), at every
   connection creation, and at every sending boundary the helpers own **after** the connection
   exists — a tool call (`liveCall`), a read (name-free reads, read-backs, absence checks), a

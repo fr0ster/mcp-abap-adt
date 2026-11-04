@@ -22,6 +22,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -64,13 +65,22 @@ export interface PinServer {
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 class PinMcpServer extends BaseMcpServer {
-  use(source: { settings: SapConfig; credential: IAuthProvider }): void {
-    this.setConnectionContext({
-      kind: 'built',
-      source: { resolve: async () => source },
-      sessionId: 'pin-server',
-      destination: PIN_DESTINATION,
-    });
+  use(source: ServerSource): void {
+    this.setConnectionContext(
+      'injected' in source
+        ? {
+            kind: 'injected',
+            connection: source.injected,
+            sessionId: 'pin-server',
+            destination: PIN_DESTINATION,
+          }
+        : {
+            kind: 'built',
+            source: { resolve: async () => source },
+            sessionId: 'pin-server',
+            destination: PIN_DESTINATION,
+          },
+    );
   }
   register(registry: CompositeHandlersRegistry): void {
     this.registerHandlers(registry);
@@ -114,11 +124,15 @@ function resultOf(answer: CallAnswer): McpResult {
   };
 }
 
-/** Where an in-process server's connection is built from: settings and a credential. */
-export interface ServerSource {
-  settings: SapConfig;
-  credential: IAuthProvider;
-}
+/**
+ * Where an in-process server's connection comes from: built from settings
+ * and a credential, or a connection handed in and used as given (a live
+ * run's guarded connection, whose fresh connections its own registered
+ * factory builds).
+ */
+export type ServerSource =
+  | { settings: SapConfig; credential: IAuthProvider }
+  | { injected: IAbapConnection };
 
 /**
  * The full and compact sets in one server of `variant` against `stand`,
@@ -162,6 +176,11 @@ export async function inProcessServer(
     report: () => {},
   });
   if (setup === 'leftover-session') {
+    if ('injected' in source) {
+      throw new Error(
+        'a leftover session needs a server that builds its connection',
+      );
+    }
     await killedProcessSession(source.settings.url ?? '', runtime, {
       user: PIN_USER,
       destination: PIN_DESTINATION,

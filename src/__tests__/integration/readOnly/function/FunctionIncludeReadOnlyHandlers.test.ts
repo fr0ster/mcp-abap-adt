@@ -20,9 +20,9 @@ import { handleListFunctionGroupIncludes } from '../../../../handlers/function_i
 import { handleListFunctionModules } from '../../../../handlers/function_include/readonly/handleListFunctionModules';
 import {
   getEnabledTestCase,
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -54,7 +54,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
   beforeAll(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -124,7 +124,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       }
       if (!isTestAvailableForSystem(testCase.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()}`,
+          `⏭️  Skipping test: not available on ${statedKindWords()}`,
         );
         return;
       }
@@ -201,7 +201,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       }
       if (!isTestAvailableForSystem(testCase.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()}`,
+          `⏭️  Skipping test: not available on ${statedKindWords()}`,
         );
         return;
       }
@@ -281,7 +281,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       }
       if (!isTestAvailableForSystem(testCase.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()}`,
+          `⏭️  Skipping test: not available on ${statedKindWords()}`,
         );
         return;
       }

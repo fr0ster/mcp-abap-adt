@@ -6,7 +6,12 @@
  * connector built.
  */
 
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import {
+  type AbapConnection,
+  type CreatedConnection,
+  createConnection,
+  type SapConfig,
+} from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
@@ -22,6 +27,7 @@ import type {
 } from '../../../embeddable/ConnectionContext';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { presented } from '../../helpers/presented';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -63,11 +69,34 @@ function provider(): IAuthProvider {
   };
 }
 
+let stand: AdtStandIn;
+
+beforeAll(async () => {
+  stand = await adtStandIn();
+});
+
+afterAll(async () => {
+  await stand.close();
+});
+
+/**
+ * A real connection to the stand-in that sends nothing: its `connect` is a
+ * spy that resolves.
+ */
+function quietConnection(): CreatedConnection {
+  const connection = createConnection({
+    config: { url: stand.url, authType: 'basic' },
+    credential: provider(),
+    system: 'onprem',
+    transport: 'http',
+  });
+  jest.spyOn(connection, 'connect').mockImplementation(async () => {});
+  return connection;
+}
+
 beforeEach(() => {
   build.mockReset();
-  build.mockImplementation(
-    () => ({ connect: jest.fn(async () => {}) }) as unknown as AbapConnection,
-  );
+  build.mockImplementation(() => quietConnection());
 });
 
 describe("'built': the source resolves, the connection is built from its answer", () => {

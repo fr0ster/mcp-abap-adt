@@ -17,10 +17,10 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetAbapSystemSymbols } from '../../../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { createBatchAvailability } from '../../../../lib/batch/availability';
 import {
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   resolveSharedDependency,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
@@ -55,7 +55,9 @@ describe('GetAbapSystemSymbols resolves a function module (read-only)', () => {
         return;
       }
       if (!isTestAvailableForSystem(shared.available_in)) {
-        testLogger?.info(`⏭️  Skipping test: not served on ${getSystemType()}`);
+        testLogger?.info(
+          `⏭️  Skipping test: not served on ${statedKindWords()}`,
+        );
         return;
       }
       const name = String(shared.name).toUpperCase();

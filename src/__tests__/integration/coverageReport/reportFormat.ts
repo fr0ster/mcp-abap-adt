@@ -1,0 +1,179 @@
+/**
+ * The run's files and their shape (spec §8, "Live"; plan C2): the call log a
+ * live case writes, the outcomes the run's reporter writes from Jest's
+ * completed results, the files that ran, the leftovers named for the owner,
+ * and the credential-refusal marker.
+ *
+ * They live in one directory per run, under the OS temp directory, never in
+ * the repository: the one `MCP_ABAP_ADT_COVERAGE_RUN` names (the
+ * integration `globalSetup` makes it and sets the variable, so the workers,
+ * the reporter and `globalTeardown` share it), else one of this process.
+ *
+ * Node's own modules only: the reporter is compiled from this directory
+ * alone (`tsconfig.reporter.json`) and loaded by Node outside ts-jest.
+ */
+
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+/** The variable naming the run's directory. */
+export const RUN_VARIABLE = 'MCP_ABAP_ADT_COVERAGE_RUN';
+
+/** The system kinds a live run reaches. */
+export type RunSystem = 'onprem' | 'cloud';
+
+/** How a key fared: its test's completed result. */
+export type KeyOutcome = 'passed' | 'failed' | 'skipped';
+
+/** One entry of the call log: which test (in which file) called which key, on which system. */
+export interface CallLogEntry {
+  /** The test file's absolute path, as Jest names it. */
+  file: string;
+  /** The test's full name. */
+  test: string;
+  key: string;
+  system: RunSystem;
+}
+
+/** One outcome of the run report. */
+export interface OutcomeEntry {
+  key: string;
+  system: RunSystem;
+  outcome: KeyOutcome;
+}
+
+const CALL_LOG = 'calls.jsonl';
+const OUTCOMES = 'report.jsonl';
+const FILES = 'files.jsonl';
+const LEFTOVERS = 'leftovers.jsonl';
+const MARKER = 'credential-refused';
+
+let ownRunDirectory: string | undefined;
+
+/** A new run directory under the OS temp directory, named per run. */
+export function newRunDirectory(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-coverage-'));
+}
+
+/** Where this run's files live. */
+export function runDirectory(): string {
+  const named = process.env[RUN_VARIABLE];
+  if (named !== undefined && named.trim() !== '') {
+    fs.mkdirSync(named, { recursive: true });
+    return named;
+  }
+  ownRunDirectory ??= newRunDirectory();
+  return ownRunDirectory;
+}
+
+const fileOf = (name: string): string => path.join(runDirectory(), name);
+
+/** The run report's path: the outcomes the reporter wrote. */
+export function outcomesPath(): string {
+  return fileOf(OUTCOMES);
+}
+
+function append(name: string, value: object): void {
+  fs.appendFileSync(fileOf(name), `${JSON.stringify(value)}\n`);
+}
+
+/** A run file's lines, parsed; empty when it does not exist. */
+function lines(name: string): unknown[] {
+  const file = fileOf(name);
+  if (!fs.existsSync(file)) return [];
+  return fs
+    .readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line): unknown => JSON.parse(line));
+}
+
+/** A parsed line's member, read by shape. */
+function member(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null && key in value
+    ? Reflect.get(value, key)
+    : undefined;
+}
+
+const isSystem = (value: unknown): value is RunSystem =>
+  value === 'onprem' || value === 'cloud';
+
+const isOutcome = (value: unknown): value is KeyOutcome =>
+  value === 'passed' || value === 'failed' || value === 'skipped';
+
+export function appendCall(entry: CallLogEntry): void {
+  append(CALL_LOG, entry);
+}
+
+/** The run's call log, as written. */
+export function readCallLog(): CallLogEntry[] {
+  return lines(CALL_LOG).flatMap((line): CallLogEntry[] => {
+    const file = member(line, 'file');
+    const test = member(line, 'test');
+    const key = member(line, 'key');
+    const system = member(line, 'system');
+    return typeof file === 'string' &&
+      typeof test === 'string' &&
+      typeof key === 'string' &&
+      isSystem(system)
+      ? [{ file, test, key, system }]
+      : [];
+  });
+}
+
+export function appendOutcome(entry: OutcomeEntry): void {
+  append(OUTCOMES, entry);
+}
+
+/** The run report's outcomes, as written. */
+export function readOutcomes(): OutcomeEntry[] {
+  return lines(OUTCOMES).flatMap((line): OutcomeEntry[] => {
+    const key = member(line, 'key');
+    const system = member(line, 'system');
+    const outcome = member(line, 'outcome');
+    return typeof key === 'string' && isSystem(system) && isOutcome(outcome)
+      ? [{ key, system, outcome }]
+      : [];
+  });
+}
+
+/** Records a test file that ran, by its repository path. */
+export function appendFileRan(file: string): void {
+  append(FILES, { file });
+}
+
+/** The repository paths of the test files that ran. */
+export function readFilesRan(): string[] {
+  return lines(FILES).flatMap((line) => {
+    const file = member(line, 'file');
+    return typeof file === 'string' ? [file] : [];
+  });
+}
+
+/** Names what a run left behind for the owner to remove, once each. */
+export function appendLeftover(what: string): void {
+  if (readLeftovers().includes(what)) return;
+  append(LEFTOVERS, { leftover: what });
+}
+
+/** What the run report names as left behind. */
+export function readLeftovers(): string[] {
+  return lines(LEFTOVERS).flatMap((line) => {
+    const value = member(line, 'leftover');
+    return typeof value === 'string' ? [value] : [];
+  });
+}
+
+/** Latches the run's credential-refusal marker: nothing is sent after it. */
+export function writeMarker(): void {
+  fs.writeFileSync(fileOf(MARKER), new Date().toISOString());
+}
+
+/** Whether the run's credential-refusal marker exists; makes no directory. */
+export function markerExists(): boolean {
+  const named = process.env[RUN_VARIABLE];
+  const dir =
+    named !== undefined && named.trim() !== '' ? named : ownRunDirectory;
+  return dir !== undefined && fs.existsSync(path.join(dir, MARKER));
+}

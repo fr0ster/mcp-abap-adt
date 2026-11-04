@@ -60,7 +60,6 @@ import { handleDebugTakeOverListener } from '../../../handlers/debugger/debug/ha
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import {
@@ -109,6 +108,7 @@ import {
 import { logOffLeft, ownedNow } from '../helpers/debuggerCleanup';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { endTestConnection } from '../helpers/openConnections';
+import { guardedTestConnection } from '../helpers/refusalGuard';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../helpers/testers/types';
 import { createHandlerContext } from '../helpers/testHelpers';
@@ -522,14 +522,15 @@ describe('Debugger handlers (integration)', () => {
       password: env.SAP_PASSWORD,
       ...(env.SAP_CLIENT ? { client: env.SAP_CLIENT.trim() } : {}),
     };
-    const conn = createAbapConnection(
+    // Guarded: a refusal of the second user's credential stops the run too.
+    const conn = guardedTestConnection(
       settings,
       credentialFromSapConfig(settings),
-      null,
-    ) as IAbapConnection & { connect?: () => Promise<void> };
-    if (typeof conn.connect === 'function') await conn.connect();
+      { logger: null },
+    );
+    await conn.connect();
     return {
-      connection: conn as IAbapConnection,
+      connection: conn,
       close: async () => {
         await endTestConnection(conn);
       },

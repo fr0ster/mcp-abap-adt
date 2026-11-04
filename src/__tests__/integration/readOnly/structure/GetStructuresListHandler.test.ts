@@ -21,9 +21,9 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleGetStructuresList } from '../../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   getEnabledTestCase,
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -63,7 +63,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
   beforeAll(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -133,7 +133,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       }
       if (!isTestAvailableForSystem(testCase.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()}`,
+          `⏭️  Skipping test: not available on ${statedKindWords()}`,
         );
         return;
       }

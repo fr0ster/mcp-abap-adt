@@ -94,6 +94,11 @@ environment:
   env: ""                                    # ← CHANGE: session file name (e.g., "your-system.env", "another-system.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
+  # The realm check before any logon: an unauthenticated GET of the ADT
+  # discovery must answer 401. On premise its WWW-Authenticate realm must
+  # equal this value; empty refuses the run before anything logs on. On the
+  # cloud it is not read: the session's JWT must not have expired instead.
+  expected_realm: ""                         # ← CHANGE (on premise): the system's 401 realm
   connection_type: "http"                    # "http" | "rfc"
   # RFC through a message server and a logon group (optional; rfc only).
   # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to

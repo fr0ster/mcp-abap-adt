@@ -301,10 +301,10 @@ and live specifics.
       debuggee id, a leftover id). `bind` may never name `object_type`, `part`, `operation` or
       `action`: key-bearing fields stay in the `args` literal (the guard refuses a fixture
       that binds one).
-    - **Fixture setup.** `type PinSetup = 'leftover-session' | 'background-run-store'`: a
-      closed list, each made by the existing helper before the server starts
-      (`leftoverSession.ts` writes the leftover file C16 needs; the background-runs memory port
-      for a run's record). A new setup is a new member of the union, in this file.
+    - **Fixture setup.** `type PinSetup = 'leftover-session'`: a closed list, each made by the
+      existing helper before the server starts (`leftoverSession.ts` writes the leftover file
+      C16 needs). A background run's record is made by an earlier call of the same case
+      (`before`), not by a setup. A new setup is a new member of the union, in this file.
     - `'none'` (a tool that sends nothing on success) requires `ran`: it asserts the tool's own
       result is in the answer, and is legal only for the tools C1 Step 1 lists.
     - `'nothing-sent'` is legal only with `refusal: 'thrown'`: the call throws with

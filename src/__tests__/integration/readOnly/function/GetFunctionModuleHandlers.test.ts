@@ -10,10 +10,10 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleGetFunctionModule } from '../../../../handlers/function_module/high/handleGetFunctionModule';
 import {
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   resolveSharedDependency,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -45,7 +45,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
   beforeAll(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -92,7 +92,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
 
       if (!isTestAvailableForSystem(sharedFM.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()}`,
+          `⏭️  Skipping test: not available on ${statedKindWords()}`,
         );
         return;
       }

@@ -24,7 +24,6 @@ import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteC
 import type { IServerAdtClient } from '../../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
-import { createAbapConnection } from '../../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../../lib/credentialSources';
 import {
   getCleanupAfter,
@@ -32,6 +31,7 @@ import {
   getEnabledTestCase,
   getOperationDelay,
   getSapConfigFromEnv,
+  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   loadTestEnv,
@@ -43,6 +43,7 @@ import { createTestLogger } from '../../helpers/loggerHelpers';
 import { trackConnection } from '../../helpers/openConnections';
 import { createDiagnosticsTracker } from '../../helpers/persistenceHelpers';
 import { primeSystemContext } from '../../helpers/primeSystemContext';
+import { guardedTestConnection } from '../../helpers/refusalGuard';
 import { DEBUG_TESTS, debugLog, delay } from '../../helpers/testHelpers';
 
 // Load environment variables
@@ -120,11 +121,9 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
 
         // Create connection directly (same as in adt-clients tests)
         connection = trackConnection(
-          createAbapConnection(
-            config,
-            credentialFromSapConfig(config),
-            connectionLogger,
-          ),
+          guardedTestConnection(config, credentialFromSapConfig(config), {
+            logger: connectionLogger,
+          }),
         );
 
         // Check refresh token availability before connecting
@@ -159,7 +158,8 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         // instead of inheriting whatever an auth-broker setup left in the process.
         await primeSystemContext(connection);
         client = createAdtClient(connection);
-        isCloud = config.authType === 'jwt';
+        // The stated kind, never the credential: a JWT is no sign of a cloud system.
+        isCloud = getSystemType() === 'cloud';
 
         // Persist session snapshot for diagnostics
         const sessionState = (connection as any).getSessionState?.();

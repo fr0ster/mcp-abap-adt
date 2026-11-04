@@ -145,10 +145,16 @@
   "scripts": {
     "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
+    "pretest": "npm run build:test-reporter",
     "test": "jest --passWithNoTests",
-    "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
+    "pretest:integration": "npm run build:test-reporter",
+    "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit --reporters=default --reporters=./build/test-reporter/coverageReporter.js",
+    "pretest:coverage-family": "npm run build:test-reporter",
+    "test:coverage-family": "jest --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit --reporters=default --reporters=./build/test-reporter/coverageReporter.js",
     "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
+    "build:test-reporter": "tsc -p tsconfig.reporter.json",
+    "check:test-reporter": "node --eval \"require('./build/test-reporter/coverageReporter.js')\"",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:check": "jest --testPathPatterns='admin/shared-deps/check' --testPathIgnorePatterns='[]' --passWithNoTests",
@@ -365,6 +371,7 @@
     "maxWorkers": 1,
     "testTimeout": 600000,
     "globalSetup": "<rootDir>/src/__tests__/integration/globalSetup.ts",
+    "globalTeardown": "<rootDir>/src/__tests__/integration/globalTeardown.ts",
     "setupFilesAfterEnv": [
       "<rootDir>/src/__tests__/integration/helpers/closeConnectionsAfterAll.ts"
     ]

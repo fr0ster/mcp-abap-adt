@@ -38,11 +38,11 @@ import {
   getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   resolvePackageName,
   resolveTransportRequest,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -71,7 +71,7 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
   beforeAll(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -115,7 +115,7 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       }
       if (!isTestAvailableForSystem(testCase.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()} (available_in: ${testCase.available_in?.join(', ')})`,
+          `⏭️  Skipping test: not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
         );
         return;
       }

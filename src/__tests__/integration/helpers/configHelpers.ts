@@ -11,9 +11,15 @@ import * as yaml from 'js-yaml';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
+import {
+  type ConfiguredSystemKind,
+  configuredSystemKindOf,
+  NO_KIND_STATED,
+} from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
 import { testConfigPathFromEnv } from './testConfigPath';
 
+export type { ConfiguredSystemKind };
 export { testConfigPathFromEnv };
 
 const configLogger = createTestLogger('config');
@@ -711,65 +717,6 @@ export function getCleanupAfterRun(testCase: any, failed: boolean): boolean {
 }
 
 /**
- * Check if current connection is cloud (JWT auth) or on-premise (basic auth).
- * Programs/FunctionGroups are not available on cloud, so tests should be skipped.
- *
- * Detection order:
- * 1. lib/utils sessionContext (when MCP server is running in-process)
- * 2. process.env.SAP_JWT_TOKEN (set by test globalSetup from auth broker)
- * 3. test-config.yaml auth_type field
- */
-export function isCloudConnection(): boolean {
-  try {
-    const { isCloudConnection: utilsIsCloud } = require('../../../lib/utils');
-    if (utilsIsCloud()) return true;
-  } catch {
-    // lib/utils not available or sessionContext not set
-  }
-
-  // Fallback: check env vars set by loadTestEnv / auth broker
-  if (process.env.SAP_JWT_TOKEN) {
-    return true;
-  }
-
-  // Fallback: check session file for hard mode destination (JWT = cloud)
-  try {
-    const config = loadTestConfig();
-    const destination =
-      config?.hard_mode?.mcp_destination ||
-      config?.auth_broker?.abap?.destination ||
-      config?.environment?.destination;
-    if (destination) {
-      const os = require('node:os');
-      const fs = require('node:fs');
-      const path = require('node:path');
-      const sessionFile = path.join(
-        os.homedir(),
-        '.config',
-        'mcp-abap-adt',
-        'sessions',
-        `${destination}.env`,
-      );
-      if (fs.existsSync(sessionFile)) {
-        const content = fs.readFileSync(sessionFile, 'utf8');
-        if (content.includes('SAP_JWT_TOKEN=')) return true;
-      }
-    }
-  } catch {
-    // no config or session file
-  }
-
-  return false;
-}
-
-/**
- * Get current system type based on connection detection.
- *
- * Returns 'cloud', 'onprem', or 'legacy'.
- * Detection: JWT auth → cloud, otherwise onprem.
- * Legacy can be set via test-config.yaml `environment.system_type: legacy`.
- */
-/**
  * The database system the test config states for its system
  * (`environment.database_system`, e.g. "HDB"), upper case, or undefined when
  * it states none: the AMDP gates then read it from SAP's system information.
@@ -785,23 +732,24 @@ export function getStatedDatabaseSystem(): string | undefined {
   }
 }
 
-export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
-  // Check explicit override in test config
-  try {
-    const config = loadTestConfig();
-    const explicitType = config?.environment?.system_type;
-    if (
-      explicitType === 'cloud' ||
-      explicitType === 'onprem' ||
-      explicitType === 'legacy'
-    ) {
-      return explicitType;
-    }
-  } catch {
-    // no config
-  }
+/**
+ * The system kind this run is configured for (`configuredSystemKindOf` over
+ * the test config): stated only — `environment.system_type`, then
+ * `SAP_SYSTEM_TYPE` in the environment or the session file — `undefined`
+ * when nothing states one. A credential type is not a statement of the kind.
+ */
+export function configuredSystemKind(): ConfiguredSystemKind | undefined {
+  return configuredSystemKindOf(loadTestConfig());
+}
 
-  return isCloudConnection() ? 'cloud' : 'onprem';
+/**
+ * The configured system kind, or a refusal naming what to set — never a
+ * default: a run whose kind nothing states does not run as on-premise.
+ */
+export function getSystemType(): ConfiguredSystemKind {
+  const kind = configuredSystemKind();
+  if (kind === undefined) throw new Error(NO_KIND_STATED);
+  return kind;
 }
 
 /**
@@ -812,7 +760,15 @@ export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
  */
 export function isTestAvailableForSystem(availableIn?: string[]): boolean {
   if (!availableIn || availableIn.length === 0) return true;
-  return availableIn.includes(getSystemType());
+  // No stated kind: the case skips (its caller names the reason), never
+  // runs as on-premise by default.
+  const kind = configuredSystemKind();
+  return kind !== undefined && availableIn.includes(kind);
+}
+
+/** A skip message's words for the configured kind: it, or that none is stated. */
+export function statedKindWords(): string {
+  return configuredSystemKind() ?? `no stated system kind (${NO_KIND_STATED})`;
 }
 
 /**

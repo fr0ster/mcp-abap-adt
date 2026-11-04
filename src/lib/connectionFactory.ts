@@ -11,6 +11,7 @@
  */
 
 import {
+  type CreatedConnection,
   createConnection,
   type ILogger,
   type SapConfig,
@@ -332,7 +333,7 @@ export function createAbapConnection(
    * kind is what `SAP_SYSTEM_TYPE` states now (`resolveSystemKind`).
    */
   kind: AbapSystemKind = resolveSystemKind(settings),
-): IAbapConnection {
+): CreatedConnection {
   // connection's `createConnection` with the system and the wire stated: the
   // choice is this server's, made from the settings as before; the connector
   // and its transport are connection's (connection 16).
@@ -343,7 +344,7 @@ export function createAbapConnection(
     ...(sessionId !== undefined ? { sessionId } : {}),
   };
   const resumed = session !== undefined ? { session } : {};
-  const built = ((): IAbapConnection => {
+  const built = ((): CreatedConnection => {
     if (kind === 'cloud') {
       return withHttpWireLog(
         createConnection({

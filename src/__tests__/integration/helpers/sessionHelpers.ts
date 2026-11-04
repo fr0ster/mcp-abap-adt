@@ -13,7 +13,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { createConnectionLogger, getTestDestination } from './authHelpers';
 import {
@@ -24,6 +23,7 @@ import {
 import { createTestLogger } from './loggerHelpers';
 import { trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
+import { guardedTestConnection, refuseAfterMarker } from './refusalGuard';
 import { extractSessionState } from './testHelpers';
 
 /**
@@ -76,11 +76,9 @@ async function createConnectionViaBroker(): Promise<IAbapConnection | null> {
     // Only pass connection logger if DEBUG_CONNECTION is set
     const connectionLoggerWithCsrf = withCsrfChannel(createConnectionLogger());
     return trackConnection(
-      createAbapConnection(
-        target.settings,
-        target.credential,
-        connectionLoggerWithCsrf,
-      ),
+      guardedTestConnection(target.settings, target.credential, {
+        logger: connectionLoggerWithCsrf,
+      }),
     );
   } catch (error: any) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {
@@ -101,6 +99,8 @@ export async function createTestConnectionAndSession(): Promise<{
   authType?: string;
   connectionSource?: 'auth_broker' | 'env' | 'unknown';
 }> {
+  // Nothing is read or sent once a credential was refused in this run.
+  refuseAfterMarker('a test connection');
   // Ensure environment and tokens are loaded (supports auth-broker fallback)
   try {
     await loadTestEnv();
@@ -144,11 +144,9 @@ export async function createTestConnectionAndSession(): Promise<{
 
       // Create connection directly (fallback when AuthBroker is not available)
       connection = trackConnection(
-        createAbapConnection(
-          config,
-          credentialFromSapConfig(config),
-          connectionLoggerWithCsrf,
-        ),
+        guardedTestConnection(config, credentialFromSapConfig(config), {
+          logger: connectionLoggerWithCsrf,
+        }),
       );
       connectionSource = 'env';
     }

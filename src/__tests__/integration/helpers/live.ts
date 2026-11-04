@@ -21,27 +21,28 @@
  *
  * **The refusal stop.** Every helper here refuses before it sends once the
  * run's credential-refusal marker exists, and an answer that is a
- * credential refusal writes it.
+ * credential refusal writes it. Below them the connection itself is guarded
+ * (`refusalGuard.ts`): the live connection, the in-process server's (handed
+ * in as that connection) and every sibling either opens; a launched server
+ * in hard mode answers to the parent (`launchedServers.ts`).
  *
  * The run's files (the marker, the call log, the leftovers named) live in
- * `MCP_ABAP_ADT_COVERAGE_RUN` when the run's setup names one, else in a
- * directory of this process under the OS temp directory — never in the
+ * the run's directory (`coverageReport/reportFormat.ts`) — never in the
  * repository.
  */
 
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import type { McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { createAbapConnection } from '../../../lib/connectionFactory';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { fullToolSet } from '../../../lib/toolSet';
 import { servedTools as plainEntries } from '../../helpers/batchHarness';
 import { servedEntries } from '../../helpers/pinCases';
 import {
@@ -52,15 +53,36 @@ import {
 import type { SystemKind } from '../../helpers/servedTools';
 import { toolAnswer } from '../../helpers/toolAnswer';
 import { type CoverageKey, keyOf } from '../../unit/coverage/coverageKeys';
+import {
+  appendCall,
+  appendLeftover,
+  type CallLogEntry,
+  readCallLog,
+  readLeftovers,
+} from '../coverageReport/reportFormat';
 import { getTestDestination } from './authHelpers';
-import { loadTestConfig } from './configHelpers';
+import { configuredSystemKind } from './configHelpers';
+import { NO_KIND_STATED } from './configuredSystemKind';
+import { type GuardedLaunch, launchGuarded } from './launchedServers';
 import { endTestConnection, trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
-import { setupSystemKind } from './setupSystemKind';
+import {
+  credentialRefused,
+  guardedTestConnection,
+  markCredentialRefused,
+  refusalAnswered,
+  refuseAfterMarker,
+} from './refusalGuard';
 import { testConfigPathFromEnv } from './testConfigPath';
-import { createHardModeClient, isHardModeEnabled } from './testers/hardMode';
+import {
+  createHardModeClient,
+  type HardModeSet,
+  isHardModeEnabled,
+} from './testers/hardMode';
 
+export { runDirectory } from '../coverageReport/reportFormat';
 export type { ToolArgs };
+export { type CallLogEntry, credentialRefused, markCredentialRefused };
 
 /** A tool's answer, with its text joined. */
 export interface LiveAnswer extends McpResult {
@@ -70,112 +92,14 @@ export interface LiveAnswer extends McpResult {
 // ---------------------------------------------------------------------------
 // The run's files
 
-let ownRunDirectory: string | undefined;
-
-/** Where this run's marker, call log and leftovers live. */
-export function runDirectory(): string {
-  const named = process.env.MCP_ABAP_ADT_COVERAGE_RUN;
-  if (named !== undefined && named.trim() !== '') {
-    fs.mkdirSync(named, { recursive: true });
-    return named;
-  }
-  if (ownRunDirectory === undefined) {
-    ownRunDirectory = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'mcp-abap-adt-coverage-'),
-    );
-  }
-  return ownRunDirectory;
-}
-
-const markerFile = () => path.join(runDirectory(), 'credential-refused');
-const callLogFile = () => path.join(runDirectory(), 'calls.jsonl');
-const leftoversFile = () => path.join(runDirectory(), 'leftovers.jsonl');
-
-/** Latches the run's credential-refusal marker: nothing is sent after it. */
-export function markCredentialRefused(): void {
-  fs.writeFileSync(markerFile(), new Date().toISOString());
-}
-
-/** Whether the run's credential-refusal marker exists. */
-export function credentialRefused(): boolean {
-  return fs.existsSync(markerFile());
-}
-
-/** Refuses before anything is sent once the marker exists. */
-function refuseAfterMarker(what: string): void {
-  if (credentialRefused()) {
-    throw new Error(
-      `${what} is not sent: a credential was refused earlier in this run`,
-    );
-  }
-}
-
-/** One entry of the run's call log: which test called which key, on which system. */
-export interface CallLogEntry {
-  test: string;
-  key: CoverageKey;
-  system: SystemKind;
-}
-
-function logCall(entry: CallLogEntry): void {
-  fs.appendFileSync(callLogFile(), `${JSON.stringify(entry)}\n`);
-}
-
 /** The run's call log, as written. */
 export function callLog(): CallLogEntry[] {
-  if (!fs.existsSync(callLogFile())) return [];
-  return fs
-    .readFileSync(callLogFile(), 'utf8')
-    .split('\n')
-    .filter((line) => line !== '')
-    .flatMap((line): CallLogEntry[] => {
-      const parsed: unknown = JSON.parse(line);
-      const test = member(parsed, 'test');
-      const key = member(parsed, 'key');
-      const system = member(parsed, 'system');
-      return typeof test === 'string' &&
-        typeof key === 'string' &&
-        (system === 'onprem' || system === 'cloud')
-        ? [{ test, key, system }]
-        : [];
-    });
-}
-
-/** How a key fared: its test's completed result. */
-export type KeyOutcome = 'passed' | 'failed' | 'skipped';
-
-/**
- * Each logged key's outcome on its system, joined with the tests' completed
- * results by full name: `passed` only when every test that called it
- * passed. The join the run's reporter makes from Jest's results.
- */
-export function outcomesOf(
-  log: readonly CallLogEntry[],
-  results: ReadonlyArray<{ fullName: string; status: string }>,
-): Map<string, KeyOutcome> {
-  const statusOf = new Map(
-    results.map((result) => [result.fullName, result.status]),
-  );
-  const outcomes = new Map<string, KeyOutcome>();
-  for (const entry of log) {
-    const status = statusOf.get(entry.test);
-    const outcome: KeyOutcome =
-      status === 'passed'
-        ? 'passed'
-        : status === 'failed'
-          ? 'failed'
-          : 'skipped';
-    const id = `${entry.key} ${entry.system}`;
-    const known = outcomes.get(id);
-    if (known === undefined || known === 'passed') outcomes.set(id, outcome);
-  }
-  return outcomes;
+  return readCallLog();
 }
 
 /** Names what a run left behind for the owner to remove (the run report). */
 function reportLeftover(what: string): void {
-  if (leftovers().includes(what)) return;
-  fs.appendFileSync(leftoversFile(), `${JSON.stringify({ leftover: what })}\n`);
+  appendLeftover(what);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,12 +123,7 @@ function jsonOf(answer: LiveAnswer): unknown {
 
 /** Whether an answer is a credential refusal: `authentication_failed`, or a `401` SAP answered. */
 function isCredentialRefusal(answer: LiveAnswer): boolean {
-  if (!answer.isError) return false;
-  const payload = jsonOf(answer);
-  return (
-    member(payload, 'error') === 'authentication_failed' ||
-    member(payload, 'status') === 401
-  );
+  return refusalAnswered(answer.isError, answer.text);
 }
 
 /** Whether an answer is SAP's "not found" (`404`). */
@@ -304,22 +223,56 @@ export function softRunner(options: {
   };
 }
 
-/** Hard mode: the MCP tool of the launched server; the connection is the test's own. */
-async function hardRunner(
+/** The full set's tool names: hard mode launches the compact binary for any other. */
+let fullNames: ReadonlySet<string> | undefined;
+
+function setOf(tool: string): HardModeSet {
+  fullNames ??= new Set(
+    (['stdio', 'http'] as const).flatMap((transport) =>
+      fullToolSet
+        .groups(noConnectionContext(), transport)
+        .flatMap((group) =>
+          group.getHandlers().map((entry) => entry.toolDefinition.name),
+        ),
+    ),
+  );
+  return fullNames.has(tool) ? 'full' : 'compact';
+}
+
+/**
+ * Hard mode: the MCP tool of a launched server — the full binary for a full
+ * tool, the compact one for a compact tool, each launched once its first
+ * tool is called, after the parent logged on (`launchGuarded`); the
+ * connection is the test's own.
+ */
+function hardRunner(
   system: SystemKind,
   user: string,
   connection: IAbapConnection,
-): Promise<LiveRunner> {
-  const hard = await createHardModeClient();
+  logOn: () => Promise<void>,
+): LiveRunner {
+  const launches = new Map<HardModeSet, Promise<GuardedLaunch>>();
+  const launchOf = (set: HardModeSet): Promise<GuardedLaunch> => {
+    const known = launches.get(set);
+    if (known !== undefined) return known;
+    const launched = launchGuarded({
+      logOn,
+      launch: () => createHardModeClient(set),
+    });
+    launches.set(set, launched);
+    return launched;
+  };
   return {
     system,
     user,
     connection: () => connection,
     call: async (tool, args) =>
-      liveAnswerOf(
-        await hard.client.callTool({ name: tool, arguments: { ...args } }),
-      ),
-    close: () => hard.close(),
+      liveAnswerOf(await (await launchOf(setOf(tool))).call(tool, args)),
+    close: async () => {
+      for (const launched of launches.values()) {
+        await (await launched).close();
+      }
+    },
   };
 }
 
@@ -339,33 +292,33 @@ async function liveRunner(system: SystemKind): Promise<LiveRunner> {
   if (destination === null) {
     throw new Error('the test config names no destination');
   }
-  refuseAfterMarker('a connection');
-  const connection = trackConnection(
-    createAbapConnection(
-      destination.settings,
-      destination.credential,
-      undefined,
-      undefined,
-      undefined,
-      system,
-    ),
-  );
+  const open = () =>
+    guardedTestConnection(destination.settings, destination.credential, {
+      kind: system,
+    });
+  const connection = trackConnection(open());
   await connection.connect();
   // The responsible person and master system a change is made for, as the
   // integration testers state them.
   await primeSystemContext(connection);
   const user = destination.settings.username ?? '';
-  return isHardModeEnabled()
-    ? hardRunner(system, user, connection)
-    : softRunner({
-        system,
-        user,
-        connection,
-        source: {
-          settings: destination.settings,
-          credential: destination.credential,
-        },
-      });
+  if (isHardModeEnabled()) {
+    // Before each launch, a logon of the parent's own with the same credentials.
+    const logOn = async (): Promise<void> => {
+      const own = open();
+      await own.connect();
+      await endTestConnection(own);
+    };
+    return hardRunner(system, user, connection, logOn);
+  }
+  // The in-process server uses the guarded connection as given; its fresh
+  // connections are guarded siblings.
+  return softRunner({
+    system,
+    user,
+    connection,
+    source: { injected: connection },
+  });
 }
 
 /**
@@ -380,15 +333,15 @@ export function liveSuite(
   const reason = !hasTestConfig()
     ? 'no test config (tests/test-config.yaml or MCP_TEST_CONFIG)'
     : undefined;
-  const kind =
-    reason === undefined ? setupSystemKind(loadTestConfig()) : undefined;
+  const stated = reason === undefined ? configuredSystemKind() : undefined;
+  const kind = stated === 'onprem' || stated === 'cloud' ? stated : undefined;
   const skipped =
     reason ??
-    (kind === undefined
-      ? 'no system kind stated (environment.system_type or SAP_SYSTEM_TYPE)'
-      : systems.includes(kind)
-        ? undefined
-        : `the configured system is ${kind}; this suite runs on ${systems.join(', ')}`);
+    (stated === undefined
+      ? NO_KIND_STATED
+      : kind === undefined || !systems.includes(kind)
+        ? `the configured system is ${stated}; this suite runs on ${systems.join(', ')}`
+        : undefined);
   if (skipped !== undefined || kind === undefined) {
     console.log(`[liveSuite] ${title}: skipped — ${skipped}`);
     describe.skip(title, body);
@@ -427,10 +380,12 @@ export async function liveCall(
   args: ToolArgs,
 ): Promise<LiveAnswer> {
   refuseAfterMarker(tool);
-  const test = expect.getState().currentTestName;
-  if (test === undefined) throw new Error('liveCall runs inside a test');
+  const { currentTestName: test, testPath: file } = expect.getState();
+  if (test === undefined || file === undefined) {
+    throw new Error('liveCall runs inside a test');
+  }
   const run = current();
-  logCall({ test, key: keyOf(tool, args), system: run.system });
+  appendCall({ file, test, key: keyOf(tool, args), system: run.system });
   const answer = await run.call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
   return answer;
@@ -907,15 +862,7 @@ export async function reconcileTaskCreate(
 
 /** What the run report names as left behind: for the run report (C2) and the tests. */
 export function leftovers(): string[] {
-  if (!fs.existsSync(leftoversFile())) return [];
-  return fs
-    .readFileSync(leftoversFile(), 'utf8')
-    .split('\n')
-    .filter((line) => line !== '')
-    .flatMap((line) => {
-      const value = member(JSON.parse(line), 'leftover');
-      return typeof value === 'string' ? [value] : [];
-    });
+  return readLeftovers();
 }
 
 /** Forgets every record of this module: for the live helpers' own tests, between cases. */

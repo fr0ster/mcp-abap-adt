@@ -33,7 +33,6 @@ import {
   leftovers,
   liveCall,
   markCredentialRefused,
-  outcomesOf,
   prepareRequestCreate,
   prepareTaskCreate,
   reconcileRequestCreate,
@@ -162,7 +161,7 @@ describe('liveCall and the refusal stop', () => {
     expect(credentialRefused()).toBe(true);
   });
 
-  it('a key is reported covered only after its test passed', async () => {
+  it('a call is logged with its file and test, whatever the test then does', async () => {
     const config: unknown = JSON.parse(
       fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
     );
@@ -206,14 +205,13 @@ describe('liveCall and the refusal stop', () => {
       { fullName: 'calls and passes', status: 'passed' },
       { fullName: 'calls and then fails', status: 'failed' },
     ]);
+    // The call log names each call's file and test; the run's reporter
+    // joins it with the completed results (runReport.test.ts).
+    const file = path.join(fixtures, 'keyOutcome.fixture.ts');
     expect(callLog()).toEqual([
-      { test: 'calls and passes', key: 'GetProgram', system: 'onprem' },
-      { test: 'calls and then fails', key: 'GetClass', system: 'onprem' },
+      { file, test: 'calls and passes', key: 'GetProgram', system: 'onprem' },
+      { file, test: 'calls and then fails', key: 'GetClass', system: 'onprem' },
     ]);
-    expect(Object.fromEntries(outcomesOf(callLog(), tests))).toEqual({
-      'GetProgram onprem': 'passed',
-      'GetClass onprem': 'failed',
-    });
   });
 });
 

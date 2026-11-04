@@ -10,7 +10,11 @@
  * - an injected connection is the consumer's and is never disconnected.
  */
 
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import {
+  type CreatedConnection,
+  createConnection,
+  type SapConfig,
+} from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
@@ -25,6 +29,7 @@ import type { ConnectionContext } from '../../../embeddable/ConnectionContext';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { own, ownedConnections } from '../../../lib/ownedConnections';
 import type { StatePart } from '../../../lib/state/InstanceState';
+import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
@@ -32,20 +37,38 @@ const build = createAbapConnection as jest.MockedFunction<
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 interface Recorded {
-  connection: AbapConnection;
+  connection: CreatedConnection;
   disconnects: () => number;
 }
 
+let stand: AdtStandIn;
+
+beforeAll(async () => {
+  stand = await adtStandIn();
+});
+
+afterAll(async () => {
+  await stand.close();
+});
+
+/**
+ * A real connection to the stand-in that sends nothing: `connect` and
+ * `disconnect` are spies, the latter counting its calls.
+ */
 function recorded(): Recorded {
   let disconnects = 0;
-  const connection = {
-    connect: jest.fn(async () => {}),
-    disconnect: jest.fn(async () => {
-      disconnects += 1;
-      // connection 16: a second disconnect() rejects NOT_CONNECTED.
-      if (disconnects > 1) throw new Error('ADT_NOT_CONNECTED');
-    }),
-  } as unknown as AbapConnection;
+  const connection = createConnection({
+    config: { url: stand.url, authType: 'basic' },
+    credential: provider(),
+    system: 'onprem',
+    transport: 'http',
+  });
+  jest.spyOn(connection, 'connect').mockImplementation(async () => {});
+  jest.spyOn(connection, 'disconnect').mockImplementation(async () => {
+    disconnects += 1;
+    // connection 16: a second disconnect() rejects NOT_CONNECTED.
+    if (disconnects > 1) throw new Error('ADT_NOT_CONNECTED');
+  });
   return { connection, disconnects: () => disconnects };
 }
 

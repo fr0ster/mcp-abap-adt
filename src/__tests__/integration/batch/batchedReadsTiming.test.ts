@@ -60,13 +60,14 @@ import {
 } from '../../../lib/batch/availability';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import {
+  configuredSystemKind,
   getSharedDependenciesConfig,
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
   resolvePackageName,
 } from '../helpers/configHelpers';
+import { NO_KIND_STATED } from '../helpers/configuredSystemKind';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
@@ -473,8 +474,10 @@ async function timeBothPaths(
 describe('batched reads timed against the sequential path on the system the test config names', () => {
   let connection: IAbapConnection | null = null;
   let packages: Array<{ label: string; name: string }> = [];
-  // Legacy support is parked: a legacy config skips before any logon.
-  const served = getSystemType() !== 'legacy';
+  // Legacy support is parked: a legacy config skips before any logon, and
+  // so does a run whose kind nothing states (never on-premise by default).
+  const stated = configuredSystemKind();
+  const served = stated !== undefined && stated !== 'legacy';
 
   beforeAll(async () => {
     if (!served) return;
@@ -493,7 +496,9 @@ describe('batched reads timed against the sequential path on the system the test
         async () => {
           if (!served) {
             testLogger?.info(
-              '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+              stated === undefined
+                ? `⏭️  Skipping: ${NO_KIND_STATED}`
+                : '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
             );
             return;
           }

@@ -22,6 +22,7 @@ import {
 } from '@mcp-abap-adt/logger';
 import { loadTestConfig } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
+import { guardedSend } from './refusalGuard';
 
 const authLogger = createTestLogger('auth');
 
@@ -234,7 +235,10 @@ export function getTestDestination(): Promise<TestDestination | null> {
       if (!destination) return null;
       const factory = createTestFactory(config, destination);
       const settings = await factory.settingsFor(destination);
-      const credential = await factory.getProvider(destination);
+      // A broker's refusal latches the run's marker (refusalGuard).
+      const credential = await guardedSend("the destination's credential", () =>
+        factory.getProvider(destination),
+      );
       return { destination, factory, settings, credential };
     })();
     testDestinationPromise.catch(() => {

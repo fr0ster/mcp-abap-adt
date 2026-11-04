@@ -967,7 +967,12 @@ listed schemas have none; `handleGetActivationStatus` is reached only through `H
   wait for the run to end (`with_long_polling`). `npm run docs:tools`.
 - [ ] **Step 5: Commit** as `feat(HandlerGet): activation_status can long-poll`.
 
-### C2e. The system kind is never inferred from the credential (owner's decision)
+### C2e. Nothing is derived from the authorization (owner's decision)
+
+**The owner's rule.** Nothing is derived from the authorization — not from the credential
+type, the token or its claims. Only the consumer's information counts: the connection
+settings. One exception: the responsible user and the system id are read from the system
+when a system-information function is available, otherwise from the settings.
 
 **Why here.** It changes four program handlers (`ActivateProgram` is C3's, `CreateProgram` and
 `UpdateProgram` C5's, the compact `PROGRAM` rows C6's), so their pins must be written on the
@@ -998,6 +1003,15 @@ comes after C2; it is independent of C2a–C2d.
   (208), `readOnly/system/RuntimeFeedHandlers.test.ts` (260, 299); and
   `unit/lowTierStrategies.test.ts`' "cloud guard" rows (around line 713, which drive the
   program refusal through `sessionContext` with `authType: 'jwt'`).
+- **Test helpers in other packages, inferring the kind — changed here:**
+  `server-runtime/src/stdio/__tests__/helpers/loginStand.ts` (around line 345:
+  `stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')`). `StandOptions` gets a
+  required `kind`, stated by each caller independently of its credential:
+  `startBrowserLogin.test.ts`, `debug/noSecretsOut.test.ts`, `discardedRefreshToken.test.ts`,
+  `sessionWrites.test.ts`, `cancel/lateConnect.test.ts`, `shutdown/crash.test.ts`,
+  `shutdown/afterStartBrowserLogin.test.ts`, `mainFlow.test.ts`, `batchStdio.test.ts`,
+  `cancel/loginBound.test.ts` (all under `server-runtime/src/stdio/__tests__/`); a test
+  `'the login stand takes the kind it is given, whatever the credential'`.
 - **Tests, credential handling only — kept:** `integration/helpers/sessionHelpers.ts`
   (passes `authType` through), `integration/helpers/configHelpers.ts`' test credential
   loader (around 458–520: `jwt` needs `SAP_JWT_TOKEN`), `integration/batch/refusalFollowUps.test.ts`
@@ -1005,10 +1019,37 @@ comes after C2; it is independent of C2a–C2d.
   `debugger/DebuggerHandlers.test.ts` (a basic second user), `testers/types.ts` (the field).
   The other 37 unit files that mention `authType` / `'jwt'` build credential fixtures; each
   is re-read at the step and any that reads a kind from them joins the list above.
+- **Anything else derived from the authorization (the owner's broader rule) — none found in
+  production.** Grep at `ab0c9ab8`, every package's production `src`, `scripts`, `tools` and
+  the test helpers, for token decoding and claims (`jwt-decode`, `decodeJwt`, `decodeToken`,
+  `split('.')` on a token, `base64url`, `atob(`, `Buffer.from(` of a token, `sub`,
+  `user_name`, `zdn`, `preferred_username`, `ext_attr`, `claims`) and for credential reads
+  (`jwtToken`, `SAP_JWT_TOKEN`, `authType`):
+  - no production code decodes a token or reads a claim; the only `base64url` uses are in
+    test stands that *mint* tokens (`loginStand.ts`, `auth/brokerFactory.test.ts`);
+  - the responsible user and the system id come from the settings or the request headers
+    (`systemContext.ts`: `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, the basic login as the
+    responsible; `requestContext.ts`: `x-sap-responsible`, `x-sap-master-system`) or from the
+    system's own information (`requestSystemResolution.ts`) — the owner's exception;
+  - `authType` / `jwtToken` reads in production choose how to authenticate, never what the
+    system is: `credentialSources.ts` (the provider for the stated `authType`, the HTTP
+    headers' credential), `httpTransport/headerSource.ts` (`x-sap-login` for a basic
+    destination), `server-runtime/src/stdio/auth/*` (the broker's handler and grant for the
+    stated `authType`), `server-runtime/src/stdio/launcher.ts` (the session's token handed to
+    the connection), `utils.ts`' configuration summary.
+  - Two comments still describe a credential-to-kind rule and are fixed in this task (and
+    checked again in step 18a): `src/lib/config/IServerConfig.ts` (around line 38: "default
+    to cloud for a jwt destination") and `src/lib/handlers/interfaces.ts` (around line 14:
+    "'cloud' — BTP ABAP Environment (jwt auth)"). The step first checks the code behind the
+    first comment: if any default by credential remains there, it is a production item of
+    this task with its own failing test, removed like `isCloudConnection`.
 
 **Files:**
 - Modify: `src/lib/utils.ts` (delete `isCloudConnection`), the four program handlers,
-  `src/__tests__/unit/lowTierStrategies.test.ts`, `CHANGELOG.md`, `MIGRATION-24.0.md`.
+  `src/__tests__/unit/lowTierStrategies.test.ts`, `src/lib/config/IServerConfig.ts` and
+  `src/lib/handlers/interfaces.ts` (the two comments),
+  `server-runtime/src/stdio/__tests__/helpers/loginStand.ts` and its ten callers,
+  `CHANGELOG.md`, `MIGRATION-24.0.md`.
 - Create: `src/__tests__/unit/systemKind/programOnJwtOnPremise.test.ts`,
   `src/__tests__/unit/sources/noKindFromCredential.test.ts` and its fixtures under
   `src/__tests__/unit/sources/__fixtures__/kindFromCredential/`.
@@ -1021,12 +1062,19 @@ comes after C2; it is independent of C2a–C2d.
     `HandlerUpdate` / `HandlerActivate` `PROGRAM` rows — each a `pinCases` row with its
     literal requests (they fail today: the handler refuses before sending).
   - Mismatch cases: `'JWT credential with onprem stated: the program tools are listed and
-    run'`; `'basic credential with cloud stated: the cloud binaries list no program tool'` —
-    the cloud listing compared with `listed-schemas.json` (no `CreateProgram`,
-    `UpdateProgram`, `ActivateProgram`, `DeleteProgram`, `GetProgram…` where the fixture has
-    none; `PROGRAM` absent from the compact enums), and a compact `HandlerCreate`
-    `object_type: 'PROGRAM'` on the cloud binary refused by its schema with nothing sent
-    (`refusal: 'thrown'`, `'nothing-sent'`).
+    run'`; `'basic credential with cloud stated: the cloud surface keeps today's program
+    reads and checks, and nothing more'` — today's cloud surface stays as it is
+    (`listed-schemas.json`, the ruling):
+    - **absent on the cloud, asserted:** `CreateProgram`, `UpdateProgram`, `ActivateProgram`,
+      `DeleteProgram`, `CreateProgramUnitTest`, `UpdateProgramUnitTest`, `RuntimeRunProgram`,
+      `GetMainPrograms`; `PROGRAM` absent from the cloud enums of `HandlerCreate`,
+      `HandlerUpdate`, `HandlerActivate`, `HandlerLock`, `HandlerUnlock`, `HandlerValidate`,
+      `HandlerDelete`; a compact `HandlerCreate` `object_type: 'PROGRAM'` on the cloud binary
+      refused by its schema with nothing sent (`refusal: 'thrown'`, `'nothing-sent'`);
+    - **present on the cloud, asserted to stay:** `GetProgram`, `GetProgramVersions`,
+      `GetProgramVersionSource`, `GetProgramVersionDiff`, `CheckProgram`,
+      `RunProgramUnitTest`; `PROGRAM` in the cloud enums of `HandlerGet`, `HandlerCheckRun`,
+      `HandlerDeletionCheck`, `HandlerWhereUsed` (`adtProjections.ts`).
   - `lowTierStrategies.test.ts`: the "cloud guard" rows are replaced by the declared-kind
     rows above; the comment's claim that registration ignores `available_in` is checked at
     the step against today's registration (the variant projections) and corrected.
@@ -1035,36 +1083,62 @@ comes after C2; it is independent of C2a–C2d.
 - [ ] **Step 3:** Remove the four `isCloudConnection()` checks and delete `isCloudConnection`
   from `src/lib/utils.ts`. What a variant offers is decided by registration and
   `available_in` on the declared kind, nothing else.
-- [ ] **Step 4: The guard — `noKindFromCredential.test.ts`.** Over the TypeScript program of
-  every package's production `src` and of `src/__tests__/integration/helpers`,
-  `src/__tests__/helpers` (the compiler API, as `staticTypes.test.ts`):
-  - **Kind-producing functions read no credential.** Every function whose return type the
-    checker resolves to a type assignable to `'cloud' | 'onprem' | 'legacy'` (or a union
-    containing one of them), or to `boolean` while its name or its result's use is a
-    system-kind position — a value assigned to a variable or property typed as the kind, or
-    returned into one — must not reference, in its body or in a same-file function it calls,
-    `authType`, `jwtToken`, `SAP_JWT_TOKEN`, or a credential's type.
-  - There is no table of allowed `authType` sites: credential handling elsewhere (the sites
-    kept above) is not checked by name, and a finding is fixed in the code, never by adding
-    an entry.
-  - **Fixtures, each refused by the check:** a copy of the old `isCloudConnection`; a
-    kind-returning function calling a same-file helper that reads `authType`; an
-    `isCloudSystem = authType === 'jwt'` assignment into a kind-typed field. A fixture of
-    credential handling that produces no kind (the configuration summary's shape) passes,
-    proving the check does not refuse plumbing.
+- [ ] **Step 4: The guard — `noKindFromCredential.test.ts`** (renamed
+  `noDerivationFromAuthorization.test.ts`). Over the TypeScript program of every package's
+  production `src` and of **every test-helper tree** — each `helpers` directory under a
+  `__tests__` directory of any package, found by walking the packages (today
+  `src/__tests__/helpers`, `src/__tests__/integration/helpers`,
+  `server-runtime/src/stdio/__tests__/helpers`, and any other) — with the compiler API, as
+  `staticTypes.test.ts`. No allowlist: a finding is fixed in the code.
+  - **What a credential read is:** a reference to a property or binding named `authType`,
+    `jwtToken`, `refreshToken`, `authorizationToken`, the environment's `SAP_JWT_TOKEN`, the
+    header `x-sap-jwt-token`, or a value the checker types as a credential provider; and any
+    decode of a token (a `split('.')`, `atob`, `Buffer.from(…, 'base64…')` or `JSON.parse`
+    applied to an expression containing such a read).
+  - **What a kind value is,** recognised by the checker, not by name:
+    1. an expression whose type is assignable to `'cloud' | 'onprem' | 'legacy'` (or the
+       declared kind types `SapEnvironment`, `SystemKind`);
+    2. a boolean **used as the kind**: converted into one (the condition of a conditional
+       whose branches are kind values, e.g. `flag ? 'cloud' : 'onprem'`), compared with one,
+       or passed or assigned where a kind or a declared kind-flag type is expected
+       (`type CloudFlag = boolean`, read through the checker's alias symbol on the
+       declaration);
+    3. any boolean bound — variable, property, parameter default, or the return of a
+       boolean function — to a comparison of a credential read with a literal: a boolean of
+       the credential type has no use but as a disguised kind (credential choices are made
+       by a `switch` or conditional on the field itself, which stays allowed).
+  - **The rule:** no kind value is produced from a credential read — in an assignment, a
+    property initialiser, a call argument, a return, or an inline call — looking through the
+    expression and the same-file functions it calls; and no production code decodes a token
+    at all.
+  - **Fixtures, each refused by its own form alone:** an assignment (`kind = authType ===
+    'jwt' ? 'cloud' : 'onprem'`); a property (`{ isCloudSystem: authType === 'jwt' }`);
+    an argument (`stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem')`); an inline
+    call (`declare(isJwt(config))` with `isJwt` same-file); a return (the old
+    `isCloudConnection`); a `CloudFlag` assigned from a credential comparison; a token decode
+    reading a claim. **Passing fixtures:** a `switch (authType)` choosing a provider; a
+    conditional on `authType` choosing a login header; the configuration summary.
   - **Its limit, stated:** a credential read reaching a kind through another module, or
-    through an untyped value, is beyond this check; that is left to review, and the PR
-    description says so.
+    through an untyped value, is beyond this check; left to review, and the PR description
+    says so.
 - [ ] **Step 5:** Run the unit suite, `npm run test:check`, every package's `lint:check`:
-  PASS. Mutate: put one `authType === 'jwt'` kind test back into a kind-producing helper (and,
-  separately, into a same-file helper a kind function calls); the guard goes red each time;
-  revert.
+  PASS. **Mutate per form:** put back, one at a time, an assignment, a property, an argument,
+  an inline call and a return deriving the kind from `authType`, and a claim read; the guard
+  goes red each time; revert each.
 - [ ] **Step 6: CHANGELOG** (24.0.0, Fixed): "On-premise systems with JWT authentication were
   refused program create, update and activate: the server took the credential type for the
-  system kind. The declared system kind decides what is offered." **MIGRATION-24.0.md:**
-  `isCloudConnection` is no longer exported from `@mcp-abap-adt/lib/utils`; an embedder reads
-  the system kind it declared (`--system-type`, `SAP_SYSTEM_TYPE`, or its own configuration),
-  never the credential type.
+  system kind. The declared system kind decides what is offered." **MIGRATION-24.0.md**, a
+  section of its own:
+  - **Removed: `isCloudConnection` from `@mcp-abap-adt/lib/utils`.** It reported an
+    on-premise system with JWT authentication as cloud: it read the credential type as the
+    system kind. Keeping it would keep that wrong answer, so it is removed although that is
+    breaking.
+  - **What to use:** the system kind the embedder declared — `--system-type`,
+    `SAP_SYSTEM_TYPE`, or its own configuration.
+  - **The rule:** nothing is derived from the authorization — not from the credential type,
+    the token or its claims; only the connection settings count. The one exception is the
+    responsible user and the system id, read from the system when its information is
+    available, otherwise from the settings.
 - [ ] **Step 7: Commit** as `fix(program): the declared system kind, not the credential,
   decides what is offered`.
 
@@ -1745,6 +1819,10 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
       `expectAbsent` / `expectCleared`, the realm check, the refusal stop and the run report;
       drop the "Cleanup" note that a delete runs as cleanup;
     - `src/__tests__/integration/helpers/testers/README.md` for `HighTester`'s changed role;
+    - every comment or doc that ties the system kind to the credential — at least
+      `src/lib/config/IServerConfig.ts` (around line 38) and `src/lib/handlers/interfaces.ts`
+      (around line 14), fixed in C2e and checked again here — and any README or `docs/`
+      page saying JWT means cloud;
     - `tests/README.md` and `tests/test-config.yaml.template`'s header: `expected_realm`, the
       `coverage_*` sections, `$TMP` on premise and the configured package on the cloud;
     - guides and examples that show a test or a config;

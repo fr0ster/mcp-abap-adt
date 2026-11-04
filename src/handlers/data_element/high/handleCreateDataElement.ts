@@ -11,7 +11,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * A lifecycle, not one call: validate the name, create the bare object, lock
  * it, read-patch-write the properties the caller gave (through `withLock`,
  * released on every path out), wait for the write to be visible, check the
- * inactive version, and optionally activate — the order the pre-migration
+ * inactive version, and activate — the order the pre-migration
  * handler ran them in: `unlock` then the wait then `check`, because `check`
  * is the first call after the write that reads it back and so the one the
  * wait has to sit ahead of. `create` itself never reaches
@@ -181,7 +181,6 @@ interface DataElementArgs {
   search_help?: string;
   search_help_parameter?: string;
   set_get_parameter?: string;
-  activate?: boolean;
   master_language?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -202,7 +201,6 @@ export async function handleCreateDataElement(
   validateTransportRequest(args.package_name, args.transport_request);
 
   const dataElementName = args.data_element_name.toUpperCase();
-  const shouldActivate = args.activate !== false;
   const typeKind = args.type_kind || 'domain';
   const detail = detailOf(args);
 
@@ -320,7 +318,7 @@ export async function handleCreateDataElement(
         }),
       );
 
-      if (!checked.ok || !shouldActivate) {
+      if (!checked.ok) {
         return checked;
       }
 

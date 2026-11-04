@@ -20,6 +20,7 @@
  */
 
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { corpusBody } from '../../lib/adtCorpus';
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
 import {
   resetSystemContextCache,
@@ -174,6 +175,14 @@ const COMPACT_CREATES: readonly CreateCase[] = [
 }));
 
 const VARIANTS: readonly SystemKind[] = ['onprem', 'cloud'];
+
+/** The data element create's answers, by request: its metadata read a corpus document. */
+const DATA_ELEMENT_ANSWERS = [
+  undefined,
+  undefined,
+  undefined,
+  { data: corpusBody('read-metadata-data-element--01-ddic-dataelements') },
+];
 
 /** Whether `variant` serves `c`: its tool, and for `HandlerCreate` its type. */
 function serves(variant: SystemKind, c: CreateCase): boolean {
@@ -385,4 +394,34 @@ describe('master_language says what a create does with it', () => {
       jsonFind(listedJson(listed.inputSchema), 'master_language')?.description,
     ).toBe(MASTER_LANGUAGE_WORDS);
   });
+});
+
+/**
+ * `CreateDataElement` declares no `activate`, and its create always
+ * activates: the last request it sends is the data element's activation.
+ * SAP's answers are real corpus documents where the chain reads one.
+ */
+describe('CreateDataElement activates what it created', () => {
+  it.each(VARIANTS.filter((v) => servedEntries(v).has('CreateDataElement')))(
+    '%s',
+    async (variant) => {
+      const recording = await recordCase({
+        tool: 'CreateDataElement',
+        variant,
+        stand: 'recording',
+        args: {
+          data_element_name: 'ZPIN_DTEL',
+          package_name: 'ZPIN_PKG',
+          description: 'Pin activation',
+        },
+        answers: DATA_ELEMENT_ANSWERS,
+        expected: 'none',
+      });
+      const requests = recording.requests;
+      const last = requests[requests.length - 1];
+      expect(last?.method).toBe('POST');
+      expect(last?.url.startsWith('/sap/bc/adt/activation?')).toBe(true);
+      expect(last?.body).toContain('adtcore:name="ZPIN_DTEL"');
+    },
+  );
 });

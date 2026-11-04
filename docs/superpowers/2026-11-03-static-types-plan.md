@@ -1583,16 +1583,31 @@ every compact tool whose `object_type` enum has `FUNCTION_MODULE`):**
   - `GetFunctionModule` → `src/handlers/function_module/high/handleGetFunctionModule.ts`;
   - `DeleteFunctionModule` → `src/handlers/function_module/high/handleDeleteFunctionModule.ts`;
   - `ActivateFunctionModule` → its handler;
+  - **`ActivateObjects`** → `src/handlers/common/low/handleActivateObject.ts`: every
+    `objects[]` entry of type `FUGR/FF` carries its group in `parentName`;
   - **`CheckFunctionModule`** → `src/handlers/function/high/handleCheckFunctionModule.ts`,
     which delegates to `src/handlers/function/low/handleCheckFunctionModule.ts`, which sends
     `.check({ functionModuleName, functionGroupName }, …)` directly;
   - `GetFunctionModuleVersions` and `GetObjectVersions` with `object_type` `FUNCTION_MODULE`
     (the version list is read under the given group);
-  - `RunFunctionModuleUnitTest` (both runners address the module under the given group).
+  - **`RunFunctionModuleUnitTest`, by runner:** the **sync** runner requires
+    `function_group_name` and addresses the module under it — checked; the **async** runner
+    forwards only the module name (the installed runner sends a `FUNC` target) and works
+    without a group — when `function_group_name` is given there, it is checked and a
+    mismatch refused; when it is absent, nothing extra is sent and the async call stays as
+    it is;
+  - **`GetWhereUsed`**, single form (`object_name` `GROUP|FM_NAME` with `object_type`) and
+    list form (`objects[]`, each `GROUP|FM_NAME`): it shares its reader with the compact
+    `HandlerWhereUsed`.
 - **compact routes:**
   - `HandlerUpdate` → `src/handlers/common/low/handleUpdateUnderLock.ts` →
     `src/handlers/function/low/handleUpdateFunctionModule.ts`;
-  - `HandlerActivate` → `src/handlers/function/low/handleActivateFunctionModule.ts`;
+  - `HandlerActivate` → `compact-modify/src/handlers/handleHandlerActivate.ts` →
+    `handleActivateObjectOnce` → `src/handlers/common/low/handleActivateObject.ts`, in each of
+    its forms: the **single** form (`FUNCTION_MODULE` by `object_type`, `GROUP|MODULE` or
+    `function_group_name`, turned into `{ name, parentName }`), the **code** form
+    (`object_adt_type` `FUGR/FF` with `parentName`) and the **list** form (`objects[]`,
+    `FUGR/FF` entries with `parentName`);
   - `HandlerGet` → the `GetFunctionModule` read;
   - `HandlerDelete` → `src/handlers/common/low/handleDeleteOnly.ts` → its `FUNCTION_MODULE`
     entry in `deletionTargets.ts`;
@@ -1602,8 +1617,8 @@ every compact tool whose `object_type` enum has `FUNCTION_MODULE`):**
     (`GROUP|MODULE` in `object_name`);
   - **`HandlerLock` / `HandlerUnlock`** `FUNCTION_MODULE` →
     `src/handlers/common/low/handleLockObject.ts` / `handleUnlockObject.ts` (`GROUP|MODULE`);
-  - **`HandlerWhereUsed`** `FUNCTION_MODULE` → its where-used read (with
-    `function_group_name`).
+  - **`HandlerWhereUsed`** `FUNCTION_MODULE` → the where-used reader `GetWhereUsed` shares
+    (with `function_group_name`).
 - **Swept and left out, with the reason:** `CreateFunctionModule` and `HandlerCreate`
   `FUNCTION_MODULE` (the module does not exist yet; the group is the container the create
   names, so there is no metadata to read); `HandlerValidate` `FUNCTION_MODULE` (validates a
@@ -1621,14 +1636,25 @@ every compact tool whose `object_type` enum has `FUNCTION_MODULE`):**
   - the same mismatch test, and a matching-group test, for each path above:
     `GetFunctionModule`, `ActivateFunctionModule`, `DeleteFunctionModule`,
     `CheckFunctionModule` (through its low handler's `.check`), `GetFunctionModuleVersions`,
-    `GetObjectVersions` `FUNCTION_MODULE`, `RunFunctionModuleUnitTest` (each runner), and
+    `GetObjectVersions` `FUNCTION_MODULE`, `RunFunctionModuleUnitTest` (sync; and async
+    with a group given), `ActivateObjects` with a `FUGR/FF` entry, `GetWhereUsed` single and
+    list, and
     the compact `HandlerGet`, `HandlerUpdate`, `HandlerActivate`, `HandlerDelete` (through
     `handleDeleteOnly`), `HandlerDeletionCheck` (through `handleDeletionCheck`),
     `HandlerCheckRun` (through `handleCheckObject`), `HandlerLock`, `HandlerUnlock` and
     `HandlerWhereUsed`;
   - in every matching-group test the metadata GET is pinned **first** — before any deletion
-    check, syntax check, version read, run, lock, unlock, where-used read or write — then the
-    path's existing requests.
+    check, syntax check, version read, run, lock, unlock, where-used scope or reference
+    request (and before a batch envelope is dispatched, when the where-used read runs inside
+    one), activation POST, or write — then the path's existing requests;
+  - **activation, every module reference:** `ActivateObjects` and `HandlerActivate` (single,
+    code and list forms) with two `FUGR/FF` references — one mismatched group refuses the
+    whole activation with **no** POST (the metadata reads pinned, then nothing); all
+    matching sends the POST after one metadata read per module reference;
+  - **`GetWhereUsed` list:** one mismatched `GROUP|FM_NAME` entry refuses the call before any
+    scope or reference request; all matching goes on after one metadata read per entry;
+  - **`RunFunctionModuleUnitTest` async without a group:** no metadata read, the existing
+    requests unchanged (pinned) — `'an async run without a group sends nothing extra'`.
 - [ ] **Step 2:** One shared check, `checkFunctionModuleGroup(context, group, module)`, in
   `src/lib/strategies/functionModuleGroup.ts` (new), reads the module's metadata (one GET)
   and refuses when the given group differs from `adtcore:containerRef`'s name. Every path

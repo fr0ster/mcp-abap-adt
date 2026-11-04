@@ -137,12 +137,22 @@ refused rather than dropped.
   `sql`, HandlerGetData's `sql_query` mode. On any other tool, full set included, `Tool.value`
   matches nothing and is ignored (named in the start line).
   `HandlerDelete.CLASS`, `HandlerBatch.end`, `HandlerGetData.sql`.
-- `Tool.prefix*`: every value of the dispatching argument that starts with `prefix`.
-  `HandlerDebugSession.get*`.
+- `Tool.CODE`: on `HandlerActivate` and `HandlerGet`, a value may also be an ADT type code, a
+  value of its own: the codes of the tool's code arguments (`objects[].type` and
+  `object_adt_type` on HandlerActivate, `object_adt_type` on HandlerGet). `HandlerActivate.CLAS/OC`,
+  `HandlerGet.DDLS/DF`. A code is written as the ADT tables write it, upper case, `/` included
+  (`ENHO/XHH`; `AUTH` has none). The `/` collides with no separator: entries are split on `,`,
+  the tool from the value on the first `.`, and no tool name or code holds either. In YAML it
+  is a plain scalar (`- HandlerActivate.CLAS/OC`), with no quoting needed. An entry's value is
+  looked up among the tool's names and among its codes; names hold no `/` and no code is also a
+  name, so a whole value names one or the other.
+- `Tool.prefix*`: every value of the dispatching argument that starts with `prefix`, and, on
+  HandlerActivate and HandlerGet, every code that does. `HandlerDebugSession.get*`;
+  `HandlerActivate.CLAS*` names `CLASS` and `CLAS/OC` both.
 - `Prefix*`: every tool whose name starts with `Prefix`. `Delete*`.
 - Malformed, stopping the start: an empty entry; a tool part that is empty or holds anything
-  but ASCII letters and digits; a value part that holds anything but ASCII letters, digits and
-  `_`; `*` anywhere but at the end; `*` alone; `*.value` (a wildcard over tools with an action);
+  but ASCII letters and digits; a value part that holds anything but ASCII letters, digits,
+  `_` and `/`; `*` anywhere but at the end; `*` alone; `*.value` (a wildcard over tools with an action);
   more than one `.`.
 - Tool names and values match exactly, case included.
 - **An entry that matches nothing in this binary is ignored** (the goal), and the start line
@@ -200,8 +210,8 @@ no credential is in the line.
   (§1, Measured that none takes one today):
   - the twelve `object_type` / `target_type` builders of `compactDescriptions.ts` take the
     remaining members instead of the variant (the variant's members minus the denied ones);
-    `HandlerActivate`'s also names only the codes left, and `HandlerGet`'s (with its `part`
-    description) leaves out the address parts when they are removed (below);
+    `HandlerActivate`'s and `HandlerGet`'s also take the codes left, so a denied code is
+    named nowhere in the definition (below);
   - **controller's call:** eight new builders, for the tools whose values are fixed today:
     `HandlerBatch`, `HandlerDebugBatch`, `HandlerSession`, `HandlerDebugSession`,
     `HandlerDebugStep`, `HandlerDebugBreakpoints`, `HandlerDebugMaintain` (each value's
@@ -211,34 +221,26 @@ no credential is in the line.
     (§7).
 - **A denied value is exactly that value.** Denying a value removes it, and only it, from its
   tool's schema: other values stay, even when they reach the same ADT endpoint (the checks are
-  formal). Denying `HandlerActivate.CLASS` leaves `BEHAVIOR_IMPLEMENTATION`.
-- **Every form that names the target is narrowed with the dispatching argument**, so the SDK's
-  parse refuses a denied value in every form the tool takes it in, with no per-call check
-  (§1):
-  - **`HandlerActivate`.** The object types map to codes by `COMPACT_ACTIVATE_ROUTES`
-    (`src/lib/adtProjections.ts:728`), 18 types to 17 codes. The map back is not one to one
-    (Measured): `CLAS/OC` stands for `CLASS` and `BEHAVIOR_IMPLEMENTATION`; every other mapped
-    code stands for exactly one type. Of `ACTIVATION_CODES`, 11 on premise (10 on cloud) map to
-    no object type: `FUGR/I`, `VIEW/DV`, `DCLS/DL`, `DSFD/SCF`, `DSFI/SFI`, `XSLT/VT`,
-    `FTG2/FT` (on premise only), `AUTH`, `ENHO/XHH`, `ENHO/XHB`, `ENHS/XSB`. When at least one
-    `HandlerActivate` value is denied, `objects[].type` and `object_adt_type` become an `enum`
-    of the codes still allowed:
-    - a mapped code is the denied value in another form, so it is removed when a value mapped
-      to it is denied: denying `CLASS` removes `CLASS` from `object_type` and `CLAS/OC` from
-      the two code arguments, and leaves `BEHAVIOR_IMPLEMENTATION` in `object_type`; denying
-      `BEHAVIOR_IMPLEMENTATION` removes it and `CLAS/OC`, and leaves `CLASS`;
-    - an unmapped code is kept: no `HandlerActivate.<value>` names it, so only denying the
-      tool removes it, and the docs say so;
-    - the enum holds the codes as the table writes them, upper case. The other spellings
-      `acceptedCodeOf` takes today (lower case, a main type, a search or friendly name) are
-      refused while a value of the tool is denied: an enum cannot hold them, and a pattern
-      would be a regex over the input. The docs say so. With nothing denied the two arguments
-      stay free strings, as today.
-  - **`HandlerGet`.** Its object types map to APIs (`COMPACT_READ_ROUTES`), not to codes, so a
-    code given in `object_adt_type` cannot be mapped back to an object type (Measured). When at
-    least one `HandlerGet` value is denied, `object_structure` and `node_structure` are removed
-    from `part`'s enum (and from its description), and `object_adt_type` with them.
-    `virtual_folders` and the activation-run parts stay: they read no object by type.
+  formal). Denying `HandlerActivate.CLASS` leaves `BEHAVIOR_IMPLEMENTATION`, and leaves the
+  code `CLAS/OC`; a code is denied by naming it.
+- **A denied code is not in the code arguments.** HandlerActivate's `objects[].type` and
+  `object_adt_type`, and HandlerGet's `object_adt_type`, are free strings today (§1). When at
+  least one code of the tool is denied, they become an `enum` of the codes the variant serves
+  there less the denied ones (HandlerActivate: `ACTIVATION_CODES`; HandlerGet: the variant's
+  ADT type table codes, `TABLE_CODES`), so the SDK's parse refuses a denied code, with no
+  per-call check (§1). A denied name changes neither argument, and a denied code changes no
+  `object_type`.
+  - Denying `HandlerActivate.CLAS/OC` removes it from `objects[].type` and `object_adt_type`;
+    `CLASS` and `BEHAVIOR_IMPLEMENTATION` stay in `object_type`.
+  - Denying `HandlerGet.CLAS/OC` removes it from `object_adt_type`, which only the address
+    parts (`object_structure`, `node_structure`) read; `part` keeps its values, and `CLASS`
+    stays in `object_type`.
+  - **Spellings while a code is denied.** The enum holds the codes as the ADT tables write
+    them, upper case. The other spellings the handlers take today (`acceptedCodeOf`,
+    `tableTypeOf`: lower case, a main type, a search or friendly name such as `class`) are
+    refused in those arguments while a code of that tool is denied: an enum cannot hold them,
+    and a pattern would be a regex over the input. Without a denied code the arguments stay
+    free strings, as today. The docs say so.
   - The full set's `ActivateObjects` (`objects[].type`) has no values; it is denied as a tool.
 - **`HandlerGetData.sql`** is an action: denying it removes `sql_query` from the listed schema
   at registration, and the description no longer names it; the read of a named table stays.
@@ -477,10 +479,13 @@ draft, and no other tool reads it.
   in each of CLI, environment and YAML; both table lists together; the start line for nothing
   configured, for each row, and with an unmatched entry; a denied tool absent from
   `tools/list`; a denied value absent from the enum, the description and the search members,
-  for each of the twenty builders; a denied `HandlerActivate` type refused in `objects[].type`
-  and `object_adt_type` too (an unmapped code kept); a denied value removing only itself
-  (`HandlerActivate.CLASS` denied: `CLASS` and `CLAS/OC` gone, `BEHAVIOR_IMPLEMENTATION`
-  listed); `HandlerGet`'s address parts gone when a value is denied; `HandlerGetData.sql` removing `sql_query` and its mention; a
+  for each of the twenty builders; a denied value removing only itself
+  (`HandlerActivate.CLASS` denied: `CLASS` gone, `BEHAVIOR_IMPLEMENTATION` listed and
+  `CLAS/OC` still taken in `objects[].type` and `object_adt_type`); a denied code removing only
+  itself (`HandlerActivate.CLAS/OC` denied: `CLAS/OC` refused in both code arguments in every
+  spelling, `CLASS` and `BEHAVIOR_IMPLEMENTATION` still in `object_type`; the same for
+  `HandlerGet.CLAS/OC` and `object_adt_type`); a code entry in each of CLI, environment and
+  YAML; a prefix covering names and codes; `HandlerGetData.sql` removing `sql_query` and its mention; a
   tool with every value denied absent; each form left absent (no row, an empty variable)
   restricting nothing; each refusal code, its words, and that no handler ran and nothing of the
   call's own was sent (a recording connection); an argument not given passing; a refused call in
@@ -518,8 +523,9 @@ draft, and no other tool reads it.
   start line, what is checked and what is not: reads are not checked; a task is matched as
   given; denying `Activate*` closes only the activation tools, not a write's `activate`;
   each entry denies exactly what it names, and an administrator who wants a whole object kind
-  out denies every value that names it; an unmapped activation code goes only with the tool; while a `HandlerActivate`
-  value is denied its code arguments take upper-case codes only; the
+  out denies every value that names it; an ADT code is a value of its own: denying a name
+  leaves its code, and `HandlerActivate.CLAS/OC` closes the code; while a code is denied, the
+  code arguments take codes as written in upper case only; the
   paths an embedder takes into its own hands are its own); the tool lists
   (`AVAILABLE_TOOLS*.md`, generated) and a section on `GetObjectDraft` (its answer, the types
   offered, the server clock, first writer wins); `CLI_OPTIONS.md`,

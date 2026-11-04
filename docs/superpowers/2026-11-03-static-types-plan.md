@@ -864,11 +864,22 @@ transport case and of C13. The measurement runs as a temporary Jest case under
   it sends nothing and names what is left.
 - [ ] **Step 2:** Move an object the measurement creates in the configured transportable
   package from the configured request's task to the created task, then back
-  (`MoveTransportObjects`); read both requests after each move. Remove the entry; delete the
-  object.
-- [ ] **Step 3:** Delete through `createAdtClient(connection).getRequest().delete` on the
-  measurement's own connection — first the task by its number, then the request; if the task
-  delete is refused, the request alone — and read each number with `GetTransport` after.
+  (`MoveTransportObjects`), journalling each move (`recordTransportEntry`); read both requests
+  after each move.
+- [ ] **Step 3: Clean up in the one order** (the same as `deleteRecordedRequests`):
+  1. delete the object (`deleteRecorded`);
+  2. detach every entry of it (`RemoveTransportObject`) from every task it is on — the
+     journalled ones and any the delete added — across the configured request and the
+     created one;
+  3. verify the final entries (`ReadTransportObjects`): the configured request back as it
+     was, the created one empty;
+  4. then measure task and request deletion: through
+     `createAdtClient(connection).getRequest().delete` on the measurement's own connection —
+     first the task by its number, then the request; if the task delete is refused, the
+     request alone — reading each number with `GetTransport` after and recording each
+     outcome.
+  The `afterAll` of Step 1a stays as the idempotent failure cleanup: it repeats only what
+  the normal path did not finish, in the same order; the credential-refusal stop applies.
 - [ ] **Step 4:** Record in C13 and in this task: which deletes ADT accepted, in which order,
   what `GetTransport` answers for a deleted number (the `expectAbsent` read), and whether the
   move between requests is accepted both ways. A refusal of the move or of every delete goes
@@ -1623,7 +1634,9 @@ recorded order.
 **Unit:** `src/__tests__/unit/pins/transport.pins.test.ts`.
 
 **Live:**
-- **The existing `TransportObjectToolsCrud`** moves to `liveCall`.
+- **The existing `TransportObjectToolsCrud`** moves to `liveCall`, and its cleanup takes the
+  same order (object deleted, its entries detached from both requests, final entries
+  verified, created tasks and requests deleted and asserted absent).
 - **New: `coverage/transport.live.test.ts`,** section `coverage_transport`.
   - **Creates.** `CreateTransport`, `CreateTransportTask`, `HandlerTransportCreate` each create
     their own request or task and **record the returned number at once**
@@ -1631,9 +1644,11 @@ recorded order.
     (`GetTransport`). Cleanup deletes only recorded numbers, in the measured order, then
     asserts each absent.
   - **Everything else** works on `coverage_transport.request`: an object the test creates in the
-    section's transportable package is added, read in the request's objects and action log,
-    sorted and compressed in that request's task, then removed — the request is left as it
-    was. The object is deleted by `deleteRecorded`.
+    section's transportable package is added (journalled, `recordTransportEntry`), read in the
+    request's objects and action log, sorted and compressed in that request's task, then
+    removed — `RemoveTransportObject` is itself a case here, asserted by a re-read. Cleanup
+    then runs the one order: the object deleted, any entry the delete added detached, the
+    configured request verified back as it was.
   - **Move** (`MoveTransportObjects`, `HandlerTransportMoveObjects`). A move between two tasks
     of one request is refused by the system (TR 717, "Object can be moved between different
     requests only"; `TransportObjectToolsCrud.test.ts`). So the case moves the object's entry

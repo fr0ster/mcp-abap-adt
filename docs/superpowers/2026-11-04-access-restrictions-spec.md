@@ -204,7 +204,21 @@ no credential is in the line.
 
 - `registryOf` takes the denied actions. It wraps each group (`withoutDenied(groups, denied)`)
   so that `getHandlers()` leaves out a denied tool, and narrows a compact tool's dispatching
-  argument to the values not denied. A compact tool left with no value is left out.
+  argument to the values not denied.
+- **When a compact tool is left out.** A `Tool` entry removes the tool outright. Otherwise a
+  compact tool stays registered while any callable form remains, and is left out only when
+  every value of every form it takes is denied:
+  - HandlerActivate: every name of `object_type` and every code of `objects[].type` /
+    `object_adt_type`. Names alone exhausted: the tool stays, its codes callable; codes alone
+    exhausted: the tool stays, its names callable.
+  - HandlerGet: its names of `object_type` and its codes of `object_adt_type` (the address
+    parts) are deniable; `virtual_folders` and the activation-run parts take neither and are
+    no deniable value, so they always remain, and only a `HandlerGet` entry removes the tool.
+    Names alone or codes alone exhausted: the tool stays with what remains.
+  - HandlerGetData: `sql` is its own mode. Denying `HandlerGetData.sql` keeps the table read;
+    the table read is not a deniable value of its own, so only a `HandlerGetData` entry removes
+    the tool.
+  - Every other compact tool: every value of its one dispatching argument.
 - **Narrowing rebuilds the definition from the remaining values**, so its enum, its description
   and its search members name no denied value. That needs a builder taking a member set
   (§1, Measured that none takes one today):
@@ -252,8 +266,15 @@ no credential is in the line.
   paths. On path 3 a denied tool cannot be registered (no wrapped group holds it, so
   `registerTool` refuses it, Measured from the code), but the definition is the embedder's,
   so a denied value is in its schema if the embedder put it there. On path 4 the registry's
-  tools are its own. On path 5 `getHandlerEntries()` leaves out a denied tool when the
-  embedder gave the exporter wrapped groups, and the arguments are the embedder's to parse.
+  tools are its own. On path 5 the exporter applies the same list itself (below), and the
+  arguments are the embedder's to parse.
+- **`HandlerExporter` takes the denied actions.** It builds its groups privately
+  (`HandlerExporter.ts`, constructor), so an embedder cannot hand it wrapped groups. Its
+  options take `deniedActions`, of the same parsed type the server's table produces (lib
+  exports the parser). The exporter applies `withoutDenied` to its groups once, in its
+  constructor, so `getHandlerEntries()`, `registerOnServer()`, `createRegistry()` and the tool
+  names it lists all start from the same narrowed groups: an embedder and the server narrow
+  identically.
   Handlers an embedder takes into its own hands are its own. The docs state it.
 
 ### 3.2 Packages, requests and tables: the strategy
@@ -431,7 +452,9 @@ draft, and no other tool reads it.
   - `changed_at`: for `own` and `other`, the `inactive` ETag's first 14 digits as a UTC time
     (ISO 8601), the draft's last write;
   - `age_seconds`: for `own` and `other`, now (UTC, the server's clock) minus `changed_at`;
-  - `etags`: the three ETags as SAP sent them, with `detail: 'full'` (`terse` leaves them out).
+  - `etags`: `active`, `inactive` and `workspace`, the three ETags as read.
+  - No `detail` argument, on `GetObjectDraft` or on `HandlerGet` `part: 'draft'`: the answer
+    always carries these fields, the same on both.
 - **Failures.** A read that fails answers as the tool's reads answer today: SAP's status and
   message (a `404` for an object that does not exist). An ETag missing, or not led by 14
   digits, answers `draft: 'undetermined'` with what came.
@@ -485,8 +508,13 @@ draft, and no other tool reads it.
   itself (`HandlerActivate.CLAS/OC` denied: `CLAS/OC` refused in both code arguments in every
   spelling, `CLASS` and `BEHAVIOR_IMPLEMENTATION` still in `object_type`; the same for
   `HandlerGet.CLAS/OC` and `object_adt_type`); a code entry in each of CLI, environment and
-  YAML; a prefix covering names and codes; `HandlerGetData.sql` removing `sql_query` and its mention; a
-  tool with every value denied absent; each form left absent (no row, an empty variable)
+  YAML; a prefix covering names and codes; `HandlerGetData.sql` alone removing `sql_query` and
+  its mention, the table read still listed and callable; HandlerActivate with every name denied
+  (the tool listed, a code callable), with every code denied (the tool listed, a name callable)
+  and with both (the tool absent); a single-argument tool with every value denied absent;
+  `HandlerExporter` given a denied value and a denied tool: the tool absent from
+  `getHandlerEntries()` and from a server it registers on, the value absent from the exported
+  definition's enum; each form left absent (no row, an empty variable)
   restricting nothing; each refusal code, its words, and that no handler ran and nothing of the
   call's own was sent (a recording connection); an argument not given passing; a refused call in
   batch mode taking no number; path 3 refusing a denied tool.
@@ -498,8 +526,8 @@ draft, and no other tool reads it.
   connection taken when the strategy reads nothing; the launcher choosing the strategy by the
   presence of a subtree entry.
 - **The draft tool, unit:** each answer from recorded ETag triples (`none`, `own`, `other`,
-  `undetermined`), a failed read, a missing ETag, the age against a fixed clock, `terse` and
-  `full`, per part when the multi-part rule applies, and in batch mode as plan step 1 decides
+  `undetermined`), a failed read, a missing ETag, the age against a fixed clock, the same
+  fields on `GetObjectDraft` and `HandlerGet` `part: 'draft'`, per part when the multi-part rule applies, and in batch mode as plan step 1 decides
   (recorded in one batch, or refused `batch_not_recordable`).
 - **Nothing configured.** Every fixture — the listed-schema fixture and the surface fixtures —
   is byte-identical to today's except two reviewed additions: the `GetObjectDraft` tool and
@@ -532,7 +560,7 @@ draft, and no other tool reads it.
   `docs/configuration/YAML_CONFIG.md`, `src/lib/config/README.md`; `BATCH_MODE.md` (a refused
   call in a batch; the draft tool recordable or not, as measured); `HANDLERS_MANAGEMENT.md` and
   the embeddable docs (`accessChecks`, the two shipped strategies, `IPackageReader`,
-  `withoutDenied`, paths 3 to 5); `README.md`; `SECURITY.md` (the checks are formal: SAP's
+  `withoutDenied`, `HandlerExporter`'s `deniedActions`, paths 3 to 5); `README.md`; `SECURITY.md` (the checks are formal: SAP's
   authorization remains the boundary); `CHANGELOG.md`.
 - **Order and semver.** Built on top of the static-types change (PR #346) after it merges, and
   released as **24.1.0**, a minor of the eighteen packages, versioned together. Everything is

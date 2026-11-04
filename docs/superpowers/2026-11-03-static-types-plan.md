@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D14 (spec §9), then C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D18 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -1342,6 +1342,15 @@ that repository's own review and CI. The release itself is the owner's.
   referenced definitions); responsible and master-system values; and a description long
   enough to be truncated, whose cut falls on a character that escapes — the body stays
   well-formed and the entity whole.
+- **`CreateTransport` `customizing` (D2 addition, measured):** `core/transport/create.js` maps
+  `customizing` to `tm:type="T"` (Transport of Copies), which SAP refuses without a real
+  target; a customizing request is type `W`. Measured: `W` with `LOCAL` or an empty target
+  answers `201`. Fix: `customizing` → `W`, `workbench` → `K`. Test: the type pinned per
+  request kind.
+- **The profiler's auto-drill-down threshold (D2 addition):** `runtime/traces/profiler.js`
+  sends `Math.trunc(autoDrillDownThreshold)`, so `0.1` goes out as `0`. Fix: send the value
+  as given. Test: `0.1` is sent as `0.1`.
+- **The `MoveTransportObjects` doc comment** (D18): SAP moves by name, not by position.
 - **#3's run id (from D8):** `core/shared/abapUnit.js` interpolates the run id raw into the
   status URL (`/abapunit/runs/{id}`) and the result URL (`/abapunit/results/{id}`). It is
   percent-encoded in both. Tests: adversarial ids (`/`, `?`, `#`, `%`, `..`) give the encoded
@@ -1374,7 +1383,11 @@ that repository's own review and CI. The release itself is the owner's.
   - `CreateProgram` per program type;
   - `HandlerValidate` without a description (no `description=undefined` in the URL) and for
     `FUNCTION_MODULE`;
-  - `CheckTable` with `ddl_code` (the source in the body).
+  - `CheckTable` with `ddl_code` (the source in the body);
+  - `CreateTransport` with `transport_type: 'customizing'` (`tm:type="W"`) and
+    `'workbench'` (`K`);
+  - the profiler's trace parameters with `auto_drill_down_threshold: 0.1` (sent as given),
+    through the tool that schedules or creates them.
 
   Each pin is red before the bump and green after. Add CHANGELOG lines.
 - [ ] Step 7: Commit (`fix(deps): adt-clients <version> — escaped create bodies, abstract,
@@ -1840,6 +1853,74 @@ given. The version source and diff tools keep their contracts (`content_uri`, an
   Failing tests, then the fix. CHANGELOG and the listed-schema fixture.
 - [ ] Commit per item.
 
+### D15. GetIncludesList: an unknown root fails the call
+
+**What the code and SAP show.** A program that does not exist answers `404`
+`ExceptionResourceNotFound` for its source and its metadata (measured).
+`handleGetIncludesList.ts`' `readSource()` maps that to `{ kind: 'absent' }` for every
+read, the root included (the root's `readObjectSource('PROG/P', …)` and
+`readInclude(parent.name)`). `sourceOf()` then answers `''`, and the call answers an empty
+tree. `absent` is right only for a nested include that is not there.
+
+- [ ] **Step 1: Failing tests** (corpus 404 document, read with the parser by exception type):
+  - `'an unknown root program fails the call'`: the root read pinned, then a refusal naming
+    the object, with no further requests;
+  - `'an unknown nested include stays absent'`: the root read and the include read pinned;
+    the tree lists the include as absent, as today.
+- [ ] **Step 2:** The root read's `absent` becomes a failure of the call; nested reads keep
+  `absent`.
+- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+
+### D16. MemorySnapshotList answers one shape
+
+**What the code shows.** `handleMemorySnapshotList.ts` answers an array when the list has
+entries and `{ snapshots: [], authorization: … }` when it is empty, for terse and full alike.
+
+- [ ] **Step 1: Failing tests:** `'a non-empty list answers { snapshots: [...] } without
+  authorization'`; `'an empty list answers { snapshots: [], authorization }'`. Both terse and
+  full.
+- [ ] **Step 2:** Always answer `{ snapshots }`; add `authorization` only when the list is
+  empty.
+- [ ] **Step 3:** CHANGELOG (Changed) and MIGRATION-24.0 (the answer is always an object with
+  `snapshots`; a caller that read the array reads `snapshots`). C15's `MemorySnapshotList`
+  live assertion reads the same shape. Commit.
+
+### D17. GetBehaviorImplementation reads the implementations
+
+**What the code shows.** `GetBehaviorImplementation` (and compact `HandlerGet`
+`BEHAVIOR_IMPLEMENTATION`) reads the pool's main source and metadata only. The behaviour
+itself — the handler and saver classes (`lhc_…`, `lsc_…`) — sits in the pool's
+`includes/implementations` (CCIMP). adt-clients already has an unused reader for it:
+`getBehaviorImplementationImplementations` (`core/behaviorImplementation/read.js`), reading
+`/sap/bc/adt/oo/classes/<pool>/includes/implementations`.
+
+**Contract:** the `part` enum of `GetBehaviorImplementation` and of `HandlerGet`
+`BEHAVIOR_IMPLEMENTATION` gains `implementations`. Today's main-source read stays the default.
+
+- [ ] **Step 1: Failing tests:** a `pinCases` row for `GetBehaviorImplementation#implementations`
+  and for `HandlerGet#BEHAVIOR_IMPLEMENTATION#implementations`, each pinning the one GET of
+  `…/includes/implementations`; an answer test over a corpus or captured CCIMP; the default
+  part still pins `source/main`.
+- [ ] **Step 2:** Add the part to both schemas and route it to the adt-clients reader through
+  the reachable member. If no `AdtBehaviorImplementation` member exposes it, the member is
+  added in the D2 release (one endpoint, one method).
+- [ ] **Step 3: Live case** (C8's file, both systems): the `implementations` part of the
+  behavior pool C3 creates over its own root, or of a shared fixture pool, holds a
+  `lhc_` class.
+- [ ] **Step 4:** Listed-schema fixture (the added enum value only), C8's keys (below),
+  CHANGELOG (Added). Commit.
+
+### D18. Description fixes
+
+Each with a description test (`src/__tests__/unit/descriptions/…`):
+- [ ] **`MoveTransportObjects`:** SAP moves the entry by name and does not check `position`
+  (measured by the campaign); the description stops saying the entry is named by its
+  position, and says what SAP does. The adt-clients doc comment that says the same is
+  corrected in the D2 release.
+- [ ] **`RuntimeGetProfilerTraceData` `statements`:** the description says the view is SAP's
+  aggregated call tree (procedure-like entries), as the request's Accept header selects it.
+- [ ] CHANGELOG (Fixed: descriptions). Commit.
+
 ### Defect-stage owner decisions (decided 2026-11-04)
 
 - **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
@@ -2105,6 +2186,8 @@ are pinned again here by literal (O2, decided).
   unit-test pairs (C12); and the typeless address parts `HandlerGet#-#object_structure`,
   `HandlerGet#-#node_structure`, `HandlerGet#-#virtual_folders`, which `handleHandlerGet`
   routes before any type. The typeless run parts are C3's.
+- **The behaviour implementations (D17):** `GetBehaviorImplementation#implementations` and
+  `HandlerGet#BEHAVIOR_IMPLEMENTATION#implementations`.
 - **The outline tool (D5):** `GetObjectOutline#<object_type>`, one key per value of its
   `object_type` enum on each variant (as D1 measured: class, interface, and on premise
   program and function group).
@@ -2136,6 +2219,7 @@ where its schema has a `part` enum, each part.
 | `HandlerGet#<type>#source` | per type with a source (not `PACKAGE`, `DOMAIN`, `DATA_ELEMENT`, `FUNCTION_GROUP`, `TABLE_TYPE`) | as the full reader's source |
 | `HandlerGet#<type>#metadata`, `#urls`, `#contents`, `#main_programs` | per type the routes serve | metadata as above; urls: the object's URI; contents: the package's entries; main programs: the include's main program |
 | `HandlerGet#-#object_structure`, `#node_structure`, `#virtual_folders` | typeless | a node of the named object or package |
+| `GetBehaviorImplementation#implementations`, `HandlerGet#BEHAVIOR_IMPLEMENTATION#implementations` | `implementations` | the pool's CCIMP holds a `lhc_` handler class |
 | `GetObjectOutline#<object_type>` | per type of its enum | the components of an object the test creates (its methods, attributes, forms or modules, as the type has them), each with visibility and a source position; the source lines at a position hold that component |
 | any `Get<Type>` source reader, ranged | the reader's own key | a read with `start_line` / `end_line` answers exactly those lines of the whole source; one out of range is refused after the one GET |
 

@@ -437,6 +437,11 @@ on-premise system disagree, the live measurement holds.
 - **#17.** The description of `CreateFunctionGroup`'s `activate` is fixed.
 - **#18.** `DeleteServiceBinding` names the binding in its answer.
 - **#24.** A version list's 404 is read by its exception type and answers "not found".
+- **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
+  program (nested includes stay absent); `MemorySnapshotList` always answers
+  `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`
+  `BEHAVIOR_IMPLEMENTATION` gain the part `implementations`; the descriptions of
+  `MoveTransportObjects` and the profiler's `statements` say what SAP does.
 - **Doubts the owner listed:** `GetServiceBinding`'s json format; the profiler's `top` of 0
   or less is refused.
 
@@ -447,6 +452,8 @@ requests:
 - #15: program type words;
 - #22: no `description=undefined` in the validation parameters;
 - #9: `CheckTable`'s source is sent;
+- `CreateTransport` `customizing` sends type `W`, not `T`;
+- the profiler's auto-drill-down threshold is sent as given;
 - the outline method.
 
 **Owner decisions (2026-11-04)**, listed in the plan's D stage:

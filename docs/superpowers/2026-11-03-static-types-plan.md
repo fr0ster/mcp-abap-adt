@@ -518,6 +518,11 @@ and live specifics.
     test connection (the connection-creation path of the testers, `sessionHelpers.ts`,
     `debuggerCleanup.ts`).
   - `tests/test-config.yaml.template`: `environment.expected_realm: ""` with its comment.
+  - `src/lib/connectionFactory.ts` (`createAbapConnection`'s declared return type; and
+    `withHttpWireLog` if it must become generic).
+  - `src/__tests__/unit/embeddable/connectionSource.test.ts`,
+    `src/__tests__/unit/embeddable/dispose.test.ts` (the two mocks).
+  - `src/__tests__/integration/helpers/testers/hardMode.ts` (Step 4b).
   - The Jest configuration: add `globalTeardown` for the integration runs.
   - `package.json`: the script `test:coverage-family` (C1's global constraints), the
     reporter added to it and to `test:integration`, `build:test-reporter`,
@@ -526,6 +531,7 @@ and live specifics.
   - `tsconfig.reporter.json` (new) and `.gitignore` (`build/test-reporter/`).
 - Create:
   - `src/__tests__/integration/helpers/realmCheck.ts`
+  - `src/__tests__/integration/helpers/launchedServers.ts` (Step 4a)
   - `src/__tests__/integration/helpers/runReport.ts`
   - `src/__tests__/integration/globalTeardown.ts`
   - `src/__tests__/integration/coverageReport/coverageReporter.ts` and
@@ -626,10 +632,18 @@ and live specifics.
     - **A step first, so the type reaches the helpers without a cast.** `createAbapConnection`
       (`src/lib/connectionFactory.ts`) declares `IAbapConnection` as its return type although
       every branch returns `createConnection(…)` (or `withHttpWireLog(createConnection(…))`).
-      Its declared return type becomes `CreatedConnection` — narrower, so no caller breaks —
-      provided `withHttpWireLog` keeps the type (made generic over its argument if it does
-      not); a test-type check (`__typechecks__`) proves the helpers receive
-      `CreatedConnection`. It is a production type change, named in the CHANGELOG with the
+      Its declared return type becomes `CreatedConnection`, provided `withHttpWireLog` keeps
+      the type (made generic over its argument if it does not); a test-type check
+      (`__typechecks__`) proves the helpers receive `CreatedConnection`.
+    - **Two typed mocks break and are migrated in the same step.**
+      `src/__tests__/unit/embeddable/connectionSource.test.ts` (around line 69) and
+      `src/__tests__/unit/embeddable/dispose.test.ts` (around line 106) mock
+      `createAbapConnection` with an `IAbapConnection` double; with the narrower return they
+      fail to compile (TS2345). Each is rewritten to return a concrete connection —
+      `createConnection(…)` of `@mcp-abap-adt/connection` over a spec pointing at
+      `adtStandIn` (or `recordingConnection`'s stand), never sending unless the test asks — so
+      the double is a real `CreatedConnection`, with no cast. Their assertions stay as they
+      are. C2's gate includes the full `npm run test:check`. It is a production type change, named in the CHANGELOG with the
       rest of 24.0.0's exported types if `createAbapConnection` is exported (it is checked at
       the step).
     - **Siblings are guarded too.** `openFreshConnection` (`src/lib/packageSessions.ts`) finds
@@ -653,6 +667,40 @@ and live specifics.
     debugger and session helpers still check the marker before they start.
   - `globalTeardown` compares the run report with `coverage-ledger.json` for the configured
     system kind, in the scope of the running script.
+- [ ] **Step 4a: Launched servers (no test hooks in production code).** A server the tests
+  launch as a child (stdio, Streamable HTTP; `hardMode.ts`, the leftover and long-session
+  cases) is not wrapped — its connections are its own. Instead, in
+  `src/__tests__/integration/helpers/launchedServers.ts` (new):
+  1. **Logged on first.** Immediately before launching a child, the parent's own guarded
+     connection with the same credentials has logged on successfully in that run
+     (`connect()` answered); a refusal there latches the marker and nothing is launched.
+  2. **Every child answer is read.** The parent reads each answer the child returns; when it
+     reports a credential refusal (the answer's refusal kind, as the server words it), the
+     parent latches the marker, stops that child, and launches and sends nothing more.
+  3. **The residual, stated openly.** Inside one child call, the child server's own follow-up
+     (an UNLOCK after a failed write, its logoff) may still be sent once after the refusal:
+     the parent cannot stop it without hooks in production code. It goes into the PR
+     description as an accepted residual for the owner (step 20).
+  Tests (`src/__tests__/unit/coverage/launchedServers.test.ts`, a real child process of the
+  stdio binary against `adtStandIn`):
+  - `'a terminal refusal answer stops every later launch and send'`: the stand answers `401`
+    to a basic credential on the child's call; the parent latches, the next launch and the
+    next call send nothing;
+  - `'a renewing credential's success does not latch'`: `401`, renewed, `200`; the call
+    answers success and no marker exists.
+- [ ] **Step 4b: The hard-mode launcher without built-in limits** (a prerequisite of every
+  hard-mode and launched-server case). `src/__tests__/integration/helpers/testers/hardMode.ts`
+  waits for health with 120 attempts of 250 ms (around line 163) and kills with a 60 s timer
+  (around line 182). Replace both:
+  - **Readiness** from the server's own ready notification — the line it writes when it
+    listens (stdio: its ready line on stderr; HTTP: its listening line) — or the child's exit
+    event, whichever comes first; no attempt count, no sleep; Jest's test timeout is the only
+    deadline.
+  - **Termination** at the test's end by a signal (`SIGTERM`), then a wait for the exit
+    event; no forced-kill timer.
+  - Tests first, on a fake child (a small node script the test launches via
+    `process.execPath`): `'ready when the ready line arrives, without a timer'`, `'an exit
+    before ready rejects at once'`, `'stop waits for the exit event and sets no timer'`.
 - [ ] **Step 5: Run the tests above:** PASS. Then check the reporter's clean build: delete
   `build/test-reporter/`, run `npm run build:test-reporter`, and confirm the one emitted file
   is `build/test-reporter/coverageReporter.js` (plus `reportFormat.js`), with nothing nested,
@@ -663,7 +711,9 @@ and live specifics.
   lists exactly that one file (no `DebuggerHandlers.test.ts`, nothing else); repeat with two
   files and expect exactly two. Without a config, `npm run test:integration` still
   returns at once, logging nothing on.
-- [ ] **Step 6: Commit** as `test(coverage): realm check, refusal stop, run report`.
+- [ ] **Step 6: Gate:** the full `npm run test:check`, the root `npm test` and every package's
+  `lint:check`.
+- [ ] **Step 7: Commit** as `test(coverage): realm check, refusal stop, run report`.
 
 ### C2a. Measure transport request deletion and the move (live, before C6)
 
@@ -725,7 +775,9 @@ deleted after the record is written.
 **Files:**
 - Modify: `src/lib/strategies/activationRun.ts` (`awaitActivationRun`), its callers
   `src/handlers/common/low/handleActivateObject.ts` and
-  `src/handlers/unit_test/shared/writeTests.ts` (drop the two arguments),
+  `src/handlers/unit_test/shared/writeTests.ts` (drop the two arguments), and
+  `src/__tests__/unit/failureStep.test.ts` (its two five-argument calls, around lines 790 and
+  827, become three-argument calls; what they assert stays),
   `CHANGELOG.md`.
 - Test: `src/__tests__/unit/activationRunWait.test.ts` (new), and the existing
   `activationCancelled.test.ts` unchanged.
@@ -750,7 +802,8 @@ deleted after the record is written.
   reads and the interval).
 - [ ] **Step 3:** Change `awaitActivationRun` and its callers as above.
 - [ ] **Step 4:** Run the new tests and every existing activation test
-  (`activationCancelled`, `activationRun`, `activateObject*`, `unitTestTools`): PASS.
+  (`activationCancelled`, `activationRun`, `activateObject*`, `unitTestTools`,
+  `failureStep`): PASS; `npm run test:check`: clean.
 - [ ] **Step 5: Literal pins and live.** Its request sequence is pinned through
   `ActivateObjects` in C3 (`pinCases`, the `withLongPolling=true` reads in the literal); the
   live case is C3's `ActivateObjects` case on both systems.
@@ -1332,10 +1385,22 @@ This covers the four compact handlers no test runs today.
   read and closed, then the closed handle is refused.
 - **Background runs.** `RuntimeRunClass` with `background: true` on a probe class the test
   creates. The run is got, listed and discarded, and the discarded run is absent from the list.
-- **Leftover sessions** (O10): the test starts the stdio binary on its destination and opens a
-  session, ends the process without logoff, then lists through a new process and logs off only
-  the session it made, by its id; a leftover it did not make is listed, never logged off. It
-  asserts the tool's answer, not SM04.
+- **Leftover sessions** (O10). By design a stdio start adopts the sole leftover of its
+  destination (`claimTheOne`, the owner's rule), so the cases use an **isolated runtime
+  store**: every process of the case runs with `AUTH_BROKER_PATH` set to a temporary
+  directory the test makes, holding a copy of the destination's session file, so its
+  runtime directory (`runtimeDirectory`) holds only what the test made; the directory is
+  removed at the end.
+  - **(a) One leftover is adopted.** The test starts the stdio binary, opens a session, ends
+    the process without logoff; a new process on the same destination adopts it — asserted
+    (the designed behaviour): the list shows no leftover, and the new process's session is
+    the leftover's. The new process then logs off normally.
+  - **(b) Two leftovers are left alone.** The test makes two leftovers the same way, recording
+    both handles; a new process adopts neither, lists both, and logs off only the two
+    recorded handles (`LogoffLeftoverSession` / `HandlerLeftoverSessionLogoff`), each
+    answer asserted; the list is then empty.
+  - The tests assert the tools' answers, not SM04. Everything the test made — sessions,
+    processes, the temporary store — is ended or removed.
 
 **Steps:** the family steps, then:
 - [ ] Turn the guard green: `npm test -- src/__tests__/unit/coverage/coverageLedger.test.ts`
@@ -1367,11 +1432,10 @@ This covers the four compact handlers no test runs today.
   out of scope). The AMDP keys run live on both systems, with no exception.
   `DebugTakeOverListener` uses a second connection of the same user, opened and logged off by
   the test (C15).
-- **O10 — leftover sessions: yes, as recommended.** The test makes its own leftover: it starts
-  the stdio binary on its destination and opens a session, ends the process without logoff,
-  then lists through a new process and logs off only the session it made, matched by its id.
-  A leftover it did not make is listed, never logged off. The test asserts the tool's answer,
-  not SM04 (C16).
+- **O10 — leftover sessions: yes.** The test makes its own leftovers, in an isolated runtime
+  store (a stdio start adopts the sole leftover of its destination by design): one leftover
+  is adopted by the next process, asserted; two are adopted by neither, listed, and only the
+  recorded handles are logged off. The tests assert the tools' answers, not SM04 (C16).
 - **O11 — per-value keys: yes.** Each value of a compact tool's `operation` or `action` enum is
   its own coverage key, read from the listed schema like `object_type`. Measured: the compact
   debugger tools use `operation` (`HandlerDebugSession` 13, `HandlerDebugBreakpoints` 6,
@@ -1468,7 +1532,8 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     Then run Codex review and CI, and get the owner's review.
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
     PR description: the owner's decisions (O1–O12), the exceptions the owner granted (none so
-    far), the measured transport delete path, the per-system run counts and the config
+    far), the accepted residual of launched servers (C2 Step 4a: one follow-up request a child
+    server may still send inside a refused call), the measured transport delete path, the per-system run counts and the config
     sections the owner's file needed. Then wait for the owner's merge and tag, the publish,
     and the registry check.
 

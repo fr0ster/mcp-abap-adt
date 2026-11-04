@@ -260,7 +260,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** What each built connection's source stated about who creates objects. */
   private readonly systemContexts = new WeakMap<
-    object,
+    AbapConnection,
     DestinationSystemContext | undefined
   >();
 
@@ -845,7 +845,7 @@ export abstract class BaseMcpServer extends McpServer {
    * `x-sap-login`), its master system —; a host's connection's
    * (`statedCallOf`). The kind is the connection's (`systemKindOf`).
    */
-  private statedCall(connection: object): SystemCall {
+  private statedCall(connection: AbapConnection): SystemCall {
     const warn = (message: string) => this.logger?.warn?.(message);
     const destination = this.destinationOf.get(connection);
     if (destination === undefined) {
@@ -869,7 +869,7 @@ export abstract class BaseMcpServer extends McpServer {
    * rules is thrown, and nothing is kept.
    */
   private parametersFrom(
-    connection: object,
+    connection: AbapConnection,
     lookup: SystemLookup,
   ): ResolvedSystemContext {
     const made = parametersOf(lookup, this.systemContextRules, () =>

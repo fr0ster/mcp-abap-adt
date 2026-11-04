@@ -557,6 +557,9 @@ function statsOf(
   };
 }
 
+/** A function module, by its type code: what its search hit answers. */
+const FUNCTION_MODULE: AdtCodes<'FUGR/FF'> = 'FUGR/FF';
+
 /** The address of a function module's group, before the group's name. */
 const FUNCTION_GROUPS = '/sap/bc/adt/functions/groups/';
 
@@ -843,7 +846,8 @@ class AbapSystemSymbolResolver {
       if (item === undefined) return notFound;
       const hit = parseSearchHits(parsedText(item)).find(
         (each) =>
-          each.type === 'FUGR/FF' && each.name.toUpperCase() === symbol.name,
+          each.type === FUNCTION_MODULE &&
+          each.name.toUpperCase() === symbol.name,
       );
       const group =
         hit?.uri === undefined ? undefined : functionGroupOf(hit.uri);

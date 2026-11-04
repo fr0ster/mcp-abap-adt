@@ -1604,7 +1604,7 @@ it or with it, and #346 bumps both from the registry.
   created object's original language is the one given (or the session's), sent as the
   logon language SAP takes it from."
 - [ ] **Step 6c: Live check of #348 on the trial** (owner's go, realm check, the cloud
-  system only — on premise the logon language is not taken, Inference: a fixed ICF node):
+  system only — the on-premise test system offers no logon language but `EN`, measured):
   create a class with `master_language: 'DE'` through `liveCall`, read its metadata and
   assert the original language `DE`, then delete it and assert it absent.
 - [ ] Step 7: Commit (`fix(deps): adt-clients <major> — escaped create bodies, create

@@ -181,9 +181,9 @@ and change the program's type after it is created.
   `adtcore:language` / `adtcore:masterLanguage`; given none, the session's language
   (`SAP_LANGUAGE`, or `x-sap-language` over HTTP) is sent the same way; with neither, the create
   states no language and SAP uses its logon language. 23.x wrote `EN` into the body when nothing
-  was given, and SAP took the logon language anyway. On premise, one system answered `EN` whatever
-  was sent (measured); that system's ICF node appears to fix the logon language (Inference), and a
-  system so configured would answer in its fixed language.
+  was given, and SAP took the logon language anyway. The language must be one the system
+  offers for logon: on an on-premise system without it, a create sent with `DE` answered and created
+  in `EN`, and a logon in `ES` was refused as not an installed language (measured).
   **What you do:** to create in a given language, pass `master_language` or state the session's;
   a caller that counted on `EN` passes `master_language: 'EN'`.
 - **A function module's validation takes a description.** `HandlerValidate` `FUNCTION_MODULE`

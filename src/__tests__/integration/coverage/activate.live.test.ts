@@ -8,8 +8,10 @@
  * run. Read right after the start, without `with_long_polling`, the status
  * answers at once with the run still going; with it, SAP holds the read
  * until the run ends and answers the final status, which a plain read then
- * confirms. The run's size is the one measured in C2b (methods per class),
- * so it lasts long enough for the plain read to see it running.
+ * confirms. The run is half of C2b's measured one — five classes of its 200
+ * methods, not ten — which still lasts long enough for the plain read, sent
+ * right after the start, to see it running (C2b: a plain read answers in
+ * 0.13–0.21 s, a run of ten classes took 36 s and more).
  */
 import { randomBytes } from 'node:crypto';
 import {
@@ -83,8 +85,19 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
 
   /** The names this run recorded for cleanup: only these are deleted. */
   const recorded: string[] = [];
+  /** The run the case started, once its id came back. */
+  const run: { id?: string } = {};
 
   afterAll(async () => {
+    // A run still going holds its objects: wait for it to end (one long
+    // poll SAP holds until then) before the classes are deleted.
+    if (run.id !== undefined) {
+      await livePrepare('HandlerGet', {
+        part: 'activation_status',
+        run_id: run.id,
+        with_long_polling: true,
+      });
+    }
     await deleteRecorded();
     for (const name of recorded) {
       await expectAbsent({ tool: 'GetClass', args: { class_name: name } });
@@ -130,6 +143,7 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
     if (typeof runId !== 'string' || runId === '') {
       throw new Error(`the run start answered no run id: ${started.text}`);
     }
+    run.id = runId;
 
     // Without long polling: answered at once, the run still going.
     const plain = await liveCall('HandlerGet', {

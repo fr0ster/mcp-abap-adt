@@ -182,7 +182,12 @@ describe('a group activation waits for its run on long polling alone', () => {
       expect(reads.overRead).toBe(false);
       expect(reads.count).toBe(1);
       expect(answered.isError).toBe(true);
-      const message = String(payloadOf(answered).message);
+      // A failure on our side, never dressed as SAP's answer.
+      const payload = payloadOf(answered);
+      expect(payload.error).toBe('client_threw');
+      expect(payload.origin).toBeUndefined();
+      expect(payload.status).toBeUndefined();
+      const message = String(payload.message);
       expect(message).toContain(`activation run ${RUN_ID}`);
       expect(message).toContain(named);
       // Nothing more is sent: no results read after a status nobody knows.

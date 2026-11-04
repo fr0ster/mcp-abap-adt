@@ -525,7 +525,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "GET /sap/bc/adt/activation/runs/{run_id}",
+    "sends": "GET /sap/bc/adt/activation/runs/{run_id}; with with_long_polling true, GET /sap/bc/adt/activation/runs/{run_id}?withLongPolling=true, which SAP holds until the run ends",
     "when": [
       {
         "argument": "part",

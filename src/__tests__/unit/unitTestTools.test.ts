@@ -771,6 +771,87 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
     }
   });
 
+  it('a run status nobody knows ends the write as a failure on our side, naming it', async () => {
+    // Past READ_BOUND reads the double refuses and records it: a wait that
+    // does not end fails the case. The bound is this test's alone.
+    const READ_BOUND = 5;
+    const paused = {
+      data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="paused"/>',
+    };
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 202,
+        headers: { location: '/sap/bc/adt/activation/runs/RUN-5' },
+      },
+      ...Array.from({ length: READ_BOUND }, () => paused),
+    ]);
+    const reads = { count: 0, overRead: false };
+    const answer = connection.makeAdtRequest.bind(connection);
+    connection.makeAdtRequest = (options) => {
+      if (options.url.startsWith('/sap/bc/adt/activation/runs/RUN-5')) {
+        reads.count += 1;
+        if (reads.count > READ_BOUND) {
+          reads.overRead = true;
+          throw new Error('the run was read past the test bound');
+        }
+      }
+      return answer(options);
+    };
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(reads.overRead).toBe(false);
+    expect(reads.count).toBe(1);
+    expect(result.isError).toBe(true);
+    const answered = payload(result);
+    expect(answered.error).toBe('client_threw');
+    expect(answered.origin).toBeUndefined();
+    expect(answered.status).toBeUndefined();
+    expect(answered.step).toBe('activate');
+    expect(answered.message).toContain(
+      'The activation run RUN-5 answered the status "paused"',
+    );
+    expect(
+      connection.requests.some((r) => r.url.includes('/activation/results/')),
+    ).toBe(false);
+  });
+
+  it('a run start with no run id ends the write as a failure on our side', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { status: 202 },
+    ]);
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(result.isError).toBe(true);
+    const answered = payload(result);
+    expect(answered.error).toBe('client_threw');
+    expect(answered.origin).toBeUndefined();
+    expect(answered.status).toBeUndefined();
+    expect(answered.step).toBe('activate');
+    expect(answered.message).toContain('The activation run answered no id');
+    expect(
+      connection.requests.some((r) => r.url.includes('/activation/runs/')),
+    ).toBe(false);
+    expect(
+      connection.requests.some((r) => r.url.includes('/activation/results/')),
+    ).toBe(false);
+  });
+
   it("a function group's main program: SAPL<group>, namespace in front", () => {
     expect(functionGroupMainProgram('zfg_x')).toBe('SAPLZFG_X');
     expect(functionGroupMainProgram('/ns/group')).toBe('/NS/SAPLGROUP');

@@ -107,9 +107,11 @@ with the single-step tools:
 6. activate — `HandlerActivate`: one object of a type the per-object activation maps answers its
    verdict; a list (`objects[]`), an `object_adt_type`, PACKAGE, SERVICE_DEFINITION and
    SERVICE_BINDING start an activation run and answer `{ run_id }`;
-7. the run's state, as often as you choose — `HandlerGet` `part: activation_status` with that
-   `run_id` (`finished`, `error`, `failed`, or its progress), then `part: activation_results`
-   for the messages it produced.
+7. the run's state — `HandlerGet` `part: activation_status` with that `run_id` (`running` while
+   the run goes on; `finished`, `error` or `failed` once it ended): with `with_long_polling: true`
+   one read that SAP holds until the run ends and that answers its final status, without it a read
+   answered at once, as often as you choose; then `part: activation_results` for the messages it
+   produced.
 
 Running unit tests with the synchronous runner is one call — `HandlerUnitTestRun` with
 `runner: 'sync'` (in the full sets `RunUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`,
@@ -199,8 +201,11 @@ BEHAVIOR_DEFINITION or METADATA_EXTENSION (by `object_type` or its ADT code) is 
 yet (an answer without a run id is a failure with `step: start activation run`). `HandlerGet` reads it by that id, one request per part: `activation_status`
 (`GET /sap/bc/adt/activation/runs/{run_id}`, answered `{ run_id, part, status, document }`) and
 `activation_results` (`GET /sap/bc/adt/activation/results/{run_id}`, answered
-`{ run_id, part, messages, document }`), each with SAP's document as it came. Asking again until the
-status settles is yours: the server sets no timer.
+`{ run_id, part, messages, document }`), each with SAP's document as it came. `activation_status`
+with `with_long_polling: true` is `GET /sap/bc/adt/activation/runs/{run_id}?withLongPolling=true`:
+SAP holds that one request until the run ends and answers its final status (`finished`, `error` or
+`failed`). Without it the read answers at once, `running` while the run goes on; asking again is
+yours: the server sets no timer.
 
 Compact `HandlerDumpList` reads one page per call: the one `GET /sap/bc/adt/runtime/dumps` (or the
 system-messages or gateway-errors feed) with `$top` from 1 to 100 (SAP answers at most 100; `top`
@@ -567,7 +572,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `HandlerGet` | when part is object_structure | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
 | `HandlerGet` | when part is node_structure and object_adt_type is given | POST /sap/bc/adt/repository/nodestructure for the one node asked |
 | `HandlerGet` | when part is virtual_folders | POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents |
-| `HandlerGet` | when part is activation_status and run_id is given | GET /sap/bc/adt/activation/runs/{run_id} |
+| `HandlerGet` | when part is activation_status and run_id is given | GET /sap/bc/adt/activation/runs/{run_id}; with with_long_polling true, GET /sap/bc/adt/activation/runs/{run_id}?withLongPolling=true, which SAP holds until the run ends |
 | `HandlerGet` | when part is activation_results and run_id is given | GET /sap/bc/adt/activation/results/{run_id} |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body |

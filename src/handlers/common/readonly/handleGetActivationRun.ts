@@ -4,10 +4,13 @@
  * parts `activation_status` and `activation_results`; spec §4.6).
  *
  * A run is started by `POST /activation/runs`, which answers its id in
- * `Location`. `GET /activation/runs/{id}` states `runs:status` — `finished`,
- * `error`, `failed`, or a progress value while it runs; `GET
+ * `Location`. `GET /activation/runs/{id}` states `runs:status` — `running`
+ * while the run goes on (progress is in attributes of its own), `finished`,
+ * `error` or `failed` once it ended (measured on premise and on the cloud
+ * trial, 2026-11-04); `GET
  * /activation/results/{id}` carries the `chkl:messages` the run produced.
- * How often to ask, and which status ends the asking, is the caller's.
+ * How often to ask, and which status ends the asking, is the caller's; a
+ * status read with `with_long_polling` is held by SAP until the run ends.
  */
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';

@@ -1616,16 +1616,29 @@ that repository's own review and CI. The release itself is the owner's.
 `handleGetUnitTest.ts`, `handleGetCdsUnitTest.ts`, and `src/handlers/unit_test/shared/runTests.ts`
 (the run tools' wait).
 
-**What changes, exactly:** the full result readers (`GetUnitTestResult`,
-`GetCdsUnitTestResult`, `GetUnitTest`, `GetCdsUnitTest`) and the run tools that wait read
-the status first without long polling, then long-poll only a running run. **What stays:**
-the compact result tools (`HandlerUnitTestResult`, `HandlerCdsUnitTestResult`, `HandlerGet`
-`UNIT_TEST` / `CDS_UNIT_TEST`) go through `src/handlers/unit_test/shared/resultOnce.ts`'s
-`readResultOnce`, which reads only the result — no status, no wait — and keep that
-behaviour.
+**What is served, and what changes.**
+- **Served tools that change:** `GetUnitTestResult` (the one full result reader registered,
+  in `HighLevelHandlersGroup` and `ReadOnlyHandlersGroup`), and the run tools whose wait goes
+  through `runTests.ts` (`RunAbapUnit`, `RunUnitTest`, `RunProgramUnitTest`,
+  `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest`, `RunCdsUnitTest`, as each uses
+  it). They read the status first without long polling, then long-poll only a running run.
+  Their pins, live cases and CHANGELOG line are about these tools only.
+- **Exported handlers, not served tools:** `handleGetCdsUnitTestResult`, `handleGetUnitTest`
+  and `handleGetCdsUnitTest` call `readRunOnce` too and change with it. They get unit tests
+  of the exported handlers, kept apart from the served tools' pins, with no ledger key and no
+  MIGRATION claim. No tool is added for them.
+- **What stays:** the compact result tools (`HandlerUnitTestResult`,
+  `HandlerCdsUnitTestResult`, `HandlerGet` `UNIT_TEST` / `CDS_UNIT_TEST`) call the `…Once`
+  readers, `src/handlers/unit_test/shared/resultOnce.ts`' `readResultOnce`, which read only
+  the result — no status, no wait — and keep that behaviour.
+- C12's inventory (`GetUnitTestResult`, the run tools, the compact tools) is what is
+  registered, and stays so.
 
-- [ ] **Step 1: Failing tests** on `recordingConnection`, for each full reader above and for
-  `runTests.ts`' wait (through a run tool):
+- [ ] **Step 1: Failing tests** on `recordingConnection`. Served-tool pins
+  (`src/__tests__/unit/pins/unitTests.pins.test.ts`): `GetUnitTestResult`, and one run tool per
+  wait path through `runTests.ts`. Exported-handler tests, apart
+  (`src/__tests__/unit/unitTest/exportedRunReaders.test.ts`): `handleGetCdsUnitTestResult`,
+  `handleGetUnitTest`, `handleGetCdsUnitTest`. Each covers:
   - `'an unknown run answers NOT_STARTED at once'`: one status read **without**
     `withLongPolling`, its answer `NOT_STARTED`, no second read;
   - `'a running run is long-polled'`: the first read without long polling says running, the
@@ -1639,28 +1652,33 @@ behaviour.
 - [ ] **Step 2:** `readRunOnce` reads the status first without long polling. It long-polls
   only a run whose status says it is running, re-reading after each answer with no limit and
   no timer (SAP holds about 300 s per read, measured).
-- [ ] **Step 3:** CHANGELOG (Fixed). Commit.
+- [ ] **Step 3:** CHANGELOG (Fixed), naming the served tools only. Commit.
 
-### D9. Held locks on stdio (#4)
+### D9. Held locks on stdio and SSE (#4)
 
-**What the code shows.** The served tools that take or give a lock handle are: `HandlerLock`
+**What the code shows.** `HeldLocks` is created per instance only by the Streamable HTTP
+server (`StreamableHttpServer.ts`); `BaseMcpServer` accepts an owner only when one is
+supplied, and the stdio and SSE servers (`server-runtime/src/sse/SseServer.ts`, where each
+instance is constructed) supply none. The served tools that take or give a lock handle are: `HandlerLock`
 (registers through `heldLocks.hold`), `HandlerUnlock` (checks `lockHeldHere`, releases),
 `HandlerUpdate` (`handleUpdateUnderLock`, checks) and `HandlerDelete` (`handleDeleteOnly`,
 checks) — and the full `UpdateBehaviorDefinition` and `UpdateMetadataExtension`, which take
 an optional `lock_handle` and write under it **without** `lockHeldHere`. `LockObjectLow` and
 `UnlockObjectLow` exist as handlers but are no served tool; they are reached only through
 `HandlerLock` / `HandlerUnlock`, whose wrappers register and release. On stdio every check
-passes, because no `heldLocks` exists there.
+passes, because no `heldLocks` exists there — and the same on SSE.
 
 **Files:** `src/lib/state/heldLocks.ts` (`lockHeldHere`), the stdio server's instance setup
-(`server-runtime/src/stdio/…`, beside how `StreamableHttpServer.ts` creates its
-`heldLocks`), `compact-modify/src/handlers/handleHandlerLock.ts`,
+(`server-runtime/src/stdio/…`) and the SSE server's (`server-runtime/src/sse/SseServer.ts`,
+where it constructs each instance), each beside how `StreamableHttpServer.ts` creates its
+`heldLocks`, `compact-modify/src/handlers/handleHandlerLock.ts`,
 `compact-modify/src/handlers/handleHandlerUnlock.ts`,
 `src/handlers/common/low/handleUpdateUnderLock.ts`, `handleDeleteOnly.ts`,
 `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`,
 `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`.
 
-- [ ] **Step 1: Failing tests** (stdio, in process, and the same on Streamable HTTP):
+- [ ] **Step 1: Failing tests,** in process, on **each transport — stdio, Streamable HTTP and
+  SSE** (each instance its own owner):
   - **registration:** `'HandlerLock registers its handle on stdio'`;
   - **enforcement, foreign handle refused with zero requests:** `HandlerUnlock`,
     `HandlerUpdate`, `HandlerDelete`, `UpdateBehaviorDefinition` and
@@ -1671,8 +1689,11 @@ passes, because no `heldLocks` exists there.
     refused'`.
 
   SAP releases the session's lock on any handle (measured), so the refusal is ours to make.
-- [ ] **Step 2:** The stdio instance owns a `HeldLocks`, as the Streamable HTTP server does.
-  `lockHeldHere` no longer answers true for an absent owner; every transport has one. The
+- [ ] **Step 2:** The stdio instance and every SSE instance own a `HeldLocks`, created where
+  the instance is constructed, as the Streamable HTTP server does; it is attached to the
+  instance's state. Only then does `lockHeldHere` stop answering true for an absent owner —
+  every transport has one, so a legitimate lock on SSE is not refused. A test,
+  `'every transport's instance has its own held-lock owner'`, asserts it for the three. The
   two full updates check `lockHeldHere` before writing under a given `lock_handle`.
 - [ ] **Step 3:** CHANGELOG (Fixed). Commit.
 

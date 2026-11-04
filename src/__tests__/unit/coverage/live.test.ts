@@ -285,8 +285,10 @@ interface StandRequest {
   number: string;
   description: string;
   tasks: string[];
-  /** The entries on its first task. */
+  /** The entries on its first task (on every task with `onEveryTask`). */
   objects?: Array<{ name: string; type: string }>;
+  /** The same entries held on every task, not only the first. */
+  onEveryTask?: boolean;
   /** The listing leaves its description out (the request's own document has it). */
   undescribed?: boolean;
 }
@@ -352,7 +354,7 @@ function organizer(requests: StandRequest[]): void {
       const tasks = (known?.tasks ?? [])
         .map(
           (task, index) =>
-            `<tm:task tm:number="${task}" tm:owner="${USER}">${index === 0 ? entries : ''}</tm:task>`,
+            `<tm:task tm:number="${task}" tm:owner="${USER}">${index === 0 || known?.onEveryTask === true ? entries : ''}</tm:task>`,
         )
         .join('');
       return {
@@ -599,6 +601,25 @@ describe('the transport cleanup', () => {
       'request K900020 is not back as it was',
     );
     expect(leftovers()).toEqual(['entry K900020/K900021 PROG ZLIVE_OURS']);
+  });
+
+  it('a configured request holding one object on two tasks counts both, and reads back as it was', async () => {
+    const configured: StandRequest = {
+      number: 'K900050',
+      description: 'configured',
+      tasks: ['K900051', 'K900052'],
+      objects: [{ name: 'ZLIVE_TWICE', type: 'PROG' }],
+      onEveryTask: true,
+    };
+    const requests = [configured];
+    deletions(requests);
+    organizer(requests);
+    await rememberConfiguredRequest(configured.number);
+    await deleteRecordedRequests();
+    expect(requests.map((request) => request.number)).toEqual([
+      configured.number,
+    ]);
+    expect(leftovers()).toEqual([]);
   });
 
   it('a number forgotten after its own delete is not asked for again', async () => {

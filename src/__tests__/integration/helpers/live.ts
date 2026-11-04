@@ -478,8 +478,12 @@ const journal: Array<{
   object: TransportObjectRef;
 }> = [];
 
-/** The configured requests' entries as they were before the run touched them. */
-const configured = new Map<string, ReadonlySet<string>>();
+/**
+ * The configured requests' entries as they were before the run touched them:
+ * a counted list (task, pgmid, type, name), sorted — an object may be held on
+ * two tasks, and each holding counts.
+ */
+const configured = new Map<string, readonly string[]>();
 
 /** Records a request or task number the test created. */
 export function recordCreatedRequest(transportNumber: string): void {
@@ -539,7 +543,7 @@ interface HeldEntry {
 }
 
 const entryText = (held: HeldEntry): string =>
-  `${held.pgmid} ${held.type} ${held.name}`;
+  `${held.task} ${held.pgmid} ${held.type} ${held.name}`;
 
 /** The entries a request (or task) holds, with their task and position. */
 async function transportObjects(transportNumber: string): Promise<HeldEntry[]> {
@@ -582,7 +586,7 @@ export async function rememberConfiguredRequest(
   if (configured.has(transportNumber)) return;
   configured.set(
     transportNumber,
-    new Set((await transportObjects(transportNumber)).map(entryText)),
+    (await transportObjects(transportNumber)).map(entryText).sort(),
   );
 }
 
@@ -633,7 +637,7 @@ export async function deleteRecordedRequests(): Promise<void> {
     }
     const requests = [...configured.keys(), ...createdRequests];
     for (const request of requests) {
-      const before = configured.get(request) ?? new Set<string>();
+      const before = new Set(configured.get(request) ?? []);
       for (const held of await transportObjects(request)) {
         if (!names.has(held.name.toUpperCase())) continue;
         if (before.has(entryText(held))) continue;
@@ -653,7 +657,7 @@ export async function deleteRecordedRequests(): Promise<void> {
     }
     for (const request of requests) {
       const now = (await transportObjects(request)).map(entryText).sort();
-      const was = [...(configured.get(request) ?? [])].sort();
+      const was = configured.get(request) ?? [];
       if (JSON.stringify(now) !== JSON.stringify(was)) {
         throw new Error(
           `request ${request} is not back as it was: it holds ${now.join(', ') || 'nothing'}, it held ${was.join(', ') || 'nothing'}`,

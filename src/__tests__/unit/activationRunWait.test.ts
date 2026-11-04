@@ -25,9 +25,9 @@ const STARTED = {
   status: 202,
   headers: { location: `/sap/bc/adt/activation/runs/${RUN_ID}` },
 };
-/** A status read while the run goes on: a progress value, not terminal. */
+/** A status read while the run goes on, as measured on both systems. */
 const RUNNING = {
-  data: `<?xml version="1.0" encoding="utf-8"?><runs:run ${RUNS} runs:status="40"/>`,
+  data: `<?xml version="1.0" encoding="utf-8"?><runs:run ${RUNS} runs:status="running"/>`,
 };
 const FINISHED = {
   data: `<?xml version="1.0" encoding="utf-8"?><runs:run ${RUNS} runs:status="finished"/>`,
@@ -136,5 +136,74 @@ describe('a group activation waits for its run on long polling alone', () => {
     const urls = connection.requests.map((request) => request.url);
     expect(urls.filter((url) => url === STATUS_URL)).toHaveLength(8);
     expect(urls.at(-1)).toBe(RESULTS_URL);
+  });
+
+  /**
+   * A run answering `status` on every read, its reads counted: past
+   * `READ_BOUND` the double refuses and records it, so a wait that does not
+   * end fails the case instead of running Jest out of memory. The bound is
+   * this test's alone.
+   */
+  function answeringAlways(statusAttribute: string) {
+    const READ_BOUND = 5;
+    const document = `<?xml version="1.0" encoding="utf-8"?><runs:run ${RUNS}${statusAttribute}/>`;
+    const connection = recordingConnection([
+      STARTED,
+      ...Array.from({ length: READ_BOUND }, () => ({ data: document })),
+    ]);
+    declareSystemKind(connection, 'onprem');
+    const reads = { count: 0, overRead: false };
+    const answer = connection.makeAdtRequest.bind(connection);
+    connection.makeAdtRequest = (options) => {
+      if (options.url.startsWith('/sap/bc/adt/activation/runs/')) {
+        reads.count += 1;
+        if (reads.count > READ_BOUND) {
+          reads.overRead = true;
+          throw new Error('the run was read past the test bound');
+        }
+      }
+      return answer(options);
+    };
+    return { connection, reads };
+  }
+
+  it.each([
+    ['an empty status', ' runs:status=""', 'no status'],
+    ['a missing status', '', 'no status'],
+    ['an unknown status', ' runs:status="paused"', '"paused"'],
+  ])(
+    '%s ends the wait as a failure naming what SAP sent',
+    async (_case, statusAttribute, named) => {
+      const { connection, reads } = answeringAlways(statusAttribute);
+      const answered = await handleActivateObject(
+        { connection },
+        { objects: OBJECTS },
+      );
+      expect(reads.overRead).toBe(false);
+      expect(reads.count).toBe(1);
+      expect(answered.isError).toBe(true);
+      const message = String(payloadOf(answered).message);
+      expect(message).toContain(`activation run ${RUN_ID}`);
+      expect(message).toContain(named);
+      // Nothing more is sent: no results read after a status nobody knows.
+      expect(
+        connection.requests.some((request) => request.url === RESULTS_URL),
+      ).toBe(false);
+    },
+  );
+
+  it('running, then finished, is still waited for and read', async () => {
+    const connection = runAnswering(2);
+    const payload = payloadOf(
+      await handleActivateObject({ connection }, { objects: OBJECTS }),
+    );
+    expect(payload.run_status).toBe('finished');
+    expect(connection.requests.map((request) => request.url)).toEqual([
+      '/sap/bc/adt/activation/runs?method=activate&preauditRequested=true',
+      STATUS_URL,
+      STATUS_URL,
+      STATUS_URL,
+      RESULTS_URL,
+    ]);
   });
 });

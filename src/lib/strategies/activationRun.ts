@@ -76,8 +76,37 @@ export interface ActivationRunSource {
   ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
 }
 
-/** A status that ends the wait. Anything else is progress. */
+/** A status that ends the wait. */
 const SETTLED = new Set(['finished', 'error', 'failed']);
+
+/**
+ * A status that says the run is still going, so the wait reads again:
+ * `running`, the one measured on premise and on the cloud (2026-11-04).
+ * adt-clients types the status as text, so nothing else is known to mean
+ * "still running"; any other status ends the wait (`unreadableStatus`).
+ */
+const RUNNING = new Set(['running']);
+
+/**
+ * A run status the wait does not know — none, an empty one, or one that is
+ * neither running nor terminal — in fixed words and the value as SAP sent it.
+ * Not SAP's refusal and not a verdict on the run: the wait cannot tell
+ * whether to read again, so it stops and says why.
+ */
+export class UnreadableRunStatus extends Error {
+  readonly runId: string;
+  readonly status: string;
+  constructor(runId: string, status: string) {
+    super(
+      `The activation run ${runId} answered ${
+        status === '' ? 'no status' : `the status "${status}"`
+      }, which is neither running (read again) nor finished, error or failed (the run ended): the wait stops here, and the run's results are not read.`,
+    );
+    this.name = 'UnreadableRunStatus';
+    this.runId = runId;
+    this.status = status;
+  }
+}
 
 /** A reading's parse and its document as it came, from a reading or a bare value. */
 export function readingOf(value: unknown): {
@@ -225,7 +254,9 @@ export function isRefusal(message: ActivationMessage): boolean {
  * until the run ends (measured on premise and on the cloud trial,
  * 2026-11-04), so the wait is one request in practice. A status that is not
  * terminal is followed by another long poll — no timer of ours, no attempt
- * limit: the run ends the wait, or SAP's refusal does.
+ * limit: the run ends the wait, or SAP's refusal does. Only `running` is
+ * read again; a status it does not know — none, empty, any other — throws
+ * `UnreadableRunStatus`, naming it, rather than reading on a guess.
  *
  * Never throws for a refusal: a refused `getActivationRun` or
  * `getActivationResults` comes back as the outcome's `failure` — the method's
@@ -265,6 +296,9 @@ export async function awaitActivationRun(
       };
     }
     status = runStatusOf(answered.getResult().value);
+    if (!SETTLED.has(status) && !RUNNING.has(status)) {
+      throw new UnreadableRunStatus(runId, status);
+    }
   }
 
   const produced = await utils.getActivationResults(runId, { analyse });

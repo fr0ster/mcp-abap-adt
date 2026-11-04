@@ -987,8 +987,7 @@ deleted after the record is written.
   tight loop against SAP).
 - [ ] **Step 5:** Commit the record as `docs: activation-run long polling, measured`.
 
-**Record — on premise (measured 2026-11-04; the cloud is pending: the trial session is to be
-refreshed first).**
+**Record — on premise (measured 2026-11-04).**
 - The run: ten classes of 200 methods each, created inactive in `$TMP` by the test and
   recorded, activated together by one `POST`; then their sources rewritten inactive and a
   second run started the same way. Each `POST` answered in under half a second.
@@ -1004,6 +1003,22 @@ refreshed first).**
 - Both runs' results: `activationExecuted="true"`, no message.
 - So on premise SAP holds the long-poll read until the run ends, and the plain read answers at
   once with the status as it stands. The ten classes were deleted and each read `404` after.
+
+**Record — cloud (measured 2026-11-04; the package `ZADT_BLD_PKG03`, the cloud has no `$TMP`).**
+- The same measurement: ten classes of 200 methods each, created inactive by the test and
+  recorded, two runs, each started by one `POST` (answered in under half a second).
+- Run 1, the plain read first: answered in 0.19 s, `running` (`progressMessage`, no
+  percentage). The long-poll read sent next was held 157.6 s and answered `finished`
+  (`progressPercentage` 100); a plain read right after answered in 0.19 s, `finished`.
+- Run 2, the long-poll read first: held 158.0 s, answered `finished`; the plain read after it
+  answered in 0.21 s, `finished`.
+- One long-poll request per run, as on premise; no running answer, no re-read. Both runs'
+  results: `activationExecuted="true"`, no message.
+- So on the cloud too SAP holds the long-poll read and answers it with the terminal status, and
+  the plain read answers at once. Inference, not measured: the two holds are nearly equal
+  (157.6 s, 158.0 s), so these data do not tell whether a hold ends exactly at the run's end or
+  at a hold limit of the server's that the run had already passed; either way no long poll
+  answered a running status. The ten classes were deleted and each read `404` after.
 
 ### C2c. `awaitActivationRun` waits on long polling alone (owner's decision (b))
 

@@ -17,6 +17,7 @@ import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
+  SOURCE_RANGE_WORDS,
   type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
@@ -28,8 +29,7 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetDdl',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
+  description: `[read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
     ddl_name: z.string().describe('DDL source name.'),
     part: READ_PART_FIELD,
@@ -50,15 +50,8 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
   if (!ddl_name) return return_error(new Error('ddl_name is required'));
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
-  const range = sourceRangeOf(args);
+  const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
-  if (range !== undefined && part === 'metadata') {
-    return return_error(
-      new Error(
-        'start_line and end_line cut the source: give them with part "source"',
-      ),
-    );
-  }
 
   const ddlName = ddl_name.toUpperCase();
   const client = createAdtClient(connection, logger);

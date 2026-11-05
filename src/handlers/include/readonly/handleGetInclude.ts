@@ -17,6 +17,7 @@ import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
+  SOURCE_RANGE_WORDS,
   type SourceCut,
   type SourceRangeArgs,
   sourceRangeOf,
@@ -29,8 +30,7 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
+  description: `[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
     include_name: z.string().describe('Include name.'),
     part: READ_PART_FIELD,
@@ -69,15 +69,8 @@ async function readInclude(
   if (!include_name) return return_error('Include name is required');
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
-  const range = sourceRangeOf(args);
+  const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
-  if (range !== undefined && part === 'metadata') {
-    return return_error(
-      new Error(
-        'start_line and end_line cut the source: give them with part "source"',
-      ),
-    );
-  }
 
   const includeName = include_name.toUpperCase();
   logger?.info(`Fetching include: ${includeName}`);

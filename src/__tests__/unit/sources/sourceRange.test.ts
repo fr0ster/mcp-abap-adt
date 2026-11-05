@@ -8,8 +8,10 @@
  *
  * - A range is sent as the whole read's request, literally the same.
  * - Refused with no request: a line that is not a positive integer (the
- *   schema), and `end_line` before `start_line` (the handler, before
- *   sending).
+ *   schema), `end_line` before `start_line` and a range with `part`
+ *   `metadata` (the handler, before sending).
+ * - The lines answered are exactly the lines asked, joined as SAP joined
+ *   them, with no line end after the last: on SAP's CRLF text too.
  * - Refused after the one GET: a range outside the source, whose length is
  *   known only from the answer; the refusal names the source's line count.
  *
@@ -17,7 +19,9 @@
  * parse and the real adt-clients request are part of it.
  */
 
+import { corpusBody } from '../../../lib/adtCorpus';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
+import { answerSourceRead } from '../../../lib/handlers/sourceRange';
 import { type PinCase, recordCase } from '../../helpers/pinCases';
 
 /** A source of five lines, as SAP answers it. */
@@ -62,6 +66,11 @@ const READERS: ReadonlyArray<{ tool: string; args: ToolArgs }> = [
   },
   { tool: 'GetStructure', args: { structure_name: 'ZPIN_STRUCT' } },
   { tool: 'GetTable', args: { table_name: 'ZPIN_TABL' } },
+  // A class's local includes: the outline's local components point into them.
+  { tool: 'GetLocalDefinitions', args: { class_name: 'ZCL_PIN' } },
+  { tool: 'GetLocalTypes', args: { class_name: 'ZCL_PIN' } },
+  { tool: 'GetLocalMacros', args: { class_name: 'ZCL_PIN' } },
+  { tool: 'GetLocalTestClass', args: { class_name: 'ZCL_PIN' } },
 ];
 
 /** A recording of `tool` with `args`, SAP answering `SOURCE` to every request. */
@@ -184,4 +193,93 @@ it('a source ending in a line break has as many lines as it has line breaks', as
   const recorded = await recordCase(c);
   expect(recorded.answer?.isError).toBe(true);
   expect(recorded.answer?.content[0]?.text).toContain('the source has 2 lines');
+});
+
+/** SAP's answer to a class source read: CRLF line ends, none after the last line. */
+const CRLF_SOURCE = corpusBody('read-class-source-text--01-read-source');
+
+/** `GetClass` with `range`, SAP answering `source`; the answer's `source` and `line_count`. */
+async function ranged(source: string, range: ToolArgs) {
+  const recorded = await recordCase({
+    tool: 'GetClass',
+    variant: 'onprem',
+    stand: 'recording',
+    args: { class_name: 'ZCL_PIN', ...range },
+    answers: [{ status: 200, data: source }],
+    expected: 'none',
+  });
+  const text = recorded.answer?.content[0]?.text ?? '';
+  return {
+    isError: recorded.answer?.isError,
+    text,
+    source: sourceOf(text),
+    line_count: member(payloadOf(text), 'line_count'),
+  };
+}
+
+describe('CRLF source, as SAP sends it', () => {
+  it('a middle range: its lines joined by CRLF, no line end after the last', async () => {
+    const cut = await ranged(CRLF_SOURCE, { start_line: 1, end_line: 2 });
+    expect(cut.source).toBe('CLASS zbp_mcp_shr_i_root DEFINITION\r\n  PUBLIC');
+    expect(cut.line_count).toBe(13);
+  });
+
+  it('one line in the middle is that line alone', async () => {
+    const cut = await ranged(CRLF_SOURCE, { start_line: 12, end_line: 12 });
+    expect(cut.source).toBe('CLASS ZBP_MCP_SHR_I_ROOT IMPLEMENTATION.');
+  });
+
+  it('the last line, which SAP ends with no line end', async () => {
+    const cut = await ranged(CRLF_SOURCE, { start_line: 12 });
+    expect(cut.source).toBe(
+      'CLASS ZBP_MCP_SHR_I_ROOT IMPLEMENTATION.\r\nENDCLASS.',
+    );
+  });
+
+  it('an empty line answers empty', async () => {
+    const cut = await ranged(CRLF_SOURCE, { start_line: 4, end_line: 4 });
+    expect(cut.source).toBe('');
+  });
+
+  it('a CRLF at the end closes the last line and opens none', async () => {
+    const cut = await ranged(`${CRLF_SOURCE}\r\n`, { start_line: 13 });
+    expect(cut.source).toBe('ENDCLASS.');
+    expect(cut.line_count).toBe(13);
+    const outside = await ranged(`${CRLF_SOURCE}\r\n`, { start_line: 14 });
+    expect(outside.isError).toBe(true);
+    expect(outside.text).toContain('the source has 13 lines');
+  });
+});
+
+it('a range with part "metadata" is refused before any request', async () => {
+  const recorded = await recordCase({
+    tool: 'GetClass',
+    variant: 'onprem',
+    stand: 'recording',
+    args: { class_name: 'ZCL_PIN', part: 'metadata', start_line: 1 },
+    expected: 'none',
+  });
+  expect(recorded.requests).toEqual([]);
+  expect(recorded.answer?.isError).toBe(true);
+  expect(recorded.answer?.content[0]?.text).toContain('part "source"');
+});
+
+it("a throw while the ranged answer is read is answered inside answer()'s boundary", async () => {
+  const result = await answerSourceRead(
+    { tool: 'GetClass', detail: 'terse' },
+    { start: 1, end: 1 },
+    async () => ({
+      ok: true,
+      getResult: () => {
+        throw new Error('the reading broke');
+      },
+    }),
+    (source) => source,
+  );
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0]?.text ?? '{}')).toMatchObject({
+    error: 'adapter_threw',
+    tool: 'GetClass',
+    message: 'the reading broke',
+  });
 });

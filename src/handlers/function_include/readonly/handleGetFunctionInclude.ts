@@ -17,6 +17,7 @@ import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
+  SOURCE_RANGE_WORDS,
   type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
@@ -28,8 +29,7 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata"), at the version asked. Returns the part read.',
+  description: `[read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata"), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
     function_group_name: z
       .string()
@@ -60,15 +60,8 @@ export async function handleGetFunctionInclude(
     );
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
-  const range = sourceRangeOf(args);
+  const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
-  if (range !== undefined && part === 'metadata') {
-    return return_error(
-      new Error(
-        'start_line and end_line cut the source: give them with part "source"',
-      ),
-    );
-  }
 
   const functionGroupName = function_group_name.toUpperCase();
   const includeName = include_name.toUpperCase();

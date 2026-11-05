@@ -253,8 +253,7 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
       );
       const block = positionOf(method, 'implementationBlock');
       const first = await lineOf(read, block.start.line);
-      // SAP keeps a line's trailing blanks (measured on premise).
-      expect(first.slice(block.start.column).trimEnd()).toBe(
+      expect(first.slice(block.start.column)).toBe(
         `METHOD ${name.toLowerCase()}.`,
       );
     }

@@ -47,7 +47,7 @@ export const OUTLINE_TYPES = {
 export type OutlineType = (typeof OUTLINE_TYPES)['onprem'][number];
 
 const DESCRIPTION =
-  "[read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column. Returns the components as a tree.";
+  "[read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.";
 
 /** GetObjectOutline's input on `variant`. */
 function outlineSchema(variant: ProjectionVariant) {
@@ -186,6 +186,8 @@ export async function handleGetObjectOutline(
   }
   const objectName = object_name.toUpperCase();
   const detail = detailOf(args);
+  /** The outline the call read, for the projection: parsed once. */
+  const read: { outline?: IObjectOutline } = {};
 
   return answer(
     { tool: 'GetObjectOutline', detail },
@@ -196,16 +198,16 @@ export async function handleGetObjectOutline(
           version,
           analyse: analyseException,
         });
-      // The document is checked inside the call, as GetObjectStructure
+      // The document is read once, inside the call, as GetObjectStructure
       // checks its own: an answer that is no outline is the call's failure.
       if (detail !== 'raw' && response.ok) {
-        outlineOf(response.getResult().value);
+        read.outline = outlineOf(response.getResult().value);
       }
       return response;
     },
     (document) => {
-      if (detail === 'raw') return document;
-      const outline = outlineOf(document);
+      const outline = read.outline;
+      if (detail === 'raw' || outline === undefined) return document;
       if (detail === 'full') return outline;
       const root = outline.root;
       return {

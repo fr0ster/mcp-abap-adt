@@ -388,6 +388,10 @@ describe('the MCP tool surface', () => {
         'readonly/GetMetadataExtension': ['start_line', 'end_line'],
         'readonly/GetFunctionModule': ['start_line', 'end_line'],
         'readonly/GetFunctionInclude': ['start_line', 'end_line'],
+        'high/GetLocalDefinitions': ['start_line', 'end_line'],
+        'high/GetLocalTypes': ['start_line', 'end_line'],
+        'high/GetLocalMacros': ['start_line', 'end_line'],
+        'high/GetLocalTestClass': ['start_line', 'end_line'],
         // 24.0.0 (D2): each lost one argument (`REMOVED`) and gained none.
         'high/CreateClass': [],
         'high/CreateProgram': [],

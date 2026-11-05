@@ -9,22 +9,25 @@
  * `source` resource has a range parameter. So the read sends its one GET
  * as without a range, and the server answers only the lines asked.
  *
- * What is known before the GET is refused before it: a line that is not a
- * positive integer, and `end_line` before `start_line`. Whether a range
+ * A line that is not a whole number from 1 is refused by the schema. What
+ * the schema cannot see is refused here before the GET: `end_line` before
+ * `start_line`, and a range given with `part` `metadata`. Whether a range
  * lies inside the source is known only from the answer, so a range outside
  * it is refused after the one GET, naming the source's line count.
+ *
+ * **The lines answered are exactly the lines asked.** A line ends at a line
+ * feed, and a carriage return before it belongs to the line end (SAP sends
+ * CRLF). The lines are joined as the source joined them — the line ends
+ * between them kept as they came — and the last one answered carries no
+ * line end: neither its line feed nor its carriage return.
  */
 
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
-import {
-  type AnswerContext,
-  answer,
-  answerThrown,
-  type McpResult,
-} from '../answer';
+import { type AnswerContext, answer, type McpResult } from '../answer';
 import type { AdtReading } from '../strategies/reading';
 import { return_error } from '../utils';
+import type { ReadPart } from './readPart';
 
 /** The `start_line` field of a source read's zod input schema. */
 export const START_LINE_FIELD = z
@@ -72,23 +75,22 @@ export interface SourceCut {
   readonly line_count: number;
 }
 
-/** Whether `line` is a line number: a positive integer. */
-const isLine = (line: number): boolean => Number.isInteger(line) && line >= 1;
-
 /**
- * The range `args` asks for: `undefined` when it gives neither end, an
- * error for what is refused before any request.
+ * The range `args` asks for: `undefined` when it gives neither end, the
+ * refusal for what is refused before any request — `end_line` before
+ * `start_line`, or a range with `part` `metadata` (it cuts a source only).
+ * A line's own value is the schema's.
  */
 export function sourceRangeOf(
   args: SourceRangeArgs,
+  part: ReadPart = 'source',
 ): SourceRange | undefined | Error {
   const { start_line: start, end_line: end } = args;
   if (start === undefined && end === undefined) return undefined;
-  if (start !== undefined && !isLine(start)) {
-    return new Error('start_line must be a whole number from 1');
-  }
-  if (end !== undefined && !isLine(end)) {
-    return new Error('end_line must be a whole number from 1');
+  if (part === 'metadata') {
+    return new Error(
+      'start_line and end_line cut the source: give them with part "source"',
+    );
   }
   if (start !== undefined && end !== undefined && end < start) {
     return new Error('end_line must not be before start_line');
@@ -98,8 +100,9 @@ export function sourceRangeOf(
 
 /**
  * The lines of `source`, split at each line feed; a line feed at the end
- * closes the last line and opens none. A carriage return stays with its
- * line, so the lines join back to the text they came from.
+ * closes the last line and opens none. A carriage return before a line feed
+ * stays on its line here, so the lines join back with `\n` to the text they
+ * came from.
  */
 function linesOf(source: string): string[] {
   const lines = source.split('\n');
@@ -121,8 +124,11 @@ export function cutSource(
       `the range ${start}-${end} lies outside the source: the source has ${count} lines`,
     );
   }
+  const text = lines.slice(start - 1, end).join('\n');
   return {
-    text: lines.slice(start - 1, end).join('\n'),
+    // The last line's own line end is not answered: a CRLF's CR stays only
+    // where a line follows.
+    text: text.endsWith('\r') ? text.slice(0, -1) : text,
     start_line: start,
     end_line: end,
     line_count: count,
@@ -132,8 +138,9 @@ export function cutSource(
 /**
  * A source read's answer: `call` sent once; on success its text, or the
  * lines `range` names (`answerOf` given the cut), or the refusal when the
- * range lies outside the text; SAP's refusal and a throw as `answer()`
- * gives them.
+ * range lies outside the text. The answer is read inside `answer()`'s
+ * boundary on both paths, so a throw there is answered as any other; SAP's
+ * refusal and a throw of the call as `answer()` gives them.
  */
 export async function answerSourceRead(
   ctx: AnswerContext,
@@ -141,28 +148,17 @@ export async function answerSourceRead(
   call: () => Promise<IAdtResponse<AdtReading<string>, IAdtError>>,
   answerOf: (source: string, cut: SourceCut | undefined) => unknown,
 ): Promise<McpResult> {
-  if (range === undefined) {
-    return answer(ctx, call, (reading) => answerOf(reading.raw, undefined));
-  }
-  let response: IAdtResponse<AdtReading<string>, IAdtError>;
-  try {
-    response = await call();
-  } catch (thrown) {
-    return answerThrown(thrown, ctx);
-  }
-  if (!response.ok)
-    return answer(
-      ctx,
-      async () => response,
-      () => undefined,
-    );
-  const cut = cutSource(response.getResult().value.raw, range);
-  if (cut instanceof Error) return return_error(cut);
-  return answer(
-    ctx,
-    async () => response,
-    () => answerOf(cut.text, cut),
-  );
+  let outside: Error | undefined;
+  const answered = await answer(ctx, call, (reading) => {
+    if (range === undefined) return answerOf(reading.raw, undefined);
+    const cut = cutSource(reading.raw, range);
+    if (cut instanceof Error) {
+      outside = cut;
+      return cut.message;
+    }
+    return answerOf(cut.text, cut);
+  });
+  return outside === undefined ? answered : return_error(outside);
 }
 
 /** The range answered beside the lines: nothing when the whole source was asked. */
@@ -179,3 +175,7 @@ export function rangeFields(cut: SourceCut | undefined): {
         line_count: cut.line_count,
       };
 }
+
+/** The sentence a ranged read's description ends with: what a range answers. */
+export const SOURCE_RANGE_WORDS =
+  'With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).';

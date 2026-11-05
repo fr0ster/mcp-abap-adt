@@ -275,8 +275,12 @@ answered with each method's `definitionBlock` link, e.g. `start: { line: 12, col
 { "class_name": "ZCL_ORDERS", "start_line": 12, "end_line": 16 }
 ```
 
-to `GetClass` answers those five lines. A line range is new on every `Get<Type>` source read; a
-call without one answers the whole source as before.
+to `GetClass` answers those five lines. A local component's links point into the class's local
+includes, read with `GetLocalDefinitions` / `GetLocalTypes` the same way. A line range is new on
+`GetClass`, `GetInterface`, `GetProgram`, `GetInclude`, `GetFunctionModule`, `GetFunctionInclude`,
+`GetDdl`, `GetMetadataExtension`, `GetBehaviorDefinition`, `GetBehaviorImplementation`,
+`GetServiceDefinition`, `GetStructure`, `GetTable`, `GetLocalDefinitions`, `GetLocalTypes`,
+`GetLocalMacros` and `GetLocalTestClass`; a call without one answers the whole source as before.
 
 ## Former users of the low set: each low tool and its compact call today
 

@@ -41,6 +41,8 @@ import {
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import { linesOf } from '../../../lib/plainText';
+import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
@@ -192,19 +194,16 @@ function resolveParent(
 }
 
 /**
- * The includes a piece of ABAP source names, in order. A full-line comment
- * (`*`) and a trailing one (`"`) are not code; `INCLUDE STRUCTURE` and
- * `INCLUDE TYPE` embed a type, not a program include.
+ * The includes a piece of ABAP source names, in order, each once — read line
+ * by line (`includeNameOf`; CR LF, LF and a lone CR end a line). A full-line
+ * comment (`*`) and a trailing one (`"`) are not code; `INCLUDE STRUCTURE`
+ * and `INCLUDE TYPE` embed a type, not a program include.
  */
 export function includeStatementsOf(source: string): string[] {
   const found: string[] = [];
-  for (const rawLine of source.split(/\r?\n/)) {
-    if (rawLine.startsWith('*')) continue;
-    const line = rawLine.replace(/".*$/, '');
-    const m = line.match(/^\s*INCLUDE\s+([A-Z0-9_/]+)\s*(?:IF\s+FOUND\s*)?\./i);
-    if (!m) continue;
-    const name = m[1].toUpperCase();
-    if (name === 'STRUCTURE' || name === 'TYPE') continue;
+  for (const line of linesOf(source)) {
+    const name = includeNameOf(line);
+    if (name === undefined || name === 'STRUCTURE' || name === 'TYPE') continue;
     if (!found.includes(name)) found.push(name);
   }
   return found;

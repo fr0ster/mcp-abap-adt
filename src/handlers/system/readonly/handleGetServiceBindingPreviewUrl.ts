@@ -51,6 +51,7 @@ import {
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { withoutTrailing } from '../../../lib/plainText';
 import {
   annotationServiceOf,
   type FeapDescriptor,
@@ -140,7 +141,7 @@ export async function handleGetServiceBindingPreviewUrl(
   const definition = adt.getServiceDefinition(
     resultsFor(serviceDefinitionDocuments),
   );
-  const baseUrl = (await connection.getBaseUrl()).replace(/\/+$/, '');
+  const baseUrl = withoutTrailing(await connection.getBaseUrl(), '/');
 
   // `client` and `language` are what the preview URL carries and what a caller
   // has no way to know. ADT answers both from `systeminformation`, which this

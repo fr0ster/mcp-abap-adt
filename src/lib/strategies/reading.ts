@@ -1,5 +1,6 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { withoutNamePrefix } from '../plainText';
 import { attr, child, type Visit, walk } from '../xml/tree';
 
 /**
@@ -91,7 +92,7 @@ const parser = new XMLParser({
   parseTagValue: false,
   removeNSPrefix: false,
   htmlEntities: true,
-  isArray: (name) => REPEATABLE.has(name.replace(/^\w+:/, '')),
+  isArray: (name) => REPEATABLE.has(withoutNamePrefix(name)),
 });
 
 /** Parse a document into named structure with verbatim attributes. */

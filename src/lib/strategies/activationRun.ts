@@ -236,9 +236,15 @@ export function activationVerdict(
   return executed !== false && !messages.some(isRefusal);
 }
 
+/** SAP's message-type letters of error severity: error, abort, exit. */
+const ERROR_LETTERS: ReadonlySet<string> = new Set(['E', 'A', 'X']);
+
 /** An error-severity message, by SAP's own letters. */
 export function isRefusal(message: ActivationMessage): boolean {
-  return /^[EAX]$/i.test(message.type) || /^error$/i.test(message.type);
+  return (
+    ERROR_LETTERS.has(message.type.toUpperCase()) ||
+    message.type.toLowerCase() === 'error'
+  );
 }
 
 /**

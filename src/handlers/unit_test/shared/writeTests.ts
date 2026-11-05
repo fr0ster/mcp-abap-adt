@@ -32,6 +32,8 @@ import {
 } from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { linesOf } from '../../../lib/plainText';
+import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
   awaitActivationRun,
   isRefusal,
@@ -62,12 +64,36 @@ export function programTestInclude(programName: string): string {
  */
 export function functionGroupTestInclude(functionGroupName: string): string {
   const name = functionGroupName.toUpperCase();
-  const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
-  return namespaced ? `${namespaced[1]}L${namespaced[2]}T99` : `L${name}T99`;
+  const namespaced = namespaceOf(name);
+  return namespaced
+    ? `${namespaced.namespace}L${namespaced.rest}T99`
+    : `L${name}T99`;
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * A namespaced name split into its namespace and the rest: `/NS/NAME` is
+ * `/NS/` and `NAME`. `undefined` for a name with no namespace — one not
+ * starting with `/`, or with an empty namespace or nothing after it.
+ */
+function namespaceOf(
+  name: string,
+): { namespace: string; rest: string } | undefined {
+  if (!name.startsWith('/')) return undefined;
+  const closing = name.indexOf('/', 1);
+  if (closing <= 1 || closing === name.length - 1) return undefined;
+  return {
+    namespace: name.slice(0, closing + 1),
+    rest: name.slice(closing + 1),
+  };
+}
+
+/**
+ * Whether a report's source pulls `includeName` in: a line
+ * `INCLUDE <name>.` (or `… IF FOUND.`) naming it, in any case.
+ */
+export function pullsInclude(source: string, includeName: string): boolean {
+  const wanted = includeName.toUpperCase();
+  return linesOf(source).some((line) => includeNameOf(line) === wanted);
 }
 
 /** Write (or, with an empty source, clear) a class's test classes, and activate. */
@@ -202,10 +228,6 @@ export async function writeProgramTests(
     if (!options.create) return activateBoth();
     // Read and write the report under one lock: a source read before the lock
     // and written after it would overwrite whatever was saved in between.
-    const pulledIn = new RegExp(
-      `^\\s*INCLUDE\\s+${escapeRegExp(includeName)}\\s*\\.`,
-      'im',
-    );
     const linked = await withLock(
       () => program.lock({ programName: name }, { analyse: analyseLock }),
       async (lockHandle): Promise<Answer> => {
@@ -216,7 +238,7 @@ export async function writeProgramTests(
         )();
         if (!current.ok) return current;
         const reportSource = current.getResult().value.raw;
-        if (pulledIn.test(reportSource)) {
+        if (pullsInclude(reportSource, includeName)) {
           return current;
         }
         return atStep('update program', () =>
@@ -225,7 +247,7 @@ export async function writeProgramTests(
               { programName: name, transportRequest },
               {
                 headers,
-                source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
+                source: `${reportSource.trimEnd()}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -311,8 +333,10 @@ export async function writeFunctionGroupTests(
  */
 export function functionGroupMainProgram(functionGroupName: string): string {
   const name = functionGroupName.toUpperCase();
-  const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
-  return namespaced ? `${namespaced[1]}SAPL${namespaced[2]}` : `SAPL${name}`;
+  const namespaced = namespaceOf(name);
+  return namespaced
+    ? `${namespaced.namespace}SAPL${namespaced.rest}`
+    : `SAPL${name}`;
 }
 
 /**

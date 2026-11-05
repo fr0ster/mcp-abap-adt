@@ -455,6 +455,20 @@ async function determineObjectTypeAndPath(
   );
 }
 
+/** `text` up to the first of `stops`, or the whole of it when none is there. */
+function beforeAny(text: string, stops: string): string {
+  for (let end = 0; end < text.length; end++) {
+    const character = text.charAt(end);
+    if (stops.includes(character)) return text.slice(0, end);
+  }
+  return text;
+}
+
+/** Whether a node structure type is an includes folder: `PROG/I`, `FUGR/I`, any `…/I`. */
+function isIncludesFolder(type: string): boolean {
+  return type.endsWith('/I');
+}
+
 /**
  * The main program an include's `contextRef` URI names: a program's own name,
  * or `SAPL<group>` for a function group. `undefined` for any other URI.
@@ -462,7 +476,7 @@ async function determineObjectTypeAndPath(
 function mainProgramOf(uri: string): string | undefined {
   const last = (prefix: string) => {
     if (!uri.toLowerCase().startsWith(prefix)) return undefined;
-    const segment = uri.slice(prefix.length).split(/[/?#]/)[0];
+    const segment = beforeAny(uri.slice(prefix.length), '/?#');
     return segment ? decodeURIComponent(segment).toUpperCase() : undefined;
   };
   const program = last('/sap/bc/adt/programs/programs/');
@@ -545,7 +559,7 @@ async function getIncludesListInternal(
       .getResult()
       // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
       // with PROG/I objects under it — on premise, 2026-09-25).
-      .value.childNodes.find((info) => /\/I$/.test(info.type));
+      .value.childNodes.find((info) => isIncludesFolder(info.type));
 
     if (!includesNode) {
       logger?.info(`No includes node found for ${objectType} '${objectName}'`);
@@ -1372,7 +1386,7 @@ function includesNodeRead(
   if (!response.ok) return undefined;
   const node = response
     .getResult()
-    .value.childNodes.find((info) => /\/I$/.test(info.type));
+    .value.childNodes.find((info) => isIncludesFolder(info.type));
   return node === undefined
     ? undefined
     : { kind: 'node', ...parent, nodeId: node.nodeId };

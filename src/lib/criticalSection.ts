@@ -73,9 +73,18 @@ const MUTATING_TRANSPORT_TOOLS: ReadonlySet<string> = new Set([
   'SortAndCompressTransportTask',
 ]);
 
+/** The name prefixes of the tools that write, compared as they are spelled. */
+const MUTATING_PREFIXES: readonly string[] = [
+  'Create',
+  'Update',
+  'Delete',
+  'Add',
+  'Remove',
+];
+
 export function isMutatingToolName(name: string): boolean {
   return (
-    /^(Create|Update|Delete|Add|Remove)/.test(name) ||
+    MUTATING_PREFIXES.some((prefix) => name.startsWith(prefix)) ||
     MUTATING_TRANSPORT_TOOLS.has(name)
   );
 }

@@ -5,6 +5,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { digitsAfter } from '../plainText';
 import { buildOrdered, ORDERED_ATTRIBUTES, parseOrdered } from '../xml/ordered';
 import {
   attr,
@@ -23,6 +24,8 @@ const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
   removeNSPrefix: true,
+  // Character references decoded as `parseStructure` decodes them.
+  htmlEntities: true,
   parseTagValue: false,
   parseAttributeValue: false,
   trimValues: false,
@@ -92,7 +95,7 @@ export interface AmdpEvent {
 }
 
 const lineOf = (uri: unknown): number | undefined => {
-  const start = /#start=(\d+)/.exec(text(uri))?.[1];
+  const start = digitsAfter(text(uri), '#start=');
   return start ? Number(start) : undefined;
 };
 
@@ -207,7 +210,31 @@ export function locationId(wire: {
   const location = String(
     wire.headers?.location ?? wire.headers?.Location ?? '',
   ).trim();
-  return /(?:^|\/)([^/?]+)\/?(?:\?.*)?$/.exec(location)?.[1] ?? '';
+  return lastSegmentOf(location);
+}
+
+/**
+ * The last path segment of a location: the first segment — counted from
+ * the start or after a `/`, holding no `/` or `?` — that only a `/`, a query
+ * (`?…`) or the end follows; empty when there is none.
+ */
+function lastSegmentOf(location: string): string {
+  for (let at = 0; at < location.length; at++) {
+    if (at > 0 && location[at - 1] !== '/') continue;
+    let end = at;
+    while (
+      end < location.length &&
+      location[end] !== '/' &&
+      location[end] !== '?'
+    )
+      end++;
+    if (end === at) continue;
+    const after = location[end] === '/' ? end + 1 : end;
+    if (after === location.length || location[after] === '?') {
+      return location.slice(at, end);
+    }
+  }
+  return '';
 }
 
 export function readAmdpStart(wire: {

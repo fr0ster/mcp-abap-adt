@@ -26,6 +26,7 @@ import {
 import { withSystemKindOf } from '../../../lib/connectionFactory';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import { afterLast, isBlank } from '../../../lib/plainText';
 import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
@@ -158,7 +159,13 @@ const DUMP_FILTERS = [
  * A value is written into the expression as it stands, so what would end an
  * operand — a blank, a comma, a parenthesis — is refused rather than sent.
  */
-const OPERAND = /^[^\s,()]+$/;
+function isOperand(value: string): boolean {
+  if (value.length === 0) return false;
+  for (const character of value) {
+    if (isBlank(character) || ',()'.includes(character)) return false;
+  }
+  return true;
+}
 
 /**
  * The dumps feed's `$query` for the filters given — `and ( … )` of one
@@ -169,7 +176,7 @@ export function dumpQueryOf(args: RuntimeListFeedsArgs): string | undefined {
   for (const [param, attribute, operator] of DUMP_FILTERS) {
     const value = args[param]?.trim();
     if (!value) continue;
-    if (!OPERAND.test(value)) {
+    if (!isOperand(value)) {
       throw new Error(
         `${param} must not contain blanks, commas or parentheses: "${value}"`,
       );
@@ -186,7 +193,7 @@ export function dumpQueryOf(args: RuntimeListFeedsArgs): string | undefined {
  * (`/sap/bc/adt/vit/runtime/dumps/<id>`), as it stands in that URI.
  */
 export function dumpIdOf(uri: string): string {
-  return uri.replace(/^.*\/runtime\/dumps\//, '');
+  return afterLast(uri, '/runtime/dumps/');
 }
 
 /**

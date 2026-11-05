@@ -21,8 +21,7 @@ const SNIPPET_MAX = 255;
 function isCommentLine(line: string): boolean {
   if (line.length === 0) return false;
   if (line[0] === '*') return true;
-  const idx = line.search(/\S/);
-  return idx !== -1 && line[idx] === '"';
+  return line.trimStart().startsWith('"');
 }
 
 function lineMatches(

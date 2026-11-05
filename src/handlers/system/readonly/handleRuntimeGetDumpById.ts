@@ -4,6 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { afterLast, digitsAfter } from '../../../lib/plainText';
 import { return_error } from '../../../lib/utils';
 import { attr, child, childAt, isList } from '../../../lib/xml/tree';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
@@ -52,7 +53,7 @@ const dumpXmlParser = new XMLParser({
  * link — so everything up to `runtime/dumps/` is dropped.
  */
 export function dumpIdFrom(value: string): string {
-  return value.trim().replace(/^.*\/runtime\/dumps\//, '');
+  return afterLast(value.trim(), '/runtime/dumps/');
 }
 
 /**
@@ -106,13 +107,20 @@ export function dumpSummaryOf(
   const termination = links.find((l) => l.relation === TERMINATION_RELATION);
   if (termination?.uri) {
     const [addressed, fragment = ''] = termination.uri.split('#');
-    const uri = addressed.replace(/^adt:\/\/[^/]*/, '');
-    const line = /start=(\d+)/.exec(fragment)?.[1];
+    const uri = withoutAdtSystem(addressed);
+    const line = digitsAfter(fragment, 'start=');
     summary.termination = line
       ? { uri: decodeURIComponent(uri), line: Number(line) }
       : { uri: decodeURIComponent(uri) };
   }
   return Object.keys(summary).length > 0 ? summary : undefined;
+}
+
+/** An `adt://<system>/…` URI without its `adt://<system>` part; any other URI as it is. */
+function withoutAdtSystem(uri: string): string {
+  if (!uri.startsWith('adt://')) return uri;
+  const path = uri.indexOf('/', 'adt://'.length);
+  return path === -1 ? '' : uri.slice(path);
 }
 
 export async function handleRuntimeGetDumpById(

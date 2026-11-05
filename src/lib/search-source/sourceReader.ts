@@ -12,6 +12,7 @@ import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
+import { linesOf } from '../plainText';
 import {
   type FugrChild,
   functionGroupStructure,
@@ -46,8 +47,9 @@ export interface ReadSourceUnitsDeps {
   logger?: { debug?: (msg: string) => void; warn?: (msg: string) => void };
 }
 
+/** A source's lines: CR LF, LF and a lone CR each end one. */
 function splitLines(text: string): string[] {
-  return text.split(/\r?\n/);
+  return linesOf(text);
 }
 
 async function safe<T>(

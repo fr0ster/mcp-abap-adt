@@ -32,10 +32,9 @@ export interface PackageResolverDeps {
   searchObjects: SearchObjectsFn;
 }
 
-const WILDCARD_RE = /[*+]/;
-
+/** A package entry is a pattern when it holds a wildcard, `*` or `+`. */
 function isPattern(entry: string): boolean {
-  return WILDCARD_RE.test(entry);
+  return entry.includes('*') || entry.includes('+');
 }
 
 export async function resolvePackagePatterns(

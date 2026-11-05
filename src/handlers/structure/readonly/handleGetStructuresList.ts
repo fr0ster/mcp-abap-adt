@@ -24,6 +24,14 @@ import {
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  afterBlanksAt,
+  holdsPhrase,
+  isAsciiLetter,
+  isWordCharacter,
+  linesOf,
+  wordAt,
+} from '../../../lib/plainText';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
@@ -109,11 +117,10 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
   const refs: EmbeddedRef[] = [];
   if (!source) return refs;
 
-  const lines = source.split(/\r?\n/);
-  for (const rawLine of lines) {
+  for (const rawLine of linesOf(source)) {
     // Strip line comments (both classic '* ' and DDL '//').
-    let line = rawLine.replace(/\/\/.*$/, '');
-    line = line.trim();
+    const comment = rawLine.indexOf('//');
+    const line = (comment === -1 ? rawLine : rawLine.slice(0, comment)).trim();
     if (!line || line.startsWith('@') || line.startsWith('*')) continue;
 
     // Classic field-list include: .INCLUDE <name>
@@ -121,41 +128,63 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
     // line in a structure's source. An append is a separate object that
     // `extend type <this> with …`; those are resolved via where-used in
     // findExtensions(), not here.
-    const classicInclude = line.match(/^\.include\s+([a-z0-9_/]+)/i);
-    if (classicInclude) {
-      refs.push({
-        name: classicInclude[1].toUpperCase(),
-        attribute: null,
-        kind: 'include',
-      });
+    const classicInclude = includedName(line, '.INCLUDE');
+    if (classicInclude !== undefined) {
+      refs.push({ name: classicInclude, attribute: null, kind: 'include' });
       continue;
     }
 
     // Modern DDL named include: `<attr> : include <name>;`
-    const namedInclude = line.match(
-      /^([a-z][a-z0-9_]*)\s*:\s*include\s+([a-z0-9_/]+)\s*;?/i,
-    );
-    if (namedInclude) {
-      refs.push({
-        name: namedInclude[2].toUpperCase(),
-        attribute: namedInclude[1].toLowerCase(),
-        kind: 'include',
-      });
+    const named = namedInclude(line);
+    if (named !== undefined) {
+      refs.push({ ...named, kind: 'include' });
       continue;
     }
 
     // Modern DDL anonymous include: `include <name>;`
-    const ddlInclude = line.match(/^include\s+([a-z0-9_/]+)\s*;?/i);
-    if (ddlInclude) {
-      refs.push({
-        name: ddlInclude[1].toUpperCase(),
-        attribute: null,
-        kind: 'include',
-      });
+    const ddlInclude = includedName(line, 'INCLUDE');
+    if (ddlInclude !== undefined) {
+      refs.push({ name: ddlInclude, attribute: null, kind: 'include' });
     }
   }
 
   return refs;
+}
+
+/** A structure name's characters: letters, digits, `_` and `/` (a namespace). */
+const isStructureNameCharacter = (character: string | undefined): boolean =>
+  isWordCharacter(character) || character === '/';
+
+/**
+ * The name after `keyword` (any case) at the start of `line`, the keyword
+ * and the name one or more blanks apart, in upper case; what follows the
+ * name is not read. `undefined` when the line does not start so.
+ */
+function includedName(line: string, keyword: string): string | undefined {
+  if (!wordAt(line, 0, keyword)) return undefined;
+  const at = afterBlanksAt(line, keyword.length);
+  if (at === keyword.length) return undefined;
+  let end = at;
+  while (end < line.length && isStructureNameCharacter(line[end])) end++;
+  return end > at ? line.slice(at, end).toUpperCase() : undefined;
+}
+
+/** `<attr> : include <name>` at the start of `line`: the attribute in lower case, the name in upper. */
+function namedInclude(
+  line: string,
+): { name: string; attribute: string } | undefined {
+  if (!isAsciiLetter(line[0])) return undefined;
+  let end = 1;
+  while (end < line.length && isWordCharacter(line[end])) end++;
+  const colon = afterBlanksAt(line, end);
+  if (line[colon] !== ':') return undefined;
+  const name = includedName(
+    line.slice(afterBlanksAt(line, colon + 1)),
+    'INCLUDE',
+  );
+  return name === undefined
+    ? undefined
+    : { name, attribute: line.slice(0, end).toLowerCase() };
 }
 
 /**
@@ -339,13 +368,9 @@ async function structuresListOf(
       for (const ref of references) {
         const name = (ref.name ?? '').trim().toUpperCase();
         if (!name || name === baseName) continue;
-        if (!/^TABL\//i.test(ref.type ?? '')) continue;
+        if (!isTablType(ref.type)) continue;
         candidates.add(name);
       }
-      const extendRe = new RegExp(
-        `extend\\s+type\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+with`,
-        'i',
-      );
       const refs: EmbeddedRef[] = [];
       for (const cand of candidates) {
         const read = await readDdl(cand);
@@ -357,7 +382,7 @@ async function structuresListOf(
           });
         }
         const csrc = 'source' in read ? read.source : null;
-        if (csrc && extendRe.test(csrc)) {
+        if (csrc && extendsBase(csrc, baseName)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
         }
       }
@@ -783,12 +808,18 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
 
 type StructureReads = ReturnType<typeof structureReads>;
 
-/** The `extend type <base> with` test an append candidate's source passes. */
-const extendsBase = (baseName: string) =>
-  new RegExp(
-    `extend\\s+type\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+with`,
-    'i',
-  );
+/**
+ * Whether an append candidate's source states `extend type <base> with`:
+ * the words in any case, one or more white-space characters apart.
+ */
+export function extendsBase(source: string, baseName: string): boolean {
+  return holdsPhrase(source, ['extend', 'type', baseName, 'with']);
+}
+
+/** Whether a where-used reference's type is a `TABL` one, in any case. */
+function isTablType(type: string | undefined): boolean {
+  return wordAt(type ?? '', 0, 'TABL/');
+}
 
 /** The append candidates a where-used outcome names: referencing TABL objects, not the base. */
 function candidatesOf(baseName: string, outcome: WhereUsedOutcome): string[] {
@@ -797,7 +828,7 @@ function candidatesOf(baseName: string, outcome: WhereUsedOutcome): string[] {
   for (const ref of outcome.references) {
     const name = (ref.name ?? '').trim().toUpperCase();
     if (!name || name === baseName) continue;
-    if (!/^TABL\//i.test(ref.type ?? '')) continue;
+    if (!isTablType(ref.type)) continue;
     candidates.add(name);
   }
   return [...candidates];
@@ -833,7 +864,6 @@ async function structureTreeFromAnswers(
         );
         return [];
       }
-      const extendRe = extendsBase(baseName);
       const refs: EmbeddedRef[] = [];
       for (const cand of candidatesOf(baseName, outcome)) {
         const read = reads.ddlOf(cand);
@@ -845,7 +875,7 @@ async function structureTreeFromAnswers(
           });
         }
         const csrc = 'source' in read ? read.source : null;
-        if (csrc && extendRe.test(csrc)) {
+        if (csrc && extendsBase(csrc, baseName)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
         }
       }
@@ -973,7 +1003,6 @@ async function structureTrees(
       }
       await reads.readDdl([...candidates.values()].flat());
       for (const [base, names] of candidates) {
-        const extendRe = extendsBase(base);
         appends.set(
           base,
           names.filter((name) => {
@@ -981,7 +1010,7 @@ async function structureTrees(
             return (
               'source' in read &&
               read.source !== '' &&
-              extendRe.test(read.source)
+              extendsBase(read.source, base)
             );
           }),
         );

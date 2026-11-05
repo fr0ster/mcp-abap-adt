@@ -165,8 +165,31 @@ function rfcWireOptions(): { logWire: boolean; maxLoggedBodyChars?: number } {
  * stderr, for the reason `wireLogger` gives above: in stdio transport stdout
  * carries JSON-RPC and nothing else.
  */
-const REDACTED =
-  /^(authorization|cookie|set-cookie)$|token|secret|password|credential|apikey|api-key/i;
+/** Header names redacted as a whole, lower-cased. */
+const REDACTED_NAMES: ReadonlySet<string> = new Set([
+  'authorization',
+  'cookie',
+  'set-cookie',
+]);
+
+/** Words that redact any header name holding them, lower-cased. */
+const REDACTED_WORDS: readonly string[] = [
+  'token',
+  'secret',
+  'password',
+  'credential',
+  'apikey',
+  'api-key',
+];
+
+/** Whether a header's value is redacted in the wire log, by its name in any case. */
+export function isRedactedHeader(name: string): boolean {
+  const lower = name.toLowerCase();
+  return (
+    REDACTED_NAMES.has(lower) ||
+    REDACTED_WORDS.some((word) => lower.includes(word))
+  );
+}
 
 function httpWireOptions(): { logWire: boolean; bodyChars: number } {
   const asked =
@@ -201,7 +224,7 @@ function safeHeaders(headers: unknown): string {
   if (headers === null || typeof headers !== 'object') return '';
   const out: Record<string, unknown> = {};
   for (const [name, value] of entries(headers)) {
-    out[name] = REDACTED.test(name) ? '[redacted]' : value;
+    out[name] = isRedactedHeader(name) ? '[redacted]' : value;
   }
   return JSON.stringify(out);
 }

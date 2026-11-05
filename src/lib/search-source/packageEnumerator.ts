@@ -3,6 +3,7 @@ import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import { globMatches } from '../plainText';
 import {
   assembleList,
   nodeStructureOn,
@@ -61,24 +62,12 @@ function familyOf(type: string): ScanObjectType | undefined {
   return code === undefined ? undefined : ADT_TYPE_TO_FAMILY[code];
 }
 
-function globToRegExp(glob: string): RegExp {
-  let pattern = '';
-  for (const ch of glob) {
-    if (ch === '*') pattern += '.*';
-    else if (ch === '?') pattern += '.';
-    else pattern += ch.replace(/[\\.+^$()|[\]{}]/g, '\\$&');
-  }
-  return new RegExp(`^${pattern}$`, 'i');
-}
-
 export async function enumerateScanTargets(
   fetch: PackageContentsFetcher,
   input: EnumerateInput,
 ): Promise<EnumeratedObject[]> {
   const wantedFamilies = new Set<ScanObjectType>(input.object_types);
-  const filter = input.object_filter
-    ? globToRegExp(input.object_filter)
-    : undefined;
+  const filter = input.object_filter;
   const seen = new Set<string>();
   const out: EnumeratedObject[] = [];
 
@@ -90,7 +79,7 @@ export async function enumerateScanTargets(
       if (item.isPackage) continue;
       const family = familyOf(item.type);
       if (!family || !wantedFamilies.has(family)) continue;
-      if (filter && !filter.test(item.name)) continue;
+      if (filter && !globMatches(filter, item.name)) continue;
       const key = `${item.packageName} ${family} ${item.name}`;
       if (seen.has(key)) continue;
       seen.add(key);

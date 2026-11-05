@@ -1,5 +1,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { withoutNamePrefix } from '../plainText';
 import { attr, child, childAt, isElement, isList } from '../xml/tree';
 import { type AdtReading, parseStructure, reading } from './reading';
 
@@ -82,7 +83,7 @@ const parser = new XMLParser({
   parseTagValue: false,
   // The column and its cells repeat; a document with one of either would
   // otherwise arrive as an object and be read as no columns at all.
-  isArray: (name) => ['columns', 'data'].includes(name.replace(/^\w+:/, '')),
+  isArray: (name) => ['columns', 'data'].includes(withoutNamePrefix(name)),
   removeNSPrefix: true,
 });
 

@@ -9,6 +9,7 @@
 
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { splitOnAny } from '../plainText';
 
 export const RUNTIME_SUBFOLDER = 'runtime';
 
@@ -21,8 +22,7 @@ export function runtimeDirectory(
   const isWindows = platform === 'win32';
   const stated =
     base ??
-    (env.AUTH_BROKER_PATH ?? '')
-      .split(isWindows ? ';' : /[:;]/)
+    splitOnAny(env.AUTH_BROKER_PATH ?? '', isWindows ? ';' : ':;')
       .map((entry) => entry.trim())
       .find((entry) => entry.length > 0);
   const root =

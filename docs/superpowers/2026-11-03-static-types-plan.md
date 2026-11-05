@@ -2395,7 +2395,9 @@ not seen":**
 - A service definition's exposed entities do not come back in source order.
 - An unknown name answers `200` with an empty element info (no name).
 
-**Released:** adt-clients 43.1.0, adt-strategies 0.20.0, adt-clients-legacy 0.7.2. The members
+**Released:** adt-clients 43.1.0, adt-strategies 0.20.0, adt-clients-legacy 0.7.2 — merged and
+tagged; the owner publishes, and D22's server half starts after the publish (the registry
+check of Step 3). The members
 are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 (`GET /sap/bc/adt/ddic/elementinfo?path=<structure>`,
 `GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>`). The readers are
@@ -2408,8 +2410,9 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 2. **`GetStructuresList` takes every include SAP states** — anonymous, named and appends
    (`extend type`, read as `.append`) — from element info. It returns the structure and does
    not filter out named includes; the model narrows further if it needs to. The answer's
-   shape stays; what changes (a named include's group name, the where-used flags, and
-   `version` per Step 1) is stated below and recorded in CHANGELOG / MIGRATION-24.0. The
+   shape stays; what changes (a named include's group name, the where-used flags, and the
+   `version` argument, removed — element info answers only the active structure) is stated
+   below and recorded in CHANGELOG / MIGRATION-24.0. The
    plain scanners for the DDL `include` and for `extend type` go away.
 3. **Only `GetIncludesList`'s tree stays on the plain scanner**, for the measured reason (SAP
    does not state which include names which).
@@ -2434,24 +2437,21 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
   `GetServiceBindingPreviewUrl` (`handleGetServiceBindingPreviewUrl.ts`).
 
 **In #346 (red first):**
-- [ ] **Step 1: Does element info take a version? (live, both systems, owner's go, realm
-  check).** On a structure the test creates and activates:
-  1. make an inactive change (add a component), recorded;
-  2. read `/sap/bc/adt/ddic/elementinfo?path=<structure>` without a version, with
-     `&version=inactive`, and with the query the source reads use for a version;
-  3. record whether the answer differs between active and inactive;
-  4. delete the structure (standard order), asserting it absent.
-
-  Then:
-  - **if it takes one,** the adt-clients member `getStructureElementInfo` gains a `version`
-    option in a patch release, and the server forwards `GetStructuresList`'s `version` to it;
-  - **if it does not,** honouring `version` becomes an **open owner decision** (keep reading
-    the inactive source for `version: inactive`, or refuse `inactive`, or drop the argument).
-    It is recorded under the defect-stage decisions, and nothing silently stops honouring
-    `version`.
-
-  Either way a red test pins the decision: `'GetStructuresList forwards version to the element
-  info read'`, or the test the owner's decision names.
+- [ ] **Step 1: `version` — measured, and the owner's decision (2026-11-05).** Measured on both
+  systems: element info takes no version and always answers the active structure. Its
+  discovery template is `{?path,uri}{&context}{&type*}`, and the answers with
+  `version=inactive`, `active` and `workingArea` were byte-identical. **Decision:**
+  `GetStructuresList` loses its `version` argument; the model reads an inactive structure
+  through the source read with `version: inactive`. Red tests first:
+  - `'GetStructuresList declares no version'`: the listed-schema test expects the property
+    gone from `GetStructuresList` on every binary;
+  - a call that still passes `version` is not forwarded anywhere: the pinned requests are
+    the element-info GETs alone (the tools parse strictly only for creates, so an extra key
+    on a read is dropped by the schema, not refused).
+  Then remove `version` from the schema (`handleGetStructuresList.ts`, around line 69), the
+  handler and its forwarding (the source reads around lines 288–297 and the batched reads
+  around lines 1093–1113), and update the listed-schema and surface fixtures for that one
+  property.
 - [ ] **Step 2: Red tests.**
   - **Request pins:** `GetServiceBindingPreviewUrl`'s entity reading sends the
     service-definition element-info GET; `GetStructuresList` sends one structure element-info
@@ -2486,7 +2486,7 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
   - **Unknown names:** an empty element info is "not found" for `GetStructuresList` (single:
     the call fails; multi: that entry's error) and for the preview URL's entity reading —
     never an empty structure or list.
-- [ ] **Step 3:** Bump adt-clients to 43.1.0 (or its patch from Step 1) and adt-strategies to
+- [ ] **Step 3:** After the publish (check `npm view` for each version), bump adt-clients to 43.1.0 and adt-strategies to
   0.20.0 (adt-clients-legacy to 0.7.2 where the server uses it) from the registry, as
   registry ranges. `npm install` regenerates the lockfile; check it for `"link": true` and
   for non-registry entries. Run build, `test:check` and the root `npm test`.
@@ -2497,10 +2497,12 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 - [ ] **Step 5:** `GetStructuresList`'s description and its `include_extensions` description
   state what is now true, functionally: the tree of included and appended structures as
   SAP's element info states them; `include_extensions: false` leaves appends out. A
-  description test for each. CHANGELOG (Changed: read from SAP's element info). MIGRATION-24.0:
+  description test for each. CHANGELOG (Changed: read from SAP's element info; Removed:
+  `GetStructuresList`'s `version`). MIGRATION-24.0:
   - a named include's `attribute` is now `null`;
   - `appends_unavailable` and `append_candidates_unread` are gone;
-  - the outcome of Step 1 for `version`;
+  - `GetStructuresList` no longer takes `version` and answers the active structure; for an
+    inactive one, read the source with `version: inactive`;
   - any flattening Step 2 found.
 - [ ] **Step 6: Live cases on both systems:**
   - the exposed entities of a service definition the test creates (C14's fixtures), compared

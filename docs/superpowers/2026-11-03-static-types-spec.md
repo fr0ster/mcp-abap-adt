@@ -450,7 +450,9 @@ on-premise system disagree, the live measurement holds.
   profiling and dumps explorer moves to adt-clients 43 (D21); service-binding facts' exposed
   entities and every include `GetStructuresList` lists — anonymous, named and appends
   (`extend type`) — read SAP's element info (adt-clients 43.1.0, adt-strategies 0.20.0), and
-  `GetStructuresList` lists all of them, a changed answer recorded in MIGRATION; only
+  `GetStructuresList` lists all of them, a changed answer recorded in MIGRATION; it loses
+  `version` (element info answers only the active structure, measured; an inactive structure
+  is read through the source read with `version: inactive`); only
   `GetIncludesList`'s tree stays on a plain scanner (D22).
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers

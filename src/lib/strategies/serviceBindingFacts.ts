@@ -25,6 +25,13 @@
  * alias is the entity set, not the exposed view's name.
  */
 
+import {
+  attributeOf,
+  firstAttribute,
+  membersNamed,
+  parseStructure,
+} from './reading';
+
 export interface ServiceBindingFacts {
   /** `srvb:services/@srvb:name` — the published service. */
   service?: string;
@@ -45,32 +52,37 @@ export interface ServiceBindingFacts {
   published: boolean;
 }
 
+/**
+ * The attribute `name` of the first `element` of a parsed document, in
+ * document order; `undefined` when that element does not carry it.
+ */
 const attribute = (
-  xml: string,
+  document: unknown,
   element: string,
   name: string,
-): string | undefined => {
-  const open = new RegExp(`<${element}\\b[^>]*>`).exec(xml)?.[0];
-  if (!open) return undefined;
-  const found = new RegExp(`${name}="([^"]*)"`).exec(open);
-  return found?.[1];
-};
+): string | undefined =>
+  attributeOf(membersNamed(document, element)[0]?.node, name);
 
 /** Read the facts the preview URL needs out of a binding document. */
 export function serviceBindingFactsOf(xml: string): ServiceBindingFacts {
-  const bindingVersion = attribute(xml, 'srvb:binding', 'srvb:version');
-  const bindingCategory = attribute(xml, 'srvb:binding', 'srvb:category');
+  const document = parseStructure(xml);
+  const bindingVersion = attribute(document, 'srvb:binding', 'srvb:version');
+  const bindingCategory = attribute(document, 'srvb:binding', 'srvb:category');
   return {
-    service: attribute(xml, 'srvb:services', 'srvb:name'),
-    serviceDefinition: attribute(xml, 'srvb:serviceDefinition', 'adtcore:name'),
-    version: attribute(xml, 'srvb:content', 'srvb:version'),
+    service: attribute(document, 'srvb:services', 'srvb:name'),
+    serviceDefinition: attribute(
+      document,
+      'srvb:serviceDefinition',
+      'adtcore:name',
+    ),
+    version: attribute(document, 'srvb:content', 'srvb:version'),
     protocol:
       bindingVersion === 'V2'
         ? 'odatav2'
         : bindingVersion === 'V4'
           ? 'odatav4'
           : undefined,
-    bindingType: attribute(xml, 'srvb:binding', 'srvb:type'),
+    bindingType: attribute(document, 'srvb:binding', 'srvb:type'),
     category:
       bindingCategory === '0'
         ? 'ui'
@@ -78,7 +90,7 @@ export function serviceBindingFactsOf(xml: string): ServiceBindingFacts {
           ? 'web_api'
           : undefined,
     published:
-      attribute(xml, 'srvb:serviceBinding', 'srvb:published') === 'true',
+      attribute(document, 'srvb:serviceBinding', 'srvb:published') === 'true',
   };
 }
 
@@ -181,10 +193,12 @@ export interface CategoryServiceUrls {
  * published V4 service answers `404` to a caller that holds a valid token.
  */
 export function categoryServiceUrlsOf(xml: string): CategoryServiceUrls {
-  const value = (name: string): string | undefined => {
-    const found = new RegExp(`(?:odatav2|odatav4):${name}="([^"]*)"`).exec(xml);
-    return found?.[1];
-  };
+  const document = parseStructure(xml);
+  // The first element, in document order, that states it: the V2 spelling,
+  // else the V4 one — a document is of one protocol.
+  const value = (name: string): string | undefined =>
+    firstAttribute(document, `odatav2:${name}`) ??
+    firstAttribute(document, `odatav4:${name}`);
   const url = value('serviceUrl');
   const annotation = value('annotationUrl');
   const prefix = value('serviceUrlPrefix');

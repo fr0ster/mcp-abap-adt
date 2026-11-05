@@ -1,3 +1,11 @@
+import { child, localName, text } from '../xml/tree';
+import {
+  attributeOf,
+  membersNamed,
+  parseStructure,
+  walkStructure,
+} from './reading';
+
 /**
  * The query variants of every feed, read out of the feed list.
  *
@@ -19,34 +27,26 @@ export interface FeedVariants {
   variants: Array<{ title: string; query: string; is_default: boolean }>;
 }
 
-const decode = (value: string): string =>
-  value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
-
-const attribute = (attributes: string, name: string): string =>
-  decode(new RegExp(`\\b${name}="([^"]*)"`).exec(attributes)?.[1] ?? '');
+/** A feed's own text member (`atom:id`, `atom:title`): text, CDATA included, `''` when none. */
+function textOf(entry: unknown, name: string): string {
+  return text(child(entry, name)) ?? '';
+}
 
 export function feedVariantsOf(answer: { data?: unknown }): FeedVariants[] {
-  const xml = String(answer?.data ?? '');
   const feeds: FeedVariants[] = [];
-  for (const entry of xml.split(/<atom:entry[\s>]/).slice(1)) {
-    const variants = [
-      ...entry.matchAll(/<\w+:queryVariant\b([^>]*?)\/?>/g),
-    ].map((match) => ({
-      title: attribute(match[1], 'title'),
-      query: attribute(match[1], 'queryString'),
-      is_default: attribute(match[1], 'isDefault') === 'true',
-    }));
+  const document = parseStructure(answer?.data);
+  for (const entry of membersNamed(document, 'atom:entry')) {
+    const variants = walkStructure(entry.node)
+      .filter((visit) => localName(visit.name) === 'queryVariant')
+      .map((visit) => ({
+        title: attributeOf(visit.node, 'title') ?? '',
+        query: attributeOf(visit.node, 'queryString') ?? '',
+        is_default: attributeOf(visit.node, 'isDefault') === 'true',
+      }));
     if (variants.length === 0) continue;
     feeds.push({
-      feed: decode(/<atom:id>([^<]*)<\/atom:id>/.exec(entry)?.[1] ?? ''),
-      title: decode(
-        /<atom:title[^>]*>([^<]*)<\/atom:title>/.exec(entry)?.[1] ?? '',
-      ),
+      feed: textOf(entry.node, 'atom:id'),
+      title: textOf(entry.node, 'atom:title'),
       variants,
     });
   }

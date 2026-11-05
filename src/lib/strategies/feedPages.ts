@@ -20,6 +20,8 @@ import type {
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import { localName } from '../xml/tree';
+import { attributeOf, parseStructure, walkStructure } from './reading';
 import { succeededWith } from './sequence';
 
 /**
@@ -47,15 +49,16 @@ export interface FeedPage<T> {
 }
 
 /**
- * The `to` of the `rel="next"` link, or nothing. Attributes are read in any
- * order and the href may carry the query encoded or with `&amp;`.
+ * The `to` of the `rel="next"` link, or nothing: a `link` element of any
+ * prefix, at any depth, read through the XML parser.
  */
 export function nextToOf(xml: string): string | undefined {
-  for (const match of xml.matchAll(/<(?:\w+:)?link\b([^>]*)\/?>/g)) {
-    const attributes = match[1];
-    if (!/\brel="next"/.test(attributes)) continue;
-    const href = /\bhref="([^"]*)"/.exec(attributes)?.[1] ?? '';
-    const to = /[?&;]to=([^&]*)/.exec(href.replace(/&amp;/g, '&'))?.[1];
+  for (const visit of walkStructure(parseStructure(xml))) {
+    if (localName(visit.name) !== 'link') continue;
+    if (attributeOf(visit.node, 'rel') !== 'next') continue;
+    // The parser has decoded the attribute: `&amp;` is `&` here.
+    const href = attributeOf(visit.node, 'href') ?? '';
+    const to = /[?&;]to=([^&]*)/.exec(href)?.[1];
     if (to) return decodeURIComponent(to);
   }
   return undefined;

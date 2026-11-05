@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D19 (spec §9), then C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D22 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -2287,12 +2287,121 @@ not identical everywhere: the ordered round trip keeps entities on purpose.
 - a possible switch to `@xmldom/xmldom` with a strict wrapper, as auth-providers does. After
   D19, that switch is a one-module change.
 
+### D20. Compact HandlerGet: a source range and an outline part (owner)
+
+**What changes.**
+- **The source range.** `HandlerGet`'s `source` part takes the same optional `start_line` /
+  `end_line` as the full source reads. It uses the same shared `sourceRangeOf` and
+  `answerSourceRead` (`src/lib/handlers/sourceRange.ts`), the same refusal rules (a
+  non-positive, non-integer or inverted range is refused before any request; a range outside
+  the source is refused after the one unchanged GET), and the same exact cut over CRLF and LF
+  line ends.
+- **The outline part.** `HandlerGet` gains `part: "outline"` for the object types
+  `GetObjectOutline` serves: `CLAS/OC`, `INTF/OI` and `FUGR/F` on both systems, and `PROG/P`
+  on premise. It routes to the same handler as `GetObjectOutline`.
+- A range with `part: "metadata"` (or any part but `source`) is refused before any request,
+  as `sourceRangeOf` already does for the full reads (DO1).
+
+**Files:** `src/lib/compact/compactSchemas.ts` (`GET_PROPERTIES`,
+`COMPACT_READ_TAKES.every` or the per-type takes, and the `part` enum),
+`compact-readonly-entries/src/handlers/handleHandlerGet.ts` and
+`compactPartRoutes.ts` (the `outline` route per type and the range pass-through), the
+listed-schema and surface fixtures, CHANGELOG, MIGRATION-24.0, the coverage ledger.
+
+- [ ] **Step 1: Failing tests.**
+  - Listed schema: `HandlerGet` lists `start_line`, `end_line` and the `outline` part value,
+    on the variants and types named above.
+  - Pins:
+    - `HandlerGet#<type>#outline` for each type, its one request with the object-structure
+      v2 Accept, as `GetObjectOutline`'s pin;
+    - a ranged `HandlerGet#<type>#source` read: the one unchanged source GET, then exactly the
+      asked lines, for an LF and a CRLF source;
+    - for a function module, the D7 metadata read first, then the one source GET.
+  - Refusals with zero requests: a range with `part: "metadata"`; an inverted range; a
+    non-positive line. After the GET: a range outside the source.
+- [ ] **Step 2:** Add the properties and the route; reuse `sourceRangeOf` / `answerSourceRead`
+  unchanged. Run: PASS; the listed-schema test passes with the fixture updated for these keys
+  alone.
+- [ ] **Step 3: Coverage.** The ledger gains `HandlerGet#<type>#outline` keys (C8's list), and
+  each compact source key's pins and live case add one ranged read (no new key: the range is
+  not an enum). Live cases on both systems in C8's file: the outline of a class the test
+  creates lists its methods with positions, and a ranged compact read answers those lines.
+- [ ] **Step 4:** CHANGELOG (Added) and MIGRATION-24.0 (an addition: `HandlerGet` takes
+  `start_line` / `end_line` on `source` and the part `outline`). Commit.
+
+### D21. The profiling and dumps explorer on adt-clients 43
+
+**What the code shows.** `tools/runtime-profiling-dumps-explorer.js` calls runtime-client
+members that adt-clients 43 removed: `listProfilerTraceFiles`,
+`createProfilerTraceParameters`, `extractProfilerIdFromResponse`, the
+`getProfilerTrace…` readers (`HitList`, `Statements`, `DbAccesses`), and the dump members
+`getRuntimeDumpById` / `listRuntimeDumpsByUser`. In 43 they live on
+`AdtRuntimeClient.getProfiler(…)` (`list`, `delete`, `getDefaultParameters`,
+`buildParametersXml`, and the trace readers) and `AdtRuntimeClient.getDumps(…)` (`list`,
+`listByUser`, `getById`), as the server's own handlers use them after the bump.
+
+- [ ] **Step 1:** Map each removed call to its 43 member, read from
+  `node_modules/@mcp-abap-adt/adt-clients/dist` (and the server's
+  `handleRuntimeListProfilerTraceFiles.ts` / `handleRuntimeGetProfilerTraceData.ts` /
+  `handleRuntimeGetDumpById.ts`, which already call them). Record the map in the tool's
+  header comment.
+- [ ] **Step 2:** Rewrite the tool onto those members, with no regex, no prose matching and
+  no polling limit, as D6 left it. Its D19 parse pin stays green.
+- [ ] **Step 3: Live run on the on-premise system** (after the realm check; read-only apart
+  from what the script creates):
+  - the profiler trace list;
+  - one trace's data (hit list, statements, database accesses);
+  - the dump list and one dump read.
+
+  Whatever the script creates (trace parameters, a trace) is deleted at the end, and the
+  run records it.
+- [ ] **Step 4:** Commit (`fix(tools): the profiling and dumps explorer on adt-clients 43`).
+
+### D22. DO2 through adt-clients: the element-info readings (owner)
+
+**Decision.** The owner approved an adt-clients release (minor) for two of DO2's source
+scans. Measured in D1 / D6: SAP's element info states a structure's components and a service
+definition's exposed entities, but not which include a name comes from, and an
+`extend type` was not seen. So:
+- moved onto SAP: service-binding facts' exposed entities (name, URI, alias), and
+  `GetStructuresList`'s anonymous `.include`;
+- staying on the plain scanners: `extend type`, and `GetIncludesList`'s tree.
+
+**adt-clients (cross-repository, minor; the owner releases):**
+- one member per endpoint, from D1's measured contract:
+  - `GET /sap/bc/adt/ddic/elementinfo?path=<structure>`;
+  - `GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>`;
+- their structured readings in adt-strategies;
+- tests per member: the request (URL with its query, Accept) and a reading of a captured
+  answer.
+
+**In #346:**
+- [ ] **Step 1: Pins before the move.** For service-binding facts and `GetStructuresList`,
+  record today's answers on corpus documents (the exposed entities with name, URI and alias;
+  the structure's included components).
+- [ ] **Step 2:** After the release, bump adt-clients and adt-strategies from the registry (a
+  registry range; `npm install` regenerates the lockfile; check for `"link": true` and
+  non-registry entries).
+- [ ] **Step 3:** Move the two readings onto the new members. The pins of Step 1 stay
+  green: the same answers. New pins: the element-info request per reading.
+- [ ] **Step 4: Live cases on both systems:** the exposed entities of a service definition the
+  test creates (C14's fixtures), and the components of a structure with an anonymous
+  include (a shared or test-made structure).
+- [ ] **Step 5:** CHANGELOG (Changed: read from SAP's element info). Commit.
+
 ### Defect-stage owner decisions (decided 2026-11-04)
 
 - **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
   no part of a source, measured).
+- **DO1a (2026-11-05):** a range together with `part: "metadata"` (or any part but
+  `source`) is refused before any request — as `sourceRangeOf` does; D20 applies it to compact
+  `HandlerGet`.
 - **DO2:** the source scans in kept tools are SAP-backed where D1 shows SAP states it,
   otherwise a plain line scanner.
+- **DO2a (2026-11-05):** through an adt-clients minor release (D22), service-binding facts'
+  exposed entities and `GetStructuresList`'s anonymous `.include` read SAP's element info;
+  `extend type` and `GetIncludesList`'s tree stay on plain scanners (SAP does not state them).
+- **D20 (2026-11-05):** compact `HandlerGet` takes the source range and the `outline` part.
 - **DO3:** the SRVD description stops promising a template.
 - **DO4:** the message-class reads before and after writes are added.
 - **DO5:** `validate_type` is removed.

@@ -444,6 +444,13 @@ on-premise system disagree, the live measurement holds.
 - **#17.** The description of `CreateFunctionGroup`'s `activate` is fixed.
 - **#18.** `DeleteServiceBinding` names the binding in its answer.
 - **#24.** A version list's 404 is read by its exception type and answers "not found".
+- **Owner decisions of 2026-11-05:** compact `HandlerGet` takes the source range
+  (`start_line`, `end_line`) and a part `outline` for the types `GetObjectOutline` serves
+  (plan D20); a range with any part but `source` is refused before any request; the
+  profiling and dumps explorer moves to adt-clients 43 (D21); service-binding facts' exposed
+  entities and `GetStructuresList`'s anonymous include read SAP's element info through an
+  adt-clients minor release, while `extend type` and `GetIncludesList`'s tree stay on plain
+  scanners (D22).
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

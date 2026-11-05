@@ -2167,29 +2167,35 @@ would mean editing all of them. The owner wants one module of ours as the only i
 **What the code shows (re-listed at Step 1).** The importers, by parse entry point (each
 parser instance or call path, not each file), with the options each uses today:
 
-| Entry point | Options today |
+| Entry point | Options today (every key set, as written at HEAD; unlisted keys are the parser's defaults) |
 | --- | --- |
-| `src/lib/strategies/reading.ts` `parseStructure` | attributes grouped under `@`, prefix `''`, no value parsing, no NS removal, `htmlEntities`, repeatables forced to arrays |
-| `src/lib/strategies/atcFindings.ts` | grouped `@`, no value parsing, NS prefixes removed |
-| `src/lib/strategies/packageSummary.ts` | grouped `@`, no value parsing, NS removed |
-| `src/lib/strategies/sqlPreview.ts` | grouped `@`, no value parsing, NS removed, `isArray` |
-| `src/lib/strategies/packageWalk.ts` | prefix `''`, no value parsing, values trimmed |
-| `src/lib/strategies/functionGroupStructure.ts` | prefix `''` (defaults otherwise) |
-| `src/lib/checkRunParser.ts` | prefix `@_` |
-| `src/lib/utils.ts` `parseValidationResponse` | prefix `@_` |
-| `src/lib/utils.ts` `parseActivationResponse` | prefix `@_`, attribute values coerced |
-| `src/lib/debugger/readings.ts` `parser` | prefix `''`, NS removed, no value parsing, no trimming, `isArray` |
-| `src/lib/debugger/readings.ts` `exceptionParser` | prefix `''`, NS removed, no value parsing, `isArray` |
-| `src/lib/debugger/amdpReadings.ts` | prefix `''`, NS removed, no value parsing, no trimming, `isArray` (no `htmlEntities`, recorded for D6) |
-| `src/lib/debugger/memoryReadings.ts` | prefix `''`, NS removed, no tag-value parsing, `isArray` |
-| `src/handlers/transport/readonly/handleGetTransport.ts` | prefix `''`, attribute values coerced, `isArray` |
-| `src/handlers/system/readonly/runtimePayloadParser.ts` | prefix `''` |
-| `src/handlers/system/readonly/handleRuntimeGetDumpById.ts` | prefix `''`, NS removed |
-| `src/handlers/system/readonly/handleGetTypeInfo.ts` | prefix `''`, no value parsing, no trimming, `isArray` |
-| `src/handlers/service_binding/high/serviceBindingPayloadUtils.ts` | prefix `''` |
-| `src/handlers/include/readonly/handleGetMainPrograms.ts` | prefix `@_`, `isArray` |
-| `src/lib/xml/ordered.ts` `isWellFormed`, `parseOrdered`, `buildOrdered` | ordered, prefix `''`, no value parsing, no trimming, **`processEntities: false`** (so `xmlPatch` keeps entities as written); the builder with `suppressEmptyNode` |
-| `tools/runtime-profiling-dumps-explorer.js`, `tools/debug-runtime-explorer.js` | prefix `@_`, `isArray` |
+| `src/lib/strategies/reading.ts` `parseStructure` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: false`, `htmlEntities: true`, `isArray` (its repeatable-name rule) |
+| `src/lib/strategies/atcFindings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: true` |
+| `src/lib/strategies/packageSummary.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: true` |
+| `src/lib/strategies/sqlPreview.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `isArray` (its rule), `removeNSPrefix: true` |
+| `src/lib/strategies/packageWalk.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseAttributeValue: false`, `parseTagValue: false`, `trimValues: true` |
+| `src/lib/strategies/functionGroupStructure.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''` |
+| `src/lib/checkRunParser.ts` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
+| `src/lib/utils.ts` `parseValidationResponse` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
+| `src/lib/utils.ts` `parseActivationResponse` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'`, `parseAttributeValue: true` |
+| `src/lib/debugger/readings.ts` `parser` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, `isArray` (its rule) |
+| `src/lib/debugger/readings.ts` `exceptionParser` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `isArray` (its rule) |
+| `src/lib/debugger/amdpReadings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, `isArray` (its rule); no `htmlEntities` (recorded for D6) |
+| `src/lib/debugger/memoryReadings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `ignoreDeclaration: true`, `isArray` (`snapshot`) |
+| `src/handlers/transport/readonly/handleGetTransport.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `textNodeName: '_text'`, `parseAttributeValue: true`, `isArray` (`tm:object`, `tm:task`, `object`, `task`) |
+| `src/handlers/system/readonly/runtimePayloadParser.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''` |
+| `src/handlers/system/readonly/handleRuntimeGetDumpById.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true` |
+| `src/handlers/system/readonly/handleGetTypeInfo.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseAttributeValue: false`, `parseTagValue: false`, `trimValues: false`, `isArray` (`doma:fixValue`, …) |
+| `src/handlers/service_binding/high/serviceBindingPayloadUtils.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''` |
+| `src/handlers/include/readonly/handleGetMainPrograms.ts` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
+| `src/lib/xml/ordered.ts` parser (`isWellFormed`, `parseOrdered`) | `preserveOrder: true`, `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, **`processEntities: false`** (so `xmlPatch` keeps entities as written), `cdataPropName: '#cdata'`, `commentPropName: '#comment'` |
+| `src/lib/xml/ordered.ts` builder (`buildOrdered`) | the parser's options plus `suppressEmptyNode: true` |
+| `tools/runtime-profiling-dumps-explorer.js` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
+| `tools/debug-runtime-explorer.js` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
+
+Step 1 re-reads every `new XMLParser(` and `new XMLBuilder(` in production at HEAD and makes
+this table option-for-option exact (the `isArray` rules written out in full) before any
+profile is named.
 
 These do not share one set of options, so no single profile can serve them, and decoding is
 not identical everywhere: the ordered round trip keeps entities on purpose.
@@ -2261,8 +2267,12 @@ not identical everywhere: the ordered round trip keeps entities on purpose.
     removed, forced arrays);
   - then the move to the module with its profile.
 
-  `tools/*.js` move the same way, with the truncation test; they are dev tools, so no answer
-  pin is needed.
+  `tools/*.js` move the same way, with the truncation test **and a pre-move pin**: a tool's
+  full answer needs SAP (each tool drives live reads), so its pin is on **what the parse
+  yields** — a captured corpus document of the kind the tool reads, parsed with the tool's
+  options before the move and with its profile after, the two results equal. Where the
+  tool's parse is inline, the step lifts it into a function of the tool so the pin can call
+  it.
 - [ ] **Step 5:** The guard passes, with only the module importing fast-xml-parser. Run
   `npm test`, `npm run test:check` and every package's `lint:check`: PASS. Mutate: add one
   direct import back in a handler and one `require` back in a tool; the guard goes red each

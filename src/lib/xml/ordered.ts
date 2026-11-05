@@ -19,7 +19,7 @@
  * name other than {@link ORDERED_ATTRIBUTES} holds its own list.
  */
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
-import { child, entries, listOf, text } from './tree';
+import { child, entries, isElement, isList, listOf, text } from './tree';
 
 /** The member of an ordered element that holds its attributes. */
 export const ORDERED_ATTRIBUTES = ':@';
@@ -109,4 +109,29 @@ export function orderedHoldsMarkup(content: readonly unknown[]): boolean {
   return content.some((member) =>
     entries(member).some(([name]) => name !== ORDERED_TEXT),
   );
+}
+
+/**
+ * The ordered form with `target` — a member found by {@link orderedElements} —
+ * replaced by `replacement`; every other member as it was.
+ */
+export function replaceOrderedMember(
+  members: readonly unknown[],
+  target: unknown,
+  replacement: readonly unknown[],
+): unknown[] {
+  return members.flatMap((member): unknown[] => {
+    if (member === target) return [...replacement];
+    if (!isElement(member)) return [member];
+    return [
+      Object.fromEntries(
+        entries(member).map(([name, content]) => [
+          name,
+          name !== ORDERED_ATTRIBUTES && isList(content)
+            ? replaceOrderedMember(content, target, replacement)
+            : content,
+        ]),
+      ),
+    ];
+  });
 }

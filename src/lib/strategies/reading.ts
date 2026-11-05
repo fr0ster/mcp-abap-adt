@@ -1,5 +1,6 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { attr, child, type Visit, walk } from '../xml/tree';
 
 /**
  * What a result strategy of ours answers.
@@ -89,6 +90,41 @@ export function parseStructure(document: unknown): unknown {
   } catch {
     return null;
   }
+}
+
+/** The attribute `name` of an element {@link parseStructure} answered (its attributes sit under `@`). */
+export function attributeOf(node: unknown, name: string): string | undefined {
+  return attr(child(node, '@'), name);
+}
+
+/**
+ * Every element and text member of a document {@link parseStructure} answered,
+ * at any depth, in document order ({@link walk}); attributes are not members.
+ */
+export function walkStructure(document: unknown): Visit[] {
+  return walk(document, ATTRIBUTES);
+}
+
+const ATTRIBUTES: ReadonlySet<string> = new Set(['@']);
+
+/** The members named `name` (as the document spells it), at any depth, in document order. */
+export function membersNamed(document: unknown, name: string): Visit[] {
+  return walkStructure(document).filter((visit) => visit.name === name);
+}
+
+/**
+ * The value of attribute `name` on the first element that carries it, in
+ * document order — an element before the ones it holds.
+ */
+export function firstAttribute(
+  document: unknown,
+  name: string,
+): string | undefined {
+  for (const visit of walkStructure(document)) {
+    const value = attributeOf(visit.node, name);
+    if (value !== undefined) return value;
+  }
+  return undefined;
 }
 
 /** `answer.data` as text, without pretending an object was ever a string. */

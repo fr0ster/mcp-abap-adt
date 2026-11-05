@@ -81,3 +81,38 @@ export function attr(value: unknown, name: string): string | undefined {
 export function entries(value: unknown): Array<[string, unknown]> {
   return isElement(value) ? Object.entries(value) : [];
 }
+
+/** A qualified name's local part: what follows its prefix, the name itself without one. */
+export function localName(qualified: string): string {
+  return qualified.slice(qualified.lastIndexOf(':') + 1);
+}
+
+/** A member met by {@link walk}: its name, its value, and the members it sits in, outermost first. */
+export interface Visit {
+  readonly name: string;
+  readonly node: unknown;
+  readonly path: readonly Visit[];
+}
+
+/**
+ * Every member at any depth under `value`, in document order: a member before
+ * what it holds, each item of a repeated member on its own. Members named in
+ * `leaves` (an attribute group, say) are met but not entered.
+ */
+export function walk(
+  value: unknown,
+  leaves: ReadonlySet<string> = new Set(),
+): Visit[] {
+  const met: Visit[] = [];
+  const enter = (node: unknown, path: readonly Visit[]): void => {
+    for (const [name, member] of entries(node)) {
+      for (const item of listOf(member)) {
+        const visit: Visit = { name, node: item, path };
+        met.push(visit);
+        if (!leaves.has(name)) enter(item, [...path, visit]);
+      }
+    }
+  };
+  enter(value, []);
+  return met;
+}

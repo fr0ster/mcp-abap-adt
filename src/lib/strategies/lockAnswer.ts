@@ -25,7 +25,8 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { attr, child, isList } from '../xml/tree';
+import { attr, child, childAt, isList, text } from '../xml/tree';
+import { parseStructure } from './reading';
 
 function headerValue(value: unknown): string {
   if (isList(value)) return String(value[0] ?? '').trim();
@@ -38,8 +39,14 @@ export function carriesLockHandle(
 ): boolean {
   // The answer is optional (`IAnalyse`); a wire answer's `headers` are not.
   if (headerValue(answer?.headers['sap-adt-lm-handle'])) return true;
-  const body = typeof answer?.data === 'string' ? answer.data : '';
-  return /<LOCK_HANDLE>\s*[^<\s][^<]*<\/LOCK_HANDLE>/.test(body);
+  const handle = childAt(
+    parseStructure(answer?.data),
+    'asx:abap',
+    'asx:values',
+    'DATA',
+    'LOCK_HANDLE',
+  );
+  return (text(handle) ?? '').trim() !== '';
 }
 
 export const analyseLock: IAnalyse<IAdtError> = (verdict, answer) => {

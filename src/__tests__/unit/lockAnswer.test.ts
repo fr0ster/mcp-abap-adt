@@ -5,6 +5,7 @@
  */
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { corpusBody } from '../../lib/adtCorpus';
 import { answer } from '../../lib/answer';
 import {
   analyseLock,
@@ -89,5 +90,27 @@ describe('analyseLock', () => {
       '<LOCK_HANDLE/>',
     );
     expect(carriesLockHandle(wireAnswer(empty))).toBe(false);
+  });
+
+  // The handle is read where adt-clients reads it, through the XML parser:
+  // `asx:abap/asx:values/DATA/LOCK_HANDLE`.
+  it('reads the handle of the recorded lock answer — tests/fixtures/adt/lock-success--01-lock.body.xml', () => {
+    expect(
+      carriesLockHandle(wireAnswer(corpusBody('lock-success--01-lock'))),
+    ).toBe(true);
+  });
+
+  it('reads a handle written as CDATA', () => {
+    const cdata = LOCKED.replace(
+      '4D88C06807F74D8FF36049093A5016DE',
+      '<![CDATA[4D88C06807F74D8FF36049093A5016DE]]>',
+    );
+    expect(carriesLockHandle(wireAnswer(cdata))).toBe(true);
+  });
+
+  it('does not take a LOCK_HANDLE outside asx:values/DATA for a handle — adt-clients reads none there', () => {
+    const elsewhere =
+      '<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><OTHER><LOCK_HANDLE>4D88</LOCK_HANDLE></OTHER></asx:values></asx:abap>';
+    expect(carriesLockHandle(wireAnswer(elsewhere))).toBe(false);
   });
 });

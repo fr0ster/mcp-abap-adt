@@ -9,8 +9,8 @@
  * declaration stays. What it does not keep: an empty element is written
  * self-closing (`<a></a>` becomes `<a/>`), an attribute is written in double
  * quotes with an apostrophe in its value as `&apos;` (the builder escapes
- * both quotes in every attribute value), and whitespace outside the root
- * element is dropped. Every document of the corpus (`tests/fixtures/adt`)
+ * both quotes in every attribute value), whitespace outside the root
+ * element is dropped, and a CR LF line end is read as LF (XML 1.0 §2.11). Every document of the corpus (`tests/fixtures/adt`)
  * builds back to its own bytes but for those apostrophes
  * (`src/__tests__/unit/xml/ordered.test.ts`).
  *
@@ -19,6 +19,7 @@
  * name other than {@link ORDERED_ATTRIBUTES} holds its own list.
  */
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
+import { child, entries, listOf, text } from './tree';
 
 /** The member of an ordered element that holds its attributes. */
 export const ORDERED_ATTRIBUTES = ':@';
@@ -51,4 +52,61 @@ export function parseOrdered(document: string): unknown {
 /** Members of the ordered form, written back as text. */
 export function buildOrdered(members: readonly unknown[]): string {
   return builder.build(members);
+}
+
+/** The text member of the ordered form. */
+export const ORDERED_TEXT = '#text';
+/** The CDATA member of the ordered form: a list holding its text member. */
+export const ORDERED_CDATA = '#cdata';
+
+/** An element of the ordered form: its name, the member it is, and its content. */
+export interface OrderedElement {
+  readonly name: string;
+  readonly member: unknown;
+  readonly content: readonly unknown[];
+}
+
+/** Every element of the ordered form at any depth, in document order: an element before what it holds. */
+export function orderedElements(members: unknown): OrderedElement[] {
+  const found: OrderedElement[] = [];
+  const visit = (list: unknown): void => {
+    for (const member of listOf(list)) {
+      for (const [name, content] of entries(member)) {
+        if (
+          name === ORDERED_ATTRIBUTES ||
+          name === ORDERED_TEXT ||
+          name === ORDERED_CDATA ||
+          name.startsWith('?') ||
+          name.startsWith('#')
+        ) {
+          continue;
+        }
+        found.push({ name, member, content: listOf(content) });
+        visit(content);
+      }
+    }
+  };
+  visit(members);
+  return found;
+}
+
+/** The text an element's content holds directly, as it came (entities kept). */
+export function orderedText(content: readonly unknown[]): string {
+  return content
+    .map((member) => text(child(member, ORDERED_TEXT)) ?? '')
+    .join('');
+}
+
+/** The CDATA an element's content holds directly, its sections joined. */
+export function orderedCdata(content: readonly unknown[]): string {
+  return content
+    .map((member) => orderedText(listOf(child(member, ORDERED_CDATA))))
+    .join('');
+}
+
+/** Whether an element's content holds anything but text: an element, CDATA, a comment. */
+export function orderedHoldsMarkup(content: readonly unknown[]): boolean {
+  return content.some((member) =>
+    entries(member).some(([name]) => name !== ORDERED_TEXT),
+  );
 }

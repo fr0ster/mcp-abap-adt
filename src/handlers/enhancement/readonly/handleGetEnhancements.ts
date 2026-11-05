@@ -36,7 +36,13 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
+import { includeContextUriOf } from '../../../lib/strategies/metadataFields';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
+import {
+  attributeOf,
+  parseStructure,
+  walkStructure,
+} from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
   carryingFailure,
@@ -45,7 +51,7 @@ import {
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
-import { elements, isList } from '../../../lib/xml/tree';
+import { child, elements, entries, isList, text } from '../../../lib/xml/tree';
 
 /**
  * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
@@ -169,6 +175,12 @@ export interface EnhancementResponse {
   unreadable?: FailureEntry[];
 }
 
+/** The first attribute of `node` whose name ends in `suffix` (`name` takes `enh:full_name` too). */
+function endingIn(node: unknown, suffix: string): string | undefined {
+  const found = entries(child(node, '@')).find(([key]) => key.endsWith(suffix));
+  return found ? attributeOf(node, found[0]) : undefined;
+}
+
 /**
  * Parses enhancement XML to extract enhancement implementations with their source code
  * @param xmlData - Raw XML response from ADT
@@ -180,100 +192,58 @@ export function parseEnhancementsFromXml(
   const enhancements: EnhancementImplementation[] = [];
 
   try {
-    // Extract <enh:source> elements which contain the base64 encoded enhancement source code
-    const sourceRegex = /<enh:source[^>]*>([^<]*)<\/enh:source>/g;
-    let match: RegExpExecArray | null = sourceRegex.exec(xmlData);
-    let index = 0;
-
-    while (match !== null) {
+    // Every <enh:source>, in document order, read through the XML parser:
+    // its text (CDATA included) is the base64 encoded source code.
+    const sources = walkStructure(parseStructure(xmlData)).filter(
+      ({ name }) => name === 'enh:source',
+    );
+    sources.forEach((source, index) => {
       const enhancement: EnhancementImplementation = {
         name: `enhancement_${index + 1}`, // Default name if not found in attributes
         type: 'enhancement',
       };
 
-      // Try to find enhancement name and type from parent elements or attributes
-      const sourceStart = match.index;
-
-      // Look backwards for parent enhancement element with name/type attributes
-      const beforeSource = xmlData.substring(0, sourceStart);
-
-      // Try multiple patterns to find enhancement name
-      // Pattern 1: adtcore:name attribute
-      let enhNameMatch = beforeSource.match(/adtcore:name="([^"]*)"[^>]*$/);
-      // Pattern 2: enh:name attribute
-      if (!enhNameMatch) {
-        enhNameMatch = beforeSource.match(/enh:name="([^"]*)"[^>]*$/);
-      }
-      // Pattern 3: name attribute
-      if (!enhNameMatch) {
-        enhNameMatch = beforeSource.match(/name="([^"]*)"[^>]*$/);
-      }
-      // Pattern 4: Look for enhancement implementation name in nearby elements
-      if (!enhNameMatch) {
-        // Look for enhancement implementation tag with name
-        const enhImplMatch = beforeSource.match(
-          /<[^>]*enhancement[^>]*name="([^"]*)"[^>]*>/i,
-        );
-        if (enhImplMatch?.[1]) {
-          enhNameMatch = [enhImplMatch[0], enhImplMatch[1]];
-        }
-      }
-
-      // Try multiple patterns to find enhancement type
-      let enhTypeMatch = beforeSource.match(/adtcore:type="([^"]*)"[^>]*$/);
-      if (!enhTypeMatch) {
-        enhTypeMatch = beforeSource.match(/enh:type="([^"]*)"[^>]*$/);
-      }
-      if (!enhTypeMatch) {
-        enhTypeMatch = beforeSource.match(/type="([^"]*)"[^>]*$/);
-      }
-
-      if (enhNameMatch?.[1]) {
-        enhancement.name = enhNameMatch[1];
-      }
-      if (enhTypeMatch?.[1]) {
-        enhancement.type = enhTypeMatch[1];
-      }
-
       // The implementation a source sits in names it. Every source nests in
       // `enh:enhancementImplementations adtcore:name="…"`, so the nearest one
-      // opened before this source is its own — the patterns above searched
-      // the whole preceding document and took its FIRST name, which named
-      // all five of SAPMV45A's implementations after the first (on premise,
-      // 2026-09-25). They stay as the fallback for a document without it.
-      const owners = beforeSource.match(
-        /<enh:enhancementImplementations\b[^>]*>/g,
-      );
-      const owner = owners?.[owners.length - 1];
-      if (owner) {
-        const ownerName = owner.match(/adtcore:name="([^"]*)"/)?.[1];
-        const ownerType = owner.match(/adtcore:type="([^"]*)"/)?.[1];
-        if (ownerName) enhancement.name = ownerName;
-        if (ownerType) enhancement.type = ownerType;
-      }
+      // around it is its own — a search of the whole preceding document took
+      // its FIRST name, which named all five of SAPMV45A's implementations
+      // after the first (on premise, 2026-09-25). For a document without it,
+      // the element the source sits in names it, else the nearest enclosing
+      // element whose name says enhancement.
+      const around = [...source.path].reverse();
+      const owner = around.find(
+        ({ name }) => name === 'enh:enhancementImplementations',
+      )?.node;
+      const parent = around[0]?.node;
+      const named = around.find(
+        ({ name, node }) =>
+          name.toLowerCase().includes('enhancement') &&
+          endingIn(node, 'name') !== undefined,
+      )?.node;
+      const name =
+        attributeOf(owner, 'adtcore:name') ??
+        attributeOf(parent, 'adtcore:name') ??
+        attributeOf(parent, 'enh:name') ??
+        endingIn(parent, 'name') ??
+        endingIn(named, 'name');
+      const type =
+        attributeOf(owner, 'adtcore:type') ??
+        attributeOf(parent, 'adtcore:type') ??
+        attributeOf(parent, 'enh:type') ??
+        endingIn(parent, 'type');
+      if (name) enhancement.name = name;
+      if (type) enhancement.type = type;
 
-      // Extract and decode the base64 source code
-      const base64Source = match[1];
+      // Decode the base64 source code
+      const base64Source = text(source.node) ?? '';
       if (base64Source) {
-        try {
-          // Decode base64 source code
-          const decodedSource = Buffer.from(base64Source, 'base64').toString(
-            'utf-8',
-          );
-          enhancement.sourceCode = decodedSource;
-        } catch (decodeError) {
-          logger?.warn(
-            `Failed to decode source code for enhancement ${enhancement.name}:`,
-            decodeError,
-          );
-          enhancement.sourceCode = base64Source; // Keep original if decode fails
-        }
+        enhancement.sourceCode = Buffer.from(base64Source, 'base64').toString(
+          'utf-8',
+        );
       }
 
       enhancements.push(enhancement);
-      index++;
-      match = sourceRegex.exec(xmlData);
-    }
+    });
 
     logger?.info(`Parsed ${enhancements.length} enhancement implementations`);
     return enhancements;
@@ -409,9 +379,7 @@ async function determineObjectTypeAndPath(
       context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
       mainProgram = manualProgramContext;
     } else {
-      context = metadata.match(
-        /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
-      )?.[1];
+      context = includeContextUriOf(metadata);
       mainProgram = context ? mainProgramOf(context) : undefined;
     }
     if (!context || !mainProgram) {
@@ -1273,9 +1241,7 @@ function pathFromAnswers(
       context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
       mainProgram = manualProgramContext;
     } else {
-      context = metadata.match(
-        /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
-      )?.[1];
+      context = includeContextUriOf(metadata);
       mainProgram = context ? mainProgramOf(context) : undefined;
     }
     if (!context || !mainProgram) {

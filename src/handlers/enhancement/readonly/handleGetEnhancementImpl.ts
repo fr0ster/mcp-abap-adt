@@ -7,6 +7,13 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { carryingFailure } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
+import {
+  orderedCdata,
+  orderedElements,
+  orderedHoldsMarkup,
+  orderedText,
+  parseOrdered,
+} from '../../../lib/xml/ordered';
 import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
 
 /**
@@ -72,44 +79,32 @@ export interface EnhancementByNameResponse {
  * @returns Decoded source code
  */
 function parseEnhancementSourceFromXml(xmlData: string): string {
-  try {
-    // Look for source code in various possible formats
+  // The answer in its order (`xml/ordered`), so a source written as base64
+  // text and one written as CDATA are told apart; a body that is not XML —
+  // the plugin's source as text — has no source element and is answered as
+  // it is.
+  const sources = orderedElements(parseOrdered(xmlData)).filter(
+    ({ name }) => name === 'source' || name === 'enh:source',
+  );
 
-    // Try to find base64 encoded source in <source> or similar tags
-    const base64SourceRegex =
-      /<(?:source|enh:source)[^>]*>([^<]*)<\/(?:source|enh:source)>/;
-    const base64Match = xmlData.match(base64SourceRegex);
-
-    if (base64Match?.[1]) {
-      try {
-        // Decode base64 source code
-        const decodedSource = Buffer.from(base64Match[1], 'base64').toString(
-          'utf-8',
-        );
-        return decodedSource;
-      } catch (decodeError) {
-        logger?.warn('Failed to decode base64 source code:', decodeError);
-      }
-    }
-
-    // Try to find plain text source code
-    const textSourceRegex =
-      /<(?:source|enh:source)[^>]*>\s*<!\[CDATA\[(.*?)\]\]>\s*<\/(?:source|enh:source)>/s;
-    const textMatch = xmlData.match(textSourceRegex);
-
-    if (textMatch?.[1]) {
-      return textMatch[1];
-    }
-
-    // If no specific source tags found, return the entire XML as fallback
-    logger?.warn(
-      'Could not find source code in expected format, returning raw XML',
-    );
-    return xmlData;
-  } catch (parseError) {
-    logger?.error('Failed to parse enhancement source XML:', parseError);
-    return xmlData; // Return raw XML as fallback
+  // A source written as base64 text: the first that holds text alone.
+  const base64 = sources.find(
+    ({ content }) =>
+      !orderedHoldsMarkup(content) && orderedText(content) !== '',
+  );
+  if (base64) {
+    return Buffer.from(orderedText(base64.content), 'base64').toString('utf-8');
   }
+
+  // A source written as plain text in CDATA: the first that holds some.
+  const cdata = sources.find(({ content }) => orderedCdata(content) !== '');
+  if (cdata) return orderedCdata(cdata.content);
+
+  // No source element: the answer is the source itself.
+  logger?.warn(
+    'Could not find source code in expected format, returning raw XML',
+  );
+  return xmlData;
 }
 
 /**

@@ -50,6 +50,11 @@ describe('the ordered round trip', () => {
     expect(buildOrdered(isList(parsed) ? parsed : [])).toBe(body);
   });
 
+  it('reads a CR LF line end as LF, as XML does', () => {
+    const parsed = parseOrdered('<a>x\r\ny</a>');
+    expect(buildOrdered(isList(parsed) ? parsed : [])).toBe('<a>x\ny</a>');
+  });
+
   it('answers null for a body that is empty', () => {
     expect(parseOrdered('')).toBeNull();
     expect(parseOrdered('  ')).toBeNull();

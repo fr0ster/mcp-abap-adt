@@ -127,6 +127,22 @@ export function firstAttribute(
   return undefined;
 }
 
+/**
+ * The value of attribute `name` on the first element named `element` (as the
+ * document spells it) that carries it, in document order.
+ */
+export function firstAttributeOn(
+  document: unknown,
+  element: string,
+  name: string,
+): string | undefined {
+  for (const { node } of membersNamed(document, element)) {
+    const value = attributeOf(node, name);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
 /** `answer.data` as text, without pretending an object was ever a string. */
 export function rawOf(answer: IAdtWireResponse): string {
   const body = answer.data;

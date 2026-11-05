@@ -5,27 +5,19 @@
  */
 import {
   attributeOf,
+  firstAttributeOn,
   membersNamed,
   parseStructure,
   walkStructure,
 } from './reading';
 
-/** The attribute `name` of the first element named `element` that carries it. */
-function firstOn(
-  document: string,
-  element: string,
-  name: string,
-): string | undefined {
-  for (const { node } of membersNamed(parseStructure(document), element)) {
-    const value = attributeOf(node, name);
-    if (value !== undefined) return value;
-  }
-  return undefined;
-}
-
 /** The package an object sits in: its `adtcore:packageRef`'s `adtcore:name`. */
 export function packageRefNameOf(metadata: string): string | undefined {
-  return firstOn(metadata, 'adtcore:packageRef', 'adtcore:name');
+  return firstAttributeOn(
+    parseStructure(metadata),
+    'adtcore:packageRef',
+    'adtcore:name',
+  );
 }
 
 /**
@@ -41,7 +33,11 @@ export function classIncludeTypesOf(metadata: string): string[] {
 
 /** An include's main program: its `include:contextRef`'s `adtcore:uri`. */
 export function includeContextUriOf(metadata: string): string | undefined {
-  return firstOn(metadata, 'include:contextRef', 'adtcore:uri');
+  return firstAttributeOn(
+    parseStructure(metadata),
+    'include:contextRef',
+    'adtcore:uri',
+  );
 }
 
 /** The object types a where-used scope offers: each `usagereferences:type`'s `name`, in order. */

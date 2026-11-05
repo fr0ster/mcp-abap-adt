@@ -1480,7 +1480,8 @@ and function group answers are identical to the on-premise ones.
   `FUGR/I`. On premise only (the trial has no program). Where-used of the fresh include
   (`usageReferences`) answered `200` with no result; Inference: the where-used index did not
   yet hold the new include.
-- **(b) A structure's `include` — SAP states it; `extend type` — not seen.**
+- **(b) A structure's `include` — SAP states it; `extend type` — not seen.** *(Superseded by D22's
+  later measurement: element info lists an append as `.append`.)*
   `GET /sap/bc/adt/ddic/elementinfo?path={structure}` (Accept
   `application/vnd.sap.adt.elementinfo+xml`) answers the components in order: an element
   `adtcore:type="TABL/DS" adtcore:name=".include"` with property `ddicIncludeName` and the
@@ -2385,40 +2386,69 @@ members that adt-clients 43 removed: `listProfilerTraceFiles`,
 
 ### D22. DO2 through adt-clients: the element-info readings (owner)
 
-**Decision.** The owner approved an adt-clients release (minor) for two of DO2's source
-scans. Measured in D1 / D6: SAP's element info states a structure's components and a service
-definition's exposed entities, but not which include a name comes from, and an
-`extend type` was not seen. So:
-- moved onto SAP: service-binding facts' exposed entities (name, URI, alias), and
-  `GetStructuresList`'s anonymous `.include`;
-- staying on the plain scanners: `extend type`, and `GetIncludesList`'s tree.
+**Measured (the adt-clients half of D22, on both systems), superseding D1's "extend type —
+not seen":**
+- A structure's element info lists an append (`extend type`) as `.append`, with its include
+  name and fields.
+- A named include (`_x : include s`) comes back as `.include` exactly like an anonymous one,
+  with no group name.
+- A service definition's exposed entities do not come back in source order.
+- An unknown name answers `200` with an empty element info (no name).
 
-**adt-clients (cross-repository, minor; the owner releases):**
-- one member per endpoint, from D1's measured contract:
-  - `GET /sap/bc/adt/ddic/elementinfo?path=<structure>`;
-  - `GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>`;
-- their structured readings in adt-strategies;
-- tests per member: the request (URL with its query, Accept) and a reading of a captured
-  answer.
+**Released:** adt-clients 43.1.0, adt-strategies 0.20.0, adt-clients-legacy 0.7.2. The members
+are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
+(`GET /sap/bc/adt/ddic/elementinfo?path=<structure>`,
+`GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>`). The readers are
+`readStructureElementInfo` / `structureElementInfo` and `readServiceDefinitionElementInfo` /
+`serviceDefinitionElementInfo`.
+
+**Owner decisions (2026-11-05):**
+1. **Service-binding facts' exposed entities** (name, URI, alias) come from the service
+   definition's element info.
+2. **`GetStructuresList` returns every include SAP states** — anonymous, named and appends
+   (`extend type`, read as `.append`) — as element info gives them. It returns the structure
+   and does not filter out named includes; the model narrows further if it needs to. This
+   changes `GetStructuresList`'s answer: CHANGELOG (Changed), MIGRATION-24.0, and its
+   description, kept functional. The plain scanners for the DDL `include` and for
+   `extend type` go away.
+3. **Only `GetIncludesList`'s tree stays on the plain scanner**, for the measured reason (SAP
+   does not state which include names which).
+4. **Pins:** service-definition entities are compared as a set (SAP's order is not the
+   source's). An unknown name (empty element info) is answered as absent — not found — and
+   never read as an empty structure or an empty entity list.
 
 **In #346 (red first):**
-- [ ] **Step 1: Red tests before the move.**
-  - **Request pins, red:** the service-binding facts' reading sends
-    `GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>` and
-    `GetStructuresList` sends `GET /sap/bc/adt/ddic/elementinfo?path=<structure>` (with the
-    Accept D1 measured). They fail today (the readings scan the source).
-  - **Answer pins:** today's answers on corpus documents — the exposed entities with name,
-    URI and alias, and the structure's included components — recorded now; after the move
-    they must stay equal.
-- [ ] **Step 2:** After the release, bump adt-clients and adt-strategies from the registry (a
-  registry range; `npm install` regenerates the lockfile; check for `"link": true` and
-  non-registry entries).
-- [ ] **Step 3:** Move the two readings onto the new members. The request pins of Step 1 turn
-  green, and the answer pins stay green: the same answers.
-- [ ] **Step 4: Live cases on both systems:** the exposed entities of a service definition the
-  test creates (C14's fixtures), and the components of a structure with an anonymous
-  include (a shared or test-made structure).
-- [ ] **Step 5:** CHANGELOG (Changed: read from SAP's element info). Commit.
+- [ ] **Step 1: Red tests.**
+  - **Request pins:** the service-binding facts' reading sends the service-definition
+    element-info GET, and `GetStructuresList` sends the structure element-info GET (URL
+    with `path`, Accept as the released member sends). Red today: the readings scan the
+    source.
+  - **Service-binding facts, answer pin as a set:** today's exposed entities (name, URI,
+    alias) on a corpus document, recorded now; after the move the same set, in any order.
+  - **`GetStructuresList`, new answers:** over captured element-info answers — an anonymous
+    include, a named include (`_x : include s`, listed like the anonymous one) and an append
+    (`.append`, with its include name and fields) are each in the answer, and nothing is
+    filtered out. Red today: the scanner misses the named include's and the append's
+    reading as element info states it.
+  - **Unknown names:** an empty element info answers "not found" for `GetStructuresList` and
+    for the service-binding facts — never an empty structure or list.
+- [ ] **Step 2:** Bump adt-clients to 43.1.0 and adt-strategies to 0.20.0 (adt-clients-legacy to
+  0.7.2 where the server uses it) from the registry, as registry ranges; `npm install`
+  regenerates the lockfile; check it for `"link": true` and non-registry entries. Run build,
+  `test:check` and the root `npm test`.
+- [ ] **Step 3:** Move the readings onto the members and readers above; delete the DDL
+  `include` and `extend type` scanners (and their D6 plain-code versions). Step 1 goes green.
+- [ ] **Step 4:** `GetStructuresList`'s description states what it answers (every include of
+  the structure SAP states: anonymous, named, appends) — a description test. CHANGELOG
+  (Changed: read from SAP's element info; `GetStructuresList` lists every stated include)
+  and MIGRATION-24.0 (`GetStructuresList` now lists named includes and appends too).
+- [ ] **Step 5: Live cases on both systems:**
+  - the exposed entities of a service definition the test creates (C14's fixtures),
+    compared as a set;
+  - a structure the test creates with an anonymous include, a named include and (where the
+    system allows) an append: all three are listed;
+  - an unknown structure name answers not found.
+- [ ] **Step 6:** Commit.
 
 ### Defect-stage owner decisions (decided 2026-11-04)
 
@@ -2429,9 +2459,12 @@ definition's exposed entities, but not which include a name comes from, and an
   `HandlerGet`.
 - **DO2:** the source scans in kept tools are SAP-backed where D1 shows SAP states it,
   otherwise a plain line scanner.
-- **DO2a (2026-11-05):** through an adt-clients minor release (D22), service-binding facts'
-  exposed entities and `GetStructuresList`'s anonymous `.include` read SAP's element info;
-  `extend type` and `GetIncludesList`'s tree stay on plain scanners (SAP does not state them).
+- **DO2a (2026-11-05):** through adt-clients 43.1.0 / adt-strategies 0.20.0 (D22), service-binding
+  facts' exposed entities and every include of `GetStructuresList` — anonymous, named and
+  appends (`extend type`) — read SAP's element info; `GetStructuresList` lists all of them
+  (a changed answer, MIGRATION). Only `GetIncludesList`'s tree stays on a plain scanner (SAP
+  does not state which include names which). Entities compare as a set; an unknown name is
+  not found.
 - **D20 (2026-11-05):** compact `HandlerGet` takes the source range and the `outline` part.
 - **DO3:** the SRVD description stops promising a template.
 - **DO4:** the message-class reads before and after writes are added.

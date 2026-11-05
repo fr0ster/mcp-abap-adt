@@ -448,9 +448,10 @@ on-premise system disagree, the live measurement holds.
   (`start_line`, `end_line`) and a part `outline` for the types `GetObjectOutline` serves
   (plan D20); a range with any part but `source` is refused before any request; the
   profiling and dumps explorer moves to adt-clients 43 (D21); service-binding facts' exposed
-  entities and `GetStructuresList`'s anonymous include read SAP's element info through an
-  adt-clients minor release, while `extend type` and `GetIncludesList`'s tree stay on plain
-  scanners (D22).
+  entities and every include `GetStructuresList` lists — anonymous, named and appends
+  (`extend type`) — read SAP's element info (adt-clients 43.1.0, adt-strategies 0.20.0), and
+  `GetStructuresList` lists all of them, a changed answer recorded in MIGRATION; only
+  `GetIncludesList`'s tree stays on a plain scanner (D22).
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

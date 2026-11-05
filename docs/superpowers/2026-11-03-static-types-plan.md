@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D18 (spec §9), then C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D19 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -2157,6 +2157,83 @@ Each with a description test (`src/__tests__/unit/descriptions/…`):
   aggregated call tree (procedure-like entries), as the request's Accept header selects it.
 - [ ] CHANGELOG (Fixed: descriptions). Commit.
 
+### D19. One XML module (owner)
+
+**Why.** fast-xml-parser's lenient parse closes unclosed tags, so a truncated SAP answer reads
+as a valid partial document. Today only `xmlPatch` validates first. Nineteen production
+files of the server import fast-xml-parser directly, so changing the parser would mean
+editing all of them. The owner wants one module of ours as the only importer.
+
+**What the code shows (at the time of writing; re-listed at Step 1).**
+- `src/`: `src/lib/xml/ordered.ts`, `src/lib/utils.ts`, `src/lib/checkRunParser.ts`,
+  `src/lib/strategies/{reading,atcFindings,functionGroupStructure,packageSummary,packageWalk,sqlPreview}.ts`,
+  `src/lib/debugger/{readings,memoryReadings,amdpReadings}.ts`,
+  `src/handlers/include/readonly/handleGetMainPrograms.ts`,
+  `src/handlers/service_binding/high/serviceBindingPayloadUtils.ts`,
+  `src/handlers/system/readonly/{handleGetTypeInfo,handleRuntimeGetDumpById,runtimePayloadParser}.ts`,
+  `src/handlers/transport/readonly/handleGetTransport.ts`.
+- `tools/`: `debug-runtime-explorer.js`, `runtime-profiling-dumps-explorer.js`.
+- The sub-packages import none today. D4's readers come onto `parseStructure`
+  (`strategies/reading.ts`) first, so they move with it.
+
+**Files:**
+- Create: in `src/lib/xml/` (beside `ordered.ts` and `tree.ts`), `src/lib/xml/parse.ts` (or the
+  module's index), the one importer of fast-xml-parser in production code, exporting:
+  - `parseXmlStrict(text: string): XmlDocument` — validates with `XMLValidator` first, then
+    parses. It refuses a document that is not well-formed with a typed error,
+    `MalformedXmlError` (the validator's line and code; never the document's text).
+  - the ordered parse and build that `ordered.ts` does today, with the same strict
+    validation before the ordered parse;
+  - `buildXml(…)`, the builder `xmlPatch` and the writers use.
+
+  Each export's options are fixed in the module, entity decoding included
+  (`processEntities`, `htmlEntities`). The AMDP reader's missing `htmlEntities`, recorded for
+  D6, is folded in here: every reader gets the same decoding.
+- Modify: every file listed above, to import from the module only; `parseStructure` becomes a
+  reader over `parseXmlStrict`.
+- Test:
+  - `src/__tests__/unit/sources/oneXmlModule.test.ts`, the guard;
+  - `src/__tests__/unit/xml/strictParse.test.ts`;
+  - one truncated-document case per moved reader, beside each reader's existing tests.
+
+**Steps:**
+- [ ] **Step 1: The guard, red.** `oneXmlModule.test.ts` walks every git-tracked production
+  file of every package (`src`, the sub-packages, `scripts`, `tools`; `.ts`, `.js`, `.mjs`,
+  `.cjs` outside `__tests__`) with the compiler API. It refuses any `import … from
+  'fast-xml-parser'`, `import('fast-xml-parser')` or `require('fast-xml-parser')` outside the
+  module. There is no allowlist beyond the module itself.
+  - Fixtures prove the guard: a direct `import` is refused, a `require` in a `.cjs` script is
+    refused, and an import through the module passes.
+  - Run it: it fails, naming today's importers. Record the list in this task.
+- [ ] **Step 2: The module, tests first** (`strictParse.test.ts`):
+  - a well-formed corpus document parses as before;
+  - a truncated one (cut mid-element) and an unclosed tag are each refused with
+    `MalformedXmlError`, carrying no document text;
+  - an entity-bearing text (`&lt;`, `&amp;`, a numeric reference, an HTML entity) decodes the
+    same through every export;
+  - the ordered parse and the builder round-trip a corpus document byte for byte where the
+    writers rely on it (xmlPatch's existing tests).
+- [ ] **Step 3: Move the readers, one per commit or per area.** For each file in the list:
+  - first a failing test: a **truncated** corpus document of the kind it reads is refused
+    (the call answers a parse failure, not a partial reading);
+  - then a pin that a normal corpus document gives **the same answer as before** (the answer
+    compared with the one recorded before the move);
+  - then the move to the module.
+
+  `tools/*.js` move the same way: their readings over a truncated document refuse. They are
+  dev tools, so the guard covers them, but no answer pin is needed.
+- [ ] **Step 4:** The guard passes, with only the module importing fast-xml-parser. Run
+  `npm test`, `npm run test:check` and every package's `lint:check`: PASS. Mutate: add one
+  direct import back in a handler and one `require` back in a tool; the guard goes red each
+  time; revert.
+- [ ] **Step 5:** CHANGELOG (Fixed): "A malformed or truncated XML answer is refused instead of
+  read as a partial document." Commit.
+
+**Later work, out of scope (recorded in the PR description at step 20):**
+- the same wrapper in adt-clients and adt-strategies, which use fast-xml-parser too;
+- a possible switch to `@xmldom/xmldom` with a strict wrapper, as auth-providers does. After
+  D19, that switch is a one-module change.
+
 ### Defect-stage owner decisions (decided 2026-11-04)
 
 - **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
@@ -2914,7 +2991,8 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     Then run Codex review and CI, and get the owner's review.
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
     PR description: the owner's decisions (O1–O12), the exceptions the owner granted (none so
-    far), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
+    far), D19's later work (the XML wrapper in adt-clients and adt-strategies; a possible
+    switch to `@xmldom/xmldom`), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
     unidentifiable leftover fails its case and is named by its description), the accepted
     residual of launched servers (C2 Step 4a: one follow-up request a child
     server may still send inside a refused call), the measured transport delete path, the per-system run counts and the config

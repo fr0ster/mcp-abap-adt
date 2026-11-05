@@ -398,6 +398,9 @@ on-premise system disagree, the live measurement holds.
   its T100 key (message class and number) and its type. Neither a regex nor a substring is
   applied to its text. Where SAP gives no key, the structured verdict decides, and SAP's
   text is relayed as it is.
+- **One XML module (owner, plan D19).** Only `src/lib/xml/` imports the parser; it validates
+  before parsing, so a truncated or malformed answer is refused, and its options are fixed
+  in one place.
 - **XML is parsed by a library.** That means fast-xml-parser through the existing
   `parseStructure`, or adt-clients' structured readings. There are no hand-rolled parsers.
 - **No regular expression in production code.** This covers every package's `src`, plus

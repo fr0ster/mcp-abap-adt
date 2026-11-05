@@ -630,7 +630,7 @@ try {
         variant,
         'the checks ran to their end',
         false,
-        String(error?.message ?? error).split('\n')[0],
+        String(error?.message ?? error),
       );
     }
     cleanup();

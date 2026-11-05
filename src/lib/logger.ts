@@ -6,7 +6,7 @@
  * interfere with MCP's JSON-RPC communication.
  */
 
-import { child, childAt, entries } from './xml/tree';
+import { entries } from './xml/tree';
 
 /**
  * What a log line spreads of its data: an object's own members; a value
@@ -92,70 +92,8 @@ function createLogFn(level: string) {
       return; // Suppress all logging in stdio mode
     }
 
-    // Check if this is an expected validation/creation error (should be suppressed)
-    if (level === 'ERROR' && child(data, 'status') === 400) {
-      // Check if it's an expected error type (validation or resource already exists)
-      const url = String(child(data, 'url') || '');
-      const body = child(data, 'data');
-      const dataStr =
-        typeof body === 'string' ? body : body ? safeStringify(body) : '';
-      const responseData = childAt(data, 'response', 'data') || '';
-      const allData = dataStr + String(responseData);
-
-      // Check if it's a validation endpoint OR an expected error type
-      const isValidationEndpoint =
-        url.includes('/validation/objectname') || url.includes('/validation/');
-      const isExpectedError =
-        allData.includes('InvalidClifName') ||
-        allData.includes('ExceptionResourceAlreadyExists') ||
-        allData.includes('ResourceAlreadyExists') ||
-        allData.includes('InvalidObjName') ||
-        allData.includes('does already exist');
-
-      if (isValidationEndpoint || isExpectedError) {
-        // Suppress expected errors - only log if debug is enabled
-        const debugEnabled =
-          process.env.DEBUG_CONNECTORS === 'true' ||
-          process.env.DEBUG_TESTS === 'true' ||
-          process.env.DEBUG_ADT_TESTS === 'true';
-        if (!debugEnabled) {
-          return; // Suppress expected errors
-        }
-      }
-    }
-
-    // Also check AxiosError format (second ERROR log format)
-    if (
-      level === 'ERROR' &&
-      child(data, 'name') === 'AxiosError' &&
-      child(data, 'status') === 400
-    ) {
-      const responseData = childAt(data, 'response', 'data') || '';
-      const allData =
-        typeof responseData === 'string'
-          ? responseData
-          : safeStringify(responseData);
-
-      // Check if it's an expected error type
-      const isExpectedError =
-        allData.includes('InvalidClifName') ||
-        allData.includes('ExceptionResourceAlreadyExists') ||
-        allData.includes('ResourceAlreadyExists') ||
-        allData.includes('InvalidObjName') ||
-        allData.includes('does already exist');
-
-      if (isExpectedError) {
-        // Suppress expected errors - only log if debug is enabled
-        const debugEnabled =
-          process.env.DEBUG_CONNECTORS === 'true' ||
-          process.env.DEBUG_TESTS === 'true' ||
-          process.env.DEBUG_ADT_TESTS === 'true';
-        if (!debugEnabled) {
-          return; // Suppress expected errors
-        }
-      }
-    }
-
+    // No line is judged by what SAP said in it: every level, ERROR
+    // included, is written only in debug mode, and every line then.
     // All log levels (including ERROR) require DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS to be enabled
     // This prevents verbose error logs from appearing in test output when debug is not enabled
     const debugEnabled =

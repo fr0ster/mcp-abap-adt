@@ -216,7 +216,7 @@ try {
     const run = spawnSync(bin, ['--version'], { env, encoding: 'utf8' });
     if (run.error || run.status !== 0) {
       const why = run.error
-        ? String(run.error.message).split('\n')[0]
+        ? String(run.error.message)
         : `exit ${run.status}: ${String(run.stderr).trim().split('\n')[0]}`;
       check(`${server.name} --version`, false, `did not run: ${why}`);
       continue;
@@ -265,7 +265,7 @@ try {
       check(
         `${server.name} MCP session`,
         false,
-        `${String(error.message).split('\n')[0]}${last ? ` (stderr: ${last})` : ''}`,
+        `${String(error.message)}${last ? ` (stderr: ${last})` : ''}`,
       );
       await client.close().catch(() => {});
     }

@@ -30,12 +30,14 @@ import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
+  readExceptionRefusal,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { hasT100Key, type T100Key } from '../../../lib/messageKeys';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -167,18 +169,25 @@ export async function handleCreateFunctionGroup(
 }
 
 /**
- * ADT's one refusal that can accompany a successful create.
+ * ADT's one refusal that can accompany a successful create: the generated
+ * interface include was not created, "Interface SAPL<group> has not been
+ * created" (`400`).
  *
- * Matched on the message because that is where ADT puts it — the status is
- * 400 for a dozen unrelated reasons, and the `exc:exception` type id is the
- * generic one. Both fragments are required so that a message mentioning only
- * one of them does not trigger a read-back that would answer a different
- * question.
+ * Recognised by its T100 key, whatever the logon language words it: the
+ * status is `400` for a dozen unrelated reasons and the `exc:exception` type
+ * is the generic one. T100 holds this message under two keys of class `EC`,
+ * `304` and `408` (on premise, 2026-11-05); either is this refusal.
  */
-function isInterfaceNotCreated(error: { message?: string }): boolean {
-  const message = error?.message ?? '';
+const INTERFACE_NOT_CREATED_KEYS: readonly T100Key[] = [
+  { id: 'EC', no: '304' },
+  { id: 'EC', no: '408' },
+];
+
+function isInterfaceNotCreated(error: IAdtError): boolean {
+  const refusal = readExceptionRefusal(error.response?.data);
   return (
-    message.includes('Interface SAPL') &&
-    message.includes('has not been created')
+    refusal?.messages.some((message) =>
+      hasT100Key(message, INTERFACE_NOT_CREATED_KEYS),
+    ) ?? false
   );
 }

@@ -76,7 +76,6 @@ function getRequiredEnv(name) {
 function parseAdtException(error) {
   const raw = error?.response?.data;
   if (typeof raw !== 'string') return null;
-  if (!raw.includes('<exc:exception')) return null;
   try {
     const parsed = xmlParser.parse(raw);
     const exc = parsed?.['exc:exception'];
@@ -95,25 +94,20 @@ function parseAdtException(error) {
   }
 }
 
+/** An existing object, by the error's code or the exception type SAP names (never its words). */
 function isAlreadyExistsError(error) {
-  const status = error?.response?.status;
-  const payload = String(error?.response?.data || error?.message || '');
   return (
     error?.code === AdtObjectErrorCodes.VALIDATION_FAILED ||
-    (status === 400 &&
-      (payload.includes('ExceptionResourceAlreadyExists') ||
-        payload.includes('already exist') ||
-        payload.includes('does already exist')))
+    (error?.response?.status === 400 &&
+      parseAdtException(error)?.type === 'ExceptionResourceAlreadyExists')
   );
 }
 
+/** A missing object, by the status or the exception type SAP names (never its words). */
 function isNotFoundError(error) {
-  const status = error?.response?.status;
-  const payload = String(error?.response?.data || error?.message || '');
   return (
-    status === 404 ||
-    payload.includes('ExceptionResourceNotFound') ||
-    payload.includes('does not exist')
+    error?.response?.status === 404 ||
+    parseAdtException(error)?.type === 'ExceptionResourceNotFound'
   );
 }
 

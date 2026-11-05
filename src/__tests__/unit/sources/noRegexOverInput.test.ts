@@ -27,13 +27,7 @@ const SCANNED: ReadonlyArray<[string, readonly string[] | undefined]> = [
   ['server-runtime/src/sse/config/sseParameters.ts', undefined],
   [
     'src/lib/utils.ts',
-    [
-      'return_error',
-      'hostAfterNotFound',
-      'mcpErrorPrefixAt',
-      'withoutMcpErrorPrefixes',
-      'isSpace',
-    ],
+    ['return_error', 'unresolvedHostOf', 'dnsFailureWords', 'mcpErrorWords'],
   ],
 ];
 

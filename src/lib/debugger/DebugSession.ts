@@ -516,9 +516,21 @@ export class DebugSession<O = unknown> {
   private tags = 0;
   protected listener?: Listener;
   protected current?: Stop;
-  protected failure?: string;
-  /** The failed listen behind `failure`, carrying the method's error. */
+  private failureWords?: string;
+  /**
+   * The failed listen behind `failure`, carrying the method's error. Set
+   * right after `failure`, whose every write drops it: it is never one
+   * recorded for an earlier failure.
+   */
   private failedListen?: DebugListenerError;
+  /** The failure the next report throws. */
+  protected get failure(): string | undefined {
+    return this.failureWords;
+  }
+  protected set failure(value: string | undefined) {
+    this.failureWords = value;
+    this.failedListen = undefined;
+  }
   protected generation = 0;
   protected readonly notices: DebugState[] = [];
   private readonly waiters = new Set<() => void>();
@@ -1276,9 +1288,7 @@ export class DebugSession<O = unknown> {
       this.failure = undefined;
       this.failedListen = undefined;
       this.observer?.(); // consuming it may leave nothing held
-      throw carried !== undefined && carried.message === message
-        ? carried
-        : new DebugListenerError(message);
+      throw carried ?? new DebugListenerError(message);
     }
     const notice = this.notices.shift();
     if (notice) {

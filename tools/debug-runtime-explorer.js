@@ -347,7 +347,6 @@ function compact(data, max = 1200) {
 function parseAdtException(error) {
   const raw = error?.response?.data;
   if (typeof raw !== 'string') return null;
-  if (!raw.includes('<exc:exception')) return null;
   try {
     const parser = new XMLParser({
       ignoreAttributes: false,
@@ -389,14 +388,12 @@ function parseAdtException(error) {
   }
 }
 
+/** An existing object, by the error's code or the exception type SAP names (never its words). */
 function isAlreadyExistsError(error) {
-  const status = error?.response?.status;
-  const payload = String(error?.response?.data || error?.message || '');
   return (
     error?.code === AdtObjectErrorCodes.VALIDATION_FAILED ||
-    (status === 400 &&
-      (payload.includes('ExceptionResourceAlreadyExists') ||
-        payload.includes('does already exist')))
+    (error?.response?.status === 400 &&
+      parseAdtException(error)?.type === 'ExceptionResourceAlreadyExists')
   );
 }
 

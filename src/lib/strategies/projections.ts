@@ -182,26 +182,15 @@ export const terseCheck: Terse<unknown> = (value) => {
 };
 
 /**
- * `del:deletionResult` and `del:checkResponse` — the verdict is an attribute.
- *
- * A delete tool answers a `del:checkResponse` only when it did not send the
- * delete: the check said the object is not there (`deleteIfDeletable`). So
- * that answer says `deleted: false` beside the check's own verdict and the
- * warning that explains it.
+ * `del:deletionResult` — the verdict is an attribute. A delete tool answers
+ * the delete's own document: a check that permits the delete is followed by
+ * it (`deleteIfDeletable`), and a refused check is a failure, answered as one.
  */
 export const terseDeletion: Terse<unknown> = (value) => {
-  const result =
-    child(value, 'del:deletionResult') ?? child(value, 'del:checkResponse');
-  const object = first(child(result, 'del:object'));
+  const object = first(childAt(value, 'del:deletionResult', 'del:object'));
   if (!object) return undefined;
-  const isDeleted = attrOf(object, 'del:isDeleted');
   return {
-    ...(isDeleted !== undefined
-      ? { deleted: isDeleted === 'true' }
-      : {
-          deleted: false,
-          deletable: attrOf(object, 'del:isDeletable') === 'true',
-        }),
+    deleted: attrOf(object, 'del:isDeleted') === 'true',
     object: attrOf(object, 'adtcore:name'),
     ...deletionMessage(object),
   };

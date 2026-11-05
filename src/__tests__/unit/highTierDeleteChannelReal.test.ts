@@ -126,10 +126,9 @@ function deletionSuccessXml(objectName: string): string {
   );
 }
 
-/** The deletion check's answer, as an on-premise system sent it (2026-09-26): deletable, or
- * refused with the reason in `del:message`. */
-/** A check that permits the delete of an object that is not there — an on-premise system,
- * 2026-09-26, for an object whose directory entry waits on an open request. */
+/** A check that permits the delete and words the object "does not exist" (W) — what an
+ * on-premise system answered (2026-11-04) for objects that were there and that the delete
+ * sent after it deleted. */
 function absentCheckXml(objectName: string): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
@@ -139,6 +138,8 @@ function absentCheckXml(objectName: string): string {
   );
 }
 
+/** The deletion check's answer, as an on-premise system sent it (2026-09-26): deletable, or
+ * refused with the reason in `del:message`. */
 function deletionCheckXml(objectName: string, refusal?: string): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
@@ -368,20 +369,22 @@ describe.each(deletionServiceCases)('$name', ({ expectedUri, run }) => {
     expect(checkAt).toBeLessThan(deleteAt);
   });
 
-  it('sends no delete when the check says the object does not exist, and is no error', async () => {
-    const conn = recordingConnection([{ data: absentCheckXml(objectName) }]);
+  it('sends the delete when the check permits it, though its W says the object does not exist (#1, #11)', async () => {
+    const conn = recordingConnection([
+      { data: absentCheckXml(objectName) },
+      { data: deletionSuccessXml(objectName) },
+    ]);
 
     const result: any = await run(conn);
 
     expect(result?.isError).toBe(false);
     expect(JSON.parse(result.content[0].text)).toMatchObject({
-      deleted: false,
+      deleted: true,
       object: objectName,
-      message: { type: 'W', text: `${objectName} does not exist` },
     });
     expect(
       requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
-    ).toHaveLength(0);
+    ).toHaveLength(1);
   });
 
   it("answers the check's refusal and never sends the delete", async () => {

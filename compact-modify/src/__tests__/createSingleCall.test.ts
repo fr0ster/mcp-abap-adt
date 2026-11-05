@@ -63,13 +63,15 @@ type Mode = 'pending' | 'answered' | 'not-found' | 'bad-request';
 type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
 
 /**
- * The `400` SAP may answer a function group create that landed: the full
- * create reads the group back after it; every type's create answers it here.
+ * The `400` SAP may answer a function group create that landed, with its
+ * T100 key (`EC 304`): the full create reads the group back after it; every
+ * type's create answers it here.
  */
 const INTERFACE_NOT_CREATED =
   '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
   '<namespace id="com.sap.adt"/><type id="ExceptionResourceCreationFailure"/>' +
-  '<message lang="EN">Interface SAPLZFG_A has not been created</message></exc:exception>';
+  '<message lang="EN">Interface SAPLZFG_A has not been created</message>' +
+  '<properties><entry key="T100KEY-ID">EC</entry><entry key="T100KEY-NO">304</entry></properties></exc:exception>';
 
 /** A connection that records every request and answers per `mode`. */
 function recording(mode: Mode, body = '') {

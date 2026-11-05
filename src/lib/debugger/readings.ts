@@ -439,18 +439,18 @@ const exceptionParser = new XMLParser({
  * exception document says beyond it — the conflict text, the localized
  * message, the subtype and the T100 key. The transport's line alone ("status
  * code 409") does not tell a conflict from a take-over (measured on premise,
- * 2026-10-11: both are 409, told apart only by the document).
+ * 2026-10-11: both are 409, told apart only by the document). A body that is
+ * no exception document adds nothing; neither text is searched.
  */
 export function failureText(error: {
   message: string;
   response?: { data?: unknown };
 }): string {
   const data = error.response?.data;
-  const xml = typeof data === 'string' ? data : '';
-  if (!xml.includes('exception')) return error.message;
+  if (typeof data !== 'string') return error.message;
   let doc: unknown;
   try {
-    doc = child(exceptionParser.parse(xml), 'exception');
+    doc = child(exceptionParser.parse(data), 'exception');
   } catch {
     return error.message;
   }
@@ -472,7 +472,5 @@ export function failureText(error: {
     .join(' ');
   const tags = [subType, t100].filter(Boolean).join(', ');
   const told = [said, tags && `[${tags}]`].filter(Boolean).join(' ');
-  return told && !error.message.includes(told)
-    ? `${error.message}: ${told}`
-    : error.message;
+  return told ? `${error.message}: ${told}` : error.message;
 }

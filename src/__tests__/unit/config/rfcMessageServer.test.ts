@@ -22,7 +22,11 @@ jest.mock('@mcp-abap-adt/connection', () => {
 });
 
 import { createConnection, rfcParamsFrom } from '@mcp-abap-adt/connection';
-import { applyMessageServerFields } from '../../../lib/config/messageServer';
+import {
+  applyMessageServerFields,
+  RfcAddressRefusal,
+  rfcAddressRefusalOf,
+} from '../../../lib/config/messageServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 
@@ -168,9 +172,10 @@ describe('applyMessageServerFields', () => {
       thrown = error;
     }
     expect(createConnection).toHaveBeenCalledTimes(1);
-    expect(thrown).toBeInstanceOf(Error);
-    expect((thrown as Error).constructor).toBe((expected as Error).constructor);
-    expect((thrown as Error).message).toBe((expected as Error).message);
+    // Recognised by its class, never by its words: connection's refusal,
+    // carrying connection's own words.
+    expect(thrown).toBeInstanceOf(RfcAddressRefusal);
+    expect(rfcAddressRefusalOf(thrown)).toBe((expected as Error).message);
   });
 
   it('with mshost, SAP_SYSNR is not read by the server either', () => {

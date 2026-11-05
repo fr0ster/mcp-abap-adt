@@ -15,8 +15,12 @@
  * references" for a table still used by the shared CDS views; `analyseDeletion`
  * reads both as refusals.
  *
- * A check that permits the delete but says the object "does not exist" ends
- * it too, without an error: the answer is the check's, the delete is not sent.
+ * A check that permits the delete is followed by the delete, whatever its
+ * messages say: on premise (2026-11-04) the check answered `isDeletable="true"`
+ * with W "<name> does not exist" for an existing function module, function
+ * include, inactive service definition and inactive service binding, and the
+ * delete sent after it deleted each. The delete's own answer is relayed; a
+ * refusal there is named by its T100 key (`analyseDeletion`).
  *
  * `deleteAnalyse` is the delete's own reading: the deletion service answers a
  * `del:deletionResult` (`analyseDeletion`), while an object deleted by a
@@ -34,7 +38,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
-import { absentPerCheck, analyseDeletion } from './deletionRefusal';
+import { analyseDeletion } from './deletionRefusal';
 import { atStep } from './step';
 import type { StepResponse } from './stepResponse';
 
@@ -57,10 +61,7 @@ export type CheckedDeletableType = AdtObjectWith<'checkDeletion'> &
  * `object`'s deletion check, then its delete when the check permits it —
  * each with the header pair of `objectType`'s member (`withAdtHeaders`).
  */
-export async function deleteIfDeletable<
-  C,
-  V extends { readonly raw?: unknown },
->(
+export async function deleteIfDeletable<C, V>(
   context: AdtHeadersContext,
   objectType: CheckedDeletableType,
   object: CheckedDeletable<C, V>,
@@ -76,10 +77,6 @@ export async function deleteIfDeletable<
     ),
   )();
   if (!check.ok) return check;
-  // Permitted, but not there: nothing to delete, so no delete is sent. The
-  // check's answer is the result — `terseDeletion` reads it as `deleted:
-  // false` with the warning. See `absentPerCheck`.
-  if (absentPerCheck(check.getResult().value.raw)) return check;
   return atStep('delete', () =>
     withAdtHeaders(context, adtOperation(objectType, 'delete'), (headers) =>
       object.delete(config, { headers, analyse: deleteAnalyse }),

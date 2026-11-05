@@ -104,6 +104,24 @@ or its claims; only the connection settings count. The one exception is the resp
 the system id, read from the system when its information is available, otherwise from the
 settings.
 
+## Embedders: `@mcp-abap-adt/lib/utils` judges SAP's answers by key
+
+**Removed: `isAlreadyCheckedError` and `safeCheckOperation`.** They searched an error's message
+for "has been checked". SAP sends those words as a check run's status text — `processed`, a
+success — and no error carries them, so there is no key to read them by. **What you use
+instead:** the check run's answer: its status and its messages' types.
+
+**Changed: `isAlreadyExistsError(error)` and `parseValidationResponse(response)`.** A taken name
+is SAP's `exc:exception` carrying the T100 key `OO 002` (a class) or `SWB_TOOL 016` (a domain, a
+table); it is recognised in any logon language, and the words "already exists" under another key
+no longer count. `isAlreadyExistsError` reads the body of the error you pass
+(`error.response.data`): a message string alone is no longer recognised. The DDL and function
+group validations refuse a taken name with `SEVERITY` `ERROR` and a sentence, without a key:
+`parseValidationResponse` answers `valid: false` with SAP's text, and states no `exists`.
+
+**The rule:** SAP's answers and errors are judged by their T100 key (message class and number)
+and message type; where SAP gives no key, by the structured verdict, its text relayed as it came.
+
 ## Callers of `CreateDomain`: `package_name` is required
 
 `CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed

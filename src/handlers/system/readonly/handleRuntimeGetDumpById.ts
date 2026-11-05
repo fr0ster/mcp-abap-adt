@@ -56,9 +56,16 @@ export function dumpIdFrom(value: string): string {
 }
 
 /**
+ * The relation of the link to the source position a dump terminated at, as
+ * the BTP ABAP environment answered it (2026-10-01): compared as a whole.
+ */
+const TERMINATION_RELATION =
+  'http://www.sap.com/adt/relations/runtime/dump/termination';
+
+/**
  * What a dump is about, read from the default view's `dump:dump` root: its
  * attributes name the runtime error, the exception, the terminated program,
- * when and whose; the `…/runtime/dump/termination` link is the source
+ * when and whose; the link of relation `TERMINATION_RELATION` is the source
  * position where it terminated. That link is addressed `adt://<system>/sap/
  * bc/adt/…#start=<line>,<column>` (BTP ABAP environment, 2026-10-01): the
  * system part is dropped, so the URI is the ADT path any reader takes.
@@ -96,10 +103,7 @@ export function dumpSummaryOf(
       uri: attr(link, 'uri'),
     }),
   );
-  const termination =
-    links.find(
-      (l) => /termination/i.test(l.relation ?? '') && l.uri?.includes('#'),
-    ) ?? links.find((l) => /#start=\d+/.test(l.uri ?? ''));
+  const termination = links.find((l) => l.relation === TERMINATION_RELATION);
   if (termination?.uri) {
     const [addressed, fragment = ''] = termination.uri.split('#');
     const uri = addressed.replace(/^adt:\/\/[^/]*/, '');

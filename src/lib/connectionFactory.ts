@@ -23,6 +23,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
+import { rfcAddressRefusalFor } from './config/messageServer';
 import {
   type AbapSystemKind,
   declaredSystemKindOf,
@@ -380,13 +381,19 @@ export function createAbapConnection(
           'An RFC session cannot be taken over by another process',
         );
       }
-      return createConnection({
-        ...common,
-        system: 'onprem',
-        transport: 'rfc',
-        wireLogger: wireLogger(logger),
-        rfc: rfcWireOptions(),
-      });
+      try {
+        return createConnection({
+          ...common,
+          system: 'onprem',
+          transport: 'rfc',
+          wireLogger: wireLogger(logger),
+          rfc: rfcWireOptions(),
+        });
+      } catch (error) {
+        // connection's refusal of an address it cannot dial, recognised by
+        // asking connection about this config, never by the error's words.
+        throw rfcAddressRefusalFor(settings) ?? error;
+      }
     }
 
     // TLS material reaches the wire through the logon, not through the

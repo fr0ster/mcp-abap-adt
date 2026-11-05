@@ -41,42 +41,40 @@ export function applyMessageServerFields(
 }
 
 /**
- * connection's own refusals of an RFC address it cannot dial — a message
+ * connection's own refusal of an RFC address it cannot dial — a message
  * server with neither `msserv` nor `sysid`, an address with neither `url` nor
- * `mshost` — read once from connection itself (`rfcParamsFrom`). Each is a
- * fixed sentence that quotes no value of the config.
+ * `mshost` — carrying connection's own words: a fixed sentence that quotes no
+ * value of the config.
  */
-const RFC_ADDRESS_REFUSALS: readonly string[] = (() => {
-  const words: string[] = [];
-  // An empty url is no url to connection, as an absent one was.
-  const probes: SapConfig[] = [
-    { url: '', authType: 'basic', mshost: 'probe' },
-    { url: '', authType: 'basic' },
-  ];
-  for (const probe of probes) {
-    try {
-      rfcParamsFrom(probe);
-    } catch (error) {
-      if (error instanceof Error && error.message) words.push(error.message);
-    }
-  }
-  return words;
-})();
+export class RfcAddressRefusal extends Error {}
 
 /**
- * The words of `error` when it is one of connection's refusals of an RFC
- * address, as connection gave them; `undefined` for anything else, whose
- * message is never read out.
+ * connection's refusal of `config`'s RFC address, asked of connection
+ * itself (`rfcParamsFrom`): its plain `Error`, as an `RfcAddressRefusal`;
+ * `undefined` when connection can dial it (or refuses with an error of
+ * another class, never read out).
+ */
+export function rfcAddressRefusalFor(
+  config: SapConfig,
+): RfcAddressRefusal | undefined {
+  try {
+    rfcParamsFrom(config);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      Object.getPrototypeOf(error) === Error.prototype
+    ) {
+      return new RfcAddressRefusal(error.message);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The words of `error` when it is connection's refusal of an RFC address
+ * (`RfcAddressRefusal`), as connection gave them; `undefined` for anything
+ * else, whose message is never read out.
  */
 export function rfcAddressRefusalOf(error: unknown): string | undefined {
-  if (!(error instanceof Error)) return undefined;
-  let message: unknown;
-  try {
-    message = error.message;
-  } catch {
-    return undefined;
-  }
-  return typeof message === 'string' && RFC_ADDRESS_REFUSALS.includes(message)
-    ? message
-    : undefined;
+  return error instanceof RfcAddressRefusal ? error.message : undefined;
 }

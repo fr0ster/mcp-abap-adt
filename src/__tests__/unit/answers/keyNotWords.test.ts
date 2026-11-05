@@ -107,6 +107,61 @@ describe('isAlreadyExistsError: a taken name, by its T100 key', () => {
   });
 });
 
+describe('the creates measured on premise (2026-11-05)', () => {
+  // Creating a class that exists: 400, ExceptionResourceAlreadyExists,
+  // SADT_RESOURCE 001 (V1 CLASS, V2 the name).
+  const classTaken = exception(
+    'Resource CLASS ZCL_X does already exist.',
+    'SADT_RESOURCE',
+    '001',
+    'EN',
+    'ExceptionResourceAlreadyExists',
+  );
+  // Creating a program that exists: 500, ExceptionResourceCreationFailure,
+  // XI 001 (V1 the name).
+  const programTaken = exception(
+    'A program or include already exists with the name ZPROG_X',
+    'XI',
+    '001',
+    'EN',
+    'ExceptionResourceCreationFailure',
+  );
+
+  it('a class duplicate (SADT_RESOURCE 001) is a taken name', () => {
+    expect(isAlreadyExistsError(carrying(classTaken))).toBe(true);
+    expect(
+      parseValidationResponse({ status: 400, data: classTaken }).exists,
+    ).toBe(true);
+  });
+
+  it('the same key in another logon language is too', () => {
+    expect(
+      isAlreadyExistsError(
+        carrying(
+          exception(
+            'Ressource CLASS ZCL_X existiert bereits',
+            'SADT_RESOURCE',
+            '001',
+            'DE',
+            'ExceptionResourceAlreadyExists',
+          ),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("a program duplicate (XI 001) is not named: SAP's answer is relayed as it is", () => {
+    expect(isAlreadyExistsError(carrying(programTaken))).toBe(false);
+    expect(
+      parseValidationResponse({ status: 500, data: programTaken }),
+    ).toEqual({
+      valid: false,
+      severity: 'ERROR',
+      message: 'A program or include already exists with the name ZPROG_X',
+    });
+  });
+});
+
 describe('isAlreadyExistsError: with no key, the exception type decides', () => {
   it('a keyless ExceptionResourceAlreadyExists is recognised', () => {
     expect(

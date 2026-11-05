@@ -1680,6 +1680,14 @@ it or with it, and #346 bumps both from the registry.
   relation is `http://www.sap.com/adt/relations/runtime/dump/termination`, measured on the BTP
   ABAP environment only (2026-10-01); read a dump's links on premise and confirm the relation
   (the `#start=` fallback over any link is gone).
+- [ ] **Creating an object that exists, per type:** measured on premise (2026-11-05) for a class
+  (`400`, `ExceptionResourceAlreadyExists`, `SADT_RESOURCE 001`) and a program (`500`,
+  `ExceptionResourceCreationFailure`, `XI 001`, not named). Owed for every other create type —
+  interface, include, function group, function module, function include, domain, data element,
+  table, structure, table type, DDL, metadata extension, behavior definition, behavior
+  implementation, service definition, service binding, message class, package — on premise and
+  on the cloud system (the class too): the status, the exception type and the T100 key each
+  answers. A key measured to mean a taken name joins `NAME_TAKEN_KEYS` with its evidence.
 
 ### D4. XML through the parser (the 67 class-A sites)
 

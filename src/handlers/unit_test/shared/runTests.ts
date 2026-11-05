@@ -1,10 +1,11 @@
 /**
  * Running ABAP Unit tests for a tool: start the run and, with `wait` (the
- * default), read its status once by long polling — SAP holds the read until
- * the run finished — and answer the result of a run SAP answered `FINISHED`,
- * or the run id and SAP's status for any other answer. With `wait: false` the
- * call answers the run id right after the start, and the run is read by its
- * id: a client with a request time limit shorter than the run would cut the
+ * default), read its status as `readRunOnce` does — at once, then by long
+ * polling (SAP holds each read until the run finished) while SAP answers it
+ * `RUNNING` — and answer the result of a run SAP answered `FINISHED`, or the
+ * run id and SAP's status for a run it answered `NOT_STARTED`. With
+ * `wait: false` the call answers the run id right after the start, and the
+ * run is read by its id: a client with a request time limit shorter than the run would cut the
  * waiting call and lose the id (measured with a 60 s client limit and a
  * 200 s run, 2026-10-31).
  *
@@ -86,8 +87,8 @@ export function testRunner(
 }
 
 /**
- * A started run: its id, and — when the call waited — what the long-polled
- * status read found.
+ * A started run: its id, and — when the call waited — what reading its
+ * status found.
  */
 export interface StartedRun {
   readonly runId: string;
@@ -96,7 +97,7 @@ export interface StartedRun {
 
 /**
  * Start a run of every test the named object holds; with `wait`, read its
- * status once by long polling and fetch the result of a finished run.
+ * status as `readRunOnce` does and fetch the result of a finished run.
  */
 export async function runAndWait(
   context: HandlerContext,
@@ -117,8 +118,8 @@ export async function runAndWait(
 
 /**
  * Start a run with `start` — whose answer is the run's id — and, with `wait`,
- * read its status once with `runner` by long polling and fetch the result of
- * a finished run; without, answer the id alone.
+ * read its status with `runner` as `readRunOnce` does and fetch the result
+ * of a finished run; without, answer the id alone.
  */
 export async function waitForRun(
   runner: IUnitTestRunInformation,
@@ -155,10 +156,10 @@ export async function waitForRun(
 
 /**
  * What a run tool answers: the result of a run SAP answered `FINISHED`; the
- * run id and SAP's status for a run its long poll answered with another
- * status; the run id alone for a run it did not wait for. `raw` answers the
- * wire document, `terse` and `full` the parse — no fixture proves a further
- * reduction of a test-run result is safe.
+ * run id and SAP's status for a run SAP answered `NOT_STARTED`; the run id
+ * alone for a run it did not wait for. `raw` answers the wire document,
+ * `terse` and `full` the parse — no fixture proves a further reduction of a
+ * test-run result is safe.
  */
 export function projectRun(detail: 'terse' | 'full' | 'raw') {
   return (run: StartedRun) => {

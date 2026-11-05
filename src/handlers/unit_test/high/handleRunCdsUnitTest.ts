@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'RunCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runs the ABAP Unit tests of the CDS view test class named by class_name. The run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.',
+    'Runs the ABAP Unit tests of the CDS view test class named by class_name. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.',
   inputSchema: z.object({
     class_name: z.string().describe('Test class of the CDS view.'),
     wait: WAIT_FIELD,

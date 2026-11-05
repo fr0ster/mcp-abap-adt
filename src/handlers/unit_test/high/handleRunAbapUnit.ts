@@ -7,9 +7,11 @@ import { RUN_TARGET_FIELD } from '../shared/runTarget';
  * interfaces-adt): one object of any type the run registry
  * (`ABAP_UNIT_RUN_TYPES`) lists, or one package. Through adt-clients'
  * generic runner (`AdtExecutor.getAbapUnitTestRunner`): the run is started on
- * `POST /abapunit/runs` and, with `wait` (the default), its status read once
- * by long polling — the result of a run SAP answers finished, the run id and
- * SAP's status otherwise — as the per-object run tools do (`runTests.ts`); with `wait: false` the run id is answered at once.
+ * `POST /abapunit/runs` and, with `wait` (the default), its status read at
+ * once and long-polled only while SAP answers it running (`readRunOnce`) —
+ * the result of a run SAP answers finished, the run id and SAP's status for
+ * one it answers not started — as the per-object run tools do
+ * (`runTests.ts`); with `wait: false` the run id is answered at once.
  *
  * The endpoint answers a type it does not run with an empty result, not a
  * refusal (adt-clients' measurements), so the type is checked before anything
@@ -41,7 +43,7 @@ export const TOOL_DEFINITION = {
   name: 'RunAbapUnit',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read once by long polling, SAP holding the read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, and a run SAP answers with another status returns the run_id and that status, read on by run_id; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.',
+    'Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.',
   inputSchema: z.object({
     target: RUN_TARGET_FIELD,
     scope: z

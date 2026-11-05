@@ -1381,9 +1381,10 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     expect(payload.finished).toBe(true);
     expect(payload.run_id).toBe('FA53C505DD7B1FD1ABB8599833A05D44');
     expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
+    // A finished run is read once, without long polling (#3).
     expect(getStatus).toHaveBeenCalledWith(
       'FA53C505DD7B1FD1ABB8599833A05D44',
-      true,
+      false,
       { analyse: analyseException },
     );
     expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44', {
@@ -1482,7 +1483,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     // Read AFTER invoking the handler — see the comment on the analogous
     // assertion in `GetUnitTest`'s own test above.
     expect(double.factory).toBe('getClassTestRunner');
-    expect(getStatus).toHaveBeenCalledWith('r1', true, {
+    expect(getStatus).toHaveBeenCalledWith('r1', false, {
       analyse: analyseException,
     });
     expect(getResult).toHaveBeenCalledWith('r1', {

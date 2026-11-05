@@ -177,6 +177,26 @@ the module whichever group the call named.
 - `HandlerUnlock` through a group that does not hold the module is refused and the lock stays
   held: call it again with the module's group and the same `lock_handle`.
 
+## Callers of `GetUnitTestResult` and the run tools: a run's status is read before any wait (#3)
+
+**Changed:** `GetUnitTestResult` and the run tools that wait for their run (`RunAbapUnit`,
+`RunUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest`,
+`RunCdsUnitTest`, with `wait` true or left out) read the run's status first without long
+polling, and long-poll only a run SAP answers `RUNNING`, again after each answer until SAP
+answers otherwise. 23.x long-polled from the first read, so a run id SAP does not know held the
+call for about 307 s before it answered `NOT_STARTED`.
+
+**What changes for you:**
+- A run id SAP does not know is answered at once: `{ success: true, run_id, status: "NOT_STARTED" }`.
+- A run that is running is waited for until SAP answers it finished, however many long polls
+  that takes; a long run under a client with a request time limit is still started with
+  `wait: false` and read by its `run_id`.
+- A status other than `RUNNING`, `FINISHED` and `NOT_STARTED`, or none, is an error at step
+  `read status` whose message states the status document SAP sent. 23.x answered any status
+  other than `FINISHED` as `{ success: true, run_id, status }`.
+- Compact `HandlerUnitTestResult` and `HandlerCdsUnitTestResult` are unchanged: they read only
+  the result.
+
 ## Callers of `CreateDomain`: `package_name` is required
 
 `CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed

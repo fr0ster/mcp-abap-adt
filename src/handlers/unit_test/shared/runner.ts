@@ -40,7 +40,7 @@ export function runnerOf(args: unknown): UnitTestRunner | Error {
  * run refuses a `wait` that is present. Absent, `waitOf` answers `true`.
  */
 const WAIT_WORDS =
-  "true (default): the call reads the run's status once by long polling, SAP holding the read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP answers with another status returns the run_id and that status, read on by run_id. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.";
+  "true (default): the call reads the run's status at once, and a run SAP answers running again by long polling, SAP holding each read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP reports unstarted (its answer for an unknown run_id) returns the run_id and that status, and any other status is an error stating what SAP answered. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.";
 
 /** The `wait` field of a run tool's zod input schema. */
 export const WAIT_FIELD = z.boolean().optional().describe(WAIT_WORDS);

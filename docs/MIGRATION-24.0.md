@@ -149,6 +149,34 @@ and answer the delete's document: `deleted`, `object` and SAP's message.
   `isDeletable="false"`, or a typed `E` beside `isDeletable="true"`) is answered as the failure it
   is, with SAP's messages and their T100 keys, and nothing but the check is sent.
 
+## Callers of the function-module tools: the function group is checked (#2)
+
+**Changed:** every tool that addresses an existing function module through a function group reads
+the module's metadata first and goes on only when the group the metadata names
+(`adtcore:containerRef`) is the group given: `GetFunctionModule`, `UpdateFunctionModule`,
+`ActivateFunctionModule`, `DeleteFunctionModule`, `CheckFunctionModule`,
+`GetFunctionModuleVersions`, `GetObjectVersions` (`function_module`),
+`RunFunctionModuleUnitTest` (runner `sync`, and runner `async` with `function_group_name`),
+`ActivateObjects` (every `FUGR/FF` entry), `GetWhereUsed` (every `GROUP|FM_NAME`), and compact
+`HandlerGet`, `HandlerUpdate`, `HandlerActivate`, `HandlerDelete`, `HandlerDeletionCheck`,
+`HandlerCheckRun`, `HandlerLock`, `HandlerUnlock` and `HandlerWhereUsed` for `FUNCTION_MODULE`.
+SAP ignores the group in a module's address, so 23.x read, locked, wrote, activated and deleted
+the module whichever group the call named.
+
+**What changes for you:**
+- A group that does not hold the module is refused with `code: "FUNCTION_GROUP_MISMATCH"` and
+  `step: "check function group"`; the message names the group SAP states. Nothing else is sent:
+  call again with that group. A module that does not exist is SAP's refusal of the metadata read,
+  as it came (`404`, T100 `FL 110`), at the same step.
+- Each such call sends the metadata read before its own request: a compact call for a function
+  module is two requests.
+- These calls are no longer recorded in batch mode, because their request waits on the metadata
+  answer: send them outside a batch. `GetFunctionModule` and `HandlerGet` with part `metadata`
+  stay recordable (the read is the answer, checked locally); `docs/user-guide/BATCH_MODE.md` lists
+  what is.
+- `HandlerUnlock` through a group that does not hold the module is refused and the lock stays
+  held: call it again with the module's group and the same `lock_handle`.
+
 ## Callers of `CreateDomain`: `package_name` is required
 
 `CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed

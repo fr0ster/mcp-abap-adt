@@ -193,9 +193,15 @@ function compared(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * An argument as the rules read it: absent, its fallback (`ABSENT_READS_AS`).
+ * An empty list is no argument: the handlers dispatch on a list only when it
+ * holds an entry (`HandlerActivate`'s `objects: []` is its single form).
+ */
 function argumentOf(tool: string, args: unknown, name: string): unknown {
   const given = child(args, name);
-  return given === undefined ? ABSENT_READS_AS[tool]?.[name] : given;
+  const stated = isList(given) && given.length === 0 ? undefined : given;
+  return stated === undefined ? ABSENT_READS_AS[tool]?.[name] : stated;
 }
 
 const among = (value: string | undefined, values: string[]) =>

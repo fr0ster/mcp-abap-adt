@@ -446,6 +446,32 @@ describe('eligible', () => {
     });
   });
 
+  it('an empty objects list is the single form, as HandlerActivate dispatches it: a function module there is not recorded (#2)', () => {
+    const no = { ok: false, reason: 'arguments' };
+    expect({
+      single: eligible(
+        'HandlerActivate',
+        { objects: [], object_type: 'FUNCTION_MODULE', object_name: 'G|M' },
+        'http',
+      ),
+      code: eligible(
+        'HandlerActivate',
+        {
+          objects: [],
+          object_name: 'M',
+          object_adt_type: 'FUGR/FF',
+          parentName: 'G',
+        },
+        'http',
+      ),
+      class: eligible(
+        'HandlerActivate',
+        { objects: [], object_type: 'CLASS', object_name: 'ZCL_A' },
+        'http',
+      ),
+    }).toEqual({ single: no, code: no, class: { ok: true } });
+  });
+
   it('reads arguments that are not an object as absent', () => {
     expect(eligible('HandlerGet', undefined, 'http')).toEqual({
       ok: false,

@@ -27,6 +27,14 @@ const {
   toolsInstalled,
   markToolsInstalled,
 } = require_('./tools.cjs');
+const {
+  withoutNpmSettings,
+  withoutOffset,
+  dynamicEntries: dynamicEntriesOf,
+  expectedDynamicEntries,
+  collapseBlanks,
+} = require_('./readings.cjs');
+const { fixVersionModules, bundleOptions } = require_('./bundling.cjs');
 // Taken before cleanEnv drops the npm_* variables.
 const npm = npmCommand();
 const tar = tarCommand();
@@ -49,9 +57,7 @@ const run = (cmd, args, opts = {}) =>
 // The nested npm runs with none of the npm_* settings `npm run` hands this
 // script, so the outer command's options do not apply to its install.
 function cleanEnv(extra = {}) {
-  const env = { ...process.env, ...extra };
-  for (const key of Object.keys(env)) if (/^npm_/i.test(key)) delete env[key];
-  return env;
+  return withoutNpmSettings({ ...process.env, ...extra });
 }
 
 function stage(work, version) {
@@ -155,8 +161,7 @@ function machoRpaths(file) {
     const entry = lines
       .slice(i + 1, i + 4)
       .find((line) => line.startsWith('path '));
-    if (entry !== undefined)
-      rpaths.push(entry.slice(5).replace(/ \(offset \d+\)$/, ''));
+    if (entry !== undefined) rpaths.push(withoutOffset(entry.slice(5)));
   }
   return rpaths;
 }
@@ -166,10 +171,9 @@ function machoRpaths(file) {
 // tail-merge another dynamic string into the one overwritten. readelf comes
 // with binutils; without it, say so.
 function dynamicEntries(file) {
-  return run('readelf', ['-d', file], { stdio: ['ignore', 'pipe', 'ignore'] })
-    .split('\n')
-    .filter((line) => /\((NEEDED|SONAME|RUNPATH|RPATH)\)/.test(line))
-    .map((line) => line.replace(/^\s*0x[0-9a-f]+\s+/i, '').trim());
+  return dynamicEntriesOf(
+    run('readelf', ['-d', file], { stdio: ['ignore', 'pipe', 'ignore'] }),
+  );
 }
 
 function checkElf(before, after) {
@@ -182,16 +186,11 @@ function checkElf(before, after) {
     );
     return;
   }
-  const added = !original.some((line) => /\((RUNPATH|RPATH)\)/.test(line));
-  const runpath = '(RUNPATH) Library runpath: [$ORIGIN]';
-  const expected = original
-    .map((line) => {
-      if (/\((RUNPATH|RPATH)\)/.test(line))
-        return line.replace(/\[.*\]$/, '[$ORIGIN]');
-      return added && /\(SONAME\)/.test(line) ? runpath : line;
-    })
-    .map((line) => line.replace(/\s+/g, ' '));
-  const actual = dynamicEntries(after).map((line) => line.replace(/\s+/g, ' '));
+  const added = !original.some(
+    (line) => line.includes('(RUNPATH)') || line.includes('(RPATH)'),
+  );
+  const expected = expectedDynamicEntries(original);
+  const actual = dynamicEntries(after).map(collapseBlanks);
   if (JSON.stringify(expected) !== JSON.stringify(actual)) {
     fail(
       `the RUNPATH ${added ? 'added' : 'rewrite'} changed more than the RUNPATH:\n  ${expected.join('\n  ')}\nbecame\n  ${actual.join('\n  ')}`,
@@ -308,63 +307,10 @@ async function bundle(work, stageDir, server, esbuild) {
   fs.writeFileSync(entry, `require(${JSON.stringify(bin)});\n`);
   const outfile = path.join(work, `${server.name}.bundle.cjs`);
   const loader = path.join(here, 'sea-rfc-loader.cjs');
-  const coreManifest = JSON.parse(
-    fs.readFileSync(
-      path.join(stageDir, 'node_modules/@mcp-abap-adt/core/package.json'),
-      'utf8',
-    ),
-  );
-  // server-runtime came with 19.2.0; an earlier version (--version) has none.
-  const runtimeManifestFile = path.join(
-    stageDir,
-    'node_modules/@mcp-abap-adt/server-runtime/package.json',
-  );
-  const runtimeManifest = fs.existsSync(runtimeManifestFile)
-    ? JSON.parse(fs.readFileSync(runtimeManifestFile, 'utf8'))
-    : undefined;
-  const result = await esbuild.build({
-    entryPoints: [entry],
-    outfile,
-    bundle: true,
-    platform: 'node',
-    format: 'cjs',
-    target: 'node24',
-    logLevel: 'warning',
-    plugins: [
-      {
-        name: 'sea-rfc-addon',
-        setup(b) {
-          b.onResolve({ filter: /^node-gyp-build$/ }, () => ({ path: loader }));
-          // core reads its version and name from ../package.json beside dist/ at
-          // run time; a single executable has no such file, so both are fixed at build.
-          b.onLoad(
-            {
-              filter:
-                /[\\/]@mcp-abap-adt[\\/]core[\\/]dist[\\/]coreVersion\.js$/,
-            },
-            () => ({
-              contents: `exports.CORE_VERSION = ${JSON.stringify(coreManifest.version)};\nexports.CORE_PACKAGE = ${JSON.stringify(coreManifest.name)};`,
-              loader: 'js',
-            }),
-          );
-          // server-runtime (19.2.0) reads its version from its own ../package.json the
-          // same way; fixed at build from the staged runtime's manifest.
-          if (runtimeManifest !== undefined) {
-            b.onLoad(
-              {
-                filter:
-                  /[\\/]@mcp-abap-adt[\\/]server-runtime[\\/]dist[\\/]runtimeVersion\.js$/,
-              },
-              () => ({
-                contents: `exports.RUNTIME_VERSION = ${JSON.stringify(runtimeManifest.version)};`,
-                loader: 'js',
-              }),
-            );
-          }
-        },
-      },
-    ],
-  });
+  // core and server-runtime read their versions from ../package.json at run
+  // time; a single executable has no such file, so both are fixed at build.
+  fixVersionModules(stageDir);
+  const result = await esbuild.build(bundleOptions({ entry, outfile, loader }));
   if (result.errors.length) fail('bundling failed');
   return outfile;
 }

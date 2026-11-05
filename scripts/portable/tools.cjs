@@ -3,6 +3,7 @@
 // tests can load it.
 const fs = require('node:fs');
 const path = require('node:path');
+const { isScriptFile, statesASystem } = require('./readings.cjs');
 
 // npm run through node and npm-cli.js, so no shell is needed: on Windows npm is
 // a .cmd, which Node only starts through a shell — where the build's arguments
@@ -14,7 +15,7 @@ function npmCommand({
   exists = fs.existsSync,
 } = {}) {
   const fromNpm = env.npm_execpath;
-  if (fromNpm && /\.c?js$/.test(fromNpm) && exists(fromNpm)) {
+  if (fromNpm && isScriptFile(fromNpm) && exists(fromNpm)) {
     return { cmd: execPath, args: [fromNpm] };
   }
   const beside = path.join(
@@ -56,11 +57,7 @@ function withoutSdk(value, library, exists = fs.existsSync) {
 function smokeEnv(parent, library, exists = fs.existsSync) {
   const env = { ...parent };
   for (const key of Object.keys(env)) {
-    if (
-      /^(SAP|MCP)_/i.test(key) ||
-      /^(SAPNWRFC_HOME|AUTH_BROKER_PATH)$/i.test(key)
-    )
-      delete env[key];
+    if (statesASystem(key)) delete env[key];
   }
   for (const key of ['PATH', 'Path', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH']) {
     if (env[key] !== undefined)

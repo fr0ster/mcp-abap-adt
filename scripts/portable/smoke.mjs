@@ -36,6 +36,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, currentPlatform } = require_('./args.cjs');
+const { sdkMissing, namesRfcKey } = require_('./readings.cjs');
 const { smokeEnv } = require_('./tools.cjs');
 const version =
   process.argv[2] ??
@@ -95,7 +96,6 @@ const work = path.join(os.tmpdir(), 'mcp-abap-adt-portable', version, platform);
 const SECOND_COPY =
   'Two copies of @mcp-abap-adt/lib are loaded in this process';
 const INSPECTION = 'Starting in inspection-only mode';
-const SDK_MISSING = /needs the SAP NW RFC SDK|is not available/;
 
 // The start against the RFC destination: stdin held open (a closed stdin is a
 // shutdown, which would end the start before its logon), every stderr line
@@ -286,13 +286,13 @@ try {
       .split('\n')
       .filter((line) => line.startsWith('[MCP]'));
     const last = lines.at(-1) ?? '';
-    const rfcKey = /\(RFC_[A-Z_]+\)/.test(last);
+    const rfcKey = namesRfcKey(last);
     check(
       `${server.name} RFC stack loads from nwrfcsdk/lib`,
       !rfc.error &&
         rfc.status === 1 &&
         rfcKey &&
-        !SDK_MISSING.test(rfc.stderr) &&
+        !sdkMissing(rfc.stderr) &&
         rfc.stdout === '',
       rfc.error
         ? `did not run: ${rfc.error.message}`

@@ -1,7 +1,8 @@
 /**
  * Fields read off an object's metadata document and off a where-used scope,
- * through the XML parser (`parseStructure`): each the first element, in
- * document order, that carries what is asked for.
+ * through the XML parser (`parseStructure`): each the first element that
+ * carries what is asked for, in `walkStructure`'s order (an element before
+ * what it holds; same-name siblings in their order).
  */
 import {
   attributeOf,
@@ -22,7 +23,8 @@ export function packageRefNameOf(metadata: string): string | undefined {
 
 /**
  * A class's sections, by `class:includeType` (definitions, implementations,
- * macros, testclasses, main), as its metadata lists them, in order.
+ * macros, testclasses, main), as its metadata lists them, in order (every
+ * `class:include` is one same-name sibling list).
  */
 export function classIncludeTypesOf(metadata: string): string[] {
   return walkStructure(parseStructure(metadata)).flatMap(({ node }) => {

@@ -1,9 +1,12 @@
 import {
   buildOrdered,
+  escapeOrderedText,
+  isWellFormed,
   ORDERED_ATTRIBUTES,
   ORDERED_CDATA,
   ORDERED_TEXT,
   type OrderedElement,
+  orderedElement,
   orderedElements,
   orderedHoldsMarkup,
   parseOrdered,
@@ -60,37 +63,25 @@ function notPresent(target: string): XmlPatchError {
   );
 }
 
-/**
- * `value` written as XML text: `&`, `<` and `>` as entities. The ordered
- * form keeps entities as they came, so a value written into it is escaped
- * here; in an attribute the builder writes the quotes as entities itself.
- */
-function escapeXml(value: string): string {
-  return value
-    .split('&')
-    .join('&amp;')
-    .split('<')
-    .join('&lt;')
-    .split('>')
-    .join('&gt;');
-}
+/** `value` written as XML text: `&`, `<` and `>` as entities. */
+const escapeXml = escapeOrderedText;
 
-/** The document in its order; none for a body that is not XML. */
+/**
+ * The document in its order. A body that is not well-formed — a read cut
+ * short among them, which the parser alone would close and read — is refused:
+ * patched, it would go back to SAP without what the read did not carry.
+ */
 function membersOf(xml: string): readonly unknown[] {
+  if (xml.trim() !== '' && !isWellFormed(xml)) {
+    throw new XmlPatchError(
+      `Cannot patch: the XML being updated is not a complete XML document. ${NOT_PRESENT}`,
+    );
+  }
   const parsed = parseOrdered(xml);
   return isList(parsed) ? parsed : [];
 }
 
-/** An element of the ordered form, named `name`, holding `content`, with `attributes` when it has any. */
-function element(
-  name: string,
-  content: readonly unknown[],
-  attributes: Element | undefined,
-): Element {
-  return attributes === undefined || entries(attributes).length === 0
-    ? { [name]: content }
-    : { [name]: content, [ORDERED_ATTRIBUTES]: attributes };
-}
+const element = orderedElement;
 
 /** An element's attributes, `undefined` when it has none. */
 function attributesOf(target: OrderedElement): Element | undefined {
@@ -207,10 +198,14 @@ export function patchXmlBlock(
   const members = membersOf(xml);
   const target = orderedElements(members).find((each) => each.name === tagName);
   if (!target) throw notPresent(`block <${tagName}>`);
-  const replacement = parseOrdered(newContent);
-  if (!isList(replacement)) {
+  // The content is the caller's markup: well-formed, and an element at least —
+  // text alone, or nothing, would delete the block.
+  const replacement = isWellFormed(newContent)
+    ? parseOrdered(newContent)
+    : null;
+  if (!isList(replacement) || orderedElements(replacement).length === 0) {
     throw new XmlPatchError(
-      `Cannot patch block <${tagName}>: the content to write is not XML.`,
+      `Cannot patch block <${tagName}>: the content to write is not a well-formed XML element.`,
     );
   }
   return rebuilt(members, target, replacement);

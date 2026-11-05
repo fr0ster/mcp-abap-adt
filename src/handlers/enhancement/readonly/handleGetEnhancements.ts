@@ -192,7 +192,7 @@ export function parseEnhancementsFromXml(
   const enhancements: EnhancementImplementation[] = [];
 
   try {
-    // Every <enh:source>, in document order, read through the XML parser:
+    // Every <enh:source> (in walkStructure's order), read through the XML parser:
     // its text (CDATA included) is the base64 encoded source code.
     const sources = walkStructure(parseStructure(xmlData)).filter(
       ({ name }) => name === 'enh:source',
@@ -209,7 +209,11 @@ export function parseEnhancementsFromXml(
       // its FIRST name, which named all five of SAPMV45A's implementations
       // after the first (on premise, 2026-09-25). For a document without it,
       // the element the source sits in names it, else the nearest enclosing
-      // element whose name says enhancement.
+      // element whose name says enhancement. (The text search named such a
+      // source after the first tag before it mentioning "enhancement" with a
+      // `name=` — typically the root, through its `xmlns:enh` URI — so two
+      // sources in `<a adtcore:name="A">` and `<b adtcore:name="B">` under a
+      // root named ROOT were ROOT, ROOT; they are A, B.)
       const around = [...source.path].reverse();
       const owner = around.find(
         ({ name }) => name === 'enh:enhancementImplementations',

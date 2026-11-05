@@ -18,8 +18,16 @@
  * read with the `tree` helpers: a list of members, each an element whose one
  * name other than {@link ORDERED_ATTRIBUTES} holds its own list.
  */
-import { XMLBuilder, XMLParser } from 'fast-xml-parser';
-import { child, entries, isElement, isList, listOf, text } from './tree';
+import { XMLBuilder, XMLParser, XMLValidator } from 'fast-xml-parser';
+import {
+  child,
+  type Element,
+  entries,
+  isElement,
+  isList,
+  listOf,
+  text,
+} from './tree';
 
 /** The member of an ordered element that holds its attributes. */
 export const ORDERED_ATTRIBUTES = ':@';
@@ -38,6 +46,16 @@ const OPTIONS = {
 
 const parser = new XMLParser(OPTIONS);
 const builder = new XMLBuilder({ ...OPTIONS, suppressEmptyNode: true });
+
+/**
+ * Whether `document` is well-formed XML, by fast-xml-parser's validator. The
+ * parser alone is lenient — it closes an unclosed element and drops text
+ * outside the root — so a reader that must not take a document cut short
+ * asks this first.
+ */
+export function isWellFormed(document: string): boolean {
+  return XMLValidator.validate(document) === true;
+}
 
 /** The document in its order, or `null` for a body that is empty or not XML. */
 export function parseOrdered(document: string): unknown {
@@ -134,4 +152,36 @@ export function replaceOrderedMember(
       ),
     ];
   });
+}
+
+/**
+ * `value` as text of the ordered form: `&`, `<` and `>` as entities. The
+ * ordered form keeps entities as they came, so a value written into it is
+ * escaped here; in an attribute the builder writes the quotes as entities
+ * itself.
+ */
+export function escapeOrderedText(value: string): string {
+  return value
+    .split('&')
+    .join('&amp;')
+    .split('<')
+    .join('&lt;')
+    .split('>')
+    .join('&gt;');
+}
+
+/** A text member of the ordered form holding `value`, escaped ({@link escapeOrderedText}). */
+export function orderedTextMember(value: string): Element {
+  return { [ORDERED_TEXT]: escapeOrderedText(value) };
+}
+
+/** An element of the ordered form, named `name`, holding `content`, with `attributes` when it has any. */
+export function orderedElement(
+  name: string,
+  content: readonly unknown[],
+  attributes?: Element,
+): Element {
+  return attributes === undefined || entries(attributes).length === 0
+    ? { [name]: content }
+    : { [name]: content, [ORDERED_ATTRIBUTES]: attributes };
 }

@@ -95,9 +95,11 @@ export interface Visit {
 }
 
 /**
- * Every member at any depth under `value`, in document order: a member before
- * what it holds, each item of a repeated member on its own. Members named in
- * `leaves` (an attribute group, say) are met but not entered.
+ * Every member at any depth under `value`, in the order of the value's own
+ * members: a member before what it holds, each item of a repeated member on
+ * its own. That is document order only as far as the parse kept it — a
+ * grouped parse puts same-named siblings together. Members named in `leaves`
+ * (an attribute group, say) are met but not entered.
  */
 export function walk(
   value: unknown,

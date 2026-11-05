@@ -64,7 +64,8 @@ describe('a patched value is written as given, whatever $ patterns it holds', ()
   });
 
   it.each(VALUES)('patchXmlBlock writes %s literally', (v) => {
-    const block = `<b>${v}</b>`; // a block is the caller's markup, written as is
+    // A block is the caller's markup, written as is: XML, its text escaped.
+    const block = `<b>${esc(v)}</b>`;
     expect(patchXmlBlock(XML, 'b', block)).toBe(
       XML.replace('<b><i>old</i></b>', () => block),
     );
@@ -162,6 +163,54 @@ describe('a patch through the XML parser', () => {
         '<b><n>1</n></b>',
       ),
     ).toBe('<r><b><n>1</n></b><c/></r>');
+  });
+
+  it('refuses a read cut short — the recorded domain without its value information — before anything is patched', () => {
+    const cut = DOMAIN.slice(0, DOMAIN.indexOf('<doma:valueInformation'));
+    expect(cut.length).toBeGreaterThan(0);
+    expect(() =>
+      patchXmlAttribute(cut, 'adtcore:description', 'after'),
+    ).toThrow(XmlPatchError);
+    expect(() =>
+      patchXmlAttribute(cut, 'adtcore:description', 'after'),
+    ).toThrow('not a complete XML document');
+    expect(() => patchDomainXml(cut, { length: 20 })).toThrow(XmlPatchError);
+  });
+
+  it('refuses block content without an element', () => {
+    expect(() => patchXmlBlock('<r><b/></r>', 'b', 'hello')).toThrow(
+      XmlPatchError,
+    );
+    expect(() => patchXmlBlock('<r><b/></r>', 'b', '')).toThrow(XmlPatchError);
+  });
+
+  it('refuses block content whose markup is not closed', () => {
+    expect(() => patchXmlBlock('<r><b/></r>', 'b', '<b><n>1</n>')).toThrow(
+      XmlPatchError,
+    );
+  });
+
+  it('writes the fixed values in the layout they had, one per line', () => {
+    const out = patchDomainXml(DOMAIN, {
+      fixed_values: [
+        { low: 'A', text: 'Alpha' },
+        { low: 'B', text: 'Beta' },
+      ],
+    });
+    expect(out).toBe(
+      DOMAIN.replace(
+        '<doma:fixValues/>',
+        '<doma:fixValues>\n      <doma:fixValue>\n        <doma:low>A</doma:low>\n        <doma:text>Alpha</doma:text>\n      </doma:fixValue>\n      <doma:fixValue>\n        <doma:low>B</doma:low>\n        <doma:text>Beta</doma:text>\n      </doma:fixValue>\n    </doma:fixValues>',
+      ),
+    );
+  });
+
+  it('writes a fixed value holding & and < as XML', () => {
+    const out = patchDomainXml(DOMAIN, {
+      fixed_values: [{ low: 'A&B', text: 'a<b' }],
+    });
+    expect(out).toContain('<doma:low>A&amp;B</doma:low>');
+    expect(out).toContain('<doma:text>a&lt;b</doma:text>');
   });
 
   it('refuses a patch whose target is not in the document', () => {

@@ -54,7 +54,7 @@ export interface ServiceBindingFacts {
 
 /**
  * The attribute `name` of the first `element` of a parsed document, in
- * document order; `undefined` when that element does not carry it.
+ * the grouped parse's order (`walkStructure`); `undefined` when that element does not carry it.
  */
 const attribute = (
   document: unknown,
@@ -194,7 +194,7 @@ export interface CategoryServiceUrls {
  */
 export function categoryServiceUrlsOf(xml: string): CategoryServiceUrls {
   const document = parseStructure(xml);
-  // The first element, in document order, that states it: the V2 spelling,
+  // The first element (in `walkStructure`'s order) that states it: the V2 spelling,
   // else the V4 one — a document is of one protocol.
   const value = (name: string): string | undefined =>
     firstAttribute(document, `odatav2:${name}`) ??

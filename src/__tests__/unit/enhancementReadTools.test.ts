@@ -88,7 +88,7 @@ describe('GetEnhancementSpot', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 200, data: BADI_SPOT_XML }],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
     expect(r.isError).toBe(false);
@@ -110,7 +110,7 @@ describe('GetEnhancementSpot', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 200, data: BADI_SPOT_XML }],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
     expect(json(r).metadata).toEqual({
@@ -142,7 +142,7 @@ describe('GetEnhancementSpot', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 200, data: document }],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
     expect(json(r).metadata.description).toBe('REST & RFC');
@@ -164,7 +164,7 @@ describe('GetEnhancementSpot', () => {
         { status: 200, data: searchHit('ZSPOT_PLAIN', 'ENHS/XS') },
       ],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_PLAIN',
     });
     expect(r.isError).toBe(true);
@@ -181,7 +181,7 @@ describe('GetEnhancementSpot', () => {
         { status: 200, data: searchHit('ZSPOT_B', 'ENHS/XSB') },
       ],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_B',
     });
     expect(r.isError).toBe(true);
@@ -197,7 +197,7 @@ describe('GetEnhancementSpot', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 401, data: '' }],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_B',
     });
     expect(r.isError).toBe(true);
@@ -216,7 +216,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: source },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
@@ -235,7 +235,7 @@ describe('GetEnhancementImpl', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhoxhh\//, { status: 200, data }],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
@@ -276,7 +276,7 @@ describe('GetEnhancementImpl', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhoxhh\//, { status: 200, data: '' }],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZGONE',
     });
@@ -293,7 +293,7 @@ describe('GetEnhancementImpl', () => {
     'refuses %s before any request — it has no source through ADT',
     async (collection, label) => {
       const connection = connectionAnswering([]);
-      const r: any = await handleGetEnhancementImpl(ctx(connection), {
+      const r = await handleGetEnhancementImpl(ctx(connection), {
         enhancement_spot: collection,
         enhancement_name: 'ZANY',
       });
@@ -310,7 +310,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: searchHit('ZCLASS_ENH', 'ENHO/XH') },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZCLASS_ENH',
     });
@@ -326,7 +326,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: searchHit('ZPLUGIN', 'ENHO/XHH') },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZPLUGIN',
     });
@@ -340,7 +340,7 @@ describe('GetEnhancementImpl', () => {
 
   it('a collection name nothing explains is refused, naming enhoxhh', async () => {
     const connection = connectionAnswering([]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZUNKNOWN',
     });
@@ -356,7 +356,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: searchHit('ZPLUGIN', 'ENHO/XHH') },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
@@ -370,7 +370,7 @@ describe('GetEnhancementImpl', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhoxhh\//, { status: 401, data: '' }],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });

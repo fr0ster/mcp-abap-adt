@@ -4,7 +4,13 @@
  * readers parse them (`parseStructure`), and over JSON.
  */
 import { corpusBody } from '../../../lib/adtCorpus';
-import { parseStructure } from '../../../lib/strategies/reading';
+import {
+  attributeOf,
+  firstAttribute,
+  firstAttributeOn,
+  parseStructure,
+  walkStructure,
+} from '../../../lib/strategies/reading';
 import {
   attr,
   child,
@@ -157,5 +163,34 @@ describe('entries', () => {
     ]);
     expect(entries(['x'])).toEqual([]);
     expect(entries('x')).toEqual([]);
+  });
+});
+
+/**
+ * The walkers over `parseStructure`'s grouped parse: an element before what
+ * it holds, siblings of one name in their order, and siblings of different
+ * names grouped by name in the order each name first appears — not document
+ * order where differently named siblings interleave.
+ */
+describe('walkStructure and firstAttribute over the grouped parse', () => {
+  it('reads the first x (and what it holds) before p, though p came between the two x', () => {
+    const doc = parseStructure('<r><x/><p n="2"/><x><p n="1"/></x></r>');
+    expect(firstAttribute(doc, 'n')).toBe('1');
+    expect(firstAttributeOn(doc, 'p', 'n')).toBe('1');
+    expect(walkStructure(doc).map((visit) => visit.name)).toEqual([
+      'r',
+      'x',
+      'x',
+      'p',
+      'p',
+    ]);
+  });
+});
+
+describe('parseStructure decodes character references', () => {
+  it('a decimal and a hexadecimal reference, in an attribute and in text', () => {
+    const doc = parseStructure('<r t="A&#39;B&#x26;C">x&#10;y &amp; z</r>');
+    expect(attributeOf(child(doc, 'r'), 't')).toBe("A'B&C");
+    expect(text(child(doc, 'r'))).toBe('x\ny & z');
   });
 });

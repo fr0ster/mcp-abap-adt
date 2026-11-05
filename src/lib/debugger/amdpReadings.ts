@@ -5,7 +5,17 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, entries, isList, listOf } from '../xml/tree';
+import { buildOrdered, ORDERED_ATTRIBUTES, parseOrdered } from '../xml/ordered';
+import {
+  attr,
+  child,
+  childAt,
+  entries,
+  isList,
+  listOf,
+  localName,
+  walk,
+} from '../xml/tree';
 import { addressOf, type ObjectAddress } from './objectUri';
 import { terseFrames } from './readings';
 
@@ -26,6 +36,14 @@ const parser = new XMLParser({
       'callstackEntry',
     ].includes(n),
 });
+/** A document parsed with this module's parser, or nothing for a body that is not XML. */
+function parseOrEmpty(xml: string): unknown {
+  try {
+    return parser.parse(xml);
+  } catch {
+    return undefined;
+  }
+}
 const text = (v: unknown): string =>
   v === undefined || v === null
     ? ''
@@ -112,9 +130,28 @@ function frameOf(f: unknown): AmdpFrame {
   };
 }
 
-// A mainResponse either closes itself or runs to its closing tag — a child's `/>` does not end it.
-const MAIN_RESPONSE =
-  /<(?:[\w.-]+:)?mainResponse\b(?:[^>]*?\/>|[^>]*>[\s\S]*?<\/(?:[\w.-]+:)?mainResponse>)/g;
+/**
+ * Each `mainResponse` of a document as text, in document order: read in the
+ * ordered form and built back (`xml/ordered`), so a body is the element as
+ * the system wrote it, a child's `/>` or a closing tag inside CDATA included.
+ */
+function mainResponseBodies(xml: string): string[] {
+  const bodies: string[] = [];
+  const visit = (members: unknown): void => {
+    for (const member of listOf(members)) {
+      for (const [name, content] of entries(member)) {
+        if (name === ORDERED_ATTRIBUTES) continue;
+        if (localName(name) === 'mainResponse') {
+          bodies.push(buildOrdered([member]));
+        } else {
+          visit(content);
+        }
+      }
+    }
+  };
+  visit(parseOrdered(xml));
+  return bodies;
+}
 
 /**
  * Every value under `key` at any depth: the event's parts sit at different
@@ -139,7 +176,7 @@ export function readAmdpEvents(xml: string): AmdpEvent[] {
   const list = child(doc, 'mainResponseList');
   const root = list && typeof list === 'object' ? list : doc;
   const rows = listOf(child(root, 'mainResponse'));
-  const bodies = [...xml.matchAll(MAIN_RESPONSE)].map((m) => m[0]);
+  const bodies = mainResponseBodies(xml);
   return rows.map((r, i) => {
     const line = lineOf(child(deep(r, 'abapPosition')[0], 'uri'));
     const frames = deep(r, 'callstackEntry');
@@ -178,10 +215,14 @@ export function readAmdpStart(wire: {
   data?: unknown;
 }): { mainId: string; hanaSession: string } {
   const body = String(wire.data ?? '');
-  const property = /<[^>]*HANA_SESSION_ID[^>]*>/.exec(body)?.[0] ?? '';
+  // The start's parameters, read with this module's parser (no prefixes): the
+  // one whose key is the HANA session names it in its value.
+  const parameter = walk(parseOrEmpty(body)).find(
+    (visit) => attr(visit.node, 'key') === 'HANA_SESSION_ID',
+  );
   return {
     mainId: locationId(wire),
-    hanaSession: /\bvalue="([^"]*)"/.exec(property)?.[1] ?? '',
+    hanaSession: attr(parameter?.node, 'value') ?? '',
   };
 }
 

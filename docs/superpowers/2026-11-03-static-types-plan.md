@@ -2160,73 +2160,114 @@ Each with a description test (`src/__tests__/unit/descriptions/…`):
 ### D19. One XML module (owner)
 
 **Why.** fast-xml-parser's lenient parse closes unclosed tags, so a truncated SAP answer reads
-as a valid partial document. Today only `xmlPatch` validates first. Nineteen production
-files of the server import fast-xml-parser directly, so changing the parser would mean
-editing all of them. The owner wants one module of ours as the only importer.
+as a valid partial document. Today only `xmlPatch` validates first. Eighteen production files
+under `src/` and two under `tools/` import fast-xml-parser directly, so changing the parser
+would mean editing all of them. The owner wants one module of ours as the only importer.
 
-**What the code shows (at the time of writing; re-listed at Step 1).**
-- `src/`: `src/lib/xml/ordered.ts`, `src/lib/utils.ts`, `src/lib/checkRunParser.ts`,
-  `src/lib/strategies/{reading,atcFindings,functionGroupStructure,packageSummary,packageWalk,sqlPreview}.ts`,
-  `src/lib/debugger/{readings,memoryReadings,amdpReadings}.ts`,
-  `src/handlers/include/readonly/handleGetMainPrograms.ts`,
-  `src/handlers/service_binding/high/serviceBindingPayloadUtils.ts`,
-  `src/handlers/system/readonly/{handleGetTypeInfo,handleRuntimeGetDumpById,runtimePayloadParser}.ts`,
-  `src/handlers/transport/readonly/handleGetTransport.ts`.
-- `tools/`: `debug-runtime-explorer.js`, `runtime-profiling-dumps-explorer.js`.
-- The sub-packages import none today. D4's readers come onto `parseStructure`
-  (`strategies/reading.ts`) first, so they move with it.
+**What the code shows (re-listed at Step 1).** The importers, by parse entry point (each
+parser instance or call path, not each file), with the options each uses today:
+
+| Entry point | Options today |
+| --- | --- |
+| `src/lib/strategies/reading.ts` `parseStructure` | attributes grouped under `@`, prefix `''`, no value parsing, no NS removal, `htmlEntities`, repeatables forced to arrays |
+| `src/lib/strategies/atcFindings.ts` | grouped `@`, no value parsing, NS prefixes removed |
+| `src/lib/strategies/packageSummary.ts` | grouped `@`, no value parsing, NS removed |
+| `src/lib/strategies/sqlPreview.ts` | grouped `@`, no value parsing, NS removed, `isArray` |
+| `src/lib/strategies/packageWalk.ts` | prefix `''`, no value parsing, values trimmed |
+| `src/lib/strategies/functionGroupStructure.ts` | prefix `''` (defaults otherwise) |
+| `src/lib/checkRunParser.ts` | prefix `@_` |
+| `src/lib/utils.ts` `parseValidationResponse` | prefix `@_` |
+| `src/lib/utils.ts` `parseActivationResponse` | prefix `@_`, attribute values coerced |
+| `src/lib/debugger/readings.ts` `parser` | prefix `''`, NS removed, no value parsing, no trimming, `isArray` |
+| `src/lib/debugger/readings.ts` `exceptionParser` | prefix `''`, NS removed, no value parsing, `isArray` |
+| `src/lib/debugger/amdpReadings.ts` | prefix `''`, NS removed, no value parsing, no trimming, `isArray` (no `htmlEntities`, recorded for D6) |
+| `src/lib/debugger/memoryReadings.ts` | prefix `''`, NS removed, no tag-value parsing, `isArray` |
+| `src/handlers/transport/readonly/handleGetTransport.ts` | prefix `''`, attribute values coerced, `isArray` |
+| `src/handlers/system/readonly/runtimePayloadParser.ts` | prefix `''` |
+| `src/handlers/system/readonly/handleRuntimeGetDumpById.ts` | prefix `''`, NS removed |
+| `src/handlers/system/readonly/handleGetTypeInfo.ts` | prefix `''`, no value parsing, no trimming, `isArray` |
+| `src/handlers/service_binding/high/serviceBindingPayloadUtils.ts` | prefix `''` |
+| `src/handlers/include/readonly/handleGetMainPrograms.ts` | prefix `@_`, `isArray` |
+| `src/lib/xml/ordered.ts` `isWellFormed`, `parseOrdered`, `buildOrdered` | ordered, prefix `''`, no value parsing, no trimming, **`processEntities: false`** (so `xmlPatch` keeps entities as written); the builder with `suppressEmptyNode` |
+| `tools/runtime-profiling-dumps-explorer.js`, `tools/debug-runtime-explorer.js` | prefix `@_`, `isArray` |
+
+These do not share one set of options, so no single profile can serve them, and decoding is
+not identical everywhere: the ordered round trip keeps entities on purpose.
 
 **Files:**
-- Create: in `src/lib/xml/` (beside `ordered.ts` and `tree.ts`), `src/lib/xml/parse.ts` (or the
-  module's index), the one importer of fast-xml-parser in production code, exporting:
-  - `parseXmlStrict(text: string): XmlDocument` — validates with `XMLValidator` first, then
-    parses. It refuses a document that is not well-formed with a typed error,
-    `MalformedXmlError` (the validator's line and code; never the document's text).
-  - the ordered parse and build that `ordered.ts` does today, with the same strict
-    validation before the ordered parse;
-  - `buildXml(…)`, the builder `xmlPatch` and the writers use.
-
-  Each export's options are fixed in the module, entity decoding included
-  (`processEntities`, `htmlEntities`). The AMDP reader's missing `htmlEntities`, recorded for
-  D6, is folded in here: every reader gets the same decoding.
-- Modify: every file listed above, to import from the module only; `parseStructure` becomes a
-  reader over `parseXmlStrict`.
+- Create in `src/lib/xml/` (beside `ordered.ts` and `tree.ts`): `src/lib/xml/profiles.ts`, the
+  one importer of fast-xml-parser in production code, plus `ordered.ts` moving onto it.
+  - **Named, fixed profiles.** Each option set in use is kept as a named profile, its options
+    fixed inside the module. Callers choose a profile by name and pass no options. The names
+    are decided at Step 1 from the inventory; similar sets are merged only where an answer pin
+    proves the merge changes no answer. Each `isArray` rule stays with its caller's profile, as
+    a fixed list of element names.
+  - **`parseXmlStrict(text: string, profile: XmlProfile): unknown`.** It validates with
+    `XMLValidator` first, then parses with the profile. A document that is not well-formed is
+    refused with a typed `MalformedXmlError` carrying the validator's line and code, never the
+    document's text.
+  - **The ordered profile** (`parseOrdered`, `buildOrdered`, `isWellFormed`) keeps
+    `processEntities: false` and the builder's `suppressEmptyNode`: a round trip writes back
+    the entities it read.
+  - **Entity decoding is per profile, by contract.** The structured readings decode entities
+    (with `htmlEntities` where they read text a person reads, as `parseStructure` does; the AMDP
+    reader joins that profile — its missing `htmlEntities`, recorded for D6, is folded in
+    here). The ordered profile does not decode. No claim of identical decoding across
+    profiles.
+- Modify: every entry point listed above, to call the module with its profile.
 - Test:
   - `src/__tests__/unit/sources/oneXmlModule.test.ts`, the guard;
-  - `src/__tests__/unit/xml/strictParse.test.ts`;
-  - one truncated-document case per moved reader, beside each reader's existing tests.
+  - `src/__tests__/unit/xml/profiles.test.ts`, one block per profile;
+  - per entry point, a truncation test and a pre-move answer pin beside its existing tests;
+  - `xmlPatch`'s two paths.
 
 **Steps:**
-- [ ] **Step 1: The guard, red.** `oneXmlModule.test.ts` walks every git-tracked production
-  file of every package (`src`, the sub-packages, `scripts`, `tools`; `.ts`, `.js`, `.mjs`,
-  `.cjs` outside `__tests__`) with the compiler API. It refuses any `import … from
-  'fast-xml-parser'`, `import('fast-xml-parser')` or `require('fast-xml-parser')` outside the
-  module. There is no allowlist beyond the module itself.
-  - Fixtures prove the guard: a direct `import` is refused, a `require` in a `.cjs` script is
-    refused, and an import through the module passes.
-  - Run it: it fails, naming today's importers. Record the list in this task.
-- [ ] **Step 2: The module, tests first** (`strictParse.test.ts`):
-  - a well-formed corpus document parses as before;
-  - a truncated one (cut mid-element) and an unclosed tag are each refused with
-    `MalformedXmlError`, carrying no document text;
-  - an entity-bearing text (`&lt;`, `&amp;`, a numeric reference, an HTML entity) decodes the
-    same through every export;
-  - the ordered parse and the builder round-trip a corpus document byte for byte where the
-    writers rely on it (xmlPatch's existing tests).
-- [ ] **Step 3: Move the readers, one per commit or per area.** For each file in the list:
+- [ ] **Step 1: The guard, red, and the inventory.**
+  - `oneXmlModule.test.ts` walks every git-tracked production file of every package (`src`, the
+    sub-packages, `scripts`, `tools`; `.ts`, `.js`, `.mjs`, `.cjs` outside `__tests__`) with
+    the compiler API. It refuses any `import … from 'fast-xml-parser'`,
+    `import('fast-xml-parser')` or `require('fast-xml-parser')` outside the module, with no
+    allowlist beyond the module.
+  - Fixtures: a direct `import` is refused, a `require` in a `.cjs` script is refused, an import
+    through the module passes.
+  - Run it: it fails, naming the 18 + 2 importers.
+  - Re-list every parse entry point with its options (the table above), and name the profiles.
+- [ ] **Step 2: Each profile's own contract, tests first** (`profiles.test.ts`):
+  - for each structured profile: its attribute naming (grouped `@`, or prefix `''` / `@_`),
+    namespace handling, value coercion or not, trimming, and its `isArray` names, each shown
+    on a corpus document; its entity decoding (`&lt;`, `&amp;`, a numeric reference, and an
+    HTML entity where the profile decodes them);
+  - for the ordered profile: entities are kept as written, and a corpus document round-trips
+    byte for byte through `parseOrdered` / `buildOrdered`;
+  - for every profile: a truncated document (cut mid-element) and an unclosed tag are refused
+    with `MalformedXmlError`, carrying no document text.
+- [ ] **Step 3: `xmlPatch`, both paths, validated once.** `src/lib/strategies/xmlPatch.ts` already
+  validates before `parseOrdered`, in two places: the patched document (`membersOf`, where an
+  empty body is accepted as no members) and `patchXmlBlock`'s replacement content (validated,
+  else a `XmlPatchError`). Both move onto the module so the document is validated once (not by
+  `isWellFormed` and again in the parse). `XmlPatchError` and the empty-body handling stay.
+  Tests:
+  - a malformed patched document is a `XmlPatchError`, as today;
+  - a malformed replacement block is a `XmlPatchError`;
+  - an empty body still gives no members;
+  - a valid patch writes the same bytes as before.
+- [ ] **Step 4: Move every entry point, one per commit or per area.** For each row of the
+  table:
   - first a failing test: a **truncated** corpus document of the kind it reads is refused
     (the call answers a parse failure, not a partial reading);
-  - then a pin that a normal corpus document gives **the same answer as before** (the answer
-    compared with the one recorded before the move);
-  - then the move to the module.
+  - then a **pre-move answer pin**: the answer to a normal corpus document, recorded before the
+    move, must equal the answer after it. These pins cover the differences between profiles
+    (grouped versus prefixed attributes, coerced versus string values, namespaces kept or
+    removed, forced arrays);
+  - then the move to the module with its profile.
 
-  `tools/*.js` move the same way: their readings over a truncated document refuse. They are
-  dev tools, so the guard covers them, but no answer pin is needed.
-- [ ] **Step 4:** The guard passes, with only the module importing fast-xml-parser. Run
+  `tools/*.js` move the same way, with the truncation test; they are dev tools, so no answer
+  pin is needed.
+- [ ] **Step 5:** The guard passes, with only the module importing fast-xml-parser. Run
   `npm test`, `npm run test:check` and every package's `lint:check`: PASS. Mutate: add one
   direct import back in a handler and one `require` back in a tool; the guard goes red each
   time; revert.
-- [ ] **Step 5:** CHANGELOG (Fixed): "A malformed or truncated XML answer is refused instead of
+- [ ] **Step 6:** CHANGELOG (Fixed): "A malformed or truncated XML answer is refused instead of
   read as a partial document." Commit.
 
 **Later work, out of scope (recorded in the PR description at step 20):**

@@ -2403,52 +2403,113 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 `serviceDefinitionElementInfo`.
 
 **Owner decisions (2026-11-05):**
-1. **Service-binding facts' exposed entities** (name, URI, alias) come from the service
-   definition's element info.
-2. **`GetStructuresList` returns every include SAP states** — anonymous, named and appends
-   (`extend type`, read as `.append`) — as element info gives them. It returns the structure
-   and does not filter out named includes; the model narrows further if it needs to. This
-   changes `GetStructuresList`'s answer: CHANGELOG (Changed), MIGRATION-24.0, and its
-   description, kept functional. The plain scanners for the DDL `include` and for
-   `extend type` go away.
+1. **Service-binding facts' exposed entities** come from the service definition's element
+   info; today's projection `{ entity, entitySet }` (and its no-alias fallback) stays.
+2. **`GetStructuresList` takes every include SAP states** — anonymous, named and appends
+   (`extend type`, read as `.append`) — from element info. It returns the structure and does
+   not filter out named includes; the model narrows further if it needs to. The answer's
+   shape stays; what changes (a named include's group name, the where-used flags, and
+   `version` per Step 1) is stated below and recorded in CHANGELOG / MIGRATION-24.0. The
+   plain scanners for the DDL `include` and for `extend type` go away.
 3. **Only `GetIncludesList`'s tree stays on the plain scanner**, for the measured reason (SAP
    does not state which include names which).
 4. **Pins:** service-definition entities are compared as a set (SAP's order is not the
    source's). An unknown name (empty element info) is answered as absent — not found — and
    never read as an empty structure or an empty entity list.
 
+**What the code shows today.**
+- **`GetStructuresList`** (`src/handlers/structure/readonly/handleGetStructuresList.ts`) answers
+  `{ success, structure_name, tree }` (plus `appends_unavailable` and
+  `append_candidates_unread` when where-used fails). `tree` is a `StructureNode`:
+  `structure`, `attribute` (the component a named include sits under, `null` for an
+  anonymous one), `kind` (`root` / `include` / `append`), `children`, `cyclic?`, `error?`.
+  - It reads named includes and anonymous ones from the DDL source (`parseEmbeddedStructures`),
+    and finds appends by where-used plus a source check (`extendsBase`), in the sequential
+    path and in the batched path (`structureReads`).
+  - `include_extensions: false` skips the append lookup.
+  - It takes `version` (`active` by default) and forwards it to every source read.
+- **Service-binding facts** (`src/lib/strategies/serviceBindingFacts.ts`): `exposedEntitiesOf`
+  answers `{ entity, entitySet }` per `expose` line, with no URI. `entitySet` is the alias,
+  or the entity's name when no alias is given. Its one caller is
+  `GetServiceBindingPreviewUrl` (`handleGetServiceBindingPreviewUrl.ts`).
+
 **In #346 (red first):**
-- [ ] **Step 1: Red tests.**
-  - **Request pins:** the service-binding facts' reading sends the service-definition
-    element-info GET, and `GetStructuresList` sends the structure element-info GET (URL
-    with `path`, Accept as the released member sends). Red today: the readings scan the
-    source.
-  - **Service-binding facts, answer pin as a set:** today's exposed entities (name, URI,
-    alias) on a corpus document, recorded now; after the move the same set, in any order.
-  - **`GetStructuresList`, new answers:** over captured element-info answers — an anonymous
-    include, a named include (`_x : include s`, listed like the anonymous one) and an append
-    (`.append`, with its include name and fields) are each in the answer, and nothing is
-    filtered out. Red today: the scanner misses the named include's and the append's
-    reading as element info states it.
-  - **Unknown names:** an empty element info answers "not found" for `GetStructuresList` and
-    for the service-binding facts — never an empty structure or list.
-- [ ] **Step 2:** Bump adt-clients to 43.1.0 and adt-strategies to 0.20.0 (adt-clients-legacy to
-  0.7.2 where the server uses it) from the registry, as registry ranges; `npm install`
-  regenerates the lockfile; check it for `"link": true` and non-registry entries. Run build,
-  `test:check` and the root `npm test`.
-- [ ] **Step 3:** Move the readings onto the members and readers above; delete the DDL
-  `include` and `extend type` scanners (and their D6 plain-code versions). Step 1 goes green.
-- [ ] **Step 4:** `GetStructuresList`'s description states what it answers (every include of
-  the structure SAP states: anonymous, named, appends) — a description test. CHANGELOG
-  (Changed: read from SAP's element info; `GetStructuresList` lists every stated include)
-  and MIGRATION-24.0 (`GetStructuresList` now lists named includes and appends too).
-- [ ] **Step 5: Live cases on both systems:**
-  - the exposed entities of a service definition the test creates (C14's fixtures),
-    compared as a set;
-  - a structure the test creates with an anonymous include, a named include and (where the
-    system allows) an append: all three are listed;
+- [ ] **Step 1: Does element info take a version? (live, both systems, owner's go, realm
+  check).** On a structure the test creates and activates:
+  1. make an inactive change (add a component), recorded;
+  2. read `/sap/bc/adt/ddic/elementinfo?path=<structure>` without a version, with
+     `&version=inactive`, and with the query the source reads use for a version;
+  3. record whether the answer differs between active and inactive;
+  4. delete the structure (standard order), asserting it absent.
+
+  Then:
+  - **if it takes one,** the adt-clients member `getStructureElementInfo` gains a `version`
+    option in a patch release, and the server forwards `GetStructuresList`'s `version` to it;
+  - **if it does not,** honouring `version` becomes an **open owner decision** (keep reading
+    the inactive source for `version: inactive`, or refuse `inactive`, or drop the argument).
+    It is recorded under the defect-stage decisions, and nothing silently stops honouring
+    `version`.
+
+  Either way a red test pins the decision: `'GetStructuresList forwards version to the element
+  info read'`, or the test the owner's decision names.
+- [ ] **Step 2: Red tests.**
+  - **Request pins:** `GetServiceBindingPreviewUrl`'s entity reading sends the
+    service-definition element-info GET; `GetStructuresList` sends one structure element-info
+    GET per structure, single (`structure_name`) and multi (`structure_names`), sequential
+    and batched. Red today, because the readings scan the source.
+  - **Service-binding facts:**
+    - today's projection `{ entity, entitySet }` on a corpus document is pinned as a **set**,
+      and stays equal after the move;
+    - the new reader's name, URI and alias are each tested separately on a captured
+      element-info answer;
+    - **the no-alias fallback stays:** an entity without an alias answers `entitySet` = its
+      name.
+  - **`GetStructuresList`, the answer after the move.** The shape stays
+    `{ success, structure_name, tree }`. The tree is built from element info's flat list by
+    its `includeLevel` / `partOfInclude` fields (as the released reader exposes them, checked
+    at the bump); `kind` is `include` for `.include` and `append` for `.append`.
+    - **Information lost:** element info gives no group name for a named include, so
+      `attribute` is `null` for named includes as for anonymous ones. A named include and an
+      anonymous one become indistinguishable in the answer.
+    - **`include_extensions`:** appends are told apart (`.append` versus `.include`), so
+      `include_extensions: false` leaves the `append` nodes out, with no where-used lookup
+      at all. `appends_unavailable` and `append_candidates_unread` go: nothing is looked up
+      that can fail.
+    - **If the flat list cannot build the tree** (a nesting it does not state), the step
+      records which, and the tree is flattened to that depth. The changed answer is then
+      stated in MIGRATION.
+    - **Assertions, single name:** over captured answers, an anonymous include, a named
+      include (`attribute: null`) and an append are each nodes of the tree with their kind;
+      `include_extensions: false` drops the append node.
+    - **Assertions, multi name:** `structure_names` answers one entry per name in the order
+      given; an unknown name's entry is `{ structure_name, error }` (not found).
+  - **Unknown names:** an empty element info is "not found" for `GetStructuresList` (single:
+    the call fails; multi: that entry's error) and for the preview URL's entity reading —
+    never an empty structure or list.
+- [ ] **Step 3:** Bump adt-clients to 43.1.0 (or its patch from Step 1) and adt-strategies to
+  0.20.0 (adt-clients-legacy to 0.7.2 where the server uses it) from the registry, as
+  registry ranges. `npm install` regenerates the lockfile; check it for `"link": true` and
+  for non-registry entries. Run build, `test:check` and the root `npm test`.
+- [ ] **Step 4:** Move the readings onto the members and readers above. Delete
+  `parseEmbeddedStructures` and `extendsBase`, with their sequential callers (the source
+  scan and the append check) and the batched path's (`structureReads`' source and
+  where-used reads), and the D6 plain-code versions of both scanners. Step 2 goes green.
+- [ ] **Step 5:** `GetStructuresList`'s description and its `include_extensions` description
+  state what is now true, functionally: the tree of included and appended structures as
+  SAP's element info states them; `include_extensions: false` leaves appends out. A
+  description test for each. CHANGELOG (Changed: read from SAP's element info). MIGRATION-24.0:
+  - a named include's `attribute` is now `null`;
+  - `appends_unavailable` and `append_candidates_unread` are gone;
+  - the outcome of Step 1 for `version`;
+  - any flattening Step 2 found.
+- [ ] **Step 6: Live cases on both systems:**
+  - the exposed entities of a service definition the test creates (C14's fixtures), compared
+    as a set, one entity without an alias;
+  - a structure the test creates with an anonymous include, a named include and, where the
+    system allows, an append: all are nodes of the tree, and `include_extensions: false`
+    drops the append;
   - an unknown structure name answers not found.
-- [ ] **Step 6:** Commit.
+- [ ] **Step 7:** Commit.
 
 ### Defect-stage owner decisions (decided 2026-11-04)
 

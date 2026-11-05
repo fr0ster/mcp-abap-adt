@@ -37,6 +37,7 @@ import {
   isRefusal,
 } from '../../../lib/strategies/activationRun';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
+import { packageRefNameOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import {
@@ -111,11 +112,6 @@ export async function writeClassTests(
   );
 }
 
-/** Where a new include goes: the report's own package, read off its metadata. */
-function packageOf(metadata: string): string | undefined {
-  return /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(metadata)?.[1];
-}
-
 /**
  * Write a report's test classes into its test include and activate both.
  *
@@ -151,7 +147,7 @@ export async function writeProgramTests(
         include.create(
           {
             includeName,
-            packageName: packageOf(metadata.getResult().value.raw),
+            packageName: packageRefNameOf(metadata.getResult().value.raw),
             description: `ABAP Unit tests of ${name}`,
             transportRequest,
           },

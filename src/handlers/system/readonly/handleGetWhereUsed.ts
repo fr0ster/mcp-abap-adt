@@ -54,6 +54,7 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
+import { whereUsedScopeTypesOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
@@ -232,11 +233,7 @@ async function whereUsedOf(
       );
     }
     const scopeXml = scopeResponse.getResult().value?.raw ?? '';
-    const available = new Set<string>(
-      [
-        ...scopeXml.matchAll(/<usagereferences:type\b[^>]*\bname="([^"]+)"/g),
-      ].map((m) => m[1]),
-    );
+    const available = new Set<string>(whereUsedScopeTypesOf(scopeXml));
     const unknown = typedArgs.enable_only_types.filter(
       (t) => !available.has(t),
     );
@@ -408,11 +405,7 @@ function unsearchable(
   scopeResponse: IAdtResponse<AdtReading<unknown>, IAdtError> & { ok: true },
 ): string | undefined {
   const scopeXml = scopeResponse.getResult().value?.raw ?? '';
-  const available = new Set<string>(
-    [...scopeXml.matchAll(/<usagereferences:type\b[^>]*\bname="([^"]+)"/g)].map(
-      (m) => m[1],
-    ),
-  );
+  const available = new Set<string>(whereUsedScopeTypesOf(scopeXml));
   const unknown = (typedArgs.enable_only_types ?? []).filter(
     (t) => !available.has(t),
   );

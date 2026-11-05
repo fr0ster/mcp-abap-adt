@@ -45,6 +45,7 @@ import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
 } from '../../../lib/strategies/functionGroupChildren';
+import { classIncludeTypesOf } from '../../../lib/strategies/metadataFields';
 import {
   endsTheCall,
   type NodeLevel,
@@ -374,9 +375,11 @@ async function includesListOf(
           analyse: analyseException,
         }),
       );
-      children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
-        (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
-      );
+      children = classIncludeTypesOf(meta).map((name) => ({
+        name,
+        type: 'CLAS/I',
+        children: [],
+      }));
     } else if (parent.kind === 'FUGR/F') {
       // The group's main program cannot be read, so which includes it names
       // directly is worked out from the rest: every include of the group,
@@ -746,9 +749,11 @@ async function treeFromAnswers(
         kind: 'class',
         name: parent.name,
       });
-      children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
-        (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
-      );
+      children = classIncludeTypesOf(meta).map((name) => ({
+        name,
+        type: 'CLAS/I',
+        children: [],
+      }));
     } else if (parent.kind === 'FUGR/F') {
       const listed = await fetchFunctionGroupChildren(
         {

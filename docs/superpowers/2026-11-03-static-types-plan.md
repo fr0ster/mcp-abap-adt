@@ -2299,8 +2299,16 @@ not identical everywhere: the ordered round trip keeps entities on purpose.
 - **The outline part.** `HandlerGet` gains `part: "outline"` for the object types
   `GetObjectOutline` serves: `CLAS/OC`, `INTF/OI` and `FUGR/F` on both systems, and `PROG/P`
   on premise. It routes to the same handler as `GetObjectOutline`.
-- A range with `part: "metadata"` (or any part but `source`) is refused before any request,
-  as `sourceRangeOf` already does for the full reads (DO1).
+- **A range with any part but `source` is refused before any request (DO1a).** Today
+  `sourceRangeOf` (`src/lib/handlers/sourceRange.ts`) rejects only `metadata`, and compact
+  `HandlerGet` sends the address parts (`object_structure`, `node_structure`,
+  `virtual_folders`) and the activation parts (`activation_status`, `activation_results`) to
+  their handlers before the object parts are handled — so reusing it unchanged would not
+  give DO1a. The fix:
+  - `sourceRangeOf`'s rule becomes "a range is taken only with `source`": any other part
+    with `start_line` or `end_line` is refused, in the full tools too;
+  - in `handleHandlerGet`, the range check runs **first**, before every dispatch (address,
+    activation, outline and the object parts).
 
 **Files:** `src/lib/compact/compactSchemas.ts` (`GET_PROPERTIES`,
 `COMPACT_READ_TAKES.every` or the per-type takes, and the `part` enum),
@@ -2317,10 +2325,15 @@ listed-schema and surface fixtures, CHANGELOG, MIGRATION-24.0, the coverage ledg
     - a ranged `HandlerGet#<type>#source` read: the one unchanged source GET, then exactly the
       asked lines, for an LF and a CRLF source;
     - for a function module, the D7 metadata read first, then the one source GET.
-  - Refusals with zero requests: a range with `part: "metadata"`; an inverted range; a
+  - Refusals with zero requests: a range with each non-source part — `metadata`, `outline`,
+    `urls`, `contents`, `main_programs`, `object_structure`, `node_structure`,
+    `virtual_folders`, `activation_status`, `activation_results`; an inverted range; a
     non-positive line. After the GET: a range outside the source.
-- [ ] **Step 2:** Add the properties and the route; reuse `sourceRangeOf` / `answerSourceRead`
-  unchanged. Run: PASS; the listed-schema test passes with the fixture updated for these keys
+  - The full tools: a range with every non-source `part` their schema declares is refused
+    with zero requests (`sourceRangeOf`'s widened rule).
+- [ ] **Step 2:** Widen `sourceRangeOf` to "only with `source`", call it at the top of
+  `handleHandlerGet` before any dispatch, add the properties and the outline route; reuse
+  `answerSourceRead` unchanged. Run: PASS; the listed-schema test passes with the fixture updated for these keys
   alone.
 - [ ] **Step 3: Coverage.** The ledger gains `HandlerGet#<type>#outline` keys (C8's list), and
   each compact source key's pins and live case add one ranged read (no new key: the range is
@@ -2335,18 +2348,31 @@ listed-schema and surface fixtures, CHANGELOG, MIGRATION-24.0, the coverage ledg
 members that adt-clients 43 removed: `listProfilerTraceFiles`,
 `createProfilerTraceParameters`, `extractProfilerIdFromResponse`, the
 `getProfilerTrace…` readers (`HitList`, `Statements`, `DbAccesses`), and the dump members
-`getRuntimeDumpById` / `listRuntimeDumpsByUser`. In 43 they live on
-`AdtRuntimeClient.getProfiler(…)` (`list`, `delete`, `getDefaultParameters`,
-`buildParametersXml`, and the trace readers) and `AdtRuntimeClient.getDumps(…)` (`list`,
-`listByUser`, `getById`), as the server's own handlers use them after the bump.
+`getRuntimeDumpById` / `listRuntimeDumpsByUser`. The map onto 43.0.1:
+- **trace list and data:** `AdtRuntimeClient.getProfiler(…)` — `list`, the trace readers
+  (hit list, statements, database accesses), `delete`, `getDefaultParameters`,
+  `buildParametersXml`;
+- **scheduling and the profiler id:** `ProfilerDomain` has no member that creates
+  parameters or extracts an id. The server schedules through
+  `AdtExecutor.getClassExecutor(…).scheduleTrace(…)`, which returns the id itself (taken
+  from SAP's `Location`) — `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`.
+  The tool does the same: `createProfilerTraceParameters` + `extractProfilerIdFromResponse`
+  become one `scheduleTrace` call whose answer carries the id;
+- **dumps:** `AdtRuntimeClient.getDumps(…)` — `list`, `listByUser`, `getById`;
+- **answers:** the old members answered an axios-like response (`.data`, `.status`); the 43
+  members answer `IAdtResponse` (`ok`, then the value or the error). Every `.data` read
+  becomes the success value, every `.status` check becomes `ok` / the error's status.
 
-- [ ] **Step 1:** Map each removed call to its 43 member, read from
-  `node_modules/@mcp-abap-adt/adt-clients/dist` (and the server's
-  `handleRuntimeListProfilerTraceFiles.ts` / `handleRuntimeGetProfilerTraceData.ts` /
-  `handleRuntimeGetDumpById.ts`, which already call them). Record the map in the tool's
-  header comment.
-- [ ] **Step 2:** Rewrite the tool onto those members, with no regex, no prose matching and
-  no polling limit, as D6 left it. Its D19 parse pin stays green.
+- [ ] **Step 1: Red tests first** (`src/__tests__/unit/toolsReadings.test.ts` or a new
+  `src/__tests__/unit/tools/profilingExplorer.test.ts`), against today's script on the 43 call
+  and answer contract, on `recordingConnection` (no SAP): the trace list read through
+  `getProfiler().list`; scheduling through `scheduleTrace` yielding the id; one trace's
+  hit list, statements and database accesses; the dump list and one dump through
+  `getDumps()`; each answer read from `IAdtResponse`. They fail today (the script calls
+  removed members).
+- [ ] **Step 2:** Rewrite the tool onto those members, with no regex, no prose matching and no
+  polling limit, as D6 left it. The Step 1 tests go green; its D19 parse pin stays green.
+  Record the map in the tool's header comment.
 - [ ] **Step 3: Live run on the on-premise system** (after the realm check; read-only apart
   from what the script creates):
   - the profiler trace list;
@@ -2375,15 +2401,20 @@ definition's exposed entities, but not which include a name comes from, and an
 - tests per member: the request (URL with its query, Accept) and a reading of a captured
   answer.
 
-**In #346:**
-- [ ] **Step 1: Pins before the move.** For service-binding facts and `GetStructuresList`,
-  record today's answers on corpus documents (the exposed entities with name, URI and alias;
-  the structure's included components).
+**In #346 (red first):**
+- [ ] **Step 1: Red tests before the move.**
+  - **Request pins, red:** the service-binding facts' reading sends
+    `GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>` and
+    `GetStructuresList` sends `GET /sap/bc/adt/ddic/elementinfo?path=<structure>` (with the
+    Accept D1 measured). They fail today (the readings scan the source).
+  - **Answer pins:** today's answers on corpus documents — the exposed entities with name,
+    URI and alias, and the structure's included components — recorded now; after the move
+    they must stay equal.
 - [ ] **Step 2:** After the release, bump adt-clients and adt-strategies from the registry (a
   registry range; `npm install` regenerates the lockfile; check for `"link": true` and
   non-registry entries).
-- [ ] **Step 3:** Move the two readings onto the new members. The pins of Step 1 stay
-  green: the same answers. New pins: the element-info request per reading.
+- [ ] **Step 3:** Move the two readings onto the new members. The request pins of Step 1 turn
+  green, and the answer pins stay green: the same answers.
 - [ ] **Step 4: Live cases on both systems:** the exposed entities of a service definition the
   test creates (C14's fixtures), and the components of a structure with an anonymous
   include (a shared or test-made structure).

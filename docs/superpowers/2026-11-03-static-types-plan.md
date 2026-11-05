@@ -1671,6 +1671,16 @@ it or with it, and #346 bumps both from the registry.
   sent whenever the check permits it."
 - [ ] **Step 6: Commit.**
 
+**Owed live captures (open after D3; each needs a live run):**
+- [ ] **The function group create's interface `400`:** capture SAP's answer and read which T100
+  key it carries — `EC 304` or `EC 408` (the two keys T100 holds for "Interface & has not been
+  created", read on premise 2026-11-05), or none. `CreateFunctionGroup` reads the group back on
+  either key; without a key it answers the `400` as it came. Its trigger is not known yet.
+- [ ] **The dump's termination relation on premise:** `RuntimeGetDumpById` takes the link whose
+  relation is `http://www.sap.com/adt/relations/runtime/dump/termination`, measured on the BTP
+  ABAP environment only (2026-10-01); read a dump's links on premise and confirm the relation
+  (the `#start=` fallback over any link is gone).
+
 ### D4. XML through the parser (the 67 class-A sites)
 
 **Files** (regex inventory, class A): `enhancementAvailability.ts`,

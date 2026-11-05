@@ -4,7 +4,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readExceptionRefusal } from '@mcp-abap-adt/adt-strategies';
+import {
+  type AdtRefusal,
+  readExceptionRefusal,
+} from '@mcp-abap-adt/adt-strategies';
 import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
@@ -25,7 +28,11 @@ import { createAbapConnection } from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
-import { hasT100Key, NAME_TAKEN_KEYS } from './messageKeys';
+import {
+  ALREADY_EXISTS_TYPE,
+  hasT100Key,
+  NAME_TAKEN_KEYS,
+} from './messageKeys';
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
@@ -716,7 +723,8 @@ function validationFromStatus(response: {
  * Parse validation response from ADT, judged by key, never by words:
  * - an `exc:exception` (a name refused with `400`): not valid, SAP's message
  *   relayed; `exists` when a message carries a name-taken T100 key
- *   (`NAME_TAKEN_KEYS`);
+ *   (`NAME_TAKEN_KEYS`), or, with no key, the type is
+ *   `ExceptionResourceAlreadyExists`;
  * - `asx:abap` `DATA`: `CHECK_RESULT` `X` is valid; else `SEVERITY` decides,
  *   `SHORT_TEXT` and `LONG_TEXT` relayed — that form carries no key, so
  *   `exists` is not stated.
@@ -728,9 +736,7 @@ export function parseValidationResponse(response: {
 }): ValidationReading {
   const exception = readExceptionRefusal(response.data);
   if (exception) {
-    const exists = exception.messages.some((message) =>
-      hasT100Key(message, NAME_TAKEN_KEYS),
-    );
+    const exists = namesTakenName(exception);
     return {
       valid: false,
       severity: 'ERROR',
@@ -779,17 +785,27 @@ export function parseValidationResponse(response: {
 }
 
 /**
+ * Whether an `exc:exception` refuses a name that is taken: a message
+ * carries a name-taken T100 key (`NAME_TAKEN_KEYS`), or — SAP giving no key —
+ * the exception type is `ExceptionResourceAlreadyExists`.
+ */
+function namesTakenName(refusal: AdtRefusal): boolean {
+  const keyed = refusal.messages.some((message) => message.t100 !== undefined);
+  return keyed
+    ? refusal.messages.some((message) => hasT100Key(message, NAME_TAKEN_KEYS))
+    : refusal.adtType === ALREADY_EXISTS_TYPE;
+}
+
+/**
  * Whether an error is SAP's refusal of a name that is taken: its body is an
- * `exc:exception` whose message carries a name-taken T100 key
- * (`NAME_TAKEN_KEYS`) — read by key, whatever the logon language words it.
+ * `exc:exception` carrying a name-taken T100 key (`NAME_TAKEN_KEYS`), or —
+ * where SAP gives no key — of type `ExceptionResourceAlreadyExists`; read by
+ * key or type, whatever the logon language words it.
  * @param error - an error carrying SAP's answer (`response.data`)
  */
 export function isAlreadyExistsError(error: unknown): boolean {
   const refusal = readExceptionRefusal(childAt(error, 'response', 'data'));
-  return (
-    refusal?.messages.some((message) => hasT100Key(message, NAME_TAKEN_KEYS)) ??
-    false
-  );
+  return refusal !== null && namesTakenName(refusal);
 }
 
 export interface ServerOptions {

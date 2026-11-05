@@ -113,14 +113,39 @@ instead:** the check run's answer: its status and its messages' types.
 
 **Changed: `isAlreadyExistsError(error)` and `parseValidationResponse(response)`.** A taken name
 is SAP's `exc:exception` carrying the T100 key `OO 002` (a class) or `SWB_TOOL 016` (a domain, a
-table); it is recognised in any logon language, and the words "already exists" under another key
-no longer count. `isAlreadyExistsError` reads the body of the error you pass
+table); it is recognised in any logon language. Where SAP gives no key, the exception type decides:
+a keyless `exc:exception` of type `ExceptionResourceAlreadyExists` counts. The words "already
+exists" under another key or type no longer count, and neither does that type under another key
+(`PAK 058`, a package held by the session, is no taken name). `isAlreadyExistsError` reads the body of the error you pass
 (`error.response.data`): a message string alone is no longer recognised. The DDL and function
 group validations refuse a taken name with `SEVERITY` `ERROR` and a sentence, without a key:
 `parseValidationResponse` answers `valid: false` with SAP's text, and states no `exists`.
 
 **The rule:** SAP's answers and errors are judged by their T100 key (message class and number)
 and message type; where SAP gives no key, by the structured verdict, its text relayed as it came.
+
+## Callers of the checked deletes: the delete is sent once the check permits it
+
+**Changed:** `DeleteBehaviorDefinition`, `DeleteBehaviorImplementation`, `DeleteCdsUnitTest`,
+`DeleteClass`, `DeleteDataElement`, `DeleteDdl`, `DeleteDomain`, `DeleteFunctionGroup`,
+`DeleteFunctionInclude`, `DeleteFunctionModule`, `DeleteInclude`, `DeleteInterface`,
+`DeleteMessageClass`, `DeleteMetadataExtension`, `DeletePackage`, `DeleteProgram`,
+`DeleteServiceBinding`, `DeleteServiceDefinition`, `DeleteStructure`, `DeleteTable` and
+`DeleteTableType` run SAP's deletion check, then send the delete whenever the check permits it,
+and answer the delete's document: `deleted`, `object` and SAP's message.
+
+**What changes for you:**
+- A permitted check whose message worded the object "does not exist" no longer ends the call. On
+  premise SAP words existing function modules, function includes and inactive service
+  definitions and bindings so; 23.x left them in place and answered success (`deleted: false`,
+  `deletable: true`).
+- An object already gone whose check still permits the delete (deleted earlier, its directory
+  entry waiting on an open request) now gets SAP's answer to the delete: a refusal such as
+  `SWB_TOOL 029` ("Error while deleting object … from the database"), or W "Release transport … to
+  remove the object directory entry". 23.x answered it as a success, `deleted: false`.
+- A delete's answer no longer carries `deletable`: read `deleted`. A refused check (an
+  `isDeletable="false"`, or a typed `E` beside `isDeletable="true"`) is answered as the failure it
+  is, with SAP's messages and their T100 keys, and nothing but the check is sent.
 
 ## Callers of `CreateDomain`: `package_name` is required
 

@@ -66,6 +66,24 @@ function refusedWithKeys(name: string): string {
   );
 }
 
+/**
+ * The check of a missing function module, as measured (on premise,
+ * 2026-11-04): `isDeletable="true"`, a W "does not exist" and a typed E
+ * keyed `RIS_MESSAGES 014`. The E's type is what refuses it.
+ */
+const MISSING_E_TYPE = 'E';
+function permittedWithError(name: string, eType = MISSING_E_TYPE): string {
+  return (
+    `<?xml version="1.0" encoding="utf-8"?><del:checkResponse ${NS}>` +
+    `<del:object del:externalStrongReferences="0" del:externalWeakReferences="0" del:isDeletable="true" adtcore:name="${name}">` +
+    '<del:lockingTransport><del:recording>false</del:recording></del:lockingTransport>' +
+    `<del:message del:priority="0" del:type="W"><del:text>${name} does not exist</del:text></del:message>` +
+    `<del:message del:priority="0" del:type="${eType}"><del:text>Error while converting object references</del:text>` +
+    '<atom:link href="/sap/bc/adt/messageclass/RIS_MESSAGES/messages/014/longtext?language=E" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/>' +
+    '</del:message></del:object></del:checkResponse>'
+  );
+}
+
 /** A delete SAP refuses, keyed SWB_TOOL 029 (on premise, 2026-09-26). */
 function deleteRefused(name: string): string {
   return (
@@ -278,6 +296,34 @@ describe.each(CASES)('$tool', (c) => {
       expected: [c.check],
     });
     const connection = recordingConnection([{ data: refusedWithKeys(c.name) }]);
+    const result = await c.run(connection);
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      origin: 'refusal',
+      messages: [
+        { type: 'W', text: `${c.name}: ${c.name} does not exist` },
+        {
+          type: 'E',
+          text: `${c.name}: Error while converting object references`,
+          t100: { id: 'RIS_MESSAGES', no: '014' },
+        },
+      ],
+    });
+  });
+
+  it('a permitted check with a typed E (the measured missing function module) is refused, only the check sent', async () => {
+    await runPinCase({
+      tool: c.tool,
+      variant: 'onprem',
+      stand: 'recording',
+      args: c.args,
+      answers: [{ data: permittedWithError(c.name) }],
+      refusal: 'answer',
+      expected: [c.check],
+    });
+    const connection = recordingConnection([
+      { data: permittedWithError(c.name) },
+    ]);
     const result = await c.run(connection);
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject({

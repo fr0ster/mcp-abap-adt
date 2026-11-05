@@ -10,6 +10,9 @@ const dotenv = require('dotenv');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('../dist/lib/connectionFactory.js');
 const { credentialFromSapConfig } = require('../dist/lib/credentialSources.js');
+const {
+  isAlreadyExistsError: takenNameRefused,
+} = require('../dist/lib/utils.js');
 const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
@@ -94,12 +97,14 @@ function parseAdtException(error) {
   }
 }
 
-/** An existing object, by the error's code or the exception type SAP names (never its words). */
+/**
+ * An existing object, by the error's code or by the library's reading of SAP's
+ * answer (its T100 key, or the exception type where SAP gives none) — never its words.
+ */
 function isAlreadyExistsError(error) {
   return (
     error?.code === AdtObjectErrorCodes.VALIDATION_FAILED ||
-    (error?.response?.status === 400 &&
-      parseAdtException(error)?.type === 'ExceptionResourceAlreadyExists')
+    takenNameRefused(error)
   );
 }
 

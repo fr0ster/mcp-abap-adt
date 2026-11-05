@@ -32,3 +32,10 @@ export const NAME_TAKEN_KEYS: readonly T100Key[] = [
   { id: 'OO', no: '002' },
   { id: 'SWB_TOOL', no: '016' },
 ];
+
+/**
+ * The exception type that names a taken name where SAP gives no T100 key:
+ * the structured verdict then. Not in the corpus (an Inference from the
+ * readers before 24.0.0); with a key, the key decides.
+ */
+export const ALREADY_EXISTS_TYPE = 'ExceptionResourceAlreadyExists';

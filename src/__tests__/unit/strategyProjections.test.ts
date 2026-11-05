@@ -143,7 +143,7 @@ describe('deletion', () => {
   // followed by the delete, so a check's document is no deletion to project.
   it("the check's document is no deletion", () => {
     const r = readingOf('deletion-check-allows--01-deletion-check');
-    expect(terseDeletion(r.value as never, r.status)).toBeUndefined();
+    expect(terseDeletion(r.value, r.status)).toBeUndefined();
   });
 });
 

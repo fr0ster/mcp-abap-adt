@@ -11,6 +11,7 @@
  * (2026-10-01).
  */
 
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { handleCreateFunctionGroup } from '../../../handlers/function/high/handleCreateFunctionGroup';
 import { dumpSummaryOf } from '../../../handlers/system/readonly/handleRuntimeGetDumpById';
@@ -49,6 +50,16 @@ function exception(
     '<properties><entry key="LONGTEXT"/>' +
     `<entry key="T100KEY-ID">${id}</entry><entry key="T100KEY-NO">${no}</entry>` +
     '</properties></exc:exception>'
+  );
+}
+
+/** An `exc:exception` with `text` and no T100 key, of type `type`. */
+function keyless(text: string, type: string): string {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
+    `<namespace id="com.sap.adt"/><type id="${type}"/>` +
+    `<message lang="EN">${text}</message><localizedMessage lang="EN">${text}</localizedMessage>` +
+    '</exc:exception>'
   );
 }
 
@@ -93,6 +104,52 @@ describe('isAlreadyExistsError: a taken name, by its T100 key', () => {
         ),
       ),
     ).toBe(true);
+  });
+});
+
+describe('isAlreadyExistsError: with no key, the exception type decides', () => {
+  it('a keyless ExceptionResourceAlreadyExists is recognised', () => {
+    expect(
+      isAlreadyExistsError(
+        carrying(keyless('ZX', 'ExceptionResourceAlreadyExists')),
+      ),
+    ).toBe(true);
+    expect(
+      parseValidationResponse({
+        status: 400,
+        data: keyless('ZX', 'ExceptionResourceAlreadyExists'),
+      }).exists,
+    ).toBe(true);
+  });
+
+  it('the same words under another type are not', () => {
+    expect(
+      isAlreadyExistsError(
+        carrying(keyless('Class ZX already exists', 'InvalidClifName')),
+      ),
+    ).toBe(false);
+    expect(
+      parseValidationResponse({
+        status: 400,
+        data: keyless('Class ZX already exists', 'InvalidClifName'),
+      }).exists,
+    ).toBeUndefined();
+  });
+
+  it('with a key, the key decides: the type with another key is not (PAK 058, a held package)', () => {
+    expect(
+      isAlreadyExistsError(
+        carrying(
+          exception(
+            'Package ZX is already locked',
+            'PAK',
+            '058',
+            'EN',
+            'ExceptionResourceAlreadyExists',
+          ),
+        ),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -279,10 +336,7 @@ describe('return_error: network failures by their code, not their words', () => 
   });
 
   it("an SDK McpError answers its own words, cut by its code's prefix", () => {
-    const error = Object.assign(new Error('MCP error -32602: bad input'), {
-      name: 'McpError',
-      code: -32602,
-    });
+    const error = new McpError(ErrorCode.InvalidParams, 'bad input');
     expect(return_error(error).content[0]?.text).toBe('bad input');
   });
 

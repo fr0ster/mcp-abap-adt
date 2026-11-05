@@ -27,8 +27,13 @@
  * the run.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { child, type Element, isElement, isList } from '../xml/tree';
-import type { AdtReading } from './reading';
+import { child, entries, listOf, text } from '../xml/tree';
+import {
+  type AdtReading,
+  attributeOf,
+  membersNamed,
+  parseStructure,
+} from './reading';
 import { withStep } from './step';
 
 /** What a run answered, once it stopped running. */
@@ -127,104 +132,93 @@ export function readingOf(value: unknown): {
   return { parsed: value, raw: typeof value === 'string' ? value : '' };
 }
 
-function attrs(node: unknown): Element {
-  const a = child(node, '@');
-  return isElement(a) ? a : {};
+/**
+ * The documents a value holds, in the order they are read: its parse, then
+ * its document kept as text, parsed (`parseStructure`) — a caller may hand a
+ * set that keeps only the document.
+ */
+function documentsOf(value: unknown): unknown[] {
+  const { parsed, raw } = readingOf(value);
+  return [parsed, parseStructure(raw)];
+}
+
+/** A document's root element: its first member that is not the declaration. */
+function rootOf(document: unknown): unknown {
+  return entries(document).find(([name]) => !name.startsWith('?'))?.[1];
 }
 
 /**
- * `runs:status` out of a run document.
+ * `runs:status` out of a run document, lowercased; `''` when it states none.
  *
- * The attribute is read from the parse when there is one and off the raw text
+ * Read from the parse when there is one and from the document kept as text
  * otherwise, because `run`'s reading is `structured` in `READING_BY_SLOT` but a
  * caller may hand this a set that keeps the document.
  */
 export function runStatusOf(value: unknown): string {
-  const { parsed, raw } = readingOf(value);
-  const root = child(parsed, 'runs:run');
-  const stated = attrs(root)['runs:status'] ?? attrs(root).status;
-  if (typeof stated === 'string' && stated !== '') return stated.toLowerCase();
-  const fromText = raw.match(/\brun[s]?:status="([^"]+)"/i)?.[1];
-  return (fromText ?? '').toLowerCase();
+  for (const document of documentsOf(value)) {
+    const root = rootOf(document);
+    const stated =
+      attributeOf(root, 'runs:status') ??
+      attributeOf(root, 'run:status') ??
+      attributeOf(root, 'status');
+    if (stated !== undefined && stated !== '') return stated.toLowerCase();
+  }
+  return '';
+}
+
+/** A message's words: its `shortText`, or the `txt` in it, else its `text` attribute. */
+function wordsOf(msg: unknown): string {
+  const shortText = child(msg, 'shortText');
+  const own = text(shortText);
+  if (own !== undefined) return own;
+  const txt = listOf(child(shortText, 'txt'))
+    .map((member) => text(member))
+    .filter((words) => words !== undefined);
+  if (txt.length > 0) return txt.join(',');
+  return attributeOf(msg, 'text') ?? 'Unknown message';
 }
 
 /**
  * Every message a results document carries.
  *
  * The shape is the checklist the single-object `/activation` answers —
- * `chkl:messages` with `msg` children — so this reads the same two spellings
- * `parseActivationResponse` does, and keeps the object each message is about
- * when the document names one. A results document with no messages is not an
- * error: a run that activated everything says nothing.
+ * `chkl:messages` with `msg` children — read at any depth, so a document this
+ * reading does not recognise by its root still has its messages read, and
+ * keeps the object each message is about when the document names one. A
+ * results document with no messages is not an error: a run that activated
+ * everything says nothing. `type` comes back as stated; the caller decides
+ * what `E` means.
  */
 export function activationMessagesOf(value: unknown): ActivationMessage[] {
-  const { parsed, raw } = readingOf(value);
-  const messages: ActivationMessage[] = [];
-  const root = child(parsed, 'chkl:messages') ?? child(parsed, 'messages');
-  const raw_msgs = child(root, 'msg');
-  const list = isList(raw_msgs)
-    ? raw_msgs
-    : raw_msgs === undefined
-      ? []
-      : [raw_msgs];
-  for (const msg of list) {
-    const a = attrs(msg);
-    const shortText = child(msg, 'shortText');
-    const text =
-      typeof shortText === 'string' ? shortText : child(shortText, 'txt');
-    messages.push({
-      type: String(a.type ?? a['@_type'] ?? 'info'),
-      text: String(text ?? a.text ?? 'Unknown message'),
-      ...(a.objName !== undefined
-        ? { objectName: String(a.objName) }
-        : a['adtcore:name'] !== undefined
-          ? { objectName: String(a['adtcore:name']) }
-          : {}),
+  for (const document of documentsOf(value)) {
+    const messages = membersNamed(document, 'msg').map(({ node: msg }) => {
+      const objectName =
+        attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
+      return {
+        type: attributeOf(msg, 'type') ?? 'info',
+        text: wordsOf(msg),
+        ...(objectName !== undefined ? { objectName } : {}),
+      };
     });
+    if (messages.length > 0) return messages;
   }
-  if (messages.length === 0 && raw !== '') {
-    // A document this parse does not recognise still has its messages in text:
-    // report them rather than answering "no messages" for a document nobody
-    // read. `type` comes back as stated; the caller decides what `E` means. The
-    // object name is picked up too — dropping it here would make a refusal name
-    // no object, which is the one detail that makes a group failure actionable.
-    for (const m of raw.matchAll(
-      /<msg\b([^>]*)>[\s\S]*?<shortText>(?:<txt>)?([^<]*)/gi,
-    )) {
-      const tag = m[1];
-      const named =
-        tag.match(/\bobjName="([^"]*)"/i)?.[1] ??
-        tag.match(/\badtcore:name="([^"]*)"/i)?.[1];
-      messages.push({
-        type: tag.match(/\btype="([^"]*)"/i)?.[1] ?? 'info',
-        text: m[2],
-        ...(named !== undefined ? { objectName: named } : {}),
-      });
-    }
-  }
-  return messages;
+  return [];
 }
 
 /**
  * `activationExecuted` of a results document's `chkl:properties`: SAP's own
  * statement whether the activation ran (`"false"` for a run SAP cancelled,
  * "Activation was cancelled.", or one with nothing to activate). `undefined`
- * where the document states none. Read from the parse, else off the raw
- * text by plain string search (the attribute of the one `chkl:properties`
- * element), never from a message's words.
+ * where the document states none. Read from the parse, else from the
+ * document kept as text, parsed — never from a message's words.
  */
 export function activationExecutedOf(value: unknown): boolean | undefined {
-  const { parsed, raw } = readingOf(value);
-  const root = child(parsed, 'chkl:messages') ?? child(parsed, 'messages');
-  const properties = child(root, 'chkl:properties');
-  const stated = attrs(properties).activationExecuted;
-  if (stated === 'true' || stated === 'false') return stated === 'true';
-  const element = raw.indexOf('<chkl:properties');
-  if (element < 0) return undefined;
-  const end = raw.indexOf('>', element);
-  const tag = raw.slice(element, end < 0 ? undefined : end);
-  if (tag.includes(' activationExecuted="true"')) return true;
-  if (tag.includes(' activationExecuted="false"')) return false;
+  for (const document of documentsOf(value)) {
+    for (const { node } of membersNamed(document, 'chkl:properties')) {
+      const stated = attributeOf(node, 'activationExecuted');
+      if (stated === 'true' || stated === 'false') return stated === 'true';
+    }
+  }
   return undefined;
 }
 

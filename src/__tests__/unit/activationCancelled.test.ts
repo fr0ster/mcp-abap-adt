@@ -18,8 +18,13 @@ import { handleHandlerActivate } from '../../../compact-modify/src/handlers/hand
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import { handleGetActivationResults } from '../../handlers/common/readonly/handleGetActivationRun';
+import { corpusBody } from '../../lib/adtCorpus';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
-import { activationExecutedOf } from '../../lib/strategies/activationRun';
+import {
+  activationExecutedOf,
+  activationMessagesOf,
+  runStatusOf,
+} from '../../lib/strategies/activationRun';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -232,4 +237,60 @@ describe('activation answers follow SAP’s verdict', () => {
       expect(activationExecutedOf({ value: parsed, raw: '' })).toBe(executed);
     },
   );
+});
+
+/**
+ * The run's documents kept as text are read through the XML parser, as the
+ * structured reading reads them: the corpus answers read as they read today,
+ * and what the text search missed — an apostrophe-quoted attribute, an entity,
+ * CDATA — reads as XML says.
+ */
+describe('a run document kept as text, read through the XML parser', () => {
+  const FAILED = corpusBody('refusal-activation-fails--01-activation');
+
+  it('the recorded refusal: its message, type and words — tests/fixtures/adt/refusal-activation-fails--01-activation.body.xml', () => {
+    expect(activationMessagesOf(FAILED)).toEqual([
+      { type: 'E', text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.' },
+    ]);
+    expect(activationExecutedOf(FAILED)).toBe(false);
+  });
+
+  it('the recorded success: no messages, activation executed — tests/fixtures/adt/activation-success-verdict--01-activation.body.xml', () => {
+    const success = corpusBody('activation-success-verdict--01-activation');
+    expect(activationMessagesOf(success)).toEqual([]);
+    expect(activationExecutedOf(success)).toBe(true);
+  });
+
+  it('a run status as the run answers it', () => {
+    expect(
+      runStatusOf(
+        '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+      ),
+    ).toBe('finished');
+  });
+
+  it('a run status quoted with apostrophes', () => {
+    expect(
+      runStatusOf(
+        '<runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status=\'finished\'/>',
+      ),
+    ).toBe('finished');
+  });
+
+  it("a message's words with an entity and its object quoted with apostrophes", () => {
+    const document =
+      `<chkl:messages ${CHECKLIST}><msg type='E' objName='ZMCP_X'>` +
+      '<shortText><txt>A &lt; B</txt></shortText></msg></chkl:messages>';
+    expect(activationMessagesOf(document)).toEqual([
+      { type: 'E', text: 'A < B', objectName: 'ZMCP_X' },
+    ]);
+  });
+
+  it('activationExecuted quoted with apostrophes', () => {
+    expect(
+      activationExecutedOf(
+        `<chkl:messages ${CHECKLIST}><chkl:properties activationExecuted='false'/></chkl:messages>`,
+      ),
+    ).toBe(false);
+  });
 });

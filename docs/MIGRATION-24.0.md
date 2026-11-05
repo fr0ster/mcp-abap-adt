@@ -113,11 +113,11 @@ instead:** the check run's answer: its status and its messages' types.
 
 **Changed: `isAlreadyExistsError(error)` and `parseValidationResponse(response)`.** A taken name
 is SAP's `exc:exception` carrying the T100 key `OO 002` (a class validation), `SWB_TOOL 016` (a
-domain or table validation) or `SADT_RESOURCE 001` (creating a class that exists); it is recognised
+domain or table validation), `SADT_RESOURCE 001` (creating a class that exists) or `XI 001`
+(creating a program that exists, `500` `ExceptionResourceCreationFailure`); it is recognised
 in any logon language. Where SAP gives no key, the exception type decides: a keyless
 `exc:exception` of type `ExceptionResourceAlreadyExists` counts (an inference: every answer measured
-carries a key). Creating a program that exists answers `500` `ExceptionResourceCreationFailure`
-keyed `XI 001`: it is not named, and SAP's answer reaches you as it came. The words "already
+carries a key). The words "already
 exists" under another key or type no longer count, and neither does that type under another key
 (`PAK 058`, a package held by the session, is no taken name). `isAlreadyExistsError` reads the body of the error you pass
 (`error.response.data`): a message string alone is no longer recognised. The DDL and function

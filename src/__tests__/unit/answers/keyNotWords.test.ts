@@ -150,14 +150,15 @@ describe('the creates measured on premise (2026-11-05)', () => {
     ).toBe(true);
   });
 
-  it("a program duplicate (XI 001) is not named: SAP's answer is relayed as it is", () => {
-    expect(isAlreadyExistsError(carrying(programTaken))).toBe(false);
+  it("a program duplicate (XI 001) is a taken name, SAP's text relayed", () => {
+    expect(isAlreadyExistsError(carrying(programTaken))).toBe(true);
     expect(
       parseValidationResponse({ status: 500, data: programTaken }),
     ).toEqual({
       valid: false,
       severity: 'ERROR',
       message: 'A program or include already exists with the name ZPROG_X',
+      exists: true,
     });
   });
 });

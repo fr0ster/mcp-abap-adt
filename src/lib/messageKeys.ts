@@ -31,16 +31,19 @@ export function hasT100Key(
  * - `SADT_RESOURCE 001` "Resource &1 &2 does already exist." — Measured:
  *   creating a class that exists, on premise 2026-11-05 (`400`,
  *   `ExceptionResourceAlreadyExists`, V1 `CLASS`, V2 the name).
+ * - `XI 001` "A program or include already exists with the name &" —
+ *   Measured: creating a program that exists, on premise 2026-11-05
+ *   (`500`, `ExceptionResourceCreationFailure`, V1 the name); its T100 text
+ *   read on premise the same day.
  *
  * The DDL and function group validations answer `SEVERITY` `ERROR` with a
- * sentence and no key, and creating a program that exists answers `500`
- * `ExceptionResourceCreationFailure` keyed `XI 001` (on premise,
- * 2026-11-05): neither is named here; SAP's answer is relayed as it is.
+ * sentence and no key: that refusal is relayed, not named.
  */
 export const NAME_TAKEN_KEYS: readonly T100Key[] = [
   { id: 'OO', no: '002' },
   { id: 'SWB_TOOL', no: '016' },
   { id: 'SADT_RESOURCE', no: '001' },
+  { id: 'XI', no: '001' },
 ];
 
 /**

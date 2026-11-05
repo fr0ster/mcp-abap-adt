@@ -41,6 +41,7 @@ import {
   keyOf,
 } from '../unit/coverage/coverageKeys';
 import { type AdtStandIn, adtStandIn, type StandInRequest } from './adtStandIn';
+import { holdingLockOf } from './heldLocks';
 import { type PinSetup, pinServer } from './pinServer';
 import {
   type RecordedRequest,
@@ -463,7 +464,10 @@ export async function recordCase(
       declareSystemKind(connection, c.variant);
       const call = async (tool: string, args: ToolArgs) =>
         resultOf(
-          await entryOf(tool, c.variant, options).call({ connection }, args),
+          await entryOf(tool, c.variant, options).call(
+            { connection, heldLocks: holdingLockOf(args) },
+            args,
+          ),
         );
       const mark = { from: connection.requests.length };
       try {
@@ -518,7 +522,10 @@ export async function recordCase(
       await connection.connect();
       call = async (tool, args) =>
         resultOf(
-          await entryOf(tool, c.variant, options).call({ connection }, args),
+          await entryOf(tool, c.variant, options).call(
+            { connection, heldLocks: holdingLockOf(args) },
+            args,
+          ),
         );
     }
     const mark = { from: stand.requests.length };

@@ -22,6 +22,7 @@ import {
   statusError,
 } from '../../helpers/batchEnvelope';
 import { batchStand, payloadOf } from '../../helpers/batchStand';
+import { holding } from '../../helpers/heldLocks';
 import {
   SAP_EXCEPTION_HEADERS,
   unsupportedMediaTypeBody,
@@ -73,6 +74,7 @@ const WRITE = {
 describe('no retry in batch mode', () => {
   it("406 (supported Accept named) and 415 parts are the calls' answers; each request sent once; no follow-up envelope", async () => {
     const s = await batchStand({
+      heldLocks: holding('LOCK_HANDLE_PLACEHOLDER'),
       tools: ['GetProgram', 'HandlerUpdate'],
       part: picky,
     });
@@ -94,6 +96,7 @@ describe('no retry in batch mode', () => {
 
   it('an envelope answered 406 is not sent again', async () => {
     const s = await batchStand({
+      heldLocks: holding('LOCK_HANDLE_PLACEHOLDER'),
       tools: ['GetProgram'],
       part: picky,
       // SAP refuses the envelope itself 406, naming another Accept.
@@ -118,7 +121,11 @@ describe('no retry in batch mode', () => {
   });
 
   it('outside a batch a header-taking call answered 415 is sent once more with the named Content-Type', async () => {
-    const s = await batchStand({ tools: ['HandlerUpdate'], part: picky });
+    const s = await batchStand({
+      heldLocks: holding('LOCK_HANDLE_PLACEHOLDER'),
+      tools: ['HandlerUpdate'],
+      part: picky,
+    });
     const answer = await s.call('HandlerUpdate', WRITE);
     expect(answer.isError).toBeFalsy();
     const puts = s.built

@@ -28,6 +28,10 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  LOCK_NOT_HELD_WORDS,
+  lockHeldHere,
+} from '../../../lib/state/heldLocks';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -49,7 +53,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        'Lock handle from LockObject. If not provided, will attempt to lock internally.',
+        'Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.',
       ),
     transport_request: z
       .string()
@@ -82,6 +86,12 @@ export async function handleUpdateMetadataExtension(
 
   if (!args.name || !args.source_code) {
     return return_error(new Error('Missing required parameters'));
+  }
+
+  // A write under a caller's lock_handle is sent only under one this
+  // instance's lock issued: SAP takes any handle in the locking session.
+  if (args.lock_handle && !lockHeldHere(context.heldLocks, args.lock_handle)) {
+    return return_error(new Error(LOCK_NOT_HELD_WORDS));
   }
 
   const ddlxName = args.name.toUpperCase();

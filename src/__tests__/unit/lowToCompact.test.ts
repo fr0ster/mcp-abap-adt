@@ -39,6 +39,7 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { holdingLockOf } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
 import {
   type LowToCompactRow,
@@ -214,7 +215,10 @@ async function compactRequests(row: LowToCompactRow): Promise<ParityRequest[]> {
   for (const call of row.compact) {
     const entry = tools.get(call.tool);
     if (!entry) throw new Error(`no compact tool ${call.tool}`);
-    await entry.call(context, declared(entry, call.args));
+    await entry.call(
+      { ...context, heldLocks: holdingLockOf(call.args) },
+      declared(entry, call.args),
+    );
   }
   return parityRequests(connection.requests);
 }

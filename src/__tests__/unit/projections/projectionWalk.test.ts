@@ -107,6 +107,7 @@ import {
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { holding } from '../../helpers/heldLocks';
 import { PROJECTED_ARGUMENTS } from '../../helpers/projectedArguments';
 import {
   type RecordedRequest,
@@ -682,7 +683,11 @@ describe('every projected value reaches a served path', () => {
     process.env.SAP_SYSTEM_TYPE = variant;
     const connection = recordingConnection();
     declareSystemKind(connection, variant);
-    const context: HandlerContext = { connection };
+    // The instance locked what the walk writes under.
+    const context: HandlerContext = {
+      connection,
+      heldLocks: holding('LOCKHANDLE'),
+    };
     const answered = await step
       .send(context)
       .catch((thrown: unknown) => ({ thrown: String(thrown) }));

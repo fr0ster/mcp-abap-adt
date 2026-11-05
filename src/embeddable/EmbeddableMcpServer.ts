@@ -28,6 +28,7 @@ import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution.js';
+import type { HeldLocks } from '../lib/state/heldLocks.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
 import { setSystemContext } from '../lib/systemContext.js';
@@ -91,6 +92,17 @@ export interface EmbeddableMcpServerOptions {
    * `batch_mode_unavailable`.
    */
   batch?: InstanceBatch;
+
+  /**
+   * The locks this instance takes, created by the embedder for this instance
+   * alone — `new HeldLocks()` — never shared with another instance: compact
+   * `HandlerLock` keeps the handle it answered there, and a write, a delete
+   * or an unlock under a `lock_handle` is sent only under one it keeps.
+   * Absent: the instance makes its own, as it is constructed. A host that
+   * makes an instance per request and keeps a lock across requests hands
+   * each request's instance the owner it keeps for that caller.
+   */
+  heldLocks?: HeldLocks;
 
   /**
    * Logger instance
@@ -245,6 +257,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
         backgroundRuns: options.backgroundRuns,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
+      ...(options.heldLocks !== undefined && {
+        heldLocks: options.heldLocks,
+      }),
       ...(options.adtHeaderPairs !== undefined && {
         adtHeaderPairs: options.adtHeaderPairs,
       }),

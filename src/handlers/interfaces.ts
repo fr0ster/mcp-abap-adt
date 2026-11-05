@@ -66,9 +66,9 @@ export interface HandlerContext {
    */
   adtHeaders?: AdtHeaderPort;
   /**
-   * The locks this instance holds between requests (`HeldLocks`), given by a
-   * host whose instances last one request each (Streamable HTTP); absent on
-   * stdio and SSE, whose instance keeps its session between calls.
+   * The locks this instance holds between requests (`HeldLocks`): every
+   * server instance's own. Absent (a group registered on a plain McpServer):
+   * no lock is taken, and nothing is sent under a `lock_handle`.
    */
   heldLocks?: HeldLockPort;
   /**

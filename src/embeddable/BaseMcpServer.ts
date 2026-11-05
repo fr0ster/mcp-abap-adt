@@ -141,7 +141,7 @@ import {
   withDestinationSystemContext,
   withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
-import type { HeldLocks } from '../lib/state/heldLocks.js';
+import { HeldLocks } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
   type StateLogger,
@@ -325,8 +325,8 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly batch: InstanceBatch | undefined;
 
-  /** The locks this instance holds between requests (`heldLocks` option). */
-  protected readonly heldLocks: HeldLocks | undefined;
+  /** The locks this instance holds between requests (`heldLocks` option, else its own). */
+  protected readonly heldLocks: HeldLocks;
 
   /** The instance's long session (`longSession` option). */
   protected readonly longSession: LongSession | undefined;
@@ -396,10 +396,12 @@ export abstract class BaseMcpServer extends McpServer {
      */
     batch?: InstanceBatch;
     /**
-     * The locks this instance holds between requests, created by a host
-     * whose instances last one request each (Streamable HTTP) for this
-     * instance alone: held state, ended by the UNLOCK. Absent: the lock
-     * tools keep nothing (stdio, SSE: the instance keeps its session).
+     * The locks this instance holds between requests, created by the host
+     * for this instance alone (every transport: the Streamable HTTP pool's
+     * instances, each SSE connection's, stdio's one): held state, ended by
+     * the UNLOCK. A write, a delete or an unlock under a `lock_handle` is
+     * sent only under a handle kept here. Absent: the instance makes its
+     * own, as it is constructed.
      */
     heldLocks?: HeldLocks;
     /**
@@ -459,8 +461,8 @@ export abstract class BaseMcpServer extends McpServer {
     });
     this.batch = options.batch;
     if (this.batch !== undefined) this.state.attach(this.batch);
-    this.heldLocks = options.heldLocks;
-    if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
+    this.heldLocks = options.heldLocks ?? new HeldLocks();
+    this.state.attach(this.heldLocks);
     this.longSession = options.longSession;
     if (this.longSession !== undefined) this.state.attach(this.longSession);
     this.longSessionPort = this.longSessionPortOf(this.longSession);
@@ -525,7 +527,7 @@ export abstract class BaseMcpServer extends McpServer {
       isOpen: () => session.isOpen(),
       close: () => {
         const holding = {
-          locks: this.heldLocks?.count() ?? 0,
+          locks: this.heldLocks.count(),
           batch: this.batch?.holdsState() === true,
           debug_session: this.takenDebugger?.holdsState() === true,
         };
@@ -1073,7 +1075,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.built === entry) this.built = undefined;
     entry.retired = true;
     // The locks the instance held in that session end with it.
-    if (entry.ready !== undefined) this.heldLocks?.mainSessionEnded();
+    if (entry.ready !== undefined) this.heldLocks.mainSessionEnded();
     entry.connection.then(
       (connection) => {
         if (entry.users === 0) void endConnection(connection);
@@ -1514,9 +1516,7 @@ export abstract class BaseMcpServer extends McpServer {
                 ...(batchAvailability !== undefined
                   ? { batchAvailability }
                   : {}),
-                ...(this.heldLocks !== undefined
-                  ? { heldLocks: this.heldLocks }
-                  : {}),
+                heldLocks: this.heldLocks,
                 ...(this.longSessionPort !== undefined
                   ? { longSession: this.longSessionPort }
                   : {}),
@@ -1890,9 +1890,7 @@ export abstract class BaseMcpServer extends McpServer {
       ...(owner.mode() === 'debugger' ? { recordedFrom: call.context } : {}),
       // Its number is read later: a lock it answers is held only while the
       // SAP session its envelope went out on is still the instance's.
-      ...(this.heldLocks !== undefined
-        ? { heldLocks: this.heldLocks.heldIn(() => open.lockSession) }
-        : {}),
+      heldLocks: this.heldLocks.heldIn(() => open.lockSession),
     };
     open.target?.point(connection);
     try {
@@ -1992,7 +1990,7 @@ export abstract class BaseMcpServer extends McpServer {
         state: this.state,
         debugger: () => this.takeDebugger(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
-        ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
+        heldLocks: this.heldLocks,
         ...(this.longSessionPort !== undefined
           ? { longSession: this.longSessionPort }
           : {}),

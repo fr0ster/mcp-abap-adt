@@ -28,6 +28,7 @@ import type {
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
 import type { BatchEntryCase } from './batchEntryCases';
+import { holdingLockOf } from './heldLocks';
 import { LOCK_SUCCESS_XML } from './recordingConnection';
 import { toolAnswer } from './toolAnswer';
 
@@ -249,7 +250,13 @@ export async function runCase(
   if (!entry) throw new Error(`no served tool ${c.tool}`);
   const counting = countingConnection(mode, c.body, c.headers);
   (context as { connection: IAbapConnection }).connection = counting.connection;
-  const call = entry.call(context, structuredClone(c.args)).then(toolAnswer);
+  // The instance locked what the case writes under (`holdingLockOf`).
+  const call = entry
+    .call(
+      { heldLocks: holdingLockOf(c.args), ...context },
+      structuredClone(c.args),
+    )
+    .then(toolAnswer);
   if (mode === 'pending') {
     call.catch(() => undefined);
     await settle();

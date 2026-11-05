@@ -1442,6 +1442,29 @@ const writeCall = (
       };
 };
 
+/** The lock_handle a `HandlerLock` answer's text carries. */
+function lockHandleOf(text: string): string {
+  const read: unknown = JSON.parse(text);
+  if (
+    typeof read !== 'object' ||
+    read === null ||
+    !('lock_handle' in read) ||
+    typeof read.lock_handle !== 'string'
+  ) {
+    throw new Error(`no lock_handle in ${text}`);
+  }
+  return read.lock_handle;
+}
+
+/** The write under `lockHandle`: compact's write runs under a lock its instance holds. */
+const underLock = (
+  write: { name: string; arguments: Record<string, unknown> },
+  lockHandle: string,
+) => ({
+  name: write.name,
+  arguments: { ...write.arguments, lock_handle: lockHandle },
+});
+
 /** A `tools/call` written in two halves on a raw socket: accepted before `finish()`. */
 function halfPost(
   port: number,
@@ -1531,8 +1554,29 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
       serverSide,
     );
     await client.connect(clientSide);
+    // Compact's write runs under a lock the instance holds: the lock first.
+    let write = writeCall(set, className);
+    if (set === 'compact') {
+      const locked = await client.callTool({
+        name: 'HandlerLock',
+        arguments: { object_type: 'CLASS', object_name: className },
+      });
+      const content = locked.content;
+      const first = Array.isArray(content) ? content[0] : undefined;
+      write = underLock(
+        write,
+        lockHandleOf(
+          typeof first === 'object' &&
+            first !== null &&
+            'text' in first &&
+            typeof first.text === 'string'
+            ? first.text
+            : '',
+        ),
+      );
+    }
     void client
-      .callTool(writeCall(set, className), undefined, { timeout: 600_000 })
+      .callTool(write, undefined, { timeout: 600_000 })
       .catch(() => undefined);
     await hold.arrived;
     started.processLike.stdin.emit('end');
@@ -1620,6 +1664,45 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
     });
     const next = eventReader(stream.body as ReadableStream<Uint8Array>);
     const postPath = await next('endpoint');
+    // Compact's write runs under a lock the connection's instance holds:
+    // the lock first, its answer the stream's first message.
+    let write = writeCall(set, className);
+    if (set === 'compact') {
+      await fetch(new URL(postPath, `http://127.0.0.1:${port}`), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 0,
+          method: 'tools/call',
+          params: {
+            name: 'HandlerLock',
+            arguments: { object_type: 'CLASS', object_name: className },
+          },
+        }),
+      });
+      const message: unknown = JSON.parse(await next('message'));
+      const result =
+        typeof message === 'object' && message !== null && 'result' in message
+          ? message.result
+          : undefined;
+      const content =
+        typeof result === 'object' && result !== null && 'content' in result
+          ? result.content
+          : undefined;
+      const first = Array.isArray(content) ? content[0] : undefined;
+      write = underLock(
+        write,
+        lockHandleOf(
+          typeof first === 'object' &&
+            first !== null &&
+            'text' in first &&
+            typeof first.text === 'string'
+            ? first.text
+            : '',
+        ),
+      );
+    }
     await fetch(new URL(postPath, `http://127.0.0.1:${port}`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -1627,7 +1710,7 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
         jsonrpc: '2.0',
         id: 1,
         method: 'tools/call',
-        params: writeCall(set, className),
+        params: write,
       }),
     });
     await hold.arrived;

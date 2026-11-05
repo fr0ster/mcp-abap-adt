@@ -46,6 +46,7 @@ import {
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { moduleInGroup } from '../../helpers/functionModuleMetadata';
+import { holding } from '../../helpers/heldLocks';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 jest.setTimeout(60_000);
@@ -605,7 +606,8 @@ describe('every type argument is checked once, against its projection', () => {
     const connection = recordingConnection();
     declareSystemKind(connection, variant);
     const answered = await each
-      .send({ connection })
+      // The instance locked what the cases write under.
+      .send({ connection, heldLocks: holding('LOCKHANDLE') })
       .catch((thrown: unknown) => ({ thrown: String(thrown) }));
     if (each.expected === 'sent') {
       expect({

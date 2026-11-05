@@ -14,6 +14,7 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { holdingLockOf } from '../helpers/heldLocks';
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
 import { toolAnswer } from '../helpers/toolAnswer';
@@ -42,7 +43,7 @@ async function call(
   // Arguments the tool's schema refuses never reach its handler: the
   // refusal is the call's answer.
   const answered = await entry
-    .call(context, args)
+    .call({ ...context, heldLocks: holdingLockOf(args) }, args)
     .then(toolAnswer, (error) => ({
       isError: true,
       content: [{ text: String(error) }],

@@ -44,6 +44,7 @@ import {
   LOCK_SUCCESS_XML,
   payloadOf,
 } from '../../helpers/batchStand';
+import { holding } from '../../helpers/heldLocks';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -503,6 +504,8 @@ describe('BatchEnd', () => {
       tools: TOOLS,
       part: sap,
       keepRawParts: true,
+      // The instance locked what it unlocks.
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
     });
     on.begin();
     await on.call('GetObjectVersionDiff', DIFF_ARGS);

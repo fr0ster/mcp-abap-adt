@@ -1528,7 +1528,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-- `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
+- `lock_handle` (string, optional) - Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -2441,7 +2441,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-- `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally.
+- `lock_handle` (string, optional) - Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.

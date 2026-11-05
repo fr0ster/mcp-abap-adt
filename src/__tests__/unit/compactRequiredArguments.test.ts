@@ -31,6 +31,7 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { holding } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -163,7 +164,10 @@ async function call(
   const connection = recordingConnection();
   declareSystemKind(connection, variant);
   const answered = await TOOLS[need.tool]
-    .send({ connection }, { object_type: need.objectType, ...args })
+    .send(
+      { connection, heldLocks: holding() },
+      { object_type: need.objectType, ...args },
+    )
     .catch((thrown: unknown) => ({ thrown: String(thrown) }));
   return { requests: connection.requests.length, answered: textOf(answered) };
 }

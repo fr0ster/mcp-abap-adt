@@ -197,6 +197,35 @@ call for about 307 s before it answered `NOT_STARTED`.
 - Compact `HandlerUnitTestResult` and `HandlerCdsUnitTestResult` are unchanged: they read only
   the result.
 
+## Callers of the lock tools: a lock_handle is checked on every transport (#4)
+
+**Changed:** SAP releases the locking session's lock on an `UNLOCK` whatever handle it names, so
+the server checks the handle. Every transport's instance now keeps the handles its own
+`HandlerLock` issued — stdio's one instance and each SSE connection's instance, as each
+Streamable HTTP instance did in 23.x — and sends a write, a delete or an unlock under a
+`lock_handle` only under one of them. 23.x checked only on Streamable HTTP.
+
+**What changes for you:**
+- Compact `HandlerUnlock`, `HandlerUpdate` and `HandlerDelete` (the emptied includes), and the
+  full `UpdateBehaviorDefinition` and `UpdateMetadataExtension`, refuse a `lock_handle` the
+  instance did not issue, sending nothing: `lock_handle is not held by this instance: …`. Take
+  the lock with `HandlerLock` on the same instance (stdio: the server; SSE: the same connection;
+  Streamable HTTP: the `state_handle` the lock answered) and pass the handle it answered.
+- A handle is released by its `HandlerUnlock`: a second unlock with it is refused. A
+  `HandlerUnlock` refused for another reason (`FUNCTION_GROUP_MISMATCH`) keeps the handle; unlock
+  again with the module's group and the same handle.
+- `UpdateBehaviorDefinition` and `UpdateMetadataExtension` without `lock_handle` lock and unlock
+  themselves, as before.
+- `HandlerLock` answers the instance's `state_handle` on every transport; only Streamable HTTP
+  routes by it.
+- **Embedders:** every `BaseMcpServer` / `EmbeddableMcpServer` instance owns its held locks: the
+  `heldLocks` option (`new HeldLocks()` from `@mcp-abap-adt/lib/state`), else one of its own. A
+  host that makes an instance per request and keeps a lock across requests hands each request's
+  instance the `HeldLocks` it keeps for that caller; with a new owner per request, the write and
+  the unlock under a lock taken in an earlier request are refused. A handler group registered
+  on a plain `McpServer` has no held locks: there `HandlerLock` is refused, sending nothing
+  (`locks are not kept by this server instance: …`), and so is every call under a `lock_handle`.
+
 ## Callers of `CreateDomain`: `package_name` is required
 
 `CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed

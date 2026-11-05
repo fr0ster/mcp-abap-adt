@@ -227,12 +227,12 @@ function objectNamed<M extends string>(
 
 /** HandlerLock's description on `variant`. */
 export function compactLockDescription(variant: ProjectionVariant): string {
-  return `Lock operation. object_type required: ${objectNamed(COMPACT_LOCK[variant], { PACKAGE: 'PACKAGE(object_name*, super_package*)' }, 'object_name*')}. Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).`;
+  return `Lock operation. object_type required: ${objectNamed(COMPACT_LOCK[variant], { PACKAGE: 'PACKAGE(object_name*, super_package*)' }, 'object_name*')}. Answers the lock_handle and the state_handle of the server instance that holds the lock; a SERVICE_BINDING open in an editing session answers an empty lock_handle, under which its publication runs. A write, a delete or an unlock under the lock_handle runs on the instance that holds it. Over Streamable HTTP send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).`;
 }
 
 /** HandlerUnlock's description on `variant`. */
 export function compactUnlockDescription(variant: ProjectionVariant): string {
-  return `Unlock operation. object_type required: ${objectNamed(COMPACT_UNLOCK[variant], {}, 'object_name*, lock_handle*')}; an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the unlock ends the instance's hold on the lock.`;
+  return `Unlock operation. object_type required: ${objectNamed(COMPACT_UNLOCK[variant], {}, 'object_name*, lock_handle*')}; an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked. The lock_handle is one a lock of this server instance answered; the unlock ends the instance's hold on the lock. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).`;
 }
 
 /** HandlerValidate's description on `variant`. */

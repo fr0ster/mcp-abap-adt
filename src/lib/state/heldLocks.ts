@@ -11,9 +11,11 @@
  * UNLOCK; the instance's logoff (its end, the idle bound's terminal close)
  * ends it in SAP. No clock of its own.
  *
- * Given only by a host whose instances last one request each (the
- * Streamable HTTP server); stdio and SSE keep their instance's session
- * between calls and give none.
+ * Every transport gives each instance its own (#4): the Streamable HTTP
+ * server each pooled instance, the SSE server each connection's instance,
+ * the stdio server its one instance. SAP releases a session's lock on an
+ * UNLOCK whatever handle it names, so only the handles kept here tell a
+ * lock this instance took from one it did not.
  */
 import type { StatePart } from './InstanceState';
 
@@ -141,13 +143,15 @@ export class HeldLocks implements StatePart, HeldLockPort {
 }
 
 /**
- * Whether a write or an unlock under `lockHandle` may be sent on this
- * instance: always where the host keeps no locks; else only under a handle
- * this instance holds.
+ * Whether a write, a delete or an unlock under `lockHandle` may be sent on
+ * this instance: only under a handle this instance holds. An instance whose
+ * host gave it no held locks holds none. SAP releases a session's lock on an
+ * UNLOCK whatever handle it names (measured on premise), so the check is the
+ * server's.
  */
 export function lockHeldHere(
   heldLocks: HeldLockPort | undefined,
   lockHandle: string,
 ): boolean {
-  return heldLocks === undefined || heldLocks.holds(lockHandle);
+  return heldLocks !== undefined && heldLocks.holds(lockHandle);
 }

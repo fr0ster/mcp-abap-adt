@@ -13,6 +13,7 @@ import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
 import {
+  HeldLocks,
   NO_IDLE_BOUND,
   type StateLogger,
   stateLoggerOf,
@@ -94,6 +95,9 @@ export class StdioServer extends BaseMcpServer {
         backgroundRuns: opts.backgroundRuns,
       }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
+      // The locks the instance took: a write, a delete or an unlock under a
+      // lock_handle is sent only under one it holds.
+      heldLocks: new HeldLocks(),
       // The responsible rules, once, at the start (`connectAtStart`).
       systemContextResolver: defaultSystemContextResolver,
       systemContextRules: responsibleRules,

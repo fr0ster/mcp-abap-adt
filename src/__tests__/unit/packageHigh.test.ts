@@ -26,6 +26,7 @@ import type {
   HandlerEntry,
   ToolArgs,
 } from '../../lib/handlers/interfaces';
+import { holdingLockOf } from '../helpers/heldLocks';
 import {
   parityConnection,
   parityRequests,
@@ -80,7 +81,8 @@ function compactTool(connection: unknown, name: string) {
   ];
   const entry = entries.find((e) => e.toolDefinition.name === name);
   if (!entry) throw new Error(name);
-  return (args: ToolArgs) => entry.call(context, args);
+  return (args: ToolArgs) =>
+    entry.call({ ...context, heldLocks: holdingLockOf(args) }, args);
 }
 
 describe('UpdatePackage (high)', () => {

@@ -43,6 +43,7 @@ import type { McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
+import { HeldLocks } from '../../../lib/state/heldLocks';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { fullToolSet } from '../../../lib/toolSet';
 import { servedTools as plainEntries } from '../../helpers/batchHarness';
@@ -203,6 +204,9 @@ export function softRunner(options: {
   source: ServerSource;
 }): LiveRunner {
   let server: Promise<PinServer> | undefined;
+  // The locks the run's entry calls take, as one server instance owns them:
+  // a write or an unlock under a lock_handle goes only under one kept here.
+  const heldLocks = new HeldLocks();
   return {
     system: options.system,
     user: options.user,
@@ -217,7 +221,7 @@ export function softRunner(options: {
         throw new Error(`the ${options.system} variant serves no tool ${tool}`);
       }
       return liveAnswerOf(
-        await entry.call({ connection: options.connection }, args),
+        await entry.call({ connection: options.connection, heldLocks }, args),
       );
     },
     close: async () => {

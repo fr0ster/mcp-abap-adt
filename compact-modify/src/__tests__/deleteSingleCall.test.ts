@@ -20,6 +20,7 @@ import { compactDeleteSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
+import { holdingLockOf } from '../../../src/__tests__/helpers/heldLocks';
 import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
 import { corpusBody } from '../../../src/lib/adtCorpus';
@@ -107,7 +108,8 @@ async function run(
 ): Promise<Run> {
   const { connection, sent } = recording(mode);
   const pending = handleHandlerDelete(
-    contextOver(connection, heldLocks),
+    // Unless a case gives its own, the instance locked what it writes under.
+    contextOver(connection, heldLocks ?? holdingLockOf(args)),
     args as never,
   ) as Promise<Answer>;
   if (mode === 'pending') {

@@ -31,6 +31,7 @@ import {
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
 import {
+  HeldLocks,
   isLatched,
   parseStateIdleMinutes,
   type StateLogger,
@@ -369,6 +370,7 @@ export class SseServer {
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
+          heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
@@ -404,6 +406,9 @@ export class SseServer {
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
         }),
+        // The locks this connection's instance took: a write, a delete or
+        // an unlock under a lock_handle is sent only under one it holds.
+        heldLocks: new HeldLocks(),
         adtHeaderPairs: this.adtHeaderPairs,
       },
     );

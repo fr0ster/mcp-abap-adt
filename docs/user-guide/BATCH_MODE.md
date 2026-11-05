@@ -91,7 +91,8 @@ with the single-step tools:
    its handle, and a write or an unlock under it is refused, sending nothing — lock again. A
    lock number never read before the next `BatchEnd` replaces the map, and a lock batch whose
    `BatchEnd` failed, leave locks in SAP that no handle reaches: they last until that session's
-   logoff (stdio: the process's end; Streamable HTTP: the pooled instance's end; or SAP's own
+   logoff (stdio: the process's end; SSE: the connection's end; Streamable HTTP: the pooled
+   instance's end; or SAP's own
    session timeout). An unlock number is read the same way: the instance drops the handle from its
    held locks when that number is read, so an unlock number never read leaves the handle held after
    SAP unlocked it — a later write under that handle is sent and SAP refuses it, where a read

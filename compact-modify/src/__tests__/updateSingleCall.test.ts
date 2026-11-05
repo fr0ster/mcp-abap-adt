@@ -29,6 +29,7 @@ import {
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
+import { holding } from '../../../src/__tests__/helpers/heldLocks';
 import {
   declaredRequired,
   jsonAt,
@@ -115,8 +116,13 @@ const notModule = ([type]: readonly [string, unknown]) =>
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
+// The instance locked what the cases write under: its owner holds the handle.
 const contextOver = (connection: unknown) =>
-  ({ connection, logger: silent }) as unknown as HandlerContext;
+  ({
+    connection,
+    logger: silent,
+    heldLocks: holding(LOCK),
+  }) as unknown as HandlerContext;
 
 /** Lets every queued callback and immediate run, so a held handler sends all it can. */
 async function settle(): Promise<void> {
@@ -747,7 +753,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   });
 
   it.each([
-    ['without held locks', undefined],
+    ['holding the lock of the other cases', undefined],
     ['with held locks (Streamable HTTP)', new HeldLocks()],
   ])(
     'unlocking a service binding with an empty lock_handle, %s: nothing to unlock, nothing sent',

@@ -35,6 +35,9 @@ request-level logs.
 **`runtime-profiling-dumps-explorer.js`** — interactive script for profiling and dump analysis: create
 or update an executable class, run it with profiling, list and read profiler traces
 (`hitlist` / `statements` / `dbaccesses`), list dumps (an ABAP user filter is required) and read one.
+After a profiled run it reads the trace files once and takes the run's trace by its fields (a trace id
+not listed before the run, else the title the run's description gave it, of the user); when the feed
+does not list it yet, it says so — list the traces later with option 3.
 
 ```bash
 node tools/runtime-profiling-dumps-explorer.js --mcp=<destination>

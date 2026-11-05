@@ -5,6 +5,7 @@ require('dotenv').config();
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
+const { isUpperAbapName } = require('./readings.js');
 const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
 // `js-yaml`, which this project declares, rather than `yaml`, which it never
@@ -94,12 +95,12 @@ function ensureAbapObjectName(name, objectType, maxLength = 30) {
       `${objectType} name "${name}" is too long (${name.length}), max ${maxLength}`,
     );
   }
-  if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
+  if (!isUpperAbapName(name)) {
     throw new Error(
-      `${objectType} name "${name}" must match ^[A-Z][A-Z0-9_]*$`,
+      `${objectType} name "${name}" must be a letter, then letters, digits or _ (upper case)`,
     );
   }
-  if (!/^[ZY]/.test(name)) {
+  if (!name.startsWith('Z') && !name.startsWith('Y')) {
     throw new Error(
       `${objectType} name "${name}" must start with Z or Y in test systems`,
     );
@@ -115,12 +116,12 @@ function ensureLocalClassName(name, objectType, maxLength = 30) {
       `${objectType} name "${name}" is too long (${name.length}), max ${maxLength}`,
     );
   }
-  if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
+  if (!isUpperAbapName(name)) {
     throw new Error(
-      `${objectType} name "${name}" must match ^[A-Z][A-Z0-9_]*$`,
+      `${objectType} name "${name}" must be a letter, then letters, digits or _ (upper case)`,
     );
   }
-  if (!/^(LTC_|LCL_)/.test(name)) {
+  if (!name.startsWith('LTC_') && !name.startsWith('LCL_')) {
     throw new Error(
       `${objectType} name "${name}" must start with LTC_ or LCL_`,
     );

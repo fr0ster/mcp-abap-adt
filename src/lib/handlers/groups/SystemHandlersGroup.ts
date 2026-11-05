@@ -25,18 +25,6 @@ import {
 import { TOOL_DEFINITION as DescribeByList_Tool } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList.js';
 import {
-  TOOL_DEFINITION as GetAbapAST_Tool,
-  handleGetAbapAST,
-} from '../../../handlers/system/readonly/handleGetAbapAST';
-import {
-  TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool,
-  handleGetAbapSemanticAnalysis,
-} from '../../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
-import {
-  TOOL_DEFINITION as GetAbapSystemSymbols_Tool,
-  handleGetAbapSystemSymbols,
-} from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
-import {
   TOOL_DEFINITION as GetAdtTypes_Tool,
   handleGetAdtTypes,
 } from '../../../handlers/system/readonly/handleGetAllTypes';
@@ -50,6 +38,10 @@ import {
 } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from '../../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetObjectNodeFromCache } from '../../../handlers/system/readonly/handleGetObjectNodeFromCache.js';
+import {
+  TOOL_DEFINITION as GetObjectOutline_Tool,
+  handleGetObjectOutline,
+} from '../../../handlers/system/readonly/handleGetObjectOutline';
 import { TOOL_DEFINITION as GetObjectStructure_Tool } from '../../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetObjectStructure } from '../../../handlers/system/readonly/handleGetObjectStructure.js';
 import {
@@ -166,13 +158,11 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       defineTool(GetSqlQuery_Tool, handleGetSqlQuery),
       defineTool(GetWhereUsed_Tool, handleGetWhereUsed),
       defineTool(GetObjectInfo_Tool, handleGetObjectInfo),
-      defineTool(GetAbapAST_Tool, handleGetAbapAST),
-      defineTool(GetAbapSemanticAnalysis_Tool, handleGetAbapSemanticAnalysis),
-      defineTool(GetAbapSystemSymbols_Tool, handleGetAbapSystemSymbols),
       defineTool(GetInactiveObjects_Tool, handleGetInactiveObjects),
       // Dynamic import handlers
       defineTool(GetAdtTypes_Tool, handleGetAdtTypes),
       defineTool(GetObjectStructure_Tool, handleGetObjectStructure),
+      defineTool(GetObjectOutline_Tool, handleGetObjectOutline),
       defineTool(GetObjectNodeFromCache_Tool, handleGetObjectNodeFromCache),
       defineTool(DescribeByList_Tool, handleDescribeByList),
       // High-level handler for package tree

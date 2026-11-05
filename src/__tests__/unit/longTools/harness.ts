@@ -67,9 +67,6 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
   GetTableContents: { table_name: 'PLACEHOLDER_TABLE' },
   GetObjectInfo: { parent_type: 'PROG/P', parent_name: 'PLACEHOLDER_PROGRAM' },
   DescribeByList: { objects: [{ name: 'PLACEHOLDER_CLASS', type: 'CLAS/OC' }] },
-  GetAbapSystemSymbols: {
-    code: 'CLASS cl_placeholder_class DEFINITION.\nENDCLASS.',
-  },
   GetATCFindings: { worklist_id: 'worklist-placeholder-1' },
   ListATCResults: { created_by: '*' },
   GetATCResult: { display_id: 'result-placeholder-1' },

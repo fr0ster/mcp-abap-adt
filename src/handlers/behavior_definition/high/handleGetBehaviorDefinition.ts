@@ -13,6 +13,13 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readBehaviorDefinitionMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -27,10 +34,11 @@ export const TOOL_DEFINITION = {
     behavior_definition_name: z.string().describe('BehaviorDefinition name.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetBehaviorDefinitionArgs {
+interface GetBehaviorDefinitionArgs extends SourceRangeArgs {
   behavior_definition_name: string;
   part?: ReadPart;
   version?: ReadVersion;
@@ -46,6 +54,15 @@ export async function handleGetBehaviorDefinition(
     return return_error(new Error('behavior_definition_name is required'));
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   // The config field is `name`, not `behaviorDefinitionName` — confirmed
   // against `IBehaviorDefinitionConfig`, and the pre-migration handler
@@ -76,18 +93,20 @@ export async function handleGetBehaviorDefinition(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetBehaviorDefinition', detail: 'terse' },
+    range,
     () =>
       obj.read({ name: behaviorDefinitionName }, version, {
         analyse: analyseException,
       }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       behavior_definition_name: behaviorDefinitionName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

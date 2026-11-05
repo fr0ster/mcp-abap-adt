@@ -1601,38 +1601,6 @@
     ],
     "semantic": "Check whether an ABAP Test Cockpit (ATC) run has finished."
   },
-  "GetAbapAST": {
-    "keywords": [
-      "AST",
-      "abstract syntax tree",
-      "parse ABAP",
-      "parser",
-      "syntax tree"
-    ],
-    "semantic": "Parse a piece of ABAP code into its abstract syntax tree."
-  },
-  "GetAbapSemanticAnalysis": {
-    "keywords": [
-      "semantic analysis",
-      "symbols",
-      "scopes",
-      "dependencies",
-      "code analysis",
-      "static analysis"
-    ],
-    "semantic": "Analyze a piece of ABAP code: its symbols, types, scopes and dependencies."
-  },
-  "GetAbapSystemSymbols": {
-    "keywords": [
-      "resolve symbols",
-      "system symbols",
-      "symbol lookup",
-      "types",
-      "packages of symbols",
-      "code analysis"
-    ],
-    "semantic": "Resolve the symbols of a piece of ABAP code against the system: their types, descriptions and packages."
-  },
   "GetAdtTypes": {
     "keywords": [
       "object types",
@@ -2395,13 +2363,25 @@
     ],
     "semantic": "Read one node from the cached object list of an earlier walk."
   },
+  "GetObjectOutline": {
+    "keywords": [
+      "outline",
+      "components",
+      "methods of a class",
+      "attributes",
+      "forms",
+      "source position",
+      "line numbers",
+      "visibility"
+    ],
+    "semantic": "List what a class, interface, program or function group defines — its methods, attributes, types, events, forms or modules — with their visibility and the source lines each occupies."
+  },
   "GetObjectStructure": {
     "keywords": [
       "object structure",
       "ADT structure",
       "tree",
-      "components",
-      "outline"
+      "components"
     ],
     "semantic": "Show the structure of a repository object as a tree of its parts."
   },

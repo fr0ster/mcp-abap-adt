@@ -54,10 +54,6 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     "The first four letters of a function module's name (the `VIEW…` maintenance modules), compared with a name, not a type.",
   ],
   [
-    'src/handlers/system/readonly/handleGetAbapSystemSymbols.ts:FUNC',
-    "A function module in the symbols tool's own object-type answer (CLAS, INTF, FUNC or LOCAL): that tool's word for what a symbol resolved to, not an ADT type code.",
-  ],
-  [
     'src/handlers/data_element/high/handleCreateDataElement.ts:CHAR',
     'The ABAP data type a data element defaults to (the DDIC built-in type `CHAR`), not an object type; it is also the search name of characteristics (`CHAR/8B`), which this literal does not mean.',
   ],

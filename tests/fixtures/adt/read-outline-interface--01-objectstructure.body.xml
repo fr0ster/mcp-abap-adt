@@ -1,0 +1,20 @@
+<abapsource:objectStructureElement xml:base="/sap/bc/adt/oo/interfaces/zmcp_d1_9e25_if/objectstructure" adtcore:name="ZMCP_D1_9E25_IF" adtcore:type="INTF/OI" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:atom="http://www.w3.org/2005/Atom">
+  <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=1,10;end=1,25"/>
+  <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=1,0;end=6,12"/>
+  <abapsource:objectStructureElement adtcore:type="INTF/IT" adtcore:name="TY_ID" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=2,8;end=2,13"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=2,2;end=2,20"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="INTF/IA" adtcore:name="ATTR" level="instance" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=3,7;end=3,11"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=3,2;end=3,23"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="INTF/IE" adtcore:name="CHANGED" level="instance" visibility="public" clif_name="ZMCP_D1_9E25_IF">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=4,9;end=4,16"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=4,2;end=4,43"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="INTF/IO" adtcore:name="RUN" level="instance" clif_name="ZMCP_D1_9E25_IF" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=5,10;end=5,13" type="INTF/IO"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=5,2;end=5,72"/>
+  </abapsource:objectStructureElement>
+</abapsource:objectStructureElement>

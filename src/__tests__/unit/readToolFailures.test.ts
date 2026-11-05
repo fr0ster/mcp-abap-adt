@@ -21,8 +21,6 @@ import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclu
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapAST } from '../../handlers/system/readonly/handleGetAbapAST';
-import { handleGetAbapSemanticAnalysis } from '../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
 import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
@@ -298,50 +296,6 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
         'object_uri_response',
       ),
     ).toBeUndefined();
-  });
-});
-
-describe('GetAbapAST / GetAbapSemanticAnalysis: a local parser that threw', () => {
-  // The arguments are typed (a string of code), so the throw comes from the
-  // parse step's own work: the logger it calls once the tree is built.
-  it("GetAbapAST: the parse step's own failure, client_threw at the parse step", async () => {
-    const logger = {
-      debug: () => {
-        throw new Error('logger down');
-      },
-      error: () => undefined,
-    };
-    const result: any = await handleGetAbapAST(
-      { connection: {} as any, logger } as any,
-      { code: 'REPORT z.' },
-    );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      error: 'client_threw',
-      tool: 'GetAbapAST',
-      message: 'logger down',
-      step: 'parse',
-    });
-  });
-
-  it("GetAbapSemanticAnalysis: the analysis' own failure, client_threw at the analysis step", async () => {
-    const logger = {
-      debug: () => {
-        throw new Error('logger down');
-      },
-      error: () => undefined,
-    };
-    const result: any = await handleGetAbapSemanticAnalysis(
-      { connection: {} as any, logger } as any,
-      { code: 'DATA a TYPE i.' },
-    );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      error: 'client_threw',
-      tool: 'GetAbapSemanticAnalysis',
-      message: 'logger down',
-      step: 'analyse',
-    });
   });
 });
 

@@ -13,6 +13,13 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -28,10 +35,11 @@ export const TOOL_DEFINITION = {
       .describe('BehaviorImplementation name.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetBehaviorImplementationArgs {
+interface GetBehaviorImplementationArgs extends SourceRangeArgs {
   behavior_implementation_name: string;
   part?: ReadPart;
   version?: ReadVersion;
@@ -47,6 +55,15 @@ export async function handleGetBehaviorImplementation(
     return return_error(new Error('behavior_implementation_name is required'));
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   // A behavior implementation is a class (`getBehaviorImplementation` is
   // typed against `classDocuments`, the same shipped set `handleGetClass`
@@ -73,18 +90,20 @@ export async function handleGetBehaviorImplementation(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetBehaviorImplementation', detail: 'terse' },
+    range,
     () =>
       obj.read({ className: behaviorImplementationName }, version, {
         analyse: analyseException,
       }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       behavior_implementation_name: behaviorImplementationName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

@@ -368,7 +368,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -429,7 +431,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -574,7 +578,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1208,7 +1214,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1604,9 +1612,11 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1747,8 +1757,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `interface_name` (string, required) - Interface name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1906,8 +1918,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -2053,8 +2067,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -2235,8 +2251,10 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -2323,7 +2341,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -2509,7 +2529,9 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -2970,4 +2992,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-11-04*
+*Last updated: 2026-11-05*

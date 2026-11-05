@@ -96,9 +96,9 @@
     "source": "heldout"
   },
   {
-    "query": "Print the abstract syntax tree of this ABAP code",
+    "query": "Which lines of class ZCL_ORDERS hold its methods?",
     "roles": ["reader", "developer"],
-    "required": [["GetAbapAST"]],
+    "required": [["GetObjectOutline"]],
     "source": "heldout"
   },
   {

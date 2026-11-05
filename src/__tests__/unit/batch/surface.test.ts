@@ -178,11 +178,10 @@ describe('the batch tools on the surface', () => {
             .get('CreatePackage')
             ?.endsWith(` When the connection is HTTP, ${RECORDABLE_TAIL}`),
         ).toBe(true);
-        // A request that depends on another's answer, no request, the
-        // debugger's own connection, a background run, a leftover session.
+        // A request that depends on another's answer, the debugger's own
+        // connection, a background run, a leftover session.
         for (const name of [
           'UpdateClass',
-          'GetAbapAST',
           'DebugStep',
           'GetBackgroundRun',
           'ListLeftoverSessions',

@@ -13,6 +13,13 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readFunctionModuleMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -30,10 +37,11 @@ export const TOOL_DEFINITION = {
       .describe('Function group containing the function module.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetFunctionModuleArgs {
+interface GetFunctionModuleArgs extends SourceRangeArgs {
   function_module_name: string;
   function_group_name: string;
   part?: ReadPart;
@@ -56,6 +64,15 @@ export async function handleGetFunctionModule(
     );
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   const functionModuleName = function_module_name.toUpperCase();
   const functionGroupName = function_group_name.toUpperCase();
@@ -85,19 +102,21 @@ export async function handleGetFunctionModule(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetFunctionModule', detail: 'terse' },
+    range,
     () =>
       obj.read({ functionModuleName, functionGroupName }, version, {
         analyse: analyseException,
       }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       function_module_name: functionModuleName,
       function_group_name: functionGroupName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

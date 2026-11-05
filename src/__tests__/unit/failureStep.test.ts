@@ -14,7 +14,6 @@ import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handl
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapSystemSymbols } from '../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import {
@@ -240,41 +239,6 @@ describe('a refusal is not swallowed', () => {
     expect(items).toHaveLength(2);
     expect(items[1].name).toBe('ZCL_Y');
     expect(items[1].error).toBeUndefined();
-  });
-
-  it('GetAbapSystemSymbols: a refused class read is that symbol\'s error with the step, not "not found", and the call goes on', async () => {
-    const reads: string[] = [];
-    fakeClient = fakeClientOf({
-      read: async (config: any) => {
-        reads.push(config?.className ?? config?.interfaceName ?? '?');
-        return forbidden();
-      },
-    });
-    const result: any = await handleGetAbapSystemSymbols(context as any, {
-      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
-    });
-    expect(result.isError).toBe(false);
-    const symbols = result.content[0].json.symbols;
-    const zclX = symbols.find((s: any) => s.name.toUpperCase() === 'ZCL_X');
-    const zclY = symbols.find((s: any) => s.name.toUpperCase() === 'ZCL_Y');
-    expect(zclX.error).toEqual(expectedPayload('read class'));
-    expect(zclX.systemInfo).toBeUndefined();
-    // Not the end of the call: the next symbol was read too.
-    expect(zclY.error).toEqual(expectedPayload('read class'));
-  });
-
-  it('GetAbapSystemSymbols: a class that is not there stays "not found"', async () => {
-    fakeClient = fakeClientOf({ read: async () => notThere() });
-    const result: any = await handleGetAbapSystemSymbols(context as any, {
-      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.',
-    });
-    expect(result.isError).toBe(false);
-    const symbols = result.content[0].json.symbols;
-    const zcl = symbols.find((s: any) => s.name.toUpperCase() === 'ZCL_X');
-    expect(zcl.systemInfo).toEqual({
-      exists: false,
-      error: 'Class not found in SAP system',
-    });
   });
 });
 
@@ -556,31 +520,6 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
     expect(payloadOf(result)).toMatchObject({ error: 'authentication_failed' });
     expect(payloadOf(result).step).toBeUndefined();
     expect(new Set(searched)).toEqual(new Set(['ZCL_X']));
-  });
-
-  it('GetAbapSystemSymbols: the answer is the failure as it came, no symbol after it is read', async () => {
-    const reads: string[] = [];
-    fakeClient = fakeClientOf({
-      read: async (config: any) => {
-        reads.push(config?.className);
-        throw credential();
-      },
-    });
-    const result: any = await handleGetAbapSystemSymbols(oneByOne() as any, {
-      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
-    });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({ error: 'authentication_failed' });
-    expect(payloadOf(result).step).toBeUndefined();
-    expect(reads).toHaveLength(1);
-  });
-
-  it("a 403 in the same batch stays that item's answer", async () => {
-    fakeClient = fakeClientOf({ read: async () => forbidden() });
-    const result: any = await handleGetAbapSystemSymbols(context as any, {
-      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
-    });
-    expect(result.isError).toBe(false);
   });
 });
 

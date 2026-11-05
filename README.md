@@ -210,7 +210,7 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
 Key examples of high-value workflows and tools:
 
 - **Repository and impact analysis**: `GetWhereUsed`, `DescribeByList`, `GetObjectStructure`, `GetObjectInfo`, `SearchObject`, `GetPackageTree`, `GetPackageContents`
-- **Code and semantic introspection**: `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetIncludesList`
+- **Code structure, as SAP states it**: `GetObjectOutline` (an object's components with the source lines each occupies), the `Get<Type>` source reads with `start_line`/`end_line` for just those lines, `GetIncludesList`
 - **RAP development**: `CreateBehaviorDefinition`, `UpdateBehaviorDefinition`, `CreateBehaviorImplementation`, `UpdateBehaviorImplementation`, `CreateServiceDefinition`, `UpdateServiceDefinition`, `CreateMetadataExtension`, `UpdateMetadataExtension`
 - **CDS/View development**: `CreateView`, `UpdateView`, `GetView`, `DeleteView`
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`

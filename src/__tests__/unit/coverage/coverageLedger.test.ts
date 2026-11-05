@@ -151,7 +151,7 @@ describe('the coverage ledger guard', () => {
   });
 
   it('the served list is the listed-schema fixture', () => {
-    expect(new Set(served.map((tool) => tool.name)).size).toBe(315);
+    expect(new Set(served.map((tool) => tool.name)).size).toBe(313);
     expect(of(findings, 'served-mismatch')).toEqual([]);
   });
 

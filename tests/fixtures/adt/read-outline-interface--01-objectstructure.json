@@ -1,0 +1,22 @@
+{
+  "case": "read-outline-interface",
+  "step": 1,
+  "stepTag": "objectstructure",
+  "capturedAt": "2026-11-04T00:00:00.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/interfaces/zmcp_d1_9e25_if/objectstructure",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.objectstructure.v2+xml"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.objectstructure.v2+xml; charset=utf-8"
+    },
+    "bodyFile": "read-outline-interface--01-objectstructure.body.xml"
+  }
+}

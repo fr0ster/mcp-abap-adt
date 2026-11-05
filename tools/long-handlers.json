@@ -84,12 +84,6 @@
     "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the quickSearch GET of every object, then the quickSearch GET without its type of every object whose first answer was empty or failed; sequential reads where the system has no communication batch"
   },
   {
-    "tool": "GetAbapSystemSymbols",
-    "set": "full",
-    "handler": "src/handlers/system/readonly/handleGetAbapSystemSymbols.ts#handleGetAbapSystemSymbols",
-    "sends": "in one ADT batch envelope (POST /sap/bc/adt/communication/batch): the source GET of every class and interface symbol found in the given code; sequential reads where the system has no communication batch"
-  },
-  {
     "tool": "GetATCFindings",
     "set": "full",
     "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",

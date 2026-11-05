@@ -304,21 +304,21 @@ describe('the MCP tool surface', () => {
         'search/SearchSource': ['start_at'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
         // part per call, `part` (source | metadata, default source), optional.
-        'high/GetClass': ['part'],
-        'high/GetInterface': ['part'],
-        'high/GetProgram': ['part'],
-        'high/GetTable': ['part'],
-        'high/GetStructure': ['part'],
-        'high/GetDdl': ['part'],
-        'high/GetServiceDefinition': ['part'],
+        'high/GetClass': ['part', 'start_line', 'end_line'],
+        'high/GetInterface': ['part', 'start_line', 'end_line'],
+        'high/GetProgram': ['part', 'start_line', 'end_line'],
+        'high/GetTable': ['part', 'start_line', 'end_line'],
+        'high/GetStructure': ['part', 'start_line', 'end_line'],
+        'high/GetDdl': ['part', 'start_line', 'end_line'],
+        'high/GetServiceDefinition': ['part', 'start_line', 'end_line'],
         'high/GetServiceBinding': ['part'],
-        'high/GetBehaviorDefinition': ['part'],
-        'high/GetBehaviorImplementation': ['part'],
-        'high/GetMetadataExtension': ['part'],
-        'high/GetFunctionModule': ['part'],
+        'high/GetBehaviorDefinition': ['part', 'start_line', 'end_line'],
+        'high/GetBehaviorImplementation': ['part', 'start_line', 'end_line'],
+        'high/GetMetadataExtension': ['part', 'start_line', 'end_line'],
+        'high/GetFunctionModule': ['part', 'start_line', 'end_line'],
         // The ninth deliberate move (below): GetInclude reads the include's
         // metadata too, `part` and `version` optional.
-        'readonly/GetInclude': ['part', 'version'],
+        'readonly/GetInclude': ['part', 'version', 'start_line', 'end_line'],
         // The ninth deliberate move too: GetTableType reads at the version
         // asked, `version` optional (active by default).
         'readonly/GetTableType': ['version'],
@@ -373,6 +373,21 @@ describe('the MCP tool surface', () => {
           'max_includes',
           'program',
         ],
+        // 24.0.0 (D5, the owner's DO1): the source reads take a line range,
+        // `start_line` and `end_line`, each optional; the server cuts the
+        // source its one GET answered (ADT serves no part of a source).
+        'readonly/GetClass': ['start_line', 'end_line'],
+        'readonly/GetInterface': ['start_line', 'end_line'],
+        'readonly/GetProgram': ['start_line', 'end_line'],
+        'readonly/GetTable': ['start_line', 'end_line'],
+        'readonly/GetStructure': ['start_line', 'end_line'],
+        'readonly/GetDdl': ['start_line', 'end_line'],
+        'readonly/GetServiceDefinition': ['start_line', 'end_line'],
+        'readonly/GetBehaviorDefinition': ['start_line', 'end_line'],
+        'readonly/GetBehaviorImplementation': ['start_line', 'end_line'],
+        'readonly/GetMetadataExtension': ['start_line', 'end_line'],
+        'readonly/GetFunctionModule': ['start_line', 'end_line'],
+        'readonly/GetFunctionInclude': ['start_line', 'end_line'],
         // 24.0.0 (D2): each lost one argument (`REMOVED`) and gained none.
         'high/CreateClass': [],
         'high/CreateProgram': [],

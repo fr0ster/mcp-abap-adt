@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 74
+- Total tools: 72
 
 ## Navigation
 
@@ -91,12 +91,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetSqlQuery](#getsqlquery-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
     - [GetObjectInfo](#getobjectinfo-read-only-system)
-    - [GetAbapAST](#getabapast-read-only-system)
-    - [GetAbapSemanticAnalysis](#getabapsemanticanalysis-read-only-system)
-    - [GetAbapSystemSymbols](#getabapsystemsymbols-read-only-system)
     - [GetInactiveObjects](#getinactiveobjects-read-only-system)
     - [GetAdtTypes](#getadttypes-read-only-system)
     - [GetObjectStructure](#getobjectstructure-read-only-system)
+    - [GetObjectOutline](#getobjectoutline-read-only-system)
     - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
     - [DescribeByList](#describebylist-read-only-system)
     - [GetPackageTree](#getpackagetree-read-only-system)
@@ -239,7 +237,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -255,7 +255,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -271,7 +273,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -343,7 +347,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -453,9 +459,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `function_group_name` (string, required) - Function group containing the include.
 - `include_name` (string, required) - Include name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -470,9 +478,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -487,8 +497,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `include_name` (string, required) - Include name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional, one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -529,8 +541,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `interface_name` (string, required) - Interface name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -586,8 +600,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -634,8 +650,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -716,8 +734,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -747,7 +767,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -951,40 +973,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-<a id="getabapast-read-only-system"></a>
-#### GetAbapAST (Read-Only / System)
-**Description:** [read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.
-
-**Source:** `src/handlers/system/readonly/handleGetAbapAST.ts`
-
-**Parameters:**
-- `code` (string, required) - ABAP source code to parse
-
----
-
-<a id="getabapsemanticanalysis-read-only-system"></a>
-#### GetAbapSemanticAnalysis (Read-Only / System)
-**Description:** [read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.
-
-**Source:** `src/handlers/system/readonly/handleGetAbapSemanticAnalysis.ts`
-
-**Parameters:**
-- `code` (string, required) - ABAP source code to analyze
-
----
-
-<a id="getabapsystemsymbols-read-only-system"></a>
-#### GetAbapSystemSymbols (Read-Only / System)
-**Description:** [read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages. Runs on an ABAP session of its own. Optional timeout (seconds): when it passes, the read is cancelled, its ABAP session logged off, and the system stays as it was. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a client's cancel ends only the client's wait, and SAP runs the read on.
-
-**Source:** `src/handlers/system/readonly/handleGetAbapSystemSymbols.ts`
-
-**Parameters:**
-- `code` (string, required) - ABAP source code to analyze and resolve symbols for
-- `timeout` (integer, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
----
-
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
 **Description:** [read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.
@@ -1018,6 +1006,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
+
+---
+
+<a id="getobjectoutline-read-only-system"></a>
+#### GetObjectOutline (Read-Only / System)
+**Description:** [read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column. Returns the components as a tree.
+
+**Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
@@ -1112,7 +1114,9 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -1230,4 +1234,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-04*
+*Last updated: 2026-11-05*

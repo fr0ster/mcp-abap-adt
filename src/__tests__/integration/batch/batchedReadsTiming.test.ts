@@ -29,9 +29,7 @@
  * (`shared_dependencies`, those served on the system): GetIncludesList (two
  * function groups), GetStructuresList (two structures), GetEnhancements (two
  * classes), ListTransports (modifiable), DescribeByList (a class, a table and
- * a structure), GetAbapSystemSymbols (a source naming a shared class and
- * interface), GetWhereUsed (two
- * tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
+ * a structure), GetWhereUsed (two tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
  *
  * Run (HTTP): npm test -- --testPathPatterns='batchedReadsTiming' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
@@ -48,7 +46,6 @@ import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGe
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapSystemSymbols } from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeListFeeds } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
@@ -325,23 +322,6 @@ const SHARED_CASES: SharedCase[] = [
             { name: table, type: 'TABL/DT' },
             { name: structure },
           ],
-        });
-    },
-  },
-  {
-    tool: 'GetAbapSystemSymbols',
-    prepare: () => {
-      // A class and an interface: the symbols the tool reads one request each.
-      const [cls] = sharedNames('classes');
-      const [intf] = sharedNames('interfaces');
-      if (!cls || !intf) {
-        return 'the config names no shared class or interface served here';
-      }
-      return (context) =>
-        handleGetAbapSystemSymbols(context, {
-          // The handler reads a class or an interface it finds defined in the
-          // source: one definition of each, named after the shared objects.
-          code: `CLASS ${cls.toLowerCase()} DEFINITION.\nENDCLASS.\nINTERFACE ${intf.toLowerCase()}.\nENDINTERFACE.`,
         });
     },
   },

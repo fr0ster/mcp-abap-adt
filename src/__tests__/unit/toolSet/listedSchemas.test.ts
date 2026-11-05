@@ -202,6 +202,38 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
     expect(Object.keys(schemas)).toEqual(keysOf(fixture));
   });
 
+  it('GetObjectOutline is listed with the kinds SAP serves an outline for on each system type, and the three ABAP-parsing tools are gone (D5)', () => {
+    for (const removed of [
+      'GetAbapAST',
+      'GetAbapSemanticAnalysis',
+      'GetAbapSystemSymbols',
+    ]) {
+      expect({ removed, listed: field(schemas, removed) }).toEqual({
+        removed,
+        listed: undefined,
+      });
+    }
+    const listed = field(schemas, 'GetObjectOutline');
+    const kinds = new Map<string, unknown>();
+    if (Array.isArray(listed)) {
+      for (const each of listed) {
+        const listedBy = field(each, 'listedBy');
+        const kind = field(
+          field(field(field(each, 'value'), 'properties'), 'object_type'),
+          'enum',
+        );
+        if (!Array.isArray(listedBy)) continue;
+        for (const by of listedBy) {
+          kinds.set(String(by).split(' ')[0] ?? '', kind);
+        }
+      }
+    }
+    expect(Object.fromEntries(kinds)).toEqual({
+      onprem: ['CLAS/OC', 'INTF/OI', 'PROG/P', 'FUGR/F'],
+      cloud: ['CLAS/OC', 'INTF/OI', 'FUGR/F'],
+    });
+  });
+
   it('every binary on every system type lists exactly the search texts of the fixture', () => {
     const fixture = frozen('search');
     for (const [tool, listed] of Object.entries(search)) {

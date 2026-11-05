@@ -63,8 +63,7 @@ entry's definition name.
 
 ## Embedders: the exported handlers take typed arguments
 
-`handleGetTypeInfo`, `handleDescribeByList`, `handleGetAbapAST`, `handleGetAbapSemanticAnalysis`,
-`handleGetAbapSystemSymbols`, `handleGetObjectNodeFromCache`, `handleGetEnhancements`,
+`handleGetTypeInfo`, `handleDescribeByList`, `handleGetObjectNodeFromCache`, `handleGetEnhancements`,
 `handleGetEnhancementImpl`, `handleGetEnhancementSpot` and `handleGetIncludesList` took
 `args: any`; each takes its schema's output or its declared interface now, as the other handlers
 did. A tool's handler type is `Parameters<typeof handleX>[1]`.
@@ -249,6 +248,35 @@ and change the program's type after it is created.
   (`0.1` was sent as `0`).
 - **A create's description, name, package and references are escaped** in the create body: a
   description holding `&`, `<` or `"` makes a well-formed request now.
+
+## Callers of `GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols`: removed
+
+The three tools parsed ABAP in this process with regular expressions; SAP states an object's
+structure itself, so they are removed, with their handlers (`handleGetAbapAST`,
+`handleGetAbapSemanticAnalysis`, `handleGetAbapSystemSymbols`). Read what SAP states instead:
+
+| Removed | Use |
+| --- | --- |
+| `GetAbapAST`, `GetAbapSemanticAnalysis` | `GetObjectOutline` for the structure — the components of a class, an interface, a function group or (on premise) a program, each with its kind, visibility and level, and for a class or an interface the lines and columns it occupies — plus the source reads (`GetClass`, `GetInterface`, `GetProgram`, …) for the text |
+| `GetAbapSystemSymbols` | `GetObjectOutline` for what an object defines, `GetWhereUsed` for what uses it |
+
+Each takes an object in the system, not a piece of code: save the code first, then read it. SAP
+states no signature in the outline; a method's signature is the source its definition block spans,
+and the source reads answer just those lines with `start_line` and `end_line`:
+
+```json
+{ "object_type": "CLAS/OC", "object_name": "ZCL_ORDERS" }
+```
+
+answered with each method's `definitionBlock` link, e.g. `start: { line: 12, column: 4 }`,
+`end: { line: 16, column: 32 }`; then
+
+```json
+{ "class_name": "ZCL_ORDERS", "start_line": 12, "end_line": 16 }
+```
+
+to `GetClass` answers those five lines. A line range is new on every `Get<Type>` source read; a
+call without one answers the whole source as before.
 
 ## Former users of the low set: each low tool and its compact call today
 

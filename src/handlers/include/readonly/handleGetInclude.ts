@@ -13,6 +13,14 @@ import {
   READ_VERSION_FIELD_UNDEFAULTED,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceCut,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readIncludeMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -27,10 +35,11 @@ export const TOOL_DEFINITION = {
     include_name: z.string().describe('Include name.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD_UNDEFAULTED,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetIncludeArgs {
+interface GetIncludeArgs extends SourceRangeArgs {
   /** Required by the schema; a call from outside it may leave it out. */
   include_name?: string;
   part?: ReadPart;
@@ -42,6 +51,7 @@ type SourceAnswer = (
   includeName: string,
   version: ReadVersion | undefined,
   source: string,
+  cut: SourceCut | undefined,
 ) => unknown;
 
 /**
@@ -59,6 +69,15 @@ async function readInclude(
   if (!include_name) return return_error('Include name is required');
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   const includeName = include_name.toUpperCase();
   logger?.info(`Fetching include: ${includeName}`);
@@ -79,16 +98,16 @@ async function readInclude(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetInclude', detail: 'terse' },
+    range,
     () =>
       client
         .getInclude(resultsFor(includeDocuments))
         .read({ includeName }, version ?? 'active', {
           analyse: analyseException,
         }),
-    (source: AdtReading<string>) =>
-      sourceAnswer(includeName, version, source.raw),
+    (source, cut) => sourceAnswer(includeName, version, source, cut),
   );
 }
 
@@ -112,11 +131,12 @@ export async function handleGetIncludePart(
   context: HandlerContext,
   args: GetIncludeArgs,
 ) {
-  return readInclude(context, args, (includeName, version, source) => ({
+  return readInclude(context, args, (includeName, version, source, cut) => ({
     success: true,
     include_name: includeName,
     ...(version === undefined ? {} : { version }),
     part: 'source',
     source,
+    ...rangeFields(cut),
   }));
 }

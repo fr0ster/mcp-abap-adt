@@ -13,6 +13,13 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readFunctionIncludeMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -30,10 +37,11 @@ export const TOOL_DEFINITION = {
     include_name: z.string().describe('Include name.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetFunctionIncludeArgs {
+interface GetFunctionIncludeArgs extends SourceRangeArgs {
   function_group_name: string;
   include_name: string;
   part?: ReadPart;
@@ -52,6 +60,15 @@ export async function handleGetFunctionInclude(
     );
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   const functionGroupName = function_group_name.toUpperCase();
   const includeName = include_name.toUpperCase();
@@ -77,19 +94,21 @@ export async function handleGetFunctionInclude(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetFunctionInclude', detail: 'terse' },
+    range,
     () =>
       obj.read({ functionGroupName, includeName }, version, {
         analyse: analyseException,
       }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       function_group_name: functionGroupName,
       include_name: includeName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

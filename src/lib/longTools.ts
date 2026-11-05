@@ -32,7 +32,6 @@ export const LONG_TOOLS: readonly string[] = [
   'GetTableContents',
   'GetObjectInfo',
   'DescribeByList',
-  'GetAbapSystemSymbols',
   'GetATCFindings',
   'ListATCResults',
   'GetATCResult',

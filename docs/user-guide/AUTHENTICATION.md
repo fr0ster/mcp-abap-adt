@@ -384,9 +384,7 @@ it arose. A tool never rewrites it:
   and no `raw_body`.
 - **The method failed** — a throw in the client, a reading or the tool itself (a document it
   could not parse, a defect): `error: "client_threw"` and the thrown message, with no `origin`
-  — it is not presented as SAP's answer. The tools that only parse the source they are given
-  and send no request (`GetAbapAST` with `step: "parse"`, `GetAbapSemanticAnalysis` with
-  `step: "analyse"`) answer a throw of their parser this way.
+  — it is not presented as SAP's answer.
 - **A tool of several reads** names the read that was refused as its `step`: `GetTypeInfo`
   (`read data element`, `read domain`, `read structure`, `read table type`; a `404` there is the
   kind absent, not a refusal) and `GetTransport` (`read transport request`). Each read is a
@@ -434,11 +432,9 @@ it arose. A tool never rewrites it:
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:
 
-- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`,
-  `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
+- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
   its failure (`failures[]` with the object for `SearchSource`, `{ name, error }` for
-  `DescribeByList`, `error` on the symbol for `GetAbapSystemSymbols` — a throw while resolving
-  one included, as `client_threw` with its step —, `unreadable` beside the tree for
+  `DescribeByList`, `unreadable` beside the tree for
   `GetIncludesList`) beside the other items' results, and the rest are read on — except a
   credential failure (an authentication failure, a `401`): the credentials are the same for
   every item, so it ends the whole call, as it came, and no further request is sent

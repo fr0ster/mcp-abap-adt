@@ -13,6 +13,13 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readStructureMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -27,10 +34,11 @@ export const TOOL_DEFINITION = {
     structure_name: z.string().describe('Structure name.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetStructureArgs {
+interface GetStructureArgs extends SourceRangeArgs {
   structure_name: string;
   part?: ReadPart;
   version?: ReadVersion;
@@ -46,6 +54,15 @@ export async function handleGetStructure(
     return return_error(new Error('structure_name is required'));
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   const structureName = structure_name.toUpperCase();
   const client = createAdtClient(connection, logger);
@@ -64,15 +81,17 @@ export async function handleGetStructure(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetStructure', detail: 'terse' },
+    range,
     () => obj.read({ structureName }, version, { analyse: analyseException }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       structure_name: structureName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

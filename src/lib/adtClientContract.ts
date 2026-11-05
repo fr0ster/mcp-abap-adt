@@ -25,6 +25,7 @@ import type {
   AdtPerformingVariantsIn,
   AdtReadVersion,
   AdtServingVariantsIn,
+  AdtTypeCode,
   AdtVariant,
   IAccessControlConfig,
   IAccessControlResults,
@@ -1223,6 +1224,35 @@ export type LocalMacrosApi<
   IAdtLockable<IClassConfig>;
 
 /**
+ * The kinds SAP serves an outline for (`GET <object uri>/objectstructure`):
+ * class, interface, program, include and function group — measured on
+ * premise and on ABAP cloud (2026-11-04), the program and the include on
+ * premise only. The implementation's `AdtOutlineCode` names the same five;
+ * interfaces-adt has no outline contract yet, so the list is stated here.
+ */
+export type ServerOutlineCode = OutlineCodes<
+  'CLAS/OC' | 'INTF/OI' | 'PROG/P' | 'PROG/I' | 'FUGR/F'
+>;
+
+/** Codes of the tables, as given: what keeps `ServerOutlineCode` to codes. */
+type OutlineCodes<C extends AdtTypeCode> = C;
+
+/**
+ * An object's outline: one GET, the document as it came (no result slot of
+ * interfaces-adt names it, so no reading is injected for it).
+ */
+export interface IServerObjectOutline {
+  getObjectOutline<E extends IAdtError = IAdtError>(
+    objectType: ServerOutlineCode,
+    objectName: string,
+    options?: {
+      version?: AdtReadVersion;
+      accept?: string;
+    } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>>;
+}
+
+/**
  * The repository search of variant `V`: `IAdtObjectSearch`'s member, its
  * filter the search names every variant of `V` takes
  * (`IAdtSearchObjectsParamsOf<V>`, interfaces-adt 24) — a name of the
@@ -1287,7 +1317,8 @@ export type UtilsApi<
     ReturnType<R['contents']>
   > &
   ObjectAccess<ReturnType<R['source']>, ReturnType<R['metadata']>> &
-  IAdtObjectProperties<ReturnType<R['objectProperties']>>;
+  IAdtObjectProperties<ReturnType<R['objectProperties']>> &
+  IServerObjectOutline;
 
 export type IServerAdtClient<V extends AdtVariant = AdtModernVariant> =
   ServedOn<

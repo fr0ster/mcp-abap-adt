@@ -13,6 +13,13 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readInterfaceMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -27,10 +34,11 @@ export const TOOL_DEFINITION = {
     interface_name: z.string().describe('Interface name.'),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
   }),
 } as const;
 
-interface GetInterfaceArgs {
+interface GetInterfaceArgs extends SourceRangeArgs {
   interface_name: string;
   part?: ReadPart;
   version?: ReadVersion;
@@ -46,6 +54,15 @@ export async function handleGetInterface(
     return return_error(new Error('interface_name is required'));
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args);
+  if (range instanceof Error) return return_error(range);
+  if (range !== undefined && part === 'metadata') {
+    return return_error(
+      new Error(
+        'start_line and end_line cut the source: give them with part "source"',
+      ),
+    );
+  }
 
   const interfaceName = interface_name.toUpperCase();
   const client = createAdtClient(connection, logger);
@@ -64,15 +81,17 @@ export async function handleGetInterface(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetInterface', detail: 'terse' },
+    range,
     () => obj.read({ interfaceName }, version, { analyse: analyseException }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       interface_name: interfaceName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

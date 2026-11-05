@@ -2169,23 +2169,23 @@ parser instance or call path, not each file), with the options each uses today:
 
 | Entry point | Options today (every key set, as written at HEAD; unlisted keys are the parser's defaults) |
 | --- | --- |
-| `src/lib/strategies/reading.ts` `parseStructure` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: false`, `htmlEntities: true`, `isArray` (its repeatable-name rule) |
+| `src/lib/strategies/reading.ts` `parseStructure` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: false`, `htmlEntities: true`, `isArray`: true when the element name, with a leading `prefix:` removed, is one of `msg`, `entry`, `checkReport`, `checkMessage`, `alert`, `detail`, `stackEntry`, `objectReference`, `object`, `testClass`, `testMethod`, `program`, `link`, `request`, `task`, `node`, `SEU_ADT_OBJECT_TYPE_INFO`, `SEU_ADT_OBJECT_CATEGORY_INFO`, `SEU_ADT_REPOSITORY_OBJ_NODE` (the `REPEATABLE` set) |
 | `src/lib/strategies/atcFindings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: true` |
 | `src/lib/strategies/packageSummary.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `removeNSPrefix: true` |
-| `src/lib/strategies/sqlPreview.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `isArray` (its rule), `removeNSPrefix: true` |
+| `src/lib/strategies/sqlPreview.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `attributesGroupName: '@'`, `parseAttributeValue: false`, `parseTagValue: false`, `isArray`: true when the element name, with a leading `prefix:` removed, is `columns` or `data`; `removeNSPrefix: true` |
 | `src/lib/strategies/packageWalk.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseAttributeValue: false`, `parseTagValue: false`, `trimValues: true` |
 | `src/lib/strategies/functionGroupStructure.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''` |
 | `src/lib/checkRunParser.ts` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
 | `src/lib/utils.ts` `parseValidationResponse` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
 | `src/lib/utils.ts` `parseActivationResponse` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'`, `parseAttributeValue: true` |
-| `src/lib/debugger/readings.ts` `parser` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, `isArray` (its rule) |
-| `src/lib/debugger/readings.ts` `exceptionParser` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `isArray` (its rule) |
-| `src/lib/debugger/amdpReadings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, `isArray` (its rule); no `htmlEntities` (recorded for D6) |
-| `src/lib/debugger/memoryReadings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `ignoreDeclaration: true`, `isArray` (`snapshot`) |
-| `src/handlers/transport/readonly/handleGetTransport.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `textNodeName: '_text'`, `parseAttributeValue: true`, `isArray` (`tm:object`, `tm:task`, `object`, `task`) |
+| `src/lib/debugger/readings.ts` `parser` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, `isArray`: true when the name is one of `STPDA_DEBUGGEE`, `STPDA_ADT_VARIABLE`, `STPDA_ADT_VARIABLE_HIERARCHY`, `stackEntry`, `breakpoint` |
+| `src/lib/debugger/readings.ts` `exceptionParser` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `isArray`: true when the name is `entry` |
+| `src/lib/debugger/amdpReadings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, `isArray`: true when the name is one of `mainResponse`, `variable`, `columns`, `data`, `breakpoint`, `callstackEntry`; no `htmlEntities` (recorded for D6) |
+| `src/lib/debugger/memoryReadings.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true`, `parseTagValue: false`, `ignoreDeclaration: true`, `isArray`: true when the name is `snapshot` |
+| `src/handlers/transport/readonly/handleGetTransport.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `textNodeName: '_text'`, `parseAttributeValue: true`, `isArray`: true when the name is one of `tm:object`, `tm:task`, `object`, `task` |
 | `src/handlers/system/readonly/runtimePayloadParser.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''` |
 | `src/handlers/system/readonly/handleRuntimeGetDumpById.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `removeNSPrefix: true` |
-| `src/handlers/system/readonly/handleGetTypeInfo.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseAttributeValue: false`, `parseTagValue: false`, `trimValues: false`, `isArray` (`doma:fixValue`, …) |
+| `src/handlers/system/readonly/handleGetTypeInfo.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseAttributeValue: false`, `parseTagValue: false`, `trimValues: false`, `isArray`: true when the name is `doma:fixValue` |
 | `src/handlers/service_binding/high/serviceBindingPayloadUtils.ts` | `ignoreAttributes: false`, `attributeNamePrefix: ''` |
 | `src/handlers/include/readonly/handleGetMainPrograms.ts` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
 | `src/lib/xml/ordered.ts` parser (`isWellFormed`, `parseOrdered`) | `preserveOrder: true`, `ignoreAttributes: false`, `attributeNamePrefix: ''`, `parseTagValue: false`, `parseAttributeValue: false`, `trimValues: false`, **`processEntities: false`** (so `xmlPatch` keeps entities as written), `cdataPropName: '#cdata'`, `commentPropName: '#comment'` |
@@ -2194,8 +2194,10 @@ parser instance or call path, not each file), with the options each uses today:
 | `tools/debug-runtime-explorer.js` | `ignoreAttributes: false`, `attributeNamePrefix: '@_'` |
 
 Step 1 re-reads every `new XMLParser(` and `new XMLBuilder(` in production at HEAD and makes
-this table option-for-option exact (the `isArray` rules written out in full) before any
-profile is named.
+that this table is still option-for-option exact before any profile is named. The `isArray`
+conditions above are written out in full, and each profile keeps its condition exactly
+(the two prefix-stripping conditions are re-expressed in plain string code under D6's
+no-regex rule, with the same result).
 
 These do not share one set of options, so no single profile can serve them, and decoding is
 not identical everywhere: the ordered round trip keeps entities on purpose.

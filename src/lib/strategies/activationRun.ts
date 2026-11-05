@@ -27,6 +27,7 @@
  * the run.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { asciiLower, asciiUpper } from '../plainText';
 import { child, entries, listOf, text } from '../xml/tree';
 import {
   type AdtReading,
@@ -242,8 +243,8 @@ const ERROR_LETTERS: ReadonlySet<string> = new Set(['E', 'A', 'X']);
 /** An error-severity message, by SAP's own letters. */
 export function isRefusal(message: ActivationMessage): boolean {
   return (
-    ERROR_LETTERS.has(message.type.toUpperCase()) ||
-    message.type.toLowerCase() === 'error'
+    ERROR_LETTERS.has(asciiUpper(message.type)) ||
+    asciiLower(message.type) === 'error'
   );
 }
 

@@ -42,11 +42,41 @@ export function leadingDigits(text: string): string {
   return text.slice(0, end);
 }
 
-/** One ASCII letter. */
+/** One ASCII letter, by char code: `A`–`Z` (65–90) or `a`–`z` (97–122). */
 export function isAsciiLetter(character: string | undefined): boolean {
   if (character === undefined || character.length !== 1) return false;
-  const lower = character.toLowerCase();
-  return lower >= 'a' && lower <= 'z';
+  const code = character.charCodeAt(0);
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+/**
+ * `text` with its ASCII letters in upper case, by char code (97–122 to
+ * 65–90); every other character as it is — no Unicode case mapping, so the
+ * Kelvin sign, `ı` or `ß` never become an ASCII letter.
+ */
+export function asciiUpper(text: string): string {
+  let out = '';
+  for (let at = 0; at < text.length; at++) {
+    const code = text.charCodeAt(at);
+    out +=
+      code >= 97 && code <= 122
+        ? String.fromCharCode(code - 32)
+        : text.charAt(at);
+  }
+  return out;
+}
+
+/** `text` with its ASCII letters in lower case, by char code; nothing else changed. */
+export function asciiLower(text: string): string {
+  let out = '';
+  for (let at = 0; at < text.length; at++) {
+    const code = text.charCodeAt(at);
+    out +=
+      code >= 65 && code <= 90
+        ? String.fromCharCode(code + 32)
+        : text.charAt(at);
+  }
+  return out;
 }
 
 /** A word character: an ASCII letter, an ASCII digit or `_`. */
@@ -90,13 +120,13 @@ export function collapsedBlanks(text: string): string {
 }
 
 /**
- * Whether `text` matches the glob `pattern` as a whole, letters compared
- * without case: `*` stands for any run of characters (none included), `?`
+ * Whether `text` matches the glob `pattern` as a whole, ASCII letters
+ * compared without case: `*` stands for any run of characters (none included), `?`
  * for one; every other character, `.` among them, stands for itself.
  */
 export function globMatches(pattern: string, text: string): boolean {
-  const glob = [...pattern.toUpperCase()];
-  const subject = [...text.toUpperCase()];
+  const glob = [...asciiUpper(pattern)];
+  const subject = [...asciiUpper(text)];
   let g = 0;
   let s = 0;
   let star = -1;
@@ -125,9 +155,9 @@ export function globMatches(pattern: string, text: string): boolean {
   return g === glob.length;
 }
 
-/** Whether `text` holds `word` at `at`, letters compared without case. */
+/** Whether `text` holds `word` at `at`, ASCII letters compared without case. */
 export function wordAt(text: string, at: number, word: string): boolean {
-  return text.slice(at, at + word.length).toUpperCase() === word.toUpperCase();
+  return asciiUpper(text.slice(at, at + word.length)) === asciiUpper(word);
 }
 
 /** The index after the run of white space at `at` (`at` itself when there is none). */

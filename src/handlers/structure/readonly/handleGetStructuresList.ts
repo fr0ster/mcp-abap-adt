@@ -26,6 +26,8 @@ import {
 import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
 import {
   afterBlanksAt,
+  asciiLower,
+  asciiUpper,
   holdsPhrase,
   isAsciiLetter,
   isWordCharacter,
@@ -166,7 +168,7 @@ function includedName(line: string, keyword: string): string | undefined {
   if (at === keyword.length) return undefined;
   let end = at;
   while (end < line.length && isStructureNameCharacter(line[end])) end++;
-  return end > at ? line.slice(at, end).toUpperCase() : undefined;
+  return end > at ? asciiUpper(line.slice(at, end)) : undefined;
 }
 
 /** `<attr> : include <name>` at the start of `line`: the attribute in lower case, the name in upper. */
@@ -184,7 +186,7 @@ function namedInclude(
   );
   return name === undefined
     ? undefined
-    : { name, attribute: line.slice(0, end).toLowerCase() };
+    : { name, attribute: asciiLower(line.slice(0, end)) };
 }
 
 /**

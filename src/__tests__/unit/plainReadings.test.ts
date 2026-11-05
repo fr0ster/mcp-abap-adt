@@ -93,6 +93,32 @@ describe('whether a report pulls its test include in', () => {
   });
 });
 
+describe('a report pulls its test include in, statement by statement', () => {
+  it('reads an INCLUDE statement over several lines', () => {
+    expect(pullsInclude('REPORT zr.\nINCLUDE\n  ztest.', 'ZTEST')).toBe(true);
+    expect(pullsInclude('REPORT zr.\nINCLUDE ztest\n.', 'ZTEST')).toBe(true);
+    expect(
+      pullsInclude('REPORT zr.\r\ninclude\r\n ztest\r\n if found .', 'ZTEST'),
+    ).toBe(true);
+  });
+  it('reads two statements on one line, after a comment line', () => {
+    expect(
+      pullsInclude('* INCLUDE zx.\nINCLUDE zother. INCLUDE ztest.', 'ZTEST'),
+    ).toBe(true);
+  });
+  it('does not read a string literal or a comment as a statement', () => {
+    expect(pullsInclude("WRITE 'x. INCLUDE ztest.'.", 'ZTEST')).toBe(false);
+    expect(pullsInclude('WRITE `x. INCLUDE ztest.`.', 'ZTEST')).toBe(false);
+    expect(pullsInclude('WRITE |x. INCLUDE ztest.|.', 'ZTEST')).toBe(false);
+    expect(pullsInclude('WRITE 1. " INCLUDE ztest.', 'ZTEST')).toBe(false);
+    expect(pullsInclude('* INCLUDE ztest.', 'ZTEST')).toBe(false);
+  });
+  it('reads no Unicode case mapping as a keyword', () => {
+    expect(pullsInclude('\u0131nclude ztest.', 'ZTEST')).toBe(false);
+    expect(includeNameOf('\u0131nclude zfoo.')).toBeUndefined();
+  });
+});
+
 describe('a function group name with an empty namespace segment', () => {
   it('is not read as namespaced', () => {
     expect(functionGroupTestInclude('//x')).toBe('L//XT99');
@@ -168,6 +194,8 @@ describe('header redaction in the wire log', () => {
     expect(isRedactedHeader('X-Api-Key')).toBe(true);
     expect(isRedactedHeader('cookie2')).toBe(false);
     expect(isRedactedHeader('Content-Type')).toBe(false);
+    // The Kelvin sign is no `k`.
+    expect(isRedactedHeader('X-Api\u212Aey')).toBe(false);
   });
 });
 

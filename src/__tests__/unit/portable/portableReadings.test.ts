@@ -54,6 +54,10 @@ describe('versions and environment keys', () => {
       () => false,
     );
     expect(env).toEqual({ HOME: 'h' });
+    // A long s upper-cases to S: no Unicode case mapping, the key stays.
+    expect(
+      tools.smokeEnv({ '\u017FAP_URL': 'x' }, 'lib.so', () => false),
+    ).toEqual({ '\u017FAP_URL': 'x' });
   });
   it('starts npm through a .js or .cjs npm_execpath', () => {
     const exists = () => true;

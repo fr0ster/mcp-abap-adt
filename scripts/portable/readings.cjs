@@ -12,6 +12,22 @@ const isHex = (c) =>
 const isBlank = (c) => c !== undefined && c.length === 1 && c.trim() === '';
 const allOf = (text, accepts) => [...text].every(accepts);
 
+// `text` with its ASCII letters in upper / lower case, by char code; every
+// other character as it is (no Unicode case mapping).
+const shifted = (text, from, to, by) => {
+  let out = '';
+  for (let at = 0; at < text.length; at++) {
+    const code = text.charCodeAt(at);
+    out +=
+      code >= from && code <= to
+        ? String.fromCharCode(code + by)
+        : text.charAt(at);
+  }
+  return out;
+};
+const asciiUpper = (text) => shifted(text, 97, 122, -32);
+const asciiLower = (text) => shifted(text, 65, 90, 32);
+
 // A semver `x.y.z` with an optional `-pre-release` (letters, digits, `.`, `-`),
 // or an npm dist-tag (a lower-case letter, then lower-case letters, digits, `-`).
 function isVersionSpec(value) {
@@ -40,7 +56,7 @@ function isVersionSpec(value) {
 function withoutNpmSettings(env) {
   const out = { ...env };
   for (const key of Object.keys(out)) {
-    if (key.toLowerCase().startsWith('npm_')) delete out[key];
+    if (asciiLower(key).startsWith('npm_')) delete out[key];
   }
   return out;
 }
@@ -150,7 +166,7 @@ function isScriptFile(file) {
 // The keys that state a system or a destination: SAP_* and MCP_*,
 // SAPNWRFC_HOME and AUTH_BROKER_PATH — in any case.
 function statesASystem(key) {
-  const upper = key.toUpperCase();
+  const upper = asciiUpper(key);
   return (
     upper.startsWith('SAP_') ||
     upper.startsWith('MCP_') ||

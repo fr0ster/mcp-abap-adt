@@ -24,6 +24,7 @@ import type {
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
 import { rfcAddressRefusalFor } from './config/messageServer';
+import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
   declaredSystemKindOf,
@@ -182,9 +183,9 @@ const REDACTED_WORDS: readonly string[] = [
   'api-key',
 ];
 
-/** Whether a header's value is redacted in the wire log, by its name in any case. */
+/** Whether a header's value is redacted in the wire log, by its name in any case (ASCII). */
 export function isRedactedHeader(name: string): boolean {
-  const lower = name.toLowerCase();
+  const lower = asciiLower(name);
   return (
     REDACTED_NAMES.has(lower) ||
     REDACTED_WORDS.some((word) => lower.includes(word))

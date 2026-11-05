@@ -48,6 +48,13 @@ describe('tools/readings.js', () => {
     expect(
       readings.traceIdIn('/runtime/traces/abaptraces/XYZ'),
     ).toBeUndefined();
+    // A dotted capital I lower-cases to two code units: the id stays where it is.
+    expect(readings.traceIdIn(`\u0130 /runtime/traces/abaptraces/${id}`)).toBe(
+      id,
+    );
+    expect(
+      readings.traceIdIn(`/runtime/traces/abaptraces/${id.slice(1)}\u212A`),
+    ).toBeUndefined();
     expect(
       readings.dumpIdsIn(
         'href="/sap/bc/adt/runtime/dumps/D1" /sap/bc/adt/runtime/dumps/D2?x /sap/bc/adt/runtime/dumps/ ',

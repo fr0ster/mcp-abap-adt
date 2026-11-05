@@ -32,8 +32,11 @@ import {
 } from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { linesOf } from '../../../lib/plainText';
-import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
+import { asciiUpper } from '../../../lib/plainText';
+import {
+  abapStatementsOf,
+  includeOfStatement,
+} from '../../../lib/strategies/abapIncludeStatement';
 import {
   awaitActivationRun,
   isRefusal,
@@ -88,12 +91,16 @@ function namespaceOf(
 }
 
 /**
- * Whether a report's source pulls `includeName` in: a line
- * `INCLUDE <name>.` (or `… IF FOUND.`) naming it, in any case.
+ * Whether a report's source pulls `includeName` in: a statement
+ * `INCLUDE <name>` (or `… IF FOUND`) naming it, the keywords in any case,
+ * over one line or several — statements split at the period outside
+ * comments and literals, as ABAP splits them.
  */
 export function pullsInclude(source: string, includeName: string): boolean {
-  const wanted = includeName.toUpperCase();
-  return linesOf(source).some((line) => includeNameOf(line) === wanted);
+  const wanted = asciiUpper(includeName);
+  return abapStatementsOf(source).some(
+    (statement) => includeOfStatement(statement) === wanted,
+  );
 }
 
 /** Write (or, with an empty source, clear) a class's test classes, and activate. */

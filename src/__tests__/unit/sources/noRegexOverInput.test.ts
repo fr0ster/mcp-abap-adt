@@ -3,8 +3,9 @@
  * (`helpers/regexScan.ts`) reads the syntax tree of every git-tracked
  * production source of every package — `src`, `scripts`, `tools` and each
  * package's sources, `.ts`, `.js`, `.mjs` and `.cjs` outside tests, fixtures
- * and docs — for a regular-expression literal, any reference to `RegExp`, and
- * a `match` / `matchAll` / `search` call given a string. There is no
+ * and docs — for a regular-expression literal, any reference to `RegExp`
+ * (by name or by a string key), and a `match` / `matchAll` / `search` call
+ * on a receiver the type checker reads as a string, or given a string. There is no
  * allowlist: input is read with plain string code, `URL` /
  * `URLSearchParams`, character tests and the XML parser.
  *
@@ -14,7 +15,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { productionSources, regexSites } from './helpers/regexScan';
+import { productionSources, regexSitesIn } from './helpers/regexScan';
+
+// One program over every production source: the type checker reads each
+// receiver of `match` / `matchAll` / `search`.
+jest.setTimeout(300_000);
 
 describe('no regular expression in production code', () => {
   it('scans src, scripts, tools and every package, outside tests and fixtures', () => {
@@ -34,8 +39,8 @@ describe('no regular expression in production code', () => {
   });
 
   it('finds none', () => {
-    const found = productionSources().flatMap((file) =>
-      regexSites(file).map((site) => `${site.where} ${site.text}`),
+    const found = regexSitesIn(productionSources()).map(
+      (site) => `${site.where} ${site.text}`,
     );
     expect(found).toEqual([]);
   });
@@ -46,11 +51,11 @@ describe('no regular expression in production code', () => {
       fs.readdirSync(path.join(root, dir)).map((name) => `${dir}/${name}`);
 
     it.each(listed('refused'))('refuses %s', (file) => {
-      expect(regexSites(file, root)).toHaveLength(1);
+      expect(regexSitesIn([file], root)).toHaveLength(1);
     });
 
     it.each(listed('clean'))('accepts %s', (file) => {
-      expect(regexSites(file, root)).toEqual([]);
+      expect(regexSitesIn([file], root)).toEqual([]);
     });
   });
 });

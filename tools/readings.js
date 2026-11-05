@@ -8,9 +8,22 @@ const isHex = (c) =>
   isDigit(c) || (c !== undefined && c.length === 1 && 'abcdefABCDEF'.includes(c));
 const isBlank = (c) => c !== undefined && c.length === 1 && c.trim() === '';
 
+// `text` with its ASCII letters in upper / lower case, by char code; every
+// other character as it is (no Unicode case mapping).
+const shifted = (text, from, to, by) => {
+  let out = '';
+  for (let at = 0; at < text.length; at++) {
+    const code = text.charCodeAt(at);
+    out += code >= from && code <= to ? String.fromCharCode(code + by) : text.charAt(at);
+  }
+  return out;
+};
+const asciiUpper = (text) => shifted(text, 97, 122, -32);
+const asciiLower = (text) => shifted(text, 65, 90, 32);
+
 // A line holding `@TODO` or `TODO:`, in any case.
 function hasTodo(line) {
-  const upper = line.toUpperCase();
+  const upper = asciiUpper(line);
   return upper.includes('@TODO') || upper.includes('TODO:');
 }
 
@@ -62,10 +75,10 @@ function splitPathList(text) {
 }
 
 // The 32-hex-digit trace id after `/runtime/traces/abaptraces/` (that path
-// in any case), or `undefined`.
+// in any case, ASCII), or `undefined`.
 function traceIdIn(text) {
   const marker = '/runtime/traces/abaptraces/';
-  const lower = text.toLowerCase();
+  const lower = asciiLower(text);
   for (let at = lower.indexOf(marker); at !== -1; at = lower.indexOf(marker, at + 1)) {
     const id = text.slice(at + marker.length, at + marker.length + 32);
     if (id.length === 32 && [...id].every(isHex)) return id;

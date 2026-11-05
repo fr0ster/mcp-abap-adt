@@ -3,14 +3,18 @@
  * (`src/lib/plainText.ts`).
  */
 import {
+  asciiLower,
+  asciiUpper,
   collapsedBlanks,
   globMatches,
   isAsciiDigits,
+  isAsciiLetter,
   isBlank,
   isWordCharacter,
   leadingDigits,
   linesOf,
   withoutTrailing,
+  wordAt,
 } from '../../lib/plainText';
 
 describe('linesOf', () => {
@@ -78,5 +82,26 @@ describe('globMatches', () => {
     expect(globMatches('A*B*C', 'AXBYBZC')).toBe(true);
     expect(globMatches('A*B*C', 'AXBYBZ')).toBe(false);
     expect(globMatches('/NS/*', '/ns/name')).toBe(true);
+  });
+});
+
+describe('ASCII only: no Unicode case mapping', () => {
+  // The Kelvin sign, a dotted capital I, a dotless small i, a sharp s.
+  const NOT_ASCII = ['K', 'İ', 'ı', 'ß'];
+  it('reads none of them as a letter', () => {
+    for (const character of NOT_ASCII) {
+      expect(isAsciiLetter(character)).toBe(false);
+      expect(isWordCharacter(character)).toBe(false);
+    }
+  });
+  it('folds none of them onto an ASCII letter', () => {
+    expect(wordAt('ınclude', 0, 'INCLUDE')).toBe(false);
+    expect(wordAt('Key', 0, 'key')).toBe(false);
+    expect(wordAt('Include', 0, 'iNCLUDE')).toBe(true);
+    expect(globMatches('Zß*', 'ZSSX')).toBe(false);
+    expect(globMatches('K*', 'kx')).toBe(false);
+    expect(globMatches('k*', 'KX')).toBe(true);
+    expect(asciiUpper('abıßz')).toBe('ABıßZ');
+    expect(asciiLower('ABİKZ')).toBe('abİKz');
   });
 });

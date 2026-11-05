@@ -12,7 +12,7 @@ import {
   parseOrdered,
   replaceOrderedMember,
 } from '../xml/ordered';
-import { child, type Element, entries, isElement, isList } from '../xml/tree';
+import { child, type Element, isElement, isList } from '../xml/tree';
 
 /**
  * Patching an XML document in place, for the read-modify-write an update is.

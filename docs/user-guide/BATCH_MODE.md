@@ -403,7 +403,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 <!-- batch-handlers:start -->
 
-184 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+179 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -415,7 +415,6 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `ActivateDdl` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateDomain` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateFunctionGroup` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
-| `ActivateFunctionModule` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateInclude` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateInterface` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
 | `ActivateMetadataExtension` | every call | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object |
@@ -432,7 +431,6 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `CheckDdl` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckDomain` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckFunctionGroup` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
-| `CheckFunctionModule` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckInterface` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckMetadataExtension` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object |
 | `CheckPackage` | every call | POST /sap/bc/adt/checkruns for the package |
@@ -478,9 +476,8 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetEnhancements` | when object_type is one of CLASS, CLAS, CLAS/OC, FUNCTION_GROUP, FUNCTIONGROUP, FUGR, FUGR/F, PROGRAM, PROG, PROG/P and include_nested is any value but true | GET {object uri}/source/main/enhancements/elements for a class, program or function group named by its type (any other type is resolved by probing metadata first, so it is not listed) |
 | `GetFunctionGroup` | every call | GET /sap/bc/adt/functions/groups/{name} |
 | `GetFunctionInclude` | every call | one request: GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/includes/{name} (part metadata) |
-| `GetFunctionModule` | every call | one request at the group given: GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/fmodules/{name} (part metadata) |
+| `GetFunctionModule` | when part is metadata | part metadata: one request at the group given, GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}, the group it states checked against the group given |
 | `GetFunctionModuleVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
-| `GetFunctionModuleVersions` | every call | GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions |
 | `GetFunctionModuleVersionSource` | every call | GET the content_uri given |
 | `GetInactiveObjects` | every call | GET /sap/bc/adt/activation/inactiveobjects |
 | `GetInclude` | every call | one request: GET /sap/bc/adt/programs/includes/{name}/source/main (part source, the default; ?version= the version given), or GET /sap/bc/adt/programs/includes/{name} (part metadata) |
@@ -501,7 +498,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetObjectsByType` | every call | POST /sap/bc/adt/repository/nodestructure for the one node asked |
 | `GetObjectStructure` | every call | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
 | `GetObjectVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
-| `GetObjectVersions` | every call | GET the versions feed of the object (…/versions) |
+| `GetObjectVersions` | when object_type is any value but function_module | GET the versions feed of the object (…/versions) |
 | `GetObjectVersionSource` | every call | GET the content_uri given |
 | `GetPackage` | every call | GET /sap/bc/adt/packages/{name}?version=active |
 | `GetProgram` | every call | one request: GET /sap/bc/adt/programs/programs/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/programs/programs/{name} (part metadata) |
@@ -523,7 +520,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
 | `GetTableVersionSource` | every call | GET the content_uri given |
 | `GetTransport` | every call | GET /sap/bc/adt/cts/transportrequests/{number} |
-| `GetWhereUsed` | when enable_all_types is any value but true and enable_only_types is absent and disable_types is absent and objects is absent | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
+| `GetWhereUsed` | when enable_all_types is any value but true and enable_only_types is absent and disable_types is absent and objects is absent and object_type is any value but FUGR/FF, function, functionmodule, function_module, func | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
 | `ListATCResults` | every call | GET /sap/bc/adt/atc/results?createdBy={user}[&centralResult=true][&ageMin=N][&ageMax=N] |
 | `ListServiceBindingTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `MoveTransportObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
@@ -531,7 +528,6 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `ReadTransportObjects` | every call | GET /sap/bc/adt/cts/transportrequests/{number} |
 | `RemoveTransportObject` | every call | PUT /sap/bc/adt/cts/transportrequests/{number} without the object |
 | `RunFunctionGroupUnitTest` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of the function group and answers the finished result |
-| `RunFunctionModuleUnitTest` | when runner is sync and function_group_name is given | POST /sap/bc/adt/abapunit/testruns at the module under its function group: runs every test of the group and answers the finished result |
 | `RunProgramUnitTest` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of the report and answers the finished result |
 | `RuntimeAnalyzeProfilerTrace` | every call | GET …/abaptraces/{id}/hitlist or /statements, summarised locally |
 | `RuntimeCreateProfilerTraceParameters` | every call | POST /sap/bc/adt/runtime/traces/abaptraces/parameters |
@@ -553,21 +549,20 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | Tool | Recorded | Sends |
 |---|---|---|
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION, BEHAVIOR_IMPLEMENTATION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
-| `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is FUNCTION_MODULE | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the function module under its function group (object_name GROUP\|MODULE, or with function_group_name), answering { run_id } |
-| `HandlerActivate` | when objects is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
-| `HandlerActivate` | when objects is absent and object_adt_type is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is given and the type of every objects entry is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is absent and object_adt_type is given and object_adt_type is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
 | `HandlerCdsUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
 | `HandlerCdsUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
-| `HandlerCheckRun` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |
+| `HandlerCheckRun` | when object_type is any value but FUNCTION_MODULE | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |
 | `HandlerCreate` | when object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
 | `HandlerCreate` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch |
-| `HandlerDelete` | when object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE | the deletion request alone: POST /sap/bc/adt/deletion/delete (a metadata extension: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}[?corrNr=…]) |
+| `HandlerDelete` | when object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE | the deletion request alone: POST /sap/bc/adt/deletion/delete (a metadata extension: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}[?corrNr=…]) |
 | `HandlerDelete` | when lock_handle is given and object_type is one of LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST | PUT of empty content to the class include under the lock_handle given ({class uri}/includes/{include}?lockHandle=…[&corrNr=…]) |
-| `HandlerDeletionCheck` | every call | POST /sap/bc/adt/deletion/check for the one object |
+| `HandlerDeletionCheck` | when object_type is any value but FUNCTION_MODULE | POST /sap/bc/adt/deletion/check for the one object |
 | `HandlerDumpList` | every call | GET /sap/bc/adt/runtime/dumps (feed_type system_messages: /sap/bc/adt/runtime/systemmessages; gateway_errors: /sap/bc/adt/gw/errorlog) with $top (1 to 100), to, from and the dump filters: one page, SAP's next link answered as next_to |
 | `HandlerDumpView` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
-| `HandlerGet` | when part is source (absent reads as source) and object_type is one of TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's source (as the full set's Get<Type>, part source); FUNCTION_MODULE at the group its arguments name |
+| `HandlerGet` | when part is source (absent reads as source) and object_type is one of TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's source (as the full set's Get<Type>, part source) |
 | `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TABLE_TYPE | one request: GET the type's metadata document (as the full set's Get<Type>, part metadata); FUNCTION_MODULE at the group its arguments name |
 | `HandlerGet` | when part is object_structure | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
 | `HandlerGet` | when part is node_structure and object_adt_type is given | POST /sap/bc/adt/repository/nodestructure for the one node asked |
@@ -576,7 +571,7 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `HandlerGet` | when part is activation_results and run_id is given | GET /sap/bc/adt/activation/results/{run_id} |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body |
-| `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
+| `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
 | `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerProfileList` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |
 | `HandlerProfileRun` | every call | POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name}; with profiler_id, ?profilerId={profiler_id} |
@@ -592,11 +587,11 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 | `HandlerUnitTestRun` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of each container named and answers the finished result |
 | `HandlerUnitTestRun` | when runner is async (absent reads as async) | POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult |
 | `HandlerUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
-| `HandlerUnlock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
+| `HandlerUnlock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
 | `HandlerUnlock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
-| `HandlerUpdate` | when lock_handle is given and object_type is one of DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE | one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request |
+| `HandlerUpdate` | when lock_handle is given and object_type is one of DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE | one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request |
 | `HandlerUpdate` | when lock_handle is given and object_type is PACKAGE and the connection is HTTP | PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerValidate` | every call | POST the type's validation endpoint (…/validation?objname=…, /cts/transportchecks for a service binding) |
-| `HandlerWhereUsed` | every call | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope |
+| `HandlerWhereUsed` | when object_type is any value but FUNCTION_MODULE | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope |
 
 <!-- batch-handlers:end -->

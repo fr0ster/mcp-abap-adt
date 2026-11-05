@@ -32,6 +32,7 @@ import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { checkFunctionModuleGroup } from '../../../lib/strategies/functionModuleGroup';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -118,6 +119,15 @@ export async function handleUpdateFunctionModule(
       const obj = createAdtClient(connection, logger).getFunctionModule(
         resultsFor(functionModuleDocuments),
       );
+
+      // SAP ignores the group of the address (#2): the module's metadata
+      // names the group holding it, read before the lock.
+      const checked = await checkFunctionModuleGroup(
+        context,
+        functionGroupName,
+        functionModuleName,
+      );
+      if (!checked.ok) return checked;
 
       const written = await withLock(
         () =>

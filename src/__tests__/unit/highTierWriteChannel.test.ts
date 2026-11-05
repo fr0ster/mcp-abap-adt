@@ -45,6 +45,7 @@ import {
   okResponse,
   reading,
 } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -362,7 +363,10 @@ const cases: WireCase[] = [
     field: 'source',
     marker: 'MARKER_FM',
     run: async () => {
-      const { members, captured } = capture({}, 'update');
+      const { members, captured } = capture(
+        { readMetadata: readsModuleIn('ZFG_X', 'Z_FM_X') },
+        'update',
+      );
       const double = fakeClientOfWithFactory(members);
       fakeClient = double.client;
       await handleUpdateFunctionModule(context as any, {

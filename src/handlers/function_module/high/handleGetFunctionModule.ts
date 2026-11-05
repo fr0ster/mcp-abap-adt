@@ -21,6 +21,10 @@ import {
   type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
+import {
+  inCheckedGroupOn,
+  inGroupStated,
+} from '../../../lib/strategies/functionModuleGroup';
 import { readFunctionModuleMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -29,7 +33,7 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name, in one request: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
+  description: `[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. The module's metadata is read first, and the part is answered only when the function group named holds the module. Returns the part read. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
     function_module_name: z.string().describe('Function module name.'),
     function_group_name: z
@@ -72,19 +76,22 @@ export async function handleGetFunctionModule(
   const client = createAdtClient(connection, logger);
   const obj = client.getFunctionModule(resultsFor(functionModuleDocuments));
 
-  // One request per call, at the group the caller gave: the part asked for,
-  // and only it.
+  // The metadata names the group holding the module, and SAP ignores the
+  // group of the address (#2): the metadata read is the answer to part
+  // "metadata", checked against the group given; part "source" reads it
+  // first and the source only when the group holds the module.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetFunctionModule', detail: 'terse' },
-      () =>
-        readFunctionModuleMetadata(
-          client,
-          {
-            functionModuleName,
-            functionGroupName,
-          },
-          version,
+      async () =>
+        inGroupStated(
+          await readFunctionModuleMetadata(
+            client,
+            { functionModuleName, functionGroupName },
+            version,
+          ),
+          functionGroupName,
+          functionModuleName,
         ),
       (metadata: AdtReading<string>) => ({
         success: true,
@@ -99,9 +106,16 @@ export async function handleGetFunctionModule(
     { tool: 'GetFunctionModule', detail: 'terse' },
     range,
     () =>
-      obj.read({ functionModuleName, functionGroupName }, version, {
-        analyse: analyseException,
-      }),
+      inCheckedGroupOn(
+        client,
+        functionGroupName,
+        functionModuleName,
+        () =>
+          obj.read({ functionModuleName, functionGroupName }, version, {
+            analyse: analyseException,
+          }),
+        version,
+      ),
     (source, cut) => ({
       success: true,
       function_module_name: functionModuleName,

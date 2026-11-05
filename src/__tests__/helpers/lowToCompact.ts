@@ -11,6 +11,7 @@
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody } from '../../lib/adtCorpus';
+import { moduleMetadataDocument } from './functionModuleMetadata';
 import {
   type RecordedRequest,
   type RecordingConnection,
@@ -53,6 +54,9 @@ const METADATA_DOCUMENTS: Array<[string, string]> = [
   ],
 ];
 
+/** The address of the rows' function module (`FUGR_A|FM_A`). */
+const MODULE_ADDRESS = '/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a';
+
 /** The stand-in: a recording connection with the answers above. */
 export function parityConnection(): RecordingConnection {
   const inner = recordingConnection();
@@ -63,6 +67,14 @@ export function parityConnection(): RecordingConnection {
       const answered = await inner.makeAdtRequest(options);
       if (options.method === 'GET') {
         const url = String(options.url).toLowerCase();
+        // The rows' function module, FM_A in FUGR_A: its metadata names that
+        // group, so a call that checks it goes on (#2).
+        if (url.startsWith(`${MODULE_ADDRESS}?`)) {
+          return {
+            ...answered,
+            data: moduleMetadataDocument('FM_A', 'FUGR_A'),
+          } as IAdtWireResponse<never, never>;
+        }
         const hit = METADATA_DOCUMENTS.find(([prefix]) =>
           url.startsWith(prefix),
         );

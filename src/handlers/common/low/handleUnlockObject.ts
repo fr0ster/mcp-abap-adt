@@ -45,6 +45,7 @@ import {
   connectionHoldingPackageLock,
   releasePackageLockSession,
 } from '../../../lib/packageSessions';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -193,16 +194,24 @@ export async function unlockObject(
               analyse: analyseException,
             });
         case 'function_module':
-          return client
-            .getFunctionModule(resultsFor(functionModuleDocuments))
-            .unlock(
-              {
-                functionGroupName,
-                functionModuleName,
-              },
-              lock_handle,
-              { analyse: analyseException },
-            );
+          // SAP ignores the group of the address (#2): the unlock is sent
+          // after the module's metadata names the group given.
+          return inCheckedGroupOn(
+            client,
+            functionGroupName,
+            functionModuleName,
+            () =>
+              client
+                .getFunctionModule(resultsFor(functionModuleDocuments))
+                .unlock(
+                  {
+                    functionGroupName,
+                    functionModuleName,
+                  },
+                  lock_handle,
+                  { analyse: analyseException },
+                ),
+          );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))

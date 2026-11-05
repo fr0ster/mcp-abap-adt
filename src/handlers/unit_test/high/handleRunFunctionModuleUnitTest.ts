@@ -9,6 +9,7 @@ import { RUNNER_FIELD, SCOPE_FIELD, WAIT_FIELD } from '../shared/runner';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
 import { return_error } from '../../../lib/utils';
 import {
   runnerOf,
@@ -75,28 +76,41 @@ export async function handleRunFunctionModuleUnitTest(
     return answer(
       { tool: 'RunFunctionModuleUnitTest', detail },
       () =>
-        runTestsSync(
+        inCheckedGroup(
           context,
-          {
-            carrier: 'functionModule',
-            functionGroupName,
-            functionModuleName: args.function_module_name,
-          },
-          runOptions,
+          functionGroupName,
+          args.function_module_name,
+          () =>
+            runTestsSync(
+              context,
+              {
+                carrier: 'functionModule',
+                functionGroupName,
+                functionModuleName: args.function_module_name,
+              },
+              runOptions,
+            ),
         ),
       projectSync(detail),
     );
   }
+  // The async runner addresses the module by name alone; a group given
+  // beside it is checked against the module's metadata (#2) before the run.
+  const run = () =>
+    runAndWait(
+      context,
+      'functionModule',
+      args.function_module_name,
+      wait,
+      runOptions,
+    );
+  const group = args.function_group_name;
   return answer(
     { tool: 'RunFunctionModuleUnitTest', detail },
     () =>
-      runAndWait(
-        context,
-        'functionModule',
-        args.function_module_name,
-        wait,
-        runOptions,
-      ),
+      group === undefined || group === ''
+        ? run()
+        : inCheckedGroup(context, group, args.function_module_name, run),
     projectRun(detail),
   );
 }

@@ -19,6 +19,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -95,22 +96,24 @@ export async function handleUpdateFunctionModule(
   return answer(
     { tool: 'UpdateFunctionModuleLow', detail },
     () =>
-      withAdtHeaders(context, 'functionModule.update', (headers) =>
-        createAdtClient(connection, logger)
-          .getFunctionModule(resultsFor(functionModuleDocuments))
-          .update(
-            {
-              functionModuleName,
-              functionGroupName,
-              transportRequest: transport_request,
-            },
-            {
-              headers,
-              source: source_code,
-              lockHandle: lock_handle,
-              analyse: analyseException,
-            },
-          ),
+      inCheckedGroup(context, functionGroupName, functionModuleName, () =>
+        withAdtHeaders(context, 'functionModule.update', (headers) =>
+          createAdtClient(connection, logger)
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .update(
+              {
+                functionModuleName,
+                functionGroupName,
+                transportRequest: transport_request,
+              },
+              {
+                headers,
+                source: source_code,
+                lockHandle: lock_handle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       ),
     project(detail, terseWrite),
   );

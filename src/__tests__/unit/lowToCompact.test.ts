@@ -242,6 +242,21 @@ describe('the low set → compact mapping table', () => {
     }
   });
 
+  /** The activations whose function module's metadata is read first (#2). */
+  const GROUP_READ_FIRST: ReadonlySet<string> = new Set([
+    'ActivateFunctionModuleLow',
+  ]);
+
+  /** A function module's metadata read through `group`, as the stand-in records it. */
+  const groupRead = (group: string, module: string) => ({
+    method: 'GET',
+    url: `/sap/bc/adt/functions/groups/${group.toLowerCase()}/fmodules/${module.toLowerCase()}?version=workingArea`,
+    headers: {
+      Accept:
+        'application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml',
+    },
+  });
+
   const mapped = TABLE.rows.filter((r) => !r.accepted);
   it.each(mapped.map((r) => [r.tool, r] as const))(
     '%s: the compact call sends the same requests',
@@ -258,7 +273,11 @@ describe('the low set → compact mapping table', () => {
       expect(low?.url).toBe(
         '/sap/bc/adt/activation?method=activate&preauditRequested=true',
       );
-      const sent = await compactRequests(row);
+      // A function module's metadata is read first (#2), the run after it.
+      const all = await compactRequests(row);
+      const checked = GROUP_READ_FIRST.has(row.tool);
+      if (checked) expect(all[0]).toEqual(groupRead('FUGR_A', 'FM_A'));
+      const sent = checked ? all.slice(1) : all;
       expect(sent[0]?.method).toBe('POST');
       expect(sent[0]?.url.startsWith('/sap/bc/adt/activation/runs?')).toBe(
         true,
@@ -267,6 +286,19 @@ describe('the low set → compact mapping table', () => {
       expect(name).toBeDefined();
       expect(String(sent[0]?.data)).toContain(`adtcore:name="${name}"`);
       expect(sent.some((r) => r.url === low?.url)).toBe(false);
+    },
+  );
+
+  const checkedFirst = TABLE.rows.filter(
+    (r) => r.accepted?.kind === 'group-checked',
+  );
+  it.each(checkedFirst.map((r): [string, LowToCompactRow] => [r.tool, r]))(
+    "%s (accepted, group checked): the module's metadata read, then the low requests",
+    async (_tool, row) => {
+      expect(await compactRequests(row)).toEqual([
+        groupRead('FUGR_A', 'FM_A'),
+        ...(row.low_requests ?? []),
+      ]);
     },
   );
 
@@ -399,14 +431,20 @@ describe('the low set → compact mapping table', () => {
     ['CreateTableLow', 'language-unstated'],
     // 24.0.0 (the owner): no program type on create, which SAP ignores.
     ['CreateProgramLow', 'program-type-removed'],
+    // 24.0.0 (the owner, #2): a function module's group is checked first.
+    ['CheckFunctionModuleLow', 'group-checked'],
+    ['DeleteFunctionModuleLow', 'group-checked'],
+    ['LockFunctionModuleLow', 'group-checked'],
+    ['UnlockFunctionModuleLow', 'group-checked'],
+    ['UpdateFunctionModuleLow', 'group-checked'],
   ];
 
-  it('accepts exactly the 18 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 23 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(18);
+    expect(ACCEPTED).toHaveLength(23);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
@@ -418,6 +456,7 @@ describe('the low set → compact mapping table', () => {
     );
     expect([...kinds].sort()).toEqual([
       'activation-run',
+      'group-checked',
       'language-sent',
       'language-unstated',
       'program-type-removed',

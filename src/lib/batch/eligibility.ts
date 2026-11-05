@@ -19,9 +19,14 @@
 import * as path from 'node:path';
 import { child, isList } from '../xml/tree';
 
-/** One condition on a named argument; an entry's `when` holds when all of them do. */
+/**
+ * One condition on a named argument; an entry's `when` holds when all of them
+ * do. With `field`, the argument is a list and `equals` / `notEquals` hold
+ * for the member `field` of each of its entries (a list absent has none).
+ */
 export type WhenRule = {
   argument: string;
+  field?: string;
   equals?: string[];
   notEquals?: string[];
   present?: boolean;
@@ -73,6 +78,11 @@ function whenRuleOf(value: unknown): WhenRule[number] | undefined {
   const argument = child(value, 'argument');
   if (typeof argument !== 'string') return undefined;
   const rule: WhenRule[number] = { argument };
+  const field = child(value, 'field');
+  if (field !== undefined) {
+    if (typeof field !== 'string') return undefined;
+    rule.field = field;
+  }
   for (const name of ['equals', 'notEquals'] as const) {
     const given = child(value, name);
     if (given === undefined) continue;
@@ -191,6 +201,16 @@ function argumentOf(tool: string, args: unknown, name: string): unknown {
 const among = (value: string | undefined, values: string[]) =>
   value !== undefined && values.some((v) => v.toUpperCase() === value);
 
+/** Whether `value` holds a rule's `equals` and `notEquals`. */
+function valueHolds(rule: WhenRule[number], value: unknown): boolean {
+  if (rule.equals !== undefined && !among(compared(value), rule.equals)) {
+    return false;
+  }
+  return !(
+    rule.notEquals !== undefined && among(compared(value), rule.notEquals)
+  );
+}
+
 /** Whether every rule of `when` holds for `args`. */
 export function whenHolds(
   tool: string,
@@ -202,15 +222,15 @@ export function whenHolds(
     if (rule.present !== undefined && (value !== undefined) !== rule.present) {
       return false;
     }
-    if (rule.equals !== undefined && !among(compared(value), rule.equals)) {
-      return false;
+    if (rule.field !== undefined) {
+      const field = rule.field;
+      const members = isList(value) ? value : [];
+      if (!members.every((member) => valueHolds(rule, child(member, field)))) {
+        return false;
+      }
+      continue;
     }
-    if (
-      rule.notEquals !== undefined &&
-      among(compared(value), rule.notEquals)
-    ) {
-      return false;
-    }
+    if (!valueHolds(rule, value)) return false;
   }
   return true;
 }

@@ -100,9 +100,14 @@ import {
   fakeClientOf,
   fakeClientOfWithFactory,
   okResponse,
+  reading as readingOf,
   recordAnalyse,
   refusedResponse,
 } from '../helpers/fakeClient';
+import {
+  moduleMetadataDocument,
+  readsModuleIn,
+} from '../helpers/functionModuleMetadata';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -112,7 +117,13 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.calls` needs this wiring; tests that need a real document
 // swap `fakeClient` to `fakeClientOf(...)` for their own call and restore it.
-const seen = recordAnalyse();
+const seen = recordAnalyse({
+  // A function module's metadata names the group the calls give (#2).
+  'getFunctionModule.readMetadata': () => {
+    const document = moduleMetadataDocument('ZFM_X', 'ZFG_X');
+    return readingOf(document, document);
+  },
+});
 let fakeClient: unknown = seen.client;
 jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
@@ -865,7 +876,10 @@ describe('function (function module)', () => {
       data: corpusBody('activation-success-verdict--01-activation'),
       status: 200,
     } as any);
-    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+    fakeClient = fakeClientOf({
+      readMetadata: readsModuleIn('ZFG_X', 'ZFM_X'),
+      activate: async () => okResponse(reading),
+    });
 
     const result: any = await handleActivateFunctionModule(context as any, {
       function_module_name: 'ZFM_X',

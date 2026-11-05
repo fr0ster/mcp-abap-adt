@@ -299,7 +299,7 @@ ADT requests, except where a row names an accepted difference.
 | `ActivateDdlLow` | `HandlerActivate` (object_type: DDL, object_name) | the same requests |
 | `ActivateDomainLow` | `HandlerActivate` (object_type: DOMAIN, object_name) | the same requests |
 | `ActivateFunctionGroupLow` | `HandlerActivate` (object_type: FUNCTION_GROUP, object_name) | the same requests |
-| `ActivateFunctionModuleLow` | `HandlerActivate` (objects) | **accepted:** HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation. |
+| `ActivateFunctionModuleLow` | `HandlerActivate` (objects) | **accepted:** HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation. The module's metadata is read first, and the run starts only when the function group the metadata names is the group given (#2). |
 | `ActivateInterfaceLow` | `HandlerActivate` (object_type: INTERFACE, object_name) | the same requests |
 | `ActivateMetadataExtensionLow` | `HandlerActivate` (object_type: METADATA_EXTENSION, object_name) | the same requests |
 | `ActivateObjectLow` | `HandlerActivate` (objects, preaudit) | the same requests |
@@ -314,7 +314,7 @@ ADT requests, except where a row names an accepted difference.
 | `CheckDdlLow` | `HandlerCheckRun` (object_type: DDL, object_name, version, source_code) | The low tool's ddl_source is HandlerCheckRun's source_code. |
 | `CheckDomainLow` | `HandlerCheckRun` (object_type: DOMAIN, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
 | `CheckFunctionGroupLow` | `HandlerCheckRun` (object_type: FUNCTION_GROUP, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
-| `CheckFunctionModuleLow` | `HandlerCheckRun` (object_type: FUNCTION_MODULE, object_name, version) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `CheckFunctionModuleLow` | `HandlerCheckRun` (object_type: FUNCTION_MODULE, object_name, version) | **accepted:** The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address. The lifecycle tools name a function module GROUP\|MODULE in object_name. |
 | `CheckInterfaceLow` | `HandlerCheckRun` (object_type: INTERFACE, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
 | `CheckMetadataExtensionLow` | `HandlerCheckRun` (object_type: METADATA_EXTENSION, object_name, version) | the same requests |
 | `CheckPackageLow` | `HandlerCheckRun` (object_type: PACKAGE, object_name) | the same requests |
@@ -342,7 +342,7 @@ ADT requests, except where a row names an accepted difference.
 | `DeleteDdlLow` | `HandlerDelete` (object_type: DDL, ddl_name, transport_request) | the same requests |
 | `DeleteDomainLow` | `HandlerDelete` (object_type: DOMAIN, domain_name, transport_request) | the same requests |
 | `DeleteFunctionGroupLow` | `HandlerDelete` (object_type: FUNCTION_GROUP, function_group_name, transport_request) | the same requests |
-| `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | the same requests |
+| `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | **accepted:** The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address. |
 | `DeleteInterfaceLow` | `HandlerDelete` (object_type: INTERFACE, interface_name, transport_request) | the same requests |
 | `DeleteMetadataExtensionLow` | `HandlerDelete` (object_type: METADATA_EXTENSION, metadata_extension_name, transport_request) | the same requests |
 | `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | The deletion request alone, as the low tool sent it, on the call's connection. The low tool's force_new_connection has no compact counterpart: compact locks and writes a package in an ABAP session of its own, so the call's session never holds a saved package; the full set's DeletePackage keeps force_new_connection. |
@@ -359,7 +359,7 @@ ADT requests, except where a row names an accepted difference.
 | `LockDdlLow` | `HandlerLock` (object_type: DDL, object_name) | the same requests |
 | `LockDomainLow` | `HandlerLock` (object_type: DOMAIN, object_name) | the same requests |
 | `LockFunctionGroupLow` | `HandlerLock` (object_type: FUNCTION_GROUP, object_name) | the same requests |
-| `LockFunctionModuleLow` | `HandlerLock` (object_type: FUNCTION_MODULE, object_name) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `LockFunctionModuleLow` | `HandlerLock` (object_type: FUNCTION_MODULE, object_name) | **accepted:** The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address. The lifecycle tools name a function module GROUP\|MODULE in object_name. |
 | `LockInterfaceLow` | `HandlerLock` (object_type: INTERFACE, object_name) | the same requests |
 | `LockMetadataExtensionLow` | `HandlerLock` (object_type: METADATA_EXTENSION, object_name) | the same requests |
 | `LockPackageLow` | `HandlerLock` (object_type: PACKAGE, object_name, super_package) | the same requests |
@@ -372,7 +372,7 @@ ADT requests, except where a row names an accepted difference.
 | `UnlockDdlLow` | `HandlerUnlock` (object_type: DDL, object_name, lock_handle) | the same requests |
 | `UnlockDomainLow` | `HandlerUnlock` (object_type: DOMAIN, object_name, lock_handle) | the same requests |
 | `UnlockFunctionGroupLow` | `HandlerUnlock` (object_type: FUNCTION_GROUP, object_name, lock_handle) | the same requests |
-| `UnlockFunctionModuleLow` | `HandlerUnlock` (object_type: FUNCTION_MODULE, object_name, lock_handle) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `UnlockFunctionModuleLow` | `HandlerUnlock` (object_type: FUNCTION_MODULE, object_name, lock_handle) | **accepted:** The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address. The lifecycle tools name a function module GROUP\|MODULE in object_name. |
 | `UnlockInterfaceLow` | `HandlerUnlock` (object_type: INTERFACE, object_name, lock_handle) | the same requests |
 | `UnlockMetadataExtensionLow` | `HandlerUnlock` (object_type: METADATA_EXTENSION, object_name, lock_handle) | the same requests |
 | `UnlockPackageLow` | `HandlerUnlock` (object_type: PACKAGE, object_name, lock_handle) | the same requests |
@@ -384,7 +384,7 @@ ADT requests, except where a row names an accepted difference.
 | `UpdateDataElementLow` | `HandlerGet` (object_type: DATA_ELEMENT, data_element_name, part: metadata), then `HandlerUpdate` (object_type: DATA_ELEMENT, data_element_name, source_code, lock_handle) | **accepted:** Since 23.0.0 every read names its version: the compact HandlerGet part metadata reads /sap/bc/adt/ddic/dataelements/dtel_a?version=active (its default); the low tool's read sent no version, which ADT answers from the working area. Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle. |
 | `UpdateDdlLow` | `HandlerUpdate` (object_type: DDL, ddl_name, ddl_source, lock_handle, transport_request) | the same requests |
 | `UpdateDomainLow` | `HandlerGet` (object_type: DOMAIN, domain_name, part: metadata), then `HandlerUpdate` (object_type: DOMAIN, domain_name, source_code, lock_handle) | **accepted:** Since 23.0.0 every read names its version: the compact HandlerGet part metadata reads /sap/bc/adt/ddic/domains/dom_a?version=active (its default); the low tool's read sent no version, which ADT answers from the working area. Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle. |
-| `UpdateFunctionModuleLow` | `HandlerUpdate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdateFunctionModuleLow` | `HandlerUpdate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, source_code, lock_handle, transport_request) | **accepted:** The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address. |
 | `UpdateInterfaceLow` | `HandlerUpdate` (object_type: INTERFACE, interface_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateMetadataExtensionLow` | `HandlerUpdate` (object_type: METADATA_EXTENSION, name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdatePackageLow` | `HandlerGet` (object_type: PACKAGE, package_name, part: metadata), then `HandlerUpdate` (object_type: PACKAGE, package_name, source_code, lock_handle, transport_request) | Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle. |

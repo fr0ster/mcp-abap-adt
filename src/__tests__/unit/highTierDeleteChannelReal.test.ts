@@ -41,7 +41,10 @@
  * table controls anyway) — keep both.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
 import { handleDeleteBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleDeleteBehaviorImplementation';
 import { handleDeleteClass } from '../../handlers/class/high/handleDeleteClass';
@@ -68,6 +71,7 @@ import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
 import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleDeleteUnitTest } from '../../handlers/unit_test/high/handleDeleteUnitTest';
+import { moduleInGroup } from '../helpers/functionModuleMetadata';
 import {
   LOCK_SUCCESS_XML,
   type RecordedRequest,
@@ -178,6 +182,11 @@ interface DeletionCase {
    * matched. */
   expectedUri: string;
   run: (connection: IAbapConnection) => Promise<unknown>;
+  /**
+   * What the handler reads before the check, answered: a function module's
+   * metadata, naming the group given (#2).
+   */
+  first?: ReadonlyArray<Partial<IAdtWireResponse>>;
 }
 
 const deletionServiceCases: DeletionCase[] = [
@@ -245,6 +254,7 @@ const deletionServiceCases: DeletionCase[] = [
     // functionModule/delete.js keeps both segments as given (no lowercase).
     name: 'DeleteFunctionModule',
     expectedUri: '/sap/bc/adt/functions/groups/ZFG_DEL_X/fmodules/ZFM_DEL_X',
+    first: [moduleInGroup('ZFM_DEL_X', 'ZFG_DEL_X')],
     run: (c) =>
       handleDeleteFunctionModule(ctx(c) as any, {
         function_module_name: 'ZFM_DEL_X',
@@ -329,78 +339,84 @@ const deletionServiceCases: DeletionCase[] = [
   },
 ];
 
-describe.each(deletionServiceCases)('$name', ({ expectedUri, run }) => {
-  const objectName = expectedUri.split('/').pop() as string;
+describe.each(deletionServiceCases)(
+  '$name',
+  ({ expectedUri, run, first = [] }) => {
+    const objectName = expectedUri.split('/').pop() as string;
 
-  it(`checks, then reaches /sap/bc/adt/deletion/delete, POSTs a request naming adtcore:uri="${expectedUri}", and takes no lock`, async () => {
-    const conn = recordingConnection([
-      { data: deletionCheckXml(objectName) },
-      { data: deletionSuccessXml(objectName) },
-    ]);
+    it(`checks, then reaches /sap/bc/adt/deletion/delete, POSTs a request naming adtcore:uri="${expectedUri}", and takes no lock`, async () => {
+      const conn = recordingConnection([
+        ...first,
+        { data: deletionCheckXml(objectName) },
+        { data: deletionSuccessXml(objectName) },
+      ]);
 
-    const result: any = await run(conn);
+      const result: any = await run(conn);
 
-    expect(result?.isError).toBe(false);
+      expect(result?.isError).toBe(false);
 
-    const hits = requestsTo(
-      conn.requests,
-      'POST',
-      '/sap/bc/adt/deletion/delete',
-    );
-    expect(hits.length).toBeGreaterThan(0);
-    // The exact object — type and name both, not a name-only substring
-    // match a wrong-family or wrong-type delete could still satisfy.
-    expect(hits.some((r) => carriesUri(r, expectedUri))).toBe(true);
-    // A held lock is what makes ADT refuse a deletion; these must never
-    // take one.
-    expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
-      false,
-    );
-    // The check went first, for the same object.
-    const checkAt = conn.requests.findIndex(
-      (r) =>
-        r.url.includes('/sap/bc/adt/deletion/check') &&
-        carriesUri(r, expectedUri),
-    );
-    const deleteAt = conn.requests.findIndex((r) =>
-      r.url.includes('/sap/bc/adt/deletion/delete'),
-    );
-    expect(checkAt).toBeGreaterThanOrEqual(0);
-    expect(checkAt).toBeLessThan(deleteAt);
-  });
-
-  it('sends the delete when the check permits it, though its W says the object does not exist (#1, #11)', async () => {
-    const conn = recordingConnection([
-      { data: absentCheckXml(objectName) },
-      { data: deletionSuccessXml(objectName) },
-    ]);
-
-    const result: any = await run(conn);
-
-    expect(result?.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toMatchObject({
-      deleted: true,
-      object: objectName,
+      const hits = requestsTo(
+        conn.requests,
+        'POST',
+        '/sap/bc/adt/deletion/delete',
+      );
+      expect(hits.length).toBeGreaterThan(0);
+      // The exact object — type and name both, not a name-only substring
+      // match a wrong-family or wrong-type delete could still satisfy.
+      expect(hits.some((r) => carriesUri(r, expectedUri))).toBe(true);
+      // A held lock is what makes ADT refuse a deletion; these must never
+      // take one.
+      expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
+        false,
+      );
+      // The check went first, for the same object.
+      const checkAt = conn.requests.findIndex(
+        (r) =>
+          r.url.includes('/sap/bc/adt/deletion/check') &&
+          carriesUri(r, expectedUri),
+      );
+      const deleteAt = conn.requests.findIndex((r) =>
+        r.url.includes('/sap/bc/adt/deletion/delete'),
+      );
+      expect(checkAt).toBeGreaterThanOrEqual(0);
+      expect(checkAt).toBeLessThan(deleteAt);
     });
-    expect(
-      requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
-    ).toHaveLength(1);
-  });
 
-  it("answers the check's refusal and never sends the delete", async () => {
-    const conn = recordingConnection([
-      { data: deletionCheckXml(objectName, 'Object does not exist') },
-    ]);
+    it('sends the delete when the check permits it, though its W says the object does not exist (#1, #11)', async () => {
+      const conn = recordingConnection([
+        ...first,
+        { data: absentCheckXml(objectName) },
+        { data: deletionSuccessXml(objectName) },
+      ]);
 
-    const result: any = await run(conn);
+      const result: any = await run(conn);
 
-    expect(result?.isError).toBe(true);
-    expect(result.content[0].text).toContain('Object does not exist');
-    expect(
-      requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
-    ).toHaveLength(0);
-  });
-});
+      expect(result?.isError).toBe(false);
+      expect(JSON.parse(result.content[0].text)).toMatchObject({
+        deleted: true,
+        object: objectName,
+      });
+      expect(
+        requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
+      ).toHaveLength(1);
+    });
+
+    it("answers the check's refusal and never sends the delete", async () => {
+      const conn = recordingConnection([
+        ...first,
+        { data: deletionCheckXml(objectName, 'Object does not exist') },
+      ]);
+
+      const result: any = await run(conn);
+
+      expect(result?.isError).toBe(true);
+      expect(result.content[0].text).toContain('Object does not exist');
+      expect(
+        requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
+      ).toHaveLength(0);
+    });
+  },
+);
 
 interface IncludeDeleteCase {
   name: string;

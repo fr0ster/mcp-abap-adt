@@ -22,6 +22,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -74,13 +75,15 @@ export async function handleCheckFunctionModule(
   return answer(
     { tool: 'CheckFunctionModuleLow', detail },
     () =>
-      withAdtHeaders(context, 'functionModule.check', (headers) =>
-        createAdtClient(connection, logger)
-          .getFunctionModule(resultsFor(functionModuleDocuments))
-          .check({ functionModuleName, functionGroupName }, checkVersion, {
-            headers,
-            analyse: analyseException,
-          }),
+      inCheckedGroup(context, functionGroupName, functionModuleName, () =>
+        withAdtHeaders(context, 'functionModule.check', (headers) =>
+          createAdtClient(connection, logger)
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .check({ functionModuleName, functionGroupName }, checkVersion, {
+              headers,
+              analyse: analyseException,
+            }),
+        ),
       ),
     project(detail, terseCheck),
   );

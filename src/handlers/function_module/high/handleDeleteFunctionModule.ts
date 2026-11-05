@@ -17,6 +17,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -68,17 +69,19 @@ export async function handleDeleteFunctionModule(
   return answer(
     { tool: 'DeleteFunctionModule', detail },
     () =>
-      deleteIfDeletable(
-        context,
-        'functionModule',
-        createAdtClient(connection, logger).getFunctionModule(
-          resultsFor(functionModuleDocuments),
+      inCheckedGroup(context, functionGroupName, functionModuleName, () =>
+        deleteIfDeletable(
+          context,
+          'functionModule',
+          createAdtClient(connection, logger).getFunctionModule(
+            resultsFor(functionModuleDocuments),
+          ),
+          {
+            functionModuleName,
+            functionGroupName,
+            transportRequest: transport_request,
+          },
         ),
-        {
-          functionModuleName,
-          functionGroupName,
-          transportRequest: transport_request,
-        },
       ),
     project(detail, terseDeletion),
   );

@@ -54,6 +54,7 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
+import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { whereUsedScopeTypesOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -617,6 +618,32 @@ function listAnswer(
   };
 }
 
+/**
+ * SAP ignores the group of a function module's address (#2): every
+ * `GROUP|FM_NAME` target's group is checked against the module's metadata,
+ * one read each, before any scope, reference or batch request. The first
+ * refusal is the call's answer; `undefined` when every group holds its
+ * module (or no target names a module).
+ */
+async function refusedModule(
+  context: HandlerContext,
+  targets: readonly WhereUsedArgs[],
+): Promise<McpResult | undefined> {
+  const references = targets.flatMap((target) => {
+    const name = target?.object_name;
+    const type = target?.object_type;
+    if (!name || !type) return [];
+    const code = whereUsedCodeOf(context.connection, type);
+    const [group, module, ...more] = name.split('|');
+    if (code === undefined || more.length > 0 || !group || !module) return [];
+    return [{ type: code, name: module, parentName: group }];
+  });
+  const refused = await checkModuleReferences(context, references);
+  return refused === undefined
+    ? undefined
+    : answerFailure(refused.getError(), WHERE_USED_CONTEXT);
+}
+
 /** One answer of the batched version: an object's, or the one that ended the call. */
 const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
   'ended' in outcome ? outcome.ended : outcome.answers[0];
@@ -633,6 +660,8 @@ export async function handleGetWhereUsed(
 ) {
   const listed = args?.objects;
   if (listed === undefined) {
+    const refused = await refusedModule(context, [args]);
+    if (refused !== undefined) return refused;
     if (!args?.object_name || !args?.object_type || !readsScope(args)) {
       return whereUsedOf(context, args);
     }
@@ -658,6 +687,8 @@ export async function handleGetWhereUsed(
   }));
   const { objects: _list, ...rest } = args;
   const targets: WhereUsedArgs[] = objects.map((o) => ({ ...rest, ...o }));
+  const refused = await refusedModule(context, targets);
+  if (refused !== undefined) return refused;
   return withSequentialFallback<McpResult>(
     context,
     async () => {

@@ -36,6 +36,7 @@ import {
   VERSIONED_KINDS,
   type VersionedKind,
 } from '../../../lib/adtProjections';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
@@ -119,10 +120,21 @@ export function resolveVersionedObject(
           'function_group_name is required for function_module (or use GROUP|FM_NAME).',
         );
       }
-      return bound(
+      const group = groupName;
+      const module = fmName;
+      const versions = bound(
         client.getFunctionModule(resultsFor(functionModuleDocuments)),
-        { functionGroupName: groupName, functionModuleName: fmName },
+        { functionGroupName: group, functionModuleName: module },
       );
+      // SAP ignores the group of the address (#2): the history is read only
+      // after the module's metadata names the group given.
+      return {
+        getVersions: (options) =>
+          inCheckedGroupOn(client, group, module, () =>
+            versions.getVersions(options),
+          ),
+        getVersionSource: versions.getVersionSource,
+      };
     }
     case 'table':
       return bound(client.getTable(resultsFor(tableDocuments)), {

@@ -56,6 +56,7 @@ import type {
   CheckedDeletableType,
 } from '../../../lib/strategies/checkedDeletion';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 
@@ -156,6 +157,26 @@ const target = <C, V extends AdtReading<unknown>>(
     deleteAnalyse,
   );
 
+/**
+ * A function module's target: SAP ignores the group of the module's address
+ * (#2), so the check and the deletion are each sent only after the module's
+ * metadata names the group given (`inCheckedGroupOn`).
+ */
+const inCheckedGroupTarget = (inner: DeletionTarget): DeletionTarget => ({
+  objectType: inner.objectType,
+  checkDeletion: (context, client, name, analyse) =>
+    inCheckedGroupOn(client, name.group ?? '', name.name, () =>
+      inner.checkDeletion(context, client, name, analyse),
+    ),
+  delete: (context, connection, logger, name, transportRequest) =>
+    inCheckedGroupOn(
+      createAdtClient(connection, logger),
+      name.group ?? '',
+      name.name,
+      () => inner.delete(context, connection, logger, name, transportRequest),
+    ),
+});
+
 const asClass = (c: AdtClient) => c.getClass(resultsFor(classDocuments));
 
 /** One target per type the deletion check takes: the compiler holds the two lists equal. */
@@ -243,13 +264,15 @@ export const DELETION_TARGETS: Readonly<
     (c) => c.getFunctionGroup(resultsFor(functionGroupDocuments)),
     ({ name }) => ({ functionGroupName: name }),
   ),
-  FUNCTION_MODULE: target(
-    'functionModule',
-    (c) => c.getFunctionModule(resultsFor(functionModuleDocuments)),
-    ({ name, group }) => ({
-      functionModuleName: name,
-      functionGroupName: group,
-    }),
+  FUNCTION_MODULE: inCheckedGroupTarget(
+    target(
+      'functionModule',
+      (c) => c.getFunctionModule(resultsFor(functionModuleDocuments)),
+      ({ name, group }) => ({
+        functionModuleName: name,
+        functionGroupName: group,
+      }),
+    ),
   ),
   BEHAVIOR_DEFINITION: target(
     'behaviorDefinition',

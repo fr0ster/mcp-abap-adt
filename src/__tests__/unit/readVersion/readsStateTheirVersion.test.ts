@@ -107,7 +107,6 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   ActivateDdl: 'activates',
   ActivateDomain: 'activates',
   ActivateFunctionGroup: 'activates',
-  ActivateFunctionModule: 'activates',
   ActivateInclude: 'activates',
   ActivateInterface: 'activates',
   ActivateMetadataExtension: 'activates',
@@ -127,7 +126,6 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   CheckDdl: 'runs a syntax check',
   CheckDomain: 'runs a syntax check',
   CheckFunctionGroup: 'runs a syntax check',
-  CheckFunctionModule: 'runs a syntax check',
   CheckInterface: 'runs a syntax check',
   CheckMetadataExtension: 'runs a syntax check',
   CheckPackage: 'runs a syntax check',
@@ -165,7 +163,6 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   DeleteDomain: 'deletes',
   DeleteFunctionGroup: 'deletes',
   DeleteFunctionInclude: 'deletes',
-  DeleteFunctionModule: 'deletes',
   DeleteInclude: 'deletes',
   DeleteInterface: 'deletes',
   DeleteLocalDefinitions: 'deletes',
@@ -206,8 +203,6 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   GetDdlVersionSource:
     'reads the version list, or a listed version by its own address',
   GetFunctionModuleVersionDiff:
-    'reads the version list, or a listed version by its own address',
-  GetFunctionModuleVersions:
     'reads the version list, or a listed version by its own address',
   GetFunctionModuleVersionSource:
     'reads the version list, or a listed version by its own address',

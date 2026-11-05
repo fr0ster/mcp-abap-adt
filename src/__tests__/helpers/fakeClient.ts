@@ -150,7 +150,8 @@ export function throwingClient(message: string) {
  * whatever string the handler used.
  */
 /**
- * `answers` supplies what a named member resolves to, for the handlers that
+ * `answers` supplies what a named member resolves to — keyed by the member,
+ * or by `factory.member` for one factory's member alone — for the handlers that
  * read one call's value to make the next. Everything else keeps the default
  * empty reading: a recorder exists to record, and a member whose value nobody
  * reads should not need one stated.
@@ -198,7 +199,7 @@ export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
               carriedAnalyse,
               args: ownArguments(args, carriedAnalyse),
             });
-            const supplied = answers[member];
+            const supplied = answers[`${factory}.${member}`] ?? answers[member];
             return okResponse(
               supplied ? supplied() : reading(undefined, '', 200),
             );

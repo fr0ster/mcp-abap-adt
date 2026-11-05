@@ -2595,7 +2595,12 @@
             "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "group-checked",
+        "reason": "The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "UnlockFunctionModuleLow",
@@ -2625,7 +2630,12 @@
             "Accept": "application/xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "group-checked",
+        "reason": "The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "CheckFunctionModuleLow",
@@ -2657,7 +2667,12 @@
             "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "group-checked",
+        "reason": "The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "ActivateFunctionModuleLow",
@@ -2683,7 +2698,7 @@
       ],
       "accepted": {
         "kind": "activation-run",
-        "reason": "HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation."
+        "reason": "HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation. The module's metadata is read first, and the run starts only when the function group the metadata names is the group given (#2)."
       },
       "low_requests": [
         {
@@ -2731,7 +2746,12 @@
             "Accept": "text/plain"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "group-checked",
+        "reason": "The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "DeleteFunctionModuleLow",
@@ -2763,7 +2783,12 @@
             "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml"
           }
         }
-      ]
+      ],
+      "accepted": {
+        "kind": "group-checked",
+        "reason": "The compact call reads the module's metadata first (GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}?version=workingArea) and sends the low tool's requests only when the function group the metadata names is the group given (#2): SAP ignores the group of a module's address.",
+        "since": "24.0.0"
+      }
     },
     {
       "tool": "CreateBehaviorDefinitionLow",

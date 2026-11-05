@@ -17,7 +17,10 @@
  * row yet — their family tasks add the row with its live case.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleDeleteFunctionInclude } from '../../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleDeleteFunctionModule } from '../../../handlers/function_module/high/handleDeleteFunctionModule';
 import { handleDeleteServiceBinding } from '../../../handlers/service_binding/high/handleDeleteServiceBinding';
@@ -98,11 +101,46 @@ function deleteRefused(name: string): string {
 interface DeleteCase {
   tool: string;
   name: string;
+  /**
+   * What the tool reads before the check, and its answer: a function
+   * module's metadata, its group checked against the group given (#2).
+   */
+  first: {
+    answers: ReadonlyArray<Partial<IAdtWireResponse>>;
+    requests: readonly PinnedRequest[];
+  };
   args: ToolArgs;
   run: (connection: IAbapConnection) => Promise<McpResult>;
   check: PinnedRequest;
   delete: PinnedRequest;
 }
+
+/** Nothing read before the check. */
+const NOTHING_FIRST = { answers: [], requests: [] };
+
+/** ZPIN_FM's metadata, read through ZPIN_FG, naming ZPIN_FG. */
+const MODULE_IN_GROUP = {
+  answers: [
+    {
+      data:
+        '<?xml version="1.0" encoding="utf-8"?><fmodule:abapFunctionModule adtcore:name="ZPIN_FM" adtcore:type="FUGR/FF" ' +
+        'xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core">' +
+        '<adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/zpin_fg" adtcore:type="FUGR/F" adtcore:name="ZPIN_FG" adtcore:packageName="$TMP"/>' +
+        '</fmodule:abapFunctionModule>',
+    },
+  ],
+  requests: [
+    {
+      method: 'GET',
+      url: '/sap/bc/adt/functions/groups/zpin_fg/fmodules/zpin_fm?version=workingArea',
+      headers: {
+        Accept:
+          'application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml',
+      },
+      body: undefined,
+    },
+  ],
+};
 
 const ctx = (connection: IAbapConnection) => ({
   connection,
@@ -113,6 +151,7 @@ const CASES: readonly DeleteCase[] = [
   {
     tool: 'DeleteFunctionModule',
     name: 'ZPIN_FM',
+    first: MODULE_IN_GROUP,
     args: { function_group_name: 'ZPIN_FG', function_module_name: 'ZPIN_FM' },
     run: (c) =>
       handleDeleteFunctionModule(ctx(c), {
@@ -151,6 +190,7 @@ const CASES: readonly DeleteCase[] = [
   {
     tool: 'DeleteFunctionInclude',
     name: 'LZPIN_FGF01',
+    first: NOTHING_FIRST,
     args: { function_group_name: 'ZPIN_FG', include_name: 'LZPIN_FGF01' },
     run: (c) =>
       handleDeleteFunctionInclude(ctx(c), {
@@ -189,6 +229,7 @@ const CASES: readonly DeleteCase[] = [
   {
     tool: 'DeleteServiceDefinition',
     name: 'ZPIN_SD',
+    first: NOTHING_FIRST,
     args: { service_definition_name: 'ZPIN_SD' },
     run: (c) =>
       handleDeleteServiceDefinition(ctx(c), {
@@ -226,6 +267,7 @@ const CASES: readonly DeleteCase[] = [
   {
     tool: 'DeleteServiceBinding',
     name: 'ZPIN_SB',
+    first: NOTHING_FIRST,
     args: { service_binding_name: 'ZPIN_SB' },
     run: (c) =>
       handleDeleteServiceBinding(ctx(c), { service_binding_name: 'ZPIN_SB' }),
@@ -271,12 +313,14 @@ describe.each(CASES)('$tool', (c) => {
       stand: 'recording',
       args: c.args,
       answers: [
+        ...c.first.answers,
         { data: permittedSaysAbsent(c.name) },
         { data: deleted(c.name) },
       ],
-      expected: [c.check, c.delete],
+      expected: [...c.first.requests, c.check, c.delete],
     });
     const connection = recordingConnection([
+      ...c.first.answers,
       { data: permittedSaysAbsent(c.name) },
       { data: deleted(c.name) },
     ]);
@@ -291,11 +335,14 @@ describe.each(CASES)('$tool', (c) => {
       variant: 'onprem',
       stand: 'recording',
       args: c.args,
-      answers: [{ data: refusedWithKeys(c.name) }],
+      answers: [...c.first.answers, { data: refusedWithKeys(c.name) }],
       refusal: 'answer',
-      expected: [c.check],
+      expected: [...c.first.requests, c.check],
     });
-    const connection = recordingConnection([{ data: refusedWithKeys(c.name) }]);
+    const connection = recordingConnection([
+      ...c.first.answers,
+      { data: refusedWithKeys(c.name) },
+    ]);
     const result = await c.run(connection);
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject({
@@ -317,11 +364,12 @@ describe.each(CASES)('$tool', (c) => {
       variant: 'onprem',
       stand: 'recording',
       args: c.args,
-      answers: [{ data: permittedWithError(c.name) }],
+      answers: [...c.first.answers, { data: permittedWithError(c.name) }],
       refusal: 'answer',
-      expected: [c.check],
+      expected: [...c.first.requests, c.check],
     });
     const connection = recordingConnection([
+      ...c.first.answers,
       { data: permittedWithError(c.name) },
     ]);
     const result = await c.run(connection);
@@ -341,6 +389,7 @@ describe.each(CASES)('$tool', (c) => {
 
   it("a delete refused by SAP is named by its T100 key through the delete's analyse strategy", async () => {
     const connection = recordingConnection([
+      ...c.first.answers,
       { data: permittedSaysAbsent(c.name) },
       { data: deleteRefused(c.name) },
     ]);

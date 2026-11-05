@@ -120,6 +120,7 @@ import {
   isRefusal,
 } from '../../../lib/strategies/activationRun';
 import { detailOf } from '../../../lib/strategies/detail';
+import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
@@ -569,6 +570,13 @@ export async function handleActivateObject(
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
     async () => {
+      // SAP ignores the group of a module's address (#2): each module
+      // reference's group is checked before the run starts.
+      const refused = await checkModuleReferences(
+        context,
+        plan.group.references,
+      );
+      if (refused !== undefined) return refused;
       const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) return started;
       const runId = started.getResult().value;
@@ -712,6 +720,11 @@ export async function activatePlanOnce(
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
     async () => {
+      const refused = await checkModuleReferences(
+        context,
+        plan.group.references,
+      );
+      if (refused !== undefined) return refused;
       const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) {
         return failedWith<string>(

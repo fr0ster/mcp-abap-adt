@@ -8,6 +8,7 @@
  * Real adt-clients code runs over a recording connection.
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
 import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
 import { corpusBody } from '../../../src/lib/adtCorpus';
@@ -37,6 +38,10 @@ const ABSENT =
   '<del:message del:type="W"><del:text>ZCL_GONE does not exist</del:text></del:message>' +
   '</del:object></del:checkResponse>';
 
+/** The function module's metadata read at its group, before its check (#2). */
+const MODULE_METADATA =
+  '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea';
+
 function recording(reply: Reply) {
   const sent: Sent[] = [];
   const connection = {
@@ -55,6 +60,15 @@ function recording(reply: Reply) {
         data: options.data,
       });
       if (reply === 'pending') return new Promise<never>(() => {});
+      // The function module's metadata names its group (#2).
+      if (reply.status < 400 && String(options.url) === MODULE_METADATA) {
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          data: moduleMetadataDocument('Z_FM_A', 'ZFG_A'),
+        };
+      }
       if (reply.status >= 400) {
         const error = new Error(
           `Request failed with status code ${reply.status}`,
@@ -152,20 +166,29 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
   });
 
   it.each(TYPES)(
-    '%s: exactly one request, the deletion check of the object, the same held, answered or 404',
+    '%s: exactly one request, the deletion check of the object, the same held, answered or 404 (a function module: its metadata read first)',
     async (object_type, object_name, uri) => {
       const args = { object_type, object_name };
       const held = await check('pending', args);
       const answered = await check({ status: 200, data: ALLOWS }, args);
       const notFound = await check({ status: 404, data: '' }, args);
 
-      expect(held.sent).toHaveLength(1);
-      expect(held.sent[0].method).toBe('POST');
-      expect(held.sent[0].url).toBe('/sap/bc/adt/deletion/check');
-      expect(String(held.sent[0].data).toLowerCase()).toContain(
+      // A function module's metadata is read at the group given, and the
+      // check sent only when that group holds it (#2).
+      const checked = object_type === 'FUNCTION_MODULE';
+      const first = checked
+        ? [{ method: 'GET', url: MODULE_METADATA, data: undefined }]
+        : [];
+      const [request, ...more] = answered.sent.slice(first.length);
+      if (request === undefined) throw new Error('no deletion check was sent');
+      expect(more).toEqual([]);
+      expect(answered.sent.slice(0, first.length)).toEqual(first);
+      expect(request.method).toBe('POST');
+      expect(request.url).toBe('/sap/bc/adt/deletion/check');
+      expect(String(request.data).toLowerCase()).toContain(
         `adtcore:uri="${uri}"`,
       );
-      expect(answered.sent).toEqual(held.sent);
+      expect(held.sent).toEqual(checked ? first : [request]);
       expect(notFound.sent).toEqual(held.sent);
       expect(answered.answer?.isError).not.toBe(true);
       expect(notFound.answer?.isError).toBe(true);

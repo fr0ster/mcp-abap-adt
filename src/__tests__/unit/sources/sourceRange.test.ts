@@ -19,9 +19,11 @@
  * parse and the real adt-clients request are part of it.
  */
 
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody } from '../../../lib/adtCorpus';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { answerSourceRead } from '../../../lib/handlers/sourceRange';
+import { moduleInGroup } from '../../helpers/functionModuleMetadata';
 import { type PinCase, recordCase } from '../../helpers/pinCases';
 
 /** A source of five lines, as SAP answers it. */
@@ -33,8 +35,16 @@ const SOURCE = [
   'line five',
 ].join('\n');
 
-/** Every source read with a `source` part, and the arguments naming its object. */
-const READERS: ReadonlyArray<{ tool: string; args: ToolArgs }> = [
+/**
+ * Every source read with a `source` part, and the arguments naming its
+ * object; `first`, what it reads before the source, answered (a function
+ * module's metadata, its group checked: #2).
+ */
+const READERS: ReadonlyArray<{
+  tool: string;
+  args: ToolArgs;
+  first?: ReadonlyArray<Partial<IAdtWireResponse>>;
+}> = [
   { tool: 'GetClass', args: { class_name: 'ZCL_PIN' } },
   { tool: 'GetInterface', args: { interface_name: 'ZIF_PIN' } },
   { tool: 'GetProgram', args: { program_name: 'ZPIN_PROG' } },
@@ -42,6 +52,7 @@ const READERS: ReadonlyArray<{ tool: string; args: ToolArgs }> = [
   {
     tool: 'GetFunctionModule',
     args: { function_module_name: 'Z_PIN_FM', function_group_name: 'ZPIN_FG' },
+    first: [moduleInGroup('Z_PIN_FM', 'ZPIN_FG')],
   },
   {
     tool: 'GetFunctionInclude',
@@ -73,23 +84,27 @@ const READERS: ReadonlyArray<{ tool: string; args: ToolArgs }> = [
   { tool: 'GetLocalTestClass', args: { class_name: 'ZCL_PIN' } },
 ];
 
-/** A recording of `tool` with `args`, SAP answering `SOURCE` to every request. */
-async function read(tool: string, args: ToolArgs) {
+/** A recording of `tool` with `args`, SAP answering `first`, then `SOURCE`. */
+async function read(
+  tool: string,
+  args: ToolArgs,
+  first: ReadonlyArray<Partial<IAdtWireResponse>> = [],
+) {
   const c: PinCase = {
     tool,
     variant: 'onprem',
     stand: 'recording',
     args,
-    answers: [{ status: 200, data: SOURCE }],
+    answers: [...first, { status: 200, data: SOURCE }],
     expected: 'none',
   };
   const recorded = await recordCase(c);
-  const first = recorded.answer?.content[0];
+  const content = recorded.answer?.content[0];
   return {
     requests: recorded.requests,
     thrown: recorded.thrown,
     isError: recorded.answer?.isError,
-    text: first === undefined ? '' : first.text,
+    text: content === undefined ? '' : content.text,
   };
 }
 
@@ -115,14 +130,18 @@ function sourceOf(text: string): unknown {
   return payload === undefined ? text : member(payload, 'source');
 }
 
-describe.each(READERS)('$tool: a line range', ({ tool, args }) => {
+describe.each(READERS)('$tool: a line range', ({ tool, args, first = [] }) => {
   it('sends the whole read’s one GET and answers exactly the lines asked', async () => {
-    const whole = await read(tool, args);
+    const whole = await read(tool, args, first);
     expect(whole.isError).toBe(false);
-    expect(whole.requests).toHaveLength(1);
+    expect(whole.requests).toHaveLength(1 + first.length);
     expect(sourceOf(whole.text)).toBe(SOURCE);
 
-    const ranged = await read(tool, { ...args, start_line: 2, end_line: 4 });
+    const ranged = await read(
+      tool,
+      { ...args, start_line: 2, end_line: 4 },
+      first,
+    );
     expect(ranged.isError).toBe(false);
     expect(ranged.requests).toEqual(whole.requests);
     expect(sourceOf(ranged.text)).toBe('line two\nline three\nline four');
@@ -137,10 +156,10 @@ describe.each(READERS)('$tool: a line range', ({ tool, args }) => {
   });
 
   it('start_line alone reads to the end, end_line alone from the first line', async () => {
-    const tail = await read(tool, { ...args, start_line: 4 });
+    const tail = await read(tool, { ...args, start_line: 4 }, first);
     expect(tail.isError).toBe(false);
     expect(sourceOf(tail.text)).toBe('line four\nline five');
-    const head = await read(tool, { ...args, end_line: 1 });
+    const head = await read(tool, { ...args, end_line: 1 }, first);
     expect(head.isError).toBe(false);
     expect(sourceOf(head.text)).toBe('line one');
   });
@@ -151,14 +170,18 @@ describe.each(READERS)('$tool: a line range', ({ tool, args }) => {
     { start_line: 1.5 },
     { start_line: 3, end_line: 2 },
   ])('refuses %j before any request', async (range) => {
-    const refused = await read(tool, { ...args, ...range });
+    const refused = await read(tool, { ...args, ...range }, first);
     expect(refused.requests).toEqual([]);
     expect(refused.thrown !== undefined || refused.isError === true).toBe(true);
   });
 
   it('a range outside the source is refused after the one GET, naming its line count', async () => {
-    const whole = await read(tool, args);
-    const outside = await read(tool, { ...args, start_line: 3, end_line: 6 });
+    const whole = await read(tool, args, first);
+    const outside = await read(
+      tool,
+      { ...args, start_line: 3, end_line: 6 },
+      first,
+    );
     expect(outside.requests).toEqual(whole.requests);
     expect(outside.isError).toBe(true);
     expect(outside.text).toContain('the source has 5 lines');

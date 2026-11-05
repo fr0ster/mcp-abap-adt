@@ -41,6 +41,7 @@ import {
 } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import {
   analyseLock,
   analysePublicationLockAnswer,
@@ -209,15 +210,23 @@ export async function lockObject(
             .getFunctionGroup(resultsFor(functionGroupDocuments))
             .lock({ functionGroupName: objectName }, { analyse: analyseLock });
         case 'function_module':
-          return client
-            .getFunctionModule(resultsFor(functionModuleDocuments))
-            .lock(
-              {
-                functionGroupName,
-                functionModuleName,
-              },
-              { analyse: analyseLock },
-            );
+          // SAP ignores the group of the address (#2): the lock is taken
+          // after the module's metadata names the group given.
+          return inCheckedGroupOn(
+            client,
+            functionGroupName,
+            functionModuleName,
+            () =>
+              client
+                .getFunctionModule(resultsFor(functionModuleDocuments))
+                .lock(
+                  {
+                    functionGroupName,
+                    functionModuleName,
+                  },
+                  { analyse: analyseLock },
+                ),
+          );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))

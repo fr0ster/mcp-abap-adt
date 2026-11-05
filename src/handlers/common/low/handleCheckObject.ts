@@ -44,6 +44,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -283,15 +284,25 @@ export async function checkObject(
               }),
           );
         case 'function_module':
-          return withAdtHeaders(context, 'functionModule.check', (headers) =>
-            client.getFunctionModule(resultsFor(functionModuleDocuments)).check(
-              {
-                functionGroupName,
-                functionModuleName,
-              },
-              checkVersion,
-              { headers, analyse: analyseException },
-            ),
+          // SAP ignores the group of the address (#2): the check is sent
+          // after the module's metadata names the group given.
+          return inCheckedGroupOn(
+            client,
+            functionGroupName,
+            functionModuleName,
+            () =>
+              withAdtHeaders(context, 'functionModule.check', (headers) =>
+                client
+                  .getFunctionModule(resultsFor(functionModuleDocuments))
+                  .check(
+                    {
+                      functionGroupName,
+                      functionModuleName,
+                    },
+                    checkVersion,
+                    { headers, analyse: analyseException },
+                  ),
+              ),
           );
         case 'package':
           // A package check runs on the active version, like every check.

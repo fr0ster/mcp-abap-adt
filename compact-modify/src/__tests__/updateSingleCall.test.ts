@@ -1,7 +1,10 @@
 /**
  * Compact `HandlerUpdate` is one ADT request: the write of the type under the
- * caller's `lock_handle`, for every type — no lock, unlock, check, activation,
- * no read before the write and none after it (spec §4.6, the owner's rule:
+ * caller's `lock_handle`, for every type but a function module — no lock,
+ * unlock, check, activation, no read before the write and none after it. A
+ * function module's metadata is read first, at the group given, and the
+ * write is sent only when that group holds it (#2: SAP ignores the group of
+ * a module's address) (spec §4.6, the owner's rule:
  * compact is one request per tool call, the consumer chains HandlerLock →
  * HandlerUpdate → HandlerUnlock → HandlerActivate). There is no flag and no mode.
  *
@@ -25,6 +28,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
+import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
 import {
   declaredRequired,
   jsonAt,
@@ -92,12 +96,22 @@ function recording(mode: Mode) {
         headers: {},
         data: String(options.url).includes('_action=LOCK')
           ? LOCK_SUCCESS_XML
-          : '',
+          : String(options.url) === MODULE_METADATA
+            ? moduleMetadataDocument('Z_FM_A', 'ZFG_A')
+            : '',
       };
     },
   };
   return { connection, sent };
 }
+
+/** The function module's metadata read, at its group (#2). */
+const MODULE_METADATA =
+  '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea';
+
+/** Every type but the function module, whose group is checked first (#2). */
+const notModule = ([type]: readonly [string, unknown]) =>
+  type !== 'FUNCTION_MODULE';
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
@@ -261,7 +275,7 @@ describe('HandlerUpdate is one write under lock_handle', () => {
     expect(withUpdate).toEqual([...new Set(TYPES.map(([t]) => t))].sort());
   });
 
-  it.each(TYPES)(
+  it.each(TYPES.filter(notModule))(
     '%s: exactly one request, under the given lock_handle, the same held, answered or 404',
     async (objectType, fields) => {
       const call = update(objectType, underLock(fields));
@@ -304,7 +318,28 @@ describe('HandlerUpdate is one write under lock_handle', () => {
     },
   );
 
-  it.each(SOURCES)(
+  it('FUNCTION_MODULE: the metadata read at its group, then the one write under the given lock_handle, its body the source byte for byte (#2)', async () => {
+    const [, fields] = SOURCES.find(([type]) => !notModule([type, 0])) ?? [];
+    const call = update('FUNCTION_MODULE', underLock(fields ?? {}));
+    const held = await run('pending', call);
+    const answered = await run('answered', call);
+    const notFound = await run('not-found', call);
+
+    expect(held.sent.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      `GET ${MODULE_METADATA}`,
+    ]);
+    expect(answered.sent.map(({ method }) => method)).toEqual(['GET', 'PUT']);
+    const write = answered.sent[1];
+    expect(write?.url).toContain(`lockHandle=${LOCK}`);
+    expect(write?.url).toContain(`corrNr=${TRANSPORT}`);
+    expect(write?.data).toBe('source text');
+    expect(answered.answer?.isError).not.toBe(true);
+    // SAP refused the metadata read: nothing is written.
+    expect(notFound.sent).toEqual(held.sent);
+    expect(notFound.answer?.isError).toBe(true);
+  });
+
+  it.each(SOURCES.filter(notModule))(
     '%s: the body is the given source, byte for byte',
     async (objectType, fields) => {
       const held = await run('pending', update(objectType, underLock(fields)));

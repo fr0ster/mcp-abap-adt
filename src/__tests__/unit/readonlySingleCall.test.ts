@@ -70,7 +70,11 @@ import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
-import { parseStructure, structured } from '../../lib/strategies/reading';
+import {
+  parseStructure,
+  structured,
+  verbatim,
+} from '../../lib/strategies/reading';
 import { child, listOf } from '../../lib/xml/tree';
 import {
   fakeClientOf,
@@ -81,6 +85,7 @@ import {
   refusedResponse,
   refusingClient,
 } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({
@@ -464,7 +469,15 @@ describe('resolveVersionedObject', () => {
     getClass: versionable('getClass'),
     getProgram: versionable('getProgram'),
     getInterface: versionable('getInterface'),
-    getFunctionModule: versionable('getFunctionModule'),
+    // A function module's history is read after its metadata names the
+    // group given (#2): the document names ZFG.
+    getFunctionModule: () => ({
+      ...versionable('getFunctionModule')(),
+      readMetadata: async (config: unknown) => {
+        calls.push(['getFunctionModule.readMetadata', config]);
+        return readsModuleIn('ZFG', 'ZFM')();
+      },
+    }),
     getTable: versionable('getTable'),
     getStructure: versionable('getStructure'),
     getDdl: versionable('getDdl'),
@@ -491,6 +504,10 @@ describe('resolveVersionedObject', () => {
     await resolved.getVersions({ analyse: analyseException });
     expect(calls).toEqual([
       [
+        'getFunctionModule.readMetadata',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+      [
         'getFunctionModule',
         { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
       ],
@@ -505,6 +522,10 @@ describe('resolveVersionedObject', () => {
     );
     await resolved.getVersions({ analyse: analyseException });
     expect(calls).toEqual([
+      [
+        'getFunctionModule.readMetadata',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
       [
         'getFunctionModule',
         { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
@@ -1209,12 +1230,12 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 });
 
 /**
- * `GetFunctionModule`, mapped from the real captured source: one `read`
- * through getFunctionModule() at the group the caller gave, the source under
- * source.
+ * `GetFunctionModule`, mapped from the real captured source: the module's
+ * metadata through getFunctionModule() at the group the caller gave, its
+ * group checked (#2), then one `read` there, the source under source.
  */
 describe('GetFunctionModule, mapped from a real captured source', () => {
-  it('calls read alone, through getFunctionModule(), and answers the real source under source', async () => {
+  it('reads the metadata, then the source, through getFunctionModule(), and answers the real source under source', async () => {
     const source = corpusBody(
       'read-function-module-source-text--01-read-source',
     );
@@ -1222,7 +1243,14 @@ describe('GetFunctionModule, mapped from a real captured source', () => {
     const double = fakeClientOfWithFactory({
       readMetadata: async (...args: unknown[]) => {
         calls.push({ member: 'readMetadata', args });
-        return okResponse(structured({ data: '', status: 200 } as any));
+        return okResponse(
+          verbatim({
+            data: corpusBody(
+              'read-metadata-function-module--01-fmodules-zmcpshrfm',
+            ),
+            status: 200,
+          } as any),
+        );
       },
       read: async (...args: unknown[]) => {
         calls.push({ member: 'read', args });
@@ -1243,12 +1271,12 @@ describe('GetFunctionModule, mapped from a real captured source', () => {
     expect(payload.source).toBe(source);
     expect(double.factory).toBe('getFunctionModule');
 
-    expect(calls.map((c) => c.member)).toEqual(['read']);
-    expect(calls[0]?.args[0]).toEqual({
+    expect(calls.map((c) => c.member)).toEqual(['readMetadata', 'read']);
+    expect(calls[1]?.args[0]).toEqual({
       functionModuleName: 'Z_MCP_SHR_FM',
       functionGroupName: 'ZMCP_SHR_FGRP',
     });
-    const readOptions = calls[0]?.args.at(-1) as
+    const readOptions = calls[1]?.args.at(-1) as
       | { analyse?: unknown }
       | undefined;
     expect(readOptions?.analyse).toBe(analyseException);
@@ -1279,10 +1307,17 @@ describe('two behaviours unpinned before fix round 1', () => {
     expect(options?.version).toBe('inactive');
   });
 
-  // The group is the caller's: one `read` at the group given, no metadata
-  // read first to compare it with the module's own `containerRef`.
-  it('GetFunctionModule reads the source at the group given, in one call', async () => {
-    const seen = recordAnalyse();
+  // SAP ignores the group of the address (#2): the module's metadata is read
+  // at the group given, its `containerRef` compared, then one `read` there.
+  it('GetFunctionModule reads the metadata, then the source, at the group given', async () => {
+    const seen = recordAnalyse({
+      readMetadata: () => {
+        const document = corpusBody(
+          'read-metadata-function-module--01-fmodules-zmcpshrfm',
+        );
+        return { value: document, raw: document, status: 200 };
+      },
+    });
     fakeClient = seen.client;
 
     await handleGetFunctionModule(context as any, {
@@ -1290,11 +1325,13 @@ describe('two behaviours unpinned before fix round 1', () => {
       function_group_name: 'zmcp_shr_fgrp',
     });
 
-    expect(seen.calls.map((c) => c.member)).toEqual(['read']);
-    expect(seen.calls[0]?.args[0]).toEqual({
-      functionModuleName: 'Z_MCP_SHR_FM',
-      functionGroupName: 'ZMCP_SHR_FGRP',
-    });
+    expect(seen.calls.map((c) => c.member)).toEqual(['readMetadata', 'read']);
+    for (const call of seen.calls) {
+      expect(call.args[0]).toEqual({
+        functionModuleName: 'Z_MCP_SHR_FM',
+        functionGroupName: 'ZMCP_SHR_FGRP',
+      });
+    }
   });
 });
 

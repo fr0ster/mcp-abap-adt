@@ -34,7 +34,7 @@ import { toolAnswer } from './toolAnswer';
 /** A captured metadata document per ADT address prefix (not a source or include read). */
 const METADATA_DOCUMENTS: Array<[string, string]> = [
   [
-    '/sap/bc/adt/functions/groups/fugr_a/fmodules/',
+    '/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/',
     'read-metadata-function-module--01-fmodules-zmcpshrfm',
   ],
   [

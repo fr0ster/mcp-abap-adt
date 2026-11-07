@@ -3525,9 +3525,15 @@ Step 4 names.
       and is the names of those package entries plus the root; not `GetPackageTree`, whose
       default depth is 5. **Fixture prerequisite:** the ABAP Cloud known-hit case needs the
       shared package (the hit's package) to be a descendant of the configured build package;
-      before the search the case requires the prepared oracle to contain it, and when the
-      configured packages are unrelated it **skips with that reason** (as `liveSuite`'s other
-      prerequisites skip) — it never fails falsely and never guesses another package; (b) every hit is real — its line, read back with the
+      before the search the case requires the prepared oracle to contain it. When it does not,
+      the case **fails** with words naming the prerequisite — "the configured shared package
+      must be a descendant of the configured build package on ABAP Cloud" — by the owner's
+      rule that a stated configuration is complete or invalid: a misconfigured fixture is an
+      error, not a skip (no new skip mechanism: `live.ts` skips only at registration, the guard
+      refuses skipped registrations, and the run report refuses a required key skipped). It
+      never guesses another package. The test-config template
+      (`tests/test-config.yaml.template`) states the prerequisite in the comments of the two
+      keys (the shared package and the cloud build package); (b) every hit is real — its line, read back with the
       hit object's own read tool (`GetFunctionModule` for a `FUGR/FF` hit with its
       `function_group_name`, `GetFunctionInclude` / `GetInclude`, `GetClass` and the local
       includes, `GetProgram`, `GetInterface`, the CDS / BDEF / DDLX / SRVD reads — through

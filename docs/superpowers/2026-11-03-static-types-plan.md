@@ -2651,8 +2651,8 @@ removed), `src/handlers/system/readonly/handleSearchSource.ts` (the schema, the 
 description), the listed-schema and surface fixtures, `tools/tool-search.json` (generated),
 the tool reference (`docs/user-guide/AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md` through
 `npm run docs:tools`), `README.md` where it describes `SearchSource`, CHANGELOG, MIGRATION-24.0,
-and the unit tests that pass `emit_no_hits` today (`src/__tests__/unit/batch/searchSource.test.ts`,
-`searchSourceEnvelopes.test.ts`).
+`runSearchSourceInPhases` and `answeredSearch` (the batched search phases), and the suites
+Step 4 names.
 
 **Steps (red first):**
 - [ ] **Step 1: What a mask is (DO12).** Red tests on the resolver, over recorded quick-search
@@ -2678,9 +2678,31 @@ and the unit tests that pass `emit_no_hits` today (`src/__tests__/unit/batch/sea
 
   Then the resolver loops: send with `maxResults`, keep the answer when it holds fewer than
   `maxResults`, else double and send again. No cap of the server's on the doubling (the
-  quick search has none, measured); no timer. Both paths (sequential and the batched
-  phase that resolves masks) resolve the same way — a round depends on the previous answer,
-  so the rounds are sequential for one mask.
+  quick search has none, measured); no timer. A round depends on the previous answer, so the
+  rounds of one mask are sequential.
+- [ ] **Step 2a: The batched path repeats its search phase until every mask is resolved
+  (DO12).** Today the batched orchestration (`runSearchSourceInPhases`,
+  `src/lib/search-source/orchestrator.ts`) runs the resolver once to collect the searches
+  (`answeredSearch`, `packageResolver.ts`, answers `[]` for a search not answered yet and
+  records it in `asked`), sends one search phase, and runs the resolver again. With the
+  doubling, that second run would find the next round unanswered, read the `[]` as a short
+  answer and stop: the mask would be cut at the first window without a word. Red tests
+  first, on the batched path (`ctx` with batch envelopes, recorded answers):
+  - `'a mask that fills maxResults twice is resolved on the batched path'`: the first phase
+    sends `maxResults` 1000, the answer fills it; a second phase is actually sent with 2000,
+    and its answer's packages are the ones walked (the requests of both phases pinned);
+  - `'a search not answered yet is not taken as a short answer'`: the resolver never ends a
+    mask on a round with no answer;
+  - `'masks of different depths resolve together'`: a mask done in one round and a mask that
+    needs three are both resolved, each round's searches of all unresolved masks sent in one
+    phase, and no search sent twice;
+  - the same multi-round cases on the sequential path, so both paths answer alike.
+
+  Then the resolver tells an unanswered round apart from an answered one (the unanswered
+  round is recorded and the mask stays unresolved, rather than resolved over `[]`), and the
+  batched orchestration repeats discovery (run the resolver, collect `asked`) and execution
+  (send that phase, record its answers) until a run asks nothing — every mask resolved or
+  failed — and only then walks the packages. `endOnCredential` applies to every phase.
 - [ ] **Step 3: The line match is a strategy (DO14).** Red tests:
   - `'the orchestrator matches lines through the strategy it is given'`: a recording strategy
     double receives each source's lines and the call's `query`, `query2`, `exclude`,
@@ -2706,11 +2728,19 @@ and the unit tests that pass `emit_no_hits` today (`src/__tests__/unit/batch/sea
     (no `no_hits`), and nothing is refused — `SearchSource` is not a strict tool (only the
     create tools are, `createArguments`), the same rule MIGRATION-24.0 states for
     `lock_handle` on the non-strict update tools and D24 applies to the removed `timeout`;
-  - `'an object with a failure is named in failures only'` (unchanged).
+  - `'an object without hits whose read failed is named in failures only'`;
+  - `'an object with hits and a failed child keeps its hits and its failures'` (as D23a and
+    the orchestrator do today: its hits in `results`, the child's entry in `failures`).
 
   Then `emit_no_hits`, `NoHitEntry`, `no_hits` and the no-hit bookkeeping go from the
-  orchestrator and the handler; the tests that passed `emit_no_hits` are rewritten to the
-  hits-only answer.
+  orchestrator and the handler. The suites that pass `emit_no_hits` or assert `no_hits` or
+  zero-hit objects are rewritten to the hits-only answer, each named here:
+  `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`,
+  `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/lib/search-source/cursor.test.ts` (its assertions counting zero-hit
+  objects), `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`, and the live
+  assertion in `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`.
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
   1000 packages"; `emit_no_hits` and `no_hits` leave it. Functional only; a description test

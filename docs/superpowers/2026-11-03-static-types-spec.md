@@ -462,7 +462,9 @@ on-premise system disagree, the live measurement holds.
     search, its `maxResults` doubled until the answer holds fewer packages than `maxResults`.
     Measured on both systems: the quick search has no cap up to `maxResults` 100 000 and
     answers no "more" marker; `*` alone answers every package in seconds. A mask SAP refuses
-    stays an `OperationFailure` (`resolve package mask`), as in D23a. (This replaces the
+    stays an `OperationFailure` (`resolve package mask`), as in D23a. The sequential and the
+    batched paths resolve alike: the batched path repeats its search phase until every mask
+    is resolved, and a search not yet answered never counts as a short answer. (This replaces the
     earlier idea of splitting a mask into disjoint parts.)
   - **What a mask is.** `*` and `?` are the wildcards (`?` one character, `*` zero or more);
     `+`, `_`, `%` and `#` are literal characters of a package name. An entry holding neither
@@ -475,7 +477,9 @@ on-premise system disagree, the live measurement holds.
     today's behaviour, and the handler wires it.
   - **Only hits are answered.** A hit names the object (type, name, package, include), the
     line number and the line's text (`snippet`, up to 255 characters). An object without a
-    hit is left out of the answer: `emit_no_hits` and the `no_hits` field are removed.
+    hit is left out of the answer: `emit_no_hits` and the `no_hits` field are removed. An
+    object whose read failed is named in `failures`; one with hits and a failed child keeps
+    both.
     `SearchSource` is not a strict tool (only the create tools are, MIGRATION-24.0), so a call
     that still sends `emit_no_hits` has it dropped, as D24's removed `timeout` is; MIGRATION
     says to drop it.

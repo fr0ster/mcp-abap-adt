@@ -236,10 +236,12 @@ export async function startBackgroundRun(
         if (cancelling !== undefined) return cancelling;
         end.phase = 'cancelled';
         cancelling = (async () => {
-          deregister?.();
-          // The mark first, then the logoff: SAP ends the read.
+          // The mark first, then the logoff: SAP ends the read. The control
+          // stays registered until the cancelled answer is kept, so a second
+          // discard meanwhile joins this cancel.
           await closeQuietly(own_, logger, tool);
           await keep(CANCELLED_ANSWER);
+          deregister?.();
           return 'cancelled' as const;
         })();
         return cancelling;

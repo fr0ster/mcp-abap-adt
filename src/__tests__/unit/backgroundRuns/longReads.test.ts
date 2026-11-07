@@ -535,6 +535,52 @@ describe('which end wins', () => {
     }
   });
 
+  it('two concurrent Gets of one finished read: exactly one answers it, the other answers not available', async () => {
+    const handle = handleOf(await stand.a.call('GetSqlQuery', SQL));
+    await until(async () => (await listed(stand.a, handle)) === 'finished');
+    const both = await Promise.all([
+      stand.a.call('GetBackgroundRun', { run_handle: handle }),
+      stand.a.call('GetBackgroundRun', { run_handle: handle }),
+    ]);
+    const states = both.map((answer) =>
+      answer.isError ? answer.payload.error : answer.payload.state,
+    );
+    expect([...states].sort()).toEqual([
+      'background_run_not_available',
+      'finished',
+    ]);
+    const refused = both.find((answer) => answer.isError);
+    expect(refused?.payload.message).toBe(BACKGROUND_RUN_NOT_AVAILABLE_WORDS);
+  });
+
+  it('two overlapping Discards of one running read: both answer cancelled, the session is logged off once, finish is called once', async () => {
+    const held = stand.standIn.hold(isSqlRead);
+    const handle = handleOf(await stand.a.call('GetSqlQuery', SQL));
+    await held.arrived;
+    const session = readSession();
+    const both = await Promise.all([
+      stand.a.call('DiscardBackgroundRun', { run_handle: handle }),
+      stand.a.call('DiscardBackgroundRun', { run_handle: handle }),
+    ]);
+    for (const answer of both) {
+      expect(answer.isError).toBe(false);
+      expect(answer.payload).toEqual({
+        run_handle: handle,
+        state: 'cancelled',
+      });
+    }
+    await until(() => logoffIndex(stand.standIn, session) > -1);
+    held.release();
+    await until(readsSettled);
+    expect(
+      stand.standIn.requests.filter(
+        (r) => r.session === session && r.url.includes('logoff'),
+      ),
+    ).toHaveLength(1);
+    expect(runs.finished.map((f) => f.handle)).toEqual([handle]);
+    expect(runs.finished[0]?.answer.cancelled).toBe(true);
+  });
+
   it('the contract: with a custom strategy the cancel arrives as finish with cancelled: true and its listing answers cancelled', async () => {
     const held = stand.standIn.hold(isSqlRead);
     const handle = handleOf(await stand.a.call('GetSqlQuery', SQL));

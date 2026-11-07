@@ -10,8 +10,10 @@
  *   someone else's and one that is not a handle at all get the same refusal,
  *   and nothing is sent.
  * - **A read run is answered once:** a finished or cancelled read run's
- *   answer is removed (the strategy's `discard`) right after `get` read it;
- *   a code run's stays until `discard`.
+ *   answer is removed (the strategy's `discard`) right after `get` read it,
+ *   and only the call whose `discard` answered `discarded` answers it — a
+ *   concurrent read of the same run answers "not available"; a code run's
+ *   stays until `discard`.
  * - **A discard of a running read cancels it** through the owner of the
  *   running runs (`owner.ts`: its run's one connection logged off, the
  *   cancelled answer kept); a running code run — or a read no owner this
@@ -87,8 +89,12 @@ export function backgroundRunTools(
         throw new ServerRefusal('background_run_not_available');
       }
       if (record.state !== 'running' && isReadRun(record.tool)) {
-        // Answered once: the read's kept answer goes now.
-        await strategy.discard(handle, who);
+        // Answered once: only the call whose discard took the kept answer
+        // answers it; a concurrent read of the same run answers as an
+        // unknown handle does.
+        if ((await strategy.discard(handle, who)) !== 'discarded') {
+          throw new ServerRefusal('background_run_not_available');
+        }
       }
       return record;
     },

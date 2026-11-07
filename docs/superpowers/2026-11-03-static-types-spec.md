@@ -513,9 +513,10 @@ on-premise system disagree, the live measurement holds.
     function modules are separate scan objects. A hit in a module names the module: its type
     is the ADT code `FUGR/FF` (measured on premise: the quick search's `adtcore:type` and the
     group's node structure name a module so), its name, its package and `function_group_name` (which `GetFunctionModule` and
-    compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`; a hit in the group's
-    own includes is the group's, with `include`. The counters count the group and each module
-    apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another.
+    compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`. A hit in the group's
+    own includes is the include's own object (amended by DO27): `FUGR/I` with
+    `function_group_name`, or `PROG/I`. The counters count the group, each module and each
+    include apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another.
   - **What a failed read leads to (owner, DO22).** A failed source read, mask search or
     package / level walk goes first through a fixed classification in our code, once per
     failed read, at the place it arises (a mask, a package root, a walk level, a
@@ -561,7 +562,8 @@ on-premise system disagree, the live measurement holds.
     its contract and the shipped strategy exported from `@mcp-abap-adt/lib/embeddable`.
   - **The caller sets how much the answer holds (owner, DO23).** Three optional controls; with
     none, every hit with line and snippet. `answer`: `objects` (each object and include with
-    hits, `function_group_name` for a `FUGR/FF` hit, and the number of hits answered),
+    hits, `function_group_name` for a `FUGR/FF` and a `FUGR/I` hit — kept at every level —, and
+    the number of hits answered),
     `lines` (plus line numbers) or `snippets` (plus the line text; the default).
     `max_hits_per_object` limits each object. `max_hits` limits the whole answer's hits,
     counted after the per-object limit: when reached, the scan stops reading further sources

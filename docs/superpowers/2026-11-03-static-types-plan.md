@@ -2833,20 +2833,22 @@ Step 4 names.
     `GetFunctionModule` requires `function_module_name` and `function_group_name`, and compact
     `HandlerGet` `FUNCTION_MODULE` takes the same two. The module's hit has no `include` (its
     source is the module's main source) and is not nested under the group.
-  - **A hit in the group's own includes stays the group's:** `object_type` the group's,
-    `object_name` the group, `include` the include's name — what `GetFunctionInclude` needs
-    (`function_group_name`, `include_name`). A group include addressed under
-    `/programs/includes/` is read through the include reader as today; its hit is still the
-    group's, with `include` its name (`GetInclude` takes `include_name`).
+  - **A hit in the group's own includes — amended by DO27:** the include is its own object,
+    like a module, named by its ADT code (Step 4b2): an include addressed under the group (or
+    a `FUGR/I` node with no address) is `object_type: 'FUGR/I'`, `object_name` the include,
+    `function_group_name` the group, no `include` (`GetFunctionInclude`); one addressed under
+    `/programs/includes/` is `PROG/I`, `object_name` the include (`GetInclude`). (DO18's first
+    text — the hit stays the group's, `FUGR` with `include` — is superseded.)
   - **Every other hit already carries what its read tool needs** (checked in the red tests):
-    a program and a program include by `object_name` / `include`, a class's local include by
+    a program (`PROG`) by `object_name`, a program include (`PROG/I`, DO27) by `object_name`
+    (`GetInclude`'s `include_name`), a class's local include by
     `object_name` and `include` (the include kind the compact `LOCAL_*` reads name by the
     class), an interface, CDS, BDEF, DDLX and SRVD by `object_name`.
   - **Counters count them apart:** `scanned.objects` and `scanned.objects_with_hits` count
-    the group and each of its modules as separate objects. (The paging over the walk's
+    the group, each of its modules and each of its includes (DO27) as separate objects. (The paging over the walk's
     targets goes in Step 4d, DO20: every target is read in one run, unless the caller gives `max_hits` and it is reached (DO23).)
-  - **`object_types`:** `FUGR` keeps scanning the group and its modules (the modules come only
-    from the group's structure); no new filter value.
+  - **`object_types`:** `FUGR` keeps scanning the group, its modules and its includes (they
+    come only from the group's structure); no new filter value.
   - **One read per source** (D23a's cache) and the skip rule (Step 4a) apply to a module as to
     any object: a module that cannot be read is skipped, the group and its other modules are
     still searched.
@@ -2855,26 +2857,27 @@ Step 4 names.
   - `'a hit in a function module is the module's object, with function_group_name'`:
     `object_type: 'FUGR/FF'`, the module's name, the group's package and
     `function_group_name`; no `include`; not listed under the group;
-  - `'a hit in a group include stays FUGR'`: `object_type: 'FUGR'`, the group's name,
-    `include` the include's name;
-  - `'a hit in a group include is the group's, with include'`;
-  - `'a group and its modules are counted as separate objects'` (`scanned.objects`,
-    `scanned.objects_with_hits` over a group with a hit in one module and in one include);
+  - `'a hit in a group include is the include's own object'` (DO27): `FUGR/I` with
+    `function_group_name`, or `PROG/I` for a `/programs/includes/` one — no `include`, not
+    listed under the group;
+  - `'a group, its modules and its includes are counted as separate objects'`
+    (`scanned.objects`, `scanned.objects_with_hits` over a group with a hit in one module and
+    in one include);
   - `'each hit carries the arguments its read tool requires'`: for every scan type, the hit's
     fields fill the read tool's required arguments (`GetFunctionModule`, `GetFunctionInclude`,
     `GetInclude`, `GetProgram`, `GetClass` and the local includes, `GetInterface`, the CDS,
     BDEF, DDLX and SRVD reads), checked against their schemas;
   - `'each object has its own max_hits_per_object'`: a group with two modules and an include
     of its own, the first module holding more hits than `max_hits_per_object` — the second
-    module and the group's include still answer their hits, each up to the limit; only the
-    first module is capped; `truncated.by_object_cap` is set by it; and a case where no object
+    module and the group's include (its own object, DO27) still answer their hits, each up to
+    the limit; only the first module is capped; `truncated.by_object_cap` is set by it; and a case where no object
     passes its own limit while their sum does — `truncated.by_object_cap` stays false;
     on both paths.
 
-  Then the hit type gains the module's identity (`function_group_name`, present only on a
-  module's hit; `include` absent there), the orchestrator emits module hits under the module
-  and counts it, and `sourceReader.ts` yields each module's unit with its own object identity
-  instead of as a group include. **The per-object hit limit follows the object.** Today the
+  Then the hit type gains the module's and the group include's identity
+  (`function_group_name`, present on a `FUGR/FF` and a `FUGR/I` hit; `include` absent on both),
+  the orchestrator emits each under its own object and counts it, and `sourceReader.ts` yields
+  each module's and include's unit with its own object identity instead of as the group's. **The per-object hit limit follows the object.** Today the
   orchestrator (`orchestrator.ts`, the per-target loop: `totalForTarget`, `capHitForTarget`
   and the probe past the cap) shares one allowance and one capped flag across every source of
   a function group, so after DO18 one module could use up `max_hits_per_object` and suppress
@@ -2969,9 +2972,13 @@ Step 4 names.
     `object_type: 'PROG/I'` — read it with `GetInclude` (`include_name` = `object_name`); a
     program's stays `PROG`; a function-group include's hit is `FUGR/I` (read it with
     `GetFunctionInclude`, `function_group_name` and `include_name` = `object_name`) or, when
-    the group lists a `/programs/includes/` include, `PROG/I`; `object_types: ['PROG']` and
+    the group lists a `/programs/includes/` include, `PROG/I`; a group include is now its own
+    object — counted apart from its group in `scanned.objects` / `objects_with_hits`, with its
+    own `max_hits_per_object` allowance and capped flag (it shared the group's before);
+    `object_types: ['PROG']` and
     `['FUGR']` select as before. CHANGELOG (24.0.0): Changed — a hit's type is its ADT code
-    where the main type was ambiguous (`PROG/I`, `FUGR/I`).
+    where the main type was ambiguous (`PROG/I`, `FUGR/I`); a group include is its own object,
+    counted apart from its group with its own allowance and capped flag.
 - [ ] **Step 4c: A refused level excludes only its branch (DO19).** Today a refused level of
   a walk ends the asked package's whole walk: `levelOf` (`src/lib/strategies/packageWalk.ts`)
   throws for a refused level — and, under `missingLevel: 'refused'`, which `SearchSource` passes
@@ -3442,8 +3449,8 @@ Step 4 names.
   snippet).
   - **`answer`: `'objects' | 'lines' | 'snippets'`, default `'snippets'`.**
     - `'objects'`: one entry per object and include with hits — `devclass`, `object_type`,
-      `object_name`, `include` where the hits are an include's, `function_group_name` for a
-      `FUGR/FF` hit — and `hits`, the number of hits answered for it (after
+      `object_name`, `include` where the hits are a class's local include's,
+      `function_group_name` for a `FUGR/FF` and a `FUGR/I` hit — and `hits`, the number of hits answered for it (after
       `max_hits_per_object` and `max_hits`; hits cut by either are not counted); no lines;
     - `'lines'`: each hit as today, with `line`, without `snippet`;
     - `'snippets'`: each hit with `line` and `snippet` (up to 255 characters) — today's.
@@ -3474,10 +3481,12 @@ Step 4 names.
   Red tests first, on both paths (sequential and batched):
   - `'with no control the answer is the snippets level'` (the Steps 4–4e answer unchanged);
   - `'answer objects names each object and include with its hit count'`: no `line`, no
-    `snippet`; a `FUGR/FF` entry carries `function_group_name`; a class's local include is its
-    own entry with `include`; `hits` is the number answered;
+    `snippet`; a `FUGR/FF` and a `FUGR/I` entry carry `function_group_name`; a class's local
+    include is its own entry with `include`; `hits` is the number answered;
   - `'answer lines carries line numbers and no snippets'`;
   - `'answer snippets carries line and snippet'`;
+  - `'function_group_name is kept for FUGR/FF and FUGR/I hits at every answer level'`
+    (`objects`, `lines`, `snippets`);
   - `'max_hits stops reading'`: a scan whose first targets reach the limit — the requests
     recorded stop after the target (sequential) or the chunk (batched) that reached it; fewer
     source requests than without the limit; `truncated.by_max_hits` true;
@@ -3561,7 +3570,8 @@ Step 4 names.
     the call; a hit in a function module is the
     module's own object — read it with `GetFunctionModule` (`function_module_name` =
     `object_name`, `function_group_name`) — where 23.x answered it as the group's hit with
-    the module in `include`; the group and its modules are counted apart (DO18);
+    the module in `include`; the group, its modules and its includes are counted apart, each
+    with its own `max_hits_per_object` allowance and capped flag (DO18, DO27);
     no paging (DO20): drop `max_objects` and `start_at` (a call that still sends them has
     them dropped); `total_targets`, `next_start_at` and `truncated.by_max_objects` are gone;
     every target is read in one run, unless the caller gives `max_hits` and it is reached (DO23) — run it in the background (the default) and read the
@@ -4681,8 +4691,9 @@ stand-in.
   `FUGR/FF` — measured on premise 2026-11-07 in the quick search's `adtcore:type` and the
   group's node structure —, name, package and
   `function_group_name`, what `GetFunctionModule` requires), not the group; a hit in the
-  group's own includes is the group's (with `include`); the counters count them apart; every
-  hit carries what its read tool needs, with no object nested under another.
+  group's own includes was the group's (with `include`) — **amended by DO27**: a group include
+  is its own object, `FUGR/I` (with `function_group_name`) or `PROG/I`; the counters count them
+  apart; every hit carries what its read tool needs, with no object nested under another.
 - **DO19 (2026-11-07, D23b Step 4c):** a refused level of a walk (a type node or a
   subpackage, its `404` included) excludes only that branch — the node and everything under
   it; the rest of the asked package is walked and searched. A refused root of the asked
@@ -4762,8 +4773,8 @@ stand-in.
   consumer's too.
 - **DO23 (2026-11-07, D23b Step 4f):** the caller sets how much the answer holds, with three
   optional controls; with none, the answer is every hit with line and snippet. `answer`:
-  `'objects'` (each object and include with hits, `function_group_name` for `FUGR/FF`, and the
-  number of hits answered), `'lines'` (plus line numbers), `'snippets'` (plus the line text;
+  `'objects'` (each object and include with hits, `function_group_name` for `FUGR/FF` and `FUGR/I`
+  (DO27; kept at every answer level), and the number of hits answered), `'lines'` (plus line numbers), `'snippets'` (plus the line text;
   the default). `max_hits_per_object` as DO18 / DO20. `max_hits` limits the hits of the whole
   answer (counted after `max_hits_per_object`): when reached, the scan stops reading and
   `truncated.by_max_hits` is set when something remains; absent, no limit; `scanned.*` report what was done until the

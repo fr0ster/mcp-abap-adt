@@ -1,21 +1,19 @@
 import * as z from 'zod';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import {
   type OrchestratorInput,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
+import { SCAN_OBJECT_TYPES } from '../../../lib/search-source/packageEnumerator';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'SearchSource',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). `packages` accepts `*` masks (Z*, /NS/Z*) alongside exact names; mask resolution is best-effort and scoped to the ADT repository-search result window — some matching packages may be left unscanned. For certainty, pass concrete package names. When using masks, narrow the mask itself and use `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply after package resolution. Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `"` comments. The `version` parameter affects PROG and CLAS main include reads only — FUGR subinclude reads always go against the active version (the include endpoint reads the active version alone). `truncated.by_object_cap` means at least one object had MORE hits than `max_hits_per_object`, so that object\'s hits were capped. The object-count limit is `max_objects` (which sets `truncated.by_max_objects`). To avoid `by_object_cap`, raise `max_hits_per_object`. The scan is read in ADT batch envelopes: the searches of the package masks, each level of the package walk, then the sources of the scanned objects in envelopes of at most 300 reads (main sources and function group structures, then function group includes and function modules); `time_budget_ms` is checked before every envelope, and a scan it stops answers whole objects. Run only ONE SearchSource per destination at a time — multiple parallel SearchSource calls against the same SAP system saturate the scan backend and can make all of them time out. Prefer combining terms into a single call over parallel calls. A scan that stops before its last target answers `next_start_at`; pass it as `start_at` to go on. When `next_start_at` equals `start_at`, `time_budget_ms` passed before the first object was answered: raise `time_budget_ms` or lower `max_objects`. The answer carries `total_targets`, the scan targets of the walk; it is absent when `time_budget_ms` passed during the walk.',
-  ),
+  description:
+    "[read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and `*` masks (Z*, /NS/Z*); a mask is resolved by one repository quick search of up to 1000 packages. `object_types`, `object_filter`, `start_at` and `max_objects` select the scan targets of the resolved packages, in order of package, type and name. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `\"` comment lines. The answer lists each hit (`results`: package, object type, object name, include, line, snippet), `scanned` (packages, objects, sources), `total_targets`, `truncated.by_object_cap` (an object had more hits than `max_hits_per_object`), `truncated.by_max_objects` and `next_start_at` (the `start_at` of the next page, present while targets remain), and `failures` when anything was left unread: `kind` `source` names the object, the source (name and URI), the read and SAP's T100 key; `kind` `operation` names the step (a package mask's resolution, a package's walk), the mask or the package, and SAP's T100 key. Sources are read in ADT batch envelopes where the system offers them, each source once per call.",
   inputSchema: z.object({
-    timeout: timeoutField(),
     query: z
       .string()
       .min(1)
@@ -50,9 +48,11 @@ export const TOOL_DEFINITION = {
         'Glob applied to object names within each package (e.g. "Z*").',
       ),
     object_types: z
-      .array(z.enum(['PROG', 'FUGR', 'CLAS']))
+      .array(z.enum(SCAN_OBJECT_TYPES))
       .optional()
-      .describe('Subset of object families to scan (default: all three).'),
+      .describe(
+        'Object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD. Default: all of them.',
+      ),
     exclude_comments: z
       .boolean()
       .optional()
@@ -92,17 +92,7 @@ export const TOOL_DEFINITION = {
     version: z
       .enum(['active', 'inactive', 'workingArea'])
       .optional()
-      .describe(
-        'Source version for PROG and CLAS main include reads. Default active. FUGR subincludes always read the active version.',
-      ),
-    time_budget_ms: z
-      .number()
-      .int()
-      .min(1)
-      .optional()
-      .describe(
-        'Internal scan deadline in ms. When exceeded, returns the hits of the objects before `next_start_at` with truncated.by_timeout=true and next_start_at; when next_start_at equals start_at, the deadline passed before the first object was answered: raise time_budget_ms or lower max_objects. Set this BELOW your client/transport timeout (e.g. 540000 for a 600s client) so you get a partial result instead of a hard cutoff.',
-      ),
+      .describe('The version every source is read at. Default active.'),
   }),
 } as const;
 

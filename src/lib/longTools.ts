@@ -20,7 +20,6 @@ import { child } from './xml/tree';
 export const LONG_TOOLS: readonly string[] = [
   'GetWhereUsed',
   'SearchObject',
-  'SearchSource',
   'GetPackageContents',
   'GetPackageTree',
   'GetObjectsList',

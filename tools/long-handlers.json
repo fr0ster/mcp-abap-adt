@@ -12,12 +12,6 @@
     "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
   },
   {
-    "tool": "SearchSource",
-    "set": "full",
-    "handler": "src/handlers/system/readonly/handleSearchSource.ts#handleSearchSource",
-    "sends": "quickSearch GETs for masks; POST /sap/bc/adt/repository/nodestructure per package and type node; one source GET per unit (program, include, function module, class), up to max_objects; keeps time_budget_ms (partial hits)"
-  },
-  {
     "tool": "GetPackageContents",
     "set": "full",
     "handler": "src/handlers/package/readonly/handleGetPackageContents.ts#handleGetPackageContents",

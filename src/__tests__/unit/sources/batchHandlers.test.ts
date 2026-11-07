@@ -97,7 +97,6 @@ const LONG_BY_REQUESTS: Readonly<
   HandlerGet: 'by-arguments',
   GetWhereUsed: 'by-arguments',
   RuntimeListFeeds: 'by-arguments',
-  SearchSource: 'chained',
   GetPackageContents: 'chained',
   GetPackageTree: 'chained',
   GetObjectsList: 'chained',

@@ -38,8 +38,11 @@ export interface Repository {
   nodes: Record<string, NodeDoc>;
   /** Sources, keyed `PROGRAM <name>`, `CLASS <name>`, `INCLUDE <name>`, `FM <name>`. */
   sources: Record<string, string>;
-  /** A function group's children: `[objecttype, objectname]`. */
-  fugrChildren: Record<string, Array<[string, string]>>;
+  /** A function group's children: `[objecttype, objectname, objecturi?]`. */
+  fugrChildren: Record<
+    string,
+    Array<[string, string] | [string, string, string]>
+  >;
   /** The packages each quickSearch mask finds. */
   masks: Record<string, string[]>;
 }
@@ -70,8 +73,8 @@ const structureXml = (repo: Repository, name: string) =>
     repo.fugrChildren[name] ?? []
   )
     .map(
-      ([type, child]) =>
-        `<projectexplorer:node objecttype="${type}" objectname="${child}"/>`,
+      ([type, child, uri]) =>
+        `<projectexplorer:node objecttype="${type}" objectname="${child}"${uri === undefined ? '' : ` objecturi="${uri}"`}/>`,
     )
     .join('')}</projectexplorer:objectstructure>`;
 
@@ -113,6 +116,27 @@ export function keyOf(url: string, params?: unknown): string {
   if (path.includes('/fmodules/')) {
     return `FM ${segmentAfter(path, '/fmodules/')}`;
   }
+  if (path.includes('/functions/groups/') && path.includes('/includes/')) {
+    return `FINCLUDE ${segmentAfter(path, '/functions/groups/')}/${segmentAfter(path, '/includes/')}`;
+  }
+  if (path.includes('/oo/classes/') && path.includes('/includes/')) {
+    return `CLASSINCLUDE ${segmentAfter(path, '/oo/classes/')}/${segmentAfter(path, '/includes/')}`;
+  }
+  if (path.includes('/oo/interfaces/')) {
+    return `INTERFACE ${segmentAfter(path, '/oo/interfaces/')}`;
+  }
+  if (path.includes('/ddic/ddl/sources/')) {
+    return `DDL ${segmentAfter(path, '/ddic/ddl/sources/')}`;
+  }
+  if (path.includes('/bo/behaviordefinitions/')) {
+    return `BDEF ${segmentAfter(path, '/bo/behaviordefinitions/')}`;
+  }
+  if (path.includes('/ddic/ddlx/sources/')) {
+    return `DDLX ${segmentAfter(path, '/ddic/ddlx/sources/')}`;
+  }
+  if (path.includes('/ddic/srvd/sources/')) {
+    return `SRVD ${segmentAfter(path, '/ddic/srvd/sources/')}`;
+  }
   if (path.includes('/programs/includes/')) {
     return `INCLUDE ${segmentAfter(path, '/programs/includes/')}`;
   }
@@ -128,6 +152,10 @@ export function keyOf(url: string, params?: unknown): string {
 export interface Model {
   /** Requests answered with this status instead (a key of `keyOf`). */
   refuse?: Record<string, number>;
+  /** Requests answered with this status and body instead (a key of `keyOf`). */
+  refuseWith?: Record<string, { status: number; body: string }>;
+  /** Direct requests that throw this plain error, no answer (a key of `keyOf`). */
+  throwOn?: Record<string, string>;
 }
 
 function answerOf(
@@ -140,6 +168,15 @@ function answerOf(
   const refused = model.refuse?.[key];
   if (refused !== undefined) {
     return { status: refused, statusText: 'Refused', body: '' };
+  }
+  const refusedWith = model.refuseWith?.[key];
+  if (refusedWith !== undefined) {
+    return {
+      status: refusedWith.status,
+      statusText: 'Refused',
+      headers: { 'content-type': 'application/xml' },
+      body: refusedWith.body,
+    };
   }
   const xml = { 'content-type': 'application/xml' };
   const text = { 'content-type': 'text/plain' };
@@ -200,6 +237,8 @@ export function standOn(
     },
     async (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
       if (options.direct !== undefined) options.direct();
+      const thrown = model.throwOn?.[keyOf(request.url, request.params)];
+      if (thrown !== undefined) throw new Error(thrown);
       const a = answerOf(repo, model, request.url, request.params);
       if (a.status >= 400) {
         throw statusError(a.status, a.statusText ?? '', a.body ?? '');
@@ -237,6 +276,19 @@ export const isError = (result: unknown) =>
 
 export const partKeys = (envelope: SeenEnvelope) =>
   envelope.parts.map((p) => keyOf(p.url));
+
+/** Every request the fake received, envelope parts and direct requests, by URL as sent. */
+export const sentUrls = (fake: Fake): string[] => [
+  ...fake.envelopes.flatMap((envelope) => envelope.parts.map((p) => p.url)),
+  ...fake.directs.map((request) => {
+    const query = new URLSearchParams();
+    for (const [k, v] of Object.entries(request.params ?? {})) {
+      query.set(k, String(v));
+    }
+    const text = query.toString();
+    return text === '' ? request.url : `${request.url}?${text}`;
+  }),
+];
 
 /** `SearchSource` through the handler on the fake, bounded by event-loop turns. */
 export const searchOn = (

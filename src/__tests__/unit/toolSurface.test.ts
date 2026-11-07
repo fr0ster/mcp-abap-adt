@@ -242,8 +242,12 @@ describe('the MCP tool surface', () => {
       // issues a lock handle, and a handle the instance did not issue is
       // refused: `UpdateBehaviorDefinition`'s and `UpdateMetadataExtension`'s
       // `lock_handle` are removed — each locks, writes and unlocks itself.
+      //
+      // **24.0.0, decided by the owner (DO11).** No deadline of the server's
+      // ends a scan: `SearchSource`'s `time_budget_ms` and `timeout` are
+      // removed; a large scan is paged by `start_at` and `max_objects`.
       const REMOVED: Record<string, string[]> = {
-        'search/SearchSource': ['concurrency'],
+        'search/SearchSource': ['concurrency', 'time_budget_ms', 'timeout'],
         'high/CreateClass': ['abstract'],
         'high/CreateProgram': ['program_type'],
         'high/UpdateBehaviorDefinition': ['lock_handle'],

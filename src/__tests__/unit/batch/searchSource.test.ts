@@ -5,8 +5,8 @@
  * type nodes); (3) the source reads of the scan targets, up to
  * `max_objects` — the main sources and function group structures together,
  * then every function group's includes and function modules together
- * (in envelopes of at most 300 reads: `searchSourceEnvelopes.test.ts`);
- * `time_budget_ms` checked before every envelope. The hits are the sequential
+ * (in envelopes of at most 300 reads: `searchSourceEnvelopes.test.ts`).
+ * The hits are the sequential
  * version's (today's code), a part's failure is that object's, a credential
  * refusal ends the call as it came, and a destination with no communication
  * batch runs the sequential reads.
@@ -79,6 +79,7 @@ const SOURCES: Record<string, string> = {
   'INCLUDE LZFG_ATOP': 'FUNCTION-POOL zfg_a.\nDATA marker TYPE i.',
   'INCLUDE LZFG_AUXX': 'INCLUDE lzfg_au01.',
   'FM Z_FM_A': 'FUNCTION z_fm_a.\n  marker = 1.\nENDFUNCTION.',
+  'FM VIEWFRAME_ZFG': 'FUNCTION viewframe_zfg.\nENDFUNCTION.',
 };
 
 const FUGR_CHILDREN: Record<string, Array<[string, string]>> = {
@@ -168,16 +169,26 @@ describe('SearchSource on internal batches', () => {
       ],
       [nodeKey('ZSUB')],
       [nodeKey('ZSUB', '40')],
-      // (3) the main sources and the function group structure of every
-      // target, then the function group's sources
+      // (3) every target's own sources (a class's main source and its four
+      // local includes) and the function group structure, then the function
+      // group's sources
       [
         'PROGRAM ZPROG_O',
         'STRUCTURE ZFG_A',
         'PROGRAM ZPROG_A',
         'PROGRAM ZPROG_B',
         'CLASS ZCL_A',
+        'CLASSINCLUDE ZCL_A/DEFINITIONS',
+        'CLASSINCLUDE ZCL_A/IMPLEMENTATIONS',
+        'CLASSINCLUDE ZCL_A/MACROS',
+        'CLASSINCLUDE ZCL_A/TESTCLASSES',
       ],
-      ['FM Z_FM_A', 'INCLUDE LZFG_ATOP', 'INCLUDE LZFG_AUXX'],
+      [
+        'FM VIEWFRAME_ZFG',
+        'FM Z_FM_A',
+        'INCLUDE LZFG_ATOP',
+        'INCLUDE LZFG_AUXX',
+      ],
     ]);
 
     // max_objects caps the targets before their phase is recorded.
@@ -185,7 +196,12 @@ describe('SearchSource on internal batches', () => {
     const result = await search(capped, { max_objects: 2 });
     expect(capped.envelopes.slice(5).map(partKeys)).toEqual([
       ['PROGRAM ZPROG_O', 'STRUCTURE ZFG_A'],
-      ['FM Z_FM_A', 'INCLUDE LZFG_ATOP', 'INCLUDE LZFG_AUXX'],
+      [
+        'FM VIEWFRAME_ZFG',
+        'FM Z_FM_A',
+        'INCLUDE LZFG_ATOP',
+        'INCLUDE LZFG_AUXX',
+      ],
     ]);
     expect(payloadOf(result).truncated.by_max_objects).toBe(true);
     expect(payloadOf(result).scanned.objects).toBe(2);
@@ -210,6 +226,10 @@ describe('SearchSource on internal batches', () => {
         'PROGRAM ZPROG_A',
         'PROGRAM ZPROG_B',
         'CLASS ZCL_A',
+        'CLASSINCLUDE ZCL_A/DEFINITIONS',
+        'CLASSINCLUDE ZCL_A/IMPLEMENTATIONS',
+        'CLASSINCLUDE ZCL_A/MACROS',
+        'CLASSINCLUDE ZCL_A/TESTCLASSES',
       ]);
     });
 
@@ -239,7 +259,15 @@ describe('SearchSource on internal batches', () => {
       expect('next_start_at' in p).toBe(false);
       expect(p.total_targets).toBe(5);
       expect(p.truncated.by_max_objects).toBe(false);
-      expect(fake.envelopes.slice(5).map(partKeys)).toEqual([['CLASS ZCL_A']]);
+      expect(fake.envelopes.slice(5).map(partKeys)).toEqual([
+        [
+          'CLASS ZCL_A',
+          'CLASSINCLUDE ZCL_A/DEFINITIONS',
+          'CLASSINCLUDE ZCL_A/IMPLEMENTATIONS',
+          'CLASSINCLUDE ZCL_A/MACROS',
+          'CLASSINCLUDE ZCL_A/TESTCLASSES',
+        ],
+      ]);
       const sequential = await search(
         system(),
         { start_at: 4, max_objects: 2 },
@@ -294,89 +322,6 @@ describe('SearchSource on internal batches', () => {
     });
   });
 
-  describe('time_budget_ms checked before every envelope; the answer holds whole targets', () => {
-    let clock = 0;
-    let spy: jest.SpyInstance<number, []>;
-    beforeEach(() => {
-      clock = 1_000_000;
-      spy = jest.spyOn(Date, 'now').mockImplementation(() => clock);
-    });
-    afterEach(() => spy.mockRestore());
-
-    it('a deadline passed during the walk: no source is read; next_start_at = start_at, total_targets unknown', async () => {
-      const fake = system(
-        {},
-        {
-          afterEnvelope: (n) => {
-            if (n === 3) clock += 10_000;
-          },
-        },
-      );
-      const result = await search(fake, { time_budget_ms: 5_000 });
-      // The walk's level 2 and the sources were never sent.
-      expect(fake.envelopes).toHaveLength(3);
-      const payload = payloadOf(result);
-      expect(payload.results).toEqual([]);
-      expect(payload.truncated.by_timeout).toBe(true);
-      expect(payload.scanned.sources).toBe(0);
-      // The targets were never enumerated: their count is left out, and the
-      // call goes on from where it was asked to start.
-      expect('total_targets' in payload).toBe(false);
-      expect(payload.next_start_at).toBe(0);
-    });
-
-    it('a deadline passed before the sources: none is read; next_start_at = start_at', async () => {
-      const fake = system(
-        {},
-        {
-          afterEnvelope: (n) => {
-            if (n === 5) clock += 10_000;
-          },
-        },
-      );
-      const result = await search(fake, { time_budget_ms: 5_000 });
-      expect(fake.envelopes).toHaveLength(5);
-      const payload = payloadOf(result);
-      expect(payload.results).toEqual([]);
-      expect(payload.truncated).toEqual({
-        by_object_cap: false,
-        by_max_objects: false,
-        by_timeout: true,
-      });
-      expect(payload.scanned).toEqual({ packages: 2, objects: 0, sources: 0 });
-      expect(payload.total_targets).toBe(5);
-      // Nothing of the slice was read: the call goes on from its start.
-      expect(payload.next_start_at).toBe(0);
-    });
-
-    it('a deadline passed between the source phases: the chunk is cut, none of its targets is answered', async () => {
-      const fake = system(
-        {},
-        {
-          afterEnvelope: (n) => {
-            if (n === 6) clock += 10_000;
-          },
-        },
-      );
-      const result = await search(fake, { time_budget_ms: 5_000 });
-      expect(fake.envelopes).toHaveLength(6);
-      // The programs and the class were read whole, but the function group
-      // was not: the five targets are one chunk, and a cut chunk answers
-      // none of them — the next call reads them from next_start_at.
-      expect(hitNames(result)).toEqual([]);
-      expect(payloadOf(result).truncated.by_timeout).toBe(true);
-      expect(payloadOf(result).scanned.sources).toBe(0);
-      expect(payloadOf(result).next_start_at).toBe(0);
-    });
-
-    it('a budget that holds: every phase runs, by_timeout false', async () => {
-      const fake = system();
-      const result = await search(fake, { time_budget_ms: 5_000 });
-      expect(fake.envelopes).toHaveLength(7);
-      expect(payloadOf(result).truncated.by_timeout).toBe(false);
-    });
-  });
-
   it('no concurrency in the schema', () => {
     expect(Object.keys(TOOL_DEFINITION.inputSchema)).not.toContain(
       'concurrency',
@@ -408,10 +353,20 @@ describe('SearchSource on internal batches', () => {
     expect(textOf(result)).toBe(textOf(sequential));
   });
 
-  it('a source that is not there is skipped, as on the sequential path', async () => {
+  it('a 404 on a source the structure listed is reported, as on the sequential path', async () => {
     const model = { refuse: { 'INCLUDE LZFG_ATOP': 404 } };
     const result = await search(system(model));
-    expect(payloadOf(result).failures).toBeUndefined();
+    expect(payloadOf(result).failures).toEqual([
+      expect.objectContaining({
+        kind: 'source',
+        object_name: 'ZFG_A',
+        source: {
+          name: 'LZFG_ATOP',
+          uri: '/sap/bc/adt/programs/includes/lzfg_atop/source/main',
+        },
+        error: expect.objectContaining({ status: 404 }),
+      }),
+    ]);
     expect(hitNames(result)).not.toContain('ZFG_A/LZFG_ATOP');
     const sequential = await search(system(model), {}, true);
     expect(textOf(result)).toBe(textOf(sequential));

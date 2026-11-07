@@ -11,11 +11,31 @@ import {
   walkPackage,
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
+import { type OperationFailure, thrownFacts } from './failures';
 
-/** What a scan reads: programs, function groups and classes, by main type. */
-export type ScanObjectType = TableMainOf<
-  AdtCodes<'PROG/P' | 'FUGR/F' | 'CLAS/OC'>
+/**
+ * The codes a scan reads: every source-bearing object a package lists —
+ * programs and program includes, function groups, classes, interfaces, CDS
+ * data definitions, behavior definitions, metadata extensions and service
+ * definitions.
+ */
+export type ScanCode = AdtCodes<
+  | 'PROG/P'
+  | 'PROG/I'
+  | 'FUGR/F'
+  | 'CLAS/OC'
+  | 'INTF/OI'
+  | 'DDLS/DF'
+  | 'BDEF/BDO'
+  | 'DDLX/EX'
+  | 'SRVD/SRV'
 >;
+
+/**
+ * What a scan names an object by: the main type the tables state for its
+ * code (`PROG/I`'s main type is `PROG`, as `PROG/P`'s).
+ */
+export type ScanObjectType = TableMainOf<ScanCode>;
 
 /**
  * The contents item as the walk hands it over.
@@ -33,6 +53,8 @@ export interface EnumeratedObject {
   devclass: string;
   object_type: ScanObjectType;
   object_name: string;
+  /** The code SAP listed the object under: which reader reads it. */
+  code: ScanCode;
 }
 
 export interface EnumerateInput {
@@ -47,38 +69,81 @@ export type PackageContentsFetcher = (
   options: { includeSubpackages: boolean },
 ) => Promise<PackageContentItem[]>;
 
-/** The family of each code of the tables a scan reads: keys are table codes. */
-const ADT_TYPE_TO_FAMILY: Readonly<
-  Partial<Record<AdtTypeCode, ScanObjectType>>
-> = {
+/** The family of each code a scan reads, by the tables' main type. */
+const FAMILY_OF: Readonly<Record<ScanCode, ScanObjectType>> = {
   'PROG/P': 'PROG',
+  'PROG/I': 'PROG',
   'FUGR/F': 'FUGR',
   'CLAS/OC': 'CLAS',
+  'INTF/OI': 'INTF',
+  'DDLS/DF': 'DDLS',
+  'BDEF/BDO': 'BDEF',
+  'DDLX/EX': 'DDLX',
+  'SRVD/SRV': 'SRVD',
 };
 
-/** The family of a type SAP answered in a package listing, if it is scanned. */
-function familyOf(type: string): ScanObjectType | undefined {
+/** Whether a table code is one a scan reads. */
+function isScanCode(code: AdtTypeCode): code is ScanCode {
+  return code in FAMILY_OF;
+}
+
+/** The code of a type SAP answered in a package listing, if it is scanned. */
+function scanCodeOf(type: string): ScanCode | undefined {
   const code = tableCodeOf(type);
-  return code === undefined ? undefined : ADT_TYPE_TO_FAMILY[code];
+  return code !== undefined && isScanCode(code) ? code : undefined;
+}
+
+/** Every family a scan reads: the default of `object_types`. */
+export const SCAN_OBJECT_TYPES = [
+  'PROG',
+  'FUGR',
+  'CLAS',
+  'INTF',
+  'DDLS',
+  'BDEF',
+  'DDLX',
+  'SRVD',
+] as const satisfies readonly ScanObjectType[];
+
+/** The scan targets of a walk, and the packages whose walk failed. */
+export interface EnumeratedTargets {
+  targets: EnumeratedObject[];
+  failures: OperationFailure[];
 }
 
 export async function enumerateScanTargets(
   fetch: PackageContentsFetcher,
   input: EnumerateInput,
-): Promise<EnumeratedObject[]> {
+): Promise<EnumeratedTargets> {
   const wantedFamilies = new Set<ScanObjectType>(input.object_types);
   const filter = input.object_filter;
   const seen = new Set<string>();
   const out: EnumeratedObject[] = [];
+  const failures: OperationFailure[] = [];
 
   for (const pkg of input.packages) {
-    const items = await fetch(pkg.toUpperCase(), {
-      includeSubpackages: input.include_subpackages,
-    });
+    let items: PackageContentItem[];
+    try {
+      items = await fetch(pkg.toUpperCase(), {
+        includeSubpackages: input.include_subpackages,
+      });
+    } catch (error) {
+      // The walk SAP refused is this package's answer; the other packages
+      // are walked on. A credential failure ends the call (`thrownFacts`).
+      failures.push({
+        kind: 'operation',
+        step: 'walk package',
+        package: pkg.toUpperCase(),
+        ...thrownFacts(error, 'walk package'),
+      });
+      continue;
+    }
     for (const item of items) {
       if (item.isPackage) continue;
-      const family = familyOf(item.type);
-      if (!family || !wantedFamilies.has(family)) continue;
+      const code = scanCodeOf(item.type);
+      if (code === undefined) continue;
+      const family = FAMILY_OF[code];
+      if (!wantedFamilies.has(family)) continue;
       if (filter && !globMatches(filter, item.name)) continue;
       const key = `${item.packageName} ${family} ${item.name}`;
       if (seen.has(key)) continue;
@@ -87,6 +152,7 @@ export async function enumerateScanTargets(
         devclass: item.packageName,
         object_type: family,
         object_name: item.name,
+        code,
       });
     }
   }
@@ -98,7 +164,7 @@ export async function enumerateScanTargets(
     return a.object_name < b.object_name ? -1 : 1;
   });
 
-  return out;
+  return { targets: out, failures };
 }
 
 /**

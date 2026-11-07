@@ -32,6 +32,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { exactPackages } from '../helpers/sourceReaderFake';
 
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({
@@ -184,28 +185,41 @@ describe('a refusal is not swallowed', () => {
       devclass: 'ZPKG',
       object_type: 'PROG',
       object_name: 'ZPROG',
-    } as any);
-    const thrown = await units.next().then(
-      () => undefined,
-      (error: unknown) => error,
-    );
-    expect(methodFailureOf(thrown)).toEqual({
-      message: 'No authorization',
-      origin: 'refusal',
-      adtType: 'ExceptionResourceNoAuthorization',
-      response: { status: 403, data: DOCUMENT },
-      step: 'read program',
+      code: 'PROG/P',
+    });
+    const first = await units.next();
+    expect(first.done).toBe(false);
+    expect(first.value).toEqual({
+      ok: false,
+      failure: {
+        kind: 'source',
+        devclass: 'ZPKG',
+        object_type: 'PROG',
+        object_name: 'ZPROG',
+        source: {
+          name: 'ZPROG',
+          uri: '/sap/bc/adt/programs/programs/zprog/source/main',
+        },
+        step: 'read program',
+        error: expectedPayload('read program'),
+      },
     });
   });
 
-  it('SearchSource: a source that is not there is skipped as before', async () => {
+  it('SearchSource: a listed source that is not there is reported, not skipped', async () => {
     fakeClient = fakeClientOf({ read: async () => notThere() });
     const deps = createSourceReaderDeps(context as any);
     const units = readSourceUnits(deps, {
       devclass: 'ZPKG',
       object_type: 'PROG',
       object_name: 'ZPROG',
-    } as any);
+      code: 'PROG/P',
+    });
+    const first = await units.next();
+    expect(first.value).toMatchObject({
+      ok: false,
+      failure: { kind: 'source', step: 'read program' },
+    });
     expect((await units.next()).done).toBe(true);
   });
 
@@ -441,17 +455,14 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
         fetchPackageContents: async () =>
           [target('ZA'), target('ZB'), target('ZC')] as never,
         sourceReader: {
-          async readProgram(name) {
-            read.push(name);
-            if (name === 'ZB') throw failure;
-            return 'marker';
+          async readSource(read_) {
+            read.push(read_.name);
+            if (read_.name === 'ZB') throw failure;
+            return { ok: true, value: 'marker' };
           },
-          readInclude: async () => null,
-          readClassMain: async () => null,
-          fetchFugrStructure: async () => [],
-          readFugrFm: async () => null,
+          readStructure: async () => ({ ok: true, value: [] }),
         },
-        resolvePackages: async (entries) => entries,
+        resolvePackages: exactPackages,
       },
       {
         query: 'marker',
@@ -478,15 +489,12 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
       {
         fetchPackageContents: async () => [target('ZA')] as never,
         sourceReader: {
-          readProgram: async () => {
+          readSource: async () => {
             throw unauthorized;
           },
-          readInclude: async () => null,
-          readClassMain: async () => null,
-          fetchFugrStructure: async () => [],
-          readFugrFm: async () => null,
+          readStructure: async () => ({ ok: true, value: [] }),
         },
-        resolvePackages: async (entries) => entries,
+        resolvePackages: exactPackages,
       },
       { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
     );
@@ -611,22 +619,13 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
   it('collects the refusal with its object beside the others, and the pool keeps going', async () => {
     const read: string[] = [];
     const sourceReader: ReadSourceUnitsDeps = {
-      async readProgram(name) {
-        read.push(name);
-        if (name === 'ZB') throw refusedRead('read program');
-        return 'REPORT x.\n* marker';
+      async readSource(read_) {
+        read.push(read_.name);
+        if (read_.name === 'ZB') throw refusedRead('read program');
+        return { ok: true, value: 'REPORT x.\n* marker' };
       },
-      async readInclude() {
-        return null;
-      },
-      async readClassMain() {
-        return null;
-      },
-      async fetchFugrStructure() {
-        return [];
-      },
-      async readFugrFm() {
-        return null;
+      async readStructure() {
+        return { ok: true, value: [] };
       },
     };
     const result = await runSearchSource(
@@ -634,7 +633,7 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
         fetchPackageContents: async () =>
           [target('ZA'), target('ZB'), target('ZC')] as never,
         sourceReader,
-        resolvePackages: async (entries) => entries,
+        resolvePackages: exactPackages,
       },
       {
         query: 'marker',
@@ -648,9 +647,15 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
     expect(result.results.map((h) => h.object_name)).toEqual(['ZA', 'ZC']);
     expect(result.failures).toEqual([
       {
+        kind: 'source',
         devclass: 'ZPKG',
         object_type: 'PROG',
         object_name: 'ZB',
+        source: {
+          name: 'ZB',
+          uri: '/sap/bc/adt/programs/programs/zb/source/main',
+        },
+        step: 'read program',
         error: expectedPayload('read program'),
       },
     ]);
@@ -661,20 +666,17 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
       {
         fetchPackageContents: async () => [target('ZA')] as never,
         sourceReader: {
-          readProgram: async () => 'marker',
-          readInclude: async () => null,
-          readClassMain: async () => null,
-          fetchFugrStructure: async () => [],
-          readFugrFm: async () => null,
+          readSource: async () => ({ ok: true, value: 'marker' }),
+          readStructure: async () => ({ ok: true, value: [] }),
         },
-        resolvePackages: async (entries) => entries,
+        resolvePackages: exactPackages,
       },
       { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
     );
     expect(result.failures).toBeUndefined();
   });
 
-  it('a function group include and module are read through adt-clients, a refusal carried with its step', async () => {
+  it("a function group include and module are read through adt-clients at the call's version, a refusal answered with SAP's error", async () => {
     const calls: Array<{ config: unknown; version: unknown }> = [];
     fakeClient = fakeClientOf({
       read: async (config: unknown, version: unknown) => {
@@ -683,35 +685,42 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
       },
     });
     const deps = createSourceReaderDeps(context as any);
-    const include = await deps.readInclude('LZFGU01').then(
-      () => undefined,
-      (e: unknown) => e,
-    );
-    expect(methodFailureOf(include)).toMatchObject({
-      message: 'No authorization',
-      step: 'read include',
+    const include = await deps.readSource({
+      reader: 'include',
+      name: 'LZFGU01',
+      version: 'inactive',
     });
-    const module = await deps.readFugrFm('ZFG', 'Z_FM').then(
-      () => undefined,
-      (e: unknown) => e,
-    );
-    expect(methodFailureOf(module)).toMatchObject({
-      message: 'No authorization',
-      step: 'read function module',
+    expect(include.ok).toBe(false);
+    if (!include.ok) {
+      expect(include.error).toMatchObject({ message: 'No authorization' });
+    }
+    const module = await deps.readSource({
+      reader: 'functionModule',
+      group: 'ZFG',
+      name: 'Z_FM',
+      version: 'inactive',
     });
+    expect(module.ok).toBe(false);
     expect(calls).toEqual([
-      { config: { includeName: 'LZFGU01' }, version: 'active' },
+      { config: { includeName: 'LZFGU01' }, version: 'inactive' },
       {
         config: { functionGroupName: 'ZFG', functionModuleName: 'Z_FM' },
-        version: 'active',
+        version: 'inactive',
       },
     ]);
   });
 
-  it('a function module that is not there is skipped, as before', async () => {
+  it("a function module that is not there answers SAP's 404, for the scan to judge", async () => {
     fakeClient = fakeClientOf({ read: async () => notThere() });
     const deps = createSourceReaderDeps(context as any);
-    await expect(deps.readFugrFm('ZFG', 'Z_FM')).resolves.toBeNull();
+    const answer = await deps.readSource({
+      reader: 'functionModule',
+      group: 'ZFG',
+      name: 'Z_FM',
+      version: 'active',
+    });
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) expect(answer.error.response?.status).toBe(404);
   });
 });
 

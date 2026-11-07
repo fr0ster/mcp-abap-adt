@@ -237,6 +237,39 @@ Streamable HTTP instance did in 23.x — and sends a write, a delete or an unloc
   on a plain `McpServer` has no held locks: there `HandlerLock` is refused, sending nothing
   (`locks are not kept by this server instance: …`), and so is every call under a `lock_handle`.
 
+## Callers of `SearchSource`: every source, typed failures, no deadline
+
+**Changed:** `SearchSource` scans every source-bearing object SAP lists, each source at the
+call's `version`, each once per call, and names everything it could not read.
+
+**What changes for you:**
+- **`object_types` is wider, and so is the default.** It takes `PROG` (programs and program
+  includes), `FUGR`, `CLAS`, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD`; left out, all of them
+  are scanned. A class is read with its four local includes, whose hits name them in `include`
+  (`definitions`, `implementations`, `macros`, `testclasses`). For the 23.x scan, pass
+  `object_types: ['PROG', 'FUGR', 'CLAS']` — program includes and local class includes are
+  still read then.
+- **`version` applies to every source**, a function group's includes and modules included
+  (they were read active).
+- **Function modules named `VIEW…` are scanned** (they were skipped by name).
+- **`failures` entries carry `kind`.** `kind: 'source'` keeps `devclass`, `object_type`,
+  `object_name` and `error`, and adds `source` (`name`, `uri`), `step` (the read) and `t100`
+  (`id`, `no`) where SAP gave a T100 key; an object may have several, one per source.
+  `kind: 'operation'` names no object: `step` is `resolve package mask` (with `mask`) or
+  `walk package` (with `package`), with `t100` where there is one and `error`. A mask SAP refused
+  or a package whose walk SAP refused is such an entry, and the other packages are scanned; it
+  ended the call before. A `404` on a listed source is an entry (it was skipped as absent), and
+  so is a read that threw without SAP's answer (it was dropped). A credential failure still ends
+  the call. An object with a failure is not listed in `no_hits`.
+- **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan: a
+  call answers when every target of its page is read. `truncated.by_timeout` is gone,
+  `total_targets` is always present, and `next_start_at` is present only while targets remain
+  after `start_at + max_objects`. To keep a large scan short, page it: call with `max_objects`
+  (say 100), then again with `start_at` set to the `next_start_at` answered, until no
+  `next_start_at` comes back. To bound a call in time, cancel it from your client.
+  `SearchSource` is no longer a long tool: it runs on the instance's connection, as the other
+  reads do.
+
 ## Callers of `CreateDomain`: `package_name` is required
 
 `CreateDomain`'s schema requires `package_name` ("Package the domain is created in."); 23.x listed

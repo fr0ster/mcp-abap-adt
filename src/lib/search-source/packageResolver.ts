@@ -6,6 +6,7 @@ import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { carryingFailure } from '../strategies/step';
+import { type OperationFailure, thrownFacts } from './failures';
 
 /** A package's code in the tables. */
 const PACKAGE_CODE: AdtCodes<'DEVC/K'> = 'DEVC/K';
@@ -37,20 +38,38 @@ function isPattern(entry: string): boolean {
   return entry.includes('*') || entry.includes('+');
 }
 
+/** The packages the entries name, and the masks whose resolution failed. */
+export interface ResolvedPackages {
+  packages: string[];
+  failures: OperationFailure[];
+}
+
 export async function resolvePackagePatterns(
   deps: PackageResolverDeps,
   entries: string[],
-): Promise<string[]> {
+): Promise<ResolvedPackages> {
   const exact: string[] = [];
   const resolved: string[] = [];
+  const failures: OperationFailure[] = [];
   for (const entry of entries) {
     if (isPattern(entry)) {
-      const names = await deps.searchObjects({
-        query: entry,
-        objectType: PACKAGE_SEARCH_NAME,
-        maxResults: 1000,
-      });
-      resolved.push(...names);
+      try {
+        const names = await deps.searchObjects({
+          query: entry,
+          objectType: PACKAGE_SEARCH_NAME,
+          maxResults: 1000,
+        });
+        resolved.push(...names);
+      } catch (error) {
+        // The mask SAP refused is answered; the other entries are scanned.
+        // A credential failure ends the call (`thrownFacts`).
+        failures.push({
+          kind: 'operation',
+          step: 'resolve package mask',
+          mask: entry,
+          ...thrownFacts(error, 'resolve package mask'),
+        });
+      }
     } else {
       exact.push(entry);
     }
@@ -63,7 +82,7 @@ export async function resolvePackagePatterns(
     seen.add(key);
     out.push(name);
   }
-  return out;
+  return { packages: out, failures };
 }
 
 /**

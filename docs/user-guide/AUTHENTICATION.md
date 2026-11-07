@@ -433,7 +433,8 @@ it arose. A tool never rewrites it:
 folded into one text:
 
 - a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
-  its failure (`failures[]` with the object for `SearchSource`, `{ name, error }` for
+  its failure (`failures[]` for `SearchSource`, each with its `kind`: `source` names the object
+  and the source, `operation` a mask's resolution or a package's walk; `{ name, error }` for
   `DescribeByList`, `unreadable` beside the tree for
   `GetIncludesList`) beside the other items' results, and the rest are read on — except a
   credential failure (an authentication failure, a `401`): the credentials are the same for

@@ -22,14 +22,24 @@ describe('enumerateScanTargets', () => {
       item('ZC_BAZ', 'CLAS/OC', 'ZPKG'),
       item('ZD_QUX', 'DTEL/D', 'ZPKG'),
     ];
-    const out = await enumerateScanTargets(fetch, {
+    const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZPKG'],
       include_subpackages: false,
       object_types: ['PROG', 'CLAS'],
     });
     expect(out).toEqual([
-      { devclass: 'ZPKG', object_type: 'CLAS', object_name: 'ZC_BAZ' },
-      { devclass: 'ZPKG', object_type: 'PROG', object_name: 'ZP_FOO' },
+      {
+        devclass: 'ZPKG',
+        object_type: 'CLAS',
+        object_name: 'ZC_BAZ',
+        code: 'CLAS/OC',
+      },
+      {
+        devclass: 'ZPKG',
+        object_type: 'PROG',
+        object_name: 'ZP_FOO',
+        code: 'PROG/P',
+      },
     ]);
   });
 
@@ -42,7 +52,7 @@ describe('enumerateScanTargets', () => {
       ],
     };
     const fetch: PackageContentsFetcher = async (name) => byPkg[name] ?? [];
-    const out = await enumerateScanTargets(fetch, {
+    const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZB', 'ZA'],
       include_subpackages: true,
       object_types: ['PROG'],
@@ -60,7 +70,7 @@ describe('enumerateScanTargets', () => {
       item('Z_FOO_BAR', 'PROG/P', 'ZPKG'),
       item('Y_FOO', 'PROG/P', 'ZPKG'),
     ];
-    const out = await enumerateScanTargets(fetch, {
+    const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZPKG'],
       include_subpackages: false,
       object_types: ['PROG'],
@@ -76,13 +86,44 @@ describe('enumerateScanTargets', () => {
       if (name === 'ZB') return [item('ZP', 'PROG/P', 'ZA_SUB')];
       return [];
     };
-    const out = await enumerateScanTargets(fetch, {
+    const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZA', 'ZB'],
       include_subpackages: true,
       object_types: ['PROG'],
     });
     expect(out).toEqual([
-      { devclass: 'ZA_SUB', object_type: 'PROG', object_name: 'ZP' },
+      {
+        devclass: 'ZA_SUB',
+        object_type: 'PROG',
+        object_name: 'ZP',
+        code: 'PROG/P',
+      },
+    ]);
+  });
+
+  it('a program include is a PROG target read by its own code', async () => {
+    const fetch: PackageContentsFetcher = async () => [
+      item('ZINCL', 'PROG/I', 'ZPKG'),
+      item('ZIF', 'INTF/OI', 'ZPKG'),
+    ];
+    const { targets } = await enumerateScanTargets(fetch, {
+      packages: ['ZPKG'],
+      include_subpackages: false,
+      object_types: ['PROG', 'INTF'],
+    });
+    expect(targets).toEqual([
+      {
+        devclass: 'ZPKG',
+        object_type: 'INTF',
+        object_name: 'ZIF',
+        code: 'INTF/OI',
+      },
+      {
+        devclass: 'ZPKG',
+        object_type: 'PROG',
+        object_name: 'ZINCL',
+        code: 'PROG/I',
+      },
     ]);
   });
 });

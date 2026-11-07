@@ -227,7 +227,9 @@ run on an ABAP session of their own and take an optional `timeout` in seconds, w
 When it passes the read is cancelled — its session logged off — and nothing was changed. Set it
 below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a tool call
 cannot be cancelled** — a client's cancel aborts nothing, the call runs to its end. No other tool takes a `timeout`: a unit test, ATC, class or program run
-goes on to its end.
+goes on to its end. Since 24.0.0 `SearchSource` is off the list: it takes no `timeout` and no
+`time_budget_ms`, and a large scan is paged by `max_objects` and `start_at`
+([MIGRATION-24.0](docs/MIGRATION-24.0.md)).
 
 ### Batch mode
 

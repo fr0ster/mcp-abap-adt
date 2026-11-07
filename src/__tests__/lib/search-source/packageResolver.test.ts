@@ -35,17 +35,16 @@ function neverCalled(): never {
 
 describe('resolvePackagePatterns — wildcard detection', () => {
   it('passes exact dev-class names through without calling ADT', async () => {
-    const out = await resolvePackagePatterns({ searchObjects: neverCalled }, [
-      'ZFI_OBSOLETE',
-      '$TMP',
-      '/NS/ZFI',
-    ]);
+    const { packages: out } = await resolvePackagePatterns(
+      { searchObjects: neverCalled },
+      ['ZFI_OBSOLETE', '$TMP', '/NS/ZFI'],
+    );
     expect(out).toEqual(['ZFI_OBSOLETE', '$TMP', '/NS/ZFI']);
   });
 
   it('treats entries containing * as patterns', async () => {
     const calls: string[] = [];
-    const out = await resolvePackagePatterns(
+    const { packages: out } = await resolvePackagePatterns(
       {
         searchObjects: async ({ query }) => {
           calls.push(query);
@@ -99,7 +98,7 @@ describe('createPackagePatternResolver — hits from `search`', () => {
 
 describe('resolvePackagePatterns — merge semantics', () => {
   it('places exact entries before pattern-resolved names', async () => {
-    const out = await resolvePackagePatterns(
+    const { packages: out } = await resolvePackagePatterns(
       {
         searchObjects: async () => ['Z_FROM_PATTERN_A', 'Z_FROM_PATTERN_B'],
       },
@@ -114,7 +113,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
   });
 
   it('deduplicates by uppercase, first occurrence wins for ordering', async () => {
-    const out = await resolvePackagePatterns(
+    const { packages: out } = await resolvePackagePatterns(
       {
         searchObjects: async () => ['ZFI', 'ZFI_BUDGET'],
       },
@@ -124,24 +123,35 @@ describe('resolvePackagePatterns — merge semantics', () => {
   });
 
   it('returns empty array when patterns resolve to no packages and no exact entries', async () => {
-    const out = await resolvePackagePatterns(
+    const { packages: out } = await resolvePackagePatterns(
       { searchObjects: async () => [] },
       ['ZZZ_NONEXISTENT*'],
     );
     expect(out).toEqual([]);
   });
 
-  it('propagates errors from searchObjects', async () => {
+  it('a mask whose search fails is an OperationFailure; the other entries resolve', async () => {
     const boom = new Error('ADT 502');
-    await expect(
-      resolvePackagePatterns(
-        {
-          searchObjects: async () => {
-            throw boom;
-          },
+    const resolved = await resolvePackagePatterns(
+      {
+        searchObjects: async () => {
+          throw boom;
         },
-        ['Z*'],
-      ),
-    ).rejects.toBe(boom);
+      },
+      ['Z*', 'ZEXACT'],
+    );
+    expect(resolved.packages).toEqual(['ZEXACT']);
+    expect(resolved.failures).toEqual([
+      {
+        kind: 'operation',
+        step: 'resolve package mask',
+        mask: 'Z*',
+        error: {
+          error: 'client_threw',
+          message: 'ADT 502',
+          step: 'resolve package mask',
+        },
+      },
+    ]);
   });
 });

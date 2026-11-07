@@ -50,10 +50,6 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     "The node type GetIncludesList's answer gives a class section (ADT's class include type), read from the class's metadata: no API of the library serves it, so no table holds it; it is the tree's label as answered before.",
   ],
   [
-    'src/lib/search-source/sourceReader.ts:VIEW',
-    "The first four letters of a function module's name (the `VIEW…` maintenance modules), compared with a name, not a type.",
-  ],
-  [
     'src/handlers/data_element/high/handleCreateDataElement.ts:CHAR',
     'The ABAP data type a data element defaults to (the DDIC built-in type `CHAR`), not an object type; it is also the search name of characteristics (`CHAR/8B`), which this literal does not mean.',
   ],

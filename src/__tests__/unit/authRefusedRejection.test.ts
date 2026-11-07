@@ -141,7 +141,10 @@ describe('SearchSource: a source read through adt-clients rejects with AuthRefus
         fetchPackageContents: async () =>
           [target('ZA'), target('ZB'), target('ZC')] as never,
         sourceReader: createSourceReaderDeps(context as any),
-        resolvePackages: async (entries) => entries,
+        resolvePackages: async (entries) => ({
+          packages: entries,
+          failures: [],
+        }),
       },
       {
         query: 'marker',

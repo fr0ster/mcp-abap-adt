@@ -7,6 +7,7 @@ import {
   runSearchSource,
 } from '../../../lib/search-source/orchestrator';
 import type { PackageContentItem } from '../../../lib/search-source/packageEnumerator';
+import { sapAnswered } from '../../helpers/sourceReaderFake';
 
 // Five targets, handed over in a scrambled order.
 const ITEMS: PackageContentItem[] = [
@@ -23,23 +24,17 @@ const ORDER = ['ZPROG_O', 'ZFG_A', 'ZPROG_A', 'ZPROG_B', 'ZCL_A'];
 const deps = (items: PackageContentItem[] = ITEMS): OrchestratorDeps => ({
   fetchPackageContents: async () => items,
   sourceReader: {
-    async readProgram(name) {
-      return `marker in ${name}`;
+    async readSource(read) {
+      // Each object's own source; a class has no local include.
+      return read.reader === 'classInclude'
+        ? { ok: false, error: sapAnswered(404) }
+        : { ok: true, value: `marker in ${read.name}` };
     },
-    async readInclude() {
-      return null;
-    },
-    async readClassMain(name) {
-      return `marker in ${name}`;
-    },
-    async fetchFugrStructure() {
-      return [];
-    },
-    async readFugrFm() {
-      return null;
+    async readStructure() {
+      return { ok: true, value: [] };
     },
   },
-  resolvePackages: async (entries) => entries,
+  resolvePackages: async (entries) => ({ packages: entries, failures: [] }),
 });
 
 const input: OrchestratorInput = {

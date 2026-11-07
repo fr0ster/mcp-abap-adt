@@ -3080,20 +3080,27 @@ Step 4 names.
     2. an envelope failure (place `'envelope'`; the outer `404` never gets here) → `'throw'`:
        it is not one object's answer, and skipping it would answer a near-empty search as if
        nothing matched;
-    3. an `IAdtError` with `origin: 'connection'` (no usable answer: unreachable host, expired
-       session), answered or carried → `'throw'`: the call fails as an error;
-    4. a **system answer** → `'skip'`:
-       - an answered failure (`ReadAnswer` `{ ok: false, error: IAdtError }`, an
-         `IAdtResponse` not `ok`, normalised to a carried one) or a carried ADT failure
-         (`methodFailureOf(thrown) !== undefined`), of `origin: 'refusal'`, with or without a
-         `response`;
-       - a raw transport failure: a thrown object that is not an `IAdtError` but carries a
-         `response` with an integer `status` (read through the existing safe property reads);
-    5. anything else — a `TypeError`, a `RangeError`, a thrown primitive, any other value →
-       `'throw'`.
+    3. a **SAP answer** → the strategy decides (shipped: `'skip'`). A failure is a SAP answer
+       when either holds:
+       - it carries a `response` with an integer HTTP status, **whatever its `origin`** —
+         an answered failure (`ReadAnswer` `{ ok: false, error: IAdtError }`, an
+         `IAdtResponse` not `ok`, normalised to a carried one), a carried ADT failure
+         (`methodFailureOf(thrown) !== undefined`), or a raw transport failure (a thrown
+         object that is not an `IAdtError` but carries `response.status`, read through the
+         existing safe property reads);
+       - or it is an `IAdtError` of `origin: 'refusal'`, with or without a `response` (an
+         `AdtSAPError`: SAP's answer by construction);
+    4. anything else → `'throw'`, never given to the strategy as a SAP answer: no `response`
+       and not `origin: 'refusal'` (an unreachable host, a network or DNS failure), a
+       library's defect, our own defect (a `TypeError`, a `RangeError`), a thrown primitive.
 
-    Rule 2 comes before rule 4 on purpose: an envelope's HTTP failure carries a status, as a
-    raw transport failure does, and must not be skipped as one.
+    **Why not by `origin` alone (owner, amending DO22; measured by the implementer on the
+    stand probe and in the adt-clients 43 code):** adt-clients gives `origin: 'refusal'` only
+    to `AdtSAPError`, which the HTTP path never throws; a SAP `4xx` / `5xx` with an exception
+    document comes back `origin: 'connection'` with its `response` (`adtType` added by
+    `analyseException`). So `origin: 'connection'` cannot tell "SAP answered" from "no
+    answer"; the `response` with its status can. Rule 2 comes before rule 3 on purpose: an
+    envelope's HTTP failure carries a status and must not be taken as one part's SAP answer.
   - **Wiring:** the resolver, the walkers (the level catch and the root), the source reader
     (structure and source reads) and the batched phases consult the strategy at the place; the
     bare `catch {}`, every `if (isCredentialFailure(error)) throw error; continue;`, the
@@ -3117,14 +3124,15 @@ Step 4 names.
     structure, source), each case on both paths:
     - `'a TypeError is thrown'`, `'a RangeError is thrown'`, `'a thrown primitive is thrown as
       the same primitive'`;
-    - `'an answered refusal with a response is skipped'` (`500`, `404`);
-    - `'an answered refusal without a response is skipped'` (an `IAdtError` of `origin:
+    - `'a SAP 500 with origin connection and a response is skipped'` and the same for a `404`
+      — the shape adt-clients 43 answers for a SAP exception document — answered and carried;
+    - `'an origin refusal failure without a response is skipped'` (an `IAdtError` of `origin:
       'refusal'` with `adtType` and no `response`);
-    - `'a carried ADT failure is skipped'` (`carryingFailure`);
+    - `'a carried ADT failure with a response is skipped'` (`carryingFailure`);
     - `'a raw transport failure with a response and a status is skipped'` (a thrown object
       carrying `response.status`, no `IAdtError`);
-    - `'an IAdtError of origin connection is thrown'`, answered and carried: the call fails
-      with it;
+    - `'a failure with no response and origin connection is thrown'` (an unreachable host):
+      the call fails with it, the strategy not asked;
     - `'a credential refusal ends the call'` (`AuthRefusedError`, a `401` SAP answered) and
       `'a failureOf refusal ends the call'`;
   - **an answered 401 ends the call** at each place (mask, root, level, structure, source),
@@ -3141,7 +3149,7 @@ Step 4 names.
       structure-and-source phase, each envelope failing with an HTTP `500` (a status-bearing
       transport failure): the call rejects with the envelope's error, nothing is skipped, and
       a recording strategy sees one `'envelope'` call and no per-read call for its parts;
-    - `'an envelope failure is not skipped as a raw transport failure'` (rule 2 before rule 4:
+    - `'an envelope failure is not skipped as a raw transport failure'` (rule 2 before rule 3:
       the same `500` is skipped when it is one part's own failure inside an answered envelope);
     - `'a credential refusal as the envelope's error ends the call'`;
     - `'a part's own failure inside an answered envelope follows the per-read rule'`;
@@ -3302,7 +3310,10 @@ Step 4 names.
     `failures`; a named package that does not exist is skipped and not counted; `scanned.objects_with_hits` matches the objects in `results`; a hit
     in a function module names the module and its group, and `GetFunctionModule` reads it
     with exactly those fields;
-  - the `VIEW*` measurement owed by D23a Step 2.
+  - the `VIEW*` measurement owed by D23a Step 2;
+  - the shape of a real SAP refusal (DO22, owed): the `origin`, the `response` status and the
+    `adtType` a SAP `404` refusal of a source read gets through adt-clients, on premise and on
+    ABAP Cloud — the unit cases' `origin: 'connection'` with a `response` checked against it.
 - [ ] **Step 8:** Commit.
 
 **Later work (not 24.0.0, DO13):** SAP's text search
@@ -4012,15 +4023,19 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   `RangeError`, any thrown value that is not a system answer) is thrown, never swallowed.
   The strategy is asked once per failed read, at the place it arises (mask, package root,
   level, function-group structure, source); its decision travels unchanged through every
-  outer layer, and a cached or replayed read reuses it. **Closed (owner, 2026-11-07):** skipped —
-  an answered failure (`ReadAnswer` `ok: false`, an `IAdtResponse` not `ok`) and a carried ADT
-  failure (`methodFailureOf`), each of `origin: 'refusal'`, with or without a `response`, and a
-  raw transport failure carrying a `response` with a status; thrown — an `IAdtError` of
-  `origin: 'connection'` and any batch envelope failure but the outer `404` of
-  `isNoBatchEndpoint`, which is no failure (the sequential fallback runs); the call ends on a
-  credential or `failureOf` refusal, whatever its shape. Precedence: credential / `failureOf`
-  end → envelope failure throws → `origin: 'connection'` throws → system answers skip →
-  anything else throws. An envelope's failure is decided in the phase, where `runPhase` sees
+  outer layer, and a cached or replayed read reuses it. **Closed (owner, 2026-11-07; amended the same
+  day — "library defects are raised, SAP's answers are handled by the strategy"):** a failure
+  is a SAP answer when it carries a `response` with an integer HTTP status, whatever its
+  `origin` (answered, carried, or a raw transport failure), or when it is an `IAdtError` of
+  `origin: 'refusal'` (with or without a `response`); a SAP answer goes to the strategy
+  (shipped: skip). Everything else — no response (unreachable host, network, DNS), a library
+  defect, our defect, a primitive — is thrown. `origin` alone does not decide: adt-clients 43
+  answers a SAP `4xx` / `5xx` exception document as `origin: 'connection'` with its `response`
+  (measured). Any batch envelope failure but the outer `404` of `isNoBatchEndpoint` (no
+  failure: the sequential fallback runs) is thrown; the call ends on a credential or
+  `failureOf` refusal, whatever its shape. Precedence: credential / `failureOf` end →
+  envelope failure throws → a SAP answer goes to the strategy → anything else throws. A live
+  check of a real SAP `404`'s shape is owed (Step 7). An envelope's failure is decided in the phase, where `runPhase` sees
   it, before adt-clients' conversion builds the parts' answers (place `'envelope'`); an
   answered failure is normalised to a carried one (`thrownOf`, `carryingFailure`) before the
   rule, so an answered `401` ends the call.

@@ -508,13 +508,18 @@ on-premise system disagree, the live measurement holds.
     non-credential throw is skipped). The strategy is asked once per failed read, at the place it
     arises (a mask, a package root, a walk level, a function-group structure read, a source
     read); its decision travels unchanged through the outer layers, and a cached or replayed
-    read reuses it. Shapes are read by structure only (owner, closed): an answered
-    or carried ADT failure of `origin: 'refusal'` (with or without a `response`) and a raw
-    transport failure carrying a `response` status are skipped; an `IAdtError` of `origin:
-    'connection'` is thrown; a batch envelope failure is thrown, except the outer `404` of
-    `isNoBatchEndpoint`, which is no failure (the sequential fallback); a credential refusal
-    ends the call. Precedence: credential / server refusal end → envelope failure throws →
-    `origin: 'connection'` throws → system answers skip → anything else throws. An envelope's
+    read reuses it. Shapes are read by structure only (owner, closed and amended:
+    library defects are raised, SAP's answers go to the strategy): a failure is a SAP answer
+    when it carries a `response` with an integer HTTP status, whatever its `origin` (answered,
+    carried, or a raw transport failure), or is an `IAdtError` of `origin: 'refusal'`; a SAP
+    answer goes to the strategy (shipped: skip). Everything else — no response (unreachable
+    host, network, DNS), a library defect, our defect, a primitive — is thrown. `origin` alone
+    does not decide: adt-clients 43 answers a SAP `4xx` / `5xx` exception document as `origin:
+    'connection'` with its `response` (Measured). A batch envelope failure is thrown, except
+    the outer `404` of `isNoBatchEndpoint`, which is no failure (the sequential fallback); a
+    credential refusal ends the call. Precedence: credential / server refusal end → envelope
+    failure throws → a SAP answer goes to the strategy → anything else throws. A live check of
+    a real SAP `404`'s shape, on premise and on ABAP Cloud, is owed. An envelope's
     failure is decided in the phase, before the client builds the parts' answers from it, so
     no part of a failed envelope is skipped as its own; an answered failure is normalised to
     a carried one first, so an answered `401` ends the call.

@@ -4091,6 +4091,395 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
 - [ ] **Step 10:** Commit as `feat(compact): D25 — HandlerSystem; HandlerSearch and
   HandlerWhereUsed removed`.
 
+### D26. Configuration: nothing stated is ignored; `systemType` reaches every connection (owner, 2026-11-07, DO25)
+
+**The owner's decisions (DO25).** "`systemType` must be fixed, and it must be checked that
+nothing given in the configuration is ignored." Scope: every finding of the configuration audit,
+in #346. Precedence, by the Unix convention: **an explicitly stated option wins over the
+environment** — a CLI flag, a YAML key, an embedder's or exporter's option, a header. The
+environment is a fallback only where the owner's existing rules allow one: stdio may read its
+environment and destination files; http/sse take request values only from headers and request
+parameters, never from the process environment.
+
+**Source and its check.** The audit (read-only, by reading the code at `4f0e3d2a`) was re-read
+against the code at the time of this stage (`19c7482c`). (Q1–Q11 answered by the owner, below; Q12 after its measurement.) Every finding below was found again
+in the code, at the lines given (they moved by a few lines); corrections:
+- **1.2 (`legacy`):** the audit says `legacy` "lists the legacy tool set". The code
+  (`src/lib/handlers/interfaces.ts`, `SapEnvironment`) says `legacy` is accepted by the type and
+  declared by no tool — that support is parked (`parked/legacy-support`; README: "Legacy systems
+  … are not supported at present"). So `legacy` lists no tool of its own today; the wire finding
+  (`statedSystemKind` maps `legacy` to `onprem`, `createAbapConnection` builds `transport:
+  'http'`, connection 19.1.0's `OnPremHttpSpec` offers `transport: 'http' | 'legacy-http'`) holds.
+- **2.3 and 3.7** stay Inference in the audit; each gets a measurement step on the stand-in
+  before its fix (below).
+- **2.1** is the reading this plan wrote in D23b Step 4e2 (a `createRegistry()` registry runs in
+  its hosting server's contexts); the audit lists it as an option accepted and not honoured. It is
+  a decision point (below).
+
+**The rule of every step:** a red test first, on the stand-in or a unit (`adtStandIn`,
+`recordingConnection`, a stand-in connection provider, the launchers' parameter readers over an
+argv / env / YAML fixture) — never a live system; then the fix; then the docs (README, `docs/`,
+`docs/installation/`, the CLI help text in `src/lib/config/authParameters.ts` and the launchers'
+help), MIGRATION-24.0 and CHANGELOG (24.0.0). An option removed from an exported type is a
+MIGRATION entry and a **decision point for the owner** — listed, not decided here.
+
+#### Group A. A flag followed by `false` turns the flag on (first)
+
+- [ ] **A1 (audit 3.2).** `readCli` (`src/lib/config/authParameters.ts`) answers `true` for a
+  `kind: 'flag'` row whenever its name appears, and the following `false` becomes a positional
+  that nothing reads. So `--auth-debug false` turns on auth debugging (secrets' first and last
+  characters on stderr), `--unsafe false` turns on session writes, `--http-enable-dns-protection
+  false` turns protection on.
+  - Red tests, on every launcher's parameter table (stdio, http, sse): `'--auth-debug false is
+    refused, suggesting --auth-debug=false'`, the same for `--unsafe` and
+    `--http-enable-dns-protection` / `--sse-enable-dns-protection`; `'--flag=false is false'`;
+    `'--flag=true and a bare --flag are true'`; `'a positional after a flag is refused'` (C1).
+  - Fix: a flag takes `--flag` (true) and `--flag=<true|false>`; a separate word after a bare flag
+    is not its value: `--flag false` (two words) is refused with words suggesting `--flag=false`
+    (owner, Q1).
+  - Docs: the CLI help shows `--flag[=true|false]`; MIGRATION-24.0: `--auth-debug false` (and the
+    others) no longer turns the flag on; CHANGELOG Fixed.
+
+#### Group B. The system kind and the transport
+
+- [ ] **B1 (audit 0, 1.13): `BaseMcpServer`'s `systemType` reaches the connection it builds.**
+  Today `connectedLogon`, the leftover resume and the leftover logoff
+  (`src/embeddable/BaseMcpServer.ts`, the three `createAbapConnection(resolved.settings,
+  resolved.credential, …)` calls) pass no kind, so `createAbapConnection`'s default
+  `resolveSystemKind(settings)` reads only `SAP_SYSTEM_TYPE` (`src/lib/connectionFactory.ts`) and
+  refuses `system_type_required` when it is unset, or builds another kind than the listing's
+  (`this.systemType ?? process.env.SAP_SYSTEM_TYPE`). The leftover runtime file's identity takes
+  its kind from the environment too (`src/lib/leftoverSessions/LeftoverSessions.ts`,
+  `sessionIdentity`).
+  - Red tests (`adtStandIn`, `SAP_SYSTEM_TYPE` unset and set to the other kind):
+    `'systemType onprem with SAP_SYSTEM_TYPE unset builds an on-premise connection'`;
+    `'systemType cloud with SAP_SYSTEM_TYPE=onprem builds a cloud connection, lists cloud tools,
+    and the rules read cloud'`; the same for the leftover resume, the leftover logoff and the
+    runtime file's identity.
+  - Fix: the server passes its `systemType` (as an `AbapSystemKind` through `statedSystemKind`)
+    to every `createAbapConnection` it calls; `resolveSystemKind` becomes the environment fallback
+    below the explicit option (Q2, below). One function decides the kind for a server — the listing,
+    `statedCall`, `declareSystemKind` and the factory read it — so they cannot disagree.
+  - **Absent option (owner, Q2; audit 1.13):** an `EmbeddableMcpServer` / `BaseMcpServer`
+    without `systemType` falls back to `SAP_SYSTEM_TYPE` — the environment below the explicit
+    option; with neither, a call that needs a kind is refused `system_type_required`.
+    `HandlerExporter` keeps its rule (no option, no kind). The launchers always pass the option
+    (B4). Red test: `'systemType given beats SAP_SYSTEM_TYPE; absent, SAP_SYSTEM_TYPE answers'`.
+- [ ] **B2 (audit 1.1): fresh, long-call, background, debugger and forced-new connections.**
+  `openFreshConnection` (`src/lib/packageSessions.ts`) declares no kind on a host-factory
+  connection; the long call's own connection, a background run's, the debugger's
+  (`src/lib/debugger/ports.ts`) and `DeletePackage` `force_new_connection` then reach
+  `systemKindOf`, which finds no record and no declaration and reads `SAP_SYSTEM_TYPE`.
+  - Red tests: an `EmbeddableMcpServer({ connection, freshConnection, systemType: 'onprem' })`,
+    `SAP_SYSTEM_TYPE` unset: a long read in the call, a background run, a debugger session and a
+    forced-new `DeletePackage` each run on an on-premise client (no `system_type_required`); with
+    `SAP_SYSTEM_TYPE=cloud` each still runs on-premise.
+  - Fix: the server declares its kind on every connection it hands a handler
+    (`declareSystemKind`, as `BaseHandlerGroup` does with `stateSystemKind`), the fresh ones
+    included, at the one place a fresh connection is opened.
+- [ ] **B3 (audit 1.12): the public `@mcp-abap-adt/lib/utils` builders.** `getManagedConnection`
+  and `setConfigOverride(SapConfig)` (`src/lib/utils.ts`) build with no kind. They also reuse
+  what they built without the kind: `getManagedConnection` returns an existing override
+  connection before building anything; the cache is keyed by `sapConfigSignature(config)`
+  alone; `invalidateConnectionCache` ends the built connections but keeps the configured
+  override, which is rebuilt from it later.
+  - Fix: the kind is kept with the configuration (`setConfigOverride(config, kind)` keeps both;
+    `getManagedConnection(kind?)` states one, typed `SapEnvironment`, the environment the
+    fallback below an explicit kind), and the reuse decision includes it: the cache key is the
+    settings' signature **and** the kind; an override built for one kind is not returned for
+    another; a rebuild after `invalidateConnectionCache` uses the kept kind.
+  - Red tests: `'setConfigOverride with a stated kind builds that kind, SAP_SYSTEM_TYPE unset'`;
+    `getManagedConnection` the same; `'a request for another kind than the cached one does not
+    reuse it'` (a conflicting requested kind: a new connection for the new kind, or a refusal
+    when the override was configured for the other — the override states one kind); `'after
+    invalidation the rebuilt connection keeps the configured kind'`, with `SAP_SYSTEM_TYPE`
+    changed in between.
+  - MIGRATION-24.0 for embedders: the new kind parameter; without it the environment answers;
+    CHANGELOG Fixed.
+- [ ] **B4: no launcher writes `process.env`; every resolved value is passed explicitly.**
+  Today `server-runtime/src/http/launcher.ts` and `server-runtime/src/sse/launcher.ts` write
+  `process.env.SAP_SYSTEM_TYPE`; the stdio launcher hydrates the destination's env file into
+  the process environment (`hydrateSystemContextFromEnvFile`, `envFileContext.ts`, keys
+  `ENV_FILE_CONTEXT_KEYS`: `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`,
+  `SAP_LANGUAGE` and the message-server keys) and then writes `SAP_CONNECTION_TYPE` and
+  `SAP_SYSTEM_TYPE` (`launcher.ts`, after `effectiveConnectionType` / `effectiveSystemType`).
+  Readers of those keys downstream (`src/lib/systemContext.ts`, `src/lib/masterLanguage.ts`, the
+  factory's `resolveSystemKind`) then take them from the process. `StdioServer`,
+  `StreamableHttpServer` and `SseServer` take no `systemType`.
+  - Fix: each launcher resolves its values — from its CLI, YAML, the destination's env file
+    (read as a file, never copied into the process) and, as the fallback, the environment — and
+    passes them explicitly: `systemType` to the three server classes (and on to every
+    per-request / session server), the connection type, the language and the message-server
+    fields with the destination's settings, the system context (responsible, master system) as
+    the server's option. The downstream readers take the passed values; the process
+    environment is read only inside the launcher's resolution (stdio's fallback rule, D1).
+    `hydrateSystemContextFromEnvFile` and every `process.env.X =` in `server-runtime/src` go.
+  - **The source guard** (`src/__tests__/unit/sources/noProcessEnvWrites.test.ts`), defined
+    precisely:
+    - **Scope:** production files only — every `.ts` under each package's `src` (`src/`,
+      `server-runtime/src/` and the other packages' `src/`), excluding every `__tests__` tree,
+      the test-helper trees (`__tests__/helpers`, e.g. `src/__tests__/helpers/systemKind.ts`,
+      `server-runtime/src/stdio/__tests__/helpers/loginStand.ts`) and `__fixtures__`; tests such
+      as `rfcMessageServer.test.ts` mutate the environment legitimately and are out of scope.
+      The file walk is the existing guards' (`tsFiles` in `noMcpErrorInSrc.test.ts`, the
+      `helperTrees` walk in `sources/helpers/authorizationDerivationScan.ts`).
+    - **Technique:** the TypeScript compiler API (`ts.createSourceFile`, an AST walk), as the
+      repository's other source guards use; no regular expression (the guard is test code, but
+      follows the same rule).
+    - **Mutation forms it catches**, on `process.env` and on any **alias** of it:
+      - whole-object replacement: `process.env = …`;
+      - dot assignment: `process.env.X = …`, including compound (`+=`, `??=`, `||=`) and
+        `++` / `--`;
+      - computed-key assignment: `process.env[key] = …`;
+      - `delete process.env.X` / `delete process.env[key]`;
+      - `Object.assign(process.env, …)` (and `Object.defineProperty` / `Reflect.set` /
+        `Reflect.deleteProperty` with `process.env` as the target);
+      - **aliases:** a binding in the same file initialised to `process.env` (`const env =
+        process.env`), a parameter defaulted to it (`env: NodeJS.ProcessEnv = process.env`, as
+        `hydrateSystemContextFromEnvFile` in `envFileContext.ts` has), and any binding whose
+        declared type is `NodeJS.ProcessEnv` — every write form above through such a binding
+        is a finding (a function that writes an env-typed parameter can be handed
+        `process.env`). Residual, stated in the test: an untyped alias handed across files is
+        not seen; the type rule covers every alias the code has today.
+    - **Load-bearing:** a fixture per form under `__fixtures__` (each refused alone), and the
+      guard **red first** on the current production writes: `server-runtime/src/http/launcher.ts`
+      (`process.env.SAP_SYSTEM_TYPE = …`), `server-runtime/src/sse/launcher.ts` (the same),
+      `server-runtime/src/stdio/launcher.ts` (`process.env.SAP_CONNECTION_TYPE = …`,
+      `process.env.SAP_SYSTEM_TYPE = …`), and `server-runtime/src/stdio/config/envFileContext.ts`
+      (`env[key] = value` through the parameter defaulted to `process.env`) — the test lists
+      them by file and form and is red until each is gone.
+  - Red tests, one per launcher (stdio, http, sse): `'process.env is unchanged after start'`
+    (a deep copy before the start compared with the environment after it, with `--system-type`,
+    `--connection-type`, an env file and YAML stated); and the server lists, builds and creates
+    with the passed values (`SAP_SYSTEM_TYPE`, `SAP_CONNECTION_TYPE`, `SAP_LANGUAGE` absent from
+    the environment).
+  - MIGRATION-24.0: a process that read `SAP_SYSTEM_TYPE` (or the other keys) from its own
+    environment after the launcher started no longer finds the launcher's values there; the
+    three server classes take `systemType`. CHANGELOG Fixed (launchers) and Added (`systemType`
+    on the server classes).
+- [ ] **B5: `legacy` is not a system kind of this package (owner, Q3; audit 1.2).** Owner:
+  "legacy is a separate package, so we have no parameters with its sets; each package answers
+  for its own." Today `legacy` is accepted by `SapEnvironment`, `statedSystemKind` (mapped to
+  `onprem`), `statedEnvironment`, `IServerConfig.systemType`, the `systemType` options and the
+  CLI / YAML / env values, and declared by no tool. It is removed: the types
+  (`SapEnvironment = 'cloud' | 'onprem'`, `IServerConfig.systemType`, every `systemType` option),
+  `statedSystemKind` / `statedEnvironment`, the parameter tables' accepted values, and the docs
+  (README's legacy line rewritten to say legacy support is its own package's). No `legacy-http`
+  wiring here.
+  - Red tests: `'systemType legacy is refused, naming onprem and cloud'` — at `--system-type`,
+    `SAP_SYSTEM_TYPE`, YAML `system-type`, the env file, `EmbeddableMcpServer` /
+    `HandlerExporter` options (a type error, and a runtime refusal for an untyped caller's value
+    where the value comes from outside the type system: CLI, env, YAML, files); no tool lists
+    for `legacy`.
+  - MIGRATION-24.0: `legacy` is no longer accepted; a 7.40 system is served by the legacy
+    package. CHANGELOG Removed.
+- [ ] **B6: `cloud` with `connectionType: 'rfc'` is refused (audit 1.3).** The factory takes the
+  cloud branch before it reads `connectionType`.
+  - Red test: `createAbapConnection` with kind `cloud` and `connectionType: 'rfc'` is refused
+    before anything is built, naming both; the launchers refuse the combination at start.
+  - Fix: the refusal, at the factory and in each launcher's configuration check.
+  - **Message-server fields on HTTP are refused (owner, Q4; audit 1.3, second half —
+    Inference, checked by the red test):** `mshost`, `msserv`, `sysid`, `group`, `saprouter` on
+    an HTTP connection are read by nothing (connection reads `mshost` only for RFC). Red test:
+    settings with any of them and `connectionType: http` (or cloud) are refused, naming them;
+    stdio's env file and the http/sse headers the same.
+- [ ] **B7 (audit 1.4): the server's `logger` reaches the connections it builds.** The three
+  `createAbapConnection` calls in `BaseMcpServer` pass no logger.
+  - Red test: a recording logger given to `EmbeddableMcpServer` receives the connection's wire
+    log lines (the HTTP wire log) for a built connection, a resumed and a fresh one.
+  - Fix: the server passes its logger.
+- [ ] **B8: owed live cases** (on the owner's go): an `EmbeddableMcpServer` with `systemType`
+  and no `SAP_SYSTEM_TYPE`, on premise and on ABAP Cloud — a read, a long read in the background
+  and a fresh connection each run on the stated kind; a launcher started with `--system-type`
+  only. (No `legacy-http` case: B5 removes `legacy`.)
+
+#### Group C. Unknown, repeated, empty input; the JSON response
+
+- [ ] **C1 (audit 3.1): unknown CLI flags, positionals and YAML keys are refused, with words.**
+  `readParameters` reads only the table's rows; `validateYamlParameters` checks removed keys,
+  secret-looking keys and known rows' values, not unknown keys.
+  - Red tests, per launcher: `'--unsfe is refused: not an argument of <program>'` (and a
+    positional `false`); `'YAML system_type is refused, naming the key and the known one'`
+    (`system-type`); `'YAML http.json_response is refused'`; `'sse.allowed_hosts is refused'`.
+  - Fix: every CLI argument must be a row's name (or its `=` form), every YAML key a row's key;
+    anything else is refused before start, in words that name it and, where one is close, the
+    row it may mean (a plain string comparison, no regex).
+- [ ] **C2 (audit 3.3): a repeated flag is refused.** `--port=3000 --port=4000` listens on 3000.
+  Red test and fix: two occurrences of a row (any of its names) refused, naming both.
+- [ ] **C3 (audit 3.4): an empty value is refused.** `convert` answers `undefined` for `''`, and
+  `readRow` falls through to env or YAML. Red tests: `--system-type=` with YAML `system-type:
+  cloud` is refused; an empty YAML value and an empty environment value are refused where the
+  row reads them. Fix: an empty value is a stated value, refused with words.
+- [ ] **C4 (audit 3.5): `--http-json-response=false` is honoured.** The HTTP launcher passes
+  `config.httpJsonResponse || undefined`, and `StreamableHttpServer` applies `?? true`. Red tests:
+  `--http-json-response=false`, `MCP_HTTP_ENABLE_JSON_RESPONSE=false` and YAML
+  `http.json-response: false` each give SSE streams (`enableJsonResponse: false` reaches the SDK
+  transport); absent stays `true`. Fix: pass the value as stated.
+
+#### Group D. Precedence; http/sse request values from headers only
+
+- [ ] **D1 (audit 3.11, 3.10): an explicit option wins over the environment.** `readRow` orders
+  CLI, then env, then YAML; stdio's `effectiveFromEnvironment` and `effectiveMessageServer`
+  (`server-runtime/src/stdio/launcher.ts`) let the environment override a YAML value, and
+  `envFileContext.ts` never overwrites a value already in the environment.
+  - Red tests: YAML `system-type: cloud` with `SAP_SYSTEM_TYPE=onprem` gives cloud (http, sse,
+    stdio); YAML `http.port` beats `MCP_HTTP_PORT`; on stdio, the destination's env file (named
+    by `--env` / `--env-path`, an explicit option) beats the shell's `SAP_SYSTEM_TYPE` and
+    `SAP_CONNECTION_TYPE`; the environment still answers a row nothing explicit states.
+  - Fix: the order is CLI, YAML, then the environment (a fallback); on stdio the destination's
+    env file named by `--env` / `--env-path` counts as explicit and beats the shell environment
+    (owner, Q5).
+  - Docs: README and `docs/installation/` state the order; MIGRATION-24.0: a YAML value now wins
+    over an inherited environment variable.
+- [ ] **D2 (audit 3.12): http/sse take request values only from headers.** A request without
+  `x-sap-responsible` creates objects under the process's `SAP_RESPONSIBLE`
+  (`getStatedSystemContext` keeps the process value; `systemContextFromConfiguration` fills it from
+  the environment on every `setConnectionContext`); the debugger reads `SAP_DEBUG_*` from the
+  environment (`src/lib/debugger/ids.ts`).
+  - Red tests (HTTP and SSE servers, a request without the headers): the responsible and the
+    master system are none (the create's own rule then applies), not the process values; the
+    debugger ids come only from `x-sap-debug-*`; stdio keeps its environment reading.
+  - Fix: on http/sse the request scope states every key (absent header → absent value), and the
+    process fallback runs only on stdio; the http help line that promises the environment
+    fallback is rewritten. MIGRATION-24.0: http/sse no longer read `SAP_RESPONSIBLE`,
+    `SAP_MASTER_SYSTEM` or `SAP_DEBUG_*` from the process environment; send the headers.
+- [ ] **D3 (audit 3.8): stdio `--env` with `--env-path` is refused** (the path wins today). Red test
+  and fix: both given → refused, naming both.
+- [ ] **D4 (audit 3.9): stdio `--mcp=<X>` with an env file is refused.** Today `X` is served, the
+  file's credentials and URL are ignored, and its `SAP_SYSTEM_TYPE`, `SAP_CONNECTION_TYPE`,
+  `SAP_LANGUAGE` and message-server keys are still copied into `process.env`. Red test and fix:
+  the combination is refused before start, naming both.
+- [ ] **D5 (audit 3.13): `SAP_CLIENT` is not copied into `process.env`.** Covered by B4 (no key
+  of the env file is copied any more); its red test asserts `SAP_CLIENT` among the unchanged
+  keys, and that the client still reaches the connection from the file.
+- [ ] **D6: the debugger's explicit option beats the environment.** `resolveBreakpointConflict`
+  (`src/lib/debugger/ids.ts`) orders the request context, then `SAP_DEBUG_BREAKPOINT_CONFLICT`,
+  then the `fallback` — the explicit `breakpointConflict` option `DebuggerInstance` passes
+  (`src/lib/debugger/DebuggerInstance.ts`) — so the environment wins over the option.
+  - Red tests: `'the breakpointConflict option beats SAP_DEBUG_BREAKPOINT_CONFLICT'`; the request
+    header beats both; with neither, the environment (stdio) or none (http/sse, D2) answers; the
+    same order for the terminal and IDE ids where an option states them.
+  - Fix: header, then the explicit option, then the environment (stdio only).
+  - MIGRATION-24.0: a stated `breakpointConflict` is no longer overridden by
+    `SAP_DEBUG_BREAKPOINT_CONFLICT`; CHANGELOG Fixed.
+
+#### Group E. Embedder and exporter options that do nothing; contradictory combinations
+
+Each option is made to work or removed; **every removal is a decision point** (listed under
+DO25). Red tests on `EmbeddableMcpServer`, `HandlerExporter` and the server classes with the
+stand-in.
+- [ ] **E1 (audit 1.5): `exposition: ['compact']` builds nothing.** `createDefaultRegistry` has
+  branches for `readonly`, `high`, `system` and `search` only. Removed (owner, Q6): `compact`
+  leaves the `exposition` type. Red test: `exposition: ['compact']` is a type error, and an
+  untyped caller's `compact` is refused at construction. MIGRATION-24.0: use the compact
+  binaries or `HandlerExporter` for the compact tools; CHANGELOG Removed.
+- [ ] **E2 (audit 1.6): `exposition` / `readOnlyDedupStrategy` beside `handlersRegistry` are
+  refused.** Red test: the combination throws at construction, naming both; a type-level
+  exclusion (a union of the two shapes) where the types can state it.
+- [ ] **E3 (audit 1.7): `systemContext` is per instance, never module-global.**
+  `EmbeddableMcpServer` calls `setSystemContext`, which merges into the module-level `cached`
+  (`src/lib/systemContext.ts`). Red test: two instances in one process with different
+  `systemContext.responsible` each create under their own. Fix: the instance holds its system
+  context and hands it to its calls' scope; `setSystemContext`'s module state goes (its exported
+  users: MIGRATION if exported).
+- [ ] **E4 (audit 1.8): `systemContext.client` is read by nothing; the doc names `isLegacy`,
+  which is not in the type.** Removed (owner, Q7): `client` leaves `IAdtSystemContext` and the
+  option's doc loses `client` and `isLegacy`. Red test: a type test that `systemContext.client`
+  does not compile. MIGRATION-24.0: drop `client` (the connection's client is the
+  connection's setting); CHANGELOG Removed.
+- [ ] **E5 (audit 1.9): `ConnectionContext.sessionId` (required) and `metadata` are read by
+  nothing.** Removed (owner, Q8): both leave `ConnectionContext`, and their writers
+  (`EmbeddableMcpServer`, `StdioServer`) stop setting them. Red test: a type test. MIGRATION-24.0:
+  drop `sessionId` and `metadata` from the connection context; CHANGELOG Removed.
+- [ ] **E6 (audit 1.10): `RouteRegistrationOptions.addJsonMiddleware` is ignored** by both servers
+  (`_options`). Removed (owner, Q9): `addJsonMiddleware` leaves `RouteRegistrationOptions`.
+  Red test: a type test. MIGRATION-24.0: drop it (the servers never read it); CHANGELOG Removed.
+- [ ] **E7 (audit 1.11): `host`, `port` and `tls` beside `app` are refused** at construction of
+  `StreamableHttpServer` and `SseServer`, naming them (they are documented as unused there).
+- [ ] **E8 (audit 2.1): `HandlerExporter.createRegistry()` and the exporter's call-time options.**
+  The exporter's `systemType`, resolver, rules and logger do not apply to a registry hosted by a
+  server, and the option's doc ("On a server instance it overrides `SAP_SYSTEM_TYPE`") says the
+  opposite; D23b Step 4e2 wrote the same for the strategies. Decided (owner, Q10, (c)): a
+  `createRegistry()` registry takes the hosting server's options; the exporter's doc is
+  corrected to say so (consistent with D23b Step 4e2), and a recorded kind contradicting the
+  exporter's stated kind is refused (E11). Red test: `'a createRegistry() registry on a server
+  uses the server's systemType, resolver, rules and logger'`; a doc test is not needed.
+- [ ] **E9 (audit 2.2): the exporter's `logger` is used on `getHandlerEntries()`** — `wrapEntry`
+  passes the embedder's context through. Red test: an entry's handler logs to the exporter's
+  logger; fix in `wrapEntry` (as the strategy fields of Step 4e2).
+- [ ] **E10 (audit 2.3, Inference): the run tools through `createRegistry()` on a server with
+  `backgroundRuns`.** First a measurement on the stand-in: whether
+  `EmbeddableMcpServer({ handlersRegistry: exporter.createRegistry(), backgroundRuns })` can start
+  `RuntimeRunClass` in the background (the exporter strips `background`). If it cannot (owner,
+  Q11), the run tools through `createRegistry()` get `background` on a server with
+  `backgroundRuns` — the D24 rule; red test: `'createRegistry() on a server with backgroundRuns
+  lists RuntimeRunClass with background and starts a run'`, and without `backgroundRuns` no
+  `background`.
+- [ ] **E11 (audit 2.4, documented): a lib-built connection's recorded kind beats the
+  exporter's.** With B1–B4 the record's kind is the stated one, not the environment's; a red test
+  pins that a record built for the server's `systemType` and an exporter stating another are
+  refused as contradictory rather than one silently winning.
+
+#### Group F. DNS-rebinding and TLS combinations
+
+- [ ] **F1 (audit 3.6): incomplete DNS-rebinding settings are refused.** `checkDnsRebinding`
+  (`src/lib/httpTransport/dnsRebindingProtection.ts`) returns `null` unless `enable` is true, and
+  with `enable` and no lists checks nothing. Red tests (http and sse): allowed hosts or origins
+  without the enable flag → refused at start; the enable flag with no list → refused; both →
+  checked as today. Fix in both parameter tables' validation **and** in the server classes:
+  `StreamableHttpServer` and `SseServer` take `allowedHosts`, `allowedOrigins` and
+  `enableDnsRebindingProtection` directly from an embedder, so each constructor refuses the
+  same incomplete combinations (lists without enablement, enablement without lists), and
+  `checkDnsRebinding` asserts nothing incomplete reaches it. Red tests: each server class
+  constructed with lists and no enablement, and with enablement and no lists, throws naming the
+  fields. MIGRATION-24.0: an incomplete combination is refused at start or construction (it
+  checked nothing, or ignored the lists); CHANGELOG Fixed.
+- [ ] **F2 (audit 3.7, Inference): `--tls-ca`.** `tlsUtils.ts` passes `ca` to
+  `https.createServer` without `requestCert`. First a measurement on a local TLS listener (no
+  SAP): whether the served chain includes the CA (OpenSSL completing the chain) and whether any
+  client certificate is asked for. **Open (owner, Q12): decided after the measurement** — the
+  result goes to the owner with the choices (keep it with an accurate help text, give it a
+  purpose — client certificates, `requestCert` —, or remove it); nothing is changed before.
+
+#### Docs, MIGRATION, CHANGELOG (all groups)
+
+- README, `docs/installation/`, `docs/configuration/`, the launchers' help: the precedence (D1),
+  the request values from headers on http/sse (D2), the refused inputs (A, C, F), the flag form
+  (A), the `systemType` option of the three servers (B4), the removals (B5, B6, E1, E4–E6).
+- **Per step, MIGRATION-24.0 (what a consumer on the old contract does now) and CHANGELOG
+  (24.0.0):**
+
+  | Step | MIGRATION-24.0 | CHANGELOG |
+  | --- | --- | --- |
+  | A1 | `--flag false` is refused; write `--flag=false` | Fixed |
+  | B1 | an embedder's `systemType` is honoured on every built connection; without it `SAP_SYSTEM_TYPE` answers | Fixed |
+  | B2 | fresh, long-call, background, debugger and forced-new connections take the server's kind | Fixed |
+  | B3 | `setConfigOverride` / `getManagedConnection` take a kind; reuse is per kind | Fixed |
+  | B4 | the launchers no longer write `process.env`; the server classes take `systemType` | Fixed, Added |
+  | B5 | `legacy` is refused; use the legacy package | Removed |
+  | B6 | `cloud` with `connectionType: rfc`, and message-server fields on HTTP, are refused | Removed (the fields on HTTP), Fixed |
+  | B7 | — (the logger reaches connections; nothing to do) | Fixed |
+  | C1–C3 | unknown, repeated and empty CLI / YAML input is refused; fix the input | Fixed |
+  | C4 | `--http-json-response=false` gives SSE streams | Fixed |
+  | D1 | YAML beats the environment; the stdio env file beats the shell | Changed |
+  | D2 | http/sse read `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_DEBUG_*` from headers only | Changed |
+  | D3, D4 | `--env` with `--env-path`, and `--mcp` with an env file, are refused | Fixed |
+  | D5 | — (covered by B4) | Fixed |
+  | D6 | a stated `breakpointConflict` beats `SAP_DEBUG_BREAKPOINT_CONFLICT` | Fixed |
+  | E1 | `exposition: 'compact'` removed; use the compact binaries or the exporter | Removed |
+  | E2 | `exposition` / `readOnlyDedupStrategy` beside `handlersRegistry` are refused | Fixed |
+  | E3 | `systemContext` is per instance; two instances no longer share it | Fixed |
+  | E4 | `systemContext.client` removed | Removed |
+  | E5 | `ConnectionContext.sessionId` / `metadata` removed | Removed |
+  | E6 | `addJsonMiddleware` removed | Removed |
+  | E7 | `host` / `port` / `tls` beside `app` are refused | Fixed |
+  | E8 | a `createRegistry()` registry takes its hosting server's options (the doc corrected) | Fixed (docs) |
+  | E9 | — (the exporter's logger is used) | Fixed |
+  | E10 | if confirmed: exported run tools take `background` on a server with background runs | Fixed |
+  | E11 | a recorded kind contradicting the exporter's stated kind is refused | Fixed |
+  | F1 | incomplete DNS-rebinding settings are refused, launchers and server classes | Fixed |
+  | F2 | the owner's answer after the measurement | per the answer |
+
 ### Defect-stage owner decisions (decided 2026-11-04)
 
 - **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
@@ -4249,6 +4638,26 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   options — and the launchers pass the shipped ones. The `HandlerContext` field is internal
   plumbing, never a consumer's: the exporter sets it from its option (absent → absent → the
   handler's default); `HandlerContext` is exported, so the fields are marked internal.
+- **DO25 (2026-11-07, D26):** "`systemType` must be fixed, and it must be checked that nothing
+  given in the configuration is ignored." Scope: every finding of the configuration audit, in
+  #346. Precedence by the Unix convention: an explicitly stated option (a CLI flag, a YAML key, an
+  embedder's or exporter's option, a header) wins over the environment; the environment is a
+  fallback only where the owner's rules allow one (stdio its environment and destination files;
+  http/sse request values only from headers and request parameters). Groups in order: A `--flag
+  false`; B the system kind and the transport; C unknown, repeated and empty input, the JSON
+  response; D precedence and headers only; E options that do nothing, contradictory combinations,
+  no module-global system context; F DNS-rebinding and TLS combinations. **Answered (owner):**
+  Q1 `--flag false` refused, suggesting `--flag=false`; Q2 an embedder's absent `systemType`
+  falls back to `SAP_SYSTEM_TYPE`; Q3 `legacy` is not a kind of this package ("legacy is a
+  separate package … each package answers for its own") — removed, a stated `legacy` refused
+  naming onprem and cloud, no `legacy-http` here; Q4 message-server fields on HTTP refused; Q5 the
+  destination env file named by `--env` / `--env-path` is explicit and beats the shell
+  environment; Q6 `exposition: 'compact'`, Q7 `systemContext.client` (and `isLegacy` in the
+  doc), Q8 `ConnectionContext.sessionId` / `metadata`, Q9 `addJsonMiddleware` removed — each a
+  MIGRATION entry and a CHANGELOG Removed line; Q10 (c): `createRegistry()` takes the hosting
+  server's options, the doc corrected, a contradicting recorded kind refused; Q11 if the
+  measurement confirms it, the exported run tools get `background` on a server with background
+  runs. **Open:** Q12 `--tls-ca`, decided after its measurement.
 
 ## Test coverage — the families
 
@@ -4985,7 +5394,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO23 as decided, D25's removal of `HandlerSearch` and
+      argument now refused, and the owner's decisions DO1–DO25 as decided, D25's removal of `HandlerSearch` and
       `HandlerWhereUsed` with their `HandlerSystem` actions included);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group

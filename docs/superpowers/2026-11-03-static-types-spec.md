@@ -569,6 +569,40 @@ on-premise system disagree, the live measurement holds.
     of about 1 000 parts and more failed with an outer `500` after about 600 s (Measured);
     that the 600 s is a limit outside the server is an Inference — its source is not measured.
   - `time_budget_ms` and `timeout` stay removed (DO11, D24).
+- **Configuration: nothing stated is ignored (owner, 2026-11-07, plan D26, DO25):** every
+  finding of the configuration audit, re-verified against the code. An explicitly stated option
+  (a CLI flag, a YAML key, an embedder's or exporter's option, a header) wins over the
+  environment, which is a fallback only where the owner's rules allow one (stdio: its
+  environment and destination files; http/sse: request values only from headers and request
+  parameters). In order:
+  - a flag followed by `false` no longer turns it on;
+  - `systemType` reaches every connection a server builds or hands a tool — built, resumed,
+    logged off, fresh, a long call's, a background run's, the debugger's, `setConfigOverride`'s
+    (whose reuse is per kind) — and no launcher writes `process.env` at all: every resolved
+    value (system type, connection type, language, message server, system context) is passed
+    explicitly; an embedder without it falls
+    back to `SAP_SYSTEM_TYPE`; `legacy` is not a kind of this package (the legacy support is
+    its own package's) and is refused, naming onprem and cloud; `cloud` with `connectionType:
+    rfc`, and message-server fields on an HTTP connection, are refused; the server's logger
+    reaches its connections;
+  - unknown, repeated and empty CLI and YAML input is refused in words, and
+    `--http-json-response=false` is honoured;
+  - a flag takes `--flag=false`, and `--flag false` is refused suggesting it;
+  - YAML beats the environment, the stdio destination env file named by `--env` / `--env-path`
+    beats the shell environment, an explicit debugger option beats `SAP_DEBUG_*`, and http/sse
+    take responsible, master system and debugger ids from headers only; contradictory stdio inputs (`--env` with `--env-path`, `--mcp` with an env
+    file) are refused;
+  - removed (each a MIGRATION entry): `exposition: 'compact'`, `systemContext.client`,
+    `ConnectionContext.sessionId` / `metadata`, `addJsonMiddleware`; a `createRegistry()`
+    registry takes its hosting server's options (the doc corrected), a contradicting recorded
+    kind is refused, and its run tools get `background` on a server with background runs if a
+    measurement confirms they lack it; contradictory combinations are refused, and the system
+    context is per instance;
+  - incomplete DNS-rebinding settings are refused by the launchers and by the server classes'
+    constructors alike, and `--tls-ca` is measured, then decided by
+    the owner.
+  Every step starts with a red test on the stand-in or a unit; owed live cases cover the
+  system kind without `SAP_SYSTEM_TYPE` on both systems.
 - **Long tools (owner, 2026-11-07, plan D24):** no server-side deadline remains — `timeout` is
   removed from every listed long tool (`SearchSource`'s `time_budget_ms` and `timeout` were already
   removed in D23a); every

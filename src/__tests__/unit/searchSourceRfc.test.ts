@@ -32,6 +32,6 @@ describe('SearchSource concurrency by connection', () => {
 
   it('the handler wires the shipped strategy', async () => {
     await handleSearchSource({ connection: connectionOf('http') } as any, args);
-    expect((run.mock.calls[0] as any[])[2]).toBe(substringLineMatch);
+    expect((run.mock.calls[0] as any[])[2].lineMatch).toBe(substringLineMatch);
   });
 });

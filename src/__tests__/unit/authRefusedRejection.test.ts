@@ -21,6 +21,7 @@ import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
+import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
 import {
   fakeClientOf,
@@ -144,6 +145,7 @@ describe('SearchSource: a source read through adt-clients rejects with AuthRefus
           listing(name, [target('ZA'), target('ZB'), target('ZC')]),
         sourceReader: createSourceReaderDeps(context as any),
         lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
         resolvePackages: async (entries) => ({ packages: entries }),
       },
       {

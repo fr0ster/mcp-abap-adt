@@ -47,6 +47,7 @@ import { handleRuntimeRunProgram } from '../../handlers/system/high/handleRuntim
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { createPackageContentsFetcher } from '../../lib/search-source/packageEnumerator';
 import { createPackagePatternResolver } from '../../lib/search-source/packageResolver';
+import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import {
   fakeClientOf,
   okResponse,
@@ -274,7 +275,10 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
         throw new Error('getPackageContentsList must not be called');
       },
     });
-    const fetcher = createPackageContentsFetcher(context as any);
+    const fetcher = createPackageContentsFetcher(
+      context as any,
+      skipSapAnswers,
+    );
     const contents = await fetcher('ZMCP_SHR_PKG', {
       includeSubpackages: false,
     });

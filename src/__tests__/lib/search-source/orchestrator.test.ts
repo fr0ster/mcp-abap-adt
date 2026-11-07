@@ -8,6 +8,7 @@ import type {
   PackageContentItem,
   PackageContentsFetcher,
 } from '../../../lib/search-source/packageEnumerator';
+import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import {
   exactPackages,
   listing,
@@ -52,6 +53,7 @@ describe('runSearchSource', () => {
         'CLAS:ZA_CLAS': 'a\nb\nmarker mid',
       }),
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, baseInput);
@@ -78,6 +80,7 @@ describe('runSearchSource', () => {
         'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3\nmarker 4\nmarker 5',
       }),
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -97,6 +100,7 @@ describe('runSearchSource', () => {
         'PROG:Z_PROG': 'marker 1\nno match\nstill no match',
       }),
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -111,6 +115,7 @@ describe('runSearchSource', () => {
     // Two includes of one function group: one object, one allowance.
     const deps: OrchestratorDeps = {
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
         { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
       ]),
@@ -132,6 +137,7 @@ describe('runSearchSource', () => {
   it('two function modules of one group each have their own allowance (DO18)', async () => {
     const deps: OrchestratorDeps = {
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
         { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
       ]),
@@ -156,6 +162,7 @@ describe('runSearchSource', () => {
   it('orders the hits by the walk, whatever order the package answers in', async () => {
     const deps: OrchestratorDeps = {
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
         { name: 'ZPROG_B', type: 'PROG/P', packageName: 'ZROOT' },
         { name: 'ZCL_A', type: 'CLAS/OC', packageName: 'ZSUB' },
@@ -185,6 +192,7 @@ describe('runSearchSource', () => {
   it('an object without a hit is not in the answer, and counts as read', async () => {
     const deps: OrchestratorDeps = {
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
         { name: 'Z_HIT', type: 'PROG/P', packageName: 'ZPKG' },
         { name: 'Z_MISS', type: 'PROG/P', packageName: 'ZPKG' },
@@ -219,6 +227,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
         'PROG:ZB_PROG': 'marker',
       }),
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       resolvePackages: async () => ({ packages: ['ZA', 'ZB'] }),
     };
     const result = await runSearchSource(deps, {
@@ -235,6 +244,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
       },
       sourceReader: sourceFor({}),
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       resolvePackages: async () => ({ packages: [] }),
     };
     const result = await runSearchSource(deps, {
@@ -260,6 +270,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
       },
       sourceReader: sourceFor({}),
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       resolvePackages: async (entries) => {
         const seen = new Set<string>();
         const out: string[] = [];
@@ -286,6 +297,7 @@ describe('runSearchSource — max_hits_per_object absent: no limit (DO20)', () =
   it('answers every hit of an object, and by_object_cap stays false', async () => {
     const deps: OrchestratorDeps = {
       lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
         { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
@@ -312,6 +324,7 @@ describe('runSearchSource — an object of any number of hits', () => {
     }));
     const deps: OrchestratorDeps = {
       lineMatch: { match: () => ({ hits, capped: false }) },
+      sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
         { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
       ]),

@@ -1,4 +1,5 @@
 import type { EnumeratedObject } from '../../../lib/search-source/packageEnumerator';
+import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import {
   createSourceReaderDeps,
   type FugrChild,
@@ -67,7 +68,9 @@ const FUGR: EnumeratedObject = {
 describe('readSourceUnits', () => {
   it('PROG yields a single source unit named after the program', async () => {
     const { deps, calls } = makeDeps();
-    const units = await collect(readSourceUnits(deps, PROG));
+    const units = await collect(
+      readSourceUnits(deps, PROG, 'active', skipSapAnswers),
+    );
     expect(units).toEqual([
       {
         include: 'Z_PROG',
@@ -93,7 +96,9 @@ describe('readSourceUnits', () => {
       },
     ];
     const { deps, calls } = makeDeps({ structure });
-    const units = await collect(readSourceUnits(deps, FUGR));
+    const units = await collect(
+      readSourceUnits(deps, FUGR, 'active', skipSapAnswers),
+    );
     expect(includes(units)).toEqual([
       'VIEW_DIALOG_GEN',
       'Z_FM_A',
@@ -159,7 +164,9 @@ describe('readSourceUnits', () => {
       },
     ];
     const { deps, calls } = makeDeps({ structure });
-    const units = await collect(readSourceUnits(deps, FUGR));
+    const units = await collect(
+      readSourceUnits(deps, FUGR, 'active', skipSapAnswers),
+    );
     expect(calls).toEqual([
       'FM:Z_FG/Z_FM_A',
       'INC:LSVIMFXX',
@@ -187,7 +194,7 @@ describe('readSourceUnits', () => {
       },
     ];
     const { deps, calls } = makeDeps({ structure });
-    await collect(readSourceUnits(deps, FUGR));
+    await collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers));
     expect(calls).toEqual(['FM:Z_FG/Z_FM_A', 'INC:LZ_FGTOP']);
   });
 
@@ -224,7 +231,9 @@ describe('readSourceUnits', () => {
 
   it('CLAS yields the main source and the four local includes; a local include SAP answers 404 is absent', async () => {
     const { deps, calls } = makeDeps({ absent: 'CLASINC:Z_CLAS/macros' });
-    const units = await collect(readSourceUnits(deps, CLAS));
+    const units = await collect(
+      readSourceUnits(deps, CLAS, 'active', skipSapAnswers),
+    );
     expect(includes(units)).toEqual([
       'Z_CLAS',
       'definitions',
@@ -242,7 +251,9 @@ describe('readSourceUnits', () => {
 
   it('a class main source SAP answers 404 is skipped; the four local includes are still read', async () => {
     const { deps, calls } = makeDeps({ absent: 'CLAS:Z_CLAS' });
-    const units = await collect(readSourceUnits(deps, CLAS));
+    const units = await collect(
+      readSourceUnits(deps, CLAS, 'active', skipSapAnswers),
+    );
     expect(includes(units)).toEqual([
       'definitions',
       'implementations',
@@ -252,37 +263,30 @@ describe('readSourceUnits', () => {
     expect(calls).toHaveLength(5);
   });
 
-  it('a unit whose read throws is skipped; the reads go on with the rest', async () => {
+  it('a unit whose read throws with no response is thrown, decided at its place (DO22)', async () => {
     const structure: FugrChild[] = [
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_A' },
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_B' },
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_C' },
     ];
     const { deps, calls } = makeDeps({ structure, failing: 'FM:Z_FG/Z_FM_B' });
-    const units = await collect(readSourceUnits(deps, FUGR));
-    expect(units).toEqual([
-      {
-        include: 'Z_FM_A',
-        lines: ['FM:Z_FG/Z_FM_A', 'line2'],
-        source:
-          '/sap/bc/adt/functions/groups/z_fg/fmodules/z_fm_a/source/main|active',
-        module: { name: 'Z_FM_A', group: 'Z_FG' },
-        last: false,
-      },
-      {
-        include: 'Z_FM_C',
-        lines: ['FM:Z_FG/Z_FM_C', 'line2'],
-        source:
-          '/sap/bc/adt/functions/groups/z_fg/fmodules/z_fm_c/source/main|active',
-        module: { name: 'Z_FM_C', group: 'Z_FG' },
-        last: true,
-      },
-    ]);
-    expect(calls).toEqual([
-      'FM:Z_FG/Z_FM_A',
-      'FM:Z_FG/Z_FM_B',
-      'FM:Z_FG/Z_FM_C',
-    ]);
+    await expect(
+      collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers)),
+    ).rejects.toThrow('boom');
+    expect(calls).toEqual(['FM:Z_FG/Z_FM_A', 'FM:Z_FG/Z_FM_B']);
+  });
+
+  it('a SAP answer at a later unit is skipped; the reads go on with the rest', async () => {
+    const structure: FugrChild[] = [
+      { objecttype: 'FUGR/FF', objectname: 'Z_FM_A' },
+      { objecttype: 'FUGR/FF', objectname: 'Z_FM_B' },
+      { objecttype: 'FUGR/FF', objectname: 'Z_FM_C' },
+    ];
+    const { deps } = makeDeps({ structure, absent: 'FM:Z_FG/Z_FM_B' });
+    const units = await collect(
+      readSourceUnits(deps, FUGR, 'active', skipSapAnswers),
+    );
+    expect(includes(units)).toEqual(['Z_FM_A', 'Z_FM_C']);
   });
 
   it('a function group whose structure SAP refuses yields nothing', async () => {
@@ -294,7 +298,9 @@ describe('readSourceUnits', () => {
         return { ok: false, error: sapAnswered(500) };
       },
     };
-    expect(await collect(readSourceUnits(deps, FUGR))).toEqual([]);
+    expect(
+      await collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers)),
+    ).toEqual([]);
   });
 
   it('a credential failure SAP answered ends the reads, thrown', async () => {
@@ -306,7 +312,9 @@ describe('readSourceUnits', () => {
         return { ok: true, value: [] };
       },
     };
-    await expect(collect(readSourceUnits(deps, PROG))).rejects.toBeDefined();
+    await expect(
+      collect(readSourceUnits(deps, PROG, 'active', skipSapAnswers)),
+    ).rejects.toBeDefined();
   });
 
   it('lazy iteration: aborting after the first FUGR unit prevents later fetches', async () => {
@@ -316,7 +324,7 @@ describe('readSourceUnits', () => {
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_C' },
     ];
     const { deps, calls } = makeDeps({ structure });
-    const gen = readSourceUnits(deps, FUGR);
+    const gen = readSourceUnits(deps, FUGR, 'active', skipSapAnswers);
     const first = await gen.next();
     expect(first.done).toBe(false);
     await gen.return(undefined);

@@ -17,6 +17,7 @@ import { handleDescribeByList } from '../../handlers/system/readonly/handleDescr
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
+import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import {
   createSourceReaderDeps,
   type ReadSourceUnitsDeps,
@@ -182,24 +183,34 @@ describe('a refusal is not swallowed', () => {
   it('SearchSource: a refused source read is skipped by owner decision (DO17): nothing is yielded', async () => {
     fakeClient = fakeClientOf({ read: async () => forbidden() });
     const deps = createSourceReaderDeps(context as any);
-    const units = readSourceUnits(deps, {
-      devclass: 'ZPKG',
-      object_type: 'PROG',
-      object_name: 'ZPROG',
-      code: 'PROG/P',
-    });
+    const units = readSourceUnits(
+      deps,
+      {
+        devclass: 'ZPKG',
+        object_type: 'PROG',
+        object_name: 'ZPROG',
+        code: 'PROG/P',
+      },
+      'active',
+      skipSapAnswers,
+    );
     expect((await units.next()).done).toBe(true);
   });
 
   it('SearchSource: a listed source that is not there is skipped (DO17): nothing is yielded', async () => {
     fakeClient = fakeClientOf({ read: async () => notThere() });
     const deps = createSourceReaderDeps(context as any);
-    const units = readSourceUnits(deps, {
-      devclass: 'ZPKG',
-      object_type: 'PROG',
-      object_name: 'ZPROG',
-      code: 'PROG/P',
-    });
+    const units = readSourceUnits(
+      deps,
+      {
+        devclass: 'ZPKG',
+        object_type: 'PROG',
+        object_name: 'ZPROG',
+        code: 'PROG/P',
+      },
+      'active',
+      skipSapAnswers,
+    );
     expect((await units.next()).done).toBe(true);
   });
 
@@ -443,6 +454,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
           readStructure: async () => ({ ok: true, value: [] }),
         },
         lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
         resolvePackages: exactPackages,
       },
       {
@@ -476,6 +488,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
           readStructure: async () => ({ ok: true, value: [] }),
         },
         lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
         resolvePackages: exactPackages,
       },
       { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
@@ -616,6 +629,7 @@ describe('SearchSource: a refused object is skipped, the scan goes on (DO17)', (
           listing(name, [target('ZA'), target('ZB'), target('ZC')]),
         sourceReader,
         lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
         resolvePackages: exactPackages,
       },
       {

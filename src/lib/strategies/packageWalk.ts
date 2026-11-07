@@ -596,7 +596,23 @@ export type MissingLevel = 'empty' | 'refused';
  */
 export interface BranchRule {
   walked: Set<string>;
+  /**
+   * A refused read of the walk, at its place: returns when what the place
+   * names is skipped (the package, or the branch below it); throws to end
+   * the walk. Every failed level, the root's included, is handed here.
+   */
+  onFailure(failure: unknown, place: WalkFailurePlace): void;
 }
+
+/** Where a walk's read failed: the asked package's root, or a level below it. */
+export type WalkFailurePlace =
+  | { kind: 'package'; package: string }
+  | {
+      kind: 'level';
+      package: string;
+      /** The refused subpackage, or the refused type node. */
+      level: { subpackage: string } | { node: { id: string; type: string } };
+    };
 
 /** A package of a walk: what was found in it, and the subpackages walked from it. */
 interface PackageWalk {
@@ -683,18 +699,29 @@ export async function walkPackages(
       if (node === undefined) options.branchRule?.walked.add(walk.name);
       return level;
     } catch (error) {
-      // A credential failure is every root's: it ends the walk as it came.
-      if (endsTheCall(error)) throw error;
-      // Under the branch rule, a refused level below the asked package's
-      // root excludes only its branch.
-      if (
-        options.branchRule !== undefined &&
-        (node !== undefined || walk.depth > 1)
-      ) {
-        if (node === undefined) excluded.add(walk);
+      const rule = options.branchRule;
+      if (rule === undefined) {
+        // A credential failure is every root's: it ends the walk as it came.
+        if (endsTheCall(error)) throw error;
+        failures.set(walk.root, error);
         return undefined;
       }
-      failures.set(walk.root, error);
+      // Under the branch rule the caller decides; a return skips what the
+      // place names: the node, the subpackage's branch, the asked package.
+      const asked = walks[walk.root]?.name ?? walk.name;
+      rule.onFailure(
+        error,
+        node !== undefined
+          ? { kind: 'level', package: walk.name, level: { node } }
+          : walk.depth > 1
+            ? {
+                kind: 'level',
+                package: asked,
+                level: { subpackage: walk.name },
+              }
+            : { kind: 'package', package: walk.name },
+      );
+      if (node === undefined) excluded.add(walk);
       return undefined;
     }
   };
@@ -794,16 +821,27 @@ export async function walkPackage(
   options: WalkOptions = {},
   depth = 1,
   seen: Set<string> = new Set(),
+  asked: string = packageName.toUpperCase(),
 ): Promise<WalkedItem[]> {
   const pkg = packageName.toUpperCase();
   if (seen.has(pkg)) return [];
   seen.add(pkg);
 
   const withShortDescriptions = options.includeDescriptions === true;
-  const root = levelOf(
-    await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
-    options.missingLevel,
+  const root = await underBranchRule(
+    options,
+    depth > 1
+      ? { kind: 'level', package: asked, level: { subpackage: pkg } }
+      : { kind: 'package', package: pkg },
+    async () =>
+      levelOf(
+        await utils.fetchNodeStructure('DEVC/K', pkg, {
+          withShortDescriptions,
+        }),
+        options.missingLevel,
+      ),
   );
+  if (root === undefined) return [];
   options.branchRule?.walked.add(pkg);
 
   // A description only when asked for: SAP sends some without it.
@@ -815,13 +853,21 @@ export async function walkPackage(
   };
   const found: WalkedItem[] = root.objects.map(owned);
   for (const child of root.childNodes) {
-    const level = await underBranchRule(options, () =>
-      utils
-        .fetchNodeStructure('DEVC/K', pkg, {
-          nodeId: child.nodeId,
-          withShortDescriptions,
-        })
-        .then((answer) => levelOf(answer, options.missingLevel)),
+    const level = await underBranchRule(
+      options,
+      {
+        kind: 'level',
+        package: pkg,
+        level: { node: { id: child.nodeId, type: child.type } },
+      },
+      async () =>
+        levelOf(
+          await utils.fetchNodeStructure('DEVC/K', pkg, {
+            nodeId: child.nodeId,
+            withShortDescriptions,
+          }),
+          options.missingLevel,
+        ),
     );
     if (level !== undefined) appendAll(found, level.objects.map(owned));
   }
@@ -833,28 +879,30 @@ export async function walkPackage(
   for (const item of found) {
     if (kindOf(item.type) !== 'package') continue;
     if (depth >= limit) continue;
-    const sub = await underBranchRule(options, () =>
-      walkPackage(utils, item.name, options, depth + 1, seen),
+    appendAll(
+      out,
+      await walkPackage(utils, item.name, options, depth + 1, seen, asked),
     );
-    if (sub !== undefined) appendAll(out, sub);
   }
   return out;
 }
 
 /**
- * A level below the asked package's root: its answer, or — under the branch
- * rule — `undefined` for a level SAP refused, which excludes only that
- * branch. Without the rule, and for a failure that ends the call, the
- * failure is thrown as it came.
+ * A level of the walk: its answer, or — under the branch rule, when the
+ * caller's `onFailure` returns — `undefined`, which skips what `place`
+ * names. Without the rule the failure is thrown as it came.
  */
 async function underBranchRule<T>(
   options: WalkOptions,
+  place: WalkFailurePlace,
   read: () => Promise<T>,
 ): Promise<T | undefined> {
   try {
     return await read();
   } catch (error) {
-    if (options.branchRule === undefined || endsTheCall(error)) throw error;
+    const rule = options.branchRule;
+    if (rule === undefined) throw error;
+    rule.onFailure(error, place);
     return undefined;
   }
 }

@@ -1,12 +1,15 @@
 import type { AdtCodes } from '../adtProjections';
-import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
-import { type PhaseResult, withSequentialFallback } from '../batch/phases';
+import {
+  type PhaseResult,
+  runPhaseOutcome,
+  withSequentialFallback,
+} from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import {
   assembleList,
-  batchReader,
+  type LevelReader,
   type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
@@ -34,6 +37,11 @@ import {
   type SearchObjectsArgs,
   searchPackagesInPhase,
 } from './packageResolver';
+import {
+  envelopeFailure,
+  failedRead,
+  type SapAnswerStrategy,
+} from './readFailure';
 import {
   answeredReaderDeps,
   createSourceReaderDeps,
@@ -165,6 +173,8 @@ export interface OrchestratorResult {
 export interface OrchestratorDeps {
   /** Which lines of a source are hits: required, the orchestrator has no match of its own. */
   lineMatch: LineMatchStrategy;
+  /** What a SAP answer to a failed read leads to (DO22): required, the orchestrator has no rule of its own. */
+  sapAnswers: SapAnswerStrategy;
   fetchPackageContents: PackageContentsFetcher;
   sourceReader: ReadSourceUnitsDeps;
   resolvePackages: (entries: string[]) => Promise<ResolvedPackages>;
@@ -335,12 +345,13 @@ export async function runSearchSource(
             };
 
       // A source that cannot be read is skipped by the reader and its other
-      // sources are read on; a credential failure is thrown by the reader
-      // and ends the call.
+      // sources are read on; any other outcome of a failed read leaves the
+      // reader as decided (`failedRead`).
       for await (const unit of readSourceUnits(
         deps.sourceReader,
         target,
         version,
+        deps.sapAnswers,
       )) {
         const object = objectOf(unit);
         object.sources++;
@@ -451,11 +462,10 @@ export const READS_PER_ENVELOPE = 300;
  */
 const TARGETS_PER_CHUNK = READS_PER_ENVELOPE;
 
-/** A credential failure in a phase is every item's: it ends the call as it came. */
-function endOnCredential(answers: Iterable<PhaseResult<unknown>>): void {
-  for (const answer of answers) {
-    if (!answer.ok && isCredentialFailure(answer.error)) throw answer.error;
-  }
+/** The strategies a `SearchSource` call runs with: the line match and the SAP-answer one. */
+export interface SearchSourceStrategies {
+  lineMatch: LineMatchStrategy;
+  sapAnswers: SapAnswerStrategy;
 }
 
 /**
@@ -473,9 +483,10 @@ function endOnCredential(answers: Iterable<PhaseResult<unknown>>): void {
 async function runSearchSourceInPhases(
   ctx: HandlerContext,
   input: OrchestratorInput,
-  lineMatch: LineMatchStrategy,
+  strategies: SearchSourceStrategies,
 ): Promise<OrchestratorResult> {
   checkInput(input);
+  const { lineMatch, sapAnswers } = strategies;
   const version = input.version ?? DEFAULTS.version;
   // (1) The quickSearch of every package mask, a phase per round: each run
   // of the resolver names the next round of every mask not resolved yet; the
@@ -485,29 +496,38 @@ async function runSearchSourceInPhases(
   for (;;) {
     const askedSearches: SearchObjectsArgs[] = [];
     resolution = await resolvePackagePatterns(
-      { searchObjects: answeredSearch(searches, askedSearches) },
+      {
+        searchObjects: answeredSearch(searches, askedSearches),
+        sapAnswers,
+      },
       input.packages,
     );
     if (askedSearches.length === 0) break;
     const answered = await searchPackagesInPhase(ctx, askedSearches);
-    endOnCredential(answered.values());
     for (const [key, answer] of answered) searches.set(key, answer);
   }
   const resolved = resolution.packages;
 
   // (2) The package walk's levels.
   const names = resolved.map((name) => name.toUpperCase());
-  const levels = batchReader<NodeRequest, NodeAnswer>(
-    ctx,
-    (request, connection) =>
-      readNode(
-        nodeStructureOn(
-          ctx,
-          createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+  // Each level in one envelope; a failed envelope is decided here, once,
+  // before any part reaches the walk.
+  const levels: LevelReader<NodeRequest, NodeAnswer> = async (requests) => {
+    const { results, envelope } = await runPhaseOutcome(
+      ctx,
+      requests,
+      (request, connection) =>
+        readNode(
+          nodeStructureOn(
+            ctx,
+            createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+          ),
+          request,
         ),
-        request,
-      ),
-  );
+    );
+    if (envelope.failed) envelopeFailure(envelope.error);
+    return results;
+  };
   // Every package whose own level was read: the asked ones' walks together
   // (a package two asked packages reach is counted once, `enumerateScanTargets`).
   const walkedPackages = new Set<string>();
@@ -518,7 +538,11 @@ async function runSearchSourceInPhases(
           includeSubpackages:
             input.include_subpackages ?? DEFAULTS.include_subpackages,
           missingLevel: 'refused',
-          branchRule: { walked: walkedPackages },
+          branchRule: {
+            walked: walkedPackages,
+            onFailure: (failure, place) =>
+              failedRead(sapAnswers, failure, place),
+          },
         });
   const fetchPackageContents: PackageContentsFetcher = async (packageName) => {
     const answer = walked[names.indexOf(packageName.toUpperCase())];
@@ -555,6 +579,7 @@ async function runSearchSourceInPhases(
     runSearchSource(
       {
         lineMatch,
+        sapAnswers,
         fetchPackageContents,
         sourceReader: answeredReaderDeps(sources, []),
         resolvePackages: async () => resolution,
@@ -567,7 +592,12 @@ async function runSearchSourceInPhases(
       const asked: Read[] = [];
       const naming = answeredReaderDeps(sources, asked);
       for (const target of chunk) {
-        for await (const _unit of readSourceUnits(naming, target, version)) {
+        for await (const _unit of readSourceUnits(
+          naming,
+          target,
+          version,
+          sapAnswers,
+        )) {
           // Only the reads it names are wanted here; the scan below answers
           // the units.
         }
@@ -612,18 +642,20 @@ async function runSearchSourceInPhases(
 export function runSearchSourceWithContext(
   ctx: HandlerContext,
   input: OrchestratorInput,
-  lineMatch: LineMatchStrategy,
+  strategies: SearchSourceStrategies,
 ): Promise<OrchestratorResult> {
+  const { lineMatch, sapAnswers } = strategies;
   return withSequentialFallback(
     ctx,
-    () => runSearchSourceInPhases(ctx, input, lineMatch),
+    () => runSearchSourceInPhases(ctx, input, strategies),
     () => {
       const searchObjects = createPackagePatternResolver(ctx);
-      const resolverDeps: PackageResolverDeps = { searchObjects };
+      const resolverDeps: PackageResolverDeps = { searchObjects, sapAnswers };
       return runSearchSource(
         {
           lineMatch,
-          fetchPackageContents: createPackageContentsFetcher(ctx),
+          sapAnswers,
+          fetchPackageContents: createPackageContentsFetcher(ctx, sapAnswers),
           sourceReader: readingOnce(createSourceReaderDeps(ctx)),
           resolvePackages: (entries) =>
             resolvePackagePatterns(resolverDeps, entries),

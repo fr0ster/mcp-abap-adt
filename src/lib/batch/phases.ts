@@ -287,11 +287,40 @@ function noop(): void {}
  * are recorded together with its first (before the read awaits anything
  * else); a request recorded after that is refused (`LATE_RECORD_WORDS`).
  */
+/**
+ * A phase's settlements, and whether its envelope failed (`batch.execute()`
+ * rejected, or the phase was refused): the parts of a failed envelope are
+ * answers adt-clients built from the envelope's rejection, so a caller that
+ * must tell the two apart reads `envelope` first. The outer `404` that is
+ * the endpoint's absence is thrown, as `runPhase` throws it.
+ */
+export interface PhaseOutcome<R> {
+  results: PhaseResult<R>[];
+  envelope: { failed: false } | { failed: true; error: unknown };
+}
+
 export async function runPhase<I, R>(
   context: HandlerContext,
   items: readonly I[],
   read: (item: I, batch: IAbapConnection) => Promise<R>,
 ): Promise<PhaseResult<R>[]> {
+  const { results } = await runPhaseOutcome(context, items, read);
+  // A credential refusal reaches every part as the same object
+  // (adt-clients): the call ends with it, as it came.
+  for (const result of results) {
+    if (!result.ok && failureOf(result.error) !== undefined) {
+      throw result.error;
+    }
+  }
+  return results;
+}
+
+/** `runPhase`, its envelope's failure reported beside the settlements (`PhaseOutcome`). */
+export async function runPhaseOutcome<I, R>(
+  context: HandlerContext,
+  items: readonly I[],
+  read: (item: I, batch: IAbapConnection) => Promise<R>,
+): Promise<PhaseOutcome<R>> {
   const watch = outerStatusWatch(context.connection);
   const batch = withSystemKindOf(
     new AdtBatchConnection(watch.forwarding, {
@@ -363,7 +392,10 @@ export async function runPhase<I, R>(
   if (refused !== undefined) {
     // Nothing of the phase is kept: every item fails with the fixed words.
     await Promise.all(settled);
-    return items.map(() => ({ ok: false, error: refused }));
+    return {
+      results: items.map(() => ({ ok: false, error: refused })),
+      envelope: { failed: true, error: refused },
+    };
   }
   const outer = watch.outer();
   const port = context.batchAvailability;
@@ -385,14 +417,10 @@ export async function runPhase<I, R>(
     throw error;
   }
   const results = await Promise.all(settled);
-  // A credential refusal reaches every part as the same object
-  // (adt-clients): the call ends with it, as it came.
-  for (const result of results) {
-    if (!result.ok && failureOf(result.error) !== undefined) {
-      throw result.error;
-    }
-  }
-  return results;
+  return {
+    results,
+    envelope: failed ? { failed: true, error } : { failed: false },
+  };
 }
 
 /**

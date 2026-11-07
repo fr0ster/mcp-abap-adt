@@ -2,20 +2,30 @@
  * The branch rule of a walk (DO19, `SearchSource` only): under it, a refused
  * or missing level below the asked package's root — a type node, a
  * subpackage — excludes only that branch, and every package whose own level
- * was read is recorded; a refused root still ends the package; a credential
+ * was read is recorded; the root and every level are handed to the caller
+ * at their place (DO22); a credential
  * refusal ends the walk. Without it (every other walking tool), a refused
  * level ends the package's walk as before. Both walkers: `walkPackage`
  * (sequential) and `walkPackages` (level by level).
  */
 import type { PhaseResult } from '../../lib/batch/phases';
 import {
+  failedRead,
+  skipSapAnswers,
+} from '../../lib/search-source/readFailure';
+import {
   type NodeAnswer,
   type NodeRequest,
   type NodeStructureSource,
+  type WalkFailurePlace,
   walkPackage,
   walkPackages,
 } from '../../lib/strategies/packageWalk';
 import { failed, succeeded } from '../../lib/strategies/stepResponse';
+
+/** The walk's failures, classified as `SearchSource` classifies them (SAP answers skipped). */
+const classified = (failure: unknown, place: WalkFailurePlace) =>
+  failedRead(skipSapAnswers, failure, place);
 
 /**
  * `P` lists a subpackage node (1) and a program node (2); its subpackages are
@@ -123,7 +133,7 @@ describe.each([
       const options = {
         includeSubpackages: true,
         missingLevel: 'refused' as const,
-        branchRule: { walked: recorded },
+        branchRule: { walked: recorded, onFailure: classified },
       };
       expect(names(await walkPackage(utils, 'P', options))).toEqual(found);
       expect([...recorded].sort()).toEqual(walked);
@@ -138,7 +148,7 @@ describe.each([
       const options = {
         includeSubpackages: true,
         missingLevel: 'refused' as const,
-        branchRule: { walked: recorded },
+        branchRule: { walked: recorded, onFailure: classified },
       };
       const [settled] = await walkPackages(read, ['P'], options);
       expect(settled?.ok).toBe(true);
@@ -151,26 +161,67 @@ describe.each([
   },
 );
 
-describe('under the branch rule, a refused root still ends the package', () => {
-  it('walkPackage throws it', async () => {
+describe('under the branch rule, the root is handed over at its place (DO22)', () => {
+  it('walkPackage: a SAP-refused root is the package place; skipped, it yields nothing', async () => {
+    const places: WalkFailurePlace[] = [];
     const { utils } = source({ 'P|root': 500 });
     const options = {
       includeSubpackages: true,
       missingLevel: 'refused' as const,
-      branchRule: { walked: new Set<string>() },
+      branchRule: {
+        walked: new Set<string>(),
+        onFailure: (failure: unknown, place: WalkFailurePlace) => {
+          places.push(place);
+          classified(failure, place);
+        },
+      },
     };
-    await expect(walkPackage(utils, 'P', options)).rejects.toBeDefined();
+    expect(await walkPackage(utils, 'P', options)).toEqual([]);
+    expect(places).toEqual([{ kind: 'package', package: 'P' }]);
+    expect([...options.branchRule.walked]).toEqual([]);
   });
 
-  it('walkPackages settles it refused', async () => {
+  it('walkPackages: a SAP-refused root is the package place; skipped, it settles empty', async () => {
+    const places: WalkFailurePlace[] = [];
     const { read } = levelReader({ 'P|root': 404 });
     const options = {
       includeSubpackages: true,
       missingLevel: 'refused' as const,
-      branchRule: { walked: new Set<string>() },
+      branchRule: {
+        walked: new Set<string>(),
+        onFailure: (failure: unknown, place: WalkFailurePlace) => {
+          places.push(place);
+          classified(failure, place);
+        },
+      },
     };
     const [settled] = await walkPackages(read, ['P'], options);
-    expect(settled?.ok).toBe(false);
+    expect(settled).toEqual({ ok: true, value: [] });
+    expect(places).toEqual([{ kind: 'package', package: 'P' }]);
+  });
+
+  it('each level is handed over with its place: a subpackage and a type node', async () => {
+    const places: WalkFailurePlace[] = [];
+    const { utils } = source({ 'SB|root': 500, 'SA|2': 500 });
+    await walkPackage(utils, 'P', {
+      includeSubpackages: true,
+      missingLevel: 'refused',
+      branchRule: {
+        walked: new Set<string>(),
+        onFailure: (failure, place) => {
+          places.push(place);
+          classified(failure, place);
+        },
+      },
+    });
+    expect(places).toEqual([
+      {
+        kind: 'level',
+        package: 'SA',
+        level: { node: { id: '2', type: 'PROG/P' } },
+      },
+      { kind: 'level', package: 'P', level: { subpackage: 'SB' } },
+    ]);
   });
 });
 
@@ -180,7 +231,7 @@ describe('under the branch rule, a credential refusal at any level ends the walk
     const options = {
       includeSubpackages: true,
       missingLevel: 'refused' as const,
-      branchRule: { walked: new Set<string>() },
+      branchRule: { walked: new Set<string>(), onFailure: classified },
     };
     await expect(walkPackage(utils, 'P', options)).rejects.toBeDefined();
   });
@@ -190,7 +241,7 @@ describe('under the branch rule, a credential refusal at any level ends the walk
     const options = {
       includeSubpackages: true,
       missingLevel: 'refused' as const,
-      branchRule: { walked: new Set<string>() },
+      branchRule: { walked: new Set<string>(), onFailure: classified },
     };
     await expect(walkPackages(read, ['P'], options)).rejects.toBeDefined();
   });

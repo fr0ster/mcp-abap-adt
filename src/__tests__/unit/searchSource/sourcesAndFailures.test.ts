@@ -8,8 +8,12 @@
  * envelopes (`served`) and the sequential reads (`absent`) — with the real
  * handler and real clients over the stand's fake connection.
  */
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { authError } from '@mcp-abap-adt/auth-errors';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { TOOL_DEFINITION as BDEFT } from '../../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { TOOL_DEFINITION as CLAST } from '../../../handlers/class/high/handleGetClass';
 import { TOOL_DEFINITION as LDEF } from '../../../handlers/class/high/handleGetLocalDefinitions';
@@ -29,20 +33,33 @@ import type {
   LineMatchStrategy,
   ScanInput,
 } from '../../../lib/search-source/lineMatch';
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
+  type OrchestratorInput,
   runSearchSource,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
+import type { PackageContentItem } from '../../../lib/search-source/packageEnumerator';
 import {
   createPackagePatternResolver,
   resolvePackagePatterns,
 } from '../../../lib/search-source/packageResolver';
+import {
+  type SapAnswerDecision,
+  type SapAnswerPlace,
+  type SapAnswerStrategy,
+  skipSapAnswers,
+  undecided,
+} from '../../../lib/search-source/readFailure';
+import { carryingFailure } from '../../../lib/strategies/step';
+import { statusError } from '../../helpers/batchEnvelope';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import {
   contextOn,
   type Fake,
   hitLabel,
   isError,
+  keyOf,
   type Model,
   type NodeDoc,
   nodeKey,
@@ -52,6 +69,7 @@ import {
   searchOn,
   sentUrls,
   standOn,
+  textOf,
 } from '../../helpers/searchSourceStand';
 import {
   exactPackages,
@@ -383,17 +401,15 @@ describe('SearchSource: what cannot be read is skipped, the reads go on (DO17)',
     },
   );
 
-  it('a non-SAP error is skipped: no entry', async () => {
+  it('a failure with no response is thrown: the call fails (DO22)', async () => {
     const { result } = searchOne(
       { throwOn: { 'PROGRAM ZGONE': 'socket hang up' } },
       true,
       { object_types: ['PROG'] },
     );
-    const payload = payloadOf(await result);
-    expect(
-      payload.results.map((h: { object_name: string }) => h.object_name),
-    ).toEqual(['ZHERE']);
-    expect(payload.failures).toBeUndefined();
+    const answered = await result;
+    expect(isError(answered)).toBe(true);
+    expect(textOf(answered)).toContain('socket hang up');
   });
 });
 
@@ -1066,6 +1082,7 @@ describe('D23b: the line match is a strategy (DO14)', () => {
       const result = await runSearchSource(
         {
           lineMatch: strategy,
+          sapAnswers: skipSapAnswers,
           fetchPackageContents: async (name) =>
             listing(name, [
               {
@@ -1115,11 +1132,10 @@ describe('D23b: the line match is a strategy (DO14)', () => {
       };
       const fake = standOn(repository);
       const { strategy, seen } = recording();
-      const result = await runSearchSourceWithContext(
-        contextOn(fake),
-        ASKED,
-        strategy,
-      );
+      const result = await runSearchSourceWithContext(contextOn(fake), ASKED, {
+        lineMatch: strategy,
+        sapAnswers: skipSapAnswers,
+      });
       expect(fake.envelopes.length).toBeGreaterThan(0);
       expect(fake.directs).toHaveLength(0);
       expect(seen.map((s) => s.lines)).toEqual([['first', 'second']]);
@@ -1287,14 +1303,12 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
       },
     );
 
-    it("a read that throws without SAP's answer is skipped (absent)", async () => {
+    it("a read that throws without SAP's answer is thrown (absent; DO22)", async () => {
       const fake = standOn(REPO, {
         ...REFUSED,
         throwOn: { 'PROGRAM ZHIT': 'socket hang up' },
       });
-      const payload = payloadOf(await search(fake, true));
-      expect(payload.failures).toBeUndefined();
-      expect(hits(payload)).toEqual(['ZCL/ZCL:1', 'Z_FM_B@ZFG:1']);
+      expect(isError(await search(fake, true))).toBe(true);
     });
 
     it.each(PATHS)(
@@ -1788,6 +1802,7 @@ describe('D23b: the package masks on the wire', () => {
       ]);
       const { packages } = await resolvePackagePatterns(
         {
+          sapAnswers: skipSapAnswers,
           searchObjects: createPackagePatternResolver({
             connection,
             logger: undefined,
@@ -1819,6 +1834,7 @@ describe('D23b: the package masks on the wire', () => {
       const connection = recordingConnection([answerOf(3)]);
       await resolvePackagePatterns(
         {
+          sapAnswers: skipSapAnswers,
           searchObjects: createPackagePatternResolver({
             connection,
             logger: undefined,
@@ -1839,6 +1855,7 @@ describe('D23b: the package masks on the wire', () => {
       const connection = recordingConnection([]);
       const { packages } = await resolvePackagePatterns(
         {
+          sapAnswers: skipSapAnswers,
           searchObjects: createPackagePatternResolver({
             connection,
             logger: undefined,
@@ -2373,5 +2390,517 @@ describe('D23b: the caller sets how much the answer holds (DO23)', () => {
     expect(b.truncated).toEqual(a.truncated);
     expect(a.scanned.sources).toBe(300);
     expect(b.scanned.sources).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: the fixed classification and the SAP-answer strategy (DO22)
+// ---------------------------------------------------------------------------
+
+describe('D23b: the fixed classification and the SAP-answer strategy (DO22)', () => {
+  /** A strategy recording every SAP answer it is handed, answering `answer`. */
+  const recordingSap = (
+    answer: (place: SapAnswerPlace) => SapAnswerDecision = () => 'skip',
+  ) => {
+    const seen: SapAnswerPlace[] = [];
+    const strategy: SapAnswerStrategy = {
+      decide(_failure, place) {
+        seen.push(place);
+        return answer(place);
+      },
+    };
+    return { strategy, seen };
+  };
+
+  /**
+   * One scan meeting a SAP 500 at every place: the mask `ZM*`, the named
+   * root `ZNOPE`, `ZPAR`'s subpackage `ZKB`, `ZTYP`'s type node 1, the
+   * function group `ZFG`'s structure, the program `ZBADP`, and the include
+   * `LSH` two function groups name.
+   */
+  const EVERY: Repository = {
+    nodes: {
+      [nodeKey('ZPAR')]: {
+        types: [
+          { type: 'DEVC/K', nodeId: '000001' },
+          { type: 'PROG/P', nodeId: '000002' },
+          { type: 'FUGR/F', nodeId: '000003' },
+        ],
+      },
+      [nodeKey('ZPAR', '1')]: { objects: [{ type: 'DEVC/K', name: 'ZKB' }] },
+      [nodeKey('ZPAR', '2')]: {
+        objects: [
+          { type: 'PROG/P', name: 'ZBADP' },
+          { type: 'PROG/P', name: 'ZGOODP' },
+        ],
+      },
+      [nodeKey('ZPAR', '3')]: {
+        objects: [
+          { type: 'FUGR/F', name: 'ZFG' },
+          { type: 'FUGR/F', name: 'ZFG1' },
+          { type: 'FUGR/F', name: 'ZFG2' },
+        ],
+      },
+      [nodeKey('ZTYP')]: {
+        types: [
+          { type: 'PROG/P', nodeId: '000001' },
+          { type: 'CLAS/OC', nodeId: '000002' },
+        ],
+      },
+      [nodeKey('ZTYP', '2')]: { objects: [{ type: 'CLAS/OC', name: 'ZTCL' }] },
+    },
+    sources: {
+      'PROGRAM ZGOODP': 'marker good',
+      'CLASS ZTCL': 'marker class',
+    },
+    fugrChildren: {
+      ZFG1: [['FUGR/I', 'LSH']],
+      ZFG2: [['FUGR/I', 'LSH']],
+    },
+    masks: { 'ZM*': ['ZPAR'] },
+  };
+  const EVERY_REFUSED: Model = {
+    refuse: {
+      'SEARCH ZM*': 500,
+      [nodeKey('ZNOPE')]: 500,
+      [nodeKey('ZKB')]: 500,
+      [nodeKey('ZTYP', '1')]: 500,
+      'STRUCTURE ZFG': 500,
+      'PROGRAM ZBADP': 500,
+      'INCLUDE LSH': 500,
+    },
+  };
+  const ARGS = {
+    query: 'marker',
+    packages: ['ZM*', 'ZNOPE', 'ZPAR', 'ZTYP'],
+  };
+  /** `EVERY` with every place readable: only a refused key fails. */
+  const EVERY_OK: Repository = {
+    ...EVERY,
+    nodes: {
+      ...EVERY.nodes,
+      [nodeKey('ZNOPE')]: {},
+      [nodeKey('ZKB')]: {},
+      [nodeKey('ZTYP', '1')]: { objects: [] },
+    },
+    sources: {
+      ...EVERY.sources,
+      'PROGRAM ZBADP': 'marker',
+      'INCLUDE LSH': 'marker',
+    },
+  };
+  const run = (
+    fake: Fake,
+    absent: boolean,
+    sapAnswers: SapAnswerStrategy,
+    args: OrchestratorInput = ARGS,
+  ) =>
+    runSearchSourceWithContext(
+      contextOn(fake, absent ? 'absent' : 'served'),
+      args,
+      { lineMatch: substringLineMatch, sapAnswers },
+    );
+  const P = [['served'], ['absent']] as const;
+
+  it.each(P)(
+    'a recording strategy sees exactly one call per SAP answer, each with its place (%s)',
+    async (batch) => {
+      const { strategy, seen } = recordingSap();
+      const result = await run(
+        standOn(EVERY, EVERY_REFUSED),
+        batch === 'absent',
+        strategy,
+      );
+      const byKind = (kind: SapAnswerPlace['kind']) =>
+        seen.filter((p) => p.kind === kind);
+      expect(byKind('mask')).toEqual([{ kind: 'mask', mask: 'ZM*' }]);
+      expect(byKind('package')).toEqual([
+        { kind: 'package', package: 'ZNOPE' },
+      ]);
+      expect(byKind('level')).toEqual(
+        expect.arrayContaining([
+          { kind: 'level', package: 'ZPAR', level: { subpackage: 'ZKB' } },
+          {
+            kind: 'level',
+            package: 'ZTYP',
+            level: { node: { id: '1', type: 'PROG/P' } },
+          },
+        ]),
+      );
+      expect(byKind('level')).toHaveLength(2);
+      expect(byKind('structure')).toEqual([
+        {
+          kind: 'structure',
+          group: 'ZFG',
+          uri: '/sap/bc/adt/functions/groups/zfg',
+        },
+      ]);
+      // ZBADP once; LSH once, though two groups name it.
+      expect(byKind('source')).toHaveLength(2);
+      expect(byKind('source')).toEqual(
+        expect.arrayContaining([
+          {
+            kind: 'source',
+            devclass: 'ZPAR',
+            object_type: 'FUGR',
+            object_name: 'ZFG1',
+            source: {
+              name: 'LSH',
+              uri: '/sap/bc/adt/programs/includes/lsh/source/main',
+              key: '/sap/bc/adt/programs/includes/lsh/source/main|active',
+            },
+          },
+          {
+            kind: 'source',
+            devclass: 'ZPAR',
+            object_type: 'PROG',
+            object_name: 'ZBADP',
+            source: {
+              name: 'ZBADP',
+              uri: '/sap/bc/adt/programs/programs/zbadp/source/main',
+              key: '/sap/bc/adt/programs/programs/zbadp/source/main|active',
+            },
+          },
+        ]),
+      );
+      expect(seen).toHaveLength(7);
+      // Every SAP answer skipped: the readable ones answer.
+      expect(result.results.map(hitLabel).sort()).toEqual([
+        'ZGOODP/ZGOODP',
+        'ZTCL/ZTCL',
+      ]);
+    },
+  );
+
+  it.each([
+    ['served', 'level'],
+    ['absent', 'level'],
+    ['served', 'structure'],
+    ['absent', 'structure'],
+    ['served', 'source'],
+    ['absent', 'source'],
+  ] as const)(
+    "a strategy's throw for a SAP answer is thrown out of the call (%s, at the %s)",
+    async (batch, kind) => {
+      const { strategy } = recordingSap((place) =>
+        place.kind === kind ? 'throw' : 'skip',
+      );
+      await expect(
+        run(standOn(EVERY, EVERY_REFUSED), batch === 'absent', strategy),
+      ).rejects.toBeDefined();
+    },
+  );
+
+  it.each(P)(
+    "a strategy's end ends the call, its skip skips, from each place (%s)",
+    async (batch) => {
+      for (const kind of [
+        'mask',
+        'package',
+        'level',
+        'structure',
+        'source',
+      ] as const) {
+        const ending = recordingSap((place) =>
+          place.kind === kind ? 'end' : 'skip',
+        );
+        await expect(
+          run(
+            standOn(EVERY, EVERY_REFUSED),
+            batch === 'absent',
+            ending.strategy,
+          ),
+        ).rejects.toBeDefined();
+      }
+      const skipping = recordingSap(() => 'skip');
+      await expect(
+        run(
+          standOn(EVERY, EVERY_REFUSED),
+          batch === 'absent',
+          skipping.strategy,
+        ),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it.each([
+    ['served', 'SEARCH ZM*'],
+    ['absent', 'SEARCH ZM*'],
+    ['served', nodeKey('ZNOPE')],
+    ['absent', nodeKey('ZNOPE')],
+    ['served', nodeKey('ZKB')],
+    ['absent', nodeKey('ZKB')],
+    ['served', nodeKey('ZTYP', '1')],
+    ['absent', nodeKey('ZTYP', '1')],
+    ['served', 'STRUCTURE ZFG'],
+    ['absent', 'STRUCTURE ZFG'],
+    ['served', 'PROGRAM ZBADP'],
+    ['absent', 'PROGRAM ZBADP'],
+  ] as const)(
+    'an answered 401 ends the call, never handed to the strategy (%s, %s)',
+    async (batch, key) => {
+      const { strategy, seen } = recordingSap();
+      await expect(
+        run(
+          standOn(EVERY_OK, { refuse: { [key]: 401 } }),
+          batch === 'absent',
+          strategy,
+        ),
+      ).rejects.toBeDefined();
+      expect(seen).toEqual([]);
+    },
+  );
+
+  it('a failure with no response is thrown, never handed to the strategy (absent)', async () => {
+    const { strategy, seen } = recordingSap();
+    const fake = standOn(EVERY_OK, {
+      throwOn: { 'PROGRAM ZBADP': 'socket hang up' },
+    });
+    await expect(run(fake, true, strategy)).rejects.toBeDefined();
+    expect(seen).toEqual([]);
+  });
+
+  describe('what the classification hands over, at a source and a structure (sequential deps)', () => {
+    const PROG: PackageContentItem = {
+      name: 'ZP',
+      type: 'PROG/P',
+      packageName: 'ZPKG',
+      isPackage: false,
+    };
+    const GROUP: PackageContentItem = {
+      name: 'ZG',
+      type: 'FUGR/F',
+      packageName: 'ZPKG',
+      isPackage: false,
+    };
+    const refusalError = (status?: number): IAdtError => ({
+      message: 'refused',
+      origin: status === undefined ? 'refusal' : 'connection',
+      ...(status !== undefined
+        ? {
+            response: {
+              status,
+              statusText: 'x',
+              headers: {},
+              data: '',
+            },
+          }
+        : {}),
+    });
+    type Failing = { thrown: unknown } | { answered: IAdtError };
+    const scanWith = async (
+      failing: Failing,
+      sapAnswers: SapAnswerStrategy,
+      at: 'source' | 'structure',
+    ) =>
+      runSearchSource(
+        {
+          lineMatch: substringLineMatch,
+          sapAnswers,
+          fetchPackageContents: async (name) =>
+            listing(name, [at === 'source' ? PROG : GROUP]),
+          sourceReader: {
+            async readSource() {
+              if ('thrown' in failing) throw failing.thrown;
+              return { ok: false, error: failing.answered };
+            },
+            async readStructure() {
+              if (at === 'source') return { ok: true, value: [] };
+              if ('thrown' in failing) throw failing.thrown;
+              return { ok: false, error: failing.answered };
+            },
+          },
+          resolvePackages: exactPackages,
+        },
+        { query: 'marker', packages: ['ZPKG'] },
+      );
+    // Each case builds its failure afresh, as every SAP answer is a new object.
+    const SAP_ANSWERS: Array<[string, () => Failing]> = [
+      [
+        'an answered 500 of origin connection with a response',
+        () => ({ answered: refusalError(500) }),
+      ],
+      [
+        'an answered 404 of origin connection with a response',
+        () => ({ answered: refusalError(404) }),
+      ],
+      [
+        'an origin refusal failure without a response',
+        () => ({ answered: refusalError() }),
+      ],
+      [
+        'a carried ADT failure with a response',
+        () => ({
+          thrown: carryingFailure(
+            new Error('carried'),
+            refusalError(500),
+            'read program',
+          ),
+        }),
+      ],
+      [
+        'a raw transport failure with a response and a status',
+        () => ({
+          thrown: Object.assign(new Error('raw'), {
+            response: { status: 503 },
+          }),
+        }),
+      ],
+    ];
+    it.each(
+      SAP_ANSWERS.flatMap(([name, failing]) => [
+        [name, 'source', failing] as const,
+        [name, 'structure', failing] as const,
+      ]),
+    )(
+      '%s is handed to the strategy and skipped by the shipped one (at the %s)',
+      async (_name, at, failing) => {
+        const { strategy, seen } = recordingSap();
+        await scanWith(failing(), strategy, at);
+        expect(seen.map((p) => p.kind)).toEqual([at]);
+        await expect(
+          scanWith(failing(), skipSapAnswers, at),
+        ).resolves.toBeDefined();
+      },
+    );
+
+    const NEVER: Array<[string, () => unknown]> = [
+      ['a TypeError', () => new TypeError('a defect')],
+      ['a RangeError', () => new RangeError('a defect')],
+      ['a thrown primitive', () => 'a primitive'],
+      [
+        'a failure with no response and origin connection',
+        () =>
+          carryingFailure(
+            new Error('down'),
+            { message: 'down', origin: 'connection' },
+            'read program',
+          ),
+      ],
+      [
+        'a credential refusal',
+        () =>
+          new AuthRefusedError(
+            authError['credential-refused']({ credential: 'token' }),
+            'request',
+          ),
+      ],
+      [
+        'an answered 401',
+        () =>
+          carryingFailure(new Error('401'), refusalError(401), 'read program'),
+      ],
+    ];
+    it.each(
+      NEVER.flatMap(([name, thrown]) => [
+        [name, 'source', thrown] as const,
+        [name, 'structure', thrown] as const,
+      ]),
+    )(
+      '%s is never handed to the strategy (at the %s): the call fails with it',
+      async (_name, at, make) => {
+        const thrown = make();
+        const { strategy, seen } = recordingSap();
+        const rejected = expect(scanWith({ thrown }, strategy, at)).rejects;
+        if (typeof thrown === 'string') await rejected.toBeDefined();
+        else await rejected.toBe(thrown);
+        expect(seen).toEqual([]);
+      },
+    );
+
+    it('a thrown primitive leaves the handler as the same primitive', async () => {
+      const decided = expect(
+        scanWith({ thrown: 'a primitive' }, skipSapAnswers, 'source'),
+      ).rejects;
+      await decided.toBeDefined();
+      try {
+        await scanWith({ thrown: 'a primitive' }, skipSapAnswers, 'source');
+      } catch (carried) {
+        expect(undecided(carried)).toBe('a primitive');
+      }
+    });
+  });
+
+  describe('envelopes (batched path), through the real client conversion', () => {
+    /** The stand, its envelope failing with `error` when a part's key starts with `prefix`. */
+    const failingEnvelope = (prefix: string, error: () => never) =>
+      standOn(
+        EVERY_OK,
+        {},
+        {
+          envelope: (parts) => {
+            if (parts.some((p) => keyOf(p.url).startsWith(prefix))) error();
+            return undefined as never;
+          },
+        },
+      );
+    it.each([
+      ['a mask-search phase', 'SEARCH '],
+      ['a walk-level phase', 'NODE '],
+      ['a structure-and-source phase', 'STRUCTURE '],
+    ])(
+      'any other envelope failure is thrown, never handed to the strategy: %s',
+      async (_name, prefix) => {
+        const { strategy, seen } = recordingSap();
+        await expect(
+          run(
+            failingEnvelope(prefix, () => {
+              throw statusError(500, 'Internal Server Error');
+            }),
+            false,
+            strategy,
+          ),
+        ).rejects.toBeDefined();
+        expect(seen).toEqual([]);
+      },
+    );
+
+    it("a credential refusal as the envelope's error ends the call", async () => {
+      const { strategy, seen } = recordingSap();
+      await expect(
+        run(
+          failingEnvelope('NODE ', () => {
+            throw new AuthRefusedError(
+              authError['credential-refused']({ credential: 'token' }),
+              'request',
+            );
+          }),
+          false,
+          strategy,
+        ),
+      ).rejects.toBeDefined();
+      expect(seen).toEqual([]);
+    });
+
+    it('an envelope answered with the outer 404 is no failure: the sequential fallback reads the same parts', async () => {
+      const { strategy, seen } = recordingSap();
+      const fake = standOn(
+        EVERY_OK,
+        {},
+        {
+          envelope: () => {
+            throw statusError(404, 'Not Found');
+          },
+        },
+      );
+      const result = await run(fake, false, strategy);
+      expect(fake.envelopes).toHaveLength(1);
+      expect(fake.directs.length).toBeGreaterThan(0);
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(seen).toEqual([]);
+    });
+  });
+
+  it('the classification lives in one module: no other search-source module reads a credential failure', () => {
+    const dir = path.join(__dirname, '../../../lib/search-source');
+    for (const file of fs.readdirSync(dir)) {
+      if (file === 'readFailure.ts') continue;
+      const text = fs.readFileSync(path.join(dir, file), 'utf8');
+      expect({
+        file,
+        reads:
+          text.includes('isCredentialFailure') || text.includes('endsTheCall'),
+      }).toEqual({ file, reads: false });
+    }
   });
 });

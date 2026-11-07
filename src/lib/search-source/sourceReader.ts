@@ -13,8 +13,7 @@ import {
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { tableCodeOf } from '../adtTypeCode';
-import { isCredentialFailure } from '../answer';
-import { type PhaseResult, runPhase } from '../batch/phases';
+import { type PhaseResult, runPhaseOutcome } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -26,6 +25,12 @@ import {
 import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure } from '../strategies/step';
 import type { EnumeratedObject } from './packageEnumerator';
+import {
+  envelopeFailure,
+  failedRead,
+  type SapAnswerPlace,
+  type SapAnswerStrategy,
+} from './readFailure';
 
 /** The version a source read names: the call's, active by default. */
 export type SourceVersion = ReadVersion;
@@ -210,30 +215,55 @@ function thrownOf(error: IAdtError, step: string): Error {
  */
 async function readable<T>(
   step: string,
+  failed: (failure: unknown, key: unknown) => void,
   read: () => Promise<ReadAnswer<T> | undefined>,
+  absent: (error: IAdtError) => boolean = () => false,
 ): Promise<T | undefined> {
   let answer: ReadAnswer<T> | undefined;
   try {
     answer = await read();
   } catch (error) {
-    if (isCredentialFailure(error)) throw error;
+    failed(error, error);
     return undefined;
   }
   if (answer === undefined) return undefined;
   if (answer.ok) return answer.value;
-  const thrown = thrownOf(answer.error, step);
-  if (isCredentialFailure(thrown)) throw thrown;
+  if (absent(answer.error)) return undefined;
+  // An answered failure is carried before it is classified (an answered
+  // `401` is a credential refusal only so), and decided under its error,
+  // the object every replay of the answer hands on.
+  failed(thrownOf(answer.error, step), answer.error);
   return undefined;
 }
 
 /** One source of an object, read: its unit, or nothing when it cannot be read. */
 async function* readOne(
   deps: ReadSourceUnitsDeps,
+  sapAnswers: SapAnswerStrategy,
+  target: EnumeratedObject,
   read: SourceRead,
   unitName: string,
   last: boolean,
 ): AsyncGenerator<SourceUnit> {
-  const text = await readable(STEP[read.reader], () => deps.readSource(read));
+  const place: SapAnswerPlace = {
+    kind: 'source',
+    devclass: target.devclass,
+    object_type: target.object_type,
+    object_name: target.object_name,
+    source: {
+      name: read.name,
+      uri: sourceUriOf(read),
+      key: sourceReadKey(read),
+    },
+  };
+  const text = await readable(
+    STEP[read.reader],
+    (failure, key) => failedRead(sapAnswers, failure, place, key),
+    () => deps.readSource(read),
+    // A class's local include no listing names: SAP's 404 says it is not
+    // there, an absence rather than a failure (D23a).
+    (error) => read.reader === 'classInclude' && error.response?.status === 404,
+  );
   if (text === undefined) return;
   yield {
     include: unitName,
@@ -382,12 +412,15 @@ function ownReaderOf(code: EnumeratedObject['code']): NamedReader | undefined {
 export async function* readSourceUnits(
   deps: ReadSourceUnitsDeps,
   target: EnumeratedObject,
-  version: SourceVersion = 'active',
+  version: SourceVersion,
+  sapAnswers: SapAnswerStrategy,
 ): AsyncGenerator<SourceUnit> {
   const own = ownReaderOf(target.code);
   if (own !== undefined) {
     yield* readOne(
       deps,
+      sapAnswers,
+      target,
       { reader: own, name: target.object_name, version },
       target.object_name,
       own !== 'class',
@@ -396,6 +429,8 @@ export async function* readSourceUnits(
       for (const [at, include] of CLASS_INCLUDES.entries()) {
         yield* readOne(
           deps,
+          sapAnswers,
+          target,
           {
             reader: 'classInclude',
             name: target.object_name,
@@ -412,8 +447,16 @@ export async function* readSourceUnits(
 
   // A function group: its structure, then every source it names.
   const group = target.object_name;
-  const structure = await readable(STEP.functionGroupStructure, () =>
-    deps.readStructure(group),
+  const structure = await readable(
+    STEP.functionGroupStructure,
+    (failure, key) =>
+      failedRead(
+        sapAnswers,
+        failure,
+        { kind: 'structure', group, uri: functionGroupUri(group) },
+        key,
+      ),
+    () => deps.readStructure(group),
   );
   if (structure === undefined) return;
   // One read per source: an include is named by every element inside it,
@@ -433,6 +476,8 @@ export async function* readSourceUnits(
   for (const [at, source] of ordered.entries()) {
     yield* readOne(
       deps,
+      sapAnswers,
+      target,
       source.read,
       source.read.name,
       at === ordered.length - 1,
@@ -667,17 +712,6 @@ async function perform(deps: SourceReader, read: Read): Promise<PhaseAnswer> {
     : { kind: 'source', answer: await deps.readSource(read) };
 }
 
-/** The credential failure a phase answer to `read` carries, thrown or answered; `undefined` when none. */
-function credentialOf(read: Read, result: PhaseResult<PhaseAnswer>): unknown {
-  if (!result.ok) {
-    return isCredentialFailure(result.error) ? result.error : undefined;
-  }
-  const { answer } = result.value;
-  if (answer.ok) return undefined;
-  const thrown = thrownOf(answer.error, STEP[read.reader]);
-  return isCredentialFailure(thrown) ? thrown : undefined;
-}
-
 /**
  * Every read of `reads` in one ADT batch envelope (`runPhase`), each through
  * the source reader over the phase's batch connection; the answers added to
@@ -689,16 +723,16 @@ export async function readSourcesInPhase(
   reads: readonly Read[],
   answers: AnsweredReads,
 ): Promise<void> {
-  const results = await runPhase(ctx, reads, (read, connection) =>
-    perform(createSourceReaderDeps({ ...ctx, connection }), read),
+  const { results, envelope } = await runPhaseOutcome(
+    ctx,
+    reads,
+    (read, connection) =>
+      perform(createSourceReaderDeps({ ...ctx, connection }), read),
   );
+  // A failed envelope is decided here, once: its parts never reach the
+  // per-read classification.
+  if (envelope.failed) envelopeFailure(envelope.error);
   const answered = reads.map((read, i) => ({ read, result: results[i] }));
-  for (const { read, result } of answered) {
-    // `runPhase` answers every read it was given, in order.
-    if (result === undefined) throw new Error('a phase read was not answered');
-    const ended = credentialOf(read, result);
-    if (ended !== undefined) throw ended;
-  }
   answered.forEach(({ read, result }) => {
     if (result === undefined) return;
     const key = sourceReadKey(read);

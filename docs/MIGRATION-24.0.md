@@ -266,6 +266,11 @@ in one run, answers only the hits with counters of what it did, and skips what i
   branch: the package's other type nodes, subpackages and objects are walked and searched. A
   readable source of an object is still searched when another of its sources failed. A
   credential failure still ends the call.
+- **What is skipped is SAP's answer** (DO22): a failure carrying a response with an HTTP status,
+  whatever its `origin`, or an ADT refusal. A read that fails before SAP answers (an unreachable
+  host, a network failure), a defect of the server, and a failed batch envelope end the call as
+  an error, as a credential refusal does; the outer `404` of a batch envelope falls back to
+  single requests.
 - **The counters count only what was done.** `scanned.packages` the packages walked (their own
   level read, subpackages included), `scanned.objects` the objects read (at least one source),
   `scanned.sources` the sources read (each once, however many objects name it), and the new `scanned.objects_with_hits` the objects with

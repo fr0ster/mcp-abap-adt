@@ -1,7 +1,6 @@
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import { isCredentialFailure } from '../answer';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { globMatches } from '../plainText';
@@ -12,6 +11,7 @@ import {
   walkPackage,
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
+import { failedRead, type SapAnswerStrategy } from './readFailure';
 
 /**
  * The codes a scan reads: every source-bearing object a package lists —
@@ -134,19 +134,14 @@ export async function enumerateScanTargets(
   const out: EnumeratedObject[] = [];
 
   for (const pkg of input.packages) {
-    let items: PackageContentItem[];
-    try {
-      const contents = await fetch(pkg.toUpperCase(), {
-        includeSubpackages: input.include_subpackages,
-      });
-      items = contents.items;
-      for (const name of contents.walked) walked.add(name.toUpperCase());
-    } catch (error) {
-      // A package whose root SAP refused, or that is not there, is skipped;
-      // the other packages are walked on. A credential failure ends the call.
-      if (isCredentialFailure(error)) throw error;
-      continue;
-    }
+    // A failed read of the walk is decided at its place (the walker's
+    // branch rule, `failedRead`): a skipped package answers nothing, any
+    // other outcome passes through as decided.
+    const contents = await fetch(pkg.toUpperCase(), {
+      includeSubpackages: input.include_subpackages,
+    });
+    const items = contents.items;
+    for (const name of contents.walked) walked.add(name.toUpperCase());
     for (const item of items) {
       if (item.isPackage) continue;
       const code = scanCodeOf(item.type);
@@ -184,6 +179,7 @@ export async function enumerateScanTargets(
  */
 export function createPackageContentsFetcher(
   ctx: HandlerContext,
+  sapAnswers: SapAnswerStrategy,
 ): PackageContentsFetcher {
   const client = createAdtClient(ctx.connection, ctx.logger);
   const utils = nodeStructureOn(ctx, client.getUtils(ourUtils));
@@ -197,7 +193,10 @@ export function createPackageContentsFetcher(
         // refusal, never an empty level; below the root, only that branch
         // is excluded.
         missingLevel: 'refused',
-        branchRule: { walked },
+        branchRule: {
+          walked,
+          onFailure: (failure, place) => failedRead(sapAnswers, failure, place),
+        },
       }),
     );
     return { items, walked };

@@ -5,6 +5,7 @@ import {
   resolvePackagePatterns,
   type SearchObjectsArgs,
 } from '../../../lib/search-source/packageResolver';
+import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import { okResponse } from '../../helpers/fakeClient';
 
 /**
@@ -39,7 +40,7 @@ function neverCalled(): never {
 describe('resolvePackagePatterns — wildcard detection', () => {
   it('passes exact dev-class names through without calling ADT', async () => {
     const { packages: out } = await resolvePackagePatterns(
-      { searchObjects: neverCalled },
+      { searchObjects: neverCalled, sapAnswers: skipSapAnswers },
       ['ZFI_OBSOLETE', '$TMP', '/NS/ZFI'],
     );
     expect(out).toEqual(['ZFI_OBSOLETE', '$TMP', '/NS/ZFI']);
@@ -49,6 +50,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
     const calls: string[] = [];
     const { packages: out } = await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async ({ query }) => {
           calls.push(query);
           return [];
@@ -64,6 +66,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
     const calls: string[] = [];
     await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async ({ query }) => {
           calls.push(query);
           return [];
@@ -78,6 +81,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
     const calls: string[] = [];
     await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async ({ query }) => {
           calls.push(query);
           return [];
@@ -90,7 +94,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
 
   it('+, _, % and # are literal', async () => {
     const { packages } = await resolvePackagePatterns(
-      { searchObjects: neverCalled },
+      { searchObjects: neverCalled, sapAnswers: skipSapAnswers },
       ['Z_PKG', 'Z+PKG', 'Z%PKG', 'Z#PKG'],
     );
     expect(packages).toEqual(['Z_PKG', 'Z+PKG', 'Z%PKG', 'Z#PKG']);
@@ -98,7 +102,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
 
   it('an entry with neither * nor ? is an exact name', async () => {
     const { packages } = await resolvePackagePatterns(
-      { searchObjects: neverCalled },
+      { searchObjects: neverCalled, sapAnswers: skipSapAnswers },
       ['ZEXACT', '/NS/ZEXACT'],
     );
     expect(packages).toEqual(['ZEXACT', '/NS/ZEXACT']);
@@ -133,6 +137,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
   it('places exact entries before pattern-resolved names', async () => {
     const { packages: out } = await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async () => ['Z_FROM_PATTERN_A', 'Z_FROM_PATTERN_B'],
       },
       ['Z_EXACT_1', 'Z*', 'Z_EXACT_2'],
@@ -148,6 +153,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
   it('deduplicates by uppercase, first occurrence wins for ordering', async () => {
     const { packages: out } = await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async () => ['ZFI', 'ZFI_BUDGET'],
       },
       ['zfi', 'ZFI_*'],
@@ -157,7 +163,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
 
   it('returns empty array when patterns resolve to no packages and no exact entries', async () => {
     const { packages: out } = await resolvePackagePatterns(
-      { searchObjects: async () => [] },
+      { searchObjects: async () => [], sapAnswers: skipSapAnswers },
       ['ZZZ_NONEXISTENT*'],
     );
     expect(out).toEqual([]);
@@ -192,7 +198,10 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
   it('a mask whose answer is shorter than maxResults takes one request', async () => {
     const asked: SearchObjectsArgs[] = [];
     const { packages } = await resolvePackagePatterns(
-      { searchObjects: sizedSearch(() => 3, asked) },
+      {
+        searchObjects: sizedSearch(() => 3, asked),
+        sapAnswers: skipSapAnswers,
+      },
       ['Z*'],
     );
     expect(asked.map((a) => a.maxResults)).toEqual([1000]);
@@ -202,7 +211,10 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
   it('a mask whose answer fills maxResults is asked again with maxResults doubled, until the answer is shorter', async () => {
     const asked: SearchObjectsArgs[] = [];
     const { packages } = await resolvePackagePatterns(
-      { searchObjects: sizedSearch(() => 5000, asked) },
+      {
+        searchObjects: sizedSearch(() => 5000, asked),
+        sapAnswers: skipSapAnswers,
+      },
       ['Z*'],
     );
     expect(asked.map((a) => [a.query, a.maxResults])).toEqual([
@@ -217,7 +229,10 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
   it('an answer of exactly maxResults packages is asked again', async () => {
     const asked: SearchObjectsArgs[] = [];
     const { packages } = await resolvePackagePatterns(
-      { searchObjects: sizedSearch(() => 1000, asked) },
+      {
+        searchObjects: sizedSearch(() => 1000, asked),
+        sapAnswers: skipSapAnswers,
+      },
       ['Z*'],
     );
     expect(asked.map((a) => a.maxResults)).toEqual([1000, 2000]);
@@ -227,7 +242,10 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
   it('the packages of the last answer are walked, each once', async () => {
     const asked: SearchObjectsArgs[] = [];
     const { packages } = await resolvePackagePatterns(
-      { searchObjects: sizedSearch(() => 1500, asked) },
+      {
+        searchObjects: sizedSearch(() => 1500, asked),
+        sapAnswers: skipSapAnswers,
+      },
       ['Z000001', 'Z*'],
     );
     expect(packages).toHaveLength(1500);
@@ -239,10 +257,14 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
     const asked: SearchObjectsArgs[] = [];
     const resolved = await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async (args) => {
           asked.push(args);
           if (args.query === 'Y*' && args.maxResults === 2000) {
-            throw new Error('ADT 502');
+            // SAP's answer: a response with an integer status.
+            throw Object.assign(new Error('ADT 502'), {
+              response: { status: 502 },
+            });
           }
           return namesOf(
             args.query.replace('*', ''),
@@ -269,6 +291,7 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
     await expect(
       resolvePackagePatterns(
         {
+          sapAnswers: skipSapAnswers,
           searchObjects: async (args) => {
             asked.push(args);
             if (args.maxResults === 2000) throw refused;
@@ -290,6 +313,7 @@ describe('resolvePackagePatterns — a mask of any size', () => {
     const all = namesOf('Z', 300_000);
     const { packages } = await resolvePackagePatterns(
       {
+        sapAnswers: skipSapAnswers,
         searchObjects: async (args) => all.slice(0, args.maxResults),
       },
       ['Z*'],

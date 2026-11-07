@@ -135,9 +135,10 @@ describe('enumerateScanTargets', () => {
     ]);
   });
 
-  it('a package whose walk fails is skipped and not counted; a package reached twice is counted once', async () => {
+  it('a package whose walk was skipped at its place is not counted; a package reached twice is counted once', async () => {
     const fetch: PackageContentsFetcher = async (name) => {
-      if (name === 'ZGONE') throw new Error('root refused');
+      // The walker decided the root at its place: skipped, it answers nothing.
+      if (name === 'ZGONE') return { items: [], walked: new Set() };
       return {
         items: [item(`P_${name}`, 'PROG/P', name)],
         walked: new Set([name, 'ZSHARED_SUB']),
@@ -150,5 +151,19 @@ describe('enumerateScanTargets', () => {
     });
     expect(targets.map((t) => t.object_name)).toEqual(['P_ZA', 'P_ZB']);
     expect(packages).toBe(3);
+  });
+
+  it("a failure the walk passes on is not the enumerator's to decide: it passes through (DO22)", async () => {
+    const decided = new TypeError('a defect');
+    const fetch: PackageContentsFetcher = async () => {
+      throw decided;
+    };
+    await expect(
+      enumerateScanTargets(fetch, {
+        packages: ['ZA'],
+        include_subpackages: true,
+        object_types: ['PROG'],
+      }),
+    ).rejects.toBe(decided);
   });
 });

@@ -2,12 +2,16 @@ import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes, TableMainOf } from '../adtProjections';
-import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
-import { type PhaseResult, runPhase } from '../batch/phases';
+import { type PhaseResult, runPhaseOutcome } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { carryingFailure } from '../strategies/step';
+import {
+  envelopeFailure,
+  failedRead,
+  type SapAnswerStrategy,
+} from './readFailure';
 
 /** A package's code in the tables. */
 const PACKAGE_CODE: AdtCodes<'DEVC/K'> = 'DEVC/K';
@@ -42,6 +46,8 @@ export type AnsweringSearch = (args: SearchObjectsArgs) => Promise<string[]>;
 
 export interface PackageResolverDeps {
   searchObjects: SearchObjectsFn;
+  /** What a SAP answer to a mask search leads to (DO22). */
+  sapAnswers: SapAnswerStrategy;
 }
 
 /**
@@ -87,7 +93,8 @@ async function resolveMask(
 /**
  * The packages `entries` name: the exact names as given, then every
  * package each mask resolves to, each package once. A mask SAP refuses is
- * skipped; a credential failure ends the call, thrown as it came.
+ * decided at its place (`failedRead`): skipped, or the call ended or
+ * thrown as decided.
  */
 export async function resolvePackagePatterns(
   deps: PackageResolverDeps,
@@ -103,7 +110,8 @@ export async function resolvePackagePatterns(
     try {
       appendAll(resolved, (await resolveMask(deps, entry)) ?? []);
     } catch (error) {
-      if (isCredentialFailure(error)) throw error;
+      // Decided at the place: a skipped mask resolves to nothing.
+      failedRead(deps.sapAnswers, error, { kind: 'mask', mask: entry });
     }
   }
   const seen = new Set<string>();
@@ -207,8 +215,13 @@ export async function searchPackagesInPhase(
   const distinct = [
     ...new Map(asked.map((args) => [searchKey(args), args])).values(),
   ];
-  const results = await runPhase(ctx, distinct, (args, connection) =>
-    createPackagePatternResolver({ ...ctx, connection })(args),
+  const { results, envelope } = await runPhaseOutcome(
+    ctx,
+    distinct,
+    (args, connection) =>
+      createPackagePatternResolver({ ...ctx, connection })(args),
   );
+  // A failed envelope is decided here, once: no search of it is a SAP answer.
+  if (envelope.failed) envelopeFailure(envelope.error);
   return new Map(distinct.map((args, i) => [searchKey(args), results[i]]));
 }

@@ -24,14 +24,10 @@ import { jsonFind, listedJson } from '../../helpers/listedJson';
 import {
   type PinCase,
   pinKey,
-  pinPort,
   runPinCase,
   servedEntries,
 } from '../../helpers/pinCases';
 import type { SystemKind } from '../../helpers/servedTools';
-
-/** This file's fixed stand-in port, for its server case. */
-const PORT = pinPort(__filename);
 
 const JWT_SETTINGS: SapConfig = {
   url: 'https://example.com',
@@ -298,28 +294,25 @@ describe('a cloud system with a basic credential', () => {
   // declared): the listed cloud schema refuses it. The SDK answers its
   // schema refusal as an error result, not a throw.
   it('a compact HandlerCreate of a PROGRAM on the cloud is refused by its schema, nothing sent', async () => {
-    await runPinCase(
-      {
-        tool: 'HandlerCreate',
-        variant: 'cloud',
-        stand: 'server',
-        args: {
-          object_type: 'PROGRAM',
-          program_name: 'ZPIN_PROGRAM',
-          package_name: 'ZPIN_PACKAGE',
-          description: 'Pin program',
-        },
-        refusal: 'answer',
-        expected: 'none',
-        ran: (answer) => {
-          const text = answer.content[0]?.text ?? '';
-          expect(text).toContain(
-            'Input validation error: Invalid arguments for tool HandlerCreate: ',
-          );
-          expect(text).toContain('at object_type');
-        },
+    await runPinCase({
+      tool: 'HandlerCreate',
+      variant: 'cloud',
+      stand: 'server',
+      args: {
+        object_type: 'PROGRAM',
+        program_name: 'ZPIN_PROGRAM',
+        package_name: 'ZPIN_PACKAGE',
+        description: 'Pin program',
       },
-      { port: PORT },
-    );
+      refusal: 'answer',
+      expected: 'none',
+      ran: (answer) => {
+        const text = answer.content[0]?.text ?? '';
+        expect(text).toContain(
+          'Input validation error: Invalid arguments for tool HandlerCreate: ',
+        );
+        expect(text).toContain('at object_type');
+      },
+    });
   });
 });

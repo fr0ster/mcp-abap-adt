@@ -167,13 +167,12 @@ function queryOf(target: string): string {
 }
 
 /**
- * The stand-in, on `port` of 127.0.0.1 when given (a pin file's fixed port,
- * so its `Host` header is constant: a busy port rejects, no other is
- * tried), else on a free one.
+ * The stand-in, on a free port of 127.0.0.1 the system gives (port 0): a
+ * fixed port can be held by any socket of the machine — an outgoing one in
+ * the ephemeral range included — so none is ever asked for; a test reads
+ * the bound port from `url`.
  */
-export async function adtStandIn(
-  options: { port?: number } = {},
-): Promise<AdtStandIn> {
+export async function adtStandIn(): Promise<AdtStandIn> {
   const requests: StandInRequest[] = [];
   let refusing = false;
   const answers: Array<{
@@ -316,7 +315,7 @@ export async function adtStandIn(
   });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(options.port ?? 0, '127.0.0.1', () => {
+    server.listen(0, '127.0.0.1', () => {
       server.off('error', reject);
       resolve();
     });

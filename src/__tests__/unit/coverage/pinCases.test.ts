@@ -1,3 +1,5 @@
+import * as net from 'node:net';
+import * as ts from 'typescript';
 /**
  * `pinCases`' own behaviour (plan C1 Step 3): what it refuses, what it
  * asserts, the deterministic inputs and the one adapter `toPinned`. Each
@@ -20,10 +22,8 @@ import {
 } from '../../helpers/adtStandIn';
 import {
   installPinFakes,
-  PIN_PORT_OWNERS,
-  PIN_PORTS,
+  PIN_STAND_HOST,
   type PinCase,
-  pinPort,
   recordCase,
   runPinCase,
   toPinned,
@@ -32,9 +32,6 @@ import { pinServer } from '../../helpers/pinServer';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 jest.setTimeout(120_000);
-
-/** This file's fixed stand-in port. */
-const PORT = pinPort(__filename);
 
 const getProgram: PinCase = {
   tool: 'GetProgram',
@@ -187,8 +184,8 @@ describe('pinCases', () => {
       expected: 'none',
       ran: () => {},
     };
-    const first = await recordCase(begin, { port: PORT });
-    const second = await recordCase(begin, { port: PORT });
+    const first = await recordCase(begin);
+    const second = await recordCase(begin);
     expect(first.answer?.content[0]?.text).toContain('state_handle');
     expect(second.answer).toEqual(first.answer);
 
@@ -196,7 +193,7 @@ describe('pinCases', () => {
     // same seed gives two different handles.
     const handles: string[] = [];
     for (const _ of [1, 2]) {
-      const stand: AdtStandIn = await adtStandIn({ port: PORT });
+      const stand: AdtStandIn = await adtStandIn();
       const server = await pinServer('onprem', stand);
       const restore = installPinFakes('BatchBegin onprem');
       try {
@@ -211,12 +208,29 @@ describe('pinCases', () => {
     expect(handles[0]).not.toEqual(handles[1]);
   });
 
+  it('a stand case runs while a port of the old fixed pin range is taken', async () => {
+    // 47100: the port this file's stand-in listened on, inside Linux's
+    // ephemeral range; held here as any socket of the machine may hold it
+    // (this file is the guard's one exception, below).
+    const holder = net.createServer();
+    await new Promise<void>((resolve) =>
+      holder.listen(47100, '127.0.0.1', resolve),
+    );
+    try {
+      const onStand: PinCase = { ...getProgram, stand: 'adtStandIn' };
+      const recorded = await recordCase(onStand);
+      expect(recorded.requests.length).toBeGreaterThan(0);
+    } finally {
+      await new Promise<void>((resolve) => holder.close(() => resolve()));
+    }
+  });
+
   it('two runs of one case record the same requests', async () => {
     const onStand: PinCase = { ...getProgram, stand: 'adtStandIn' };
-    const first = await recordCase(onStand, { port: PORT });
-    const second = await recordCase(onStand, { port: PORT });
+    const first = await recordCase(onStand);
+    const second = await recordCase(onStand);
     expect(first.requests.length).toBeGreaterThan(0);
-    expect(first.requests[0]?.headers.host).toBe(`127.0.0.1:${PORT}`);
+    expect(first.requests[0]?.headers.host).toBe(PIN_STAND_HOST);
     expect(second.requests).toEqual(first.requests);
   });
 
@@ -278,7 +292,7 @@ describe('pinCases', () => {
           refusal: 'thrown',
           expected: 'nothing-sent',
         },
-        { port: PORT, entries: entries(before, throws) },
+        { entries: entries(before, throws) },
       );
       expect({
         stand,
@@ -409,7 +423,7 @@ describe('pinCases', () => {
       body: '<x/>',
     });
 
-    const stand = await adtStandIn({ port: PORT });
+    const stand = await adtStandIn();
     try {
       await fetch(`${stand.url}/sap/bc/adt/x?b=two&a=1`, {
         method: 'POST',
@@ -422,65 +436,80 @@ describe('pinCases', () => {
       expect(pinned.url).toBe('/sap/bc/adt/x?b=two&a=1');
       expect(pinned.body).toBe('<x/>');
       expect(pinned.headers).toMatchObject(headers);
-      expect(pinned.headers.host).toBe(`127.0.0.1:${PORT}`);
+      expect(pinned.headers.host).toBe(new URL(stand.url).host);
     } finally {
       await stand.close();
     }
   });
 });
 
-describe('the pin ports', () => {
+describe('no test server listens on a fixed port', () => {
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const tests = path.join(repo, 'src', '__tests__');
 
-  /** Every test source under `dir`, fixtures excluded. */
+  /** Every test source under `dir`. */
   function sources(dir: string, out: string[] = []): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name !== '__fixtures__') sources(full, out);
+        if (entry.name !== 'node_modules' && entry.name !== 'dist') {
+          sources(full, out);
+        }
       } else if (entry.name.endsWith('.ts')) {
         out.push(full);
       }
     }
     return out;
   }
-  const repoPath = (file: string) =>
-    path.relative(repo, file).split(path.sep).join('/');
 
-  it('each pin file owns its own port, in the range, and exists', () => {
-    const ports = Object.values(PIN_PORT_OWNERS);
-    expect(new Set(ports).size).toBe(ports.length);
-    for (const [file, port] of Object.entries(PIN_PORT_OWNERS)) {
-      expect({
-        file,
-        inRange: port >= PIN_PORTS.first && port <= PIN_PORTS.last,
-      }).toEqual({ file, inRange: true });
-      expect({ file, exists: fs.existsSync(path.join(repo, file)) }).toEqual({
-        file,
-        exists: true,
-      });
-    }
+  /** The `.listen(<number>, …)` calls of `file` whose port is a number other than 0. */
+  function fixedListens(file: string): string[] {
+    const text = fs.readFileSync(file, 'utf8');
+    const tree = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    const found: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'listen'
+      ) {
+        const [first] = node.arguments;
+        if (
+          first !== undefined &&
+          ts.isNumericLiteral(first) &&
+          Number(first.text) !== 0
+        ) {
+          const at = tree.getLineAndCharacterOfPosition(node.getStart());
+          found.push(
+            `${path.relative(repo, file)}:${at.line + 1} listen(${first.text})`,
+          );
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(tree);
+    return found;
+  }
+
+  it('every test server listens on port 0: a fixed port can be held by any socket of the machine', () => {
+    const roots = [
+      path.join(repo, 'src', '__tests__'),
+      ...fs
+        .readdirSync(repo, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => path.join(repo, entry.name, 'src'))
+        .filter((dir) => fs.existsSync(dir) && dir !== path.join(repo, 'src')),
+    ];
+    const self = __filename;
+    const found = roots
+      .flatMap((root) => sources(root))
+      .filter((file) => file.includes(`${path.sep}__tests__${path.sep}`))
+      .filter((file) => file !== self)
+      .flatMap(fixedListens);
+    expect(found).toEqual([]);
   });
 
-  it('every file that takes a pin port is in PIN_PORT_OWNERS, and none reads the range itself', () => {
-    const helper = 'src/__tests__/helpers/pinCases.ts';
-    const self = repoPath(__filename);
-    for (const file of sources(tests)) {
-      const owner = repoPath(file);
-      if (owner === helper || owner === self) continue;
-      const text = fs.readFileSync(file, 'utf8');
-      expect({ owner, readsRange: text.includes('PIN_PORTS') }).toEqual({
-        owner,
-        readsRange: false,
-      });
-      if (text.includes('pinPort(')) {
-        expect(Object.keys(PIN_PORT_OWNERS)).toContain(owner);
-      }
-    }
-    expect(pinPort(__filename)).toBe(PIN_PORT_OWNERS[self]);
-    expect(() => pinPort(path.join(tests, 'unregistered.test.ts'))).toThrow(
-      'src/__tests__/unregistered.test.ts has no row in PIN_PORT_OWNERS',
-    );
+  it('the ADT stand-in takes no port', () => {
+    const arity: Parameters<typeof adtStandIn>['length'] = 0;
+    expect(adtStandIn.length).toBe(arity);
   });
 });

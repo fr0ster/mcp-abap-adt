@@ -7,7 +7,7 @@
  * - `recording`: the variant's registered entry (`entry.call(context, args)`,
  *   so the schema parse is part of the case) on `recordingConnection`;
  * - `adtStandIn`: the same entry on a real connection to the ADT stand-in,
- *   bound to the pin file's fixed port;
+ *   on a port the system gives (its address pinned as `PIN_STAND_HOST`);
  * - `server`: the tool by name through `pinServer` (the batch, the
  *   background runs, the debugger, the long and leftover sessions).
  *
@@ -18,8 +18,9 @@
  * failure; every case records twice, and the two recordings must be equal
  * byte for byte before either is compared with `expected`.
  *
- * Ports kept for pins: 47100–47199, one per pin file, each file's own
- * recorded in `PIN_PORT_OWNERS` and read with `pinPort(__filename)`.
+ * The stand-in listens on a port the system gives; the recorded requests
+ * name it `PIN_STAND_HOST` (no fixed port: any socket of the machine may
+ * hold one).
  */
 
 import crypto from 'node:crypto';
@@ -61,35 +62,28 @@ export type { McpResult, PinSetup };
 /** The clock every pin runs at. */
 export const PIN_EPOCH = Date.UTC(2026, 0, 1);
 
-/** The ports kept for pins' stand-ins: each pin file takes one, as a constant. */
-export const PIN_PORTS = { first: 47100, last: 47199 } as const;
-
 /**
- * Every pin file that takes a stand-in port, and its port, from
- * `PIN_PORTS`: one port per file, never shared, so pin files can run in
- * parallel. A new pin file adds its row here and reads its port with
- * `pinPort(__filename)`; `pinCases.test.ts` checks the rows.
+ * The stand-in's address as a pin states it: every stand-in listens on a port
+ * the system gives (port 0), and a case's recorded requests carry this token
+ * where they carried `127.0.0.1:<the bound port>` — its `Host` header above
+ * all — so a pin's `expected` stays a literal and two recordings compare.
  */
-export const PIN_PORT_OWNERS: Readonly<Record<string, number>> = {
-  'src/__tests__/unit/coverage/pinCases.test.ts': 47100,
-  'src/__tests__/unit/systemKind/programOnJwtOnPremise.test.ts': 47101,
-  'src/__tests__/unit/pins/backgroundRuns.pins.test.ts': 47102,
-  'src/__tests__/unit/pins/searchSource.pins.test.ts': 47103,
-};
+export const PIN_STAND_HOST = '127.0.0.1:<stand-in>';
 
-/** The repository root, from this helper's place. */
-const PIN_REPO = path.join(__dirname, '..', '..', '..');
-
-/** The port `PIN_PORT_OWNERS` records for the pin file `file`; refused when none. */
-export function pinPort(file: string): number {
-  const owner = path.relative(PIN_REPO, file).split(path.sep).join('/');
-  const port = PIN_PORT_OWNERS[owner];
-  if (port === undefined) {
-    throw new Error(
-      `${owner} has no row in PIN_PORT_OWNERS: add it with a free port`,
-    );
-  }
-  return port;
+/** `request` with the stand-in's bound `host` (`127.0.0.1:<port>`) as `PIN_STAND_HOST`. */
+function withPinHost(request: PinnedRequest, host: string): PinnedRequest {
+  const swap = (text: string) => text.split(host).join(PIN_STAND_HOST);
+  return {
+    method: request.method,
+    url: swap(request.url),
+    headers: Object.fromEntries(
+      Object.entries(request.headers).map(([name, value]) => [
+        name,
+        swap(value),
+      ]),
+    ),
+    body: request.body === undefined ? undefined : swap(request.body),
+  };
 }
 
 /** One request as sent: method, path with its query, every header, body. */
@@ -135,9 +129,8 @@ export interface PinCase {
   ran?: (answer: McpResult) => void;
 }
 
-/** A pin file's fixed stand-in port. */
+/** What a pin file's cases run with. */
 export interface PinOptions {
-  port?: number;
   /**
    * The entries a case finds its tool among, in place of the variant's
    * served ones: for `pinCases`' own tests (a stub tool), never a pin file.
@@ -530,12 +523,10 @@ export async function recordCase(
         };
       }
     }
-    if (options.port === undefined) {
-      throw new Error(
-        `a ${c.stand} pin needs its file's fixed port (pinCases' port)`,
-      );
-    }
-    const stand = await adtStandIn({ port: options.port });
+    const stand = await adtStandIn();
+    const standHost = new URL(stand.url).host;
+    const pinned = (request: StandInRequest) =>
+      withPinHost(toPinned(request), standHost);
     closing.push(() => stand.close());
     answerByIndex(stand, c.answers);
     let call: (tool: string, args: ToolArgs) => Promise<McpResult>;
@@ -597,11 +588,11 @@ export async function recordCase(
         between,
       );
       if (own.logoff !== undefined) await own.logoff;
-      const requests = stand.requests.slice(mark.from).map(toPinned);
+      const requests = stand.requests.slice(mark.from).map(pinned);
       return { requests, answer, thrown: undefined };
     } catch (thrown) {
       return {
-        requests: stand.requests.slice(mark.from).map(toPinned),
+        requests: stand.requests.slice(mark.from).map(pinned),
         answer: undefined,
         thrown,
       };
@@ -709,8 +700,7 @@ export const pinKey = (c: PinCase): CoverageKey => keyOf(c.tool, c.args);
 /**
  * One `it('<key> (<variant>) sends the pinned requests')` per case. Call it
  * at the top level or in a `describe` callback: the guard refuses a call
- * Jest never collects. `options.port`: the file's fixed stand-in port, from
- * `pinPort(__filename)`, for its `adtStandIn` and `server` cases.
+ * Jest never collects.
  */
 export function pinCases(
   cases: readonly PinCase[],

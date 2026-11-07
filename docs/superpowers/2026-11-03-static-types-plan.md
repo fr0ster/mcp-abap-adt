@@ -4160,12 +4160,6 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   the shipped one (skip); its contract and the shipped strategy are exported from
   `@mcp-abap-adt/lib/embeddable`. **Closed (DO24):** the line-match strategy is the
   consumer's too.
-- **DO24 (2026-11-07, D23b Steps 4e2 and 4e3):** "a default strategy, and the means to change
-  the search at will". The default's placement is approved: `SearchSource`'s handler uses
-  `context.<field> ?? shipped` (the one place a default lives; the orchestrator takes it
-  explicitly), `HandlerExporter` has its own option, the launchers pass the shipped one. The
-  line-match strategy is the consumer's exactly like the SAP-answer strategy: the same option
-  path, its contract and `substringLineMatch` exported from `@mcp-abap-adt/lib/embeddable`.
 - **DO23 (2026-11-07, D23b Step 4f):** the caller sets how much the answer holds, with three
   optional controls; with none, the answer is every hit with line and snippet. `answer`:
   `'objects'` (each object and include with hits, `function_group_name` for `FUGR/FF`, and the
@@ -4174,6 +4168,12 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   answer (counted after `max_hits_per_object`): when reached, the scan stops reading and
   `truncated.by_max_hits` is set when something remains; absent, no limit; `scanned.*` report what was done until the
   stop.
+- **DO24 (2026-11-07, D23b Steps 4e2 and 4e3):** "a default strategy, and the means to change
+  the search at will". The default's placement is approved: `SearchSource`'s handler uses
+  `context.<field> ?? shipped` (the one place a default lives; the orchestrator takes it
+  explicitly), `HandlerExporter` has its own option, the launchers pass the shipped one. The
+  line-match strategy is the consumer's exactly like the SAP-answer strategy: the same option
+  path, its contract and `substringLineMatch` exported from `@mcp-abap-adt/lib/embeddable`.
 
 ## Test coverage — the families
 

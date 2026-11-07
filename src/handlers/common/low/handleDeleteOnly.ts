@@ -36,10 +36,7 @@ import type {
   HandlerContext,
   ToolArgs,
 } from '../../../lib/handlers/interfaces';
-import {
-  LOCK_NOT_HELD_WORDS,
-  lockHeldHere,
-} from '../../../lib/state/heldLocks';
+import { lockHeldHere, lockNotHeldWords } from '../../../lib/state/heldLocks';
 import {
   project,
   terseDeletion,
@@ -94,7 +91,7 @@ export async function handleDeleteOnly(
       );
     }
     if (!lockHeldHere(context.heldLocks, lockHandle)) {
-      return return_error(new Error(LOCK_NOT_HELD_WORDS));
+      return return_error(new Error(lockNotHeldWords(context.heldLocks)));
     }
     const className = text(args.class_name);
     if (className === undefined) {

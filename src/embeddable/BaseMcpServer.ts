@@ -572,11 +572,21 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * After the idle bound's stop, whatever its undo answered: the connections
    * held state owns are closed with a logoff. The instance itself lives on
-   * (stdio's, an SSE connection's): its own connection is not touched. A
-   * host whose instance ends with its state (the pool) closes all of them.
+   * (an SSE connection's): its own connection is kept — unless the stop let
+   * go of locks held in it, whose handles are gone: then it is logged off
+   * too, and the logoff releases those locks in SAP; the next call logs on
+   * afresh. A package lock's own session goes the same way. A host whose
+   * instance ends with its state (the pool) closes all of them.
    */
   protected idleStopped(): Promise<void> {
-    return closeOwnedConnections(this, ['state']);
+    const dropped = this.heldLocks.takeDropped();
+    if (dropped.has('main') && this.built !== undefined) {
+      this.retire(this.built);
+    }
+    return closeOwnedConnections(
+      this,
+      dropped.has('own') ? ['state', 'lock'] : ['state'],
+    );
   }
 
   /**

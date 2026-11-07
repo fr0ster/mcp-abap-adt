@@ -28,10 +28,6 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LOCK_NOT_HELD_WORDS,
-  lockHeldHere,
-} from '../../../lib/state/heldLocks';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -49,12 +45,6 @@ export const TOOL_DEFINITION = {
   inputSchema: z.object({
     name: z.string().describe('Metadata Extension name'),
     source_code: z.string().describe('New source code'),
-    lock_handle: z
-      .string()
-      .optional()
-      .describe(
-        'Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.',
-      ),
     transport_request: z
       .string()
       .optional()
@@ -72,7 +62,6 @@ export const TOOL_DEFINITION = {
 interface UpdateMetadataExtensionArgs {
   name: string;
   source_code: string;
-  lock_handle?: string;
   transport_request?: string;
   activate?: boolean;
   detail?: 'terse' | 'full' | 'raw';
@@ -88,19 +77,12 @@ export async function handleUpdateMetadataExtension(
     return return_error(new Error('Missing required parameters'));
   }
 
-  // A write under a caller's lock_handle is sent only under one this
-  // instance's lock issued: SAP takes any handle in the locking session.
-  if (args.lock_handle && !lockHeldHere(context.heldLocks, args.lock_handle)) {
-    return return_error(new Error(LOCK_NOT_HELD_WORDS));
-  }
-
   const ddlxName = args.name.toUpperCase();
   const shouldActivate = args.activate !== false;
   const detail = detailOf(args);
 
-  // `lock_handle` given by the caller is honoured, not re-acquired — the same
-  // shape the pre-migration handler had. Without one, this locks and unlocks
-  // itself through `withLock`.
+  // The handler locks, writes and unlocks itself through `withLock`: it takes
+  // no lock_handle (on the full set no tool issues one).
   return answer(
     { tool: 'UpdateMetadataExtension', detail },
     async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
@@ -121,17 +103,15 @@ export async function handleUpdateMetadataExtension(
           ),
         );
 
-      const written = args.lock_handle
-        ? await update(args.lock_handle)
-        : await withLock(
-            () => obj.lock({ name: ddlxName }, { analyse: analyseLock }),
-            atStep('update', update),
-            (lockHandle) =>
-              obj.unlock({ name: ddlxName }, lockHandle, {
-                analyse: analyseException,
-              }),
-            { type: 'METADATA_EXTENSION', name: ddlxName },
-          );
+      const written = await withLock(
+        () => obj.lock({ name: ddlxName }, { analyse: analyseLock }),
+        atStep('update', update),
+        (lockHandle) =>
+          obj.unlock({ name: ddlxName }, lockHandle, {
+            analyse: analyseException,
+          }),
+        { type: 'METADATA_EXTENSION', name: ddlxName },
+      );
 
       if (!written.ok) {
         return written;

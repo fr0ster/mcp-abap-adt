@@ -237,10 +237,17 @@ describe('the MCP tool surface', () => {
       // **24.0.0, decided by the owner (D2).** SAP ignores both on create
       // (measured on premise): `CreateClass`'s `abstract` and
       // `CreateProgram`'s `program_type` are removed, and nothing else.
+      //
+      // **24.0.0, decided by the owner (D9, #4).** No tool of the full set
+      // issues a lock handle, and a handle the instance did not issue is
+      // refused: `UpdateBehaviorDefinition`'s and `UpdateMetadataExtension`'s
+      // `lock_handle` are removed — each locks, writes and unlocks itself.
       const REMOVED: Record<string, string[]> = {
         'search/SearchSource': ['concurrency'],
         'high/CreateClass': ['abstract'],
         'high/CreateProgram': ['program_type'],
+        'high/UpdateBehaviorDefinition': ['lock_handle'],
+        'high/UpdateMetadataExtension': ['lock_handle'],
       };
       const removed = REMOVED[tool] ?? [];
       expect({
@@ -395,6 +402,9 @@ describe('the MCP tool surface', () => {
         // 24.0.0 (D2): each lost one argument (`REMOVED`) and gained none.
         'high/CreateClass': [],
         'high/CreateProgram': [],
+        // 24.0.0 (D9): each lost `lock_handle` (`REMOVED`) and gained none.
+        'high/UpdateBehaviorDefinition': [],
+        'high/UpdateMetadataExtension': [],
       };
       const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
       const gainsTimeout = isLong && !had.includes('timeout');

@@ -206,16 +206,26 @@ Streamable HTTP instance did in 23.x — and sends a write, a delete or an unloc
 `lock_handle` only under one of them. 23.x checked only on Streamable HTTP.
 
 **What changes for you:**
-- Compact `HandlerUnlock`, `HandlerUpdate` and `HandlerDelete` (the emptied includes), and the
-  full `UpdateBehaviorDefinition` and `UpdateMetadataExtension`, refuse a `lock_handle` the
-  instance did not issue, sending nothing: `lock_handle is not held by this instance: …`. Take
-  the lock with `HandlerLock` on the same instance (stdio: the server; SSE: the same connection;
-  Streamable HTTP: the `state_handle` the lock answered) and pass the handle it answered.
+- Compact `HandlerUnlock`, `HandlerUpdate` and `HandlerDelete` (the emptied includes) refuse a
+  `lock_handle` the instance did not issue, sending nothing — an unknown handle and another
+  instance's in the same words. Streamable HTTP: `lock_handle is not held by this instance: send
+  the state_handle HandlerLock answered as the state_handle argument (or in the
+  x-mcp-state-handle header)`. stdio and SSE: `lock_handle is not held by this instance: a lock
+  handle works only in the server instance whose HandlerLock issued it`. Take the lock with
+  `HandlerLock` on the same instance (stdio: the server; SSE: the same connection; Streamable
+  HTTP: the `state_handle` the lock answered) and pass the handle it answered.
 - A handle is released by its `HandlerUnlock`: a second unlock with it is refused. A
   `HandlerUnlock` refused for another reason (`FUNCTION_GROUP_MISMATCH`) keeps the handle; unlock
   again with the module's group and the same handle.
-- `UpdateBehaviorDefinition` and `UpdateMetadataExtension` without `lock_handle` lock and unlock
-  themselves, as before.
+- **`lock_handle` is removed from `UpdateBehaviorDefinition` and `UpdateMetadataExtension`.** No
+  tool of the full set issues a lock handle. Both lock, write and unlock themselves; drop the
+  argument (a call that sends it is refused as undeclared). To write under a lock you hold, use
+  compact `HandlerLock` and `HandlerUpdate` (`BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`) with
+  the handle it answered.
+- **SSE: the idle bound logs a lock's session off.** When the idle bound (`stateIdleMinutes`)
+  ends the state of an SSE instance that holds a lock, its handle is let go and the instance's
+  SAP session is logged off, which releases the lock; the next call logs on afresh. Lock again
+  after a pause longer than the bound.
 - `HandlerLock` answers the instance's `state_handle` on every transport; only Streamable HTTP
   routes by it.
 - **Embedders:** every `BaseMcpServer` / `EmbeddableMcpServer` instance owns its held locks: the

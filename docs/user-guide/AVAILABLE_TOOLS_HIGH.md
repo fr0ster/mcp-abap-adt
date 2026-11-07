@@ -384,7 +384,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-- `lock_handle` (string, optional) - Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1297,7 +1296,6 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-- `lock_handle` (string, optional) - Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
@@ -3000,4 +2998,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-11-05*
+*Last updated: 2026-11-07*

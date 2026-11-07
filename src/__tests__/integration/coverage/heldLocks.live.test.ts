@@ -7,8 +7,8 @@
  * holding a class's lock, SAP answered `200` to an `UNLOCK` naming an
  * invented handle and released the lock; on stdio and SSE the server passed
  * any handle on. The test creates a class, locks it through `HandlerLock`,
- * and checks that every lock tool and both full updates refuse a handle the
- * instance did not issue, writing nothing (read back), while the handle the
+ * and checks that every lock tool refuses a handle the instance did not
+ * issue, writing nothing (read back), while the handle the
  * lock issued writes (read back), deletes an include and unlocks — once.
  *
  * The calls go through `livePrepare`: the keys these paths stand for are
@@ -160,26 +160,6 @@ liveSuite(['onprem', 'cloud'], 'held locks', () => {
           object_type: 'LOCAL_TYPES',
           class_name: CLASS,
           lock_handle: FOREIGN,
-          ...onRequest(),
-        }),
-      );
-      expectNotHeld(
-        'UpdateBehaviorDefinition foreign',
-        await livePrepare('UpdateBehaviorDefinition', {
-          name: `ZMCP_HB${SUFFIX}`,
-          source_code: 'placeholder source',
-          lock_handle: FOREIGN,
-          activate: false,
-          ...onRequest(),
-        }),
-      );
-      expectNotHeld(
-        'UpdateMetadataExtension foreign',
-        await livePrepare('UpdateMetadataExtension', {
-          name: `ZMCP_HM${SUFFIX}`,
-          source_code: 'placeholder source',
-          lock_handle: FOREIGN,
-          activate: false,
           ...onRequest(),
         }),
       );

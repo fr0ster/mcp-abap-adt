@@ -8,15 +8,14 @@
  *
  * Every transport runs over its real server and the ADT stand-in; the tools
  * under test are compact `HandlerLock` / `HandlerUnlock` / `HandlerUpdate` /
- * `HandlerDelete` and the full `UpdateBehaviorDefinition` /
- * `UpdateMetadataExtension`, which take a `lock_handle`.
+ * `HandlerDelete`. An unknown handle and another instance's get one answer:
+ * on Streamable HTTP it names the `state_handle` that routes a call to its
+ * instance; on stdio and SSE, which route nothing by it, it says a lock
+ * handle works only in the instance that issued it.
  */
 
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
-import {
-  HighLevelHandlersGroup,
-  noConnectionContext,
-} from '@mcp-abap-adt/lib/handlers';
+import { noConnectionContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
 import type {
   AdtStandIn,
@@ -29,9 +28,12 @@ import { stand as stdioStand } from '../stdio/__tests__/helpers/loginStand';
 jest.setTimeout(60_000);
 
 // The words a write or an unlock under a handle the instance does not hold
-// answers, copied here, never imported: the test is the copy.
-const NOT_HELD =
+// answers, copied here, never imported: the test is the copy. Streamable
+// HTTP routes by the state_handle, stdio and SSE do not.
+const NOT_HELD_ROUTED =
   'lock_handle is not held by this instance: send the state_handle HandlerLock answered as the state_handle argument (or in the x-mcp-state-handle header)';
+const NOT_HELD_HERE =
+  'lock_handle is not held by this instance: a lock handle works only in the server instance whose HandlerLock issued it';
 
 /** The handle the stand-in's every LOCK answers. */
 const ISSUED = 'B92E65858E83454C783181344F429D4BFD8E395D';
@@ -47,6 +49,8 @@ interface Session {
 
 interface TransportStand {
   adt: AdtStandIn;
+  /** The words of a handle the instance does not hold, on this transport. */
+  notHeld: string;
   /** A session on an instance of its own. */
   session(): Promise<Session>;
   /**
@@ -60,10 +64,7 @@ interface TransportStand {
 
 const groups = () => {
   const context = noConnectionContext();
-  return [
-    new CompactModifyHandlersGroup(context),
-    new HighLevelHandlersGroup(context),
-  ];
+  return [new CompactModifyHandlersGroup(context)];
 };
 
 const textOf = (answer: Answer | 'cancelled'): Answer =>
@@ -74,6 +75,7 @@ async function onStdio(): Promise<TransportStand> {
   const s = await stdioStand({ kind: 'onprem', groups: groups() });
   return {
     adt: s.adt,
+    notHeld: NOT_HELD_HERE,
     session: async () => ({
       call: async (name, args) => textOf(await s.callTool(name, args)),
     }),
@@ -87,6 +89,7 @@ async function onSse(): Promise<TransportStand> {
   const s = await sseStand({ groups: groups() });
   return {
     adt: s.standIn,
+    notHeld: NOT_HELD_HERE,
     session: async () => {
       const connection = await s.open();
       let id = 0;
@@ -112,6 +115,7 @@ async function onHttp(): Promise<TransportStand> {
   const s = await httpStand({ groups: groups() });
   return {
     adt: s.standIn,
+    notHeld: NOT_HELD_ROUTED,
     session: async () => {
       let stateHandle: string | undefined;
       return {
@@ -205,38 +209,6 @@ const UNDER_LOCK: Array<[string, UnderLock]> = [
       ],
     },
   ],
-  [
-    'UpdateBehaviorDefinition',
-    {
-      lock: { object_type: 'BEHAVIOR_DEFINITION', object_name: 'ZBP_HELD' },
-      args: (lock_handle) => ({
-        name: 'ZBP_HELD',
-        source_code: SOURCE,
-        lock_handle,
-        activate: false,
-      }),
-      requests: [
-        `PUT /sap/bc/adt/bo/behaviordefinitions/zbp_held/source/main?lockHandle=${ISSUED}`,
-        'GET /sap/bc/adt/bo/behaviordefinitions/zbp_held/source/main?version=inactive&withLongPolling=true',
-      ],
-    },
-  ],
-  [
-    'UpdateMetadataExtension',
-    {
-      lock: { object_type: 'METADATA_EXTENSION', object_name: 'ZC_HELD' },
-      args: (lock_handle) => ({
-        name: 'ZC_HELD',
-        source_code: SOURCE,
-        lock_handle,
-        activate: false,
-      }),
-      requests: [
-        `PUT /sap/bc/adt/ddic/ddlx/sources/zc_held/source/main?lockHandle=${ISSUED}`,
-        'GET /sap/bc/adt/ddic/ddlx/sources/zc_held/source/main?version=inactive&withLongPolling=true',
-      ],
-    },
-  ],
 ];
 
 /** Locks through `HandlerLock`: answers the handle it issued. */
@@ -301,7 +273,7 @@ describe.each(TRANSPORTS)('%s', (_transport, standOf) => {
       const before = s.adt.requests.length;
       const answered = await session.call(tool, underLock.args(FOREIGN));
       expect(answered.isError).toBe(true);
-      expect(answered.text).toContain(NOT_HELD);
+      expect(answered.text).toContain(s.notHeld);
       expect(sent(s.adt.requests.slice(before))).toEqual([]);
     },
   );
@@ -391,7 +363,10 @@ describe("every transport's instance has its own held-lock owner", () => {
         const second = await s.session();
         const refused = await second.call('HandlerUpdate', UPDATE(handle));
         expect(refused.isError).toBe(true);
-        expect(refused.text).toContain(NOT_HELD);
+        expect(refused.text).toContain(s.notHeld);
+        // An unknown handle gets the same answer as another instance's.
+        const unknown = await second.call('HandlerUpdate', UPDATE(FOREIGN));
+        expect(unknown).toEqual(refused);
         expect(
           s.adt.requests.filter(
             (r) => r.method === 'PUT' || r.url.includes('_action=UNLOCK'),

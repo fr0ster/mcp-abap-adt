@@ -58,10 +58,7 @@ import {
   type ToolArgs,
 } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
-import {
-  LOCK_NOT_HELD_WORDS,
-  lockHeldHere,
-} from '../../../lib/state/heldLocks';
+import { lockHeldHere, lockNotHeldWords } from '../../../lib/state/heldLocks';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -277,7 +274,7 @@ export async function handleUpdateUnderLock(
     );
   }
   if (!emptyBindingHandle && !lockHeldHere(context.heldLocks, lockHandle)) {
-    return return_error(new Error(LOCK_NOT_HELD_WORDS));
+    return return_error(new Error(lockNotHeldWords(context.heldLocks)));
   }
   const { connection, logger } = context;
   const transportRequest = text(args.transport_request);

@@ -25,7 +25,12 @@ export {
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { jsonOf } from '../jsonText.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
-export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';
+export {
+  LOCK_NOT_HELD_HERE_WORDS,
+  LOCK_NOT_HELD_WORDS,
+  lockHeldHere,
+  lockNotHeldWords,
+} from '../state/heldLocks.js';
 export { DETAIL_SHAPE } from '../strategies/detail.js';
 export { byVariant } from '../variantDefinition.js';
 export { child, type Element, isElement, isList } from '../xml/tree.js';

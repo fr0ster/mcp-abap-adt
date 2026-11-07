@@ -4,10 +4,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  *
  * Uses AdtClient.getBehaviorDefinition().{lock,update,unlock,read,activate}
- * from @mcp-abap-adt/adt-clients 19, through `withLock` when this handler
- * owns the lock — held for the whole write, released on every path out. A
- * caller who passes `lock_handle` already holds it, so `withLock` is
- * skipped and the update runs as the one request it is.
+ * from @mcp-abap-adt/adt-clients 19, through `withLock`: the handler locks,
+ * writes and unlocks itself, the lock held for the whole write and released
+ * on every path out. It takes no `lock_handle`: on the full set no tool
+ * issues one (compact `HandlerUpdate` writes under a held lock).
  *
  * The wait between the write and `activate` is the pre-migration handler's
  * long-polling `read({withLongPolling: true})`, discarded for its result
@@ -29,10 +29,6 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LOCK_NOT_HELD_WORDS,
-  lockHeldHere,
-} from '../../../lib/state/heldLocks';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -56,12 +52,6 @@ export const TOOL_DEFINITION = {
       .describe(
         'Transport request number, not a task. Required for transportable packages.',
       ),
-    lock_handle: z
-      .string()
-      .optional()
-      .describe(
-        'Lock handle a lock of this server instance answered; the update is written under it. Absent: the update locks and unlocks the object itself.',
-      ),
     activate: z
       .boolean()
       .optional()
@@ -74,7 +64,6 @@ interface UpdateBehaviorDefinitionArgs {
   name: string;
   source_code: string;
   transport_request?: string;
-  lock_handle?: string;
   activate?: boolean;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -87,12 +76,6 @@ export async function handleUpdateBehaviorDefinition(
 
   if (!args.name || !args.source_code) {
     return return_error(new Error('Missing required parameters'));
-  }
-
-  // A write under a caller's lock_handle is sent only under one this
-  // instance's lock issued: SAP takes any handle in the locking session.
-  if (args.lock_handle && !lockHeldHere(context.heldLocks, args.lock_handle)) {
-    return return_error(new Error(LOCK_NOT_HELD_WORDS));
   }
 
   const name = args.name.toUpperCase();
@@ -119,15 +102,13 @@ export async function handleUpdateBehaviorDefinition(
           ),
         );
 
-      const written = args.lock_handle
-        ? await update(args.lock_handle)
-        : await withLock(
-            () => obj.lock({ name }, { analyse: analyseLock }),
-            atStep('update', update),
-            (lockHandle) =>
-              obj.unlock({ name }, lockHandle, { analyse: analyseException }),
-            { type: 'BEHAVIOR_DEFINITION', name: name },
-          );
+      const written = await withLock(
+        () => obj.lock({ name }, { analyse: analyseLock }),
+        atStep('update', update),
+        (lockHandle) =>
+          obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+        { type: 'BEHAVIOR_DEFINITION', name: name },
+      );
 
       if (!written.ok) {
         return written;

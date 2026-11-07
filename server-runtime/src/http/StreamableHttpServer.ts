@@ -592,7 +592,8 @@ export class StreamableHttpServer extends BaseMcpServer {
         // An instance lasts one request unless it holds state: a lock taken
         // here is kept as state, so the write and the unlock under it reach
         // this instance (and its SAP session) by its state_handle.
-        heldLocks: new HeldLocks(),
+        // routed by the state_handle: the refusal names it.
+        heldLocks: new HeldLocks({ routedByStateHandle: true }),
         // The long session the model opens: held state while open, so this
         // instance and its SAP connection serve every call carrying its
         // state_handle.

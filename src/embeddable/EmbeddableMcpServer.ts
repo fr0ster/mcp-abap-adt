@@ -72,8 +72,8 @@ export interface EmbeddableMcpServerOptions {
    * A run tool called with `background: true` runs on a connection of its
    * own — from `freshConnection` on an injected connection — and its answer
    * is handed to the strategy; a listed long tool runs in the background by
-   * default, and the default registry serves the background-run tools for
-   * every exposition. Without it, a code run's `background: true` and the
+   * default, and the server serves the background-run tools beside any long
+   * tool its registry carries. Without it, a code run's `background: true` and the
    * background-run tools are refused (`background_runs_unavailable`), and a
    * long tool answers in the call.
    */
@@ -289,7 +289,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
         options.exposition ?? ['readonly', 'high'],
         options.logger,
         options.readOnlyDedupStrategy,
-        options.backgroundRuns !== undefined,
       );
 
     this.registerHandlers(registry);
@@ -302,7 +301,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     exposition: ('readonly' | 'high' | 'compact' | 'system' | 'search')[],
     logger?: Logger,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
-    keepsBackgroundRuns = false,
   ): IHandlersRegistry {
     // A registration-only context: BaseMcpServer.registerHandlers() gives
     // every call a context of its own (getConnection()); this connection
@@ -345,12 +343,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
     if (exposition.includes('search')) {
       groups.push(new SearchHandlersGroup(dummyContext));
-    }
-    // With a strategy, the long reads of any exposition run in the
-    // background (the owner, D24): their background runs, read, listed and
-    // cancelled — reads alone where no run tool is exposed.
-    if (keepsBackgroundRuns && !exposition.includes('system')) {
-      groups.push(new BackgroundRunHandlersGroup(dummyContext));
     }
 
     return new CompositeHandlersRegistry(groups);

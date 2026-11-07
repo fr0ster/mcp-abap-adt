@@ -96,9 +96,10 @@ Each call:
 
 A listed long tool's read runs in the call on a connection of its own, opened from the call's, as
 on a plain registration. For long reads in the background, an embedder serves its groups from a
-server instance with a strategy: an `EmbeddableMcpServer` given `backgroundRuns` adds the
-background-run tools to its default registry for every exposition, `readonly` alone included, and
-`registryForExposition(['readonly'])` includes them. A server instance with a strategy that registers the exporter's registry
+server instance with a strategy: an `EmbeddableMcpServer` given `backgroundRuns` serves the
+background-run tools beside every long tool its registry carries (`createRegistry()` included),
+whatever the exposition. Without a strategy, or on a plain registration, no background-run tool is
+listed. A server instance with a strategy that registers the exporter's registry
 (`createRegistry()`) without the background-run tools lists its long tools without `background`
 too: nothing there could read a run.
 

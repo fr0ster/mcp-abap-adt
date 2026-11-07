@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { isBackgroundRunTool } from '../../backgroundRuns/tools.js';
 import { listedTool } from '../../listedTool.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type {
@@ -108,6 +109,9 @@ export class CompositeHandlersRegistry<
       for (const entry of handlers) {
         if (!listedTool(entry.toolDefinition, environment).listed) continue;
         const name = entry.toolDefinition.name;
+        // A plain registration keeps no background runs: no
+        // background-run tool is listed (`BaseHandlerGroup.registerOneTool`).
+        if (isBackgroundRunTool(name)) continue;
         if (this.registeredTools.has(name)) {
           const msg = `Duplicate tool registration detected: "${name}" in group "${group.getName()}"`;
           if (this.failOnDuplicate) {

@@ -12,6 +12,7 @@ jest.mock('../../../lib/connectionFactory', () => ({
   withSystemKindOf: jest.fn((view: object) => view),
 }));
 
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -68,7 +69,11 @@ const OUTSIDE_WORDS = 'Runs outside batch mode.';
 class SurfaceServer extends BaseMcpServer {
   constructor(
     registry: IHandlersRegistry,
-    options: { batch?: InstanceBatch; source?: ConnectionSource } = {},
+    options: {
+      batch?: InstanceBatch;
+      source?: ConnectionSource;
+      backgroundRuns?: boolean;
+    } = {},
   ) {
     super({
       name: 'batch-surface',
@@ -76,6 +81,9 @@ class SurfaceServer extends BaseMcpServer {
       logger: silent as never,
       systemType: 'onprem',
       ...(options.batch !== undefined ? { batch: options.batch } : {}),
+      ...(options.backgroundRuns === true
+        ? { backgroundRuns: new InMemoryBackgroundRuns() }
+        : {}),
     });
     this.registerHandlers(registry);
     if (options.source !== undefined) {
@@ -94,7 +102,11 @@ class SurfaceServer extends BaseMcpServer {
 
 async function served(
   registry: IHandlersRegistry,
-  options: { batch?: InstanceBatch; source?: ConnectionSource } = {},
+  options: {
+    batch?: InstanceBatch;
+    source?: ConnectionSource;
+    backgroundRuns?: boolean;
+  } = {},
 ) {
   const server = new SurfaceServer(registry, options);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -147,8 +159,10 @@ describe('the batch tools on the surface', () => {
   it.each(SETS.map(([kind, set]) => [kind, set] as const))(
     "every tool's description in %s ends with its sentence (recordable, recordable for some arguments, outside batch mode)",
     async (kind, set) => {
+      // As the launchers: every set keeps background runs.
       const { client } = await served(registryOf(set, 'stdio'), {
         batch: new InstanceBatch({ keepRawParts: false }),
+        backgroundRuns: true,
       });
       const { tools } = await client.listTools();
       expect(tools.length).toBeGreaterThan(10);

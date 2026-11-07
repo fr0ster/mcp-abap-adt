@@ -47,6 +47,24 @@ const COMPACT_RUN_TOOLS = {
   discard: 'HandlerBackgroundRunDiscard',
 } as const;
 
+/** The tools that read, list and end background runs, full and compact. */
+const BACKGROUND_RUN_TOOLS: ReadonlySet<string> = new Set([
+  'GetBackgroundRun',
+  'ListBackgroundRuns',
+  'DiscardBackgroundRun',
+  'HandlerBackgroundRunGet',
+  'HandlerBackgroundRunList',
+  'HandlerBackgroundRunDiscard',
+]);
+
+/**
+ * Whether `name` reads, lists or ends background runs: listed only where a
+ * strategy keeps the runs (a server instance given `backgroundRuns`).
+ */
+export function isBackgroundRunTool(name: string): boolean {
+  return BACKGROUND_RUN_TOOLS.has(name);
+}
+
 /** The compact listed long tools: their runs are read and discarded by compact's tools. */
 const COMPACT_LONG_READS: ReadonlySet<string> = new Set([
   'HandlerWhereUsed',

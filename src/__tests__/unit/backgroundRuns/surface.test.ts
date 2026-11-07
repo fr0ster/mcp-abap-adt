@@ -12,6 +12,8 @@ import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
@@ -37,6 +39,7 @@ import type {
   HandlerContext,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
   noConnectionContext,
   registryForExposition,
@@ -233,13 +236,15 @@ describe('where the background-run tools are served: beside the run tools and th
   ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
   it.each<[HandlerSet[], boolean, boolean]>([
-    [['readonly'], true, false],
+    // The registry builder adds them beside the run tools only; a server
+    // with a strategy adds them beside any long read (below).
+    [['readonly'], false, false],
     [['readonly', 'high'], true, true],
-    [['readonly', 'debug'], true, false],
+    [['readonly', 'debug'], false, false],
     [['high'], true, true],
     [['debug'], false, false],
   ])(
-    'full %j: background-run tools served %s (beside the long reads or the run tools), RuntimeRunClass %s',
+    'full %j: the registry carries the background-run tools %s (beside the run tools), RuntimeRunClass %s',
     (exposition, served, runs) => {
       const tools = namesOf(
         registryForExposition(exposition).getHandlerGroups(),
@@ -282,6 +287,136 @@ describe('where the background-run tools are served: beside the run tools and th
             ),
           }).toEqual({ tool: tool.name, background: true });
         }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it.each<[HandlerSet[]]>([[['readonly']], [['high']], [['readonly', 'high']]])(
+    'a supplied registryForExposition(%j) on an EmbeddableMcpServer without a strategy lists no background-run tool, and its long tools answer in the call',
+    async (exposition) => {
+      const server = new EmbeddableMcpServer({
+        connection: unconnected(),
+        handlersRegistry: registryForExposition(exposition),
+        systemType: 'onprem',
+        logger: silent,
+      });
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.list();
+        expect(tools.filter((t) => FULL.includes(t.name))).toEqual([]);
+        const long = tools.filter((t) => LONG_TOOLS.includes(t.name));
+        expect(long.length).toBeGreaterThan(0);
+        for (const tool of long) {
+          expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain(
+            'background',
+          );
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it.each<[string, () => CompositeHandlersRegistry, readonly string[]]>([
+    [
+      'registryForExposition(["debug"])',
+      () => registryForExposition(['debug']),
+      FULL,
+    ],
+    [
+      'registryForExposition(["high"])',
+      () => registryForExposition(['high']),
+      FULL,
+    ],
+    [
+      'a search group alone',
+      () =>
+        new CompositeHandlersRegistry([
+          new SearchHandlersGroup(noConnectionContext()),
+        ]),
+      FULL,
+    ],
+    [
+      'the compact read-only group alone',
+      () =>
+        new CompositeHandlersRegistry([
+          new CompactReadOnlyHandlersGroup(noConnectionContext()),
+        ]),
+      COMPACT,
+    ],
+  ])(
+    'a supplied registry carrying a long tool (%s) on a server with a strategy serves the background-run tools, and its long tools list background',
+    async (_name, registry, runTools) => {
+      const server = new EmbeddableMcpServer({
+        connection: unconnected(),
+        handlersRegistry: registry(),
+        systemType: 'onprem',
+        logger: silent,
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      });
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.list();
+        const names = tools.map((t) => t.name);
+        expect(runTools.filter((n) => !names.includes(n))).toEqual([]);
+        const long = tools.filter((t) => LONG_TOOLS.includes(t.name));
+        expect(long.length).toBeGreaterThan(0);
+        for (const tool of long) {
+          expect({
+            tool: tool.name,
+            background: Object.keys(tool.inputSchema.properties ?? {}).includes(
+              'background',
+            ),
+          }).toEqual({ tool: tool.name, background: true });
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it('with a strategy, the same supplied registry lists them and its long tools list background', async () => {
+    const server = new EmbeddableMcpServer({
+      connection: unconnected(),
+      handlersRegistry: registryForExposition(['readonly']),
+      systemType: 'onprem',
+      logger: silent,
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    });
+    const client = await clientOf(server);
+    try {
+      const { tools } = await client.list();
+      expect(
+        tools
+          .filter((t) => FULL.includes(t.name))
+          .map((t) => t.name)
+          .sort(),
+      ).toEqual([...FULL].sort());
+      const contents = tools.find((t) => t.name === 'GetTableContents');
+      expect(Object.keys(contents?.inputSchema.properties ?? {})).toContain(
+        'background',
+      );
+    } finally {
+      await client.close();
+    }
+  });
+
+  it.each<[HandlerSet[]]>([[['readonly']], [['high']]])(
+    'a plain registration of registryForExposition(%j) on an McpServer lists no background-run tool: it keeps no background runs',
+    async (exposition) => {
+      const server = new McpServer({ name: 'plain', version: '1.0.0' });
+      registryForExposition(exposition).registerAllTools(server);
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'plain', version: '1.0.0' });
+      await Promise.all([
+        server.connect(serverSide),
+        client.connect(clientSide),
+      ]);
+      try {
+        const { tools } = await client.listTools();
+        expect(tools.filter((t) => FULL.includes(t.name))).toEqual([]);
       } finally {
         await client.close();
       }

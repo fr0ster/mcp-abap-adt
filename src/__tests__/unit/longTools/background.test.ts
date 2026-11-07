@@ -177,39 +177,30 @@ describe.each(LONG_TOOLS)('%s', (tool) => {
   });
 });
 
-describe('a strategy without the tools that read its runs', () => {
+describe('a strategy and a registry that carries no tool reading the runs', () => {
   it.each(['GetSqlQuery', 'HandlerGetData'])(
-    '%s lists no background and answers in the call: nothing could read a run_handle',
+    '%s: the server adds the tools that read its runs, and it lists background',
     async (tool) => {
       const stand = await longStand(tool, {
         backgroundRuns: new InMemoryBackgroundRuns(),
         runTools: false,
       });
       try {
-        expect(await stand.inputs(tool)).not.toContain('background');
-        const described = await stand.described(tool);
-        expect(described).toContain(IN_CALL_WORDS);
-        expect(described).not.toContain('run_handle');
-        const answer = await stand.call(tool, LONG_TOOL_ARGS[tool] ?? {});
-        expect(payloadOf(answer).run_handle).toBeUndefined();
-        await until(() => stand.standIn.loggedOff().length === 1);
+        expect(await stand.inputs(tool)).toContain('background');
+        expect(await stand.described(tool)).toContain('run_handle');
+        const names = runToolsOf(tool);
+        expect(await stand.inputs(names.get)).toContain('run_handle');
+        const started = await stand.call(tool, LONG_TOOL_ARGS[tool] ?? {});
+        const handle = handleOf(started);
+        expect(handle).not.toBe('');
+        await until(
+          async () => (await listedState(stand, tool, handle)) === 'finished',
+        );
       } finally {
         await stand.close();
       }
     },
   );
-
-  it('with them, the tool lists background', async () => {
-    const stand = await longStand('GetSqlQuery', {
-      backgroundRuns: new InMemoryBackgroundRuns(),
-    });
-    try {
-      expect(await stand.inputs('GetSqlQuery')).toContain('background');
-      expect(await stand.described('GetSqlQuery')).toContain('run_handle');
-    } finally {
-      await stand.close();
-    }
-  });
 });
 
 describe.each([

@@ -18,7 +18,10 @@ import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
-import { longToolInTheCall } from '../../../lib/backgroundRuns/tools';
+import {
+  isBackgroundRunTool,
+  longToolInTheCall,
+} from '../../../lib/backgroundRuns/tools';
 import { variantOf } from '../../../lib/clients';
 import {
   createAbapConnection,
@@ -161,9 +164,11 @@ describe.each(Object.entries(REGISTRIES))(
       const { registry, definitions } = registeredFor();
       const plain = await plainListing(registry);
       expect(plain).toEqual(await listedOn(new StatedServer(registryFor())));
+      // A plain registration keeps no background runs: no background-run tool.
       expect(plain.map((tool) => tool.name)).toEqual(
         definitions
           .map((definition) => definition.name)
+          .filter((name) => !isBackgroundRunTool(name))
           .sort((a, b) => a.localeCompare(b)),
       );
       // A listed long tool as a plain registration hands it out: without

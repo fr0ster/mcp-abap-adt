@@ -4,6 +4,7 @@ import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { ServerRefusal } from '../../auth/serverRefusal.js';
 import {
   BACKGROUND_INVALID_WORDS,
+  isBackgroundRunTool,
   isBackgroundTool,
   longToolInTheCall,
   readBackground,
@@ -92,8 +93,10 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     entry: HandlerEntry,
     callContext: CallContext = () => Promise.resolve(this.context),
   ): void {
-    // A group registered on its own keeps no background runs: a listed long
-    // tool is listed without `background` and answers in the call.
+    // A group registered on its own keeps no background runs: no
+    // background-run tool is listed, and a listed long tool is listed
+    // without `background` and answers in the call.
+    if (isBackgroundRunTool(entry.toolDefinition.name)) return;
     const listed = listedTool(
       isLongTool(entry.toolDefinition.name)
         ? longToolInTheCall(entry.toolDefinition)

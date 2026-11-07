@@ -45,6 +45,7 @@ import {
 import {
   BACKGROUND_INVALID_WORDS,
   backgroundObjectOf,
+  isBackgroundRunTool,
   isBackgroundTool,
   longToolInTheCall,
   readBackground,
@@ -71,6 +72,7 @@ import {
 } from '../lib/batch/sentence.js';
 import { runWithCallTransport } from '../lib/callTransport.js';
 import { hasMethod } from '../lib/capability.js';
+import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
   systemKindOf,
@@ -85,14 +87,17 @@ import {
   isDebuggerOwnConnectionTool,
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
+import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import type {
   HandlerEntry,
+  IHandlerGroup,
   IHandlersRegistry,
   SapEnvironment,
   ToolArgs,
 } from '../lib/handlers/interfaces.js';
 import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import { noConnectionContext } from '../lib/handlers/registry/expositionRegistry.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
   type ClaimedSession,
@@ -1409,7 +1414,9 @@ export abstract class BaseMcpServer extends McpServer {
   protected registerHandlers(handlersRegistry: IHandlersRegistry): void {
     // Get handler groups from registry
     if (handlersRegistry instanceof CompositeHandlersRegistry) {
-      const groups = handlersRegistry.getHandlerGroups();
+      const groups = this.withBackgroundRunTools(
+        handlersRegistry.getHandlerGroups(),
+      );
       // Where the instance has a batch owner, every tool's description but
       // a batch tool's ends with its batch sentence (spec §3).
       const sentenced = this.batch !== undefined;
@@ -1417,6 +1424,8 @@ export abstract class BaseMcpServer extends McpServer {
       // read: this instance holds a strategy and serves the tool that reads
       // its runs. Elsewhere it is listed without the parameter and answers
       // in the call.
+      // The background-run tools are listed only where a strategy keeps the
+      // runs: without one, none is listed, whichever registry brought them.
       const served = new Set(
         groups.flatMap((group) =>
           group
@@ -1442,6 +1451,9 @@ export abstract class BaseMcpServer extends McpServer {
             this.systemType ?? process.env.SAP_SYSTEM_TYPE,
           );
           const name = entry.toolDefinition.name;
+          if (this.backgroundRuns === undefined && isBackgroundRunTool(name)) {
+            continue;
+          }
           if (
             isLongTool(name) &&
             (this.backgroundRuns === undefined ||
@@ -1794,6 +1806,39 @@ export abstract class BaseMcpServer extends McpServer {
       handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
   }
+  /**
+   * The registry's groups, and — on an instance that holds a strategy — the
+   * background-run tools beside every listed long tool they carry (the
+   * owner, D24: a set with a long tool serves the tools that read, list and
+   * end its runs): the full ones beside a full long tool, compact's beside
+   * a compact one, each when the registry does not already carry them.
+   * Without a strategy nothing is added (and none is listed).
+   */
+  private withBackgroundRunTools(groups: IHandlerGroup[]): IHandlerGroup[] {
+    if (this.backgroundRuns === undefined) return groups;
+    const names = new Set(
+      groups.flatMap((group) =>
+        group
+          .getHandlers()
+          .map((entry: HandlerEntry) => entry.toolDefinition.name),
+      ),
+    );
+    const readers = new Set(
+      [...names].filter(isLongTool).map((name) => runToolsOf(name).get),
+    );
+    const added: IHandlerGroup[] = [];
+    if (readers.has('GetBackgroundRun') && !names.has('GetBackgroundRun')) {
+      added.push(new BackgroundRunHandlersGroup(noConnectionContext()));
+    }
+    if (
+      readers.has('HandlerBackgroundRunGet') &&
+      !names.has('HandlerBackgroundRunGet')
+    ) {
+      added.push(new CompactBackgroundRunHandlersGroup(noConnectionContext()));
+    }
+    return [...groups, ...added];
+  }
+
   /**
    * Whether a call of `tool` meets an open batch: a batch is open and `tool`
    * is neither a batch tool nor a long-session tool — those run beside it,

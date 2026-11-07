@@ -418,7 +418,7 @@ describe('the limit per caller', () => {
 });
 
 describe('without a strategy', () => {
-  it('refuses background: true in fixed words, before any connection, and the tools too', async () => {
+  it('refuses background: true in fixed words, before any connection, and lists no background-run tool', async () => {
     const bare = await callerOn(stand.standIn, undefined, {
       user: 'RUN_USER',
     });
@@ -434,15 +434,15 @@ describe('without a strategy', () => {
         message: BACKGROUND_RUNS_UNAVAILABLE_WORDS,
       });
       expect(stand.standIn.requests).toHaveLength(before);
+      // Without a strategy no background-run tool is listed.
       for (const tool of [
         'ListBackgroundRuns',
         'GetBackgroundRun',
         'DiscardBackgroundRun',
       ]) {
         const answer = await bare.call(tool, { run_handle: 'x' });
-        expect(answer.payload).toMatchObject({
-          error: 'background_runs_unavailable',
-        });
+        expect(answer.isError).toBe(true);
+        expect(answer.payload.text).toContain(`Tool ${tool} not found`);
       }
       // Without `background` the tool runs as ever.
       expect((await bare.call('RuntimeRunClass', RUN)).isError).toBe(false);

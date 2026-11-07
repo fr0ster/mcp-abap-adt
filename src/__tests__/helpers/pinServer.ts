@@ -31,6 +31,13 @@ import { InMemoryBackgroundRuns } from '../../../background-runs-memory/src/InMe
 import { compactToolSet } from '../../../compact/src/launcher';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { McpResult } from '../../lib/answer';
+import type {
+  BackgroundRunAnswer,
+  BackgroundRunCaller,
+  BackgroundRunStart,
+  BackgroundRunStarted,
+  IBackgroundRuns,
+} from '../../lib/backgroundRuns/contract';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
 import type { ToolArgs } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -59,10 +66,69 @@ export type PinSetup = 'leftover-session';
 
 export interface PinServer {
   call(tool: string, args: ToolArgs): Promise<McpResult>;
+  /**
+   * Settles once every background run the server started has ended: its
+   * answer handed to the store (`finish`). A run's end is waited for on
+   * the store, never polled.
+   */
+  runsEnded(): Promise<void>;
   close(): Promise<void>;
 }
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
+
+/**
+ * The launchers' store (`InMemoryBackgroundRuns`), its runs counted: how
+ * many it took and has not been handed the answer of, and who waits for
+ * none to be left.
+ */
+class PinBackgroundRuns implements IBackgroundRuns {
+  private readonly kept = new InMemoryBackgroundRuns();
+  private running = 0;
+  private waiting: Array<() => void> = [];
+
+  /** Settles once no run the store took is without its answer. */
+  ended(): Promise<void> {
+    if (this.running === 0) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      this.waiting.push(resolve);
+    });
+  }
+
+  async start(
+    caller: BackgroundRunCaller,
+    run: BackgroundRunStart,
+  ): Promise<BackgroundRunStarted> {
+    const started = await this.kept.start(caller, run);
+    if ('handle' in started) this.running += 1;
+    return started;
+  }
+
+  async finish(
+    handle: string,
+    answer: BackgroundRunAnswer,
+    finishedAt: string,
+  ): Promise<void> {
+    await this.kept.finish(handle, answer, finishedAt);
+    this.running -= 1;
+    if (this.running > 0) return;
+    const waiting = this.waiting;
+    this.waiting = [];
+    for (const resolve of waiting) resolve();
+  }
+
+  get(handle: string, caller: BackgroundRunCaller) {
+    return this.kept.get(handle, caller);
+  }
+
+  list(caller: BackgroundRunCaller) {
+    return this.kept.list(caller);
+  }
+
+  discard(handle: string, caller: BackgroundRunCaller) {
+    return this.kept.discard(handle, caller);
+  }
+}
 
 class PinMcpServer extends BaseMcpServer {
   use(source: ServerSource): void {
@@ -186,13 +252,14 @@ export async function inProcessServer(
       destination: PIN_DESTINATION,
     });
   }
+  const runs = new PinBackgroundRuns();
   const server = new PinMcpServer({
     name: 'pin-server',
     logger: silent,
     systemType: variant,
     systemContextResolver: defaultSystemContextResolver,
     batch: new InstanceBatch({ keepRawParts: false }),
-    backgroundRuns: new InMemoryBackgroundRuns(),
+    backgroundRuns: runs,
     leftoverSessions,
     longSession: new LongSession(),
   });
@@ -209,6 +276,7 @@ export async function inProcessServer(
   return {
     call: async (tool, args) =>
       resultOf(await client.callTool({ name: tool, arguments: { ...args } })),
+    runsEnded: () => runs.ended(),
     close: async () => {
       await client.close();
       await server.terminalClose();

@@ -15,6 +15,14 @@
  * - the read-only sets (`core-ro`, `compact-ro`) list the three run tools
  *   and run the first case.
  *
+ * **Where the calls go.** The suite is a `liveSuite`; each of its three
+ * sets is served by an in-process server of its own, the suite's runner for
+ * the set's cases (`useLiveRunner`), on a guarded connection opened as
+ * `liveSuite`'s runner opens one. The suite's own runner is not used: its
+ * connection, tracked, is logged off when the file ends. The server is
+ * reached over an in-memory MCP transport by plain JSON-RPC requests
+ * (`InMemoryMcpClient`): no SDK client, so no request timer.
+ *
  * **What makes the cancel deterministic.** The read is the shared table's
  * rows (`GetSqlQuery`, `HandlerGetData`): one request. The run's own
  * connection is the test's (the fresh-connection factory registered for the
@@ -35,15 +43,21 @@
  * promise the code under test settles; no timer, no polling.
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolResultSchema,
+  isJSONRPCErrorResponse,
+  isJSONRPCResultResponse,
+  type JSONRPCMessage,
+  LATEST_PROTOCOL_VERSION,
+  ListToolsResultSchema,
+  type RequestId,
+  type Result,
+} from '@modelcontextprotocol/sdk/types.js';
 import { InMemoryBackgroundRuns } from '../../../../background-runs-memory/src/InMemoryBackgroundRuns';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
@@ -72,13 +86,13 @@ import {
   configuredSystemKind,
   getSharedDependenciesConfig,
 } from '../helpers/configHelpers';
-import { NO_KIND_STATED } from '../helpers/configuredSystemKind';
 import {
   type LiveAnswer,
   type LiveRunner,
   liveCall,
-  liveDescribe,
   livePrepare,
+  liveSuite,
+  useLiveRunner,
 } from '../helpers/live';
 import { endTestConnection, trackConnection } from '../helpers/openConnections';
 import { primeSystemContext } from '../helpers/primeSystemContext';
@@ -86,7 +100,6 @@ import {
   type GuardedConnection,
   guardedTestConnection,
 } from '../helpers/refusalGuard';
-import { testConfigPathFromEnv } from '../helpers/testConfigPath';
 
 // ---------------------------------------------------------------------------
 // Waits on what the code under test settles
@@ -217,7 +230,7 @@ function observed(
 }
 
 // ---------------------------------------------------------------------------
-// The in-process server of one tool set
+// The in-process server of one tool set, and its client
 
 class LiveRunServer extends BaseMcpServer {
   use(connection: IAbapConnection, destination: string): void {
@@ -235,7 +248,105 @@ class LiveRunServer extends BaseMcpServer {
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
-/** What a suite's server holds beside its runner. */
+/**
+ * The client end of an in-memory MCP transport, by plain JSON-RPC
+ * requests: each request answered by the response of its id, with no timer
+ * of its own; the server's notifications are not read.
+ */
+class InMemoryMcpClient {
+  private nextId = 0;
+  private readonly waiting = new Map<
+    RequestId,
+    { resolve(result: Result): void; reject(error: Error): void }
+  >();
+
+  constructor(private readonly transport: InMemoryTransport) {
+    transport.onmessage = (message) => this.received(message);
+  }
+
+  private received(message: JSONRPCMessage): void {
+    if (isJSONRPCResultResponse(message)) {
+      this.waiting.get(message.id)?.resolve(message.result);
+      this.waiting.delete(message.id);
+    } else if (isJSONRPCErrorResponse(message)) {
+      const id = message.id;
+      if (id === undefined) return;
+      this.waiting
+        .get(id)
+        ?.reject(
+          new Error(
+            `MCP error ${message.error.code}: ${message.error.message}`,
+          ),
+        );
+      this.waiting.delete(id);
+    }
+  }
+
+  private request(
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<Result> {
+    this.nextId += 1;
+    const id = this.nextId;
+    const answered = new Promise<Result>((resolve, reject) => {
+      this.waiting.set(id, { resolve, reject });
+    });
+    return this.transport
+      .send({ jsonrpc: '2.0', id, method, params })
+      .then(() => answered);
+  }
+
+  /** The MCP handshake: `initialize`, then `notifications/initialized`. */
+  async connect(): Promise<void> {
+    await this.transport.start();
+    await this.request('initialize', {
+      protocolVersion: LATEST_PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: 'live', version: '1.0.0' },
+    });
+    await this.transport.send({
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+    });
+  }
+
+  async callTool(tool: string, args: ToolArgs): Promise<LiveAnswer> {
+    const result = toolAnswer(
+      CallToolResultSchema.parse(
+        await this.request('tools/call', {
+          name: tool,
+          arguments: { ...args },
+        }),
+      ),
+    );
+    const content = result.content.map((item) => ({
+      type: 'text' as const,
+      text: item.text,
+    }));
+    return {
+      isError: result.isError === true,
+      content,
+      text: content.map((item) => item.text).join('\n'),
+    };
+  }
+
+  async listTools(): Promise<string[]> {
+    const listed = ListToolsResultSchema.parse(
+      await this.request('tools/list', {}),
+    );
+    return listed.tools.map((tool) => tool.name);
+  }
+
+  close(): Promise<void> {
+    for (const pending of this.waiting.values()) {
+      pending.reject(new Error('the client closed'));
+    }
+    this.waiting.clear();
+    return this.transport.close();
+  }
+}
+
+/** What a set's server holds beside its runner. */
 interface Served {
   readonly runs: ObservedRuns;
   /** Every fresh connection the server opened, in order. */
@@ -249,28 +360,12 @@ interface Served {
 let served: Served | undefined;
 
 function current(): Served {
-  if (served === undefined) throw new Error('no server: inside a suite only');
+  if (served === undefined) throw new Error('no server: inside a set only');
   return served;
 }
 
-/** A tool call's answer as the MCP client declares it. */
-type CallAnswer = Awaited<ReturnType<Client['callTool']>>;
-
-function liveAnswerOf(answer: CallAnswer): LiveAnswer {
-  const result = toolAnswer(CallToolResultSchema.parse(answer));
-  const content = result.content.map((item) => ({
-    type: 'text' as const,
-    text: item.text,
-  }));
-  return {
-    isError: result.isError === true,
-    content,
-    text: content.map((item) => item.text).join('\n'),
-  };
-}
-
 /**
- * The runner of a suite: the configured destination's guarded connection
+ * The runner of a set: the configured destination's guarded connection
  * (as `liveSuite`'s runner opens it), injected into an in-process server
  * serving `toolSet` with the background-run store; every call goes through
  * the server's dispatch. The connection's fresh connections are the test's
@@ -312,8 +407,9 @@ async function serverRunner(
   server.use(connection, destination.destination);
   server.register(toolSet);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'live', version: '1.0.0' });
-  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+  const client = new InMemoryMcpClient(clientSide);
+  await server.connect(serverSide);
+  await client.connect();
 
   served = {
     runs,
@@ -323,17 +419,13 @@ async function serverRunner(
       hold = gate.promise;
       return { release: gate.resolve };
     },
-    tools: async () =>
-      (await client.listTools()).tools.map((tool) => tool.name),
+    tools: () => client.listTools(),
   };
   return {
     system,
     user: destination.settings.username ?? '',
     connection: () => connection,
-    call: async (tool: string, args: ToolArgs) =>
-      liveAnswerOf(
-        await client.callTool({ name: tool, arguments: { ...args } }),
-      ),
+    call: (tool, args) => client.callTool(tool, args),
     close: async () => {
       served = undefined;
       await client.close();
@@ -347,59 +439,45 @@ async function serverRunner(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Where the suites run (as `liveSuite` decides it)
-
-function hasTestConfig(): boolean {
-  return (
-    testConfigPathFromEnv() !== undefined ||
-    fs.existsSync(
-      path.join(__dirname, '..', '..', '..', '..', 'tests', 'test-config.yaml'),
-    )
-  );
+/** The configured system, inside a `liveSuite` that runs on it. */
+function configuredSystem(): SystemKind {
+  const kind = configuredSystemKind();
+  if (kind !== 'onprem' && kind !== 'cloud') {
+    throw new Error(`no system this suite runs on is configured: ${kind}`);
+  }
+  return kind;
 }
 
 /**
- * A suite of live cases on `systems`, its calls through a server serving
- * `toolSet`. Without a config, or on a system it does not name, it skips
- * and logs the reason.
+ * The cases of the enclosing describe go to a server serving `toolSet`: its
+ * runner is the suite's from before them until after them, when it is
+ * closed and its connection logged off.
  */
-function serverSuite(
-  systems: readonly SystemKind[],
-  toolSet: ToolSet,
-  title: string,
-  body: () => void,
-): void {
-  const reason = !hasTestConfig()
-    ? 'no test config (tests/test-config.yaml or MCP_TEST_CONFIG)'
-    : undefined;
-  const stated = reason === undefined ? configuredSystemKind() : undefined;
-  const kind = stated === 'onprem' || stated === 'cloud' ? stated : undefined;
-  const skipped =
-    reason ??
-    (stated === undefined
-      ? NO_KIND_STATED
-      : kind === undefined || !systems.includes(kind)
-        ? `the configured system is ${stated}; this suite runs on ${systems.join(', ')}`
-        : undefined);
-  if (skipped !== undefined || kind === undefined) {
-    console.log(`[serverSuite] ${title}: skipped — ${skipped}`);
-    describe.skip(title, body);
-    return;
-  }
-  liveDescribe(
-    title,
-    () => serverRunner(kind, toolSet),
-    async (ending) => {
-      await ending.close();
-      await endTestConnection(ending.connection());
-    },
-    body,
-  );
+function servedBy(toolSet: ToolSet): void {
+  let runner: LiveRunner | undefined;
+  beforeAll(async () => {
+    runner = await serverRunner(configuredSystem(), toolSet);
+    useLiveRunner(runner);
+  });
+  afterAll(async () => {
+    useLiveRunner(undefined);
+    const ending = runner;
+    runner = undefined;
+    if (ending === undefined) return;
+    await ending.close();
+    await endTestConnection(ending.connection());
+  });
 }
 
 // ---------------------------------------------------------------------------
 // The read and its answers
+
+/** A member of a JSON value, read by shape. */
+function member(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null
+    ? Reflect.get(value, key)
+    : undefined;
+}
 
 /** The shared table the configured system holds: what the read reads. */
 function sharedTable(): string {
@@ -421,16 +499,9 @@ function sharedTable(): string {
   return name;
 }
 
-/** The query every case reads: a few rows of the shared table. */
+/** The query every case reads: the rows of the shared table. */
 function query(): string {
   return `SELECT * FROM ${sharedTable()}`;
-}
-
-/** A member of a JSON value, read by shape. */
-function member(value: unknown, key: string): unknown {
-  return typeof value === 'object' && value !== null
-    ? Reflect.get(value, key)
-    : undefined;
 }
 
 /** The JSON of an answer's `at`-th content item. */
@@ -460,6 +531,15 @@ function startedHandle(tool: string, answer: LiveAnswer): string {
   return handle;
 }
 
+/** A run read `finished`: its header, then the rows of the shared table. */
+function expectFinished(answer: LiveAnswer, handle: string, tool: string) {
+  const header = itemOf(succeeded(`the run of ${tool}`, answer), 0);
+  expect(member(header, 'state')).toBe('finished');
+  expect(member(header, 'run_handle')).toBe(handle);
+  expect(member(header, 'tool')).toBe(tool);
+  expectRows(itemOf(answer, 1));
+}
+
 /** The rows of the shared table, as the read answers them. */
 function expectRows(payload: unknown): void {
   expect(member(payload, 'sql_query')).toBe(query());
@@ -475,92 +555,44 @@ function expectNotAvailable(answer: LiveAnswer): void {
   );
 }
 
-/** The names of the three run tools of a set. */
-interface RunTools {
-  readonly get: string;
-  readonly list: string;
-  readonly discard: string;
-}
-
-const FULL_RUN_TOOLS: RunTools = {
-  get: 'GetBackgroundRun',
-  list: 'ListBackgroundRuns',
-  discard: 'DiscardBackgroundRun',
-};
-
-const COMPACT_RUN_TOOLS: RunTools = {
-  get: 'HandlerBackgroundRunGet',
-  list: 'HandlerBackgroundRunList',
-  discard: 'HandlerBackgroundRunDiscard',
-};
-
-/** A long read of a set: its tool and the arguments reading the shared table. */
-interface LongRead {
-  readonly tool: string;
-  args(): ToolArgs;
-}
-
-const SQL_READ: LongRead = {
-  tool: 'GetSqlQuery',
-  args: () => ({ sql_query: query(), row_number: 5 }),
-};
-
-const COMPACT_SQL_READ: LongRead = {
-  tool: 'HandlerGetData',
-  args: () => ({ sql_query: query(), max_rows: 5 }),
-};
-
-/**
- * Case 1: called without `background`, the read answers a `run_handle`;
- * its finished answer is read once, and a second read answers "not
- * available".
- */
-async function defaultBackgroundReadsOnce(
-  read: LongRead,
-  tools: RunTools,
-): Promise<void> {
-  const handle = startedHandle(
-    read.tool,
-    await liveCall(read.tool, read.args()),
-  );
-  await current().runs.ended(handle);
-
-  const finished = succeeded(
-    tools.get,
-    await liveCall(tools.get, { run_handle: handle }),
-  );
-  const header = itemOf(finished, 0);
-  expect(member(header, 'state')).toBe('finished');
-  expect(member(header, 'run_handle')).toBe(handle);
-  expect(member(header, 'tool')).toBe(read.tool);
-  expectRows(itemOf(finished, 1));
-
-  expectNotAvailable(await livePrepare(tools.get, { run_handle: handle }));
-  expect(current().runs.finishCount(handle)).toBe(1);
+/** The tools a set lists, among them `names`. */
+async function expectListed(names: readonly string[]): Promise<void> {
+  expect(await current().tools()).toEqual(expect.arrayContaining([...names]));
 }
 
 // ---------------------------------------------------------------------------
 // The cases
 
-serverSuite(
-  ['onprem', 'cloud'],
-  fullToolSet,
-  'Background runs of a long read (core)',
-  () => {
+liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
+  describe('core', () => {
+    servedBy(fullToolSet);
+
     it('a long read called without background answers a run_handle, read finished once', async () => {
-      await defaultBackgroundReadsOnce(SQL_READ, FULL_RUN_TOOLS);
+      const started = await liveCall('GetSqlQuery', {
+        sql_query: query(),
+        row_number: 5,
+      });
+      const handle = startedHandle('GetSqlQuery', started);
+      await current().runs.ended(handle);
+
+      const finished = await liveCall('GetBackgroundRun', {
+        run_handle: handle,
+      });
+      expectFinished(finished, handle, 'GetSqlQuery');
+      expectNotAvailable(
+        await livePrepare('GetBackgroundRun', { run_handle: handle }),
+      );
+      expect(current().runs.finishCount(handle)).toBe(1);
     });
 
     it('a long read with background false answers its result in the call, on a session of its own', async () => {
       const before = current().own.length;
-      const answer = succeeded(
-        'GetSqlQuery',
-        await liveCall('GetSqlQuery', {
-          ...SQL_READ.args(),
-          background: false,
-        }),
-      );
-      const payload = itemOf(answer, 0);
+      const answered = await liveCall('GetSqlQuery', {
+        sql_query: query(),
+        row_number: 5,
+        background: false,
+      });
+      const payload = itemOf(succeeded('GetSqlQuery', answered), 0);
       expect(member(payload, 'run_handle')).toBeUndefined();
       expectRows(payload);
       // One connection of its own, logged off after the answer.
@@ -573,7 +605,7 @@ serverSuite(
       const held = current().holdNext();
       const handle = startedHandle(
         'GetSqlQuery',
-        await livePrepare('GetSqlQuery', SQL_READ.args()),
+        await livePrepare('GetSqlQuery', { sql_query: query(), row_number: 5 }),
       );
       const own = current().own.at(-1);
       if (own === undefined) throw new Error('the run opened no connection');
@@ -581,11 +613,10 @@ serverSuite(
       await own.entered;
       expect(own.logoffs()).toBe(0);
 
-      const discarded = succeeded(
-        'DiscardBackgroundRun',
-        await liveCall('DiscardBackgroundRun', { run_handle: handle }),
-      );
-      expect(itemOf(discarded, 0)).toEqual({
+      const discarded = await liveCall('DiscardBackgroundRun', {
+        run_handle: handle,
+      });
+      expect(itemOf(succeeded('DiscardBackgroundRun', discarded), 0)).toEqual({
         run_handle: handle,
         state: 'cancelled',
       });
@@ -595,11 +626,11 @@ serverSuite(
       await own.connection.flushGoodbye();
       expect(own.connection.isConnected()).toBe(false);
 
-      const listed = succeeded(
-        'ListBackgroundRuns',
-        await liveCall('ListBackgroundRuns', {}),
+      const listed = await liveCall('ListBackgroundRuns', {});
+      const runs = member(
+        itemOf(succeeded('ListBackgroundRuns', listed), 0),
+        'runs',
       );
-      const runs = member(itemOf(listed, 0), 'runs');
       expect(
         Array.isArray(runs)
           ? runs
@@ -624,49 +655,65 @@ serverSuite(
       expect(current().runs.finishCount(handle)).toBe(1);
       expect(own.logoffs()).toBe(1);
     });
-  },
-);
+  });
 
-serverSuite(
-  ['onprem', 'cloud'],
-  fullReadOnlyToolSet,
-  'Background runs of a long read (core-ro)',
-  () => {
+  describe('core-ro', () => {
+    servedBy(fullReadOnlyToolSet);
+
     it('the read-only set lists the three run tools', async () => {
-      const tools = await current().tools();
-      expect(tools).toEqual(
-        expect.arrayContaining([
-          FULL_RUN_TOOLS.get,
-          FULL_RUN_TOOLS.list,
-          FULL_RUN_TOOLS.discard,
-        ]),
-      );
+      await expectListed([
+        'GetBackgroundRun',
+        'ListBackgroundRuns',
+        'DiscardBackgroundRun',
+      ]);
     });
 
     it('a long read called without background answers a run_handle, read finished once', async () => {
-      await defaultBackgroundReadsOnce(SQL_READ, FULL_RUN_TOOLS);
-    });
-  },
-);
+      const started = await liveCall('GetSqlQuery', {
+        sql_query: query(),
+        row_number: 5,
+      });
+      const handle = startedHandle('GetSqlQuery', started);
+      await current().runs.ended(handle);
 
-serverSuite(
-  ['onprem', 'cloud'],
-  compactReadOnlyToolSet,
-  'Background runs of a long read (compact-ro)',
-  () => {
+      const finished = await liveCall('GetBackgroundRun', {
+        run_handle: handle,
+      });
+      expectFinished(finished, handle, 'GetSqlQuery');
+      expectNotAvailable(
+        await livePrepare('GetBackgroundRun', { run_handle: handle }),
+      );
+      expect(current().runs.finishCount(handle)).toBe(1);
+    });
+  });
+
+  describe('compact-ro', () => {
+    servedBy(compactReadOnlyToolSet);
+
     it('the read-only compact set lists the three run tools', async () => {
-      const tools = await current().tools();
-      expect(tools).toEqual(
-        expect.arrayContaining([
-          COMPACT_RUN_TOOLS.get,
-          COMPACT_RUN_TOOLS.list,
-          COMPACT_RUN_TOOLS.discard,
-        ]),
-      );
+      await expectListed([
+        'HandlerBackgroundRunGet',
+        'HandlerBackgroundRunList',
+        'HandlerBackgroundRunDiscard',
+      ]);
     });
 
     it('a long read called without background answers a run_handle, read finished once', async () => {
-      await defaultBackgroundReadsOnce(COMPACT_SQL_READ, COMPACT_RUN_TOOLS);
+      const started = await liveCall('HandlerGetData', {
+        sql_query: query(),
+        max_rows: 5,
+      });
+      const handle = startedHandle('HandlerGetData', started);
+      await current().runs.ended(handle);
+
+      const finished = await liveCall('HandlerBackgroundRunGet', {
+        run_handle: handle,
+      });
+      expectFinished(finished, handle, 'HandlerGetData');
+      expectNotAvailable(
+        await livePrepare('HandlerBackgroundRunGet', { run_handle: handle }),
+      );
+      expect(current().runs.finishCount(handle)).toBe(1);
     });
-  },
-);
+  });
+});

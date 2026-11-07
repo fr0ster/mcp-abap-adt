@@ -40,7 +40,13 @@ import {
   isDimension,
   keyOf,
 } from '../unit/coverage/coverageKeys';
-import { type AdtStandIn, adtStandIn, type StandInRequest } from './adtStandIn';
+import {
+  type AdtStandIn,
+  adtStandIn,
+  isLogoff,
+  type StandInHold,
+  type StandInRequest,
+} from './adtStandIn';
 import { holdingLockOf } from './heldLocks';
 import { type PinSetup, pinServer } from './pinServer';
 import {
@@ -67,6 +73,7 @@ export const PIN_PORTS = { first: 47100, last: 47199 } as const;
 export const PIN_PORT_OWNERS: Readonly<Record<string, number>> = {
   'src/__tests__/unit/coverage/pinCases.test.ts': 47100,
   'src/__tests__/unit/systemKind/programOnJwtOnPremise.test.ts': 47101,
+  'src/__tests__/unit/pins/backgroundRuns.pins.test.ts': 47102,
 };
 
 /** The repository root, from this helper's place. */
@@ -112,6 +119,17 @@ export interface PinCase {
     bind?: Readonly<Record<string, Binding>>;
   }>;
   refusal?: 'answer' | 'thrown';
+  /**
+   * What a `server` case waits for at the stand-in, so its window holds
+   * what it sends and nothing else, without a timer:
+   * - `own-session`: the case's call opens a session of its own (a listed
+   *   long tool's) and logs it off as it ends; the case's requests are read
+   *   once that logoff has arrived, so it is among them;
+   * - `background-runs`: before the case's own call, every
+   *   background run its `before` steps started has ended (its answer kept)
+   *   and its session's logoff has arrived, outside the case's window.
+   */
+  settle?: 'own-session' | 'background-runs';
   expected: readonly PinnedRequest[] | 'none' | 'nothing-sent';
   ran?: (answer: McpResult) => void;
 }
@@ -429,12 +447,29 @@ function answerByIndex(stand: AdtStandIn, answers: PinCase['answers']): void {
   );
 }
 
-/** The calls of `before`, then the case's own: the answers, and where its requests begin. */
+/**
+ * Settles when the next request `match` accepts has arrived at the stand-in
+ * (it is then among its requests); the request is answered as ever, at
+ * once — a hold released as it arrives.
+ */
+function arrivalOf(
+  stand: AdtStandIn,
+  match: (request: StandInRequest) => boolean,
+): Promise<void> {
+  const hold: StandInHold = stand.hold(match);
+  return hold.arrived.then(() => hold.release());
+}
+
+/**
+ * The calls of `before`, then `between`, then the case's own: the answers,
+ * and where its requests begin.
+ */
 async function runCalls(
   c: PinCase,
   call: (tool: string, args: ToolArgs) => Promise<McpResult>,
   sent: () => number,
   mark: { from: number },
+  between?: () => Promise<void>,
 ): Promise<McpResult> {
   const answers: McpResult[] = [];
   for (const step of c.before ?? []) {
@@ -442,6 +477,7 @@ async function runCalls(
       await call(step.tool, withBindings(step.args, step.bind, answers)),
     );
   }
+  await between?.();
   const args = withBindings(c.args, c.bind, answers);
   // The case's own requests begin here, whether its call answers or throws.
   mark.from = sent();
@@ -460,6 +496,9 @@ export async function recordCase(
   const closing: Array<() => Promise<void>> = [];
   try {
     if (c.stand === 'recording') {
+      if (c.settle !== undefined) {
+        throw new Error("settle needs stand: 'server'");
+      }
       const connection = recordingConnection([...(c.answers ?? [])]);
       declareSystemKind(connection, c.variant);
       const call = async (tool: string, args: ToolArgs) =>
@@ -499,10 +538,29 @@ export async function recordCase(
     closing.push(() => stand.close());
     answerByIndex(stand, c.answers);
     let call: (tool: string, args: ToolArgs) => Promise<McpResult>;
+    // What the case waits for before its own call (`settle`).
+    let between: (() => Promise<void>) | undefined;
+    // The case's own session's logoff, held from its call on (`own-session`).
+    const own: { logoff?: Promise<void> } = {};
     if (c.stand === 'server') {
       const server = await pinServer(c.variant, stand, c.setup);
       closing.unshift(() => server.close());
       call = (tool, args) => server.call(tool, args);
+      if (c.settle === 'own-session') {
+        between = async () => {
+          own.logoff = arrivalOf(stand, (request) => isLogoff(request.url));
+        };
+      }
+      if (c.settle === 'background-runs') {
+        // Armed before the steps: the logoff of the run they start.
+        const runLogoff = arrivalOf(stand, (request) => isLogoff(request.url));
+        between = async () => {
+          await server.runsEnded();
+          await runLogoff;
+        };
+      }
+    } else if (c.settle !== undefined) {
+      throw new Error("settle needs stand: 'server'");
     } else {
       const connection = createAbapConnection(
         {
@@ -530,7 +588,14 @@ export async function recordCase(
     }
     const mark = { from: stand.requests.length };
     try {
-      const answer = await runCalls(c, call, () => stand.requests.length, mark);
+      const answer = await runCalls(
+        c,
+        call,
+        () => stand.requests.length,
+        mark,
+        between,
+      );
+      if (own.logoff !== undefined) await own.logoff;
       const requests = stand.requests.slice(mark.from).map(toPinned);
       return { requests, answer, thrown: undefined };
     } catch (thrown) {

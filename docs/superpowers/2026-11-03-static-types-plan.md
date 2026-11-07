@@ -2796,6 +2796,14 @@ Step 4 names.
   Step 4c's); the counters are taken from what was read.
 
   Affected suites (each rewritten to skip-and-count, red first):
+  `src/__tests__/lib/search-source/sourceReader.test.ts` — its failure-contract cases move
+  here, red first: today they expect failed outcomes and read `failure` (`kind: 'source'`,
+  `object_name`, `step`, `error`), e.g. "a class main source SAP answers 404 is a failure"
+  and "a unit whose read throws is a failure; the reads go on with the rest". They are
+  rewritten to expect the failed source yielded as nothing — no failed outcome, no
+  `failure` — and the object's other sources still yielded in order (`Z_FM_A`, `Z_FM_C`;
+  the class's four local includes); its DO18 rewrites (a module as its own object) stay in
+  Step 4b,
   `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
   `src/__tests__/lib/search-source/packageResolver.test.ts` (a refused mask),
   `src/__tests__/lib/search-source/packageEnumerator.test.ts` (a refused or missing walk),
@@ -2852,14 +2860,29 @@ Step 4 names.
     fields fill the read tool's required arguments (`GetFunctionModule`, `GetFunctionInclude`,
     `GetInclude`, `GetProgram`, `GetClass` and the local includes, `GetInterface`, the CDS,
     BDEF, DDLX and SRVD reads), checked against their schemas;
-  - `'the page stays over the walk's targets'` (cursor unchanged with modules split out).
+  - `'the page stays over the walk's targets'` (cursor unchanged with modules split out);
+  - `'each object has its own max_hits_per_object'`: a group with two modules and an include
+    of its own, the first module holding more hits than `max_hits_per_object` — the second
+    module and the group's include still answer their hits, each up to the limit; only the
+    first module is capped; `truncated.by_object_cap` is set by it; and a case where no object
+    passes its own limit while their sum does — `truncated.by_object_cap` stays false;
+    on both paths.
 
   Then the hit type gains the module's identity (`function_group_name`, present only on a
   module's hit; `include` absent there), the orchestrator emits module hits under the module
   and counts it, and `sourceReader.ts` yields each module's unit with its own object identity
-  instead of as a group include.
+  instead of as a group include. **The per-object hit limit follows the object.** Today the
+  orchestrator (`orchestrator.ts`, the per-target loop: `totalForTarget`, `capHitForTarget`
+  and the probe past the cap) shares one allowance and one capped flag across every source of
+  a function group, so after DO18 one module could use up `max_hits_per_object` and suppress
+  another module's or the group's own hits. From DO18 each separate object — every function
+  module and the group itself — has its own allowance and its own capped flag, and
+  `truncated.by_object_cap` is set when any object's flag is; the probe past the cap probes
+  per object. Both paths (the sequential scan and the batched phases' final scan) go through
+  the same per-object bookkeeping.
 
-  Affected suites: `src/__tests__/lib/search-source/sourceReader.test.ts`,
+  Affected suites: `src/__tests__/lib/search-source/sourceReader.test.ts` (its DO18 cases:
+  module units under their own object; its failure-contract cases are Step 4a's),
   `src/__tests__/lib/search-source/orchestrator.test.ts`,
   `src/__tests__/lib/search-source/cursor.test.ts`,
   `src/__tests__/lib/search-source/packageEnumerator.test.ts` (unchanged walk, kept green),

@@ -497,7 +497,7 @@ on-premise system disagree, the live measurement holds.
     type, its name, its package and `function_group_name` (which `GetFunctionModule` and
     compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`; a hit in the group's
     own includes is the group's, with `include`. The counters count the group and each module
-    apart. Every hit carries what its read tool needs; no object is nested under another. The
+    apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another. The
     page stays over the walk's targets.
     `SearchSource` is not a strict tool (only the create tools are, MIGRATION-24.0), so a call
     that still sends `emit_no_hits` has it dropped, as D24's removed `timeout` is; MIGRATION

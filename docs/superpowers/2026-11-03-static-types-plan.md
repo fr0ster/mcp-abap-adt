@@ -3058,7 +3058,7 @@ Step 4 names.
 **Later work (not 24.0.0, DO13):** SAP's text search
 (`/sap/bc/adt/repository/informationsystem/textsearch`) first when a system offers it, decided
 by its T100 key (`SRIS_SEARCH 006` = not offered, the scan runs), keeping package scope,
-`version`, the filters and paging; measured on a system that offers it before it is designed.
+`version` and the filters; measured on a system that offers it before it is designed.
 Goes into the PR description when this plan is deleted.
 
 **DO11, settled:** `SearchSource`'s `time_budget_ms` and `timeout` were removed in D23a

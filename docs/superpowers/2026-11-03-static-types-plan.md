@@ -2541,9 +2541,10 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 - **adt-clients** (43.x): `AdtUtils.search(criteria)` sends one quick search with `maxResults`
   (default 100); it offers no paging.
 
-**The task is in two parts.** **D23a** needs no SAP and starts now. **D23b** holds the masks and
-the text search, whose design depends on measurements; it waits until the owner restores
-the on-premise tunnel and the trial session, and nothing of it runs before then.
+**The task is in two parts.** **D23a** needs no SAP and starts now. **D23b** holds the masks, the
+line-match strategy and the hits-only answer; the owner decided it on 2026-11-07 from the
+measurements (DO12–DO16), its red-first steps need no SAP, and its live cases wait for the
+owner's go.
 
 #### D23a. Sources, versions, failures, dedup, description (no SAP; starts now)
 
@@ -2619,8 +2620,8 @@ session).*
 - [ ] **Step 6: The description.** `SearchSource`'s description says what the tool does, its
   arguments and its answer — functionally. The advice lines go: "Run only ONE SearchSource
   per destination at a time…", "Prefer combining terms…", "For certainty, pass concrete
-  package names", and the other recommendations. The mask sentence states what D23b will
-  measure only after D23b; until then it states today's behaviour plainly. A description
+  package names", and the other recommendations. The mask sentence states today's behaviour
+  plainly; D23b Step 5 rewrites it for DO12. A description
   test, under the functional-descriptions guard.
 - [ ] **Step 7: Pins, CHANGELOG / MIGRATION.** Pins over corpus answers for each new type's read
   and version, the dedup and the failure kinds. CHANGELOG (Fixed: every source-bearing type
@@ -2628,44 +2629,122 @@ session).*
   description). MIGRATION-24.0: `object_types`' wider set and default, the failure entries'
   shape, and the `VIEW*` modules scanned.
 
-#### D23b. Masks and SAP's text search (owed: measurement first, after the systems are restored)
+#### D23b. Masks, the line-match strategy, hits only (owner, 2026-11-07)
 
-- [ ] **Step 1: Measure the quick search (owed).** On both systems, read-only:
-  - how it treats case, a `/NS/` namespace, `+`, several `*`, and a `*` that matches zero
-    characters;
-  - the full set of characters a package name may hold, and the maximum name length SAP
-    allows (from the system's own definition, read through an existing tool);
-  - what it answers when the hits reach `maxResults`.
+**Measured (both systems, read-only), and decided by the owner:**
+- **The quick search has no window to page around.** Up to `maxResults` 100 000 it answers
+  every match, with no cap and no "more" marker; `*` alone answers every package in seconds.
+  So a mask is resolved by **doubling** `maxResults` until the answer holds fewer packages
+  than `maxResults` (DO12). The disjoint-partition scheme drafted here before is dropped:
+  nothing needs splitting.
+- **SAP's text search is not offered.** It answers `SRIS_SEARCH 006` on both systems; on
+  premise its business function is off. It is **later work, not in 24.0.0** (DO13).
+- **Package walks are quick enough uncapped** (DO16). Known limit, recorded in the spec, no
+  change: on ABAP Cloud a walk of 12 packages took about 130 s, and walk envelopes of about
+  1 000 parts and more failed with an outer `500` after about 600 s (Measured; the 600 s
+  being a limit outside the server is an Inference).
 
-  Recorded in this task.
-- [ ] **Step 2: Define the resolution from the measurement.**
-  - **Disjoint partitions:** a mask that fills the window is split by its next character
-    position into the measured character set, each part disjoint from the others, so no
-    package is counted in two parts;
-  - **the terminal name:** the mask itself without `*` (the exact name the mask also
-    matches) is checked as its own query, once;
-  - **maximum depth:** the measured maximum name length, never a guessed number;
-  - **query dedup:** a query already sent in the call is not sent again;
-  - **incomplete:** any part that still fills the window at the maximum depth is named in
-    the answer as incomplete (an `OperationFailure` of step `package resolution`, with the
-    mask and the part). No package is dropped without being named.
-  - Red tests, on `recordingConnection` over captured answers: the partitions are disjoint and
-    cover the mask; the terminal name is queried once; depth stops at the measured length;
-    no query repeats; the **request count** for a given window-filling mask equals the
-    number of distinct parts; an unresolvable part is reported incomplete.
-- [ ] **Step 3: SAP's text search first, by key (owed for its success shape).** It completes
-  only after the request and the success answer are measured on a system that offers it, and
-  then it must keep package scope, `version`, the filters (`query2`, `exclude`,
-  `object_types`, `object_filter`, comments) and paging (`start_at`, `max_objects`); where it
-  cannot carry one, the scan runs instead, and the reason is recorded. Red tests:
-  - `'exactly SRIS_SEARCH 006 means unavailable, and the scan runs'` (the T100 key read with
-    the parser, never words);
-  - `'an unrelated failure of the text search is recorded as an OperationFailure, then the
-    scan runs'`;
-  - `'a text-search success answers without a fallback scan'` (over the measured answer).
-- [ ] **Step 4: Live cases (owed),** on both systems: a mask that fills the window resolves to
-  completion or names its incomplete part; the text-search key check; a `VIEW*` measurement
-  (D23a Step 2).
+**Files:** `src/lib/search-source/packageResolver.ts` (`isPattern`, the doubling),
+`src/lib/search-source/lineScanner.ts` (the shipped strategy), `src/lib/search-source/orchestrator.ts`
+(the strategy in `OrchestratorDeps`, both paths; `emit_no_hits`, `NoHitEntry`, `no_hits`
+removed), `src/handlers/system/readonly/handleSearchSource.ts` (the schema, the wiring, the
+description), the listed-schema and surface fixtures, `tools/tool-search.json` (generated),
+the tool reference (`docs/user-guide/AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md` through
+`npm run docs:tools`), `README.md` where it describes `SearchSource`, CHANGELOG, MIGRATION-24.0,
+and the unit tests that pass `emit_no_hits` today (`src/__tests__/unit/batch/searchSource.test.ts`,
+`searchSourceEnvelopes.test.ts`).
+
+**Steps (red first):**
+- [ ] **Step 1: What a mask is (DO12).** Red tests on the resolver, over recorded quick-search
+  answers:
+  - `'an entry with ? is a mask'` (`Z?TEST` goes to the quick search, as given);
+  - `'an entry with * is a mask'` (`Z*`, `/NS/Z*`, several `*`);
+  - `'+, _, % and # are literal'`: `Z_PKG`, `Z+PKG`, `Z%PKG`, `Z#PKG` are exact names — no quick
+    search is sent for them and each is walked as named;
+  - `'an entry with neither * nor ? is an exact name'`.
+
+  Then `isPattern` tests `*` and `?` only, and its comment says so.
+- [ ] **Step 2: A mask is resolved completely (DO12).** Red tests, on `recordingConnection`
+  (or the resolver's `searchObjects` double) with answers sized per request:
+  - `'a mask whose answer is shorter than maxResults takes one request'`;
+  - `'a mask whose answer fills maxResults is asked again with maxResults doubled, until the
+    answer is shorter'`: the request sequence pinned (`maxResults` 1000, 2000, 4000, …) and
+    the last answer's packages used;
+  - `'the packages of the last answer are walked, each once'` (the dedup with exact entries
+    stays);
+  - `'a mask SAP refuses at any round is an OperationFailure resolve package mask, and the
+    other entries are scanned'` (the D23a shape, unchanged);
+  - `'a credential failure at any round ends the call'`.
+
+  Then the resolver loops: send with `maxResults`, keep the answer when it holds fewer than
+  `maxResults`, else double and send again. No cap of the server's on the doubling (the
+  quick search has none, measured); no timer. Both paths (sequential and the batched
+  phase that resolves masks) resolve the same way — a round depends on the previous answer,
+  so the rounds are sequential for one mask.
+- [ ] **Step 3: The line match is a strategy (DO14).** Red tests:
+  - `'the orchestrator matches lines through the strategy it is given'`: a recording strategy
+    double receives each source's lines and the call's `query`, `query2`, `exclude`,
+    `exclude_comments` and the per-object hit limit, and its hits are the answer's — on the
+    sequential path and on the batched path alike;
+  - `'the orchestrator has no line match of its own'`: its deps type requires the strategy (a
+    type test: leaving it out does not compile), and the orchestrator module imports no
+    matcher;
+  - `'the shipped strategy keeps today's match'`: the existing `scanLines` cases (case
+    folding, `query2` on the same line, `exclude`, the comment lines, the snippet cut at 255
+    characters, the hit limit and `capped`) run against the shipped strategy unchanged;
+  - `'the handler wires the shipped strategy'`.
+
+  Then a typed strategy interface (lines and the scan input in, hits and `capped` out) in
+  `src/lib/search-source/`, the shipped one built from today's `scanLines`, a required member
+  of `OrchestratorDeps`, wired by `handleSearchSource.ts`. The cap probe past
+  `max_hits_per_object` calls the same strategy.
+- [ ] **Step 4: Only hits are answered (DO15).** A hit keeps `devclass`, `object_type`,
+  `object_name`, `include`, `line` and `snippet` (up to 255 characters). Red tests:
+  - `'an object without a hit is not in the answer'`: no `no_hits` field, on both paths;
+  - `'SearchSource does not declare emit_no_hits'`: the listed-schema fixture;
+  - `'a call that still sends emit_no_hits has it dropped'`: the call answers as without it
+    (no `no_hits`), and nothing is refused — `SearchSource` is not a strict tool (only the
+    create tools are, `createArguments`), the same rule MIGRATION-24.0 states for
+    `lock_handle` on the non-strict update tools and D24 applies to the removed `timeout`;
+  - `'an object with a failure is named in failures only'` (unchanged).
+
+  Then `emit_no_hits`, `NoHitEntry`, `no_hits` and the no-hit bookkeeping go from the
+  orchestrator and the handler; the tests that passed `emit_no_hits` are rewritten to the
+  hits-only answer.
+- [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
+  `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
+  1000 packages"; `emit_no_hits` and `no_hits` leave it. Functional only; a description test
+  under the functional-descriptions guard. `time_budget_ms` and `timeout` are not
+  reintroduced (DO11; D24's regression check).
+- [ ] **Step 6: Pins, docs, CHANGELOG, MIGRATION-24.0.**
+  - Pins over corpus answers: the doubling sequence, the `?` mask, a literal `_` name.
+  - The tool reference regenerated (`npm run docs:tools`), `README.md` and any `docs/` page
+    that describes `SearchSource`'s masks or `no_hits`.
+  - CHANGELOG (24.0.0): Fixed — a package mask is resolved completely (it was cut at 1000
+    packages without a word); `?` is a wildcard and `+` a literal character. Removed —
+    `SearchSource`'s `emit_no_hits` and its `no_hits` answer. Changed — the line match is a
+    strategy (an embedder of the orchestrator passes it).
+  - MIGRATION-24.0, in the `SearchSource` section: a mask is `*` / `?`, and an entry with `+`
+    is an exact name now (write `*` where `+` was meant as a wildcard); a mask answers every
+    matching package; drop `emit_no_hits` (a call that still sends it has it dropped) and read
+    the objects with hits from `results` — an object without a hit is no longer listed;
+    embedders of `runSearchSource` pass the line-match strategy (the shipped one keeps
+    today's match).
+- [ ] **Step 7: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
+  live-run safety:
+  - on premise: a mask with `*` (several, and one matching zero characters), a mask with `?`,
+    and an exact name with a literal `_` — each answers the packages the quick search names,
+    the `*` mask past 1000 packages through the doubling;
+  - a `SearchSource` on premise, and one on ABAP Cloud in the cloud's configured build
+    package, each with a known hit: the hit's object, line and snippet; no `no_hits`;
+  - the `VIEW*` measurement owed by D23a Step 2.
+- [ ] **Step 8:** Commit.
+
+**Later work (not 24.0.0, DO13):** SAP's text search
+(`/sap/bc/adt/repository/informationsystem/textsearch`) first when a system offers it, decided
+by its T100 key (`SRIS_SEARCH 006` = not offered, the scan runs), keeping package scope,
+`version`, the filters and paging; measured on a system that offers it before it is designed.
+Goes into the PR description when this plan is deleted.
 
 **DO11, settled:** `SearchSource`'s `time_budget_ms` and `timeout` were removed in D23a
 (commit `91ee9d14`); D24 only runs the regression check that they stay gone, and removes
@@ -2922,6 +3001,21 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   running read is ended by `DiscardBackgroundRun`.
 - **DO9:** the prose guard recognises SAP-derived values by type and flow, with no allowlist;
   values that cross modules are left to review.
+- **DO12 (2026-11-07, D23b):** a package mask is resolved by doubling the quick search's
+  `maxResults` until the answer holds fewer than `maxResults` (measured: no cap up to 100 000,
+  no "more" marker; `*` answers every package in seconds). `*` and `?` are the wildcards (`?`
+  one character, `*` zero or more); `+`, `_`, `%` and `#` are literal.
+- **DO13 (2026-11-07):** SAP's text search is deferred — later work, not in 24.0.0 (it answers
+  `SRIS_SEARCH 006` on both systems; on premise the business function is off).
+- **DO14 (2026-11-07, D23b):** the line match is a strategy the orchestrator takes explicitly,
+  no default inside it; the shipped strategy keeps today's match; the handler wires it.
+- **DO15 (2026-11-07, D23b):** a hit keeps the object (type, name, package, include), the line
+  number and the line's text (snippet, up to 255 characters); an object without a hit is left
+  out: `emit_no_hits` and `no_hits` are removed (a call that still sends `emit_no_hits` has it
+  dropped — `SearchSource` is not strict).
+- **DO16 (2026-11-07):** package walk envelopes are not capped; the ABAP Cloud limit (12
+  packages about 130 s; envelopes of about 1 000 parts and more an outer `500` after about
+  600 s) is a known limit, no change.
 
 ## Test coverage — the families
 
@@ -3652,7 +3746,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO9 as decided);
+      argument now refused, and the owner's decisions DO1–DO16 as decided);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
       activation waits on long polling with no attempt limit or interval) and C2d's added
@@ -3664,7 +3758,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
     PR description: the owner's decisions (O1–O12), the exceptions the owner granted (none so
     far), D19's later work (the XML wrapper in adt-clients and adt-strategies; a possible
-    switch to `@xmldom/xmldom`), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
+    switch to `@xmldom/xmldom`), D23b's later work (SAP's text search, DO13), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
     unidentifiable leftover fails its case and is named by its description), the accepted
     residual of launched servers (C2 Step 4a: one follow-up request a child
     server may still send inside a refused call), the measured transport delete path, the per-system run counts and the config

@@ -454,12 +454,39 @@ on-premise system disagree, the live measurement holds.
   `version` (element info answers only the active structure, measured; an inactive structure
   is read through the source read with `version: inactive`); only
   `GetIncludesList`'s tree stays on a plain scanner (D22).
-- **SearchSource rework (owner, 2026-11-07, plan D23):** masks resolved completely or
-  named as incomplete; every source-bearing object SAP lists is scanned through the existing
-  readers; no `VIEW*` name skip; no object dropped silently; SAP's text search first when
-  offered, decided by its key; one read per source; a functional description. D23a (sources,
-  versions, failures, dedup, description) needs no SAP; D23b (masks, text search) is
-  measurement-first and owed until the systems are restored.
+- **SearchSource rework (owner, 2026-11-07, plan D23):** every source-bearing object SAP
+  lists is scanned through the existing readers; no `VIEW*` name skip; no object dropped
+  silently; one read per source; a functional description — that is D23a, which needs no
+  SAP. D23b (owner, 2026-11-07) holds the following:
+  - **Masks are resolved completely.** A package mask is resolved by the repository quick
+    search, its `maxResults` doubled until the answer holds fewer packages than `maxResults`.
+    Measured on both systems: the quick search has no cap up to `maxResults` 100 000 and
+    answers no "more" marker; `*` alone answers every package in seconds. A mask SAP refuses
+    stays an `OperationFailure` (`resolve package mask`), as in D23a. (This replaces the
+    earlier idea of splitting a mask into disjoint parts.)
+  - **What a mask is.** `*` and `?` are the wildcards (`?` one character, `*` zero or more);
+    `+`, `_`, `%` and `#` are literal characters of a package name. An entry holding neither
+    `*` nor `?` is an exact package name. Today `+` counts as a wildcard and `?` does not;
+    that is fixed.
+  - **The line match is a strategy.** Today it is hard-wired (`scanLines`,
+    `src/lib/search-source/lineScanner.ts`: a case-insensitive substring per line, with
+    `query2`, `exclude` and `exclude_comments`). It becomes a typed strategy the orchestrator
+    takes explicitly, with no default inside the orchestrator; the shipped strategy keeps
+    today's behaviour, and the handler wires it.
+  - **Only hits are answered.** A hit names the object (type, name, package, include), the
+    line number and the line's text (`snippet`, up to 255 characters). An object without a
+    hit is left out of the answer: `emit_no_hits` and the `no_hits` field are removed.
+    `SearchSource` is not a strict tool (only the create tools are, MIGRATION-24.0), so a call
+    that still sends `emit_no_hits` has it dropped, as D24's removed `timeout` is; MIGRATION
+    says to drop it.
+  - **SAP's text search is later work, not in 24.0.0.** It answers `SRIS_SEARCH 006` ("Source
+    Search is not supported") on both systems (Measured); on premise its business function is
+    off. The scan stays the one path until a system offers it.
+  - **Package walks stay uncapped (owner: packages are found quickly).** Known limit, no
+    change planned: on ABAP Cloud a walk of 12 packages took about 130 s, and walk envelopes
+    of about 1 000 parts and more failed with an outer `500` after about 600 s (Measured);
+    that the 600 s is a limit outside the server is an Inference — its source is not measured.
+  - `time_budget_ms` and `timeout` stay removed (DO11, D24).
 - **Long tools (owner, 2026-11-07, plan D24):** no server-side deadline remains — `timeout` is
   removed from every listed long tool (`SearchSource`'s `time_budget_ms` and `timeout` were already
   removed in D23a); every

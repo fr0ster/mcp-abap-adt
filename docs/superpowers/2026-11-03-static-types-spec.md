@@ -482,8 +482,11 @@ on-premise system disagree, the live measurement holds.
     with no `failures` list. A source or object that cannot be read is skipped — no entry, no
     count; a readable source of the same object is still searched and its hits kept. The
     package-level outcomes follow the same rule: a mask search SAP refuses, a named package
-    that does not exist (`404`) and a refused walk of a package, type node or subpackage are
-    skipped with no entry. The counters count only what was done: `scanned.packages` the
+    that does not exist (its root refused or `404`) are skipped with no entry. A refused level
+    of a walk (a type node or a subpackage, its `404` included) excludes only that branch —
+    the node and everything under it; the package's other nodes, subpackages and objects are
+    walked and searched (owner, DO19; today it ends the package's whole walk). The other
+    walking tools keep their answer. The counters count only what was done: `scanned.packages` the
     packages walked, `scanned.objects` the objects read (at least one source read),
     `scanned.sources` the sources read, and `scanned.objects_with_hits`; `total_targets`,
     `next_start_at` and `truncated` stay. A credential refusal still ends the call. This

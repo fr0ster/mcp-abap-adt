@@ -2545,7 +2545,7 @@ skipped without an entry or a count; the search is about the objects that can be
 
 **The task is in two parts.** **D23a** needs no SAP and starts now. **D23b** holds the masks, the
 line-match strategy, the hits-only answer, the skipped unreadable objects and the function
-module as its own object; the owner decided it on 2026-11-07 (DO12–DO18), its red-first steps
+module as its own object; the owner decided it on 2026-11-07 (DO12–DO19), its red-first steps
 need no SAP, and its live cases wait for the owner's go.
 
 #### D23a. Sources, versions, failures, dedup, description (no SAP; starts now)
@@ -2775,10 +2775,10 @@ Step 4 names.
       scanned;
     - `'a named package that does not exist (its root answers 404) is skipped: no entry, not
       in scanned.packages'`;
-    - `'a refused walk is skipped: no entry, not in scanned.packages'`, for the package itself,
-      a type node and a subpackage. Today a refused level ends that package's walk
-      (`walkPackage` throws, `failed_level` names the level), so the asked package is skipped
-      whole; the test pins that, and the other packages are walked;
+    - `'a refused root is skipped: no entry, not in scanned.packages'`: the asked package's
+      own root refused (or `404`) excludes that package, nothing under it is reachable; the
+      other packages are walked;
+    - the refused levels below the root are Step 4c's (DO19): only that branch is excluded;
     - `'a mask that matches no package answers no packages'` (unchanged);
   - **counters:** `'the counters count only what was done'`, on a page with hit, no-hit and
     unreadable objects and a skipped package: `scanned.packages`, `scanned.objects`,
@@ -2792,7 +2792,8 @@ Step 4 names.
   and `src/lib/search-source/failures.ts` goes with them (its credential check moves to where
   the skip is decided, so a credential refusal still ends the call). `sourceReader.ts` skips a
   failed read and goes on to the object's next source; the resolver skips a refused mask; the
-  enumerator skips a refused or missing package; the counters are taken from what was read.
+  enumerator skips a package whose root is refused or missing (a refused level below it is
+  Step 4c's); the counters are taken from what was read.
 
   Affected suites (each rewritten to skip-and-count, red first):
   `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
@@ -2868,6 +2869,57 @@ Step 4 names.
   `src/__tests__/helpers/sourceReaderFake.ts`, the live assertion in
   `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`, and the
   listed-schema and surface fixtures (the answer's shape).
+- [ ] **Step 4c: A refused level excludes only its branch (DO19).** Today a refused level of
+  a walk ends the asked package's whole walk: `levelOf` (`src/lib/strategies/packageWalk.ts`)
+  throws for a refused level — and, under `missingLevel: 'refused'`, which `SearchSource` passes
+  (`packageEnumerator.ts`' fetcher and the batched orchestration), for a `404` too — and both
+  walkers end the package on it: `walkPackage` (sequential, recursive) and `walkPackages`
+  (batched, level by level, one settlement per package: "the first refused read of its
+  walk"). From DO19, for `SearchSource`:
+  - a refused **type node** (its `404` included) excludes that node and everything under it;
+    the package's other type nodes, its subpackages and their objects are walked and searched;
+  - a refused **subpackage** (its `404` included) excludes that subpackage and its
+    descendants; its siblings and the parent's own objects are walked and searched;
+  - a refused **root** of the asked package excludes that package (Step 4a);
+  - no entry, and nothing excluded is counted; a credential refusal still ends the call.
+
+  Red tests first, on both paths (the sequential `walkPackage` through
+  `createPackageContentsFetcher`, and the batched `walkPackages` through
+  `runSearchSourceInPhases`), on `recordingConnection` with node-structure answers:
+  - `'a refused type node excludes only that node'`: a package with two type nodes, the first
+    refused — the second node's objects are read and their hits answered; no request under the
+    refused node; `scanned.packages` counts the package;
+  - `'a type node answering 404 excludes only that node'` (the same, with `404`);
+  - `'a refused subpackage excludes only its branch'`: a parent with its own objects and two
+    subpackages, one refused (and a case with its `404`) — the parent's objects and the
+    sibling's are searched; the refused subpackage's descendants are not requested; it is not
+    in `scanned.packages`, its sibling and the parent are;
+  - `'a refused root excludes the package'` (Step 4a's case, on both paths);
+  - `'a credential refusal at any level ends the call'`;
+  - `'the other walking tools are unchanged'`: `GetPackageContents`, `GetPackageTree` and the
+    other `walkPackage` / `walkPackages` users keep today's answer for a refused level (their
+    existing tests stay green, with one pinning case added in `packageWalk.test.ts`).
+
+  Then the walkers take the branch rule as an explicit option (beside `missingLevel` in
+  `WalkOptions`, typed; the other callers do not pass it and keep today's behaviour):
+  with it, a refused or missing level below the root yields nothing for that branch and the
+  walk goes on with the next node or subpackage; a refused root still settles the package as
+  refused, which the enumerator skips; a credential refusal still ends the walk.
+  `packageEnumerator.ts`' fetcher and the batched orchestration pass it; the enumerator counts
+  a package in `scanned.packages` only when its own level was read. `failed_level` and the
+  `walk package` failure go with Step 4a's `failures`.
+
+  Affected suites: `src/__tests__/unit/packageWalk.test.ts`,
+  `src/__tests__/unit/batch/packageWalks.test.ts`,
+  `src/__tests__/lib/search-source/packageEnumerator.test.ts`,
+  `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`,
+  `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
+  `src/__tests__/unit/failureStep.test.ts` (its walk cases); the other walkers' suites
+  (`src/__tests__/unit/readonlySingleCall.test.ts`, `src/__tests__/unit/batch/metadataReads.test.ts`,
+  `src/__tests__/unit/runtimeReadersFixRound1.test.ts`, `src/__tests__/unit/detailSurface.test.ts`)
+  stay green unchanged.
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
   1000 packages"; `emit_no_hits`, `no_hits` and `failures` leave it, and it states
@@ -2883,7 +2935,9 @@ Step 4 names.
     packages without a word); `?` is a wildcard and `+` a literal character. Removed —
     `SearchSource`'s `emit_no_hits`, its `no_hits` answer and its `failures` list (what cannot
     be read — a source, an object, a refused mask search, a missing or refused package walk —
-    is skipped; the counters count only what was done; DO17). Added — `scanned.objects_with_hits`.
+    is skipped; the counters count only what was done; DO17). Fixed — a refused or missing
+    type node or subpackage excludes only its branch; the rest of the package is walked and
+    searched (it ended the package's whole walk; DO19). Added — `scanned.objects_with_hits`.
     Changed — a hit in a function module names the module (its type, its name and
     `function_group_name`), not the group with the module as `include` (DO18).
     Changed — the line match is a strategy (an embedder of the orchestrator passes it).
@@ -2893,8 +2947,10 @@ Step 4 names.
     the objects with hits from `results` — an object without a hit is no longer listed;
     the `failures` list is gone, both kinds (24.0.0 is unreleased, so the section's D23a text
     about it is rewritten, not kept beside): a source or object that cannot be read, a mask
-    search SAP refuses, a package that does not exist and a refused walk are skipped with no
-    entry, and a readable source of the same object is still searched; `scanned.packages`,
+    search SAP refuses, a package that does not exist (its root refused or `404`) are
+    skipped with no entry; a refused or missing type node or subpackage excludes only its
+    branch — the package's other nodes, subpackages and objects are walked and searched
+    (DO19); a readable source of an object is still searched when another failed; `scanned.packages`,
     `scanned.objects` and `scanned.sources` count only what was walked and read, and
     `scanned.objects_with_hits` counts the objects with hits; a credential refusal still ends
     the call; a hit in a function module is the
@@ -3198,8 +3254,8 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   object is still searched and its hits kept. A credential refusal still ends the call.
   Supersedes D23a's failure contract. **Closed (owner, 2026-11-07):** the package-level
   outcomes follow the same rule — a refused mask search, a package that does not exist
-  (`404`), a refused walk of a package, type node or subpackage are skipped with no entry; the
-  answer has no `failures` list. The counters count only what was done: `scanned.packages`
+  (`404`), a refused walk of a package, type node or subpackage are skipped with no entry (a
+  type node or subpackage excludes only its branch, DO19); the answer has no `failures` list. The counters count only what was done: `scanned.packages`
   the packages walked, `scanned.objects` the objects read (at least one source),
   `scanned.sources` the sources read, `scanned.objects_with_hits`; `total_targets`,
   `next_start_at` and `truncated` stay.
@@ -3208,6 +3264,11 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   `function_group_name`, what `GetFunctionModule` requires), not the group; a hit in the
   group's own includes is the group's (with `include`); the counters count them apart; every
   hit carries what its read tool needs, with no object nested under another.
+- **DO19 (2026-11-07, D23b Step 4c):** a refused level of a walk (a type node or a
+  subpackage, its `404` included) excludes only that branch — the node and everything under
+  it; the rest of the asked package is walked and searched. A refused root of the asked
+  package excludes that package. No entry, not counted. For `SearchSource` only; the other
+  walking tools keep their answer.
 
 ## Test coverage — the families
 
@@ -3938,7 +3999,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO18 as decided);
+      argument now refused, and the owner's decisions DO1–DO19 as decided);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
       activation waits on long polling with no attempt limit or interval) and C2d's added

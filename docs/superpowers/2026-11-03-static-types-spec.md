@@ -472,7 +472,9 @@ on-premise system disagree, the live measurement holds.
   answers gain `cancelled`. A finished read run's answer is removed once `GetBackgroundRun` answers it (code
   runs are kept until discarded); with no background-run strategy a long tool runs
   synchronously; `HandlerGet`'s run-reading parts (unit-test results, activation status and
-  results) stay synchronous and take no `background`. `time_budget_ms` / `timeout` go in D24.
+  results) stay synchronous and take no `background`. `time_budget_ms` / `timeout` were removed in D23a (`91ee9d14`); D24 only runs the
+  regression check. Once Get answers a finished or cancelled read, that read is gone: a lost
+  Get response cannot be recovered, List no longer shows it, and the read is started again.
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

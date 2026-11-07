@@ -2667,9 +2667,9 @@ session).*
   completion or names its incomplete part; the text-search key check; a `VIEW*` measurement
   (D23a Step 2).
 
-**DO11, decided by D24 (2026-11-07):** no server-side deadline remains: `SearchSource`'s
-`time_budget_ms` and `timeout` go with every long tool's `timeout`; a running read is ended
-by `DiscardBackgroundRun`. D23 does not touch either field; D24 removes them.
+**DO11, settled:** `SearchSource`'s `time_budget_ms` and `timeout` were removed in D23a
+(commit `91ee9d14`); D24 only runs the regression check that they stay gone, and removes
+every other long tool's `timeout`. A running read is ended by `DiscardBackgroundRun`.
 
 ### D24. Long tools: no timeout, their own session, background by default, cancel by discard (owner, 2026-11-07)
 
@@ -2808,8 +2808,10 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   - `'a code run's background default is unchanged'`: `RuntimeRunClass` without `background`
     waits for the run, as today.
   - `'Discard of a running read run cancels it'`: on `adtStandIn` with the read held, the
-    discard sends that session's logoff; `GetBackgroundRun` then answers `cancelled`, and
-    `ListBackgroundRuns` lists it as `cancelled`.
+    discard sends that session's logoff; `ListBackgroundRuns` then lists it as `cancelled`;
+    `GetBackgroundRun` answers `cancelled` and consumes it (the store's `discard` deletes
+    the entry), after which `ListBackgroundRuns` no longer shows it and a second Get answers
+    "not available".
   - `'Discard of a finished run removes its answer'` (as today).
   - `'Discard of a running code run is refused'`: `RuntimeRunClass` in the background, still
     running; the discard is refused and nothing is sent.
@@ -2842,8 +2844,11 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   uses. Put `SearchSource` back on the list.
 - [ ] **Step 3:** Give every long tool `background`, default `true`, through the existing
   background-run port, keeping the code-running tools' own field and default. The
-  background branch of the dispatch runs a long tool on its own session (`runLongCall`), so
-  a background read and a synchronous one share one path.
+  background branch runs the long tool's handler **directly on the instance-held run
+  connection** that `startBackgroundRun` opened (`backgroundRuns/run.ts`), with no
+  `runLongCall`: `run.ts` and `longCall.ts` each open a fresh connection, so nesting them
+  would give a run two. Only the synchronous path (`background: false`, or no strategy) uses
+  `runLongCall`.
 - [ ] **Step 4:** The owner's typed run-connection map (`trackRun` extended), the discard route
   (caller check, logoff, cleanup), the final `cancelled` mark, and the contract change above
   (`cancelled?: true` on the answer, `'cancelled'` in the state), implemented by
@@ -2857,7 +2862,11 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
     refused.";
   - `GetBackgroundRun` / `ListBackgroundRuns`: the states, `cancelled` included, and that a
     read run's finished or cancelled answer is answered once and then removed, while a code
-    run's answer is kept until `DiscardBackgroundRun`.
+    run's answer is kept until `DiscardBackgroundRun`. **Docs line (accepted by the
+    owner):** once Get answers a finished or cancelled read, that read is gone — a Get
+    response lost on the way cannot be recovered, `ListBackgroundRuns` no longer shows it,
+    and the read must be started again. The same line goes into the user guide's
+    background-run page and MIGRATION.
 
   Description tests under the functional-descriptions guard; the advice text that went with
   `timeout` goes.
@@ -2908,8 +2917,9 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
 - **DO8:** the outline tool is `GetObjectOutline`.
 - **DO10 (#25):** `content_uri` comes from the object's version list and is read as given;
   the version tools' contracts do not change.
-- **DO11 (decided, D24):** `SearchSource`'s `time_budget_ms` and `timeout` are removed with every
-  long tool's `timeout`; a running read is ended by `DiscardBackgroundRun`.
+- **DO11 (settled):** `SearchSource`'s `time_budget_ms` and `timeout` were removed in D23a
+  (`91ee9d14`); D24 checks they stay gone and removes every other long tool's `timeout`; a
+  running read is ended by `DiscardBackgroundRun`.
 - **DO9:** the prose guard recognises SAP-derived values by type and flow, with no allowlist;
   values that cross modules are left to review.
 

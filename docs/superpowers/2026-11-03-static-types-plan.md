@@ -3512,13 +3512,24 @@ Step 4 names.
     answers `scanned.packages` equal to the packages `SearchObject` over `DEVC` names), and
     "a package that does not exist is skipped and not counted" (`scanned.packages` `1`). They
     are replaced by evidence that reads no package counter:
-    - **masks:** `livePrepare` reads the packages `SearchObject` over `DEVC` names for the mask
-      and, for each, its scan objects (`GetPackageContents`, without subpackages, the scan
-      types); the search runs with the mask, `include_subpackages: false` and `answer:
-      'objects'` over a query that matches nothing, and asserts `scanned.objects` equals the
-      number of scan objects those packages hold (every named package walked, none other) —
-      and, in a second call with a query the prepared objects hold, that every `devclass` in
-      the answer is among the named packages;
+    - **what the live cases claim (DO26: the problem is a search returning an object that
+      holds nothing of what was searched):** in the mask cases and the known-hit cases,
+      (a) every hit's `devclass` is among the packages `SearchObject` over `DEVC` names for that
+      mask, read first with `livePrepare`; (b) every hit is real — its line, read back with the
+      hit object's own read tool (`GetFunctionModule` for a `FUGR/FF` hit with its
+      `function_group_name`, `GetFunctionInclude` / `GetInclude`, `GetClass` and the local
+      includes, `GetProgram`, `GetInterface`, the CDS / BDEF / DDLX / SRVD reads — through
+      `livePrepare` with literal arguments), contains the query on that line number; (c) a mask
+      whose packages hold the known hit returns it. No count of packages or objects is the
+      oracle: the `scanned.objects`-equals-prepared-count check is not used (it counts objects
+      with a source read, modules apart, and an equal count could come from other packages);
+    - **which packages are walked is proved on the stand-in, not live:** the request pins of
+      the unit suites — Step 2's `'the packages of the last answer are walked, each once'` and a
+      new pin in `src/__tests__/lib/search-source/orchestrator.test.ts` (both paths, on
+      `recordingConnection`): the node-structure requests sent are exactly those for the
+      packages the mask resolution named and the exact names given — an empty package and a
+      missing one (`200`, empty body) each requested once, a package the resolution did not
+      name never requested — and Step 4c's branch pins for excluded levels;
     - **the missing package:** "a named package that does not exist yields no hit" — the
       shared package and the missing one searched together answer the module's hit from the
       shared package only, and the missing one alone answers no hit and `scanned.objects` `0`;

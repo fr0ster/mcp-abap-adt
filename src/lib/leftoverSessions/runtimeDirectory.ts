@@ -20,6 +20,9 @@ export function runtimeDirectory(
   home: string = os.homedir(),
 ): string {
   const isWindows = platform === 'win32';
+  // The paths of the platform named, not the host's: the same answer for a
+  // platform passed in as for the one this process runs on.
+  const paths = isWindows ? path.win32 : path.posix;
   const stated =
     base ??
     splitOnAny(env.AUTH_BROKER_PATH ?? '', isWindows ? ';' : ':;')
@@ -27,9 +30,9 @@ export function runtimeDirectory(
       .find((entry) => entry.length > 0);
   const root =
     stated !== undefined
-      ? path.resolve(stated)
+      ? paths.resolve(stated)
       : isWindows
-        ? path.join(home, 'Documents', 'mcp-abap-adt')
-        : path.join(home, '.config', 'mcp-abap-adt');
-  return path.join(root, RUNTIME_SUBFOLDER);
+        ? paths.join(home, 'Documents', 'mcp-abap-adt')
+        : paths.join(home, '.config', 'mcp-abap-adt');
+  return paths.join(root, RUNTIME_SUBFOLDER);
 }

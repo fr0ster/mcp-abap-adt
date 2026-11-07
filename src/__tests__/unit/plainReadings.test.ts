@@ -282,6 +282,16 @@ describe('the runtime directory from AUTH_BROKER_PATH', () => {
       ),
     ).toBe('/a/runtime');
   });
+  it("builds the path of the platform named, not the host's", () => {
+    expect(
+      runtimeDirectory(
+        undefined,
+        { AUTH_BROKER_PATH: 'C:\\a;D:\\b' },
+        'win32',
+        'C:\\h',
+      ),
+    ).toBe('C:\\a\\runtime');
+  });
 });
 
 describe('source search', () => {

@@ -531,8 +531,12 @@ on-premise system disagree, the live measurement holds.
     (skip). An absent option stays absent through the server and every context; the
     handler's `?? shipped` is the one default, so a context no host fills (a `HandlerExporter`
     entry's without its option, a plain group's, an optionless `EmbeddableMcpServer`'s) gets
-    the shipped one there. Which wins when an embedder's context field and the
-    `HandlerExporter` option are both present is open for the owner. Its contract and the shipped strategy are exported from
+    the shipped one there. The consumer is any server built on the library; it passes the
+    strategies only as explicit parameters — `EmbeddableMcpServer`'s options and
+    `HandlerExporter`'s options. The context field is internal plumbing from the server to the
+    handler: the exporter sets it from its option (absent option, absent field), an embedder's
+    own context is no way to pass a strategy, and because `HandlerContext` is exported the
+    field is marked internal in its doc comment. Its contract and the shipped strategy are exported from
     `@mcp-abap-adt/lib/embeddable`. The line-match strategy is the consumer's the same way (owner,
     DO24): the same option path, the handler's default `substringLineMatch` (today's match),
     its contract and the shipped strategy exported from `@mcp-abap-adt/lib/embeddable`.

@@ -3218,17 +3218,27 @@ Step 4 names.
       carries the strategy unless its host puts it there. The plan: such a context gets the
       shipped one where the handler reads it (`context.<field> ?? shipped`, in
       `handleSearchSource.ts`, the one place the default lives — the orchestrator still takes
-      it explicitly), and `HandlerExporter` takes it as an option and adds it to the context it
-      passes (`wrapEntry`) when the embedder's context has none. This placement of the default is
-      approved by the owner (DO24).
+      it explicitly), and `HandlerExporter` takes it as an option. This placement of the
+      default is approved by the owner (DO24).
+  - **The consumer, and its one public path per server kind (owner, DO24 clarified).** The
+    consumer is any server built on the library — ours and other server implementations. It
+    passes the strategies as explicit parameters only: `EmbeddableMcpServer`'s options, and
+    `HandlerExporter`'s options (the exporter's one public path); the launchers pass the
+    shipped ones. The `HandlerContext` field is internal plumbing from the server to the
+    handler, never filled by a consumer: `HandlerExporter.wrapEntry` sets the field of the
+    context it passes from its own option — the option's value when given, the field removed
+    when not, whatever the embedder's context held — so an absent option means an absent
+    field and the handler's `?? shipped`. An embedder's own context is not a way to pass a
+    strategy, and no doc says it is. `HandlerContext` is exported to embedders
+    (`@mcp-abap-adt/lib/handlers`: `src/lib/handlers/index.ts` re-exports
+    `src/lib/handlers/interfaces.ts`, which re-exports it, and `HandlerEntry.call` takes it),
+    so the two fields' doc comments mark them internal (`@internal`, "set by the server from
+    its options; not part of the context a consumer builds"), and the exported-contract docs
+    leave them out.
   - **`EmbeddableMcpServer` without the option:** the option stays absent through the server
     and every context it builds — no server, launcher-independent constructor or context
     builder fills it in; the handler's `?? shipped` is the one default. An embedder that
     passes its own gets its own on every route.
-  - **Precedence when both are present** — an embedder's context field and the
-    `HandlerExporter` option: the code fixes no rule for it (the field is new); it is put to
-    the owner. Until the owner answers, the exporter adds its option only when the context has
-    none, and the case of both is a red test owed on the owner's answer.
 
   Red tests first:
   - `'a consumer strategy passed to EmbeddableMcpServer is asked for a SAP answer at each
@@ -3253,7 +3263,9 @@ Step 4 names.
     - a long call's own connection (`background: false`);
     - launcher-built servers: stdio (`StdioServer`), HTTP (`StreamableHttpServer`'s
       per-request server) and SSE (`SseServer`'s session server) — each uses the shipped one;
-    - `HandlerExporter` with its option, and without it (the handler's default);
+    - `'the HandlerExporter option reaches the handler; without it the shipped strategy is
+      used'` — also when the embedder's context passed to `entry.call` carries a value in the
+      field: the exporter's option (or its absence) decides;
     - a plain-group registration (the handler's default);
     - `'an optionless EmbeddableMcpServer leaves the field absent'`: no context it builds
       carries the field, and the handler's default answers;
@@ -3277,9 +3289,10 @@ Step 4 names.
   the shipped one is `substringLineMatch` (`lineScanner.ts`, today's match).
   - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the three
     `HandlerContext`s it builds (dispatch, `recordedContext`, the run tools'), kept in every
-    derived context; `HandlerExporter` takes it as its own option and adds it in `wrapEntry`
-    when the embedder's context has none (precedence when both are present: the owner's, as
-    Step 4e2); an optionless `EmbeddableMcpServer` leaves the field absent; the binaries'
+    derived context; `HandlerExporter` takes it as its own option, its one public path, and
+    `wrapEntry` sets the field from it (absent option → field absent); the field is internal,
+    marked so, never a consumer's way in (Step 4e2); an optionless `EmbeddableMcpServer`
+    leaves the field absent; the binaries'
     launchers (stdio, HTTP per-request, SSE session) pass `substringLineMatch`; `handleSearchSource.ts` reads
     `context.<field> ?? substringLineMatch` (the one place the default lives) and hands it to
     the orchestrator, which takes it explicitly.
@@ -3303,8 +3316,9 @@ Step 4 names.
     the stdio, HTTP and SSE launcher servers with `substringLineMatch`, `HandlerExporter` with
     and without its option, a plain group, an optionless `EmbeddableMcpServer` leaving the
     field absent), each on the sequential and the batched path;
-  - the precedence of an embedder's context field and the exporter's option — as Step 4e2,
-    owed on the owner's answer;
+  - `'the HandlerExporter line-match option reaches the handler; without it
+    substringLineMatch is used'`, also when the embedder's context carries a value in the
+    field;
   - `'the line-match contract is exported'`: a type test importing the types and
     `substringLineMatch` from `@mcp-abap-adt/lib/embeddable`.
 
@@ -4208,6 +4222,11 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   explicitly), `HandlerExporter` has its own option, the launchers pass the shipped one. The
   line-match strategy is the consumer's exactly like the SAP-answer strategy: the same option
   path, its contract and `substringLineMatch` exported from `@mcp-abap-adt/lib/embeddable`.
+  **Clarified (owner):** the consumer is any server built on the library; the strategies are
+  passed as explicit parameters only — `EmbeddableMcpServer`'s options and `HandlerExporter`'s
+  options — and the launchers pass the shipped ones. The `HandlerContext` field is internal
+  plumbing, never a consumer's: the exporter sets it from its option (absent → absent → the
+  handler's default); `HandlerContext` is exported, so the fields are marked internal.
 
 ## Test coverage — the families
 

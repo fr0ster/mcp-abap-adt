@@ -1,11 +1,12 @@
 /**
- * The approved list of long tools is the one place a
- * `timeout` comes from: `tools/long-handlers.json` names every tool the user
- * approved, tool by tool, with its handler and what it sends. Every tool on
- * it declares `timeout` and carries the advice in its description; no tool
- * off it does either — whichever group registers it, full or compact. The
- * server's own list (`LONG_TOOLS`, what the wrapper reads) is the JSON's.
- * Every listed tool is a read: its `timeout` cuts it.
+ * The approved list of long tools: `tools/long-handlers.json` names every
+ * tool the user approved, tool by tool, with its handler and what it sends.
+ * Every tool on it declares `background` (default true) and carries the
+ * long-tool words in its description; no tool off it does either, but the
+ * code-running tools' own `background` — whichever group registers it,
+ * full or compact. No tool declares `timeout` (24.0.0). The server's own
+ * list (`LONG_TOOLS`, what the wrapper reads) is the JSON's. Every listed
+ * tool is a read, on an ABAP session of its own.
  */
 
 import * as fs from 'node:fs';
@@ -13,6 +14,7 @@ import * as path from 'node:path';
 import * as z from 'zod';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import { isBackgroundTool } from '../../../lib/backgroundRuns/tools';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
@@ -76,6 +78,11 @@ function declaresTimeout(definition: ToolDefinition): boolean {
   return Object.hasOwn(definition.inputSchema.shape, 'timeout');
 }
 
+/** Whether a schema declares `background`. */
+function declaresBackground(definition: ToolDefinition): boolean {
+  return Object.hasOwn(definition.inputSchema.shape, 'background');
+}
+
 const carriesAdvice = (definition: ToolDefinition) =>
   definition.description.includes(LONG_TOOL_ADVICE);
 
@@ -94,7 +101,7 @@ describe('the approved list of long tools', () => {
     expect([...tools].sort()).toEqual([...LONG_TOOLS].sort());
   });
 
-  it('the tools that start a run or run code are off the list and take no timeout', () => {
+  it('the tools that start a run or run code are off the list, take no timeout and carry no long-tool words', () => {
     // Removed by the owner (2026-10-13): their work goes on in SAP, so a
     // timeout could only end the wait, never the work.
     const notReads = [
@@ -122,11 +129,34 @@ describe('the approved list of long tools', () => {
         shipped: true,
       });
       for (const definition of found) {
-        expect({ tool, timeout: declaresTimeout(definition) }).toEqual({
+        expect({
           tool,
-          timeout: false,
-        });
+          timeout: declaresTimeout(definition),
+          advice: carriesAdvice(definition),
+        }).toEqual({ tool, timeout: false, advice: false });
       }
+    }
+  });
+
+  it('no long tool declares timeout', () => {
+    const offending = definitions
+      .filter((d) => names.has(d.name))
+      .filter(declaresTimeout)
+      .map((d) => d.name);
+    expect(offending).toEqual([]);
+  });
+
+  it('SearchSource is listed and still declares neither time_budget_ms nor timeout', () => {
+    expect(names.has('SearchSource')).toBe(true);
+    const found = definitions.filter((d) => d.name === 'SearchSource');
+    expect(found.length).toBeGreaterThan(0);
+    for (const definition of found) {
+      const shape = definition.inputSchema.shape;
+      expect({
+        time_budget_ms: Object.hasOwn(shape, 'time_budget_ms'),
+        timeout: Object.hasOwn(shape, 'timeout'),
+        background: Object.hasOwn(shape, 'background'),
+      }).toEqual({ time_budget_ms: false, timeout: false, background: true });
     }
   });
 
@@ -147,7 +177,7 @@ describe('the approved list of long tools', () => {
     }
   });
 
-  it('every listed tool is shipped, declares timeout and carries the advice', () => {
+  it('every listed tool is shipped, declares background and carries the long-tool words', () => {
     for (const tool of names) {
       const found = definitions.filter((d) => d.name === tool);
       expect({ tool, shipped: found.length > 0 }).toEqual({
@@ -157,17 +187,21 @@ describe('the approved list of long tools', () => {
       for (const definition of found) {
         expect({
           tool,
-          timeout: declaresTimeout(definition),
+          background: declaresBackground(definition),
           advice: carriesAdvice(definition),
-        }).toEqual({ tool, timeout: true, advice: true });
+        }).toEqual({ tool, background: true, advice: true });
       }
     }
   });
 
-  it('no tool off the list declares timeout or carries the advice', () => {
+  it('no tool off the list declares background — but the code-running tools — or carries the long-tool words', () => {
     const offending = definitions
       .filter((d) => !names.has(d.name))
-      .filter((d) => declaresTimeout(d) || carriesAdvice(d))
+      .filter(
+        (d) =>
+          (declaresBackground(d) && !isBackgroundTool(d.name)) ||
+          carriesAdvice(d),
+      )
       .map((d) => d.name);
     expect(offending).toEqual([]);
   });

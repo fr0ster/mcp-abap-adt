@@ -21,9 +21,11 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
+import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { DestinationSystemContext } from '../../../lib/auth/destinationSystemContext';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
+import type { BackgroundRunOwner } from '../../../lib/backgroundRuns/owner';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
@@ -99,6 +101,7 @@ export function shippedGroups(): CompositeHandlersRegistry {
     new RuntimeRunHandlersGroup(placeholderContext),
     new BackgroundRunHandlersGroup(placeholderContext),
     new CompactModifyHandlersGroup(placeholderContext),
+    new CompactReadOnlyHandlersGroup(placeholderContext),
     new CompactBackgroundRunHandlersGroup(placeholderContext),
   ]);
 }
@@ -155,12 +158,14 @@ export async function callerOn(
   standIn: AdtStandIn,
   strategy: IBackgroundRuns | undefined,
   who: { user: string } | { tokenUser: string },
+  owner?: BackgroundRunOwner,
 ): Promise<Caller> {
   const server = new StandServer({
     name: 'background-stand',
     logger: silent,
     systemType: 'onprem',
     ...(strategy !== undefined ? { backgroundRuns: strategy } : {}),
+    ...(owner !== undefined ? { backgroundRunOwner: owner } : {}),
   });
   if ('user' in who) {
     // The system names the session's user (systeminformation), as a session
@@ -201,15 +206,16 @@ export async function callerOn(
 
 export interface BackgroundStand {
   standIn: AdtStandIn;
-  strategy: InMemoryBackgroundRuns;
+  strategy: IBackgroundRuns;
   /** The first caller (`RUN_USER`). */
   a: Caller;
   close(): Promise<void>;
 }
 
-export async function backgroundStand(): Promise<BackgroundStand> {
+export async function backgroundStand(
+  strategy: IBackgroundRuns = new InMemoryBackgroundRuns(),
+): Promise<BackgroundStand> {
   const standIn = await adtStandIn();
-  const strategy = new InMemoryBackgroundRuns();
   const a = await callerOn(standIn, strategy, { user: 'RUN_USER' });
   return {
     standIn,

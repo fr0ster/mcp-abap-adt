@@ -5,11 +5,11 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetBackgroundRun',
   description:
-    '[read-only] [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). A read keeps the run; a finished run is kept until you discard it.',
+    "[read-only] [runtime] Reads one of your background runs by its run_handle: running; finished with what the run tool answered (the system answer as it is, an error included); or cancelled. A read run's finished or cancelled answer is answered once and then deleted, so a lost answer is read again by starting the read again; a code run's answer is kept until it is discarded.",
   inputSchema: z.object({
     run_handle: z
       .string()
-      .describe('The run_handle a run started with background=true answered.'),
+      .describe('The run_handle a background run answered at its start.'),
   }),
 } as const;
 

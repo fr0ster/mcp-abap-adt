@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { TIMEOUT_FIELD } from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
@@ -49,7 +49,7 @@ export const TOOL_DEFINITION = {
     "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers; ADT receives the default search alone.",
   ),
   inputSchema: z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     user: z
       .string()
       .optional()

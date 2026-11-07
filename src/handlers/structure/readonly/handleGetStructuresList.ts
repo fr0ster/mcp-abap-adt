@@ -23,7 +23,10 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import {
   afterBlanksAt,
   asciiLower,
@@ -55,7 +58,7 @@ export const TOOL_DEFINITION = {
       'legacy systems (BASIS < 7.50) refuse it (issue #207).',
   ),
   inputSchema: z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     structure_name: z
       .string()
       .optional()

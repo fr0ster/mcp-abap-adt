@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
-import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
@@ -9,7 +12,7 @@ export const TOOL_DEFINITION = {
     '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
   ),
   inputSchema: z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     parent_name: z
       .string()
       .optional()

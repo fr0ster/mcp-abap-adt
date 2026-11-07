@@ -3,7 +3,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { parseAtcResultList } from '../../../lib/strategies/atcResults';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -23,7 +26,7 @@ export const TOOL_DEFINITION = {
     '[read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own.',
   ),
   inputSchema: z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     created_by: z
       .string()
       .describe('Whose results: a user name, or * for every user.'),

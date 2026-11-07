@@ -17,7 +17,10 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
+import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
+import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
@@ -86,6 +89,11 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
   HandlerGet: { object_type: 'CLASS', class_name: 'PLACEHOLDER_CLASS' },
 };
 
+const placeholderContext = {
+  connection: null,
+  logger: undefined,
+} as unknown as HandlerContext;
+
 /** The group of the shipped binaries that registers `tool`, and its entry. */
 function shippedEntry(tool: string): {
   group: IHandlerGroup & { getHandlers(): HandlerEntry[] };
@@ -147,10 +155,15 @@ export interface CallAnswer {
 /**
  * The stand for `tool`. `injected: 'bare'` serves a connection the host
  * injected with no fresh-connection factory: a listed tool is refused.
+ * `backgroundRuns`: the host's strategy, with the background-run tools
+ * (full and compact) served beside the tool; none: the tool runs in the call.
  */
 export async function longStand(
   tool: string,
-  options: { injected?: 'built' | 'bare' } = {},
+  options: {
+    injected?: 'built' | 'bare';
+    backgroundRuns?: IBackgroundRuns;
+  } = {},
 ): Promise<LongStand> {
   if (!LONG_TOOLS.includes(tool)) throw new Error(`${tool} is not listed`);
   const standIn = await adtStandIn();
@@ -170,8 +183,17 @@ export async function longStand(
     handlersRegistry: new CompositeHandlersRegistry([
       oneToolGroup(tool),
       probeGroup(),
+      ...(options.backgroundRuns !== undefined
+        ? [
+            new BackgroundRunHandlersGroup(placeholderContext),
+            new CompactBackgroundRunHandlersGroup(placeholderContext),
+          ]
+        : []),
     ]),
     systemType: 'onprem',
+    ...(options.backgroundRuns !== undefined
+      ? { backgroundRuns: options.backgroundRuns }
+      : {}),
     logger: silent,
     systemContextResolver: defaultSystemContextResolver,
   });
@@ -231,11 +253,11 @@ const silent = {
 
 /** Real short waits until `done()` holds; fails after `limitMs`. */
 export async function until(
-  done: () => boolean,
+  done: () => boolean | Promise<boolean>,
   limitMs = 10_000,
 ): Promise<void> {
   const end = Date.now() + limitMs;
-  while (!done()) {
+  while (!(await done())) {
     if (Date.now() > end) throw new Error('the condition never held');
     await new Promise((resolve) => setTimeout(resolve, 2));
   }

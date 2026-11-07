@@ -5,11 +5,11 @@ import type { HandlerContext } from '../../handlers/index';
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunDiscard',
   description:
-    '[read-only] Removes the kept answer of one of your finished background runs. Works on a finished run; a started run runs to its end.',
+    "[read-only] Ends the run named by run_handle: a running read is cancelled and its session logged off; a finished run's answer is deleted; a running code run is refused.",
   inputSchema: z.object({
     run_handle: z
       .string()
-      .describe('The run_handle a run started with background=true answered.'),
+      .describe('The run_handle a background run answered at its start.'),
   }),
 } as const;
 

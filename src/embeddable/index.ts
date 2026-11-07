@@ -24,11 +24,12 @@ export {
   type AdtHeaderPort,
 } from '../lib/adtHeaders/AdtHeaderPairs.js';
 /**
- * Background runs of the code-running tools: the strategy's contract
+ * Background runs of the code-running tools and the listed long reads: the strategy's contract
  * (`IBackgroundRuns`) — where runs and their answers are kept, checked
  * against the caller. lib ships no implementation: a host hands its
  * instances its own, or `@mcp-abap-adt/background-runs-memory`'s
- * (`backgroundRuns`). Without one, `background: true` is refused.
+ * (`backgroundRuns`). Without one, a code run's `background: true` is
+ * refused, and a listed long tool answers its result in the call.
  */
 export type {
   BackgroundRunAnswer,
@@ -38,8 +39,16 @@ export type {
   BackgroundRunRecord,
   BackgroundRunStart,
   BackgroundRunStarted,
+  BackgroundRunState,
   IBackgroundRuns,
 } from '../lib/backgroundRuns/index.js';
+/**
+ * The owner of the running background runs, by `run_handle`: a host that
+ * serves one client through several instances hands each the same one
+ * (`backgroundRunOwner`), so a discard reaching any of them cancels a
+ * running read.
+ */
+export { BackgroundRunOwner } from '../lib/backgroundRuns/owner.js';
 /**
  * The owner of an instance's batch state (batch mode: the open batch and the
  * last batch's answers): created by the host, one per instance, handed to it

@@ -16,7 +16,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import {
-  BATCH_NO_TIMEOUT_WORDS,
+  BATCH_NO_BACKGROUND_WORDS,
   batchNotRecordableWords,
   batchNotServedWords,
 } from '../../../lib/auth/serverRefusal';
@@ -448,17 +448,17 @@ describe('recording in batch mode', () => {
     await s.close();
   });
 
-  it('timeout given in batch mode is refused batch_no_timeout before recording', async () => {
+  it('background: true given in batch mode is refused batch_no_background before recording', async () => {
     const s = await stand([shipped('SearchObject')]);
     const refused = refusalOf(
       await s.call('SearchObject', {
         object_name: 'ZPLACEHOLDER*',
-        timeout: 30,
+        background: true,
       }),
     );
     expect(refused).toEqual({
-      error: 'batch_no_timeout',
-      message: BATCH_NO_TIMEOUT_WORDS,
+      error: 'batch_no_background',
+      message: BATCH_NO_BACKGROUND_WORDS,
     });
     expect(s.recorded).toEqual([]);
     expect(recordedCalls(s)).toEqual([]);

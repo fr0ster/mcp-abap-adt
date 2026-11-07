@@ -3,7 +3,10 @@ import { answerCaught, thrownEntry } from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import {
   assembleList,
   batchReader,
@@ -26,7 +29,7 @@ export const TOOL_DEFINITION = {
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time.',
   ),
   inputSchema: z.object({
-    timeout: timeoutField(),
+    background: LONG_BACKGROUND_FIELD,
     package_name: z
       .string()
       .optional()

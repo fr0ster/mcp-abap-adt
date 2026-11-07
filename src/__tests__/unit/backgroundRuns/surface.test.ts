@@ -37,6 +37,7 @@ import {
   noConnectionContext,
   registryForExposition,
 } from '../../../lib/handlers/registry/expositionRegistry';
+import { LONG_TOOLS } from '../../../lib/longTools';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   compactReadOnlyToolSetOf,
@@ -271,6 +272,8 @@ describe('where the background-run tools are served: beside the run tools', () =
 });
 
 describe('which tools take background', () => {
+  // A long tool's default (`true`) is the wrapper's: the schema states it in
+  // words only, so a call that leaves it out is told from one that states it.
   /** Every tool definition the packages ship: full groups and compact. */
   const definitions: ToolDefinition[] = [
     ...new HandlerExporter({
@@ -301,11 +304,13 @@ describe('which tools take background', () => {
     return Object.hasOwn(schema.properties ?? {}, 'background');
   };
 
-  it('exactly the listed run tools declare it, optional, a boolean with no default', () => {
+  it('exactly the listed run tools and the listed long tools declare it, optional, a boolean with no default in the schema', () => {
     const declaring = [
       ...new Set(definitions.filter(declares).map((d) => d.name)),
     ].sort();
-    expect(declaring).toEqual(Object.keys(BACKGROUND_TOOLS).sort());
+    expect(declaring).toEqual(
+      [...Object.keys(BACKGROUND_TOOLS), ...LONG_TOOLS].sort(),
+    );
     for (const definition of definitions.filter(declares)) {
       const schema = listedJson(definition.inputSchema);
       expect(jsonAt(schema, 'background').type).toBe('boolean');

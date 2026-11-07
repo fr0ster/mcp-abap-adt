@@ -4,11 +4,10 @@ import { join } from 'node:path';
 import { tsxCommand } from '../helpers/platform';
 
 /**
- * **The long tools on the approved list gain `timeout` (19.0.0).** The
- * user approved them tool by tool (`tools/long-handlers.json`); each may
- * gain `timeout` and nothing else for it. `GetIncludesList` and
- * `GetStructuresList` already declared one (per request, in ms) — the name
- * stays, its meaning is now the call's (seconds, on the wait only).
+ * **The long tools on the approved list** (`tools/long-handlers.json`,
+ * approved tool by tool): 19.0.0 gave them `timeout`; 24.0.0 (D24, the
+ * owner) removes it and gives each `background` (default true) instead —
+ * nothing else for it.
  */
 const LONG_TOOLS = new Set(
   (
@@ -262,7 +261,12 @@ describe('the MCP tool surface', () => {
             !removed.includes(p) &&
             p !== `${relaxed ?? '\u0000'}*` &&
             p !== tightened &&
-            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))),
+            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))) &&
+            // 24.0.0 (D24, the owner): no long tool takes `timeout`.
+            !(
+              LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1)) &&
+              p === 'timeout'
+            ),
         ),
       }).toEqual({
         tool,
@@ -418,7 +422,10 @@ describe('the MCP tool surface', () => {
           p !== relaxed &&
           p !== `${tightened}*` &&
           !(listRelaxed(p) && had.includes(`${p}*`)) &&
-          !(gainsTimeout && p === 'timeout'),
+          !(gainsTimeout && p === 'timeout') &&
+          // 24.0.0 (D24, the owner): every long tool gains `background`
+          // (default true) and loses `timeout`.
+          !(isLong && p === 'background'),
       );
       // A long tool whose only change is its `timeout` (gained, or moved
       // first in the list) gained nothing else.

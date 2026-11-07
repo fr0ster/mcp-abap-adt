@@ -40,7 +40,10 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
@@ -72,7 +75,7 @@ export const TOOL_DEFINITION = {
 /** GetIncludesList's input on `variant`. */
 function includesListSchema(variant: ProjectionVariant) {
   return z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     object_name: z
       .string()
       .optional()
@@ -284,9 +287,9 @@ async function includesListOf(
       );
     }
 
-    // No deadline of the server's on a request: the call's own
-    // `timeout`, when given, ends only the wait — a request abandoned here
-    // would run on in SAP while its session is logged off under it.
+    // No deadline of the server's on a request: the read ends when SAP
+    // answers, or when its background run is cancelled (its session logged
+    // off).
     logger?.info(
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );

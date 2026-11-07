@@ -33,7 +33,10 @@ import {
 } from '../../../lib/handlers/HandlerExporter';
 import type { SapEnvironment } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
-import { isLongTool, TIMEOUT_NOT_FOR_RUN_WORDS } from '../../../lib/longTools';
+import {
+  BACKGROUND_NOT_FOR_RUN_WORDS,
+  isLongTool,
+} from '../../../lib/longTools';
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { type Counting, countingConnection } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
@@ -372,15 +375,15 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
 });
 
 /**
- * A call the path refuses for its arguments — a `timeout` on a long tool's
- * run mode — is refused before the call's context is asked for: the
+ * A call the path refuses for its arguments — a `background` on a long
+ * tool's run mode — is refused before the call's context is asked for: the
  * provider is not called. No exporter tool has a run mode (the schema
- * refuses an invalid `timeout` before the path sees it), so this goes
+ * refuses an invalid `background` before the path sees it), so this goes
  * through the path `registerOnServer` registers by
  * (`registerHandlersOnCall`), on the compact group that has one.
  */
 describe('registerHandlersOnCall (the path registerOnServer registers by)', () => {
-  it('a timeout on a run mode is refused before the call context is asked for', async () => {
+  it('a background on a run mode is refused before the call context is asked for', async () => {
     let asked = 0;
     const counting = countingConnection('document', undefined);
     const server = new McpServer({ name: 'per-call', version: '1.0.0' });
@@ -398,10 +401,10 @@ describe('registerHandlersOnCall (the path registerOnServer registers by)', () =
     const answer = await call(server, 'HandlerGet', {
       object_type: 'UNIT_TEST',
       run_id: 'run-placeholder-1',
-      timeout: 1,
+      background: true,
     });
     expect(answer).toContain('"isError":true');
-    expect(answer).toContain(TIMEOUT_NOT_FOR_RUN_WORDS);
+    expect(answer).toContain(BACKGROUND_NOT_FOR_RUN_WORDS);
     expect(asked).toBe(0);
     expect(counting.sent).toEqual([]);
   });

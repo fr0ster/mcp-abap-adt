@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { TIMEOUT_FIELD } from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
  * WhereUsed handler using AdtClient utilities
  * Endpoint: /sap/bc/adt/repository/informationsystem/usageReferences
@@ -90,7 +90,7 @@ function whereUsedTypeDescription(variant: ProjectionVariant): string {
 /** GetWhereUsed's input on `variant`. */
 function whereUsedSchema(variant: ProjectionVariant) {
   return z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     object_name: z
       .string()
       .optional()

@@ -10,6 +10,7 @@ import type {
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   AdtHeaderPairs,
+  BackgroundRunOwner,
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
@@ -162,6 +163,8 @@ export class SseServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
+  /** The running background runs' owner: this server's, shared by every stream's instance. */
+  private readonly runOwner = new BackgroundRunOwner();
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
   /** The corrected header pairs: the process's, shared by every stream's instance. */
   private readonly adtHeaderPairs = new AdtHeaderPairs();
@@ -369,6 +372,7 @@ export class SseServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
+          backgroundRunOwner?: BackgroundRunOwner;
           batch?: InstanceBatch;
           heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
@@ -401,6 +405,9 @@ export class SseServer {
         stateLogger: this.stateLogger,
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,
+          // The running runs' owner is this server's, shared by every
+          // instance it makes: a discard reaching any of them cancels.
+          backgroundRunOwner: this.runOwner,
         }),
         // Batch mode: this connection's own, never shared with another.
         ...(this.batchSettings !== undefined && {

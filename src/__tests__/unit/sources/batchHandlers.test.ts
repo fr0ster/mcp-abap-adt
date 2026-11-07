@@ -105,6 +105,7 @@ const LONG_BY_REQUESTS: Readonly<
   ListTransports: 'chained',
   GetObjectInfo: 'chained',
   DescribeByList: 'chained',
+  SearchSource: 'chained',
   HandlerDumpList: 'independent',
 };
 

@@ -12,6 +12,12 @@
     "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
   },
   {
+    "tool": "SearchSource",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleSearchSource.ts#handleSearchSource",
+    "sends": "a package mask's repository quickSearch GET (/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…), the nodestructure walk of every package (POST /sap/bc/adt/repository/nodestructure), then the source GET of every scan target, each source once per call; in ADT batch envelopes (POST /sap/bc/adt/communication/batch) where the system offers them, sequential reads where it has no communication batch"
+  },
+  {
     "tool": "GetPackageContents",
     "set": "full",
     "handler": "src/handlers/package/readonly/handleGetPackageContents.ts#handleGetPackageContents",
@@ -141,6 +147,6 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes (with include_descriptions as single requests, several at a time), as GetPackageContents; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
+    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes (with include_descriptions as single requests, several at a time), as GetPackageContents; background applies to its reads only — UNIT_TEST / CDS_UNIT_TEST and the parts activation_status / activation_results read a run in SAP, run as an ordinary call on the instance's connection, and refuse a background"
   }
 ]

@@ -11,12 +11,11 @@ import {
 import { listedTool, statedEnvironment } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import {
+  BACKGROUND_NOT_FOR_RUN_WORDS,
   isLongRead,
   isLongTool,
-  readTimeout,
-  TIMEOUT_INVALID_WORDS,
-  TIMEOUT_NOT_FOR_RUN_WORDS,
-  withoutTimeout,
+  readLongBackground,
+  statesBackground,
 } from '../../longTools.js';
 import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent } from '../../toolResult.js';
@@ -156,14 +155,17 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // call asks for none (no provider is called).
           const listed = isLongTool(toolName);
           const read = listed && isLongRead(toolName, args);
-          if (listed && !read && readTimeout(args) !== undefined) {
-            // A listed tool's run mode takes no `timeout`.
-            return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS));
-          }
-          // A long read's `timeout`, cutting the read.
-          const timeoutSeconds = read ? readTimeout(args) : undefined;
-          if (timeoutSeconds === null) {
-            return return_error(new Error(TIMEOUT_INVALID_WORDS));
+          if (listed) {
+            if (!read && statesBackground(args)) {
+              // A listed tool's run mode is read in the call.
+              return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
+            }
+            if (readLongBackground(args) === null) {
+              return return_error(new Error(BACKGROUND_INVALID_WORDS));
+            }
+            // A group registered on its own has no strategy: a listed long
+            // read answers its result in the call, whatever `background`.
+            args = withoutBackground(args);
           }
           // The call's context, asked for now: the group's own, or one made
           // for this call (its provider's connection). Its rejection is
@@ -178,21 +180,20 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             inStatedScope(context, args, fn);
           let result: unknown;
           if (read) {
-            // A listed long tool: a read on a connection of its
-            // own, its `timeout` cutting the read.
+            // A listed long tool: a read on a connection of its own, in the
+            // call, logged off after the answer.
             result = await withParameters(() =>
               runLongCall({
                 name: toolName,
                 connection: context.connection,
                 logger: context.logger,
-                timeoutSeconds,
                 run: (own) => {
                   stateSystemKind(own, context.systemType);
                   const ownContext: HandlerContext = {
                     ...context,
                     connection: own,
                   };
-                  return call(ownContext, withoutTimeout(args));
+                  return call(ownContext, args);
                 },
               }),
             );

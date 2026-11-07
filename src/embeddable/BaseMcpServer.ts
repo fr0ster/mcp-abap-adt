@@ -36,13 +36,18 @@ import type {
   BackgroundRunCaller,
   IBackgroundRuns,
 } from '../lib/backgroundRuns/contract.js';
+import { BackgroundRunOwner } from '../lib/backgroundRuns/owner.js';
 import { backgroundRunTools } from '../lib/backgroundRuns/port.js';
-import { startBackgroundRun } from '../lib/backgroundRuns/run.js';
+import {
+  type BackgroundRunKind,
+  startBackgroundRun,
+} from '../lib/backgroundRuns/run.js';
 import {
   BACKGROUND_INVALID_WORDS,
   backgroundObjectOf,
   isBackgroundTool,
   readBackground,
+  readObjectOf,
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
 import {
@@ -105,12 +110,11 @@ import {
 } from '../lib/listedTool.js';
 import { runLongCall } from '../lib/longCall.js';
 import {
+  BACKGROUND_NOT_FOR_RUN_WORDS,
   isLongRead,
   isLongTool,
-  readTimeout,
-  TIMEOUT_INVALID_WORDS,
-  TIMEOUT_NOT_FOR_RUN_WORDS,
-  withoutTimeout,
+  readLongBackground,
+  statesBackground,
 } from '../lib/longTools.js';
 import {
   closeOwnedConnections,
@@ -319,6 +323,13 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly backgroundRuns: IBackgroundRuns | undefined;
 
   /**
+   * The running runs, by `run_handle`: each one's control over its one
+   * execution connection (`backgroundRunOwner` option, else this
+   * instance's own). Never a module's.
+   */
+  protected readonly runOwner: BackgroundRunOwner;
+
+  /**
    * The owner of this instance's batch state (`batch` option), given by the
    * host, one per instance; attached to the state. Absent: the batch tools
    * answer `batch_mode_unavailable`.
@@ -384,10 +395,19 @@ export abstract class BaseMcpServer extends McpServer {
      * Where background runs and their answers are kept: the host's strategy,
      * shared by its instances (the launchers' `InMemoryBackgroundRuns` of
      * `@mcp-abap-adt/background-runs-memory`, an
-     * embedder's own). Absent: `background: true` and the background-run
-     * tools are refused.
+     * embedder's own). Absent: a code run's `background: true` and the
+     * background-run tools are refused, and a listed long tool answers its
+     * result in the call.
      */
     backgroundRuns?: IBackgroundRuns;
+    /**
+     * The owner of the running background runs (their controls, by
+     * `run_handle`): handed by a host that serves one client through several
+     * instances (Streamable HTTP's per-request instances, SSE's per-stream
+     * ones), so `DiscardBackgroundRun` reaching any of them cancels a
+     * running read. Absent: the instance holds its own.
+     */
+    backgroundRunOwner?: BackgroundRunOwner;
     /**
      * The owner of this instance's batch state, created by the host for this
      * instance alone (never shared between instances): the open batch and
@@ -449,6 +469,7 @@ export abstract class BaseMcpServer extends McpServer {
     this.logger = options.logger ?? getDefaultLogger();
     this.leftoverSessions = options.leftoverSessions;
     this.backgroundRuns = options.backgroundRuns;
+    this.runOwner = options.backgroundRunOwner ?? new BackgroundRunOwner();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
       ...(options.isStateHandleTaken !== undefined && {
@@ -1452,16 +1473,30 @@ export abstract class BaseMcpServer extends McpServer {
             if (lockHandle !== undefined && !this.heldLocks.holds(lockHandle)) {
               return return_error(new Error(lockNotHeldWords(this.heldLocks)));
             }
+            // A listed long tool's run mode (HandlerGet's run parts) is read
+            // in the call: a `background` on it is refused, nothing sent.
+            const longTool = isLongTool(entry.toolDefinition.name);
+            const longRead =
+              longTool && isLongRead(entry.toolDefinition.name, args);
+            if (longTool && !longRead && statesBackground(args)) {
+              return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
+            }
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —
-              // before any connection — and never handed to the handler.
-              const runsInBackground =
-                isBackgroundTool(entry.toolDefinition.name) &&
-                this.backgroundRequested(args);
-              const handlerArgs = isBackgroundTool(entry.toolDefinition.name)
-                ? withoutBackground(args)
-                : args;
+              // before any connection — and never handed to the handler. A
+              // listed long read's is too: `true` by default, in the call
+              // when the host gave no strategy or a batch is open.
+              const runsInBackground = isBackgroundTool(
+                entry.toolDefinition.name,
+              )
+                ? this.backgroundRequested(args)
+                : longRead &&
+                  this.longReadInBackground(entry.toolDefinition.name, args);
+              const handlerArgs =
+                isBackgroundTool(entry.toolDefinition.name) || longTool
+                  ? withoutBackground(args)
+                  : args;
               // Get connection from context (this.connectionContext), with
               // the call's signal (the session's end).
               let connection = await this.getConnection(signal);
@@ -1584,6 +1619,8 @@ export abstract class BaseMcpServer extends McpServer {
                   call: entry.call,
                   context,
                   args: handlerArgs,
+                  askedBackground:
+                    longRead && child(args, 'background') === true,
                   holdsFlow,
                   runsInBackground,
                   system,
@@ -1591,43 +1628,34 @@ export abstract class BaseMcpServer extends McpServer {
                 });
               }
               let handlerPromise: Promise<unknown>;
-              const listed = isLongTool(entry.toolDefinition.name);
-              const read =
-                listed && isLongRead(entry.toolDefinition.name, args);
-              if (listed && !read && readTimeout(args) !== undefined) {
-                // A listed tool's run mode takes no `timeout`.
-                return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS));
-              }
               if (runsInBackground) {
-                // A background run: on a connection of its own, answered at
-                // once with its handle; its answer goes to the strategy.
+                // A background run — a code run, or a listed long read — on
+                // its one connection of its own (the read's handler runs on
+                // it directly, no `runLongCall`), answered at once with its
+                // handle; its answer goes to the strategy.
                 handlerPromise = resolved(() =>
                   this.startBackground(
                     entry.toolDefinition.name,
+                    longRead ? 'read' : 'code',
                     entry.call,
                     context,
                     handlerArgs,
                     signal,
                   ),
                 );
-              } else if (read) {
-                // A listed long tool: a read on a connection of
-                // its own, its `timeout` cutting the read.
-                const timeoutSeconds = readTimeout(args);
-                if (timeoutSeconds === null) {
-                  return return_error(new Error(TIMEOUT_INVALID_WORDS));
-                }
+              } else if (longRead) {
+                // A listed long tool in the call: a read on a connection of
+                // its own, logged off after the answer.
                 handlerPromise = resolved(() =>
                   runLongCall({
                     name: entry.toolDefinition.name,
                     connection,
                     logger: this.logger,
-                    timeoutSeconds,
                     run: (own) =>
                       callHandler(
                         entry.call,
                         { ...context, connection: own },
-                        withoutTimeout(args),
+                        handlerArgs,
                       ),
                   }),
                 );
@@ -1772,8 +1800,9 @@ export abstract class BaseMcpServer extends McpServer {
    * as the server's refusal, answered by the caller — unless the open
    * batch is a communication batch that admits it: a tool that works on a
    * connection of its own (a debugger tool, a background run) or a call
-   * that holds no turn is not served; a listed long read given `timeout` is
-   * refused `batch_no_timeout`; a call no entry of the eligibility table
+   * that holds no turn is not served; a listed long read given
+   * `background: true` is refused `batch_no_background` (without it, it is
+   * recorded); a call no entry of the eligibility table
    * admits — read on the arguments the handler receives, over the kind of
    * the instance's connection — is refused `batch_not_recordable`. A refusal
    * takes no number.
@@ -1794,6 +1823,8 @@ export abstract class BaseMcpServer extends McpServer {
     call: HandlerEntry['call'];
     context: HandlerContext;
     args: ToolArgs;
+    /** A listed long read whose call stated `background: true`. */
+    askedBackground: boolean;
     holdsFlow: boolean;
     runsInBackground: boolean;
     system: ResolvedSystemContext | undefined;
@@ -1826,8 +1857,8 @@ export abstract class BaseMcpServer extends McpServer {
     ) {
       throw notServed();
     }
-    if (isLongTool(call.tool) && readTimeout(call.args) !== undefined) {
-      throw new ServerRefusal('batch_no_timeout');
+    if (call.askedBackground) {
+      throw new ServerRefusal('batch_no_background');
     }
     const connection = call.context.connection;
     const kind = isRfcConnection(connection) ? 'rfc' : 'http';
@@ -2022,8 +2053,10 @@ export abstract class BaseMcpServer extends McpServer {
           : {}),
         ...(this.backgroundRuns !== undefined
           ? {
-              backgroundRuns: backgroundRunTools(this.backgroundRuns, () =>
-                this.backgroundCaller(signal),
+              backgroundRuns: backgroundRunTools(
+                this.backgroundRuns,
+                () => this.backgroundCaller(signal),
+                this.runOwner,
               ),
             }
           : {}),
@@ -2063,15 +2096,30 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Starts a background run of a run tool (lib's `startBackgroundRun`): the
-   * caller resolved, the run's own connection opened from the call's, the
-   * handler run on it without the call waiting, its answer — as this
-   * wrapper would answer it, an error included — handed to the strategy.
-   * Answers the handle at once; the shutdown refusal once the shutdown or
-   * this instance's close began.
+   * Whether a listed long read runs in the background: its `background`,
+   * `true` by default; refused in fixed words when it is not a boolean. In
+   * the call when the host gave no strategy, and while a batch is open (the
+   * read is recorded; `background: true` there is refused by `recordCall`).
+   */
+  private longReadInBackground(tool: string, args: unknown): boolean {
+    const background = readLongBackground(args);
+    if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
+    if (this.backgroundRuns === undefined) return false;
+    if (this.batchOpenFor(tool) && !this.inDebuggerBatch(tool)) return false;
+    return background;
+  }
+
+  /**
+   * Starts a background run (lib's `startBackgroundRun`) — of a run tool, or
+   * of a listed long read: the caller resolved, the run's one connection
+   * opened from the call's, the handler run on it without the call waiting,
+   * its answer — as this wrapper would answer it, an error included —
+   * handed to the strategy. Answers the handle at once; the shutdown
+   * refusal once the shutdown or this instance's close began.
    */
   private async startBackground(
     tool: string,
+    kind: BackgroundRunKind,
     call: HandlerEntry['call'],
     context: HandlerContext,
     args: ToolArgs,
@@ -2091,11 +2139,13 @@ export abstract class BaseMcpServer extends McpServer {
       strategy,
       caller,
       tool,
-      object: backgroundObjectOf(args),
+      kind,
+      object: kind === 'read' ? readObjectOf(args) : backgroundObjectOf(args),
       instance: this,
       connection: context.connection,
       logger: this.logger,
       track: (own) => this.trackRun(own),
+      register: (handle, control) => this.runOwner.register(handle, control),
       run: (own) =>
         this.backgroundAnswer(call, { ...context, connection: own }, args),
     });

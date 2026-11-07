@@ -202,6 +202,12 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
  * compact's class read (`HandlerGet`) is listed and full's (`GetClass`) is
  * not, so those two no longer share a failure path.
  */
+/**
+ * The sample read, in the call (`background: false`): a long tool answers a
+ * `run_handle` by default where the set keeps background runs (the write
+ * sets) and its result where it keeps none (the `-ro` sets); in the call it
+ * answers alike on all four.
+ */
 const readCall = (
   set: SetName,
   className = 'ZCL_PARITY',
@@ -209,11 +215,19 @@ const readCall = (
   familyOf(set) === 'full'
     ? {
         name: 'GetWhereUsed',
-        arguments: { object_name: className, object_type: 'class' },
+        arguments: {
+          object_name: className,
+          object_type: 'class',
+          background: false,
+        },
       }
     : {
         name: 'HandlerWhereUsed',
-        arguments: { object_type: 'CLASS', object_name: className },
+        arguments: {
+          object_type: 'CLASS',
+          object_name: className,
+          background: false,
+        },
       };
 const READ_CALL: Record<SetName, ReturnType<typeof readCall>> = {
   full: readCall('full'),

@@ -1,13 +1,15 @@
 /**
- * The tools that may run in the background, and the `background` parameter
- * each declares. A leaf module — no import of the server's — so every
- * handler's definition can read it; the run itself is `run.ts`.
+ * The code-running tools that may run in the background, and the
+ * `background` parameter each declares. A leaf module — no import of the
+ * server's — so every handler's definition can read it; the run itself is
+ * `run.ts`.
  *
  * The list is exactly the code-running tools whose run may write and run
  * long: `RuntimeRunClass`, `RuntimeRunProgram` and compact's
- * `HandlerProfileRun`. A source test keeps every tool's
- * schema equal to it: a listed tool without the parameter, or a tool outside
- * the list with it, fails.
+ * `HandlerProfileRun` — `background` without a default. The listed long
+ * tools (`longTools.ts`) declare their own `background`, defaulting to
+ * `true`. A source test keeps every tool's schema equal to the two lists: a
+ * listed tool without the parameter, or a tool outside both with it, fails.
  */
 
 import * as z from 'zod';
@@ -32,6 +34,37 @@ export const BACKGROUND_TOOLS: Readonly<
 /** Whether `name` takes `background`. */
 export function isBackgroundTool(name: string): boolean {
   return Object.hasOwn(BACKGROUND_TOOLS, name);
+}
+
+const FULL_RUN_TOOLS = {
+  get: 'GetBackgroundRun',
+  discard: 'DiscardBackgroundRun',
+} as const;
+
+const COMPACT_RUN_TOOLS = {
+  get: 'HandlerBackgroundRunGet',
+  discard: 'HandlerBackgroundRunDiscard',
+} as const;
+
+/** The compact listed long tools: their runs are read and discarded by compact's tools. */
+const COMPACT_LONG_READS: ReadonlySet<string> = new Set([
+  'HandlerWhereUsed',
+  'HandlerSearch',
+  'HandlerDumpList',
+  'HandlerGetData',
+  'HandlerProfileView',
+  'HandlerGet',
+]);
+
+/** The tools that read and discard a run of `tool`: compact's for a compact tool. */
+export function runToolsOf(tool: string): {
+  readonly get: string;
+  readonly discard: string;
+} {
+  return (
+    BACKGROUND_TOOLS[tool] ??
+    (COMPACT_LONG_READS.has(tool) ? COMPACT_RUN_TOOLS : FULL_RUN_TOOLS)
+  );
 }
 
 /** The `background` property of a full run tool's JSON Schema. */
@@ -110,6 +143,32 @@ export function withoutBackground(
 
 /** The fixed words of a `background` that is not a boolean. */
 export const BACKGROUND_INVALID_WORDS = 'background must be true or false.';
+
+/** The arguments a listed read names its object by, in order. */
+const READ_OBJECT_ARGUMENTS = [
+  'object_name',
+  'package_name',
+  'table_name',
+  'structure_name',
+  'parent_name',
+  'class_name',
+  'program_name',
+  'display_id',
+  'worklist_id',
+  'trace_id_or_uri',
+  'feed_type',
+] as const;
+
+/** What a listed read's call reads: the first object it names, upper case; `''` when none. */
+export function readObjectOf(args: unknown): string {
+  for (const argument of READ_OBJECT_ARGUMENTS) {
+    const value = child(args, argument);
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim().toUpperCase();
+    }
+  }
+  return '';
+}
 
 /** What a run tool's call runs: its class or program, upper case; `''` when none is named. */
 export function backgroundObjectOf(args: unknown): string {

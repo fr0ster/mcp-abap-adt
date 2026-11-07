@@ -3,7 +3,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_FIELD, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { child, entries, isElement, isList } from '../../../lib/xml/tree';
@@ -15,7 +18,7 @@ export const TOOL_DEFINITION = {
     '[read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).',
   ),
   inputSchema: z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     trace_id_or_uri: z
       .string()
       .describe('Profiler trace ID or full trace URI.'),

@@ -2,6 +2,10 @@ import * as z from 'zod';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import {
   type OrchestratorInput,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
@@ -11,9 +15,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'SearchSource',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     "[read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and `*` masks (Z*, /NS/Z*); a mask is resolved by one repository quick search of up to 1000 packages. `object_types`, `object_filter`, `start_at` and `max_objects` select the scan targets of the resolved packages, in order of package, type and name. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `\"` comment lines. The answer lists each hit (`results`: package, object type, object name, include, line, snippet), `scanned` (packages, objects, sources), `total_targets`, `truncated.by_object_cap` (an object had more hits than `max_hits_per_object`), `truncated.by_max_objects` and `next_start_at` (the `start_at` of the next page, present while targets remain), and `failures` when anything was left unread: `kind` `source` names the object, the source (name and URI), the read and SAP's T100 key; `kind` `operation` names the step (a package mask's resolution, a package's walk), the mask or the package, and SAP's T100 key. Sources are read in ADT batch envelopes where the system offers them, each source once per call.",
+  ),
   inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
     query: z
       .string()
       .min(1)

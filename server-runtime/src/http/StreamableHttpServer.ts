@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   type AdtHeaderPairs,
+  type BackgroundRunOwner,
   BaseMcpServer,
   closeInstance,
   type IBackgroundRuns,
@@ -526,6 +527,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
+          backgroundRunOwner?: BackgroundRunOwner;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
           longSession?: LongSession;
@@ -584,6 +586,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         isStateHandleTaken: this.pool.isHandleTaken,
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
+          // The running runs' owner is this server's, shared by every
+          // instance it makes: a discard reaching any of them cancels.
+          backgroundRunOwner: this.runOwner,
         }),
         // Batch mode: this pooled instance's own, never shared with another.
         ...(this.batchSettings !== undefined && {

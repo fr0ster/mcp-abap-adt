@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { TIMEOUT_FIELD } from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
  * GetPackageTree Handler - High-level handler for package tree structure
  *
@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
     '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
   ),
   inputSchema: z.object({
-    timeout: TIMEOUT_FIELD,
+    background: LONG_BACKGROUND_FIELD,
     package_name: z
       .string()
       .optional()

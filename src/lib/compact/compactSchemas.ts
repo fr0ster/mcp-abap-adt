@@ -21,7 +21,10 @@ import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
 import { createArguments } from '../handlers/createArguments';
 import { listedValues } from '../handlers/listedValues';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
-import { TIMEOUT_DESCRIPTION, TIMEOUT_FIELD } from '../longTools';
+import {
+  COMPACT_LONG_BACKGROUND_DESCRIPTION,
+  COMPACT_LONG_BACKGROUND_FIELD,
+} from '../longTools';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../masterLanguage';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
 import { DETAIL_SHAPE } from '../strategies/detail';
@@ -359,8 +362,8 @@ const readPartSchema = z
   .optional()
   .describe(READ_PART_WORDS);
 
-const GET_TIMEOUT = TIMEOUT_FIELD.describe(
-  `${TIMEOUT_DESCRIPTION} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
+const GET_BACKGROUND = COMPACT_LONG_BACKGROUND_FIELD.describe(
+  `${COMPACT_LONG_BACKGROUND_DESCRIPTION} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
 );
 
 const GET_PROPERTIES = {
@@ -525,11 +528,11 @@ function readPartFor(mainPrograms: readonly ReadMember[]) {
  * takes, and `version` where its `Get<Type>` reads one.
  */
 export const COMPACT_READ_TAKES = takesOf<
-  'timeout' | 'object_type' | keyof typeof GET_PROPERTIES,
+  'background' | 'object_type' | keyof typeof GET_PROPERTIES,
   ReadMember
 >()({
   every: [
-    'timeout',
+    'background',
     'object_type',
     'part',
     'run_id',
@@ -584,13 +587,13 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
   mainPrograms: readonly ReadMember[] = [],
 ) {
   const properties = {
-    timeout: GET_TIMEOUT,
+    background: GET_BACKGROUND,
     object_type: objectTypeOf(members),
     ...GET_PROPERTIES,
   } as const;
   return z.object({
     ...offered(properties, COMPACT_READ_TAKES, members),
-    timeout: properties.timeout,
+    background: properties.background,
     object_type: properties.object_type,
     part: readPartFor(mainPrograms),
   });
@@ -1131,7 +1134,7 @@ export const compactProfileRunSchema = compactProfileRunSchemaFor(
 export const compactProfileListSchema = z.object({});
 
 export const compactProfileViewSchema = z.object({
-  timeout: TIMEOUT_FIELD,
+  background: COMPACT_LONG_BACKGROUND_FIELD,
   trace_id_or_uri: z.string().describe('Profiler trace id or URI.'),
   view: z
     .enum(['hitlist', 'statements', 'db_accesses'])
@@ -1162,7 +1165,7 @@ export const compactProfileViewSchema = z.object({
 });
 
 export const compactDumpListSchema = z.object({
-  timeout: TIMEOUT_FIELD,
+  background: COMPACT_LONG_BACKGROUND_FIELD,
   feed_type: z
     .enum(['dumps', 'system_messages', 'gateway_errors'])
     .default('dumps')
@@ -1662,7 +1665,7 @@ export const compactActivateSchema = compactActivateSchemaFor(
 
 /** Object search by name or mask. */
 export const compactSearchSchema = z.object({
-  timeout: TIMEOUT_FIELD,
+  background: COMPACT_LONG_BACKGROUND_FIELD,
   query: z.string().describe('Object name or mask, with * as a wildcard.'),
   object_type: z.string().optional().describe(SEARCH_TYPE_DESCRIPTION),
   max_results: z
@@ -1679,7 +1682,7 @@ function whereUsedProperties<const M extends readonly WhereUsedMember[]>(
   members: M,
 ) {
   return {
-    timeout: TIMEOUT_FIELD,
+    background: COMPACT_LONG_BACKGROUND_FIELD,
     object_type: listedValues(members)
       .optional()
       .describe('Type of the object whose usages are listed.'),
@@ -1701,7 +1704,7 @@ export const COMPACT_WHERE_USED_TAKES = takesOf<
   keyof ReturnType<typeof whereUsedProperties<readonly WhereUsedMember[]>>,
   WhereUsedMember
 >()({
-  every: ['timeout', 'object_type', 'object_name', 'max_results'],
+  every: ['background', 'object_type', 'object_name', 'max_results'],
   members: { FUNCTION_MODULE: ['function_group_name'] },
 });
 
@@ -1712,7 +1715,7 @@ export function compactWhereUsedSchemaFor<
   const properties = whereUsedProperties(members);
   return z.object({
     ...offered(properties, COMPACT_WHERE_USED_TAKES, members),
-    timeout: properties.timeout,
+    background: properties.background,
     object_type: requiredField(properties.object_type),
     object_name: requiredField(properties.object_name),
     max_results: properties.max_results,
@@ -1725,7 +1728,7 @@ export const compactWhereUsedSchema = compactWhereUsedSchemaFor(
 
 /** Rows of a table or CDS view, or of an SQL SELECT. */
 export const compactGetDataSchema = z.object({
-  timeout: TIMEOUT_FIELD,
+  background: COMPACT_LONG_BACKGROUND_FIELD,
   object_name: z
     .string()
     .optional()

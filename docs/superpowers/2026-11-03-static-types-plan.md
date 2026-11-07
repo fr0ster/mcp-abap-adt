@@ -2516,6 +2516,8 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 ### D23. SearchSource rework (owner, 2026-11-07)
 
 **The owner's rules for it:** never guess; no silent failure; SAP does what SAP can.
+*Superseded for object reads by DO17 (2026-11-07):* a source or object that cannot be read is
+skipped without an entry or a count; the search is about the objects that can be read.
 
 **What the code does today** (`src/lib/search-source/`, `src/handlers/system/readonly/handleSearchSource.ts`):
 - **`packageResolver.ts`:** a mask is resolved by one quick search over `DEVC`
@@ -2542,9 +2544,9 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
   (default 100); it offers no paging.
 
 **The task is in two parts.** **D23a** needs no SAP and starts now. **D23b** holds the masks, the
-line-match strategy and the hits-only answer; the owner decided it on 2026-11-07 from the
-measurements (DO12–DO16), its red-first steps need no SAP, and its live cases wait for the
-owner's go.
+line-match strategy, the hits-only answer, the skipped unreadable objects and the function
+module as its own object; the owner decided it on 2026-11-07 (DO12–DO18), its red-first steps
+need no SAP, and its live cases wait for the owner's go.
 
 #### D23a. Sources, versions, failures, dedup, description (no SAP; starts now)
 
@@ -2578,6 +2580,9 @@ session).*
 - [ ] **Step 2: The `VIEW*` skip goes.** Red test: `'a function module named VIEW… is scanned'`.
   The name skip is removed. If such modules must not be scanned, that is decided from
   something SAP states — a measurement, *owed* live (D23b). Until then they are scanned.
+*D23a Steps 3, 4 and 5's failure parts are superseded by DO17 (D23b Step 4a): the reads still
+go on past a failed source, but the answer carries no failure entries. The text below is kept
+as what D23a did.*
 - [ ] **Step 3: No object is lost silently.** Today three paths lose sources:
   - `safe()` logs a non-SAP error at debug level and drops the object;
   - `refusedOrAbsent()` (`sourceReader.ts`) turns every `404` into `null`, even for a source
@@ -2724,7 +2729,7 @@ Step 4 names.
   `src/lib/search-source/`, the shipped one built from today's `scanLines`, a required member
   of `OrchestratorDeps`, wired by `handleSearchSource.ts`. The cap probe past
   `max_hits_per_object` calls the same strategy.
-- [ ] **Step 4: Only hits are answered (DO15).** A hit keeps `devclass`, `object_type`,
+- [ ] **Step 4: Only hits are answered (DO15, DO17).** A hit keeps `devclass`, `object_type`,
   `object_name`, `include`, `line` and `snippet` (up to 255 characters). Red tests:
   - `'an object without a hit is not in the answer'`: no `no_hits` field, on both paths;
   - `'SearchSource does not declare emit_no_hits'`: the listed-schema fixture;
@@ -2732,9 +2737,7 @@ Step 4 names.
     (no `no_hits`), and nothing is refused — `SearchSource` is not a strict tool (only the
     create tools are, `createArguments`), the same rule MIGRATION-24.0 states for
     `lock_handle` on the non-strict update tools and D24 applies to the removed `timeout`;
-  - `'an object without hits whose read failed is named in failures only'`;
-  - `'an object with hits and a failed child keeps its hits and its failures'` (as D23a and
-    the orchestrator do today: its hits in `results`, the child's entry in `failures`).
+  - the failure cases are Step 4a's.
 
   Then `emit_no_hits`, `NoHitEntry`, `no_hits` and the no-hit bookkeeping go from the
   orchestrator and the handler. The suites that pass `emit_no_hits` or assert `no_hits` or
@@ -2745,9 +2748,128 @@ Step 4 names.
   `src/__tests__/lib/search-source/cursor.test.ts` (its assertions counting zero-hit
   objects), `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`, and the live
   assertion in `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`.
+- [ ] **Step 4a: Unreadable objects are skipped; the answer is hits and counters (DO17).**
+  Supersedes D23a Step 4 (the failure contract) and the failure parts of D23a Steps 3 and 5.
+  The answer is `results` plus counters; the cursor fields stay as they are (`scanned`
+  `{ packages, objects, sources }`, `total_targets`, `next_start_at`, `truncated`), and
+  `scanned` gains `objects_with_hits` (the objects with at least one hit in `results`). Red
+  tests first, on both paths (sequential and batched):
+  - `'a source SAP refuses is skipped: no entry, no count'`: no `failures` field; the source is
+    not in `scanned.sources`;
+  - `'a listed source that answers 404 is skipped'`, and `'a read that throws without SAP's
+    answer is skipped'` (the two paths D23a Step 3 turned into entries);
+  - `'an object none of whose sources can be read is not in the answer'`;
+  - `'a readable source of an object is searched and its hits kept when another source of the
+    same object failed'`: a function group whose first child fails and a later one hits —
+    both requests pinned, the later one's hits in `results`, no entry for the first; the same
+    for a class whose local include fails beside a hitting main source;
+  - `'a shared source that fails is skipped for both owners'`: one request (the D23a cache),
+    no entry, the other sources of both owners still read;
+  - `'objects_with_hits counts the objects with hits'`, on a page with hit, no-hit and
+    unreadable objects;
+  - `'a credential refusal still ends the call'` (unchanged: it is no broken object), on a
+    source read and on a walk, through `AuthRefusedError` as today.
+
+  Then `SourceFailure`, the per-object failure bookkeeping (`targetFailures`, the answer's
+  `failures` from sources) and `orderedFailures` for sources go; `sourceReader.ts` skips a
+  failed read and goes on to the object's next source; `src/lib/search-source/failures.ts`
+  keeps only what the package-level outcomes below need, or goes if they go.
+
+  **Package-level outcomes — not object reads, kept as the current contract answers them
+  until the owner decides (open, DO17):** today they are entries of `kind: 'operation'` in the
+  same `failures` list:
+  - a mask whose quick search SAP refused: `step: 'resolve package mask'`, `mask`, `t100`
+    where SAP gave one, `error`; the other entries are scanned;
+  - a named package whose walk SAP refused, a package that does not exist (its root answers
+    `404`), or a type node or subpackage SAP refused or answered `404`: `step: 'walk package'`,
+    `package` (the one the call asked for), `failed_level` (`package`, and `node` `{ id, type
+    }` for a type node), `t100`, `error`; the other packages are walked;
+  - a mask that matches no package answers no packages and no entry;
+  - a credential refusal ends the call.
+
+  Such a package also counts in `scanned.packages` today (the count is of the resolved
+  packages, before the walk), and `scanned.objects` counts the page's targets, an unreadable
+  one included. These stay unchanged here; whether the operation entries stay in a
+  `failures` list of their own, and whether the counts leave out what was not read, is the
+  owner's to decide before this step is implemented.
+
+  Affected suites (each rewritten to skip-and-count, red first):
+  `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
+  `src/__tests__/unit/failureStep.test.ts` (its `SearchSource` cases: a refused source read, a
+  listed source not there, "a refused object is its own answer"),
+  `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/lib/search-source/cursor.test.ts`, `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`, the helper
+  `src/__tests__/helpers/sourceReaderFake.ts`, the live assertion in
+  `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`, and the
+  listed-schema and surface fixtures; `src/__tests__/unit/authRefusedRejection.test.ts` stays
+  as the credential regression.
+- [ ] **Step 4b: A function module is its own scan object (DO18).** Today a function group
+  is one scan object: the walk (`packageEnumerator.ts`) lists `FUGR/F` under the family
+  `FUGR`; `sourceReader.ts` reads the group's structure and then each child — modules
+  (`FUGR/FF`, `reader: 'functionModule'`, `…/fmodules/<f>/source/main`) and includes
+  (`functionInclude` or `include`) — all as sources of the group, so a hit in a module is
+  answered as `object_type: 'FUGR'`, `object_name: <group>`, `include: <module>`, and
+  `scanned.objects` counts the group once. What changes:
+  - **A hit in a function module names the module:** its own `object_type` (a function
+    module's, distinct from the group's — the value the type tables give for `FUGR/FF`,
+    never a name made up here; the first red test pins it), `object_name` the module's name,
+    `devclass` the group's package, and **`function_group_name`**, the group — because
+    `GetFunctionModule` requires `function_module_name` and `function_group_name`, and compact
+    `HandlerGet` `FUNCTION_MODULE` takes the same two. The module's hit has no `include` (its
+    source is the module's main source) and is not nested under the group.
+  - **A hit in the group's own includes stays the group's:** `object_type` the group's,
+    `object_name` the group, `include` the include's name — what `GetFunctionInclude` needs
+    (`function_group_name`, `include_name`). A group include addressed under
+    `/programs/includes/` is read through the include reader as today; its hit is still the
+    group's, with `include` its name (`GetInclude` takes `include_name`).
+  - **Every other hit already carries what its read tool needs** (checked in the red tests):
+    a program and a program include by `object_name` / `include`, a class's local include by
+    `object_name` and `include` (the include kind the compact `LOCAL_*` reads name by the
+    class), an interface, CDS, BDEF, DDLX and SRVD by `object_name`.
+  - **Counters count them apart:** `scanned.objects` and `scanned.objects_with_hits` count
+    the group and each of its modules as separate objects. The page (`start_at`,
+    `max_objects`, `total_targets`, `next_start_at`) stays over the walk's targets as today —
+    the modules are known only after the group's structure read — so a group's modules come
+    with the group's page.
+  - **`object_types`:** `FUGR` keeps scanning the group and its modules (the modules come only
+    from the group's structure); no new filter value.
+  - **One read per source** (D23a's cache) and the skip rule (Step 4a) apply to a module as to
+    any object: a module that cannot be read is skipped, the group and its other modules are
+    still searched.
+
+  Red tests first, on both paths:
+  - `'a hit in a function module is the module's object, with function_group_name'`: its type,
+    name, package and group; no `include`; not listed under the group;
+  - `'a hit in a group include is the group's, with include'`;
+  - `'a group and its modules are counted as separate objects'` (`scanned.objects`,
+    `scanned.objects_with_hits` over a group with a hit in one module and in one include);
+  - `'each hit carries the arguments its read tool requires'`: for every scan type, the hit's
+    fields fill the read tool's required arguments (`GetFunctionModule`, `GetFunctionInclude`,
+    `GetInclude`, `GetProgram`, `GetClass` and the local includes, `GetInterface`, the CDS,
+    BDEF, DDLX and SRVD reads), checked against their schemas;
+  - `'the page stays over the walk's targets'` (cursor unchanged with modules split out).
+
+  Then the hit type gains the module's identity (`function_group_name`, present only on a
+  module's hit; `include` absent there), the orchestrator emits module hits under the module
+  and counts it, and `sourceReader.ts` yields each module's unit with its own object identity
+  instead of as a group include.
+
+  Affected suites: `src/__tests__/lib/search-source/sourceReader.test.ts`,
+  `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/lib/search-source/cursor.test.ts`,
+  `src/__tests__/lib/search-source/packageEnumerator.test.ts` (unchanged walk, kept green),
+  `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
+  `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`, the helper
+  `src/__tests__/helpers/sourceReaderFake.ts`, the live assertion in
+  `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`, and the
+  listed-schema and surface fixtures (the answer's shape).
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
-  1000 packages"; `emit_no_hits` and `no_hits` leave it. Functional only; a description test
+  1000 packages"; `emit_no_hits`, `no_hits` and the source `failures` leave it, and it states
+  that an object that cannot be read is skipped, names the counters, and says a hit in a
+  function module names the module and its group (DO18). Functional only; a description test
   under the functional-descriptions guard. `time_budget_ms` and `timeout` are not
   reintroduced (DO11; D24's regression check).
 - [ ] **Step 6: Pins, docs, CHANGELOG, MIGRATION-24.0.**
@@ -2756,12 +2878,23 @@ Step 4 names.
     that describes `SearchSource`'s masks or `no_hits`.
   - CHANGELOG (24.0.0): Fixed — a package mask is resolved completely (it was cut at 1000
     packages without a word); `?` is a wildcard and `+` a literal character. Removed —
-    `SearchSource`'s `emit_no_hits` and its `no_hits` answer. Changed — the line match is a
-    strategy (an embedder of the orchestrator passes it).
+    `SearchSource`'s `emit_no_hits`, its `no_hits` answer and its source `failures` entries (an
+    object that cannot be read is skipped; DO17). Added — `scanned.objects_with_hits`.
+    Changed — a hit in a function module names the module (its type, its name and
+    `function_group_name`), not the group with the module as `include` (DO18).
+    Changed — the line match is a strategy (an embedder of the orchestrator passes it).
   - MIGRATION-24.0, in the `SearchSource` section: a mask is `*` / `?`, and an entry with `+`
     is an exact name now (write `*` where `+` was meant as a wildcard); a mask answers every
     matching package; drop `emit_no_hits` (a call that still sends it has it dropped) and read
     the objects with hits from `results` — an object without a hit is no longer listed;
+    `failures` entries of `kind: 'source'` are gone (24.0.0 is unreleased, so the section's
+    D23a text about them is rewritten, not kept beside): a source or object that cannot be
+    read is skipped with no entry and no count, and a readable source of the same object is
+    still searched; `scanned.objects_with_hits` counts the objects with hits; the
+    package-level entries as the owner decides (Step 4a); a hit in a function module is the
+    module's own object — read it with `GetFunctionModule` (`function_module_name` =
+    `object_name`, `function_group_name`) — where 23.x answered it as the group's hit with
+    the module in `include`; the group and its modules are counted apart (DO18);
     embedders of `runSearchSource` pass the line-match strategy (the shipped one keeps
     today's match).
 - [ ] **Step 7: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
@@ -2770,7 +2903,10 @@ Step 4 names.
     and an exact name with a literal `_` — each answers the packages the quick search names,
     the `*` mask past 1000 packages through the doubling;
   - a `SearchSource` on premise, and one on ABAP Cloud in the cloud's configured build
-    package, each with a known hit: the hit's object, line and snippet; no `no_hits`;
+    package, each with a known hit: the hit's object, line and snippet; no `no_hits`, no
+    source `failures`; `scanned.objects_with_hits` matches the objects in `results`; a hit
+    in a function module names the module and its group, and `GetFunctionModule` reads it
+    with exactly those fields;
   - the `VIEW*` measurement owed by D23a Step 2.
 - [ ] **Step 8:** Commit.
 
@@ -3050,6 +3186,18 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
 - **DO16 (2026-11-07):** package walk envelopes are not capped; the ABAP Cloud limit (12
   packages about 130 s; envelopes of about 1 000 parts and more an outer `500` after about
   600 s) is a known limit, no change.
+- **DO17 (2026-11-07, D23b Step 4a):** the answer is `results` (the hits) plus counters
+  (packages walked, objects scanned, objects with hits); the cursor fields stay. A source or
+  object that cannot be read is skipped: no entry, no count; a readable source of the same
+  object is still searched and its hits kept. A credential refusal still ends the call.
+  Supersedes D23a's failure contract for object reads. **Open:** the package-level outcomes
+  (a refused mask search, a refused or missing package walk) — today `kind: 'operation'`
+  entries in `failures` — are kept as they are until the owner decides.
+- **DO18 (2026-11-07, D23b Step 4b):** a function group and each of its function modules are
+  separate scan objects: a hit in a module names the module (its type, name, package and
+  `function_group_name`, what `GetFunctionModule` requires), not the group; a hit in the
+  group's own includes is the group's (with `include`); the counters count them apart; every
+  hit carries what its read tool needs, with no object nested under another.
 
 ## Test coverage — the families
 
@@ -3780,7 +3928,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO16 as decided);
+      argument now refused, and the owner's decisions DO1–DO18 as decided);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
       activation waits on long polling with no attempt limit or interval) and C2d's added

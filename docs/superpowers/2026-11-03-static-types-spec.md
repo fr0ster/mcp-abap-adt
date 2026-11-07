@@ -456,7 +456,7 @@ on-premise system disagree, the live measurement holds.
   `GetIncludesList`'s tree stays on a plain scanner (D22).
 - **SearchSource rework (owner, 2026-11-07, plan D23):** every source-bearing object SAP
   lists is scanned through the existing readers; no `VIEW*` name skip; no object dropped
-  silently; one read per source; a functional description — that is D23a, which needs no
+  silently (for object reads superseded by DO17 below); one read per source; a functional description — that is D23a, which needs no
   SAP. D23b (owner, 2026-11-07) holds the following:
   - **Masks are resolved completely.** A package mask is resolved by the repository quick
     search, its `maxResults` doubled until the answer holds fewer packages than `maxResults`.
@@ -477,9 +477,24 @@ on-premise system disagree, the live measurement holds.
     today's behaviour, and the handler wires it.
   - **Only hits are answered.** A hit names the object (type, name, package, include), the
     line number and the line's text (`snippet`, up to 255 characters). An object without a
-    hit is left out of the answer: `emit_no_hits` and the `no_hits` field are removed. An
-    object whose read failed is named in `failures`; one with hits and a failed child keeps
-    both.
+    hit is left out of the answer: `emit_no_hits` and the `no_hits` field are removed.
+  - **Unreadable objects are skipped (owner, DO17).** The answer is `results` plus counters:
+    packages walked, objects scanned and objects with hits (`scanned.objects_with_hits`); the
+    cursor fields (`scanned`, `total_targets`, `next_start_at`, `truncated`) stay. A source or
+    object that cannot be read is skipped — no entry, no count; a readable source of the same
+    object is still searched and its hits kept. The source `failures` entries go (this
+    supersedes D23a's failure contract for object reads; MIGRATION-24.0, unreleased, says
+    they are removed). A credential refusal still ends the call. The package-level outcomes
+    (a mask search SAP refused, a package walk SAP refused or answered `404`) stay as the
+    current contract answers them — `kind: 'operation'` entries in `failures` — until the
+    owner decides.
+  - **A function module is its own object (owner, DO18).** A function group and each of its
+    function modules are separate scan objects. A hit in a module names the module: its own
+    type, its name, its package and `function_group_name` (which `GetFunctionModule` and
+    compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`; a hit in the group's
+    own includes is the group's, with `include`. The counters count the group and each module
+    apart. Every hit carries what its read tool needs; no object is nested under another. The
+    page stays over the walk's targets.
     `SearchSource` is not a strict tool (only the create tools are, MIGRATION-24.0), so a call
     that still sends `emit_no_hits` has it dropped, as D24's removed `timeout` is; MIGRATION
     says to drop it.

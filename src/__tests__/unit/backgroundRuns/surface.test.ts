@@ -282,6 +282,28 @@ describe('where the background-run tools are served: beside the run tools and th
       LONG_TOOLS.includes(e.toolDefinition.name),
     );
     expect(long.length).toBeGreaterThan(10);
+    // Its description says the call answers the result, on every variant.
+    for (const entry of long) {
+      const { description, variants } = entry.toolDefinition;
+      for (const text of [
+        description,
+        ...(variants !== undefined
+          ? [variants.onprem.description, variants.cloud.description]
+          : []),
+      ]) {
+        expect({
+          tool: entry.toolDefinition.name,
+          handle: text.includes('run_handle'),
+          inCall: text.includes(
+            'Runs on an ABAP session of its own and answers its result in the call.',
+          ),
+        }).toEqual({
+          tool: entry.toolDefinition.name,
+          handle: false,
+          inCall: true,
+        });
+      }
+    }
     expect(
       long
         .filter((e) =>

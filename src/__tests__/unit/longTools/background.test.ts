@@ -45,6 +45,10 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
+/** What a long tool listed without `background` says of its answer. */
+const IN_CALL_WORDS =
+  'Runs on an ABAP session of its own and answers its result in the call.';
+
 /** The list tool beside a run's get tool. */
 const listToolOf = (tool: string): string =>
   runToolsOf(tool).get === 'GetBackgroundRun'
@@ -158,6 +162,9 @@ describe.each(LONG_TOOLS)('%s', (tool) => {
     const stand = await longStand(tool);
     try {
       expect(await stand.inputs(tool)).not.toContain('background');
+      const described = await stand.described(tool);
+      expect(described).toContain(IN_CALL_WORDS);
+      expect(described).not.toContain('run_handle');
       const answer = await stand.call(tool, args);
       expect(payloadOf(answer).run_handle).toBeUndefined();
       expect(
@@ -180,6 +187,9 @@ describe('a strategy without the tools that read its runs', () => {
       });
       try {
         expect(await stand.inputs(tool)).not.toContain('background');
+        const described = await stand.described(tool);
+        expect(described).toContain(IN_CALL_WORDS);
+        expect(described).not.toContain('run_handle');
         const answer = await stand.call(tool, LONG_TOOL_ARGS[tool] ?? {});
         expect(payloadOf(answer).run_handle).toBeUndefined();
         await until(() => stand.standIn.loggedOff().length === 1);
@@ -195,6 +205,7 @@ describe('a strategy without the tools that read its runs', () => {
     });
     try {
       expect(await stand.inputs('GetSqlQuery')).toContain('background');
+      expect(await stand.described('GetSqlQuery')).toContain('run_handle');
     } finally {
       await stand.close();
     }

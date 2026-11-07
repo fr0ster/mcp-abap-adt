@@ -18,6 +18,7 @@ import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
+import { longToolInTheCall } from '../../../lib/backgroundRuns/tools';
 import { variantOf } from '../../../lib/clients';
 import {
   createAbapConnection,
@@ -165,10 +166,14 @@ describe.each(Object.entries(REGISTRIES))(
           .map((definition) => definition.name)
           .sort((a, b) => a.localeCompare(b)),
       );
+      // A listed long tool as a plain registration hands it out: without
+      // background runs, it answers in the call (`longToolInTheCall`).
       const described = new Map(
         definitions.map((definition) => [
           definition.name,
-          definition.description,
+          isLongTool(definition.name)
+            ? longToolInTheCall(definition).description
+            : definition.description,
         ]),
       );
       for (const tool of plain) {

@@ -146,6 +146,8 @@ export interface LongStand {
   call(name: string, args: Record<string, unknown>): Promise<CallAnswer>;
   /** The input properties the server lists for `name`. */
   inputs(name: string): Promise<string[]>;
+  /** The description the server lists for `name`. */
+  described(name: string): Promise<string>;
   close(): Promise<void>;
 }
 
@@ -218,6 +220,10 @@ export async function longStand(
           timeout: 120_000,
         })
         .then((answer) => answer as CallAnswer),
+    described: async (name) => {
+      const listed = await client.listTools();
+      return listed.tools.find((t) => t.name === name)?.description ?? '';
+    },
     inputs: async (name) => {
       const listed = await client.listTools();
       const tool = listed.tools.find((t) => t.name === name);

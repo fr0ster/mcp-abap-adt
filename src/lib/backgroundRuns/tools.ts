@@ -14,6 +14,7 @@
 
 import * as z from 'zod';
 import type { ToolDefinition } from '../handlers/interfaces.js';
+import { LONG_TOOL_ADVICE, LONG_TOOL_IN_CALL_ADVICE } from '../longTools';
 import { child } from '../xml/tree';
 
 /** The tools that take `background`, with the names of the tools that read and discard their runs. */
@@ -102,6 +103,36 @@ export function withoutBackgroundParameter(
       },
     }),
   };
+}
+
+/**
+ * A listed long tool as a listing without background runs hands it out:
+ * without `background`, its description — on every variant — saying it
+ * answers its result in the call.
+ */
+export function longToolInTheCall(definition: ToolDefinition): ToolDefinition {
+  const stripped = withoutBackgroundParameter(definition);
+  const { variants } = stripped;
+  return {
+    ...stripped,
+    description: inTheCallWords(stripped.description),
+    ...(variants !== undefined && {
+      variants: {
+        onprem: {
+          ...variants.onprem,
+          description: inTheCallWords(variants.onprem.description),
+        },
+        cloud: {
+          ...variants.cloud,
+          description: inTheCallWords(variants.cloud.description),
+        },
+      },
+    }),
+  };
+}
+
+function inTheCallWords(description: string): string {
+  return description.split(LONG_TOOL_ADVICE).join(LONG_TOOL_IN_CALL_ADVICE);
 }
 
 function schemaWithoutBackground(

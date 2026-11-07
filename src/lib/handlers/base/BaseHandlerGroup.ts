@@ -5,9 +5,9 @@ import { ServerRefusal } from '../../auth/serverRefusal.js';
 import {
   BACKGROUND_INVALID_WORDS,
   isBackgroundTool,
+  longToolInTheCall,
   readBackground,
   withoutBackground,
-  withoutBackgroundParameter,
 } from '../../backgroundRuns/tools.js';
 import { listedTool, statedEnvironment } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
@@ -96,7 +96,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     // tool is listed without `background` and answers in the call.
     const listed = listedTool(
       isLongTool(entry.toolDefinition.name)
-        ? withoutBackgroundParameter(entry.toolDefinition)
+        ? longToolInTheCall(entry.toolDefinition)
         : entry.toolDefinition,
       this.statedSystemType(),
     );

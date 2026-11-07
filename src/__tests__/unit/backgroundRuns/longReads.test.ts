@@ -414,6 +414,95 @@ describe('a long read in the background', () => {
   });
 });
 
+/**
+ * An embedder's asynchronous strategy whose `get` reads the store at once
+ * and answers when the case lets it go: a read it answers may be stale.
+ */
+class LateGetRuns extends RecordingRuns {
+  private gate: Promise<void> | undefined;
+  /** The next `get` answers only once `release()` is called. */
+  holdNextGet(): () => void {
+    let release: () => void = () => {};
+    this.gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return release;
+  }
+  /** Whether the held `get` has not been called yet. */
+  holding(): boolean {
+    return this.gate !== undefined;
+  }
+  lateGet(
+    handle: string,
+    caller: BackgroundRunCaller,
+  ):
+    | Promise<BackgroundRunRecord | undefined>
+    | BackgroundRunRecord
+    | undefined {
+    const read = super.get(handle, caller);
+    const gate = this.gate;
+    if (gate === undefined) return read;
+    this.gate = undefined;
+    return gate.then(() => read);
+  }
+}
+
+/** `LateGetRuns` as the server sees it: its `get` is the late one. */
+function lateStrategy(runs: LateGetRuns): IBackgroundRuns {
+  return {
+    start: (caller, run) => runs.start(caller, run),
+    finish: (handle, answer, at) => runs.finish(handle, answer, at),
+    get: (handle, caller) => runs.lateGet(handle, caller),
+    list: (caller) => runs.list(caller),
+    discard: (handle, caller) => runs.discard(handle, caller),
+  };
+}
+
+describe('a strategy whose get answers late', () => {
+  let runs: LateGetRuns;
+
+  beforeEach(async () => {
+    runs = new LateGetRuns();
+    stand = await backgroundStand(lateStrategy(runs));
+  });
+
+  it('a discard whose get answered running after the cancel kept cancelled reads the store again and acts on the fresh state', async () => {
+    const held = stand.standIn.hold(isSqlRead);
+    const handle = handleOf(await stand.a.call('GetSqlQuery', SQL));
+    await held.arrived;
+    // The second discard's read of the store answers late: it read running.
+    const release = runs.holdNextGet();
+    const late = stand.a.call('DiscardBackgroundRun', { run_handle: handle });
+    await until(() => !runs.holding());
+    const first = await stand.a.call('DiscardBackgroundRun', {
+      run_handle: handle,
+    });
+    expect(first.payload).toEqual({ run_handle: handle, state: 'cancelled' });
+    release();
+    const second = await late;
+    expect(second.isError).toBe(false);
+    expect(second.payload).toEqual({ run_handle: handle, state: 'discarded' });
+    expect(runs.finished.map((f) => f.handle)).toEqual([handle]);
+    held.release();
+    await until(readsSettled);
+  });
+
+  it('a discard whose get answered running after the run finished reads the store again and removes its answer', async () => {
+    const held = stand.standIn.hold(isSqlRead);
+    const handle = handleOf(await stand.a.call('GetSqlQuery', SQL));
+    await held.arrived;
+    const release = runs.holdNextGet();
+    const late = stand.a.call('DiscardBackgroundRun', { run_handle: handle });
+    await until(() => !runs.holding());
+    held.release();
+    await until(async () => (await listed(stand.a, handle)) === 'finished');
+    release();
+    const answer = await late;
+    expect(answer.isError).toBe(false);
+    expect(answer.payload).toEqual({ run_handle: handle, state: 'discarded' });
+  });
+});
+
 describe('the owner of the running runs', () => {
   beforeEach(async () => {
     stand = await backgroundStand();

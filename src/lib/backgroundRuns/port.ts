@@ -110,11 +110,21 @@ export function backgroundRunTools(
       }
       if (record.state === 'running') {
         const control = controls.control(handle);
-        if (!isReadRun(record.tool) || control?.kind !== 'read') {
-          throw new ServerRefusal('background_run_running');
-        }
-        if ((await control.cancel()) === 'cancelled') {
-          return { run_handle: handle, state: 'cancelled' };
+        if (isReadRun(record.tool) && control?.kind === 'read') {
+          if ((await control.cancel()) === 'cancelled') {
+            return { run_handle: handle, state: 'cancelled' };
+          }
+        } else {
+          // No control to cancel through: the store's answer may be older
+          // than the run's end (an asynchronous strategy). Read it again and
+          // act on the fresh state; still running is refused, nothing sent.
+          const fresh = await strategy.get(handle, who);
+          if (fresh === undefined) {
+            throw new ServerRefusal('background_run_not_available');
+          }
+          if (fresh.state === 'running') {
+            throw new ServerRefusal('background_run_running');
+          }
         }
       }
       const outcome = await strategy.discard(handle, who);

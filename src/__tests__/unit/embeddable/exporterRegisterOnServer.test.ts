@@ -382,6 +382,38 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
  * (`registerHandlersOnCall`), on the compact group that has a run mode.
  */
 describe('registerHandlersOnCall (the path registerOnServer registers by)', () => {
+  it.each(['onprem', 'cloud'] as const)(
+    'on %s every compact long tool is listed answering in the call',
+    async (systemType) => {
+      const server = new McpServer({ name: 'per-call', version: '1.0.0' });
+      new CompactReadOnlyHandlersGroup({
+        ...noConnectionContext(),
+        systemType,
+      }).registerHandlersOnCall(server, async () => ({
+        connection: countingConnection('document', undefined).connection,
+        logger: silentLogger,
+        systemType,
+      }));
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.listTools();
+        const long = tools.filter((t) => isLongTool(t.name));
+        expect(long.length).toBeGreaterThan(3);
+        for (const tool of long) {
+          expect({
+            tool: tool.name,
+            handle: (tool.description ?? '').includes('run_handle'),
+            inCall: (tool.description ?? '').includes(
+              'Runs on an ABAP session of its own and answers its result in the call.',
+            ),
+          }).toEqual({ tool: tool.name, handle: false, inCall: true });
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
   it('lists HandlerGet without background, and a run mode runs in the call on the call context', async () => {
     let asked = 0;
     const counting = countingConnection('document', undefined);
@@ -404,6 +436,10 @@ describe('registerHandlersOnCall (the path registerOnServer registers by)', () =
       expect(Object.keys(get?.inputSchema.properties ?? {})).not.toContain(
         'background',
       );
+      expect(get?.description ?? '').toContain(
+        'Runs on an ABAP session of its own and answers its result in the call.',
+      );
+      expect(get?.description ?? '').not.toContain('run_handle');
     } finally {
       await client.close();
     }

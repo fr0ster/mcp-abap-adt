@@ -3,7 +3,10 @@ import type { Logger } from '@mcp-abap-adt/logger';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import { ServerRefusal } from '../auth/serverRefusal.js';
-import { withoutBackgroundParameter } from '../backgroundRuns/tools.js';
+import {
+  longToolInTheCall,
+  withoutBackgroundParameter,
+} from '../backgroundRuns/tools.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -236,9 +239,7 @@ export class HandlerExporter {
             isLongTool(entry.toolDefinition.name)
               ? {
                   ...entry,
-                  toolDefinition: withoutBackgroundParameter(
-                    entry.toolDefinition,
-                  ),
+                  toolDefinition: longToolInTheCall(entry.toolDefinition),
                 }
               : entry,
           ),

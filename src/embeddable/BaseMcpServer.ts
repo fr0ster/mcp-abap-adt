@@ -46,11 +46,11 @@ import {
   BACKGROUND_INVALID_WORDS,
   backgroundObjectOf,
   isBackgroundTool,
+  longToolInTheCall,
   readBackground,
   readObjectOf,
   runToolsOf,
   withoutBackground,
-  withoutBackgroundParameter,
 } from '../lib/backgroundRuns/tools.js';
 import {
   type BatchAvailability,
@@ -1451,7 +1451,7 @@ export abstract class BaseMcpServer extends McpServer {
           }
           const listed = listedTool(
             this.longToolsInTheCall.has(name)
-              ? withoutBackgroundParameter(entry.toolDefinition)
+              ? longToolInTheCall(entry.toolDefinition)
               : entry.toolDefinition,
             environment,
           );

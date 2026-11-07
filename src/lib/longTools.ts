@@ -97,6 +97,14 @@ export const BACKGROUND_NOT_FOR_RUN_WORDS =
 export const LONG_TOOL_ADVICE =
   'Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.';
 
+/**
+ * The words a listed tool's description carries where it is listed without
+ * `background` (no strategy, or no tool reading the runs): it answers in
+ * the call.
+ */
+export const LONG_TOOL_IN_CALL_ADVICE =
+  'Runs on an ABAP session of its own and answers its result in the call.';
+
 /** The `background` property of a listed full tool. */
 export const LONG_BACKGROUND_DESCRIPTION =
   'Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.';

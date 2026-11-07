@@ -22,7 +22,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
-import { withoutBackgroundParameter } from '../../../src/lib/backgroundRuns/tools';
+import { longToolInTheCall } from '../../../src/lib/backgroundRuns/tools';
 import { createAdtClient } from '../../../src/lib/clients';
 import { createAbapConnection } from '../../../src/lib/connectionFactory';
 import type {
@@ -855,7 +855,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
     expect(wrapped.map((e) => e.toolDefinition)).toEqual(
       raw.map((e) =>
         isLongTool(e.toolDefinition.name)
-          ? withoutBackgroundParameter(e.toolDefinition)
+          ? longToolInTheCall(e.toolDefinition)
           : e.toolDefinition,
       ),
     );

@@ -12,6 +12,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
 import { type PhaseResult, runPhaseOutcome } from '../batch/phases';
 import { createAdtClient } from '../clients';
@@ -41,19 +42,41 @@ export interface SourceUnit {
   /** The source's identity in the call (`sourceReadKey`): the same for every object that names it. */
   source: string;
   /**
-   * The function module whose main source this is (DO18): it is its own scan
-   * object, named by the module and the group it is addressed under. Absent
-   * for every other source, which belongs to the object read.
+   * The object of a function group this source is (DO18, DO27): a module or
+   * an include the group lists, its own scan object, named by its ADT code
+   * and its name (and the group, when addressed under it). Absent for every
+   * other source, which belongs to the object read.
    */
-  module?: FunctionModuleOwner | undefined;
+  member?: GroupMember | undefined;
   /** Whether this is the last source the object's reads name: none follows it. */
   last: boolean;
 }
 
-/** A function module as its own scan object: its name and its group. */
-export interface FunctionModuleOwner {
-  name: string;
-  group: string;
+/**
+ * A source a function group lists, as its own scan object (DO27): a module
+ * (`FUGR/FF`) or an include addressed under the group (`FUGR/I`), each with
+ * the group; an include addressed under `/programs/includes/` (`PROG/I`).
+ */
+export type GroupMember =
+  | {
+      object_type: AdtCodes<'FUGR/FF' | 'FUGR/I'>;
+      name: string;
+      group: string;
+    }
+  | { object_type: AdtCodes<'PROG/I'>; name: string };
+
+/** The member of a group a read of its structure names: by the reader. */
+function memberOf(read: SourceRead): GroupMember | undefined {
+  switch (read.reader) {
+    case 'functionModule':
+      return { object_type: 'FUGR/FF', name: read.name, group: read.group };
+    case 'functionInclude':
+      return { object_type: 'FUGR/I', name: read.name, group: read.group };
+    case 'include':
+      return { object_type: 'PROG/I', name: read.name };
+    default:
+      return undefined;
+  }
 }
 
 export type { FugrChild };
@@ -244,6 +267,7 @@ async function* readOne(
   read: SourceRead,
   unitName: string,
   last: boolean,
+  member: GroupMember | undefined,
 ): AsyncGenerator<SourceUnit> {
   const place: SapAnswerPlace = {
     kind: 'source',
@@ -268,10 +292,7 @@ async function* readOne(
     include: unitName,
     lines: linesOf(text),
     source: sourceReadKey(read),
-    module:
-      read.reader === 'functionModule'
-        ? { name: read.name, group: read.group }
-        : undefined,
+    member,
     last,
   };
 }
@@ -309,7 +330,7 @@ function segmentAfter(path: string, marker: string): string | undefined {
  * (`…/programs/includes/<i>`). Any other address (a screen, a GUI status or
  * title: `/sap/bc/adt/vit/wb/…`) has no source. A node without `objecturi`
  * is read by its type: `FUGR/FF` a function module of the group, `FUGR/I`
- * an include by its name.
+ * an include of the group, through the function include reader (DO27).
  */
 function fugrSourceOf(
   group: string,
@@ -363,7 +384,12 @@ function fugrSourceOf(
   if (code === 'FUGR/I') {
     return {
       kind: 'include',
-      read: { reader: 'include', name: node.objectname, version },
+      read: {
+        reader: 'functionInclude',
+        group,
+        name: node.objectname,
+        version,
+      },
     };
   }
   return undefined;
@@ -423,6 +449,7 @@ export async function* readSourceUnits(
       { reader: own, name: target.object_name, version },
       target.object_name,
       own !== 'class',
+      undefined,
     );
     if (own === 'class') {
       for (const [at, include] of CLASS_INCLUDES.entries()) {
@@ -438,6 +465,7 @@ export async function* readSourceUnits(
           },
           include,
           at === CLASS_INCLUDES.length - 1,
+          undefined,
         );
       }
     }
@@ -480,6 +508,7 @@ export async function* readSourceUnits(
       source.read,
       source.read.name,
       at === ordered.length - 1,
+      memberOf(source.read),
     );
   }
 }

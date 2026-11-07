@@ -63,7 +63,10 @@ function bigGroup(): Repository {
       },
     },
     sources: Object.fromEntries(
-      includes.map((name) => [`INCLUDE ${name}`, `* ${name}\nDATA marker.`]),
+      includes.map((name) => [
+        `FINCLUDE ZFG_BIG/${name}`,
+        `* ${name}\nDATA marker.`,
+      ]),
     ),
     fugrChildren: { ZFG_BIG: includes.map((name) => ['FUGR/I', name]) },
     masks: {},
@@ -98,7 +101,7 @@ function twoChunks(): Repository {
       ...first.sources,
       'PROGRAM ZB_P1': 'REPORT zb_p1. " marker',
       'PROGRAM ZB_P2': 'REPORT zb_p2. " marker',
-      'INCLUDE LZFG_BTOP': 'DATA marker.',
+      'FINCLUDE ZFG_B/LZFG_BTOP': 'DATA marker.',
     },
     fugrChildren: { ZFG_B: [['FUGR/I', 'LZFG_BTOP']] },
     masks: {},

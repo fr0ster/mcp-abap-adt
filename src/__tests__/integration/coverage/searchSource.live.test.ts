@@ -222,35 +222,28 @@ async function hitLine(hit: unknown): Promise<string> {
           end_line: line,
         }),
       );
-    case 'FUGR': {
-      const asFunctionInclude = await livePrepare('GetFunctionInclude', {
-        function_group_name: name,
-        include_name: include,
-        part: 'source',
-        start_line: line,
-        end_line: line,
-      });
-      if (!asFunctionInclude.isError) {
-        return sourceOf('GetFunctionInclude', asFunctionInclude);
-      }
+    case 'FUGR/I':
       return sourceOf(
-        'GetInclude',
-        await livePrepare('GetInclude', {
-          include_name: include,
+        'GetFunctionInclude',
+        await livePrepare('GetFunctionInclude', {
+          function_group_name: member(hit, 'function_group_name'),
+          include_name: name,
           part: 'source',
           start_line: line,
           end_line: line,
         }),
       );
-    }
-    case 'PROG': {
-      const asProgram = await livePrepare('GetProgram', {
-        program_name: name,
-        part: 'source',
-        start_line: line,
-        end_line: line,
-      });
-      if (!asProgram.isError) return sourceOf('GetProgram', asProgram);
+    case 'PROG':
+      return sourceOf(
+        'GetProgram',
+        await livePrepare('GetProgram', {
+          program_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    case 'PROG/I':
       return sourceOf(
         'GetInclude',
         await livePrepare('GetInclude', {
@@ -260,7 +253,6 @@ async function hitLine(hit: unknown): Promise<string> {
           end_line: line,
         }),
       );
-    }
     case 'CLAS':
       switch (include) {
         case 'definitions':
@@ -386,7 +378,7 @@ function scanned(payload: unknown, counter: string): unknown {
   return member(member(payload, 'scanned'), counter);
 }
 
-/** The distinct objects of hits: a module and its group count apart. */
+/** The distinct objects of hits: each module and include of a group counts apart. */
 function objectsOf(results: readonly unknown[]): number {
   return new Set(
     results.map(

@@ -183,7 +183,7 @@ describe('readSourceUnits', () => {
     ]);
   });
 
-  it('FUGR without objecturi reads FUGR/FF as function modules and FUGR/I as includes, nothing else', async () => {
+  it('FUGR without objecturi reads FUGR/FF as function modules and FUGR/I as function includes of the group (DO27), nothing else', async () => {
     const structure: FugrChild[] = [
       { objecttype: 'FUGR/I', objectname: 'LZ_FGTOP' },
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_A' },
@@ -195,7 +195,7 @@ describe('readSourceUnits', () => {
     ];
     const { deps, calls } = makeDeps({ structure });
     await collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers));
-    expect(calls).toEqual(['FM:Z_FG/Z_FM_A', 'INC:LZ_FGTOP']);
+    expect(calls).toEqual(['FM:Z_FG/Z_FM_A', 'FINC:Z_FG/LZ_FGTOP']);
   });
 
   it('the structure is read through the objectStructure strategy: every FUGR node with its objecturi', async () => {

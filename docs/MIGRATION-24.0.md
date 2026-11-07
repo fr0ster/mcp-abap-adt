@@ -283,9 +283,19 @@ in one run, answers only the hits with counters of what it did, and skips what i
 - **A hit in a function module is the module's own object.** It names the module: `object_type`
   `FUGR/FF`, `object_name` the module, `function_group_name` its group, and no `include` — read
   it with `GetFunctionModule` (`function_module_name` = `object_name`, `function_group_name`),
-  where 23.x answered it as the group's hit with the module in `include`. A hit in the group's own
-  includes stays the group's (`FUGR`, `include`). The group and its modules are counted apart,
-  and each has its own `max_hits_per_object`.
+  where 23.x answered it as the group's hit with the module in `include`. Each module is counted
+  apart from its group, with its own `max_hits_per_object`.
+- **A hit's `object_type` names its read tool** (DO27). A program include's hit is `PROG/I` —
+  read it with `GetInclude` (`include_name` = `object_name`); a program's stays `PROG`
+  (`GetProgram`). A function group's include is its own object: a hit in an include the group
+  addresses under itself (or lists as `FUGR/I` without an address) is `FUGR/I`, `object_name`
+  the include, `function_group_name` its group and no `include` — read it with
+  `GetFunctionInclude` (`function_group_name`, `include_name` = `object_name`); a hit in an
+  include the group lists under `/programs/includes/` is `PROG/I`. 23.x answered both as the
+  group's hit (`FUGR`, the include in `include`). A group include is counted apart from its group
+  in `scanned.objects` / `scanned.objects_with_hits`, with its own `max_hits_per_object`
+  allowance and capped flag (it shared the group's). `object_types: ['PROG']` and `['FUGR']`
+  select as before.
 - **New, nothing to do:** without them the answer is the hits with lines and snippets. To keep a
   large answer small, pass `answer: 'objects'` (one entry per object and include with its number
   of hits) or `'lines'` (no snippets), `max_hits` (the scan stops once the answer holds that many;

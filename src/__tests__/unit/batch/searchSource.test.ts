@@ -75,8 +75,8 @@ const SOURCES: Record<string, string> = {
   'PROGRAM ZPROG_B': 'REPORT zprog_b.',
   'PROGRAM ZPROG_O': "REPORT zprog_o.\nWRITE 'marker'.",
   'CLASS ZCL_A': 'CLASS zcl_a DEFINITION.\n" marker\nENDCLASS.',
-  'INCLUDE LZFG_ATOP': 'FUNCTION-POOL zfg_a.\nDATA marker TYPE i.',
-  'INCLUDE LZFG_AUXX': 'INCLUDE lzfg_au01.',
+  'FINCLUDE ZFG_A/LZFG_ATOP': 'FUNCTION-POOL zfg_a.\nDATA marker TYPE i.',
+  'FINCLUDE ZFG_A/LZFG_AUXX': 'INCLUDE lzfg_au01.',
   'FM Z_FM_A': 'FUNCTION z_fm_a.\n  marker = 1.\nENDFUNCTION.',
   'FM VIEWFRAME_ZFG': 'FUNCTION viewframe_zfg.\nENDFUNCTION.',
 };
@@ -134,17 +134,18 @@ describe('SearchSource on internal batches', () => {
     expect(textOf(a)).toBe(textOf(b));
     expect(hitNames(a)).toEqual([
       'ZPROG_O/ZPROG_O',
-      'ZFG_A/LZFG_ATOP',
+      'LZFG_ATOP@ZFG_A',
       'ZPROG_A/ZPROG_A',
       'ZPROG_A/ZPROG_A',
       'Z_FM_A@ZFG_A',
       'ZCL_A/ZCL_A',
     ]);
-    // ZPROG_B and the module VIEWFRAME_ZFG have no hit: they are not
-    // listed, and they count as read; the group and its modules count apart.
+    // ZPROG_B, the module VIEWFRAME_ZFG and the include LZFG_AUXX have no
+    // hit: they are not listed, and they count as read; the group's modules
+    // and includes each count as an object (DO18, DO27).
     expect(payloadOf(a).no_hits).toBeUndefined();
     expect(payloadOf(a).scanned).toEqual({
-      objects: 7,
+      objects: 8,
       sources: 8,
       objects_with_hits: 5,
     });
@@ -190,8 +191,8 @@ describe('SearchSource on internal batches', () => {
       [
         'FM VIEWFRAME_ZFG',
         'FM Z_FM_A',
-        'INCLUDE LZFG_ATOP',
-        'INCLUDE LZFG_AUXX',
+        'FINCLUDE ZFG_A/LZFG_ATOP',
+        'FINCLUDE ZFG_A/LZFG_AUXX',
       ],
     ]);
   });
@@ -228,7 +229,7 @@ describe('SearchSource on internal batches', () => {
     expect(payload.failures).toBeUndefined();
     expect(hitNames(result)).toEqual([
       'ZPROG_O/ZPROG_O',
-      'ZFG_A/LZFG_ATOP',
+      'LZFG_ATOP@ZFG_A',
       'Z_FM_A@ZFG_A',
       'ZCL_A/ZCL_A',
     ]);
@@ -237,10 +238,10 @@ describe('SearchSource on internal batches', () => {
   });
 
   it('a 404 on a source the structure listed is skipped, as on the sequential path', async () => {
-    const model = { refuse: { 'INCLUDE LZFG_ATOP': 404 } };
+    const model = { refuse: { 'FINCLUDE ZFG_A/LZFG_ATOP': 404 } };
     const result = await search(system(model));
     expect(payloadOf(result).failures).toBeUndefined();
-    expect(hitNames(result)).not.toContain('ZFG_A/LZFG_ATOP');
+    expect(hitNames(result)).not.toContain('LZFG_ATOP@ZFG_A');
     const sequential = await search(system(model), {}, true);
     expect(textOf(result)).toBe(textOf(sequential));
   });

@@ -123,17 +123,17 @@ describe('runSearchSource', () => {
   });
 
   it('probes later source units and flips truncated.by_object_cap when matches are omitted after the per-object budget is filled', async () => {
-    // Two includes of one function group: one object, one allowance.
+    // A class: its main source fills the allowance, a later local include
+    // is probed and sets the cap.
     const deps: OrchestratorDeps = {
       lineMatch: substringLineMatch,
       sapAnswers: skipSapAnswers,
       fetchPackageContents: pkg([
-        { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
+        { name: 'ZCL_A', type: 'CLAS/OC', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
-        'FUGRSTR:Z_FG': 'FUGR/I|LZ_A\nFUGR/I|LZ_B',
-        'INC:LZ_A': 'marker 1',
-        'INC:LZ_B': 'marker 2',
+        'CLAS:ZCL_A': 'marker 1',
+        'CLASINC:ZCL_A/definitions': 'marker 2',
       }),
       resolvePackages: identityResolver,
     };
@@ -143,6 +143,31 @@ describe('runSearchSource', () => {
     });
     expect(result.results).toHaveLength(1);
     expect(result.truncated.by_object_cap).toBe(true);
+  });
+
+  it('two includes of one group each have their own allowance (DO27)', async () => {
+    const deps: OrchestratorDeps = {
+      lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
+      fetchPackageContents: pkg([
+        { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'FUGRSTR:Z_FG': 'FUGR/I|LZ_A\nFUGR/I|LZ_B',
+        'FINC:Z_FG/LZ_A': 'marker 1',
+        'FINC:Z_FG/LZ_B': 'marker 2',
+      }),
+      resolvePackages: identityResolver,
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      max_hits_per_object: 1,
+    });
+    expect(result.results.map((h) => [h.object_type, h.object_name])).toEqual([
+      ['FUGR/I', 'LZ_A'],
+      ['FUGR/I', 'LZ_B'],
+    ]);
+    expect(result.truncated.by_object_cap).toBe(false);
   });
 
   it('two function modules of one group each have their own allowance (DO18)', async () => {

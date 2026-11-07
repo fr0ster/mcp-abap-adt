@@ -26,6 +26,7 @@ import {
   enumerateScanTargets,
   type PackageContentsFetcher,
   SCAN_OBJECT_TYPES,
+  type ScanCode,
   type ScanObjectType,
 } from './packageEnumerator';
 import {
@@ -45,6 +46,7 @@ import {
 import {
   answeredReaderDeps,
   createSourceReaderDeps,
+  type GroupMember,
   noAnsweredReads,
   type Read,
   type ReadSourceUnitsDeps,
@@ -75,10 +77,30 @@ export interface OrchestratorInput {
   version?: SourceVersion;
 }
 
+/**
+ * The type a hit of a scanned object is answered under: its main type, or
+ * its ADT code where the main type is read by two tools (DO27): a program
+ * `PROG`, a program include `PROG/I`.
+ */
+export type ObjectHitType = ScanObjectType | AdtCodes<'PROG/I'>;
+
+/** A hit's type by the code its object was listed under. */
+const HIT_TYPE_OF: Readonly<Record<ScanCode, ObjectHitType>> = {
+  'PROG/P': 'PROG',
+  'PROG/I': 'PROG/I',
+  'CLAS/OC': 'CLAS',
+  'INTF/OI': 'INTF',
+  'FUGR/F': 'FUGR',
+  'DDLS/DF': 'DDLS',
+  'BDEF/BDO': 'BDEF',
+  'DDLX/EX': 'DDLX',
+  'SRVD/SRV': 'SRVD',
+};
+
 /** A hit in a source of a scanned object: its include names the source. */
 export interface ObjectHit {
   devclass: string;
-  object_type: ScanObjectType;
+  object_type: ObjectHitType;
   object_name: string;
   include: string;
   line: number;
@@ -86,36 +108,31 @@ export interface ObjectHit {
 }
 
 /**
- * The ADT code a function module is answered under (DO18, measured on
- * premise: the quick search and the group's node structure name a module
- * `FUGR/FF`).
+ * A hit in a module or an include addressed under a function group, its own
+ * object (DO18, DO27), answered under its ADT code (`FUGR/FF`, `FUGR/I`, as
+ * the group's node structure names them): its name and its group — what
+ * `GetFunctionModule` and `GetFunctionInclude` take —, no include.
  */
-export const FUNCTION_MODULE_TYPE: AdtCodes<'FUGR/FF'> = 'FUGR/FF';
-
-/**
- * A hit in a function module, its own object (DO18): the module's name and
- * its group — what `GetFunctionModule` takes —, no include.
- */
-export interface FunctionModuleHit {
+export interface GroupMemberHit {
   devclass: string;
-  object_type: typeof FUNCTION_MODULE_TYPE;
+  object_type: AdtCodes<'FUGR/FF' | 'FUGR/I'>;
   object_name: string;
   function_group_name: string;
   line: number;
   snippet: string;
 }
 
-export type SearchHit = ObjectHit | FunctionModuleHit;
+export type SearchHit = ObjectHit | GroupMemberHit;
 
 /** A hit answered at the `lines` level: no snippet. */
 export type LineHit =
   | Omit<ObjectHit, 'snippet'>
-  | Omit<FunctionModuleHit, 'snippet'>;
+  | Omit<GroupMemberHit, 'snippet'>;
 
 /** One object and include with hits, at the `objects` level: the hits answered for it. */
 export type ObjectEntry =
   | (Omit<ObjectHit, 'line' | 'snippet'> & { hits: number })
-  | (Omit<FunctionModuleHit, 'line' | 'snippet'> & { hits: number });
+  | (Omit<GroupMemberHit, 'line' | 'snippet'> & { hits: number });
 
 /** The hits as the level asks them. */
 function answeredAs(
@@ -190,7 +207,7 @@ const DEFAULTS = {
   version: DEFAULT_VERSION,
 };
 
-/** A hit's include, for the order of the answer: a module's hit has none. */
+/** A hit's include, for the order of the answer: a group member's hit has none. */
 function includeOf(hit: SearchHit): string {
   return 'include' in hit ? hit.include : '';
 }
@@ -304,11 +321,14 @@ export async function runSearchSource(
       if (stopped) return;
       const target = targets[index];
       if (target === undefined) return;
-      // Each object of the target its own bookkeeping (DO18): the target
-      // itself, and every function module read under it.
+      // Each object of the target its own bookkeeping (DO18, DO27): the
+      // target itself, and every module and include read under it.
       const objects = new Map<string, ObjectAnswer>();
       const objectOf = (unit: SourceUnit): ObjectAnswer => {
-        const key = unit.module === undefined ? '' : unit.module.name;
+        const key =
+          unit.member === undefined
+            ? ''
+            : `${unit.member.object_type}|${unit.member.name}`;
         const found = objects.get(key);
         if (found !== undefined) return found;
         const created: ObjectAnswer = {
@@ -320,28 +340,43 @@ export async function runSearchSource(
         objects.set(key, created);
         return created;
       };
-      const hitOf = (
-        unit: SourceUnit,
+      const memberHit = (
+        member: GroupMember,
         line: number,
         snippet: string,
       ): SearchHit =>
-        unit.module === undefined
+        member.object_type === 'PROG/I'
           ? {
               devclass: target.devclass,
-              object_type: target.object_type,
-              object_name: target.object_name,
-              include: unit.include,
+              object_type: member.object_type,
+              object_name: member.name,
+              include: member.name,
               line,
               snippet,
             }
           : {
               devclass: target.devclass,
-              object_type: FUNCTION_MODULE_TYPE,
-              object_name: unit.module.name,
-              function_group_name: unit.module.group,
+              object_type: member.object_type,
+              object_name: member.name,
+              function_group_name: member.group,
               line,
               snippet,
             };
+      const hitOf = (
+        unit: SourceUnit,
+        line: number,
+        snippet: string,
+      ): SearchHit =>
+        unit.member === undefined
+          ? {
+              devclass: target.devclass,
+              object_type: HIT_TYPE_OF[target.code],
+              object_name: target.object_name,
+              include: unit.include,
+              line,
+              snippet,
+            }
+          : memberHit(unit.member, line, snippet);
 
       // A source that cannot be read is skipped by the reader and its other
       // sources are read on; any other outcome of a failed read leaves the

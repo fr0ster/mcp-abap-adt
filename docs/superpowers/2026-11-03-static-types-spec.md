@@ -461,12 +461,15 @@ on-premise system disagree, the live measurement holds.
   versions, failures, dedup, description) needs no SAP; D23b (masks, text search) is
   measurement-first and owed until the systems are restored.
 - **Long tools (owner, 2026-11-07, plan D24):** no server-side deadline remains — `timeout` is
-  removed from every listed long tool and `SearchSource`'s `time_budget_ms` with it; every
+  removed from every listed long tool (`SearchSource`'s `time_budget_ms` and `timeout` were already
+  removed in D23a); every
   long tool runs on its own ABAP session, `SearchSource` included; `background` defaults to
   `true` on every long tool (a call answers a `run_handle` at once; `background: false`
   answers in the call) — a breaking change in MIGRATION; the code-running tools keep their
   own `background` default; `DiscardBackgroundRun` cancels a running read run by logging off
-  its session (a running code run is still refused), and the run answers gain `cancelled`. `time_budget_ms` / `timeout` go in D24.
+  its session — the run's one connection held by the instance, `cancelled` final, recorded
+  through the store's existing `finish` (a running code run is still refused) — and the run
+  answers gain `cancelled`. `time_budget_ms` / `timeout` go in D24.
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

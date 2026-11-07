@@ -2684,9 +2684,23 @@ by `DiscardBackgroundRun`. D23 does not touch either field; D24 removes them.
    - compact: `HandlerWhereUsed`, `HandlerSearch`, `HandlerDumpList`, `HandlerGetData`,
      `HandlerProfileView`, `HandlerGet`.
 
-   `SearchSource`'s `time_budget_ms`, a deadline inside the server, goes with them (DO11 is
-   decided by this). `timeoutField`, `TIMEOUT_FIELD`, `withLongToolAdvice` and the timed-out
-   answer are removed wherever nothing uses them any more.
+   `SearchSource`'s `time_budget_ms` and `timeout` are already gone: D23a's commit
+   (`fix(search-source): D23a — …; no deadline`) removed them, which settles DO11. D24 keeps
+   that with a regression check. `timeoutField`, `TIMEOUT_FIELD`, `withLongToolAdvice` and
+   the timed-out answer are removed wherever nothing uses them any more. Their users today
+   (grep at HEAD):
+   - `src/lib/longTools.ts`;
+   - the full long handlers: `handleGetPackageContents`, `handleGetTableContents`,
+     `handleListATCResults`, `handleGetATCResult`, `handleGetATCFindings`,
+     `handleSearchObject`, `handleGetObjectsList`, `handleGetIncludesList`,
+     `handleGetStructuresList`, `handleListTransports`, `handleDescribeByList`,
+     `handleRuntimeGetProfilerTraceData`, `handleGetSqlQuery`,
+     `handleRuntimeAnalyzeProfilerTrace`, `handleGetWhereUsed`, `handleRuntimeListFeeds`,
+     `handleGetObjectInfo`, `handleGetPackageTree`;
+   - compact: `src/lib/compact/compactSchemas.ts`, `compactDescriptions.ts`,
+     `src/lib/compact/index.ts`, and the `compact-readonly-entries` handlers
+     `handleHandlerSearch`, `handleHandlerDumpList`, `handleHandlerGetData`,
+     `handleHandlerProfileView`.
 2. **Every listed long tool keeps its own ABAP session** (`runLongCall`,
    `src/lib/longCall.ts`: its own connection, logged off after the answer). **`SearchSource`
    goes back onto the list.** It left because the list required `timeout`, and so it holds
@@ -2712,23 +2726,65 @@ by `DiscardBackgroundRun`. D23 does not touch either field; D24 removes them.
      a started run still runs to its end: discard refuses it while it runs, as today.
    - The caller check stays: an unknown handle and someone else's handle answer alike, "not
      available".
+   - The compact run tools, `HandlerBackgroundRunGet` and `HandlerBackgroundRunDiscard`, get
+     the same treatment: schemas, descriptions and the cancel tests.
+
+**How the cancel reaches the connection (decided here).**
+- **Ownership, typed.** Today `src/lib/backgroundRuns/run.ts` holds the run's connection only
+  in its closure, and `port.ts` sends a discard to the store, which cannot reach it. From
+  D24 each run has **one execution connection**, held by the **instance's owner** (the
+  `BaseMcpServer` instance, extending its `trackRun`), in a typed map keyed by
+  `run_handle` — never a module global. A long tool in the background runs on that one
+  connection: the background path does **not** nest `runLongCall` (which would open a
+  second one); `runLongCall` is the synchronous path's.
+- **The route.** `DiscardBackgroundRun(handle)`:
+  1. runs the caller check first (`get` through the store for this caller; unknown or foreign
+     → "not available", nothing sent);
+  2. if the run is a running read, the owner logs off that run's connection;
+  3. then cleans up: the map entry goes, and the run's end records `cancelled`.
+
+  A running code run is refused at step 2, nothing sent; a finished run is removed by the
+  store's `discard`, as today.
+- **`cancelled` is final.** Today `run.ts` turns a rejection into an error answer and always
+  calls `strategy.finish`, so a late finish could overwrite a cancel. From D24 the owner marks
+  the run cancelled before the logoff; the run's end calls `finish` exactly once, with the
+  cancelled answer when the mark is set. A rejection or a late answer after the mark changes
+  nothing.
+- **The store contract (`IBackgroundRuns`, `src/lib/backgroundRuns/contract.ts`),** decided
+  statically:
+  - **no new method:** the owner holds the connections and records `cancelled` through the
+    existing `finish`;
+  - **one typed change:** `BackgroundRunAnswer` gains an optional `cancelled?: true`, and
+    `BackgroundRunListing['state']` / the read's state gain `'cancelled'`, derived by the
+    store from a finished answer carrying `cancelled: true` (`InMemoryBackgroundRuns`
+    does so);
+  - **embedders (MIGRATION):** a custom strategy keeps the answer it is given in `finish` (as
+    today) and answers `state: 'cancelled'` for a kept answer with `cancelled: true`; nothing
+    else changes for it.
+- **No strategy.** Today, with no strategy, `background` is refused. **Proposed (to confirm
+  with the owner):** with no strategy, a long tool runs synchronously, as with
+  `background: false`, so a host without a strategy keeps working; the code-running tools
+  stay as today.
 5. **State.** `GetBackgroundRun` answers `running`, `finished` with the answer, or `cancelled`.
    `ListBackgroundRuns` lists the caller's runs with that state. Both answers gain
    `cancelled`.
 
-**Files:** `src/lib/longTools.ts`, `tools/long-handlers.json`,
+**Files:** the helper users listed under decision 1, `src/lib/longTools.ts`, `tools/long-handlers.json`,
 `src/lib/longCall.ts` (`runLongCall`), `src/lib/backgroundRuns/{tools,run,answers,port,contract}.ts`,
 `src/embeddable/BaseMcpServer.ts` (the background branch of the dispatch),
 `src/lib/handlers/base/BaseHandlerGroup.ts`, `src/handlers/system/readonly/handleSearchSource.ts`
 and `src/lib/search-source/orchestrator.ts` (`time_budget_ms`), each long tool's schema,
 `background-runs-memory/src/InMemoryBackgroundRuns.ts` (the `cancelled` state), the
-listed-schema and surface fixtures, `tools/tool-search.json` (generated), `docs/` tool docs,
-CHANGELOG, MIGRATION-24.0.
+the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
+`HandlerBackgroundRunDiscard`), the listed-schema and surface fixtures,
+`tools/tool-search.json` (generated), `docs/` tool docs, `README.md` and the embedder guides
+(`docs/` embedding and background-run pages), CHANGELOG, MIGRATION-24.0.
 
 **Steps (red first):**
 - [ ] **Step 1: Red tests.**
   - `'no long tool declares timeout'`: the listed-schema test, on every binary, for every
-    `LONG_TOOLS` entry; `'SearchSource declares no time_budget_ms'`.
+    `LONG_TOOLS` entry; a regression check that `SearchSource` still declares neither
+    `time_budget_ms` nor `timeout` (removed in D23a).
   - `'SearchSource is a long tool and runs on its own connection'`: it is in `LONG_TOOLS`, and
     on `adtStandIn` its requests go on a session other than the instance's main one, which is
     logged off after the answer; the main-call queue is free while it runs.
@@ -2747,17 +2803,31 @@ CHANGELOG, MIGRATION-24.0.
     running; the discard is refused and nothing is sent.
   - `'an unknown and a foreign handle answer alike'`: Get, List and Discard, for a handle that
     never existed and for another caller's.
-- [ ] **Step 2:** Remove `timeout` (and `time_budget_ms`) from the schemas, handlers and
-  `runLongCall`; remove the timed-out answer and the helpers nothing uses. Put `SearchSource`
-  on the list.
+  - **Which end wins** (on `adtStandIn`, the read held):
+    - `'the logoff makes the in-flight request reject, and the kept state stays cancelled'`;
+    - `'an answer arriving after the cancel does not overwrite it'`;
+    - `'Discard racing the run's completion ends in one state'`: completion first answers
+      `finished` and the discard removes it; discard first answers `cancelled`; `finish` is
+      called once either way.
+  - `'a background long run uses one connection'`: one fresh connection per run, no second
+    from `runLongCall`.
+  - **The contract:** with a custom strategy (a test double implementing `IBackgroundRuns`), the
+    cancel arrives as `finish` with `cancelled: true` and its listing answers `cancelled`;
+    with no strategy, a long tool answers its result in the call (the proposal above, once
+    confirmed).
+  - **Compact:** the same cancel, get and list cases through `HandlerBackgroundRunGet` and
+    `HandlerBackgroundRunDiscard`, and the compact long tools' `background` default.
+- [ ] **Step 2:** Remove `timeout` from the schemas, handlers and `runLongCall` (full and
+  compact, the users listed above); remove the timed-out answer and the helpers nothing
+  uses. Put `SearchSource` back on the list.
 - [ ] **Step 3:** Give every long tool `background`, default `true`, through the existing
   background-run port, keeping the code-running tools' own field and default. The
   background branch of the dispatch runs a long tool on its own session (`runLongCall`), so
   a background read and a synchronous one share one path.
-- [ ] **Step 4:** Extend the run record with `cancelled`, and `DiscardBackgroundRun`:
-  cancel a running read run (log off its session, mark it `cancelled`), remove a finished
-  one, refuse a running code run. `IBackgroundRuns` gains what the cancel needs, typed in
-  the port's contract; `InMemoryBackgroundRuns` implements it.
+- [ ] **Step 4:** The owner's typed run-connection map (`trackRun` extended), the discard route
+  (caller check, logoff, cleanup), the final `cancelled` mark, and the contract change above
+  (`cancelled?: true` on the answer, `'cancelled'` in the state), implemented by
+  `InMemoryBackgroundRuns`.
 - [ ] **Step 5: Descriptions,** functional only:
   - each long tool: "Runs on an ABAP session of its own. By default the call answers at once
     with a run_handle, read with GetBackgroundRun; with background false it answers the
@@ -2774,6 +2844,9 @@ CHANGELOG, MIGRATION-24.0.
     `time_budget_ms`; Added — `background` on every long tool, `cancelled` in the run
     answers; Changed — `DiscardBackgroundRun` cancels a running read; `SearchSource` runs on
     its own session.
+  - MIGRATION-24.0 for embedders: the `IBackgroundRuns` change (`cancelled?: true`, the
+    `'cancelled'` state) and what a custom strategy does with it; the no-strategy behaviour
+    once confirmed.
   - **MIGRATION-24.0, breaking:** today a call to a long tool answers its result directly. From
     24.0.0 a call **without** `background` answers a `run_handle` at once, and the result is
     read with `GetBackgroundRun`. A caller that wants the result in the call passes

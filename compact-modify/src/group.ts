@@ -69,6 +69,11 @@ import {
   TOOL_DEFINITION as HandlerUpdate_Tool,
   handleHandlerUpdate,
 } from './handlers/handleHandlerUpdate';
+import {
+  deleteHeldLockOf,
+  unlockHeldLockOf,
+  updateHeldLockOf,
+} from './handlers/heldLockOf';
 
 /**
  * The entries: each takes the call's context at the call, as the read-only
@@ -77,8 +82,14 @@ import {
 export function compactModifyEntries(): HandlerEntry[] {
   return [
     defineTool(HandlerCreate_Tool, handleHandlerCreate),
-    defineTool(HandlerUpdate_Tool, handleHandlerUpdate),
-    defineTool(HandlerDelete_Tool, handleHandlerDelete),
+    {
+      ...defineTool(HandlerUpdate_Tool, handleHandlerUpdate),
+      heldLockOf: updateHeldLockOf,
+    },
+    {
+      ...defineTool(HandlerDelete_Tool, handleHandlerDelete),
+      heldLockOf: deleteHeldLockOf,
+    },
     defineTool(HandlerActivate_Tool, handleHandlerActivate),
     defineTool(HandlerTransportCreate_Tool, handleHandlerTransportCreate),
     defineTool(
@@ -90,7 +101,10 @@ export function compactModifyEntries(): HandlerEntry[] {
       handleHandlerTransportMoveObjects,
     ),
     defineTool(HandlerLock_Tool, handleHandlerLock),
-    defineTool(HandlerUnlock_Tool, handleHandlerUnlock),
+    {
+      ...defineTool(HandlerUnlock_Tool, handleHandlerUnlock),
+      heldLockOf: unlockHeldLockOf,
+    },
     defineTool(HandlerUnitTestRun_Tool, handleHandlerUnitTestRun),
     defineTool(HandlerProfileSchedule_Tool, handleHandlerProfileSchedule),
     defineTool(HandlerProfileRun_Tool, handleHandlerProfileRun),

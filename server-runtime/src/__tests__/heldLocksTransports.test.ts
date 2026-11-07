@@ -265,12 +265,24 @@ describe.each(TRANSPORTS)('%s', (_transport, standOf) => {
   });
 
   it.each(UNDER_LOCK)(
-    '%s under a handle this instance did not issue is refused with zero requests',
+    '%s under a handle this instance did not issue is refused with zero requests, no logon either',
     async (tool, underLock) => {
       const session = await s.session();
       // The instance holds a lock of its own, so it is connected and kept.
       await lock(session, underLock.lock);
       const before = s.adt.requests.length;
+      const answered = await session.call(tool, underLock.args(FOREIGN));
+      expect(answered.isError).toBe(true);
+      expect(answered.text).toContain(s.notHeld);
+      expect(sent(s.adt.requests.slice(before))).toEqual([]);
+    },
+  );
+
+  it.each(UNDER_LOCK)(
+    '%s under a handle on an instance that has not logged on sends nothing, no logon either',
+    async (tool, underLock) => {
+      const before = s.adt.requests.length;
+      const session = await s.session();
       const answered = await session.call(tool, underLock.args(FOREIGN));
       expect(answered.isError).toBe(true);
       expect(answered.text).toContain(s.notHeld);
@@ -361,17 +373,16 @@ describe("every transport's instance has its own held-lock owner", () => {
         expect(owners).toHaveLength(1);
 
         const second = await s.session();
+        const before = s.adt.requests.length;
         const refused = await second.call('HandlerUpdate', UPDATE(handle));
         expect(refused.isError).toBe(true);
         expect(refused.text).toContain(s.notHeld);
         // An unknown handle gets the same answer as another instance's.
         const unknown = await second.call('HandlerUpdate', UPDATE(FOREIGN));
         expect(unknown).toEqual(refused);
-        expect(
-          s.adt.requests.filter(
-            (r) => r.method === 'PUT' || r.url.includes('_action=UNLOCK'),
-          ),
-        ).toEqual([]);
+        // Refused before a connection is taken: nothing sent, no logon of
+        // the second instance either.
+        expect(sent(s.adt.requests.slice(before))).toEqual([]);
 
         await lock(second, LOCKED);
         expect(owners).toHaveLength(2);

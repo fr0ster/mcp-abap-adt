@@ -141,7 +141,7 @@ import {
   withDestinationSystemContext,
   withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
-import { HeldLocks } from '../lib/state/heldLocks.js';
+import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
   type StateLogger,
@@ -1444,6 +1444,13 @@ export abstract class BaseMcpServer extends McpServer {
                 : undefined;
             if (nothingToEnd !== undefined) {
               return this.refusalAnswer(nothingToEnd);
+            }
+            // A call under a lock handle this instance does not hold is
+            // refused before a connection is taken: nothing is sent, no
+            // logon either — an unknown handle and another instance's alike.
+            const lockHandle = entry.heldLockOf?.(args);
+            if (lockHandle !== undefined && !this.heldLocks.holds(lockHandle)) {
+              return return_error(new Error(lockNotHeldWords(this.heldLocks)));
             }
             try {
               // A run tool's `background` is the wrapper's: read, refused

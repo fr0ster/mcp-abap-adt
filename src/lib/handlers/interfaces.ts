@@ -75,6 +75,13 @@ export interface HandlerEntry<R = unknown> {
    * before any connection is taken (`HandlerBatch`: every action but `end`).
    */
   readonly connectionless?: true | ((args: ToolArgs) => boolean);
+  /**
+   * The lock handle the call would be sent under, read from its arguments
+   * as the SDK parsed them; `undefined` when it is sent under none. The
+   * server refuses a handle its instance does not hold before it takes a
+   * connection, so the refusal sends nothing, no logon included (#4).
+   */
+  readonly heldLockOf?: (args: ToolArgs) => string | undefined;
 }
 
 /**
